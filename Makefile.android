@@ -472,6 +472,9 @@ else
 endif
 
 ifeq ($(HOST_OS),linux)
+    ifeq ($(shell cat /proc/version | tr '[a-z]' '[A-Z]' | grep -o SUSE),SUSE)
+        LOCAL_LDLIBS += -L/usr/X11R6/lib
+    endif
     LOCAL_LDLIBS += -lX11
 endif
 
