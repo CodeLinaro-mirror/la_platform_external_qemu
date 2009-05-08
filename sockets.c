@@ -28,7 +28,7 @@
 #  include <sys/socket.h>
 #  include <netinet/in.h>
 #  include <netinet/tcp.h>
-#  include "../../bionic/libc/include/netdb.h"
+#  include <netdb.h>
 #  if HAVE_UNIX_SOCKETS
 #    include <sys/un.h>
 #    ifndef UNIX_PATH_MAX
@@ -634,7 +634,6 @@ sock_address_init_resolve( SockAddress*  a, const char*  hostname, uint16_t  por
             err = EHOSTDOWN;
             break;
 
-        case EAI_NODATA:
         case EAI_NONAME:
             err = ENOENT;
             break;
