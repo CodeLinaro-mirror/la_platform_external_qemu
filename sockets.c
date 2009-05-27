@@ -31,7 +31,7 @@
 #  include <sys/socket.h>
 #  include <netinet/in.h>
 #  include <netinet/tcp.h>
-#  include <netdb.h>
+#  include "../../bionic/libc/include/netdb.h"
 #  if HAVE_UNIX_SOCKETS
 #    include <sys/un.h>
 #    ifndef UNIX_PATH_MAX
