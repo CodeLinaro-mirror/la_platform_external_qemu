@@ -12,6 +12,7 @@
 #include "sockets.h"
 #include "sysdeps.h"
 #include "qemu-timer.h"
+#include "qemu-char.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #else
@@ -23,7 +24,7 @@
 #include <netdb.h>
 #endif
 
-#define  DEBUG  1
+#define  DEBUG  0
 
 #define  D_ACTIVE  DEBUG
 
@@ -245,9 +246,7 @@ sys_channel_read( SysChannel  channel, void*  buffer, int  size )
     while (len > 0) {
         int  ret = socket_recv(channel->fd, buf, len);
         if (ret < 0) {
-            if (errno == EINTR)
-                continue;
-            if (errno == EWOULDBLOCK)
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
             D( "%s: after reading %d bytes, recv() returned error %d: %s\n",
                 __FUNCTION__, size - len, errno, errno_str);
@@ -272,9 +271,7 @@ sys_channel_write( SysChannel  channel, const void*  buffer, int  size )
     while (len > 0) {
         int  ret = socket_send(channel->fd, buf, len);
         if (ret < 0) {
-            if (errno == EINTR)
-                continue;
-            if (errno == EWOULDBLOCK)
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
             D( "%s: send() returned error %d: %s\n",
                 __FUNCTION__, errno, errno_str);
