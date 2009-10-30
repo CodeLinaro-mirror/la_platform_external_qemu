@@ -1740,7 +1740,7 @@ int main(int argc, char **argv)
     int    shell_serial = 0;
     int    dns_count = 0;
     unsigned  cachePartitionSize = 0;
-    unsigned  defaultPartitionSize = 0x4200000;
+    unsigned  defaultPartitionSize = 0x521d000;
 
     AndroidHwConfig*  hw;
 
