@@ -218,6 +218,8 @@ typedef struct {
 /* the spec says that there can only be a max of 4 contexts */
 #define  MAX_DATA_CONTEXTS  4
 #define  MAX_CALLS          4
+#define  MAX_EMERGENCY_NUMBERS 16
+
 
 #define  A_MODEM_SELF_SIZE   3
 
@@ -276,6 +278,9 @@ typedef struct AModemRec_
     int32_t preferred_mask;
     int subscription_source;
     int roaming_pref;
+    int in_emergency_mode;
+
+    const char *emergency_numbers[MAX_EMERGENCY_NUMBERS];
 } AModemRec;
 
 
@@ -360,7 +365,12 @@ amodem_end_line( AModem  modem )
 #define NV_PREFERRED_MODE                      "preferred_mode"
 #define NV_CDMA_SUBSCRIPTION_SOURCE            "cdma_subscription_source"
 #define NV_CDMA_ROAMING_PREF                   "cdma_roaming_pref"
+#define NV_IN_ECBM                             "in_ecbm"
+#define NV_EMERGENCY_NUMBER                    "emergency_number_%d"
 #define NV_SREGISTER                           "sregister"
+
+#define MAX_KEY_NAME 40
+
 static AConfig *
 amodem_load_nvram( AModem modem )
 {
@@ -373,18 +383,60 @@ amodem_load_nvram( AModem modem )
     }
     return root;
 }
+
+static int
+amodem_read_set_nv_int( AModem modem, const char *nvname, int defval)
+{
+    int value;
+    char strval[MAX_KEY_NAME + 1];
+    char *newvalue;
+
+    value = aconfig_int(modem->nvram, nvname, defval);
+    snprintf(strval, MAX_KEY_NAME, "%d", value);
+    D("Setting value of %s to %d (%s)",nvname, value, strval);
+    newvalue = strdup(strval);
+    if (!newvalue) {
+        newvalue = "";
+    }
+    aconfig_set(modem->nvram, nvname, newvalue);
+
+    return value;
+}
+
+const char *
+amodem_read_set_nv_str( AModem modem, const char *nvname, const char *defval)
+{
+    const char *value;
+
+    value = aconfig_str(modem->nvram, nvname, defval);
+    if (!value && !defval) return NULL;
+    if (!value) value = defval;
+    aconfig_set(modem->nvram, nvname, value);
+
+    return value;
+}
+
 static void
 amodem_reset( AModem  modem )
 {
     const char *tmp;
+    int i;
     modem->nvram = amodem_load_nvram(modem);
     modem->radio_state = A_RADIO_STATE_OFF;
     modem->wait_sms    = 0;
 
-    modem->oper_name_index     = aconfig_int(modem->nvram, NV_OPER_NAME_INDEX, 2);
-    modem->oper_selection_mode = aconfig_int(modem->nvram, NV_SELECTION_MODE, A_SELECTION_AUTOMATIC);
-    modem->oper_index          = aconfig_int(modem->nvram, NV_OPER_INDEX, 0);
-    modem->oper_count          = aconfig_int(modem->nvram, NV_OPER_COUNT, 2);
+    modem->oper_name_index     = amodem_read_set_nv_int(modem, NV_OPER_NAME_INDEX, 2);
+    modem->oper_selection_mode = amodem_read_set_nv_int(modem, NV_SELECTION_MODE, A_SELECTION_AUTOMATIC);
+    modem->oper_index          = amodem_read_set_nv_int(modem, NV_OPER_INDEX, 0);
+    modem->oper_count          = amodem_read_set_nv_int(modem, NV_OPER_COUNT, 2);
+    modem->in_emergency_mode   = amodem_read_set_nv_int(modem, NV_IN_ECBM, 0);
+
+    modem->emergency_numbers[0] = "911";
+    char key_name[MAX_KEY_NAME + 1];
+    for (i = 1; i < MAX_EMERGENCY_NUMBERS; i++) {
+        snprintf(key_name,MAX_KEY_NAME, NV_EMERGENCY_NUMBER, i);
+        modem->emergency_numbers[i] = amodem_read_set_nv_str(modem,key_name, NULL);
+    }
 
     modem->area_code = -1;
     modem->cell_id   = -1;
@@ -407,16 +459,16 @@ amodem_reset( AModem  modem )
     modem->data_state   = A_REGISTRATION_HOME;
     modem->data_network = A_DATA_NETWORK_UMTS;
 
-    tmp = aconfig_str( modem->nvram, NV_MODEM_TECHNOLOGY, "gsm" );
+    tmp = amodem_read_set_nv_str( modem, NV_MODEM_TECHNOLOGY, "gsm" );
     modem->technology = android_parse_modem_tech( tmp );
     if (modem->technology == A_TECH_UNKNOWN) {
         modem->technology = aconfig_int( modem->nvram, NV_MODEM_TECHNOLOGY, A_TECH_GSM );
     }
     // Support GSM, WCDMA, CDMA, EvDo
-    modem->preferred_mask = aconfig_int( modem->nvram, NV_PREFERRED_MODE, 0x0f );
+    modem->preferred_mask = amodem_read_set_nv_int( modem, NV_PREFERRED_MODE, 0x0f );
 
-    modem->subscription_source = aconfig_int( modem->nvram, NV_CDMA_SUBSCRIPTION_SOURCE, 0 );
-    modem->roaming_pref = aconfig_int( modem->nvram, NV_CDMA_ROAMING_PREF, 0 );
+    modem->subscription_source = amodem_read_set_nv_int( modem, NV_CDMA_SUBSCRIPTION_SOURCE, 0 );
+    modem->roaming_pref = amodem_read_set_nv_int( modem, NV_CDMA_ROAMING_PREF, 0 );
 }
 
 static AModemRec   _android_modem[1];
@@ -430,6 +482,10 @@ amodem_create( int  base_port, AModemUnsolFunc  unsol_func, void*  unsol_opaque 
     char *end = start + sizeof(nvfname);
 
     modem->base_port    = base_port;
+    start = bufprint_config_file( start, end, "modem-nv-ram-" );
+    start = bufprint( start, end, "%d", modem->base_port );
+    modem->nvfilename = strdup( nvfname );
+
     amodem_reset( modem );
     modem->supportsNetworkDataType = 1;
     modem->unsol_func   = unsol_func;
@@ -437,9 +493,6 @@ amodem_create( int  base_port, AModemUnsolFunc  unsol_func, void*  unsol_opaque 
 
     modem->sim = asimcard_create();
 
-    start = bufprint_config_file( start, end, "modem-nv-ram-" );
-    start = bufprint( start, end, "%d", modem->base_port );
-    modem->nvfilename = strdup( nvfname );
     aconfig_save_file( modem->nvram, modem->nvfilename );
     return  modem;
 }
@@ -556,7 +609,6 @@ static int
 amodem_set_nv( AModem modem, const char *name, const char *value )
 {
     aconfig_set(modem->nvram, name, value);
-    aconfig_save_file(modem->nvram, modem->nvfilename);
     return 0;
 }
 static AModemTech
@@ -888,7 +940,10 @@ switchTechnology( AModem modem, AModemTech newtech, int32_t newpreferred )
         return "ERROR: At least one technology must be enabled";
     }
     if (modem->preferred_mask != newpreferred) {
+        char value[MAX_KEY_NAME + 1];
         modem->preferred_mask = newpreferred;
+        snprintf(value, MAX_KEY_NAME, "%d", newpreferred);
+        amodem_set_nv(modem, NV_PREFERRED_MODE, value);
         if (!matchPreferredMask(modem->preferred_mask, newtech)) {
             newtech = chooseTechFromMask(modem, newpreferred);
         }
@@ -1031,6 +1086,40 @@ handleTech( const char*  cmd, AModem  modem )
         return switchTechnology( modem, newtech, pt );
     }
     return amodem_printf( modem, "ERROR: %s: Unknown Technology", cmd + 1 );
+}
+
+static const char*
+handleEmergencyMode( const char* cmd, AModem modem )
+{
+    long arg;
+    char *endptr = NULL;
+    assert ( !memcmp( "+WSOS", cmd, 5 ) );
+    cmd += 5;
+    if (cmd[0] == '?') {
+        return amodem_printf( modem, "+WSOS: %d", modem->in_emergency_mode);
+    }
+
+    if (cmd[0] == '=') {
+        if (cmd[1] == '?') {
+            return amodem_printf(modem, "+WSOS: (0)");
+        }
+        if (cmd[1] == 0) {
+            return amodem_printf(modem, "ERROR");
+        }
+        arg = strtol(cmd+1, &endptr, 10);
+
+        if (!endptr || endptr[0] != 0) {
+            return amodem_printf(modem, "ERROR");
+        }
+
+        arg = arg? 1 : 0;
+
+        if ((!arg) != (!modem->in_emergency_mode)) {
+            modem->in_emergency_mode = arg;
+            return amodem_printf(modem, "+WSOS: %d", arg);
+        }
+    }
+    return amodem_printf(modem, "ERROR");
 }
 
 static const char*
@@ -1822,6 +1911,19 @@ voice_call_event( void*  _vcall )
     amodem_send_calls_update(vcall->modem);
 }
 
+static int amodem_is_emergency( AModem modem, const char *number )
+{
+    int i;
+
+    if (!number) return 0;
+    for (i = 0; i < MAX_EMERGENCY_NUMBERS; i++) {
+        if ( modem->emergency_numbers[i] && !strcmp( number, modem->emergency_numbers[i] )) break;
+    }
+
+    if (i < MAX_EMERGENCY_NUMBERS) return 1;
+
+	return 0;
+}
 
 static const char*
 handleDial( const char*  cmd, AModem  modem )
@@ -1849,13 +1951,18 @@ handleDial( const char*  cmd, AModem  modem )
     memcpy( call->number, cmd, len );
     call->number[len] = 0;
 
+    amodem_begin_line( modem );
+    if (amodem_is_emergency(modem, call->number)) {
+        modem->in_emergency_mode = 1;
+        amodem_add_line( modem, "+WSOS: 1" );
+    }
     vcall->is_remote = (remote_number_string_to_port(call->number) > 0);
 
     vcall->timer = sys_timer_create();
     sys_timer_set( vcall->timer, sys_time_ms() + CALL_DELAY_DIAL,
                    voice_call_event, vcall );
 
-    return NULL;
+    return amodem_end_line( modem );
 }
 
 
@@ -2028,6 +2135,9 @@ static const struct {
 
     { "+CCSS=?", "+CTEC: 0,1", NULL }, /* Query available subscription sources */
     { "!+CCSS", NULL, handleSubscriptionSource }, /* Set/Get current subscription source */
+
+    { "+WSOS=?", "+WSOS: 0", NULL}, /* Query supported +WSOS values */
+    { "!+WSOS=", NULL, handleEmergencyMode },
 
     /* see requestOrSendPDPContextList() */
     { "+CGACT?", "", handleListPDPContexts },
