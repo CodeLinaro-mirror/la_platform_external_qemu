@@ -82,6 +82,7 @@
 
 static const char* switchTechnology(AModem modem, AModemTech newtech, int32_t newpreferred);
 static int set_cdma_subscription_source( AModem modem, ACdmaSubscriptionSource ss);
+static int set_cdma_prl_version( AModem modem, int prlVersion);
 
 #if DEBUG
 static const char*  quote( const char*  line )
@@ -279,6 +280,7 @@ typedef struct AModemRec_
     int subscription_source;
     int roaming_pref;
     int in_emergency_mode;
+    int prl_version;
 
     const char *emergency_numbers[MAX_EMERGENCY_NUMBERS];
 } AModemRec;
@@ -367,6 +369,7 @@ amodem_end_line( AModem  modem )
 #define NV_CDMA_ROAMING_PREF                   "cdma_roaming_pref"
 #define NV_IN_ECBM                             "in_ecbm"
 #define NV_EMERGENCY_NUMBER                    "emergency_number_%d"
+#define NV_PRL_VERSION                         "prl_version"
 #define NV_SREGISTER                           "sregister"
 
 #define MAX_KEY_NAME 40
@@ -430,6 +433,7 @@ amodem_reset( AModem  modem )
     modem->oper_index          = amodem_read_set_nv_int(modem, NV_OPER_INDEX, 0);
     modem->oper_count          = amodem_read_set_nv_int(modem, NV_OPER_COUNT, 2);
     modem->in_emergency_mode   = amodem_read_set_nv_int(modem, NV_IN_ECBM, 0);
+    modem->prl_version         = amodem_read_set_nv_int(modem, NV_PRL_VERSION, 0);
 
     modem->emergency_numbers[0] = "911";
     char key_name[MAX_KEY_NAME + 1];
@@ -975,6 +979,26 @@ parsePreferred( const char *str, int *preferred )
 }
 
 void
+amodem_set_cdma_prl_version( AModem modem, int prlVersion)
+{
+    D("amodem_set_prl_version()\n");
+    if (!set_cdma_prl_version( modem, prlVersion)) {
+        amodem_unsol(modem, "+WPRL: %d", prlVersion);
+    }
+}
+
+static int
+set_cdma_prl_version( AModem modem, int prlVersion)
+{
+    D("set_cdma_prl_version");
+    if (modem->prl_version != prlVersion) {
+        modem->prl_version = prlVersion;
+        return 0;
+    }
+    return -1;
+}
+
+void
 amodem_set_cdma_subscription_source( AModem modem, ACdmaSubscriptionSource ss)
 {
     D("amodem_set_cdma_subscription_source()\n");
@@ -982,6 +1006,7 @@ amodem_set_cdma_subscription_source( AModem modem, ACdmaSubscriptionSource ss)
         amodem_unsol(modem, "+CCSS: %d", (int)ss);
     }
 }
+
 #define MAX_INT_DIGITS 10
 static int
 set_cdma_subscription_source( AModem modem, ACdmaSubscriptionSource ss)
@@ -1119,6 +1144,20 @@ handleEmergencyMode( const char* cmd, AModem modem )
             return amodem_printf(modem, "+WSOS: %d", arg);
         }
     }
+    return amodem_printf(modem, "ERROR");
+}
+
+static const char*
+handlePrlVersion( const char* cmd, AModem modem )
+{
+    long arg;
+    char *endptr = NULL;
+    assert ( !memcmp( "+WPRL", cmd, 5 ) );
+    cmd += 5;
+    if (cmd[0] == '?') {
+        return amodem_printf( modem, "+WPRL: %d", modem->prl_version);
+    }
+
     return amodem_printf(modem, "ERROR");
 }
 
@@ -2138,6 +2177,8 @@ static const struct {
 
     { "+WSOS=?", "+WSOS: 0", NULL}, /* Query supported +WSOS values */
     { "!+WSOS=", NULL, handleEmergencyMode },
+
+    { "+WPRL?", NULL, handlePrlVersion }, /* Query the current PRL version */
 
     /* see requestOrSendPDPContextList() */
     { "+CGACT?", "", handleListPDPContexts },

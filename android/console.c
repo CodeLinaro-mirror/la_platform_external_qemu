@@ -1037,6 +1037,22 @@ do_cdma_ssource( ControlClient  client, char*  args )
     return -1;
 }
 
+static int
+do_cdma_prl_version( ControlClient client, char * args )
+{
+    int version = 0;
+    char *endptr;
+
+    if (!args) {
+        control_write( client, "KO: missing argument, try 'cdma prl_version <version>'\r\n");
+        return -1;
+    }
+
+    version = strtol(args, &endptr, 0);
+    if (endptr != args) {
+        amodem_set_cdma_prl_version( android_modem, version );
+    }
+}
 /********************************************************************************************/
 /********************************************************************************************/
 /*****                                                                                 ******/
