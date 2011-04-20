@@ -1726,7 +1726,7 @@ static const struct {
     { "!+CHLD=", NULL, handleHangup },
 
     /* see requestSignalStrength() */
-    { "+CSQ", "+CSQ: 7,99", NULL },  /* XXX: TODO: implement variable signal strength and error rates */
+    { "+CSQ", "+CSQ: 10,2,85,130,90,6,4,25,9,50,68,12", NULL },  /* XXX: TODO: implement variable signal strength and error rates */
 
     /* see requestRegistrationState() */
     { "!+CREG", NULL, handleNetworkRegistration },
