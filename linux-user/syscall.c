@@ -8387,11 +8387,33 @@ static int is_proc_myself(const char *filename, const char *entry)
         filename += strlen("/proc/");
         if (!strncmp(filename, "self/", strlen("self/"))) {
             filename += strlen("self/");
+            if (!strncmp(filename, "task/", strlen("task/"))) {
+                filename += strlen("task/");
+                if (*filename >= '1' && *filename <= '9') {
+                    char myself[80];
+                    snprintf(myself, sizeof(myself), "%d/", getpid());
+                    if (!strncmp(filename, myself, strlen(myself))) {
+                        filename += strlen(myself);
+                    } else {
+                        return 0;
+                    }
+                }
+            }
         } else if (*filename >= '1' && *filename <= '9') {
             char myself[80];
             snprintf(myself, sizeof(myself), "%d/", getpid());
             if (!strncmp(filename, myself, strlen(myself))) {
                 filename += strlen(myself);
+                if (!strncmp(filename, "task/", strlen("task/"))) {
+                    filename += strlen("task/");
+                    if (*filename >= '1' && *filename <= '9') {
+                        if (!strncmp(filename, myself, strlen(myself))) {
+                            filename += strlen(myself);
+                        } else {
+                            return 0;
+                        }
+                    }
+                }
             } else {
                 return 0;
             }
