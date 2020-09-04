@@ -67,7 +67,11 @@ extensions = [
     'qapi_domain',
     'qapidoc',
     'qmp_lexer',
+    'sphinxcontrib.blockdiag',
 ]
+
+# Fontpath for blockdiag (truetype font)
+blockdiag_fontpath = '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'
 
 if sphinx.version_info[:3] > (4, 0, 0):
     tags.add('sphinx4')
