@@ -1873,6 +1873,18 @@ static inline abi_long target_to_host_cmsg(struct msghdr *msgh,
     return 0;
 }
 
+/*
+ * Linux kernel actually keeps track of whether the old version (potentially
+ * 32-bit time_t) or the new version is used for each socket. Instead of
+ * replicate it will all the complexity, we only keep track of one global state,
+ * which is enough for guest programs that don't intentionally mix the two
+ * versions.
+ */
+static enum TargetTimestampVersion {
+    TARGET_TIMESTAMP_OLD,
+    TARGET_TIMESTAMP_NEW,
+} target_expected_timestamp_version = TARGET_TIMESTAMP_OLD;
+
 static inline abi_long host_to_target_cmsg(struct target_msghdr *target_msgh,
                                            struct msghdr *msgh)
 {
@@ -1923,8 +1935,17 @@ static inline abi_long host_to_target_cmsg(struct target_msghdr *target_msgh,
         switch (cmsg->cmsg_level) {
         case SOL_SOCKET:
             switch (cmsg->cmsg_type) {
-            case SO_TIMESTAMP:
-                tgt_len = sizeof(struct target_timeval);
+            case SCM_TIMESTAMP:
+                switch (target_expected_timestamp_version) {
+                case TARGET_TIMESTAMP_OLD:
+                    tgt_len = sizeof(struct target_timeval);
+                    target_cmsg->cmsg_type = tswap32(TARGET_SCM_TIMESTAMP_OLD);
+                    break;
+                case TARGET_TIMESTAMP_NEW:
+                    tgt_len = sizeof(struct target__kernel_sock_timeval);
+                    target_cmsg->cmsg_type = tswap32(TARGET_SCM_TIMESTAMP_NEW);
+                    break;
+                }
                 break;
             default:
                 break;
@@ -1958,20 +1979,39 @@ static inline abi_long host_to_target_cmsg(struct target_msghdr *target_msgh,
                 }
                 break;
             }
-            case SO_TIMESTAMP:
+            case SCM_TIMESTAMP:
             {
                 struct timeval *tv = (struct timeval *)data;
-                struct target_timeval *target_tv =
-                    (struct target_timeval *)target_data;
-
-                if (len != sizeof(struct timeval) ||
-                    tgt_len != sizeof(struct target_timeval)) {
+                if (len != sizeof(struct timeval)) {
                     goto unimplemented;
                 }
 
-                /* copy struct timeval to target */
-                __put_user(tv->tv_sec, &target_tv->tv_sec);
-                __put_user(tv->tv_usec, &target_tv->tv_usec);
+                switch (target_expected_timestamp_version) {
+                case TARGET_TIMESTAMP_OLD:
+                {
+                    struct target_timeval *target_tv =
+                        (struct target_timeval *)target_data;
+                    if (tgt_len != sizeof(struct target_timeval)) {
+                        goto unimplemented;
+                    }
+
+                    __put_user(tv->tv_sec, &target_tv->tv_sec);
+                    __put_user(tv->tv_usec, &target_tv->tv_usec);
+                    break;
+                }
+                case TARGET_TIMESTAMP_NEW:
+                {
+                    struct target__kernel_sock_timeval *target_tv =
+                        (struct target__kernel_sock_timeval *)target_data;
+                    if (tgt_len != sizeof(struct target__kernel_sock_timeval)) {
+                        goto unimplemented;
+                    }
+
+                    __put_user(tv->tv_sec, &target_tv->tv_sec);
+                    __put_user(tv->tv_usec, &target_tv->tv_usec);
+                    break;
+                }
+                }
                 break;
             }
             case SCM_CREDENTIALS:
@@ -2121,6 +2161,8 @@ static abi_long do_setsockopt(int sockfd, int level, int optname,
 {
     abi_long ret;
     int val;
+    enum TargetTimestampVersion target_timestamp_version =
+        target_expected_timestamp_version;
 
     switch(level) {
     case SOL_TCP:
@@ -2539,9 +2581,14 @@ static abi_long do_setsockopt(int sockfd, int level, int optname,
         case TARGET_SO_PASSSEC:
                 optname = SO_PASSSEC;
                 break;
-        case TARGET_SO_TIMESTAMP:
-		optname = SO_TIMESTAMP;
-		break;
+        case TARGET_SO_TIMESTAMP_OLD:
+                target_timestamp_version = TARGET_TIMESTAMP_OLD;
+                optname = SO_TIMESTAMP;
+                break;
+        case TARGET_SO_TIMESTAMP_NEW:
+                target_timestamp_version = TARGET_TIMESTAMP_NEW;
+                optname = SO_TIMESTAMP;
+                break;
         case TARGET_SO_RCVLOWAT:
 		optname = SO_RCVLOWAT;
 		break;
@@ -2554,6 +2601,9 @@ static abi_long do_setsockopt(int sockfd, int level, int optname,
 	if (get_user_u32(val, optval_addr))
             return -TARGET_EFAULT;
 	ret = get_errno(setsockopt(sockfd, SOL_SOCKET, optname, &val, sizeof(val)));
+        if (!is_error(ret) && optname == SO_TIMESTAMP) {
+            target_expected_timestamp_version = target_timestamp_version;
+        }
         break;
 #ifdef SOL_NETLINK
     case SOL_NETLINK:
@@ -2604,6 +2654,7 @@ static abi_long do_getsockopt(int sockfd, int level, int optname,
     abi_long ret;
     int len, val;
     socklen_t lv;
+    int timestamp_format_matches = 0;
 
     switch(level) {
     case TARGET_SOL_SOCKET:
@@ -2784,7 +2835,14 @@ get_timeout:
         case TARGET_SO_PASSCRED:
             optname = SO_PASSCRED;
             goto int_case;
-        case TARGET_SO_TIMESTAMP:
+        case TARGET_SO_TIMESTAMP_OLD:
+            timestamp_format_matches =
+                (target_expected_timestamp_version == TARGET_TIMESTAMP_OLD);
+            optname = SO_TIMESTAMP;
+            goto int_case;
+        case TARGET_SO_TIMESTAMP_NEW:
+            timestamp_format_matches =
+                (target_expected_timestamp_version == TARGET_TIMESTAMP_NEW);
             optname = SO_TIMESTAMP;
             goto int_case;
         case TARGET_SO_RCVLOWAT:
@@ -2822,6 +2880,9 @@ get_timeout:
         case SO_ERROR:
             val = host_to_target_errno(val);
             break;
+        }
+        if (optname == SO_TIMESTAMP) {
+            val = val && timestamp_format_matches;
         }
         if (len > lv)
             len = lv;
