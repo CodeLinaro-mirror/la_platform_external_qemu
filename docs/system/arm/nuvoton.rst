@@ -64,7 +64,6 @@ Missing devices
  * LPC/eSPI host-to-BMC interface, including
 
    * Keyboard and mouse controller interface (KBCI)
-   * Keyboard Controller Style (KCS) channels
    * BIOS POST code FIFO
    * System Wake-up Control (SWC)
    * Shared memory (SHM)

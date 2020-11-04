@@ -3642,6 +3642,7 @@ if have_system
     'hw/ide',
     'hw/input',
     'hw/intc',
+    'hw/ipmi',
     'hw/isa',
     'hw/mem',
     'hw/mips',
