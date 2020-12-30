@@ -69,6 +69,7 @@ static void pci_ipmi_bt_realize(PCIDevice *pd, Error **errp)
     PCIIPMIBTDevice *pib = PCI_IPMI_BT(pd);
     IPMIInterface *ii = IPMI_INTERFACE(pd);
     IPMIInterfaceClass *iic = IPMI_INTERFACE_GET_CLASS(ii);
+    IPMICore *ic;
 
     if (!pib->bt.bmc) {
         error_setg(errp, "IPMI device requires a bmc attribute to be set");
@@ -77,7 +78,8 @@ static void pci_ipmi_bt_realize(PCIDevice *pd, Error **errp)
 
     pib->uuid = ipmi_next_uuid();
 
-    pib->bt.bmc->intf = ii;
+    ic = IPMI_CORE(pib->bt.bmc);
+    ic->intf = ii;
     pib->bt.opaque = pib;
 
     pci_config_set_prog_interface(pd->config, 0x02); /* BT */

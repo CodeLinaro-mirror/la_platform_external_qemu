@@ -510,7 +510,8 @@ static int attn_irq_enabled(IPMIBmcSim *ibs)
 void ipmi_bmc_gen_event(IPMIBmc *b, uint8_t *evt, bool log)
 {
     IPMIBmcSim *ibs = IPMI_BMC_SIMULATOR(b);
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
 
     if (!IPMI_BMC_EVENT_MSG_BUF_ENABLED(ibs)) {
@@ -532,7 +533,8 @@ void ipmi_bmc_gen_event(IPMIBmc *b, uint8_t *evt, bool log)
 static void gen_event(IPMIBmcSim *ibs, unsigned int sens_num, uint8_t deassert,
                       uint8_t evd1, uint8_t evd2, uint8_t evd3)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     uint8_t evt[16];
     IPMISensor *sens = ibs->sensors + sens_num;
@@ -702,7 +704,8 @@ static void ipmi_sim_handle_command(IPMIBmc *b,
                                     uint8_t msg_id)
 {
     IPMIBmcSim *ibs = IPMI_BMC_SIMULATOR(b);
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     const IPMICmdHandler *hdl;
     RspBuffer rsp = RSP_BUFFER_INITIALIZER;
@@ -748,14 +751,15 @@ static void ipmi_sim_handle_command(IPMIBmc *b,
     hdl->cmd_handler(ibs, cmd, cmd_len, &rsp);
 
  out:
-    k->handle_rsp(s, msg_id, rsp.buffer, rsp.len);
+    k->handle_msg(s, msg_id, rsp.buffer, rsp.len);
 
     next_timeout(ibs);
 }
 
 static void ipmi_sim_handle_timeout(IPMIBmcSim *ibs)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     bool do_log = !IPMI_BMC_WATCHDOG_GET_DONT_LOG(ibs);
 
@@ -853,7 +857,8 @@ static void chassis_control(IPMIBmcSim *ibs,
                             uint8_t *cmd, unsigned int cmd_len,
                             RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
 
     switch (cmd[2] & 0xf) {
@@ -910,7 +915,8 @@ static void get_device_id(IPMIBmcSim *ibs,
 
 static void set_global_enables(IPMIBmcSim *ibs, uint8_t val)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     bool irqs_on;
 
@@ -926,7 +932,8 @@ static void cold_reset(IPMIBmcSim *ibs,
                        uint8_t *cmd, unsigned int cmd_len,
                        RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
 
     /* Disable all interrupts */
@@ -941,7 +948,8 @@ static void warm_reset(IPMIBmcSim *ibs,
                        uint8_t *cmd, unsigned int cmd_len,
                        RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
 
     if (k->reset) {
@@ -1011,7 +1019,8 @@ static void clr_msg_flags(IPMIBmcSim *ibs,
                           uint8_t *cmd, unsigned int cmd_len,
                           RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
 
     ibs->msg_flags &= ~cmd[2];
@@ -1029,7 +1038,8 @@ static void read_evt_msg_buf(IPMIBmcSim *ibs,
                              uint8_t *cmd, unsigned int cmd_len,
                              RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     unsigned int i;
 
@@ -1061,7 +1071,8 @@ static void get_msg(IPMIBmcSim *ibs,
     g_free(msg);
 
     if (QTAILQ_EMPTY(&ibs->rcvbufs)) {
-        IPMIInterface *s = ibs->parent.intf;
+        IPMICore *ic = IPMI_CORE(ibs);
+        IPMIInterface *s = ic->intf;
         IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
 
         ibs->msg_flags &= ~IPMI_BMC_MSG_FLAG_RCV_MSG_QUEUE;
@@ -1083,7 +1094,8 @@ static void send_msg(IPMIBmcSim *ibs,
                      uint8_t *cmd, unsigned int cmd_len,
                      RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     IPMIRcvBufEntry *msg;
     uint8_t *buf;
@@ -1199,7 +1211,8 @@ static void set_watchdog_timer(IPMIBmcSim *ibs,
                                uint8_t *cmd, unsigned int cmd_len,
                                RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     unsigned int val;
 
@@ -1311,7 +1324,8 @@ static void get_channel_info(IPMIBmcSim *ibs,
                              uint8_t *cmd, unsigned int cmd_len,
                              RspBuffer *rsp)
 {
-    IPMIInterface *s = ibs->parent.intf;
+    IPMICore *ic = IPMI_CORE(ibs);
+    IPMIInterface *s = ic->intf;
     IPMIInterfaceClass *k = IPMI_INTERFACE_GET_CLASS(s);
     IPMIFwInfo info = {};
     uint8_t ch = cmd[2] & 0x0f;
