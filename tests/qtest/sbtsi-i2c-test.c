@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * QTests for the SBTSI I2C temperature sensor
+ *
+ * Copyright 2020 Google LLC
+ */
+
+#include "qemu/osdep.h"
+
+#include "libqtest-single.h"
+#include "libqos/qgraph.h"
+#include "libqos/i2c.h"
+#include "qobject/qdict.h"
+#include "qemu/bitops.h"
+
+#define TEST_ID   "sbtsi-i2c-test"
+#define TEST_ADDR (0x4c)
+
+/*
+ * SB-TSI registers only support SMBus byte data access. "_INT" registers are
+ * the integer part of a temperature value or limit, and "_DEC" registers are
+ * corresponding decimal parts.
+ */
+#define REG_TEMP_INT      0x01 /* RO */
+#define REG_STATUS        0x02 /* RO */
+#define REG_CONFIG        0x03 /* RO */
+#define REG_TEMP_HIGH_INT 0x07 /* RW */
+#define REG_TEMP_LOW_INT  0x08 /* RW */
+#define REG_CONFIG_WR     0x09 /* RW */
+#define REG_TEMP_DEC      0x10 /* RO */
+#define REG_TEMP_HIGH_DEC 0x13 /* RW */
+#define REG_TEMP_LOW_DEC  0x14 /* RW */
+#define REG_ALERT_CONFIG  0xBF /* RW */
+
+#define STATUS_HIGH_ALERT BIT(4)
+#define STATUS_LOW_ALERT  BIT(3)
+#define CONFIG_ALERT_MASK BIT(7)
+#define ALARM_EN          BIT(0)
+
+/* The temperature stored are in units of 0.125 degrees. */
+#define TEMP_UNIT_IN_MILLIDEGREE 125
+#define LIMIT_LOW (10500)
+#define LIMIT_HIGH (55125)
+
+
+/*
+ * Compute the temperature using the integer and decimal part and return
+ * millidegrees. The decimal part are only the top 3 bits so we shift it by
+ * 5 here.
+ */
+static uint32_t regs_to_temp(uint8_t integer, uint8_t decimal)
+{
+    return ((integer << 3) + (decimal >> 5)) * TEMP_UNIT_IN_MILLIDEGREE;
+}
+
+/*
+ * Compute the integer and decimal parts of the temperature in millidegrees.
+ * H/W store the decimal in the top 3 bits so we shift it by 5.
+ */
+static void temp_to_regs(uint32_t temp, uint8_t *integer, uint8_t *decimal)
+{
+    temp /= TEMP_UNIT_IN_MILLIDEGREE;
+    *integer = temp >> 3;
+    *decimal = (temp & 0x7) << 5;
+}
+
+static void tx_rx(void *obj, void *data, QGuestAllocator *alloc)
+{
+    uint16_t value;
+    uint8_t integer, decimal;
+    QI2CDevice *i2cdev = (QI2CDevice *)obj;
+
+    /* Test default values */
+    /* TODO: re-enable QMP tests for SBTSI device */
+
+    integer = i2c_get8(i2cdev, REG_TEMP_INT);
+    decimal = i2c_get8(i2cdev, REG_TEMP_DEC);
+    g_assert_cmpuint(regs_to_temp(integer, decimal), ==, 0);
+
+    /* Set alert mask in config */
+    i2c_set8(i2cdev, REG_CONFIG_WR, CONFIG_ALERT_MASK);
+    value = i2c_get8(i2cdev, REG_CONFIG);
+    g_assert_cmphex(value, ==, CONFIG_ALERT_MASK);
+    /* Enable alarm_en */
+    i2c_set8(i2cdev, REG_ALERT_CONFIG, ALARM_EN);
+    value = i2c_get8(i2cdev, REG_ALERT_CONFIG);
+    g_assert_cmphex(value, ==, ALARM_EN);
+
+    /* Test setting limits */
+    /* Limit low = 10.500 */
+    temp_to_regs(LIMIT_LOW, &integer, &decimal);
+    i2c_set8(i2cdev, REG_TEMP_LOW_INT, integer);
+    i2c_set8(i2cdev, REG_TEMP_LOW_DEC, decimal);
+    integer = i2c_get8(i2cdev, REG_TEMP_LOW_INT);
+    decimal = i2c_get8(i2cdev, REG_TEMP_LOW_DEC);
+    g_assert_cmpuint(regs_to_temp(integer, decimal), ==, LIMIT_LOW);
+    /* Limit high = 55.125 */
+    temp_to_regs(LIMIT_HIGH, &integer, &decimal);
+    i2c_set8(i2cdev, REG_TEMP_HIGH_INT, integer);
+    i2c_set8(i2cdev, REG_TEMP_HIGH_DEC, decimal);
+    integer = i2c_get8(i2cdev, REG_TEMP_HIGH_INT);
+    decimal = i2c_get8(i2cdev, REG_TEMP_HIGH_DEC);
+    g_assert_cmpuint(regs_to_temp(integer, decimal), ==, LIMIT_HIGH);
+
+    /* Disable alarm_en */
+    i2c_set8(i2cdev, REG_ALERT_CONFIG, 0);
+    value = i2c_get8(i2cdev, REG_ALERT_CONFIG);
+    g_assert_cmphex(value, ==, 0);
+    /* No alert when alarm_en is false. */
+    value = i2c_get8(i2cdev, REG_STATUS);
+    g_assert_cmphex(value, ==, 0);
+}
+
+static void sbtsi_register_nodes(void)
+{
+    QOSGraphEdgeOptions opts = {
+        .extra_device_opts = "id=" TEST_ID ",address=0x4c"
+    };
+    add_qi2c_address(&opts, &(QI2CAddress) { TEST_ADDR });
+
+    qos_node_create_driver("sbtsi-i2c-target", i2c_device_create);
+    qos_node_consumes("sbtsi-i2c-target", "i2c-bus", &opts);
+
+    qos_add_test("tx-rx", "sbtsi-i2c-target", tx_rx, NULL);
+}
+libqos_init(sbtsi_register_nodes);

@@ -88,3 +88,7 @@ config LTC4287
     bool
     depends on I2C
     default y if I2C_DEVICES
+
+config AMDSBTSI
+    bool
+    depends on I2C
