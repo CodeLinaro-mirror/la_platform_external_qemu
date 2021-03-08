@@ -313,6 +313,14 @@ static type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5,	\
 #define TARGET_O_NONBLOCK_MASK TARGET_O_NONBLOCK
 #endif
 
+/*
+ * Use the same identifier here, so we break if the kernel headers are updated
+ * to contain the correct value.
+ */
+#if defined TARGET_NR_membarrier && defined __NR_membarrier
+static const int MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_RSEQ = (1 << 8);
+#endif
+
 #define __NR_sys_gettid __NR_gettid
 _syscall0(int, sys_gettid)
 
@@ -14387,6 +14395,12 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
 #endif
 #if defined TARGET_NR_membarrier && defined __NR_membarrier
     case TARGET_NR_membarrier:
+        /*
+         * We don't support RSEQ, so fail RSEQ registrations.
+         */
+        if (arg1 & MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_RSEQ) {
+            return -TARGET_EINVAL;
+        }
         return get_errno(membarrier(arg1, arg2));
 #endif
 
