@@ -57,6 +57,7 @@ Supported devices
  * Tachometer
  * Peripheral SPI controller (PSPI)
  * PCI Mailbox
+ * BIOS POST code FIFO
 
 Missing devices
 ---------------
@@ -64,7 +65,6 @@ Missing devices
  * LPC/eSPI host-to-BMC interface, including
 
    * Keyboard and mouse controller interface (KBCI)
-   * BIOS POST code FIFO
    * System Wake-up Control (SWC)
    * Shared memory (SHM)
    * eSPI slave interface
