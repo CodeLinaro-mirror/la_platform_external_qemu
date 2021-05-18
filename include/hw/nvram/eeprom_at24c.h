@@ -36,4 +36,8 @@ I2CSlave *at24c_eeprom_init(I2CBus *bus, uint8_t address, uint32_t rom_size);
 I2CSlave *at24c_eeprom_init_rom(I2CBus *bus, uint8_t address, uint32_t rom_size,
                                 const uint8_t *init_rom, uint32_t init_rom_size);
 
+/* Init one at24c eeprom device */
+void at24c_eeprom_init_one(I2CBus *i2c_bus, int bus, uint8_t addr,
+                           uint32_t rsize, int unit_number);
+
 #endif
