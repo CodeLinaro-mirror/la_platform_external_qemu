@@ -46,6 +46,10 @@ config PCA954X
     bool
     select I2C
 
+config PCA_I2C_GPIO
+    bool
+    select I2C
+
 config PMBUS
     bool
     select SMBUS
