@@ -12,6 +12,7 @@
 #include "migration/vmstate.h"
 #include "qemu/module.h"
 #include "qemu/log.h"
+#include "trace.h"
 
 uint16_t pmbus_data2direct_mode(PMBusCoefficients c, uint32_t value)
 {
@@ -63,8 +64,9 @@ void pmbus_send(PMBusDevice *pmdev, const uint8_t *data, uint16_t len)
 static void pmbus_send_uint(PMBusDevice *pmdev, uint64_t data, uint8_t size)
 {
     uint8_t bytes[8];
-    g_assert(size <= 8);
 
+    g_assert(size <= 8);
+    trace_pmbus_read_uint(DEVICE(pmdev)->canonical_path, pmdev->code, data);
     for (int i = 0; i < size; i++) {
         bytes[i] = data & 0xFF;
         data = data >> 8;
@@ -105,6 +107,7 @@ void pmbus_send_string(PMBusDevice *pmdev, const char *data)
     g_assert(len + pmdev->out_buf_len < SMBUS_DATA_MAX_LEN);
     pmdev->out_buf[len + pmdev->out_buf_len] = len;
 
+    trace_pmbus_read_string(DEVICE(pmdev)->canonical_path, pmdev->code, data);
     for (int i = len - 1; i >= 0; i--) {
         pmdev->out_buf[i + pmdev->out_buf_len] = data[len - 1 - i];
     }
@@ -152,6 +155,8 @@ static uint64_t pmbus_receive_uint(PMBusDevice *pmdev)
     for (int i = pmdev->in_buf_len - 1; i >= 0; i--) {
         ret = ret << 8 | pmdev->in_buf[i];
     }
+
+    trace_pmbus_write_uint(DEVICE(pmdev)->canonical_path, pmdev->code, ret);
     return ret;
 }
 

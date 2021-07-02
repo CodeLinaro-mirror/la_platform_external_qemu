@@ -66,3 +66,8 @@ imx_i2c_write(const char *id, const char *reg, uint64_t ofs, uint64_t value) "%s
 
 cmis_device_send(const char *id, uint8_t data) "%s send data: 0x%02" PRIx8
 cmis_device_recv(const char *id, uint8_t data) "%s recv data: 0x%02" PRIx8
+
+# pmbus_device.c
+pmbus_read_uint(const char *id, uint8_t code, uint16_t data) "%s: read reg: 0x%02x data: 0x%x"
+pmbus_read_string(const char *id, uint8_t code, const char *data) "%s: read reg: 0x%02x data: %s"
+pmbus_write_uint(const char *id, uint8_t code, uint16_t data) "%s: write to reg: 0x%02x data: 0x%x"
