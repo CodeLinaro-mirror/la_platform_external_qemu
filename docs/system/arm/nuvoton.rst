@@ -56,6 +56,7 @@ Supported devices
  * Ethernet controller (EMC)
  * Tachometer
  * Peripheral SPI controller (PSPI)
+ * PCI Mailbox
 
 Missing devices
 ---------------
