@@ -45,6 +45,8 @@ typedef enum {
     SBRMI_REG_SW_INTERRUPT = 0x40,
     SBRMI_REG_THREADNUMBER,
     SBRMI_REG_RAS_STATUS = 0x4c,
+    SBRMI_REG_THREADNUMBER_LOW = 0x4E,
+    SBRMI_REG_THREADNUMBER_HIGH,
 } SbrmiReg;
 
 /* Only list the commands we support now. */
@@ -66,6 +68,14 @@ typedef enum {
     SBRMI_MAILBOX_INVALID_INPUT_ARG = 0x9,
     SBRMI_MAILBOX_INVALID_OOB_RAS_CONFIG,
 } SbrmiMailboxError;
+
+/* CPUID function, see PPR Vol 1 for AMD Family 1Ah Model 02h C0 */
+typedef enum {
+    SBRMI_CPUID_FN00000000 = 0x0,
+    SBRMI_CPUID_FN00000001 = 0x1,
+    SBRMI_CPUID_FN0000000B = 0xb,
+    SBRMI_CPUID_FN8000001E = 0x8000001E,
+} SbrmiCpuidFn;
 
 /* BIT definition for SBRMI_REG_CONTROL */
 #define SBRMI_BIT_ALERT_MASK (0)
@@ -260,5 +270,6 @@ struct SbrmiI3cTargetState {
 
 I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
                                    uint64_t pid, const char *cpu_vendor,
-                                   uint32_t ucode_rev);
+                                   uint32_t ucode_rev, int nr_cores,
+                                   int nr_thread);
 #endif  /* SBRMI_I3C_H_ */

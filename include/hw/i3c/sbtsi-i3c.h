@@ -32,4 +32,6 @@ struct SbtsiI3cTargetState {
 };
 
 
+I3CTarget *create_sbtsi_i3c_target(const char *device_name, uint8_t addr,
+                                   uint64_t pid);
 #endif  /* SBTSI_I3C_H_ */
