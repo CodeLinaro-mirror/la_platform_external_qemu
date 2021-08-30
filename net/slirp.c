@@ -750,55 +750,25 @@ static const char *parse_protocol(const char *str, bool *is_udp,
     return p;
 }
 
-static int parse_hostfwd_sockaddr(const char *str, int family, int socktype,
+static int parse_hostfwd_sockaddr(const char *str, int socktype,
                                   struct sockaddr_storage *saddr,
-                                  bool *v6_only, Error **errp)
+                                  Error **errp)
 {
     struct addrinfo hints, *res = NULL, *e;
     InetSocketAddress *addr = g_new(InetSocketAddress, 1);
     int gai_rc;
     int rc = -1;
-    Error *err = NULL;
 
     const char *optstr = inet_parse_host_port(addr, str, errp);
     if (optstr == NULL) {
         goto fail_return;
     }
 
-    if (inet_parse_ipv46(addr, optstr, errp) < 0) {
-        goto fail_return;
-    }
-
-    if (v6_only) {
-        bool v4 = addr->has_ipv4 && addr->ipv4;
-        bool v6 = addr->has_ipv6 && addr->ipv6;
-        *v6_only = v6 && !v4;
-    }
-
     memset(&hints, 0, sizeof(hints));
     hints.ai_flags = AI_PASSIVE; /* ignored if host is not ""(->NULL) */
     hints.ai_flags |= AI_NUMERICHOST | AI_NUMERICSERV;
     hints.ai_socktype = socktype;
-    hints.ai_family = inet_ai_family_from_address(addr, &err);
-    if (err) {
-        error_propagate(errp, err);
-        goto fail_return;
-    }
-    if (family != PF_UNSPEC) {
-        /* Guest must use same family as host (for now). */
-        if (hints.ai_family != PF_UNSPEC && hints.ai_family != family) {
-            error_setg(errp,
-                       "unexpected address family for %s: expecting %s",
-                       str, family == PF_INET ? "ipv4" : "ipv6");
-            goto fail_return;
-        }
-        hints.ai_family = family;
-    }
-
-    /* For backward compatibility, treat an empty host spec as IPv4. */
-    if (*addr->host == '\0' && hints.ai_family == PF_UNSPEC) {
-        hints.ai_family = PF_INET;
-    }
+    hints.ai_family = PF_INET;
 
     /*
      * Calling getaddrinfo for guest addresses is dubious, but addresses are
@@ -853,10 +823,10 @@ static int parse_hostfwd_sockaddr(const char *str, int family, int socktype,
 void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
 {
     struct sockaddr_storage host_addr;
-    char buf[256];
     const char *src_str, *p;
     SlirpState *s;
-    int is_udp = 0;
+    bool is_udp;
+    Error *error = NULL;
     int err;
     const char *arg1 = qdict_get_str(qdict, "arg1");
     const char *arg2 = qdict_get_try_str(qdict, "arg2");
@@ -872,21 +842,38 @@ void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
         return;
     }
 
+    g_assert(src_str != NULL);
     p = src_str;
-    if (!p || get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+
+    p = parse_protocol(p, &is_udp, &error);
+    if (p == NULL) {
         goto fail_syntax;
     }
 
-    if (parse_hostfwd_sockaddr(p, PF_UNSPEC, is_udp ? SOCK_DGRAM : SOCK_STREAM,
-                               &host_addr, /*v6_only=*/NULL, NULL) < 0) {
+    if (parse_hostfwd_sockaddr(p, is_udp ? SOCK_DGRAM : SOCK_STREAM,
+                               &host_addr, &error) < 0) {
         goto fail_syntax;
     }
 
 #if SLIRP_CHECK_VERSION(4, 5, 0)
-    err = slirp_remove_hostxfwd(s->slirp, (struct sockaddr *) &host_addr,
-            sizeof(host_addr), is_udp ? SLIRP_HOSTFWD_UDP : 0);
+    {
+        int flags = is_udp ? SLIRP_HOSTFWD_UDP : 0;
+        err = slirp_remove_hostxfwd(s->slirp, (struct sockaddr *) &host_addr,
+                                    sizeof(host_addr), flags);
+    }
 #else
-    err = slirp_remove_hostfwd(s->slirp, is_udp, host_addr.sin_addr, host_port);
+    if (host_addr.ss_family != AF_INET) {
+        monitor_printf(mon,
+                       "Could not remove host forwarding rule '%s':"
+                       " only IPv4 supported",
+                       src_str);
+        return;
+    } else {
+        struct sockaddr_in *host_in_addr = (struct sockaddr_in *) &host_addr;
+        err = slirp_remove_hostfwd(s->slirp, is_udp,
+                                   host_in_addr->sin_addr,
+                                   ntohs(host_in_addr->sin_port));
+    }
 #endif
 
     monitor_printf(mon, "host forwarding rule for %s %s\n", src_str,
@@ -894,7 +881,8 @@ void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
     return;
 
  fail_syntax:
-    monitor_printf(mon, "invalid format\n");
+    monitor_printf(mon, "Invalid format: %s\n", error_get_pretty(error));
+    error_free(error);
 }
 
 static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
@@ -904,7 +892,7 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
     char buf[256];
     bool is_udp;
     Error *error = NULL;
-    bool v6_only;
+    int port;
 
     g_assert(redir_str != NULL);
     p = redir_str;
@@ -919,25 +907,31 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
         goto fail_syntax;
     }
 
-    if (parse_hostfwd_sockaddr(buf, PF_UNSPEC,
-                               is_udp ? SOCK_DGRAM : SOCK_STREAM,
-                               &host_addr, &v6_only, &error) < 0) {
+    if (parse_hostfwd_sockaddr(buf, is_udp ? SOCK_DGRAM : SOCK_STREAM,
+                               &host_addr, &error) < 0) {
         error_prepend(&error, "For host address: ");
         goto fail_syntax;
     }
 
-    if (parse_hostfwd_sockaddr(p, host_addr.ss_family,
-                               is_udp ? SOCK_DGRAM : SOCK_STREAM,
-                               &guest_addr, /*v6_only=*/NULL, &error) < 0) {
+    if (parse_hostfwd_sockaddr(p, is_udp ? SOCK_DGRAM : SOCK_STREAM,
+                               &guest_addr, &error) < 0) {
+        error_prepend(&error, "For guest address: ");
+        goto fail_syntax;
+    }
+    port = sockaddr_getport((struct sockaddr *) &guest_addr);
+    if (port == 0) {
+        error_setg(&error, "For guest address: invalid port '0'");
+        goto fail_syntax;
+    }
+
+    if (parse_hostfwd_sockaddr(p, is_udp ? SOCK_DGRAM : SOCK_STREAM,
+                               &guest_addr, &error) < 0) {
         error_prepend(&error, "For guest address: ");
         goto fail_syntax;
     }
 #if SLIRP_CHECK_VERSION(4, 5, 0)
     {
         int flags = is_udp ? SLIRP_HOSTFWD_UDP : 0;
-        if (v6_only) {
-            flags |= SLIRP_HOSTFWD_V6ONLY;
-        }
         if (slirp_add_hostxfwd(s->slirp,
                                (struct sockaddr *) &host_addr,
                                sizeof(host_addr),
@@ -950,14 +944,33 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
         }
     }
 #else
-    err = slirp_add_hostfwd(s->slirp, is_udp,
-            host_addr.sin_addr, host_port,
-            guest_addr.sin_addr, guest_port);
+    if (host_addr.ss_family != AF_INET || guest_addr.ss_family != AF_INET) {
+        error_setg(errp,
+                   "Could not set up host forwarding rule '%s':"
+                   " only IPv4 supported",
+                   redir_str);
+        return -1;
+    } else {
+        struct sockaddr_in *host_in_addr = (struct sockaddr_in *) &host_addr;
+        struct sockaddr_in *guest_in_addr = (struct sockaddr_in *) &guest_addr;
+        if (slirp_add_hostfwd(s->slirp, is_udp,
+                              host_in_addr->sin_addr,
+                              ntohs(host_in_addr->sin_port),
+                              guest_in_addr->sin_addr,
+                              ntohs(guest_in_addr->sin_port)) < 0) {
+            error_setg(errp, "Could not set up host forwarding rule '%s'",
+                       redir_str);
+            return -1;
+        }
+    }
 #endif
 
     return 0;
 
  fail_syntax:
+    error_setg(errp, "Invalid host forwarding rule '%s' (%s)", redir_str,
+               error_get_pretty(error));
+    error_free(error);
     return -1;
 }
 
