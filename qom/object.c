@@ -786,6 +786,9 @@ Object *object_new(const char *typename)
 {
     TypeImpl *ti = type_get_or_load_by_name(typename, &error_fatal);
 
+    if (ti == NULL) {
+        error_report("Failed to find type for '%s'", typename);
+    }
     return object_new_with_type(ti);
 }
 
@@ -1114,7 +1117,7 @@ static void object_class_foreach_tramp(gpointer key, gpointer value,
         return;
     }
 
-    if (data->implements_type && 
+    if (data->implements_type &&
         !object_class_dynamic_cast(k, data->implements_type)) {
         return;
     }
