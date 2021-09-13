@@ -36,6 +36,7 @@
 #include "hw/usb/hcd-ehci.h"
 #include "qom/object.h"
 #include "hw/misc/aspeed_lpc.h"
+#include "hw/ipmi/aspeed_ibt.h"
 #include "hw/misc/unimp.h"
 #include "hw/misc/aspeed_peci.h"
 #include "hw/fsi/aspeed_apb2opb.h"
@@ -86,6 +87,7 @@ struct AspeedSoCState {
     AspeedSDHCIState sdhci;
     AspeedSDHCIState emmc;
     AspeedLPCState lpc;
+    AspeedIBTState ibt;
     AspeedPECIState peci;
     SerialMM uart[ASPEED_UARTS_NUM];
     Clock *sysclk;
