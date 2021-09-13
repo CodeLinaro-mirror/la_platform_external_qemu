@@ -38,6 +38,7 @@
 #include "hw/usb/hcd-ehci.h"
 #include "qom/object.h"
 #include "hw/misc/aspeed_lpc.h"
+#include "hw/ipmi/aspeed_ibt.h"
 #include "hw/misc/unimp.h"
 #include "hw/pci-host/aspeed_pcie.h"
 #include "hw/misc/aspeed_peci.h"
@@ -103,6 +104,7 @@ struct AspeedSoCState {
     AspeedLPCState lpc;
     AspeedPCIECfgState pcie[ASPEED_PCIE_NUM];
     AspeedPCIEPhyState pcie_phy[ASPEED_PCIE_NUM];
+    AspeedIBTState ibt;
     AspeedPECIState peci;
     SerialMM uart[ASPEED_UARTS_NUM];
     Clock *sysclk;
