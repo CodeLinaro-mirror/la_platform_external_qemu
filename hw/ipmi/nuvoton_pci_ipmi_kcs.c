@@ -112,6 +112,8 @@ struct NuvotonPCIIPMIState {
         uint32_t hmbxctl;
         uint32_t hmbxcmd;
 
+        qemu_irq irq_host[8];
+        qemu_irq wire_bmc_cif[8];
         MemoryRegion iomem;
     } pci_mbx;
 };
@@ -158,10 +160,44 @@ static void *nuvoton_ipmi_kcs_get_backend_data(IPMIInterface *ii)
     return &s->kcs;
 }
 
+static uint32_t nuvoton_pci_ipmi_cfg_read(PCIDevice *dev, uint32_t addr,
+                                          int size)
+{
+    NuvotonPCIIPMIState *s = NUVOTON_PCI_IPMI(dev);
+    bool hidecfg = FIELD_EX32(s->pci_mbx.hmbxctl, NUVOTON_HMBXCTL, HIDECFG);
+
+    if (hidecfg) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Attempted to read from PCI cfg "
+                      "regs when configuration space is hidden\n", path);
+        return 0;
+    }
+
+    return pci_default_read_config(dev, addr, size);
+}
+
 static void nuvoton_pci_ipmi_cfg_write(PCIDevice *dev, uint32_t addr,
                                        uint32_t val, int size)
 {
     uint8_t *p;
+    NuvotonPCIIPMIState *s = NUVOTON_PCI_IPMI(dev);
+    bool cfglck = FIELD_EX32(s->pci_mbx.hmbxctl, NUVOTON_HMBXCTL, CFGLCK);
+    bool hidecfg = FIELD_EX32(s->pci_mbx.hmbxctl, NUVOTON_HMBXCTL, HIDECFG);
+
+    if (hidecfg) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Attempted to write to PCI cfg regs "
+                      "when configuration space is hidden\n", path);
+        return;
+    }
+
+    if (cfglck && (addr >= A_NUVOTON_BPCI_VID_DID_WRITE &&
+                   addr <= A_NUVOTON_BPCI_SUBSYSTEM_ID_WRITE)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Attempted to write to PCI cfg regs "
+                      "when configuration is locked\n", path);
+        return;
+    }
 
     switch (addr) {
     case A_NUVOTON_BPCI_VID_DID_WRITE:
@@ -196,9 +232,36 @@ static void nuvoton_pci_ipmi_cfg_write(PCIDevice *dev, uint32_t addr,
     }
 }
 
+static void nuvoton_pcimbx_host_update_irq(NuvotonPCIIPMIState *s)
+{
+    size_t i;
+    uint8_t hif = FIELD_EX32(s->pci_mbx.hmbxstat, NUVOTON_HMBXSTAT, HIF);
+    uint8_t hie = FIELD_EX32(s->pci_mbx.hmbxstat, NUVOTON_HMBXCTL, HIE);
+
+    for (i = 0; i < ARRAY_SIZE(s->pci_mbx.irq_host); i++) {
+        bool hif_set = extract8(hif, 1 << i, 1);
+        bool hie_set = extract8(hie, 1 << i, 1);
+
+        qemu_set_irq(s->pci_mbx.irq_host[i], hif_set && hie_set);
+    }
+}
+
+static void nuvoton_pcimbx_bmc_update_irq(NuvotonPCIIPMIState *s)
+{
+    size_t i;
+    uint8_t cif = FIELD_EX32(s->pci_mbx.hmbxstat, NUVOTON_HMBXCMD, CIF);
+
+    for (i = 0; i < ARRAY_SIZE(s->pci_mbx.wire_bmc_cif); i++) {
+        bool cif_set = extract8(cif, 1 << i, 1);
+
+        qemu_set_irq(s->pci_mbx.wire_bmc_cif[i], cif_set);
+    }
+}
+
 static uint64_t nuvoton_pci_ipmi_mbx_reg_read(NuvotonPCIIPMIState *s,
                                               hwaddr addr)
 {
+
     switch (addr) {
     case A_NUVOTON_HMBXSTAT:
         return s->pci_mbx.hmbxstat;
@@ -208,9 +271,12 @@ static uint64_t nuvoton_pci_ipmi_mbx_reg_read(NuvotonPCIIPMIState *s,
         return s->pci_mbx.hmbxcmd;
     /* Anything else in the MMIO region is RES1 */
     default:
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: Access to unknown register at "
-                      "0x%lx\n", object_get_canonical_path(OBJECT(s)), addr);
-        return 0xffffffff;
+        {
+            g_autofree char *path = object_get_canonical_path(OBJECT(s));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: Access to unknown register at "
+                          "0x%lx\n", path, addr);
+            return 0xffffffff;
+        }
     }
 }
 
@@ -235,6 +301,8 @@ static void nuvoton_pci_ipmi_hmbxstat_w(NuvotonPCIIPMIState *s, uint64_t val)
     v &= ~0x7fffff00;
     /* Bits are W1C */
     s->pci_mbx.hmbxstat &= ~v;
+
+    nuvoton_pcimbx_host_update_irq(s);
 }
 
 static void nuvoton_pci_ipmi_hmbxctl_w(NuvotonPCIIPMIState *s, uint64_t val)
@@ -248,6 +316,8 @@ static void nuvoton_pci_ipmi_hmbxctl_w(NuvotonPCIIPMIState *s, uint64_t val)
     /* CFGLCK can only be cleared on reset */
     s->pci_mbx.hmbxctl = FIELD_DP32(s->pci_mbx.hmbxctl, NUVOTON_HMBXCTL, CFGLCK,
                                     cfglck);
+
+    nuvoton_pcimbx_host_update_irq(s);
 }
 
 static void nuvoton_pci_ipmi_hmbxcmd_w(NuvotonPCIIPMIState *s, uint64_t val)
@@ -258,11 +328,14 @@ static void nuvoton_pci_ipmi_hmbxcmd_w(NuvotonPCIIPMIState *s, uint64_t val)
     v &= ~0xffffff00;
     /* Bits are W1S */
     s->pci_mbx.hmbxcmd |= v;
+
+    nuvoton_pcimbx_bmc_update_irq(s);
 }
 
 static void nuvoton_pci_ipmi_mbx_reg_write(NuvotonPCIIPMIState *s, hwaddr addr,
                                            uint64_t val64)
 {
+
     switch (addr) {
     case A_NUVOTON_HMBXSTAT:
         nuvoton_pci_ipmi_hmbxstat_w(s, val64);
@@ -274,10 +347,13 @@ static void nuvoton_pci_ipmi_mbx_reg_write(NuvotonPCIIPMIState *s, hwaddr addr,
         nuvoton_pci_ipmi_hmbxcmd_w(s, val64);
         break;
     default:
-        /* Anything else is RES1, ignore writes to it */
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: Access to unknown register at "
-                      "0x%lx\n", object_get_canonical_path(OBJECT(s)), addr);
-        break;
+        {
+            g_autofree char *path = object_get_canonical_path(OBJECT(s));
+            /* Anything else is RES1, ignore writes to it */
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: Access to unknown register at "
+                          "0x%lx\n", path, addr);
+            break;
+        }
     }
 }
 
@@ -365,6 +441,7 @@ static void nuvoton_pci_ipmi_realize(PCIDevice *pd, Error **errp)
 
     pci_config_set_prog_interface(pd->config, 0x01);
     pci_config_set_interrupt_pin(pd->config, 0x01);
+    pci_register_bar(pd, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &s->pci_mbx.iomem);
 }
 
 static void nuvoton_ipmi_kcs_realize(DeviceState *dev, Error **errp)
@@ -451,6 +528,7 @@ static void nuvoton_pci_ipmi_class_init(ObjectClass *oc, void *data)
     dc->vmsd = &vmstate_nuvoton_ipmi_kcs;
     device_class_set_props(dc, nuvoton_pci_ipmi_properties);
 
+    pdc->config_read = nuvoton_pci_ipmi_cfg_read;
     pdc->config_write = nuvoton_pci_ipmi_cfg_write;
     pdc->vendor_id = PCI_VENDOR_ID_WINBOND;
     pdc->device_id = PCI_DEVICE_ID_WINBOND_BPCI;
