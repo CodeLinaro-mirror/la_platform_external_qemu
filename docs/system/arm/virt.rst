@@ -36,6 +36,7 @@ The virt board supports:
 - An RTC
 - The fw_cfg device that allows a guest to obtain data from QEMU
 - A PL061 GPIO controller
+- A DesignWare I2C controller
 - An optional SMMUv3 IOMMU
 - hotpluggable DIMMs
 - hotpluggable NVDIMMs
@@ -209,6 +210,9 @@ x-oem-id
 x-oem-table-id
   Set string (up to 8 bytes) to override the default value of field OEM Table ID
   in ACPI table header.
+
+smbus
+  Set ``on``/``off`` to enable/disable smbus controller. The default is ``off``.
 
 Linux guest kernel configuration
 """"""""""""""""""""""""""""""""

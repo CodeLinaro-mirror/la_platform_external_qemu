@@ -37,6 +37,7 @@ config ARM_VIRT
     select VIRTIO_MEM_SUPPORTED
     select ACPI_CXL
     select ACPI_HMAT
+    select DESIGNWARE_I2C
 
 config CUBIEBOARD
     bool
