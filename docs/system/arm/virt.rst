@@ -39,6 +39,7 @@ The virt board supports:
 - A PL061 GPIO controller
 - An optional machine-wide SMMUv3 IOMMU
 - User-creatable SMMUv3 devices (see below for example)
+- A DesignWare I2C controller
 - hotpluggable DIMMs
 - hotpluggable NVDIMMs
 - An MSI controller (GICv2m or ITS).
@@ -238,6 +239,9 @@ x-oem-id
 x-oem-table-id
   Set string (up to 8 bytes) to override the default value of field OEM Table ID
   in ACPI table header.
+
+smbus
+  Set ``on``/``off`` to enable/disable smbus controller. The default is ``off``.
 
 SMMU configuration
 """"""""""""""""""

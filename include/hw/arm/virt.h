@@ -82,6 +82,7 @@ enum {
     VIRT_NVDIMM_ACPI,
     VIRT_PVTIME,
     VIRT_ACPI_PCIHP,
+    VIRT_SMBUS,
     VIRT_LOWMEMMAP_LAST,
 };
 
@@ -156,6 +157,7 @@ struct VirtMachineState {
     bool mte;
     bool dtb_randomness;
     bool second_ns_uart_present;
+    bool smbus_enabled;
     OnOffAuto acpi;
     VirtGICType gic_version;
     VirtIOMMUType iommu;
@@ -179,6 +181,7 @@ struct VirtMachineState {
     Notifier powerdown_notifier;
     Notifier generic_error_notifier;
     PCIBus *bus;
+    I2CBus *smbus;
     char *oem_id;
     char *oem_table_id;
     bool ns_el2_virt_timer_irq;
