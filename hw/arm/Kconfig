@@ -478,6 +478,7 @@ config NPCM7XX
     select PCA954X
     select USB_OHCI_SYSBUS
     select MAX20730
+    select PECI
 
 config NPCM8XX
     bool
