@@ -3734,6 +3734,13 @@ F: include/hw/fsi/*
 F: docs/specs/fsi.rst
 F: tests/qtest/aspeed_fsi-test.c
 
+PECI
+M: Titus Rwantare <titusr@google.com>
+S: Maintained
+F: hw/peci/peci-core.c
+F: hw/peci/peci-client.c
+F: include/hw/peci/peci.h
+
 Firmware schema specifications
 M: Philippe Mathieu-Daudé <philmd@linaro.org>
 R: Daniel P. Berrange <berrange@redhat.com>
