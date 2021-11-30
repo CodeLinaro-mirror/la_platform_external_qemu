@@ -305,6 +305,20 @@ static void aspeed_install_boot_rom(AspeedMachineState *bmc, BlockBackend *blk,
                    rom_size, &error_abort);
 }
 
+static void aspeed_board_init_flash(AspeedSMCState *s, int unit0, int index,
+                                    const char *flashtype)
+{
+    DriveInfo *dinfo = drive_get(IF_MTD, 0, unit0 + index);
+    DeviceState *dev;
+
+    dev = qdev_new(flashtype);
+    if (dinfo) {
+        qdev_prop_set_drive(dev, "drive", blk_by_legacy_dinfo(dinfo));
+    }
+    qdev_prop_set_uint8(dev, "cs", index);
+    qdev_realize_and_unref(dev, BUS(s->spi), &error_fatal);
+}
+
 void aspeed_board_init_flashes(AspeedSMCState *s, const char *flashtype,
                                       unsigned int count, int unit0)
 {
@@ -315,15 +329,7 @@ void aspeed_board_init_flashes(AspeedSMCState *s, const char *flashtype,
     }
 
     for (i = 0; i < count; ++i) {
-        DriveInfo *dinfo = drive_get(IF_MTD, 0, unit0 + i);
-        DeviceState *dev;
-
-        dev = qdev_new(flashtype);
-        if (dinfo) {
-            qdev_prop_set_drive(dev, "drive", blk_by_legacy_dinfo(dinfo));
-        }
-        qdev_prop_set_uint8(dev, "cs", i);
-        qdev_realize_and_unref(dev, BUS(s->spi), &error_fatal);
+        aspeed_board_init_flash(s, unit0, i, flashtype);
     }
 }
 
