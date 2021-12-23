@@ -285,6 +285,15 @@ static void quanta_gbs_i2c_init(NPCM7xxState *soc)
      *     pca9535@25
      *     pca9535@26
      */
+    /* pca6416 is compatible with pca9535 - 16-bit i2c gpio expander */
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 1), "pca6416", 0x24);
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 1), "pca6416", 0x20);
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 1), "pca6416", 0x21);
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 1), "pca6416", 0x22);
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 1), "pca6416", 0x23);
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 1), "pca6416", 0x25);
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 1), "pca6416", 0x26);
+
 
     /* i2c-2: */
     i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 2), "sbtsi", 0x4c);
