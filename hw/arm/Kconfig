@@ -475,6 +475,7 @@ config NPCM7XX
     select UNIMP
     select PCA954X
     select USB_OHCI_SYSBUS
+    select MAX20730
 
 config NPCM8XX
     bool
