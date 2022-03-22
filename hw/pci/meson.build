@@ -21,3 +21,4 @@ system_ss.add_all(when: 'CONFIG_PCI', if_true: pci_ss)
 
 stub_ss.add(files('pci-stub.c'))
 system_ss.add(when: 'CONFIG_GUEST_ONLY_PCI', if_true: files('guest_only_pci.c'))
+system_ss.add(when: 'CONFIG_REMOTE_PCI', if_true: files('remote_pci.c'))

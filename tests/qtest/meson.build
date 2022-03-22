@@ -334,6 +334,7 @@ qos_test_ss.add(
   'pci-test.c',
   'pcnet-test.c',
   'pi7c9x3g606gp.c',
+  # 'remote-pci-test.c', diasbled TODO(b/247856997)
   'rs5c372-test.c',
   'sdhci-test.c',
   'spapr-phb-test.c',

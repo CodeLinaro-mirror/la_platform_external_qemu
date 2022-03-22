@@ -21,3 +21,8 @@ config GUEST_ONLY_PCI
     bool
     default y if PCI_DEVICES
     select PCI_EXPRESS
+
+config REMOTE_PCI
+    bool
+    select PCI_EXPRESS
+    select PCI_DEVICES

@@ -80,6 +80,7 @@ void qpci_device_foreach(QPCIBus *bus, int vendor_id, int device_id,
                          void (*func)(QPCIDevice *dev, int devfn, void *data),
                          void *data);
 QPCIDevice *qpci_device_find(QPCIBus *bus, int devfn);
+void qpci_device_set(QPCIDevice *dev, QPCIBus *bus, int devfn);
 void qpci_device_init(QPCIDevice *dev, QPCIBus *bus, QPCIAddress *addr);
 int qpci_secondary_buses_init(QPCIBus *bus);
 

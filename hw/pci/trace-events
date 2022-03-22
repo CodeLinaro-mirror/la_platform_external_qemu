@@ -28,3 +28,11 @@ pcie_cap_slot_write_config(const char *parent, const char *child, const char *pd
 
 # shpc.c
 shpc_slot_command(const char *parent, int pci_slot, const char *child, const char *old_pic, const char *new_pic, const char *old_aic, const char *new_aic, const char *old_state, const char *new_state) "%s[%d] > %s: pic: %s->%s, aic: %s->%s, state: %s->%s"
+
+# remote_pci.c
+remote_pci_read_external_config(const char *id, uint32_t addr, int size, uint32_t val) "%s: addr: 0x%04" PRIx32 ", size: %d, val: 0x%04" PRIx32
+remote_pci_write_external_config(const char *id, uint32_t addr, int size, uint32_t val) "%s: addr: 0x%04" PRIx32 ", size: %d, val: 0x%04" PRIx32
+remote_pci_bar_read(const char *id, uint32_t addr, int size, uint64_t val) "%s: addr: 0x%04" PRIx32 ", size: %u, val: 0x%08" PRIx64
+remote_pci_bar_write(const char *id, uint32_t addr, int size, uint64_t val) "%s: addr: 0x%04" PRIx32 ", size: %u, val: 0x%08" PRIx64
+remote_pci_dma_read(const char *id, uint64_t addr, uint64_t size) "%s: addr: 0x%08" PRIx64 ", size: 0x%08" PRIx64
+remote_pci_dma_write(const char *id, uint64_t addr, uint64_t size) "%s: addr: 0x%08" PRIx64 ", size: 0x%08" PRIx64

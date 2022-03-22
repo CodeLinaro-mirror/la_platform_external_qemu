@@ -505,6 +505,7 @@ config NPCM8XX
     select I3C
     select SVC_I3C
     select USB_NPCM
+    select REMOTE_PCI
 
 config FSL_IMX25
     bool
