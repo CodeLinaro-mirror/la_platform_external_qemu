@@ -30,6 +30,7 @@
 #include "hw/misc/npcm7xx_rng.h"
 #include "hw/net/npcm7xx_emc.h"
 #include "hw/nvram/npcm7xx_otp.h"
+#include "hw/pci-host/npcm_pcierc.h"
 #include "hw/sd/npcm7xx_sdhci.h"
 #include "hw/timer/npcm7xx_timer.h"
 #include "hw/ssi/npcm7xx_fiu.h"
@@ -99,6 +100,7 @@ struct NPCM8xxState {
     OHCISysBusState     ohci[2];
     NPCM7xxFIUState     fiu[3];
     NPCM7xxSDHCIState   mmc;
+    NPCMPCIERCState     pcierc;
 };
 
 struct NPCM8xxClass {
