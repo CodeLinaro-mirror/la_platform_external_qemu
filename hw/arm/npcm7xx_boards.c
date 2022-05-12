@@ -427,6 +427,10 @@ static void quanta_gbs_init(MachineState *machine)
     npcm7xx_connect_flash(&soc->fiu[0], 0, "mx66u51235f",
                           drive_get(IF_MTD, 0, 0));
 
+    /* Actually mt25ql512a; this one is 3V. */
+    npcm7xx_connect_flash(&soc->fiu[1], 0, "mx25l25635e",
+                          drive_get(IF_MTD, 3, 0));
+
     quanta_gbs_i2c_init(soc);
     sdhci_attach_drive(&soc->mmc.sdhci, 0);
     npcm7xx_load_kernel(machine, soc);
