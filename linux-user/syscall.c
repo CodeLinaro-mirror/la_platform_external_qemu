@@ -6710,6 +6710,8 @@ static abi_long do_prctl(CPUArchState *env, abi_long option, abi_long arg2,
     case PR_SET_CHILD_SUBREAPER:
     case PR_GET_SPECULATION_CTRL:
     case PR_SET_SPECULATION_CTRL:
+    case PR_GET_THP_DISABLE:
+    case PR_SET_THP_DISABLE:
         /* Some prctl options have no pointer arguments and we can pass on. */
         return get_errno(prctl(option, arg2, arg3, arg4, arg5));
 
@@ -6742,8 +6744,6 @@ static abi_long do_prctl(CPUArchState *env, abi_long option, abi_long arg2,
     case PR_SET_MM:
     case PR_GET_SECCOMP:
     case PR_SET_SECCOMP:
-    case PR_GET_THP_DISABLE:
-    case PR_SET_THP_DISABLE:
     case PR_GET_TSC:
     case PR_SET_TSC:
         /* Disable to prevent the target disabling stuff we need. */
