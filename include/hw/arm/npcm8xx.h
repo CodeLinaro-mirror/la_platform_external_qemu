@@ -21,7 +21,7 @@
 #include "hw/cpu/cluster.h"
 #include "hw/dma/npcm8xx-gdma.h"
 #include "hw/gpio/npcm7xx_gpio.h"
-#include "hw/i2c/npcm7xx_smbus.h"
+#include "hw/i2c/npcm_smbus.h"
 #include "hw/i3c/svc-i3c.h"
 #include "hw/ipmi/npcm7xx_kcs.h"
 #include "hw/intc/arm_gic_common.h"
@@ -106,7 +106,7 @@ struct NPCM8xxState {
     NPCM7xxMCState      mc;
     NPCM7xxRNGState     rng;
     NPCM7xxGPIOState    gpio[8];
-    NPCM7xxSMBusState   smbus[27];
+    NPCMSMBusState      smbus[27];
     NPCM7xxKCSState     kcs;
     EHCISysBusState     ehci[2];
     OHCISysBusState     ohci[2];
