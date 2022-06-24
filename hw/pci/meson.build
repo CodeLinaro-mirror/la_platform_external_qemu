@@ -20,3 +20,4 @@ system_ss.add(when: 'CONFIG_PCI_EXPRESS', if_true: files('pcie_port.c', 'pcie_ho
 system_ss.add_all(when: 'CONFIG_PCI', if_true: pci_ss)
 
 system_ss.add(when: 'CONFIG_PCI', if_false: files('pci-stub.c'))
+system_ss.add(when: 'CONFIG_GUEST_ONLY_PCI', if_true: files('guest_only_pci.c'))
