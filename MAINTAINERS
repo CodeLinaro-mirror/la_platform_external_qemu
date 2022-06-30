@@ -2549,6 +2549,12 @@ S: Orphaned
 F: hw/gpio/pcf8574.c
 F: include/gpio/pcf8574.h
 
+cmis
+M: Hao Wu <wuhaotsh@google.com>
+S: Maintained
+F: hw/i2c/cmis.c
+F: include/hw/i2c/cmis.h
+
 DesignWare I2C
 M: Chris Rauer <crauer@google.com>
 S: Maintained
