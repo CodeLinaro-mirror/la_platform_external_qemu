@@ -23,6 +23,7 @@
 #define MAX34451_MFR_IOUT_PEAK          0xD5
 #define MAX34451_MFR_TEMPERATURE_PEAK   0xD6
 #define MAX34451_MFR_VOUT_MIN           0xD7
+#define MAX34451_MFR_NV_FAULT_LOG       0xDC
 
 #define DEFAULT_VOUT                    0
 #define DEFAULT_UV_LIMIT                0
@@ -338,6 +339,23 @@ static void test_all_pages(void *obj, void *data, QGuestAllocator *alloc)
     }
 }
 
+/* test reading the full 255-byte fault log */
+static void test_nv_fault_log(void *obj, void *data, QGuestAllocator *alloc)
+{
+    uint8_t buf[255];
+    QI2CDevice *i2cdev = (QI2CDevice *)obj;
+
+    /* initialise buffer to known bit pattern if read_block doesn't complete */
+    memset(buf, 0x55, sizeof(buf));
+
+    i2c_read_block(i2cdev, MAX34451_MFR_NV_FAULT_LOG, buf, sizeof(buf));
+
+    /* The device is reset to 0xff */
+    for (int i = 0; i < 255; i++) {
+        g_assert_cmphex(buf[i], ==, 0xff);
+    }
+}
+
 static void max34451_register_nodes(void)
 {
     QOSGraphEdgeOptions opts = {
@@ -355,6 +373,7 @@ static void max34451_register_nodes(void)
     qos_add_test("test_ro_regs", "max34451", test_ro_regs, NULL);
     qos_add_test("test_ov_faults", "max34451", test_ov_faults, NULL);
     qos_add_test("test_ot_faults", "max34451", test_ot_faults, NULL);
+    qos_add_test("test_nv_fault_log", "max34451", test_nv_fault_log, NULL);
     qos_add_test("test_all_pages", "max34451", test_all_pages, NULL);
 }
 libqos_init(max34451_register_nodes);
