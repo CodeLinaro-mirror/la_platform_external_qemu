@@ -464,6 +464,7 @@ config NPCM7XX
     select A9MPCORE
     select ADM1266
     select ADM1272
+    select ADP1050
     select ARM_GIC
     select SMBUS
     select AT24C  # EEPROM
