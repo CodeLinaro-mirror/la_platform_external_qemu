@@ -8,10 +8,12 @@
 
 #include "qemu/osdep.h"
 #include <math.h>
+#include <stdint.h>
 #include "hw/i2c/pmbus_device.h"
 #include "migration/vmstate.h"
 #include "qemu/module.h"
 #include "qemu/log.h"
+#include "trace.h"
 
 uint16_t pmbus_data2direct_mode(PMBusCoefficients c, uint32_t value)
 {
@@ -36,6 +38,37 @@ uint16_t pmbus_data2linear_mode(uint16_t value, int exp)
     return value >> exp;
 }
 
+uint16_t pmbus_data2linear11(uint16_t value, int exp)
+{
+    return (uint16_t)((exp & 0x1F) << 11 |
+        (pmbus_data2linear_mode(value, exp) & 0x7FF));
+}
+
+uint16_t pmbus_milliunits2linear_mode(uint32_t value, int exp)
+{
+    uint32_t ret;
+
+    /* L = D * 2^(-e) */
+    if (exp < 0) {
+        ret = DIV_ROUND_CLOSEST((value << (-exp)), 1000);
+    } else {
+        ret = DIV_ROUND_CLOSEST((value >> exp), 1000);
+    }
+
+    /* clamp value to maximum if it exceeds representable value*/
+    if (ret > UINT16_MAX) {
+        return UINT16_MAX;
+    }
+
+    return ret;
+}
+
+uint16_t pmbus_milliunits2linear11(uint32_t value, int exp)
+{
+    return (uint16_t)((exp & 0x1F) << 11 |
+        (pmbus_milliunits2linear_mode(value, exp) & 0x7FF));
+}
+
 uint16_t pmbus_linear_mode2data(uint16_t value, int exp)
 {
     /* D = L * 2^e */
@@ -43,6 +76,17 @@ uint16_t pmbus_linear_mode2data(uint16_t value, int exp)
         return value >> (-exp);
     }
     return value << exp;
+}
+
+uint32_t pmbus_linear_mode2milliunits(uint16_t value, int exp)
+{
+    /* D = L * 2^e */
+    uint32_t v = (uint32_t)value;
+
+    if (exp < 0) {
+        return (v * 1000) >> (-exp);
+    }
+    return (v << exp) * 1000;
 }
 
 void pmbus_send(PMBusDevice *pmdev, const uint8_t *data, uint16_t len)
@@ -63,8 +107,9 @@ void pmbus_send(PMBusDevice *pmdev, const uint8_t *data, uint16_t len)
 static void pmbus_send_uint(PMBusDevice *pmdev, uint64_t data, uint8_t size)
 {
     uint8_t bytes[8];
-    g_assert(size <= 8);
 
+    g_assert(size <= 8);
+    trace_pmbus_read_uint(DEVICE(pmdev)->canonical_path, pmdev->code, data);
     for (int i = 0; i < size; i++) {
         bytes[i] = data & 0xFF;
         data = data >> 8;
@@ -105,6 +150,7 @@ void pmbus_send_string(PMBusDevice *pmdev, const char *data)
     g_assert(len + pmdev->out_buf_len < SMBUS_DATA_MAX_LEN);
     pmdev->out_buf[len + pmdev->out_buf_len] = len;
 
+    trace_pmbus_read_string(DEVICE(pmdev)->canonical_path, pmdev->code, data);
     for (int i = len - 1; i >= 0; i--) {
         pmdev->out_buf[i + pmdev->out_buf_len] = data[len - 1 - i];
     }
@@ -152,6 +198,8 @@ static uint64_t pmbus_receive_uint(PMBusDevice *pmdev)
     for (int i = pmdev->in_buf_len - 1; i >= 0; i--) {
         ret = ret << 8 | pmdev->in_buf[i];
     }
+
+    trace_pmbus_write_uint(DEVICE(pmdev)->canonical_path, pmdev->code, ret);
     return ret;
 }
 
@@ -1246,6 +1294,16 @@ static int pmbus_write_data(SMBusDevice *smd, uint8_t *buf, uint8_t len)
 
     pmdev->in_buf_len = len;
     pmdev->in_buf = buf;
+
+    /* clear the output buffer when the register being read changes */
+    if (pmdev->out_buf_len != 0 && pmdev->code != buf[0]) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: previous read was not completed, %d bytes dropped\n",
+                      __func__, pmdev->out_buf_len);
+
+        pmdev->out_buf_len = 0;
+        memset(pmdev->out_buf, 0, sizeof(pmdev->out_buf));
+    }
 
     pmdev->code = buf[0]; /* PMBus command code */
 

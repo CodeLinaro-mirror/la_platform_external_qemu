@@ -61,3 +61,8 @@ pca954x_read_data(uint8_t value) "PCA954X read data: 0x%02x"
 
 imx_i2c_read(const char *id, const char *reg, uint64_t ofs, uint64_t value) "%s:[%s (0x%" PRIx64 ")] -> 0x%02" PRIx64
 imx_i2c_write(const char *id, const char *reg, uint64_t ofs, uint64_t value) "%s:[%s (0x%" PRIx64 ")] <- 0x%02" PRIx64
+
+# pmbus_device.c
+pmbus_read_uint(const char *id, uint8_t code, uint16_t data) "%s: read reg: 0x%02x data: 0x%x"
+pmbus_read_string(const char *id, uint8_t code, const char *data) "%s: read reg: 0x%02x data: %s"
+pmbus_write_uint(const char *id, uint8_t code, uint16_t data) "%s: write to reg: 0x%02x data: 0x%x"
