@@ -20,3 +20,4 @@ system_ss.add(when: 'CONFIG_DELTA_U50SU8P167', if_true: files('delta_u50su8p167.
 system_ss.add(when: 'CONFIG_PMBUS', if_true: files('pmbus_generic.c'))
 system_ss.add(when: 'CONFIG_TDA387XX', if_true: files('tda387xx.c'))
 system_ss.add(when: 'CONFIG_LTC4287', if_true: files('ltc4287.c'))
+system_ss.add(when: 'CONFIG_PI7C9X3G606GP', if_true: files('pi7c9x3g606gp.c'))

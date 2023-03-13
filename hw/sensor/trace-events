@@ -18,6 +18,15 @@ tmp105_read(uint8_t dev, uint8_t addr) "device: 0x%02x, addr: 0x%02x"
 tmp105_write(uint8_t dev, uint8_t addr) "device: 0x%02x, addr 0x%02x"
 tmp105_write_shutdown(uint8_t dev) "device: 0x%02x"
 
+# pi7c9x3g606gp.c
+pi7c9x3g606gp_byte_enabled(const char *id, uint8_t data) "%s: 0x%" PRIx8
+pi7c9x3g606gp_port(const char *id, uint8_t data) "%s: 0x%" PRIx8
+pi7c9x3g606gp_address(const char *id, uint32_t data) "%s: 0x%" PRIx32
+pi7c9x3g606gp_read_byte(const char *id, uint8_t data) "%s: 0x%" PRIx8
+pi7c9x3g606gp_write_byte(const char *id, uint8_t data) "%s: 0x%" PRIx8
+pi7c9x3g606gp_read_reg(const char *id, uint32_t addr, uint32_t data) "%s: reg[0x%02" PRIx32 "]= 0x%" PRIx32
+pi7c9x3g606gp_write_reg(const char *id, uint32_t addr, uint32_t data) "%s: reg[0x%02" PRIx32 "]= 0x%" PRIx32
+
 # sbtsi.c
 sbtsi_write(uint8_t addr, uint8_t value) "SBTSI write addr:0x%02x data: 0x%02x"
 sbtsi_read(uint8_t addr, uint8_t value) "SBTSI read addr:0x%02x data: 0x%02x"

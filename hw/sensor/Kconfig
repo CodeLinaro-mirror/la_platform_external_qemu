@@ -92,3 +92,8 @@ config LTC4287
     bool
     depends on I2C
     default y if I2C_DEVICES
+
+config PI7C9X3G606GP
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
