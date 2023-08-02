@@ -17,6 +17,7 @@
 #include "qemu/osdep.h"
 
 #include "hw/core/boards.h"
+#include "chardev/char.h"
 #include "hw/arm/boot.h"
 #include "hw/arm/bsa.h"
 #include "hw/arm/npcm8xx.h"
@@ -27,8 +28,10 @@
 #include "hw/core/qdev-clock.h"
 #include "hw/core/qdev-properties.h"
 #include "qapi/error.h"
+#include "qemu/error-report.h"
 #include "qemu/units.h"
 #include "system/system.h"
+#include "qom/object.h"
 
 /*
  * This covers the whole MMIO space. We'll use this to catch any MMIO accesses
@@ -752,6 +755,14 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
 
     /* PCI Mailbox. Cannot fail */
     for (i = 0; i < ARRAY_SIZE(s->pci_mbox); i++) {
+        g_autofree char *char_name = g_strdup_printf("pci%d", i);
+        Chardev *chardev = qemu_chr_find(char_name);
+
+        if (chardev) {
+            qdev_prop_set_chr(DEVICE(&s->pci_mbox[i]), "chardev", chardev);
+        } else {
+            warn_report("PCI Mailbox %d does not have a chardev backend.", i);
+        }
         sysbus_realize(SYS_BUS_DEVICE(&s->pci_mbox[i]), &error_abort);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->pci_mbox[i]), 0,
                                        npcm8xx_pci_mbox_addr[i]);
