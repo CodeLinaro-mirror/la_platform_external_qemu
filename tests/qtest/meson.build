@@ -319,6 +319,7 @@ qos_test_ss.add(
   'rs5c372-test.c',
   'sdhci-test.c',
   'spapr-phb-test.c',
+  'tda387xx-test.c',
   'tmp105-test.c',
   'emc141x-test.c',
   'usb-hcd-ohci-test.c',
