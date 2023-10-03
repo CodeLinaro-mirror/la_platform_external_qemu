@@ -47,6 +47,9 @@ if host_os != 'windows'
   system_ss.add(when: 'CONFIG_USB_STORAGE_MTP', if_true: files('dev-mtp.c'))
 endif
 
+# usb device controllers
+system_ss.add(when: 'CONFIG_USB_NPCM8XX', if_true: files('npcm8xx-udc.c'))
+
 # smartcard
 system_ss.add(when: 'CONFIG_USB_SMARTCARD', if_true: files('dev-smartcard-reader.c'))
 

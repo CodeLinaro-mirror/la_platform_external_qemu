@@ -500,6 +500,7 @@ config NPCM8XX
     select I3C
     select SVC_I3C
     select NPCM8XX_GDMA
+    select USB_NPCM8XX
 
 config FSL_IMX25
     bool
