@@ -61,6 +61,11 @@ config MAX_16600
     bool
     depends on I2C
 
+config MAX31732
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
 config MAX31760
     bool
     depends on I2C

@@ -1,0 +1,140 @@
+/*
+ * MAX31732 temperature sensor
+ *
+ * Features:
+ *  - 4 external diode temperature inputs
+ *
+ * Copyright 2023 Google LLC
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#ifndef MAX31732_H
+#define MAX31732_H
+
+#include "qemu/osdep.h"
+#include "hw/i2c/smbus_slave.h"
+#include "hw/registerfields.h"
+#include "qemu/compiler.h"
+#include "qom/object.h"
+
+REG8(MANUFACTURER_ID, 0x0)
+REG8(REVISION_CODE, 0x1)
+
+REG16(REMOTE_1_TEMPERATURE, 0x02)
+REG16(REMOTE_2_TEMPERATURE, 0x04)
+REG16(REMOTE_3_TEMPERATURE, 0x06)
+REG16(REMOTE_4_TEMPERATURE, 0x08)
+REG16(LOCAL_TEMPERATURE, 0x0A)
+
+REG8(THERMAL_STATUS_HIGH_TEMPERATURE, 0x0C)
+REG8(THERMAL_STATUS_LOW_TEMPERATURE, 0x0D)
+REG8(TEMPERATURE_CHANNEL_ENABLE, 0x0E)
+
+REG8(CONFIGURATION_1, 0x0F)
+REG8(CONFIGURATION_2, 0x10)
+
+REG8(REMOTE_1_CHANNEL_CUSTOM_IDEALITY, 0x11)
+REG8(REMOTE_2_CHANNEL_CUSTOM_IDEALITY, 0x12)
+REG8(REMOTE_3_CHANNEL_CUSTOM_IDEALITY, 0x13)
+REG8(REMOTE_4_CHANNEL_CUSTOM_IDEALITY, 0x14)
+
+REG8(CUSTOM_IDEALITY_ENABLE, 0x15)
+
+REG8(CUSTOM_OFFSET, 0x16)
+REG8(CUSTOM_OFFSET_ENABLE, 0x17)
+
+REG8(FILTER_ENABLE, 0x18)
+
+REG8(BETA_COMPENSATION_ENABLE, 0x19)
+
+REG8(HIGHEST_TEMPERATURE_ENABLE, 0x1A)
+FIELD(HIGHEST_TEMPERATURE_ENABLE, LOCAL, 0, 1)
+
+REG16(ALARM_1_MASK, 0x1B)
+REG16(ALARM_2_MASK, 0x1C)
+
+REG16(REMOTE_1_PRIMARY_OVER_TEMPERATURE_THRESHOLD, 0x1D)
+REG16(REMOTE_2_PRIMARY_OVER_TEMPERATURE_THRESHOLD, 0x1F)
+REG16(REMOTE_3_PRIMARY_OVER_TEMPERATURE_THRESHOLD, 0x21)
+REG16(REMOTE_4_PRIMARY_OVER_TEMPERATURE_THRESHOLD, 0x23)
+REG16(LOCAL_PRIMARY_OVER_TEMPERATURE_THRESHOLD, 0x25)
+REG16(PRIMARY_THRESHOLD_LOW_LIMIT, 0x27)
+
+REG8(REMOTE_1_SECONDARY_THRESHOLD_HIGH_LIMIT, 0x29)
+REG8(REMOTE_2_SECONDARY_THRESHOLD_HIGH_LIMIT, 0x2A)
+REG8(REMOTE_3_SECONDARY_THRESHOLD_HIGH_LIMIT, 0x2B)
+REG8(REMOTE_4_SECONDARY_THRESHOLD_HIGH_LIMIT, 0x2C)
+REG8(LOCAL_SECONDARY_THRESHOLD_HIGH_LIMIT, 0x2D)
+REG8(SECONDARY_THRESHOLD_LOW_LIMIT, 0x2E)
+
+REG16(REMOTE_1_REFERENCE_TEMPERATURE, 0x2F)
+REG16(REMOTE_2_REFERENCE_TEMPERATURE, 0x31)
+REG16(REMOTE_3_REFERENCE_TEMPERATURE, 0x33)
+REG16(REMOTE_4_REFERENCE_TEMPERATURE, 0x35)
+REG16(LOCAL_REFERENCE_TEMPERATURE, 0x37)
+
+REG8(MTP_CONFIGURATION, 0x39)
+REG8(MTP_CONFIGURATION_2, 0x3A)
+REG8(MTP_ADDRESS, 0x3B)
+REG16(MTP_DIN, 0x3C)
+
+REG8(STATUS, 0x41)
+REG8(SECONDARY_THERMAL_STATUS_HIGH_TEMPERATURE, 0x42)
+REG8(SECONDARY_THERMAL_STATUS_LOW_TEMPERATURE, 0x43)
+REG8(DIODE_FAULT_STATUS, 0x44)
+REG16(HIGHEST_TEMPERATURE, 0x45)
+
+REG8(BETA_VALUE_REMOTE_1, 0x47)
+REG8(BETA_VALUE_REMOTE_2, 0x48)
+REG8(BETA_VALUE_REMOTE_3, 0x49)
+REG8(BETA_VALUE_REMOTE_4, 0x4A)
+
+
+#define MAX31732_NUM_REG (A_BETA_VALUE_REMOTE_4 + 1)
+#define MAX31732_NUM_TEMPS 5
+
+typedef struct MAX31732State {
+    SMBusDevice parent;
+
+    /* registers */
+    uint8_t regs[MAX31732_NUM_REG];
+
+    /* ix2 transaction state */
+    uint8_t command;
+    bool i2c_cmd_event;
+} MAX31732State;
+
+#define TYPE_MAX31732 "max31732"
+OBJECT_DECLARE_SIMPLE_TYPE(MAX31732State, MAX31732)
+
+/**
+ * @temp: is an 8-bit two's complement integer with a range of [-63C, 127C]
+ * @fraction: represents 0.0625 increments of the temperature.
+ * @sign: the lower nibble is unused on hardware, in this model a sign bit is
+ * stored here to distinguish between fractions around zero, e.g: 0.5 and -0.5C
+ */
+typedef struct MAX31732Temperature {
+    int8_t temp;
+    uint8_t fraction:4;
+    uint8_t sign:1;
+    uint8_t _padding:3;
+} QEMU_PACKED MAX31732Temperature;
+
+/**
+ * get_temperature:
+ * @temp_reg: a pointer to the MSB of the temperature value
+ *
+ */
+int32_t max31732_get_temperature(uint8_t *temp_reg);
+
+/**
+ * set_temperature:
+ * @temp_reg: the device registers
+ * @temperature: the temperature to be written in millidegrees
+ *
+ * Take a temperature in millidegrees between 128C and -63C and store it in
+ * @temp_reg.
+ */
+void max31732_set_temperature(uint8_t *temp_reg, int32_t value);
+#endif
