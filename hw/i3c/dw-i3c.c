@@ -723,8 +723,10 @@ static void dw_i3c_ibi_queue_push(DWI3C *s)
 {
     /* Stored value is in 32-bit chunks, convert it to byte chunks. */
     uint8_t ibi_slice_size = dw_i3c_ibi_slice_size(s);
-    uint8_t num_slices = fifo8_num_used(&s->ibi_data.ibi_intermediate_queue) /
-                         ibi_slice_size;
+    uint8_t num_slices = (fifo8_num_used(&s->ibi_data.ibi_intermediate_queue) /
+                         ibi_slice_size) +
+                         ((fifo8_num_used(&s->ibi_data.ibi_intermediate_queue) %
+                         ibi_slice_size) ? 1 : 0);
     uint8_t ibi_status_count = num_slices;
     union {
         uint8_t b[sizeof(uint32_t)];
