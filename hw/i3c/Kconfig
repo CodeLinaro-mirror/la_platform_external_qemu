@@ -18,3 +18,7 @@ config REMOTE_I3C
     bool
     select I3C
     default y if I3C_DEVICES
+
+config SVC_I3C
+    select I3C
+    bool
