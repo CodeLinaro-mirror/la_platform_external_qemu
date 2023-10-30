@@ -501,6 +501,8 @@ config NPCM8XX
     select CMIS
     select NPCM_PCIERC
     select NPCM8XX_GDMA
+    select I3C
+    select SVC_I3C
 
 config FSL_IMX25
     bool
