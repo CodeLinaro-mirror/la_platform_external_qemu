@@ -53,3 +53,6 @@ remote_i3c_send(const char *name, uint32_t num_sent, bool is_ccc) "Remote I3C '%
 remote_i3c_ccc_read(const char *name, uint32_t num_read, uint32_t num_to_read) "Remote I3C '%s' CCC read %" PRId32 "/%" PRId32 " bytes"
 remote_i3c_event(const char *name, uint8_t event) "Remote I3C '%s' event 0x%" PRIx8
 remote_i3c_do_ibi(const char *name, uint8_t addr, bool is_recv) "Remote I3C '%s' IBI with addr 0x%" PRIx8 " RnW=%d"
+
+# svc-i3c.c
+svc_i3c_reset(char *device) "%s: reset"
