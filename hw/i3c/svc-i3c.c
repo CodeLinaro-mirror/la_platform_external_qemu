@@ -163,6 +163,14 @@ static const uint32_t svc_i3c_ro[SVC_I3C_NR_REGS] = {
     [R_MRMSG_SDR]  = 0xffff0000,
 };
 
+static void svc_i3c_update_irq(SVCI3C *s)
+{
+    s->regs[R_MINTMASKED] = s->regs[R_MSTATUS] & s->regs[R_MINTSET];
+    bool level = !!(s->regs[R_MINTMASKED]);
+
+    qemu_set_irq(s->irq, level);
+}
+
 static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
 {
     return 0;
@@ -195,6 +203,33 @@ static void svc_i3c_enter_reset(Object *obj, ResetType type)
     trace_svc_i3c_reset(path);
 }
 
+static void svc_i3c_mintclr_w(SVCI3C *s, uint32_t val)
+{
+    /* Clear the corresponding bits in MINTSET/ */
+    s->regs[R_MINTSET] &= ~val;
+    svc_i3c_update_irq(s);
+}
+
+static void svc_i3c_mintset_w(SVCI3C *s, uint32_t val)
+{
+    s->regs[R_MINTSET] |= val;
+    svc_i3c_update_irq(s);
+}
+
+static void svc_i3c_mstatus_w(SVCI3C *s, uint32_t val)
+{
+    /* If they're clearing IBIWON, clear IBIADDR and IBITYPE. */
+    if (FIELD_EX32(val, MSTATUS, IBIWON) &&
+        ARRAY_FIELD_EX32(s->regs, MSTATUS, IBIWON)) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, IBIADDR, 0);
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, IBITYPE, 0);
+    }
+
+    /* MSTATUS is W1C. */
+    s->regs[R_MSTATUS] &= ~val;
+    svc_i3c_update_irq(s);
+}
+
 static void svc_i3c_write(void *opaque, hwaddr offset, uint64_t value,
                          unsigned size)
 {
@@ -206,6 +241,15 @@ static void svc_i3c_write(void *opaque, hwaddr offset, uint64_t value,
     val32 &= ~svc_i3c_ro[addr];
     trace_svc_i3c_write(path, offset, val32);
     switch (addr) {
+    case R_MSTATUS:
+        svc_i3c_mstatus_w(s, val32);
+        break;
+    case R_MINTSET:
+        svc_i3c_mintset_w(s, val32);
+        break;
+    case R_MINTCLR:
+        svc_i3c_mintclr_w(s, val32);
+        break;
     default:
         s->regs[addr] = val32;
         break;
