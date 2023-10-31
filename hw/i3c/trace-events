@@ -57,3 +57,4 @@ remote_i3c_do_ibi(const char *name, uint8_t addr, bool is_recv) "Remote I3C '%s'
 # svc-i3c.c
 svc_i3c_reset(char *device) "%s: reset"
 svc_i3c_write(char *device, uint64_t offset, uint32_t data) "%s: write: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
+svc_i3c_read(char *device, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
