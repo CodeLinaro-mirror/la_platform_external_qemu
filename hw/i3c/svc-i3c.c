@@ -10,15 +10,15 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/log.h"
 #include "qemu/error-report.h"
-#include "hw/registerfields.h"
-#include "hw/qdev-properties.h"
+#include "qemu/log.h"
 #include "qapi/error.h"
-#include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/svc-i3c.h"
 #include "hw/irq.h"
+#include "hw/qdev-properties.h"
+#include "hw/registerfields.h"
+#include "trace.h"
 
 REG32(MCONFIG, 0x00)
     FIELD(MCONFIG, I2CBAUD, 28, 3)
@@ -163,6 +163,16 @@ static const uint32_t svc_i3c_ro[SVC_I3C_NR_REGS] = {
     [R_MRMSG_SDR]  = 0xffff0000,
 };
 
+static inline bool svc_i3c_is_enabled(SVCI3C *s)
+{
+    return ARRAY_FIELD_EX32(s->regs, MCONFIG, MSTENA);
+}
+
+static inline bool svc_i3c_tx_in_progress(SVCI3C *s)
+{
+    return ARRAY_FIELD_EX32(s->regs, MSTATUS, STATE) == SVC_I3C_STATE_NORM_ACT;
+}
+
 static void svc_i3c_update_irq(SVCI3C *s)
 {
     s->regs[R_MINTMASKED] = s->regs[R_MSTATUS] & s->regs[R_MINTSET];
@@ -171,11 +181,66 @@ static void svc_i3c_update_irq(SVCI3C *s)
     qemu_set_irq(s->irq, level);
 }
 
+static void svc_i3c_merrwarn_update(SVCI3C *s, uint32_t mask)
+{
+    s->regs[R_MERRWARN] |= mask;
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, ERRWARN, 1);
+    svc_i3c_update_irq(s);
+}
+
+static void svc_i3c_merrwarn_clear(SVCI3C *s, uint32_t mask)
+{
+    s->regs[R_MERRWARN] &= ~mask;
+    if (s->regs[R_MERRWARN] == 0) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, ERRWARN, 0);
+        svc_i3c_update_irq(s);
+    }
+}
+
+static uint32_t svc_i3c_rxtrig_threshold(SVCI3C *s)
+{
+    switch (ARRAY_FIELD_EX32(s->regs, MDATACTRL, RXTRIG)) {
+    /* Trigger when not empty. */
+    case 0:
+        return 1;
+    /* Trigger when 1/4 full. */
+    case 1:
+        return SVC_I3C_FIFO_SIZE / 4;
+    /* Trigger when 1/2 full. */
+    case 2:
+        return SVC_I3C_FIFO_SIZE / 2;
+    /* Trigger when 3/4 full. */
+    case 3:
+        return SVC_I3C_FIFO_SIZE * 3 / 4;
+    default:
+        g_assert_not_reached();
+     }
+}
+
+static uint32_t svc_i3c_mdatactrl_r(SVCI3C *s)
+{
+    uint32_t val = s->regs[R_MDATACTRL];
+
+    val = FIELD_DP32(val, MDATACTRL, RXEMPTY, fifo8_is_empty(&s->rx_fifo));
+    val = FIELD_DP32(val, MDATACTRL, TXFULL, fifo8_is_full(&s->tx_fifo));
+    val = FIELD_DP32(val, MDATACTRL, RXCOUNT, fifo8_num_used(&s->rx_fifo));
+    val = FIELD_DP32(val, MDATACTRL, TXCOUNT, fifo8_num_used(&s->tx_fifo));
+    return val;
+}
+
 static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
 {
     SVCI3C *s = SVC_I3C(opaque);
     uint32_t addr = offset >> 2;
-    uint32_t value = s->regs[addr];
+    uint32_t value;
+
+    switch (addr) {
+    case R_MDATACTRL:
+        value = svc_i3c_mdatactrl_r(s);
+        break;
+    default:
+        value = s->regs[addr];
+    }
 
     trace_svc_i3c_read(object_get_canonical_path(OBJECT(s)), offset, value);
     return value;
@@ -196,6 +261,192 @@ static int svc_i3c_ibi_finish(I3CBus *bus)
     return 0;
 }
 
+static void svc_i3c_end_transfer(SVCI3C *s)
+{
+    bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
+
+    if (is_i2c) {
+        legacy_i2c_end_transfer(s->bus);
+    } else {
+        /* TODO(b/308692346): I3C. */
+    }
+
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_IDLE);
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+
+    /* If this was a 1-shot DMA transfer, clear the DMA bit. */
+    if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMATB) == 1) {
+        ARRAY_FIELD_DP32(s->regs, MDMACTRL, DMATB, 0);
+    }
+    if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMAFB) == 1) {
+        ARRAY_FIELD_DP32(s->regs, MDMACTRL, DMAFB, 0);
+    }
+
+    trace_svc_i3c_end_transfer(object_get_canonical_path(OBJECT(s)));
+}
+
+static uint32_t svc_i3c_txtrig_threshold(SVCI3C *s)
+{
+
+    switch (ARRAY_FIELD_EX32(s->regs, MDATACTRL, TXTRIG)) {
+    /* Trigger when empty. */
+    case 0:
+        return 0;
+    /* Trigger when 1/4 full. */
+    case 1:
+        return SVC_I3C_FIFO_SIZE / 4;
+    /* Trigger when 1/2 full. */
+    case 2:
+        return SVC_I3C_FIFO_SIZE / 2;
+    /* Trigger when FIFO_SIZE - 1 */
+    case 3:
+        return SVC_I3C_FIFO_SIZE  - 1;
+    default:
+        g_assert_not_reached();
+    }
+}
+
+static uint32_t svc_i3c_txfifo_pop(SVCI3C *s, uint8_t *buf, uint32_t num_bytes)
+{
+    uint32_t trig_threshold = svc_i3c_txtrig_threshold(s);
+    uint32_t i;
+
+    for (i = 0; i < num_bytes; i++) {
+        if (fifo8_is_empty(&s->tx_fifo)) {
+            break;
+        }
+        buf[i] = fifo8_pop(&s->tx_fifo);
+        trace_svc_i3c_txfifo_pop(object_get_canonical_path(OBJECT(s)), buf[i]);
+
+        if (fifo8_num_used(&s->tx_fifo) <= trig_threshold) {
+            ARRAY_FIELD_DP32(s->regs, MSTATUS, TXNOTFULL, 0);
+        }
+    }
+
+    svc_i3c_update_irq(s);
+    return i;
+}
+
+static void svc_i3c_txfifo_push(SVCI3C *s, const uint8_t *buf, int num_bytes)
+{
+    uint32_t trig_threshold = svc_i3c_txtrig_threshold(s);
+
+    for (int i = 0; i < num_bytes; i++) {
+        if (fifo8_is_full(&s->tx_fifo)) {
+            svc_i3c_merrwarn_update(s, R_MERRWARN_OWRITE_MASK);
+            break;
+        }
+
+        fifo8_push(&s->tx_fifo, buf[i]);
+        trace_svc_i3c_txfifo_push(object_get_canonical_path(OBJECT(s)), buf[i]);
+        if (fifo8_num_used(&s->tx_fifo) <= trig_threshold) {
+            ARRAY_FIELD_DP32(s->regs, MSTATUS, TXNOTFULL, 1);
+        }
+    }
+
+    svc_i3c_update_irq(s);
+}
+
+static int svc_i3c_tx(SVCI3C *s)
+{
+    int ret = 0;
+    bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
+    uint32_t xfer_size = 0;
+    uint8_t i3c_buf[SVC_I3C_FIFO_SIZE];
+
+    if (!svc_i3c_is_enabled(s)) {
+        return 0;
+    }
+    if (!svc_i3c_tx_in_progress(s)) {
+        return 0;
+    }
+
+    if (is_i2c) {
+        xfer_size = svc_i3c_txfifo_pop(s, i3c_buf, SVC_I3C_FIFO_SIZE);
+        for (int i = 0; i < xfer_size; i++) {
+            /* Break out if we got NACKed. */
+            ret = legacy_i2c_send(s->bus, i3c_buf[i]);
+            if (ret) {
+                break;
+            }
+        }
+    } else {
+        /* TODO(b/308692346): I3C. */
+    }
+
+    trace_svc_i3c_send(object_get_canonical_path(OBJECT(s)), xfer_size);
+    return ret;
+}
+
+static void svc_i3c_send_start(SVCI3C *s)
+{
+    bool is_read = ARRAY_FIELD_EX32(s->regs, MCTRL, DIR);
+    uint8_t addr = ARRAY_FIELD_EX32(s->regs, MCTRL, ADDR);
+    bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
+    int ret = 0;
+
+    if (!svc_i3c_is_enabled(s)) {
+        return;
+    }
+
+    if (is_i2c) {
+        ret = legacy_i2c_start_transfer(s->bus, addr, is_read);
+    } else {
+        /* TODO(b/308692346): I3C. */
+    }
+
+    /* MCTRLDONE is set regardless of an ACK or NACK. */
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, MCTRLDONE, 1);
+    if (ret) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+        svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+    } else {
+        /* MSTATUS.NACKED must be cleared by us on any START ACK. */
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 0);
+    }
+
+    trace_svc_i3c_start_transfer(object_get_canonical_path(OBJECT(s)));
+    svc_i3c_update_irq(s);
+}
+
+static void svc_i3c_mctrl_w(SVCI3C *s, uint32_t val)
+{
+    bool is_read;
+
+    s->regs[R_MCTRL] = val;
+    SVCI3CRequest req = ARRAY_FIELD_EX32(s->regs, MCTRL, REQUEST);
+
+    /* Automatically cleared on an MCTRL write. */
+    svc_i3c_merrwarn_clear(s, R_MERRWARN_NACK_MASK);
+
+    switch (req) {
+    case SVC_I3C_REQUEST_NONE:
+        break;
+    case SVC_I3C_REQUEST_EMIT_START_ADDR:
+        /* We're initiating a transfer from MCTRL, set state to NORMACT. */
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_NORM_ACT);
+        svc_i3c_send_start(s);
+        is_read = ARRAY_FIELD_EX32(s->regs, MCTRL, DIR);
+        if (is_read) {
+            /* TODO(b/308691746): I3C. */
+        } else {
+            svc_i3c_tx(s);
+        }
+        break;
+    case SVC_I3C_REQUEST_EMIT_STOP:
+        svc_i3c_end_transfer(s);
+        break;
+    case SVC_I3C_REQUEST_IBI_ACK_NACK:
+        break;
+    case SVC_I3C_REQUEST_PROCESS_DAA:
+        break;
+    case SVC_I3C_REQUEST_AUTO_IBI:
+        break;
+    default:
+        g_assert_not_reached();
+    }
+}
+
 static void svc_i3c_enter_reset(Object *obj, ResetType type)
 {
     SVCI3C *s = SVC_I3C(obj);
@@ -209,7 +460,7 @@ static void svc_i3c_enter_reset(Object *obj, ResetType type)
 
 static void svc_i3c_mintclr_w(SVCI3C *s, uint32_t val)
 {
-    /* Clear the corresponding bits in MINTSET/ */
+    /* Clear the corresponding bits in MINTSET. */
     s->regs[R_MINTSET] &= ~val;
     svc_i3c_update_irq(s);
 }
@@ -227,6 +478,162 @@ static void svc_i3c_mstatus_w(SVCI3C *s, uint32_t val)
     svc_i3c_update_irq(s);
 }
 
+static void svc_i3c_update_fifo_trigger(SVCI3C *s)
+{
+    uint32_t tx_threshold = svc_i3c_txtrig_threshold(s);
+    uint32_t rx_threshold = svc_i3c_rxtrig_threshold(s);
+
+    if (fifo8_num_used(&s->tx_fifo) <= tx_threshold) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, TXNOTFULL, 1);
+        if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMATB)) {
+            svc_i3c_tx(s);
+        }
+    }
+    if (fifo8_num_used(&s->rx_fifo) > rx_threshold) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
+        if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMAFB)) {
+            /* TODO(b/308691746): I3C. */
+        }
+    }
+
+    svc_i3c_update_irq(s);
+}
+
+static void svc_i3c_merrwarn_w(SVCI3C *s, uint32_t val)
+{
+    /* MERRWARN is W1C. */
+    svc_i3c_merrwarn_clear(s, val);
+}
+
+static void svc_i3c_mdatactrl_w(SVCI3C *s, uint32_t val)
+{
+    /* FIFO triggers can only be written if UNLOCK is set. */
+    if (FIELD_EX32(val, MDATACTRL, UNLOCK)) {
+        ARRAY_FIELD_DP32(s->regs, MDATACTRL, RXTRIG,
+                         FIELD_EX32(val, MDATACTRL, RXTRIG));
+        ARRAY_FIELD_DP32(s->regs, MDATACTRL, TXTRIG,
+                         FIELD_EX32(val, MDATACTRL, TXTRIG));
+
+        svc_i3c_update_fifo_trigger(s);
+    }
+
+    if (FIELD_EX32(val, MDATACTRL, FLUSHFB)) {
+        fifo8_reset(&s->rx_fifo);
+    }
+    if (FIELD_EX32(val, MDATACTRL, FLUSHTB)) {
+        fifo8_reset(&s->tx_fifo);
+    }
+}
+
+static void svc_i3c_mwdatab_w(SVCI3C *s, uint32_t val)
+{
+    bool end = FIELD_EX32(val, MWDATAB, END_B) ||
+               FIELD_EX32(val, MWDATAB, END_A);
+    uint8_t byte = FIELD_EX32(val, MWDATAB, DATA);
+
+    svc_i3c_txfifo_push(s, &byte, sizeof(byte));
+    svc_i3c_tx(s);
+
+    /* This is the last byte, complete the transfer. */
+    if (end) {
+        svc_i3c_end_transfer(s);
+    }
+}
+
+static void svc_i3c_mwdatabe_w(SVCI3C *s, uint32_t val)
+{
+    uint8_t byte = FIELD_EX32(val, MWDATABE, DATA);
+
+    svc_i3c_txfifo_push(s, &byte, sizeof(byte));
+    svc_i3c_tx(s);
+
+    /* MWDATAxE registers always complete transfers. */
+    svc_i3c_end_transfer(s);
+}
+
+static void svc_i3c_mwdatah_w(SVCI3C *s, uint32_t val)
+{
+    uint16_t word;
+    bool end = FIELD_EX32(val, MWDATAH, END);
+
+    word = FIELD_EX32(val, MWDATAH, DATA0);
+    word <<= 8;
+    word |= FIELD_EX32(val, MWDATAH, DATA1);
+    svc_i3c_txfifo_push(s, (const uint8_t *)&word, sizeof(word));
+
+    svc_i3c_tx(s);
+    /* This is the last byte, complete the transfer. */
+    if (end) {
+        svc_i3c_end_transfer(s);
+    }
+}
+
+static void svc_i3c_mwdatahe_w(SVCI3C *s, uint32_t val)
+{
+    uint16_t word;
+
+    word = FIELD_EX32(val, MWDATAHE, DATA0);
+    word <<= 8;
+    word |= FIELD_EX32(val, MWDATAHE, DATA1);
+    svc_i3c_txfifo_push(s, (const uint8_t *)&word, sizeof(word));
+
+    svc_i3c_tx(s);
+    /* MWDATAxE registers always complete transfers. */
+    svc_i3c_end_transfer(s);
+}
+
+static void svc_i3c_mwmsg_sdr_w(SVCI3C *s, uint32_t val)
+{
+    /*
+     * If there isn't a transfer in progress, this first write is the
+     * information about the transfer.
+     * Otherwise it's data to be transferred.
+     */
+    if (!s->mwmsg_xfer_in_progress) {
+        s->mwmsg_xfer.len = FIELD_EX32(val, MWMSG_SDR, LEN);
+        s->mwmsg_xfer.is_i2c = FIELD_EX32(val, MWMSG_SDR, I2C);
+        s->mwmsg_xfer.end_with_stop = FIELD_EX32(val, MWMSG_SDR, END);
+        s->mwmsg_xfer.addr = FIELD_EX32(val, MWMSG_SDR, ADDR);
+        s->mwmsg_xfer.rnw = FIELD_EX32(val, MWMSG_SDR, DIR);
+
+        svc_i3c_send_start(s);
+        s->mwmsg_xfer_in_progress = true;
+    } else {
+        uint16_t word = FIELD_EX32(val, MWMSG_SDR, DATA);
+
+        /* Transmit the word. */
+        for (int i = 0; i < sizeof(word); i++) {
+            if (s->mwmsg_xfer.len == 0) {
+                break;
+            }
+
+            uint8_t byte = word & 0xff;
+            if (s->mwmsg_xfer.is_i2c) {
+                if (legacy_i2c_send(s->bus, byte)) {
+                    ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+                    svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+                }
+                s->mwmsg_xfer.len--;
+            } else {
+                /* TODO(b/308692346): I3C. */
+            }
+            trace_svc_i3c_send(object_get_canonical_path(OBJECT(s)), 1);
+
+            word >>= 8;
+            s->mwmsg_xfer.len--;
+        }
+
+        /* If we're done and set up to do so, send a STOP. */
+        if (s->mwmsg_xfer.len == 0) {
+            s->mwmsg_xfer_in_progress = false;
+            ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+            if (s->mwmsg_xfer.end_with_stop) {
+                svc_i3c_end_transfer(s);
+            }
+        }
+    }
+}
+
 static void svc_i3c_write(void *opaque, hwaddr offset, uint64_t value,
                          unsigned size)
 {
@@ -240,11 +647,35 @@ static void svc_i3c_write(void *opaque, hwaddr offset, uint64_t value,
     case R_MSTATUS:
         svc_i3c_mstatus_w(s, val32);
         break;
+    case R_MCTRL:
+        svc_i3c_mctrl_w(s, val32);
+        break;
     case R_MINTSET:
         svc_i3c_mintset_w(s, val32);
         break;
     case R_MINTCLR:
         svc_i3c_mintclr_w(s, val32);
+        break;
+    case R_MERRWARN:
+        svc_i3c_merrwarn_w(s, val32);
+        break;
+    case R_MDATACTRL:
+        svc_i3c_mdatactrl_w(s, val32);
+        break;
+    case R_MWDATAB:
+        svc_i3c_mwdatab_w(s, val32);
+        break;
+    case R_MWDATABE:
+        svc_i3c_mwdatabe_w(s, val32);
+        break;
+    case R_MWDATAH:
+        svc_i3c_mwdatah_w(s, val32);
+        break;
+    case R_MWDATAHE:
+        svc_i3c_mwdatahe_w(s, val32);
+        break;
+    case R_MWMSG_SDR:
+        svc_i3c_mwmsg_sdr_w(s, val32);
         break;
     default:
         s->regs[addr] = val32;
@@ -269,6 +700,9 @@ static void svc_i3c_realize(DeviceState *dev, Error **errp)
     memory_region_init_io(&s->mr, OBJECT(s), &svc_i3c_ops,
                           s, name, SVC_I3C_NR_REGS << 2);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mr);
+
+    fifo8_create(&s->tx_fifo, SVC_I3C_FIFO_SIZE);
+    fifo8_create(&s->rx_fifo, SVC_I3C_FIFO_SIZE);
 
     s->bus = i3c_init_bus(DEVICE(s), name);
     I3CBusClass *bc = I3C_BUS_GET_CLASS(s->bus);

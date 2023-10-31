@@ -57,3 +57,8 @@ mock_target_do_ibi(uint8_t address, bool is_recv) "I3C mock target IBI with addr
 svc_i3c_reset(char *device) "%s: reset"
 svc_i3c_write(char *device, uint64_t offset, uint32_t data) "%s: write: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
 svc_i3c_read(char *device, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
+svc_i3c_end_transfer(char *device) "%s: sent STOP"
+svc_i3c_txfifo_pop(char *device, uint8_t data) "%s: TXFIFO popped 0x%.2" PRIx8
+svc_i3c_txfifo_push(char *device, uint8_t data) "%s: TXFIFO pushed 0x%.2" PRIx8
+svc_i3c_send(char *device, uint32_t num_bytes) "%s: sent %" PRId32 " bytes to bus"
+svc_i3c_start_transfer(char *device) "%s: sent START"
