@@ -500,6 +500,7 @@ config NPCM8XX
     select UNIMP
     select CMIS
     select NPCM_PCIERC
+    select NPCM8XX_GDMA
 
 config FSL_IMX25
     bool
