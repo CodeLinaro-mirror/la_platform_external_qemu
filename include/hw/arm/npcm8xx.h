@@ -19,6 +19,7 @@
 #include "hw/adc/npcm7xx_adc.h"
 #include "hw/core/split-irq.h"
 #include "hw/cpu/cluster.h"
+#include "hw/dma/npcm8xx-gdma.h"
 #include "hw/gpio/npcm7xx_gpio.h"
 #include "hw/i2c/npcm7xx_smbus.h"
 #include "hw/i3c/svc-i3c.h"
@@ -106,6 +107,7 @@ struct NPCM8xxState {
     NPCM7xxSDHCIState   mmc;
     NPCMPCIERCState     pcierc;
     SVCI3C              i3c[6];
+    NPCM8xxGDMA         gdma[3];
 };
 
 struct NPCM8xxClass {

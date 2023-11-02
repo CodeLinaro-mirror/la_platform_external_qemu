@@ -114,6 +114,9 @@ enum NPCM8xxInterrupt {
     NPCM8XX_OHCI1_IRQ,
     NPCM8XX_EHCI2_IRQ,
     NPCM8XX_OHCI2_IRQ,
+    NPCM8XX_GDMA0_IRQ           = 88,
+    NPCM8XX_GDMA1_IRQ,
+    NPCM8XX_GDMA2_IRQ,
     NPCM8XX_PWM0_IRQ            = 93,   /* PWM module 0 */
     NPCM8XX_PWM1_IRQ,                   /* PWM module 1 */
     NPCM8XX_MFT0_IRQ            = 96,   /* MFT module 0 */
@@ -302,6 +305,13 @@ static const hwaddr npcm8xx_i3c_addr[] = {
     0xfff15000,
 };
 
+/* Register base addresses for each GDMA module. */
+static const hwaddr npcm8xx_gdma_addr[] = {
+    0xf0850000,
+    0xf0851000,
+    0xf0852000,
+};
+
 static const struct {
     hwaddr regs_addr;
     uint32_t reset_pu;
@@ -485,6 +495,10 @@ static void npcm8xx_init(Object *obj)
 
     for (i = 0; i < ARRAY_SIZE(s->i3c); i++) {
         object_initialize_child(obj, "i3c[*]", &s->i3c[i], TYPE_SVC_I3C);
+    }
+
+    for (i = 0; i < ARRAY_SIZE(s->gdma); i++) {
+        object_initialize_child(obj, "gdma[*]", &s->gdma[i], TYPE_NPCM8XX_GDMA);
     }
 }
 
@@ -794,6 +808,14 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
                            npcm8xx_irq(s, NPCM8XX_I3C0_IRQ + i));
     }
 
+    /* GDMA */
+    for (i = 0; i < ARRAY_SIZE(s->gdma); i++) {
+        sysbus_realize(SYS_BUS_DEVICE(&s->gdma[i]), &error_abort);
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->gdma[i]), 0, npcm8xx_gdma_addr[i]);
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->gdma[i]), 0,
+                           npcm8xx_irq(s, NPCM8XX_GDMA0_IRQ + i));
+    }
+
     create_unimplemented_device("npcm8xx.shm",          0xc0001000,   4 * KiB);
     create_unimplemented_device("npcm8xx.gicextra",     0xdfffa000,  24 * KiB);
     create_unimplemented_device("npcm8xx.vdmx",         0xe0800000,   4 * KiB);
@@ -836,9 +858,6 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("npcm8xx.usbd[8]",      0xf0838000,   4 * KiB);
     create_unimplemented_device("npcm8xx.usbd[9]",      0xf0839000,   4 * KiB);
     create_unimplemented_device("npcm8xx.pci_mbox1",    0xf0848000,  64 * KiB);
-    create_unimplemented_device("npcm8xx.gdma0",        0xf0850000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.gdma1",        0xf0851000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.gdma2",        0xf0852000,   4 * KiB);
     create_unimplemented_device("npcm8xx.aes",          0xf0858000,   4 * KiB);
     create_unimplemented_device("npcm8xx.des",          0xf0859000,   4 * KiB);
     create_unimplemented_device("npcm8xx.sha",          0xf085a000,   4 * KiB);
