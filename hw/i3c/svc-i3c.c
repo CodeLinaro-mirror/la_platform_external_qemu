@@ -228,6 +228,80 @@ static uint32_t svc_i3c_mdatactrl_r(SVCI3C *s)
     return val;
 }
 
+static void svc_i3c_rxfifo_pop(SVCI3C *s, uint8_t *buf, int num_bytes)
+{
+    uint32_t trig_threshold = svc_i3c_rxtrig_threshold(s);
+
+    for (int i = 0; i < num_bytes; i++) {
+        if (fifo8_is_empty(&s->rx_fifo)) {
+            svc_i3c_merrwarn_update(s, R_MERRWARN_OREAD_MASK);
+            break;
+        }
+
+        buf[i] = fifo8_pop(&s->rx_fifo);
+        trace_svc_i3c_rxfifo_pop(object_get_canonical_path(OBJECT(s)), buf[i]);
+        if (fifo8_num_used(&s->rx_fifo) < trig_threshold) {
+            ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 0);
+        }
+    }
+
+    svc_i3c_update_irq(s);
+}
+
+static uint32_t svc_i3c_mrdatab_r(SVCI3C *s)
+{
+    uint8_t val = 0;
+
+    svc_i3c_rxfifo_pop(s, &val, sizeof(val));
+    return val;
+}
+
+static uint32_t svc_i3c_mrdatah_r(SVCI3C *s)
+{
+    uint16_t word = 0;
+
+    svc_i3c_rxfifo_pop(s, (uint8_t *)&word, sizeof(word));
+    return word;
+}
+
+static uint32_t svc_i3c_mrmsg_sdr_r(SVCI3C *s)
+{
+    uint16_t word = 0;
+
+    if (!s->mwmsg_xfer_in_progress) {
+        return 0;
+    }
+
+    for (int i = 0; i < sizeof(word); i++) {
+        if (s->mwmsg_xfer.len == 0) {
+            break;
+        }
+
+        if (s->mwmsg_xfer.is_i2c) {
+            word |= legacy_i2c_recv(s->bus);
+        } else {
+            /* TODO(b/308692346): I3C. */
+        }
+        word <<= 8;
+        s->mwmsg_xfer.len--;
+    }
+
+    if (s->mwmsg_xfer.len == 0) {
+        s->mwmsg_xfer_in_progress = false;
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+        if (s->mwmsg_xfer.end_with_stop) {
+            if (s->mwmsg_xfer.is_i2c) {
+                legacy_i2c_end_transfer(s->bus);
+                trace_svc_i3c_end_transfer(
+                    object_get_canonical_path(OBJECT(s)));
+            }
+        }
+    }
+
+    trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), sizeof(word));
+    return word;
+}
+
 static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
 {
     SVCI3C *s = SVC_I3C(opaque);
@@ -237,6 +311,15 @@ static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
     switch (addr) {
     case R_MDATACTRL:
         value = svc_i3c_mdatactrl_r(s);
+        break;
+    case R_MRDATAB:
+        value = svc_i3c_mrdatab_r(s);
+        break;
+    case R_MRDATAH:
+        value = svc_i3c_mrdatah_r(s);
+        break;
+    case R_MRMSG_SDR:
+        value = svc_i3c_mrmsg_sdr_r(s);
         break;
     default:
         value = s->regs[addr];
@@ -378,6 +461,57 @@ static int svc_i3c_tx(SVCI3C *s)
     return ret;
 }
 
+static void svc_i3c_rxfifo_push(SVCI3C *s, const uint8_t *buf, size_t num_bytes)
+{
+    uint32_t trig_threshold = svc_i3c_rxtrig_threshold(s);
+
+    for (int i = 0; i < num_bytes; i++) {
+        if (fifo8_is_full(&s->rx_fifo)) {
+            break;
+        }
+
+        fifo8_push(&s->rx_fifo, buf[i]);
+        trace_svc_i3c_rxfifo_push(object_get_canonical_path(OBJECT(s)), buf[i]);
+        if (fifo8_num_used(&s->rx_fifo) >= trig_threshold) {
+            ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
+        }
+    }
+
+    svc_i3c_update_irq(s);
+}
+
+static void svc_i3c_rx(SVCI3C *s)
+{
+    bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
+    uint8_t num_bytes = ARRAY_FIELD_EX32(s->regs, MCTRL, RDTERM);
+    uint8_t i3c_buf[SVC_I3C_FIFO_SIZE];
+    uint32_t num_to_read = 0;
+
+    if (!svc_i3c_is_enabled(s)) {
+        return;
+    }
+
+    if (is_i2c) {
+        num_to_read = num_bytes > SVC_I3C_FIFO_SIZE ?
+            SVC_I3C_FIFO_SIZE : num_bytes;
+
+        for (int i = 0; i < num_to_read; i++) {
+            i3c_buf[i] = legacy_i2c_recv(s->bus);
+        }
+        svc_i3c_rxfifo_push(s, i3c_buf, num_to_read);
+    } else {
+        /* TODO(b/308692346): I3C. */
+    }
+
+    num_bytes -= num_to_read;
+    if (num_bytes == 0) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+    }
+    ARRAY_FIELD_DP32(s->regs, MCTRL, RDTERM, num_bytes);
+
+    trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), num_to_read);
+}
+
 static void svc_i3c_send_start(SVCI3C *s)
 {
     bool is_read = ARRAY_FIELD_EX32(s->regs, MCTRL, DIR);
@@ -428,7 +562,7 @@ static void svc_i3c_mctrl_w(SVCI3C *s, uint32_t val)
         svc_i3c_send_start(s);
         is_read = ARRAY_FIELD_EX32(s->regs, MCTRL, DIR);
         if (is_read) {
-            /* TODO(b/308691746): I3C. */
+            svc_i3c_rx(s);
         } else {
             svc_i3c_tx(s);
         }
@@ -492,7 +626,7 @@ static void svc_i3c_update_fifo_trigger(SVCI3C *s)
     if (fifo8_num_used(&s->rx_fifo) > rx_threshold) {
         ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
         if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMAFB)) {
-            /* TODO(b/308691746): I3C. */
+            svc_i3c_rx(s);
         }
     }
 
