@@ -460,7 +460,13 @@ static int svc_i3c_tx(SVCI3C *s)
             }
         }
     } else {
-        /* TODO(b/308692346): I3C. */
+        uint32_t bytes_sent;
+
+        xfer_size = svc_i3c_txfifo_pop(s, i3c_buf, SVC_I3C_FIFO_SIZE);
+        ret = i3c_send(s->bus, i3c_buf, xfer_size, &bytes_sent);
+        if (ret) {
+            return ret;
+        }
     }
 
     trace_svc_i3c_send(object_get_canonical_path(OBJECT(s)), xfer_size);
@@ -644,16 +650,21 @@ static void svc_i3c_update_fifo_trigger(SVCI3C *s)
     uint32_t tx_threshold = svc_i3c_txtrig_threshold(s);
     uint32_t rx_threshold = svc_i3c_rxtrig_threshold(s);
 
+    int ret;
     if (fifo8_num_used(&s->tx_fifo) <= tx_threshold) {
         ARRAY_FIELD_DP32(s->regs, MSTATUS, TXNOTFULL, 1);
         if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMATB)) {
-            svc_i3c_tx(s);
+            ret = svc_i3c_tx(s);
+            if (ret) {
+                ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+                svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+            }
         }
     }
     if (fifo8_num_used(&s->rx_fifo) > rx_threshold) {
         ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
         if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMAFB)) {
-            int ret =  svc_i3c_rx(s);
+            ret = svc_i3c_rx(s);
             if (ret) {
                 ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
                 svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
@@ -780,7 +791,12 @@ static void svc_i3c_mwmsg_sdr_w(SVCI3C *s, uint32_t val)
                 }
                 s->mwmsg_xfer.len--;
             } else {
-                /* TODO(b/308692346): I3C. */
+                uint32_t num_sent;
+                if (i3c_send(s->bus, &byte, sizeof(byte), &num_sent)) {
+                    ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+                    svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+                    return;
+                }
             }
             trace_svc_i3c_send(object_get_canonical_path(OBJECT(s)), 1);
 
