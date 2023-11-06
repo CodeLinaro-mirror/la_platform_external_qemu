@@ -280,7 +280,13 @@ static uint32_t svc_i3c_mrmsg_sdr_r(SVCI3C *s)
         if (s->mwmsg_xfer.is_i2c) {
             word |= legacy_i2c_recv(s->bus);
         } else {
-            /* TODO(b/308692346): I3C. */
+            uint32_t bytes_received;
+            if (i3c_recv(s->bus, (uint8_t *)&word, sizeof(uint8_t),
+                         &bytes_received)) {
+                ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+                svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+                return word;
+            }
         }
         word <<= 8;
         s->mwmsg_xfer.len--;
@@ -351,7 +357,7 @@ static void svc_i3c_end_transfer(SVCI3C *s)
     if (is_i2c) {
         legacy_i2c_end_transfer(s->bus);
     } else {
-        /* TODO(b/308692346): I3C. */
+        i3c_end_transfer(s->bus);
     }
 
     ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_IDLE);
@@ -480,36 +486,57 @@ static void svc_i3c_rxfifo_push(SVCI3C *s, const uint8_t *buf, size_t num_bytes)
     svc_i3c_update_irq(s);
 }
 
-static void svc_i3c_rx(SVCI3C *s)
+static int svc_i3c_rx(SVCI3C *s)
 {
     bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
     uint8_t num_bytes = ARRAY_FIELD_EX32(s->regs, MCTRL, RDTERM);
     uint8_t i3c_buf[SVC_I3C_FIFO_SIZE];
-    uint32_t num_to_read = 0;
+    int ret = 0;
+    bool xfer_done;
 
     if (!svc_i3c_is_enabled(s)) {
-        return;
+        return 0;
     }
 
     if (is_i2c) {
-        num_to_read = num_bytes > SVC_I3C_FIFO_SIZE ?
+        uint32_t num_to_read = num_bytes > SVC_I3C_FIFO_SIZE ?
             SVC_I3C_FIFO_SIZE : num_bytes;
 
         for (int i = 0; i < num_to_read; i++) {
             i3c_buf[i] = legacy_i2c_recv(s->bus);
         }
         svc_i3c_rxfifo_push(s, i3c_buf, num_to_read);
+
+        num_bytes -= num_to_read;
+        xfer_done = num_bytes == 0;
+        trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), num_to_read);
     } else {
-        /* TODO(b/308692346): I3C. */
+        uint32_t bytes_read;
+        uint32_t xfer_size = SVC_I3C_FIFO_SIZE > num_bytes ? num_bytes :
+                             SVC_I3C_FIFO_SIZE;
+        ret = i3c_recv(s->bus, i3c_buf, xfer_size, &bytes_read);
+        if (ret) {
+            return ret;
+        }
+
+        svc_i3c_rxfifo_push(s, i3c_buf, bytes_read);
+        num_bytes -= bytes_read;
+
+        /*
+         * The transfer is done if we've received all of the bytes we requested
+         * from the target, or If the target gave us less bytes than we
+         * requested from it, meaning it has nothing left to send.
+         */
+        xfer_done = (bytes_read < xfer_size) || (num_bytes == 0);
+        trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), bytes_read);
     }
 
-    num_bytes -= num_to_read;
-    if (num_bytes == 0) {
+    if (xfer_done) {
         ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
     }
     ARRAY_FIELD_DP32(s->regs, MCTRL, RDTERM, num_bytes);
 
-    trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), num_to_read);
+    return ret;
 }
 
 static void svc_i3c_send_start(SVCI3C *s)
@@ -526,7 +553,7 @@ static void svc_i3c_send_start(SVCI3C *s)
     if (is_i2c) {
         ret = legacy_i2c_start_transfer(s->bus, addr, is_read);
     } else {
-        /* TODO(b/308692346): I3C. */
+        ret = i3c_start_transfer(s->bus, addr, is_read);
     }
 
     /* MCTRLDONE is set regardless of an ACK or NACK. */
@@ -626,7 +653,11 @@ static void svc_i3c_update_fifo_trigger(SVCI3C *s)
     if (fifo8_num_used(&s->rx_fifo) > rx_threshold) {
         ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
         if (ARRAY_FIELD_EX32(s->regs, MDMACTRL, DMAFB)) {
-            svc_i3c_rx(s);
+            int ret =  svc_i3c_rx(s);
+            if (ret) {
+                ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+                svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+            }
         }
     }
 
