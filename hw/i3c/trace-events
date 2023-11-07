@@ -65,3 +65,4 @@ svc_i3c_start_transfer(char *device) "%s: sent START"
 svc_i3c_rxfifo_pop(char *device, uint8_t data) "%s: RXFIFO popped 0x%.2" PRIx8
 svc_i3c_rxfifo_push(char *device, uint8_t data) "%s: RXFIFO pushed 0x%.2" PRIx8
 svc_i3c_recv(char *device, uint32_t num_bytes) "%s: received %" PRId32 " bytes from bus"
+svc_i3c_addr_assign(char *device, uint8_t addr) "%s: assigned address 0x%.2" PRIx8 " to target on bus"

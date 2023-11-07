@@ -68,6 +68,7 @@ typedef struct SVCI3C {
     Fifo8 rx_fifo;
     bool mwmsg_xfer_in_progress;
     MWMsgSDRXfer mwmsg_xfer;
+    bool in_entdaa;
     uint32_t regs[SVC_I3C_NR_REGS];
     qemu_irq irq;
 } SVCI3C;

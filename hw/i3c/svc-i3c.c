@@ -371,6 +371,7 @@ static void svc_i3c_end_transfer(SVCI3C *s)
         ARRAY_FIELD_DP32(s->regs, MDMACTRL, DMAFB, 0);
     }
 
+    s->in_entdaa = false;
     trace_svc_i3c_end_transfer(object_get_canonical_path(OBJECT(s)));
 }
 
@@ -576,6 +577,82 @@ static void svc_i3c_send_start(SVCI3C *s)
     svc_i3c_update_irq(s);
 }
 
+static void svc_i3c_do_entdaa(SVCI3C *s)
+{
+    uint8_t target_data[I3C_ENTDAA_SIZE];
+    uint32_t num_read;
+
+    /*
+     * if the bus isn't in ENTDAA, we send a START w/ broadcast, followed by the
+     * CCC.
+     */
+    if (!s->in_entdaa) {
+        if (i3c_start_transfer(s->bus, I3C_BROADCAST, /*is_read=*/false)) {
+            ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+            svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+            return;
+        }
+        i3c_send_byte(s->bus, I3C_CCC_ENTDAA);
+        s->in_entdaa = true;
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_DAA);
+    }
+
+    /*
+     * If we're in the BETWEEN state, we should assign the target's address,
+     * which the user should write to MWDATAB.
+     * We should also send a reSTART and read the next target's PID+BCR+DCR, or
+     * get NACKed if no one left on the bus needs an address.
+     */
+    if (ARRAY_FIELD_EX32(s->regs, MSTATUS, BETWEEN)) {
+        uint8_t addr = ARRAY_FIELD_EX32(s->regs, MWDATAB, DATA);
+        if (i3c_send_byte(s->bus, addr)) {
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: Target NACKed address 0x%.2x"
+                          "during assignment in ENTDAA.",
+                          object_get_canonical_path(OBJECT(s)), addr);
+            svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+        } else {
+            trace_svc_i3c_addr_assign(object_get_canonical_path(OBJECT(s)),
+                                      addr);
+        }
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, BETWEEN, 0);
+    }
+
+    if (i3c_start_transfer(s->bus, I3C_BROADCAST, /*is_read=*/true)) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 1);
+        /* In ENTDAA, we're completed if no one ACKs the reSTART. */
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_IDLE);
+        svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+        return;
+    }
+
+    /* If a target NACKed at this point, it's misbehaving, so log it. */
+    if (i3c_recv(s->bus, target_data, I3C_ENTDAA_SIZE, &num_read)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Target ACKed ENTDAA reSTART, "
+                      "but NACKed PID reading.",
+                      object_get_canonical_path(OBJECT(s)));
+        svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+        return;
+    }
+
+    /*
+     * Similarly, it should send 8 bytes of data. If it doesn't we can move
+     * along and things will most likely be fine, but we should log it.
+     */
+    if (num_read != I3C_ENTDAA_SIZE) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Target sent %d bytes during, "
+                      "ENTDAA read instead of %d",
+                      object_get_canonical_path(OBJECT(s)), num_read,
+                      I3C_ENTDAA_SIZE);
+    }
+    svc_i3c_rxfifo_push(s, target_data, num_read);
+
+    /* Set BETWEEN. This tells the user to write the target's address. */
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, BETWEEN, 1);
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, MCTRLDONE, 1);
+    svc_i3c_update_irq(s);
+}
+
 static void svc_i3c_mctrl_w(SVCI3C *s, uint32_t val)
 {
     bool is_read;
@@ -606,6 +683,7 @@ static void svc_i3c_mctrl_w(SVCI3C *s, uint32_t val)
     case SVC_I3C_REQUEST_IBI_ACK_NACK:
         break;
     case SVC_I3C_REQUEST_PROCESS_DAA:
+        svc_i3c_do_entdaa(s);
         break;
     case SVC_I3C_REQUEST_AUTO_IBI:
         break;
@@ -706,6 +784,21 @@ static void svc_i3c_mwdatab_w(SVCI3C *s, uint32_t val)
     bool end = FIELD_EX32(val, MWDATAB, END_B) ||
                FIELD_EX32(val, MWDATAB, END_A);
     uint8_t byte = FIELD_EX32(val, MWDATAB, DATA);
+
+    /*
+     * If the controller is in the ENTDAA state, this write is an address being
+     * assigned to a target.
+     */
+    if (ARRAY_FIELD_EX32(s->regs, MSTATUS, STATE) == SVC_I3C_STATE_DAA) {
+        /*
+         * Temporarily store the address and do ENTDAA. This register is WO, so
+         * the address is cleared once it's sent.
+         */
+        ARRAY_FIELD_DP32(s->regs, MWDATAB, DATA, val);
+        svc_i3c_do_entdaa(s);
+        ARRAY_FIELD_DP32(s->regs, MWDATAB, DATA, 0);
+        return;
+    }
 
     svc_i3c_txfifo_push(s, &byte, sizeof(byte));
     svc_i3c_tx(s);
