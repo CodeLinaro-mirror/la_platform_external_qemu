@@ -41,6 +41,7 @@
 #include "hw/ssi/npcm_espi.h"
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
+#include "hw/usb/npcm8xx-udc.h"
 #include "target/arm/cpu.h"
 #include "hw/ssi/npcm_pspi.h"
 
@@ -104,6 +105,7 @@ struct NPCM8xxState {
     NPCM7xxSMBusState   smbus[27];
     EHCISysBusState     ehci[2];
     OHCISysBusState     ohci[2];
+    NPCM8xxUDC          udc[8];
     NPCM7xxFIUState     fiu[3];
     NPCMGMACState       gmac[4];
     NPCMPCSState        pcs;
