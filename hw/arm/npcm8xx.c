@@ -17,6 +17,7 @@
 #include "qemu/osdep.h"
 
 #include "hw/boards.h"
+#include "exec/hwaddr.h"
 #include "hw/arm/boot.h"
 #include "hw/arm/bsa.h"
 #include "hw/arm/npcm8xx.h"
@@ -26,6 +27,7 @@
 #include "hw/misc/unimp.h"
 #include "hw/qdev-clock.h"
 #include "hw/qdev-properties.h"
+#include "hw/sysbus.h"
 #include "qapi/error.h"
 #include "qemu/units.h"
 #include "system/system.h"
@@ -297,6 +299,18 @@ static const hwaddr npcm8xx_ohci_addr[] = {
     0xf082b000,
 };
 
+/* Register base address for 0-7 USB device controller registers */
+static const hwaddr npcm8xx_udc_addr[] = {
+    0xf0830000,
+    0xf0831000,
+    0xf0832000,
+    0xf0833000,
+    0xf0834000,
+    0xf0835000,
+    0xf0836000,
+    0xf0837000,
+};
+
 /* Register base addresses for each I3C module. */
 static const hwaddr npcm8xx_i3c_addr[] = {
     0xfff10000,
@@ -471,6 +485,10 @@ static void npcm8xx_init(Object *obj)
     }
     for (i = 0; i < ARRAY_SIZE(s->ohci); i++) {
         object_initialize_child(obj, "ohci[*]", &s->ohci[i], TYPE_SYSBUS_OHCI);
+    }
+
+    for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
+        object_initialize_child(obj, "udc[*]", &s->udc[i], TYPE_NPCM8XX_UDC);
     }
 
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm8xx_fiu) != ARRAY_SIZE(s->fiu));
@@ -702,6 +720,12 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
                            npcm8xx_irq(s, NPCM8XX_OHCI1_IRQ + 2 * i));
     }
 
+    /* USB Device Controller */
+    for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
+        sysbus_realize(SYS_BUS_DEVICE(&s->udc[i]), &error_abort);
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->udc[i]), 0, npcm8xx_udc_addr[i]);
+    }
+
     /* PWM Modules. Cannot fail. */
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm8xx_pwm_addr) != ARRAY_SIZE(s->pwm));
     for (i = 0; i < ARRAY_SIZE(s->pwm); i++) {
@@ -855,14 +879,6 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("npcm8xx.vcd",          0xf0810000,  64 * KiB);
     create_unimplemented_device("npcm8xx.ece",          0xf0820000,   8 * KiB);
     create_unimplemented_device("npcm8xx.vdma",         0xf0822000,   8 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[0]",      0xf0830000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[1]",      0xf0831000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[2]",      0xf0832000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[3]",      0xf0833000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[4]",      0xf0834000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[5]",      0xf0835000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[6]",      0xf0836000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.usbd[7]",      0xf0837000,   4 * KiB);
     create_unimplemented_device("npcm8xx.usbd[8]",      0xf0838000,   4 * KiB);
     create_unimplemented_device("npcm8xx.usbd[9]",      0xf0839000,   4 * KiB);
     create_unimplemented_device("npcm8xx.pci_mbox1",    0xf0848000,  64 * KiB);
