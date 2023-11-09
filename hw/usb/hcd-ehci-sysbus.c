@@ -133,7 +133,7 @@ static void ehci_npcm7xx_class_init(ObjectClass *oc, void *data)
     sec->capsbase = 0x0;
     sec->opregbase = 0x10;
     sec->portscbase = 0x44;
-    sec->portnr = 1;
+    sec->portnr = 4;
     set_bit(DEVICE_CATEGORY_USB, dc->categories);
 }
 

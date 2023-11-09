@@ -41,6 +41,7 @@
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
 #include "hw/usb/npcm8xx-udc.h"
+#include "hw/usb/redirect-host.h"
 #include "target/arm/cpu.h"
 
 #define NPCM8XX_MAX_NUM_CPUS    (4)
@@ -66,6 +67,7 @@ struct NPCM8xxMachine {
      */
     SplitIRQ            fan_splitter[NPCM8XX_NR_PWM_MODULES *
                                      NPCM7XX_PWM_PER_MODULE];
+    char *remote_udc;
 };
 
 
@@ -103,6 +105,7 @@ struct NPCM8xxState {
     NPCM7xxSMBusState   smbus[27];
     EHCISysBusState     ehci[2];
     OHCISysBusState     ohci[2];
+    USBRedirectHost     usbredir_host;
     NPCM8xxUDC          udc[8];
     NPCM7xxFIUState     fiu[3];
     NPCMGMACState       gmac[4];

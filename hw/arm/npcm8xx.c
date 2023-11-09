@@ -26,8 +26,10 @@
 #include "hw/loader.h"
 #include "hw/misc/unimp.h"
 #include "hw/qdev-clock.h"
+#include "hw/qdev-core.h"
 #include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
+#include "hw/usb/redirect-host.h"
 #include "qapi/error.h"
 #include "qemu/units.h"
 #include "system/system.h"
@@ -495,6 +497,9 @@ static void npcm8xx_init(Object *obj)
         object_initialize_child(obj, "ohci[*]", &s->ohci[i], TYPE_SYSBUS_OHCI);
     }
 
+    object_initialize_child(obj, "usbredir-host", &s->usbredir_host,
+                            TYPE_USB_REDIR_HOST);
+
     for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
         object_initialize_child(obj, "udc[*]", &s->udc[i], TYPE_NPCM8XX_UDC);
     }
@@ -727,6 +732,9 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->ohci[i]), 0,
                            npcm8xx_irq(s, NPCM8XX_OHCI1_IRQ + 2 * i));
     }
+
+    /* USB Redirect Host */
+    qdev_realize(DEVICE(&s->usbredir_host), NULL, &error_abort);
 
     /* USB Device Controller */
     for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
