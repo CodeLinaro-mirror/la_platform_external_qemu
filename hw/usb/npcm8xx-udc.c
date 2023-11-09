@@ -11,6 +11,7 @@
 #include "hw/usb/npcm8xx-udc.h"
 
 #include "exec/memory.h"
+#include "hw/irq.h"
 #include "hw/qdev-core.h"
 #include "hw/registerfields.h"
 #include "hw/sysbus.h"
@@ -132,6 +133,8 @@ REG32(ENDPTCTRL2, 0x1C8)
 static void npcm8xx_udc_reset(DeviceState *dev)
 {
     NPCM8xxUDC *udc = NPCM8XX_UDC(dev);
+    udc->running = false;
+
     NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
     registers->status = USBSTS_INIT_VALUE;
     registers->interrupt_enable = USBINTR_INIT_VALUE;
@@ -142,6 +145,35 @@ static void npcm8xx_udc_reset(DeviceState *dev)
     registers->ep1_control = ENDPTCTRL1_INIT_VALUE;
     registers->ep2_control = ENDPTCTRL2_INIT_VALUE;
     registers->command = USBCMD_INIT_VALUE & ~R_USBCMD_RESET_MASK;
+}
+
+static inline void npcm8xx_udc_update_irq(NPCM8xxUDC *udc)
+{
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    if (udc->running) {
+        qemu_set_irq(udc->irq, registers->interrupt_enable & registers->status);
+    } else {
+        qemu_set_irq(udc->irq, 0);
+    }
+}
+
+static inline void npcm8xx_udc_write_usbcmd(NPCM8xxUDC *udc, uint32_t value)
+{
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+
+    registers->command = value;
+
+    if (FIELD_EX32(registers->command, USBCMD, RESET)) {
+        npcm8xx_udc_reset(DEVICE(udc));
+    }
+
+    /* Handle run/stop bit toggle */
+    bool new_run_state = FIELD_EX32(registers->command, USBCMD, RUN) != 0;
+
+    if (udc->running != new_run_state) {
+        udc->running = new_run_state;
+        npcm8xx_udc_update_irq(udc);
+    }
 }
 
 static inline void npcm8xx_udc_write_usbsts(NPCM8xxUDC *udc, uint32_t value)
@@ -159,6 +191,8 @@ static inline void npcm8xx_udc_write_usbsts(NPCM8xxUDC *udc, uint32_t value)
     uint8_t dcsuspend_bit = FIELD_EX32(value, USBSTS, DCSUSPEND) ? 1 : 0;
     registers->status =
         FIELD_DP32(registers->status, USBSTS, DCSUSPEND, dcsuspend_bit);
+
+    npcm8xx_udc_update_irq(udc);
 }
 
 static inline void npcm8xx_udc_write_portsc1(NPCM8xxUDC *udc, uint32_t value)
@@ -250,13 +284,14 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
                         A_DCCPARAMS);
         break;
     case A_USBCMD:
-        registers->command = value;
+        npcm8xx_udc_write_usbcmd(udc, value);
         break;
     case A_USBSTS:
         npcm8xx_udc_write_usbsts(udc, value);
         break;
     case A_USBINTR:
         registers->interrupt_enable = value;
+        npcm8xx_udc_update_irq(udc);
         break;
     case A_ENDPOINTLISTADDR:
         registers->endpoint_list_address = value;
@@ -312,6 +347,7 @@ static void npcm8xx_udc_realize(DeviceState *dev, Error **err)
     memory_region_init_io(&udc->mr, OBJECT(udc), &npcm8xx_udc_mr_ops, udc,
                           TYPE_NPCM8XX_UDC, NPCM8XX_MEMORY_ADDRESS_SIZE);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &udc->mr);
+    sysbus_init_irq(SYS_BUS_DEVICE(dev), &udc->irq);
 }
 
 static void npcm8xx_udc_class_init(ObjectClass *klass, void *data)
