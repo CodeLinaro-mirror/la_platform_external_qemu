@@ -114,6 +114,14 @@ enum NPCM8xxInterrupt {
     NPCM8XX_WDG0_IRQ            = 47,   /* Timer Module 0 Watchdog */
     NPCM8XX_WDG1_IRQ,                   /* Timer Module 1 Watchdog */
     NPCM8XX_WDG2_IRQ,                   /* Timer Module 2 Watchdog */
+    NPCM8XX_UDC0_IRQ            = 51,   /* USB Device Controller */
+    NPCM8XX_UDC1_IRQ,
+    NPCM8XX_UDC2_IRQ,
+    NPCM8XX_UDC3_IRQ,
+    NPCM8XX_UDC4_IRQ,
+    NPCM8XX_UDC5_IRQ,
+    NPCM8XX_UDC6_IRQ,
+    NPCM8XX_UDC7_IRQ,
     NPCM8XX_EHCI1_IRQ           = 61,
     NPCM8XX_OHCI1_IRQ,
     NPCM8XX_EHCI2_IRQ,
@@ -724,6 +732,8 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
         sysbus_realize(SYS_BUS_DEVICE(&s->udc[i]), &error_abort);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->udc[i]), 0, npcm8xx_udc_addr[i]);
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->udc[i]), 0,
+                           npcm8xx_irq(s, NPCM8XX_UDC0_IRQ + i));
     }
 
     /* PWM Modules. Cannot fail. */
