@@ -27,6 +27,7 @@
 #include "qemu/error-report.h"
 #include "qemu/datadir.h"
 #include "qemu/units.h"
+#include "qom/object.h"
 
 #define NPCM8XX_POWER_ON_STRAPS_DEFAULT (               \
         NPCM8XX_PWRON_STRAP_RISEL |                     \
@@ -66,6 +67,19 @@ static void npcm8xx_load_bootrom(MachineState *machine, NPCM8xxState *soc)
         error_report("Failed to load ROM image '%s'", filename);
         exit(1);
     }
+}
+
+static void npcm8xx_board_init_remote_udc(NPCM8xxState *npcm8xx,
+                                          const char *chardev)
+{
+    Chardev *cdev = qemu_chr_find(chardev);
+
+    if (!cdev) {
+        error_printf("ERROR: chardev %s not found. Exiting...\n", chardev);
+        exit(1);
+    }
+
+    qdev_prop_set_chr(DEVICE(&npcm8xx->usbredir_host), "chardev", cdev);
 }
 
 static void npcm8xx_connect_flash(NPCM7xxFIUState *fiu, int cs_no,
@@ -185,6 +199,24 @@ static void npcm8xx_connect_pwm_fan(NPCM8xxState *soc, SplitIRQ *splitter,
     qdev_connect_gpio_out(DEVICE(splitter), output_no, fan_duty_gpio);
 }
 
+static char *npcm8xx_get_remote_udc(Object *obj, Error **errp)
+{
+    return NPCM8XX_MACHINE(obj)->remote_udc;
+}
+
+static void npcm8xx_set_remote_udc(Object *obj, const char *value, Error **errp)
+{
+    NPCM8XX_MACHINE(obj)->remote_udc = g_strdup(value);
+}
+
+static void npcm8xx_add_remote_udc(ObjectClass *oc)
+{
+    object_class_property_add_str(oc, "remote-udc", npcm8xx_get_remote_udc,
+                                  npcm8xx_set_remote_udc);
+    object_class_property_set_description(
+        oc, "remote-udc", "a USB device is connected to this chardev");
+}
+
 static void npcm845_evb_i2c_init(NPCM8xxState *soc)
 {
     /* tmp100 temperature sensor on SVB, tmp105 is compatible */
@@ -218,9 +250,14 @@ static void npcm845_evb_fan_init(NPCM8xxMachine *machine, NPCM8xxState *soc)
 static void npcm845_evb_init(MachineState *machine)
 {
     NPCM8xxState *soc;
+    NPCM8xxMachine *npcm8xx_machine = NPCM8XX_MACHINE(machine);
+    char *remote_udc = npcm8xx_machine->remote_udc;
 
     soc = npcm8xx_create_soc(machine, NPCM845_EVB_POWER_ON_STRAPS);
     npcm8xx_connect_dram(soc, machine->ram);
+    if (remote_udc) {
+        npcm8xx_board_init_remote_udc(soc, remote_udc);
+    }
     qdev_realize(DEVICE(soc), NULL, &error_fatal);
 
     npcm8xx_load_bootrom(machine, soc);
@@ -265,6 +302,8 @@ static void npcm845_evb_machine_class_init(ObjectClass *oc, void *data)
     mc->desc = "Nuvoton NPCM845 Evaluation Board (Cortex-A35)";
     mc->init = npcm845_evb_init;
     mc->default_ram_size = 1 * GiB;
+
+    npcm8xx_add_remote_udc(oc);
 };
 
 static const TypeInfo npcm8xx_machine_types[] = {
