@@ -11,6 +11,7 @@
 #define NPCM8XX_UDC_H
 
 #include "hw/sysbus.h"
+#include "hw/usb/redirect-host.h"
 #include "qemu/typedefs.h"
 #include "qom/object.h"
 
@@ -35,6 +36,9 @@ typedef struct NPCM8xxUDC {
     SysBusDevice parent;
     MemoryRegion mr;
     qemu_irq irq;
+    uint8_t device_index;
+
+    const USBRedirectHostOps *usbredir_ops;
 
     /*
      * Registers are stored as array instead of NPCM8xxUDCRegisters because
@@ -44,6 +48,7 @@ typedef struct NPCM8xxUDC {
      */
     uint32_t registers[NPCM8XX_UDC_NUM_REGS];
     bool running;
+    bool attached;
 } NPCM8xxUDC;
 
 #endif /* NPCM8XX_UDC_H */

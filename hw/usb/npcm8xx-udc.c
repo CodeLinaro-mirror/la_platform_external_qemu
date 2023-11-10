@@ -13,8 +13,10 @@
 #include "exec/memory.h"
 #include "hw/irq.h"
 #include "hw/qdev-core.h"
+#include "hw/qdev-properties.h"
 #include "hw/registerfields.h"
 #include "hw/sysbus.h"
+#include "hw/usb/redirect-host.h"
 #include "migration/vmstate.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
@@ -172,6 +174,13 @@ static inline void npcm8xx_udc_write_usbcmd(NPCM8xxUDC *udc, uint32_t value)
 
     if (udc->running != new_run_state) {
         udc->running = new_run_state;
+
+        if (udc->running && udc->attached) {
+            registers->port_control_status |=
+                R_PORTSC1_CURRENT_CONNECT_STATUS_MASK;
+            registers->status |= R_USBSTS_PORT_CHANGE_DETECT_MASK;
+        }
+
         npcm8xx_udc_update_irq(udc);
     }
 }
@@ -265,7 +274,7 @@ static uint64_t npcm8xx_udc_read(void *opaque, hwaddr offset, unsigned size)
             DEVICE(opaque)->canonical_path, offset);
     }
 
-    trace_npcm8xx_udc_read(offset, value);
+    trace_npcm8xx_udc_read(udc->device_index, offset, value);
     return value;
 }
 
@@ -318,17 +327,36 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
             DEVICE(opaque)->canonical_path, offset);
     }
 
-    trace_npcm8xx_udc_write(offset, value);
+    trace_npcm8xx_udc_write(udc->device_index, offset, value);
 }
 
 static const MemoryRegionOps npcm8xx_udc_mr_ops = {
     .read = npcm8xx_udc_read,
     .write = npcm8xx_udc_write,
     .valid = {
-            .min_access_size = 4,
-            .max_access_size = 4,
-            .unaligned = false,
-        },
+        .min_access_size = 4,
+        .max_access_size = 4,
+        .unaligned = false,
+    },
+};
+
+static void npcm8xx_udc_usbredir_attach(void *opaque)
+{
+    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+
+    udc->attached = true;
+
+    if (udc->running) {
+        registers->port_control_status |= R_PORTSC1_CURRENT_CONNECT_STATUS_MASK;
+        registers->status |= R_USBSTS_PORT_CHANGE_DETECT_MASK;
+    }
+
+    npcm8xx_udc_update_irq(udc);
+}
+
+static const USBRedirectHostOps npcm8xx_udc_usbredir_ops = {
+    .on_attach = npcm8xx_udc_usbredir_attach,
 };
 
 static const VMStateDescription vmstate_npcm8xx_udc = {
@@ -348,11 +376,17 @@ static void npcm8xx_udc_realize(DeviceState *dev, Error **err)
                           TYPE_NPCM8XX_UDC, NPCM8XX_MEMORY_ADDRESS_SIZE);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &udc->mr);
     sysbus_init_irq(SYS_BUS_DEVICE(dev), &udc->irq);
+    udc->usbredir_ops = &npcm8xx_udc_usbredir_ops;
 }
+
+static const Property npcm8xx_udc_properties[] = {
+    DEFINE_PROP_UINT8("device-index", NPCM8xxUDC, device_index, 0xff),
+};
 
 static void npcm8xx_udc_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
+    device_class_set_props(dc, npcm8xx_udc_properties);
     dc->realize = npcm8xx_udc_realize;
     device_class_set_legacy_reset(dc, npcm8xx_udc_reset);
     dc->vmsd = &vmstate_npcm8xx_udc;
