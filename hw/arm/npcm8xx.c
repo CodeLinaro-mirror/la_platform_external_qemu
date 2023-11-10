@@ -738,11 +738,15 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
 
     /* USB Device Controller */
     for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
+        qdev_prop_set_uint8(DEVICE(&s->udc[i]), "device-index", i);
         sysbus_realize(SYS_BUS_DEVICE(&s->udc[i]), &error_abort);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->udc[i]), 0, npcm8xx_udc_addr[i]);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->udc[i]), 0,
                            npcm8xx_irq(s, NPCM8XX_UDC0_IRQ + i));
     }
+
+    usbredir_host_set_ops(&s->usbredir_host, s->udc[0].usbredir_ops,
+                          &s->udc[0]);
 
     /* PWM Modules. Cannot fail. */
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm8xx_pwm_addr) != ARRAY_SIZE(s->pwm));
