@@ -1,0 +1,3 @@
+# This file is a placeholder and ignored by Bazel when this module is used via
+# a registry. The "real" file lives at
+# build/bazel/registry/modules/qemu/0.0.1/MODULE.bazel.

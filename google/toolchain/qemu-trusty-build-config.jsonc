@@ -1,0 +1,296 @@
+{
+  // This file configures the build of a Meson-based project for the Trusty OS.
+  //
+  // Trusty is a secure Operating System (OS) that provides a Trusted Execution
+  // Environment (TEE) for Android. Its specification is open-source and can be
+  // found at source.android.com/security/trusty.
+  //
+  // This configuration is used by the generic MesonProjectBuilder to generate
+  // toolchains, dependencies, and other necessary build files for a Trusty
+  // environment.
+  //
+  // The structure is composed of two main sections:
+  // 1. "common": Holds configurations that are shared across all target platforms.
+  // 2. "platforms": Contains platform-specific configurations that can override
+  //    or extend the common settings. This file does not use platform-specific
+  //    configurations.
+  //
+  // # Merging Strategy
+  //
+  // The builder merges these sections based on the target platform. For example,
+  // when building for "linux-x64", the builder will merge the settings from
+  // "common" and "platforms.linux-x64". The merging rules are as follows:
+  //
+  // - Dictionaries (like "dependencies" and "meson_options"): The platform-specific
+  //   dictionary is merged into the common one. If there are conflicting keys,
+  //   the platform-specific value takes precedence.
+  //
+  // - Lists of Objects (like "generated_files"): The list from the platform is
+  //   appended to the common list. A special deep merge is then performed on
+  //   objects that share the same "filename", combining their "content" fields.
+  //   This ensures that platform-specific file content supplements, rather than
+  //   replaces, common content.
+  "project_name": "qemu",
+  "source_path": "third_party/qemu",
+
+  "common": {
+    // "dependencies": A dictionary of libraries required for the build. These
+    // are used to generate pkg-config (.pc) files, which Meson uses to find
+    // libraries and their headers.
+    //
+    // # The `shim` Object
+    //
+    // The `shim` object allows for fine-grained control over the generated
+    // .pc file, enabling you to override or supplement the information
+    // retrieved from the build system (e.g., Bazel).
+    //
+    // Common `shim` keys include:
+    // - "name": Overrides the package name in the .pc file. Useful when the
+    //   Bazel target name doesn't match the expected pkg-config name.
+    // - "archive_target": Specifies a different Bazel target to get the
+    //   library archive (.a, .lib) from.
+    // - "include_target": Specifies a different Bazel target to get the
+    //   include paths from.
+    // - "Requires": Sets the `Requires` field in the .pc file to declare
+    //   dependencies on other pkg-config packages.
+    // - "link_flags": Appends additional flags to the `Libs` field in the
+    //   .pc file (e.g., "-pthread").
+    // - "cflags": Appends additional flags to the `Cflags` field.
+    // - "Libs": Completely overrides the `Libs` line in the .pc file. This is
+    //   useful for system libraries where you only need to provide a flag
+    //   like "-lpulse".
+    // - "link_name": Creates a symbolic link for the library archive, for
+    //   cases where a different filename is expected.
+    // - "dll_ext": Overrides the file extension for shared libraries,
+    //   primarily for Windows.
+    "dependencies": {
+       "libfdt": {
+        "lib_type": "bazel",
+        "bazel_target": "@dtc//:libfdt",
+        "version": "1.6.0"
+      },
+      "gmodule": {
+        "lib_type": "bazel",
+        "bazel_target": "@glib//gmodule:gmodule_import",
+        "version": "2.77.2",
+        "shim": {
+          "name": "gmodule-export-2.0",
+          "link_flags": "-pthread",
+          "Requires": "pcre2"
+        }
+      },
+      "zlib": {
+        "lib_type": "bazel",
+        "bazel_target": "@zlib//:zlib",
+        "version": "1.2.10"
+      },
+      "glib": {
+        "lib_type": "bazel",
+        "bazel_target": "@glib//glib:glib_import",
+        "version": "2.77.2",
+        "shim": {
+          "name": "glib-2.0",
+          "Requires": "pcre2, gmodule-export-2.0",
+          "link_flags": "-pthread"
+        }
+      },
+      "pixman": {
+        "lib_type": "bazel",
+        "bazel_target": "@pixman//:pixman-1",
+        "version": "0.42.3",
+        "shim": {
+          "Requires": "pixman_simd"
+        }
+      },
+      "pixman_simd": {
+        "lib_type": "bazel",
+        "bazel_target": "@pixman//:pixman_simd",
+        "version": "0.42.3"
+      },
+      "pcre2": {
+        "lib_type": "bazel",
+        "bazel_target": "@pcre2//:pcre2",
+        "version": "10.42"
+      }
+    },
+    // "meson_options": A dictionary of Meson feature flags and settings.
+    // These are passed to the `meson setup` command.
+    "meson_options": {
+      "-Daf_xdp": "disabled",
+      "-Dalsa": "disabled",
+      "-Dandroid": "enabled",
+      "-Dasan": "false",
+      "-Dattr": "disabled",
+      "-Daudio_drv_list": "default",
+      "-Dauth_pam": "disabled",
+      "-Dauto_features": "disabled",
+      "-Db_coverage": "false",
+      "-Db_lto": "false",
+      "-Db_pie": "false",
+      "-Dblkio": "disabled",
+      "-Dbochs": "disabled",
+      "-Dbpf": "disabled",
+      "-Dbrlapi": "disabled",
+      "-Dbzip2": "disabled",
+      "-Dcanokey": "disabled",
+      "-Dcap_ng": "disabled",
+      "-Dcapstone": "disabled",
+      "-Dcfi": "false",
+      "-Dcfi_debug": "false",
+      "-Dcloop": "disabled",
+      "-Dcocoa": "disabled",
+      "-Dcolo_proxy": "disabled",
+      "-Dcoreaudio": "disabled",
+      "-Dcoroutine_pool": "true",
+      "-Dcrypto_afalg": "disabled",
+      "-Dcurl": "disabled",
+      "-Dcurses": "disabled",
+      "-Ddbus_display": "disabled",
+      "-Ddebug_graph_lock": "false",
+      "-Ddebug_mutex": "false",
+      "-Ddebug_remap": "false",
+      "-Ddebug_stack_usage": "false",
+      "-Ddebug_tcg": "false",
+      "-Ddefault_devices": "true",
+      "-Ddmg": "disabled",
+      "-Ddocs": "disabled",
+      "-Ddsound": "disabled",
+      "-Dfdt": "enabled",
+      "-Dfuse": "disabled",
+      "-Dfuse_lseek": "disabled",
+      "-Dfuzzing": "false",
+      "-Dgcrypt": "disabled",
+      "-Dgettext": "disabled",
+      "-Dgio": "disabled",
+      "-Dglusterfs": "disabled",
+      "-Dgnutls": "disabled",
+      "-Dgtk": "disabled",
+      "-Dgtk_clipboard": "disabled",
+      "-Dguest_agent": "disabled",
+      "-Dguest_agent_msi": "disabled",
+      "-Dhexagon_idef_parser": "true",
+      "-Dhv_balloon": "disabled",
+      "-Dhvf": "disabled",
+      "-Diconv": "disabled",
+      "-Dinstall_blobs": "false",
+      "-Djack": "disabled",
+      "-Dkeyring": "disabled",
+      "-Dkvm": "disabled",
+      "-Dl2tpv3": "disabled",
+      "-Dlibcbor": "disabled",
+      "-Dlibdaxctl": "disabled",
+      "-Dlibdw": "disabled",
+      "-Dlibiscsi": "disabled",
+      "-Dlibkeyutils": "disabled",
+      "-Dlibnfs": "disabled",
+      "-Dlibpmem": "disabled",
+      "-Dlibssh": "disabled",
+      "-Dlibudev": "disabled",
+      "-Dlibusb": "disabled",
+      "-Dlibvduse": "disabled",
+      "-Dlinux_aio": "disabled",
+      "-Dlinux_io_uring": "disabled",
+      "-Dlzfse": "disabled",
+      "-Dlzo": "disabled",
+      "-Dmalloc_trim": "disabled",
+      "-Dmembarrier": "disabled",
+      "-Dmodule_upgrades": "false",
+      "-Dmodules": "disabled",
+      "-Dmpath": "disabled",
+      "-Dmultiprocess": "disabled",
+      "-Dnetmap": "disabled",
+      "-Dnettle": "disabled",
+      "-Dnuma": "disabled",
+      "-Dnvmm": "disabled",
+      "-Dopengl": "disabled",
+      "-Doss": "disabled",
+      "-Dpa": "disabled",
+      "-Dparallels": "disabled",
+      "-Dpipewire": "disabled",
+      "-Dpixman": "enabled",
+      "-Dplugins": "false",
+      "-Dpng": "disabled",
+      "-Dprefer_static": "true",
+      "-Dpvg": "disabled",
+      "-Dqatzip": "disabled",
+      "-Dqcow1": "disabled",
+      "-Dqed": "disabled",
+      "-Dqga_vss": "disabled",
+      "-Dqom_cast_debug": "false",
+      "-Dqpl": "disabled",
+      "-Drbd": "disabled",
+      "-Drdma": "disabled",
+      "-Drelocatable": "true",
+      "-Dreplication": "disabled",
+      "-Drng_none": "false",
+      "-Drust": "disabled",
+      "-Drutabaga_gfx": "disabled",
+      "-Dsafe_stack": "false",
+      "-Dsdl": "disabled",
+      "-Dsdl_image": "disabled",
+      "-Dseccomp": "disabled",
+      "-Dselinux": "disabled",
+      "-Dslirp": "enabled",
+      "-Dslirp_smbd": "disabled",
+      "-Dsmartcard": "disabled",
+      "-Dsnappy": "disabled",
+      "-Dsndio": "disabled",
+      "-Dsparse": "disabled",
+      "-Dspice": "disabled",
+      "-Dspice_protocol": "disabled",
+      "-Dstack_protector": "disabled",
+      "-Dstrict_rust_lints": "false",
+      "-Dtcg": "enabled",
+      "-Dtcg_interpreter": "false",
+      "-Dtools": "disabled",
+      "-Dtpm": "disabled",
+      "-Dtsan": "false",
+      "-Du2f": "disabled",
+      "-Duadk": "disabled",
+      "-Dubsan": "false",
+      "-Dusb_redir": "disabled",
+      "-Dvde": "disabled",
+      "-Dvdi": "disabled",
+      "-Dvduse_blk_export": "disabled",
+      "-Dvfio_user_server": "disabled",
+      "-Dvhdx": "disabled",
+      "-Dvhost_crypto": "disabled",
+      "-Dvhost_kernel": "disabled",
+      "-Dvhost_net": "disabled",
+      "-Dvhost_user": "disabled",
+      "-Dvhost_user_blk_server": "disabled",
+      "-Dvhost_vdpa": "disabled",
+      "-Dvirglrenderer": "disabled",
+      "-Dvirtfs": "disabled",
+      "-Dvmdk": "disabled",
+      "-Dvmnet": "disabled",
+      "-Dvnc": "disabled",
+      "-Dvnc_jpeg": "disabled",
+      "-Dvnc_sasl": "disabled",
+      "-Dvpc": "disabled",
+      "-Dvte": "disabled",
+      "-Dvvfat": "disabled",
+      "-Dwerror": "false",
+      "-Dwhpx": "disabled",
+      "-Dx86_version": "2",
+      "-Dxen": "disabled",
+      "-Dxen_pci_passthrough": "disabled",
+      "-Dxkbcommon": "disabled",
+      "-Dzstd": "disabled"
+    },
+    // "generated_files": A list of files to be generated by the build script.
+    // This is primarily used for files like QEMU's `config-host.mak`.
+    "generated_files": [
+      {
+        "filename": "config-host.mak",
+        "content": {
+          "common": {
+            "GENISOIMAGE": "False",
+            "TARGET_DIRS": "aarch64-softmmu riscv64-softmmu x86_64-softmmu",
+            "CONFIG_DEFAULT_TARGETS": "y"
+          }
+        }
+      }
+    ]
+  }
+}

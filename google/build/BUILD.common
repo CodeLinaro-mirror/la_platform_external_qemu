@@ -1,0 +1,390 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
+load("@rules_license//rules:license.bzl", "license")
+load("@rules_python//python:defs.bzl", "py_binary")
+load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
+
+package(
+    default_applicable_licenses = [":license"],
+)
+
+license(
+    name = "license",
+    package_name = "qemu",
+    copyright_notice = "Copyright (C) 1989, 1991 Free Software Foundation, Inc.",
+    license_kinds = ["@rules_license//licenses/spdx:GPL-2.0-only"],
+    license_text = "COPYING",
+    package_url = "https://www.qemu.org/",
+    visibility = ["//visibility:public"],
+)
+
+exports_files([
+    "COPYING",
+    "google/build/darwin-entitlements.plist",
+])
+
+filegroup(
+    name = "qemu_sources",
+    srcs = glob(
+        ["**/*"],
+        exclude = [
+            "google/toolchain/**/*",
+            "bazel-*/**/*",
+            "out/**/*",
+        ],
+    ),
+    visibility = [":__subpackages__"],
+)
+
+filegroup(
+    name = "platform_files",
+    srcs = select({
+        "@platforms//os:windows": ["platform/BUILD.windows-x86_64"] + glob(["platform/windows-amd64/**/*"]),
+        "@platforms//os:macos": ["platform/BUILD.darwin-arm64"] + glob(["platform/darwin-arm64/**/*"]),
+        "@platforms//os:linux": ["platform/BUILD.linux-x86_64"] + glob(["platform/linux-x86_64/**/*"]),
+    }),
+    visibility = [":__subpackages__"],
+)
+
+cc_library(
+    name = "aemu_func_defs",
+    hdrs = ["google/system/aemu_func_defs.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
+# Make all the headers available, including the generated ones.
+cc_library(
+    name = "qemu-headers",
+    hdrs = [
+        "config-poison.h",
+        "generate_shared_QAPI_source_files",
+        "google/drivers/trace/goldfish.h",
+        "qapi/trace.h",
+        "trace/trace-accel_kvm.h",
+        "trace/trace-accel_tcg.h",
+        "trace/trace-audio.h",
+        "trace/trace-authz.h",
+        "trace/trace-backends.h",
+        "trace/trace-backends_tpm.h",
+        "trace/trace-block.h",
+        "trace/trace-chardev.h",
+        "trace/trace-crypto.h",
+        "trace/trace-ebpf.h",
+        "trace/trace-gdbstub.h",
+        "trace/trace-hw_9pfs.h",
+        "trace/trace-hw_acpi.h",
+        "trace/trace-hw_adc.h",
+        "trace/trace-hw_alpha.h",
+        "trace/trace-hw_arm.h",
+        "trace/trace-hw_audio.h",
+        "trace/trace-hw_block.h",
+        "trace/trace-hw_char.h",
+        "trace/trace-hw_core.h",
+        "trace/trace-hw_display.h",
+        "trace/trace-hw_dma.h",
+        "trace/trace-hw_gpio.h",
+        "trace/trace-hw_hyperv.h",
+        "trace/trace-hw_i2c.h",
+        "trace/trace-hw_i386.h",
+        "trace/trace-hw_i386_kvm.h",
+        "trace/trace-hw_i386_xen.h",
+        "trace/trace-hw_ide.h",
+        "trace/trace-hw_input.h",
+        "trace/trace-hw_intc.h",
+        "trace/trace-hw_isa.h",
+        "trace/trace-hw_mem.h",
+        "trace/trace-hw_mips.h",
+        "trace/trace-hw_misc.h",
+        "trace/trace-hw_misc_macio.h",
+        "trace/trace-hw_net.h",
+        "trace/trace-hw_net_can.h",
+        "trace/trace-hw_nubus.h",
+        "trace/trace-hw_nvme.h",
+        "trace/trace-hw_nvram.h",
+        "trace/trace-hw_pci.h",
+        "trace/trace-hw_pci_host.h",
+        "trace/trace-hw_ppc.h",
+        "trace/trace-hw_remote.h",
+        "trace/trace-hw_rtc.h",
+        "trace/trace-hw_s390x.h",
+        "trace/trace-hw_scsi.h",
+        "trace/trace-hw_sd.h",
+        "trace/trace-hw_sensor.h",
+        "trace/trace-hw_sh4.h",
+        "trace/trace-hw_sparc.h",
+        "trace/trace-hw_sparc64.h",
+        "trace/trace-hw_ssi.h",
+        "trace/trace-hw_timer.h",
+        "trace/trace-hw_tpm.h",
+        "trace/trace-hw_ufs.h",
+        "trace/trace-hw_usb.h",
+        "trace/trace-hw_vfio.h",
+        "trace/trace-hw_virtio.h",
+        "trace/trace-hw_watchdog.h",
+        "trace/trace-hw_xen.h",
+        "trace/trace-io.h",
+        "trace/trace-migration.h",
+        "trace/trace-monitor.h",
+        "trace/trace-nbd.h",
+        "trace/trace-net.h",
+        "trace/trace-qapi.h",
+        "trace/trace-qapi_commands_acpi_trace_events.h",
+        "trace/trace-qapi_commands_audio_trace_events.h",
+        "trace/trace-qapi_commands_authz_trace_events.h",
+        "trace/trace-qapi_commands_block_core_trace_events.h",
+        "trace/trace-qapi_commands_block_export_trace_events.h",
+        "trace/trace-qapi_commands_block_trace_events.h",
+        "trace/trace-qapi_commands_char_trace_events.h",
+        "trace/trace-qapi_commands_common_trace_events.h",
+        "trace/trace-qapi_commands_compat_trace_events.h",
+        "trace/trace-qapi_commands_control_trace_events.h",
+        "trace/trace-qapi_commands_crypto_trace_events.h",
+        "trace/trace-qapi_commands_cryptodev_trace_events.h",
+        "trace/trace-qapi_commands_cxl_trace_events.h",
+        "trace/trace-qapi_commands_dump_trace_events.h",
+        "trace/trace-qapi_commands_error_trace_events.h",
+        "trace/trace-qapi_commands_introspect_trace_events.h",
+        "trace/trace-qapi_commands_job_trace_events.h",
+        "trace/trace-qapi_commands_machine_common_trace_events.h",
+        "trace/trace-qapi_commands_machine_trace_events.h",
+        "trace/trace-qapi_commands_migration_trace_events.h",
+        "trace/trace-qapi_commands_misc_trace_events.h",
+        "trace/trace-qapi_commands_net_trace_events.h",
+        "trace/trace-qapi_commands_pci_trace_events.h",
+        "trace/trace-qapi_commands_pragma_trace_events.h",
+        "trace/trace-qapi_commands_qdev_trace_events.h",
+        "trace/trace-qapi_commands_qom_trace_events.h",
+        "trace/trace-qapi_commands_replay_trace_events.h",
+        "trace/trace-qapi_commands_rocker_trace_events.h",
+        "trace/trace-qapi_commands_run_state_trace_events.h",
+        "trace/trace-qapi_commands_sockets_trace_events.h",
+        "trace/trace-qapi_commands_stats_trace_events.h",
+        "trace/trace-qapi_commands_tpm_trace_events.h",
+        "trace/trace-qapi_commands_trace_trace_events.h",
+        "trace/trace-qapi_commands_transaction_trace_events.h",
+        "trace/trace-qapi_commands_ui_trace_events.h",
+        "trace/trace-qapi_commands_virtio_trace_events.h",
+        "trace/trace-qapi_commands_yank_trace_events.h",
+        "trace/trace-qom.h",
+        "trace/trace-root.h",
+        "trace/trace-scsi.h",
+        "trace/trace-system.h",
+        "trace/trace-target_arm.h",
+        "trace/trace-target_arm_hvf.h",
+        "trace/trace-target_hppa.h",
+        "trace/trace-target_i386.h",
+        "trace/trace-target_i386_kvm.h",
+        "trace/trace-target_mips_tcg.h",
+        "trace/trace-target_ppc.h",
+        "trace/trace-target_riscv.h",
+        "trace/trace-target_s390x.h",
+        "trace/trace-target_s390x_kvm.h",
+        "trace/trace-target_sparc.h",
+        "trace/trace-ui.h",
+        "trace/trace-util.h",
+        "ui/input-keymap-atset1-to-qcode.c.inc",
+        "ui/input-keymap-linux-to-qcode.c.inc",
+        "ui/input-keymap-osx-to-qcode.c.inc",
+        "ui/input-keymap-qcode-to-atset1.c.inc",
+        "ui/input-keymap-qcode-to-atset2.c.inc",
+        "ui/input-keymap-qcode-to-atset3.c.inc",
+        "ui/input-keymap-qcode-to-linux.c.inc",
+        "ui/input-keymap-qcode-to-qnum.c.inc",
+        "ui/input-keymap-qcode-to-sun.c.inc",
+        "ui/input-keymap-qnum-to-qcode.c.inc",
+        "ui/input-keymap-usb-to-qcode.c.inc",
+        "ui/input-keymap-win32-to-qcode.c.inc",
+        "ui/input-keymap-x11-to-qcode.c.inc",
+        "ui/input-keymap-xorgevdev-to-qcode.c.inc",
+        "ui/input-keymap-xorgkbd-to-qcode.c.inc",
+        "ui/input-keymap-xorgxquartz-to-qcode.c.inc",
+        "ui/input-keymap-xorgxwin-to-qcode.c.inc",
+    ] + select({
+        "@platforms//os:windows": [
+            "platform/windows-amd64/aarch64-softmmu-config-devices.h",
+            "platform/windows-amd64/aarch64-softmmu-config-target.h",
+            "platform/windows-amd64/config-host.h",
+            "platform/windows-amd64/riscv64-softmmu-config-devices.h",
+            "platform/windows-amd64/riscv64-softmmu-config-target.h",
+            "platform/windows-amd64/x86_64-softmmu-config-devices.h",
+            "platform/windows-amd64/x86_64-softmmu-config-target.h",
+        ],
+        "@platforms//os:macos": [
+            "platform/darwin-arm64/aarch64-softmmu-config-devices.h",
+            "platform/darwin-arm64/aarch64-softmmu-config-target.h",
+            "platform/darwin-arm64/config-host.h",
+            "platform/darwin-arm64/riscv64-softmmu-config-devices.h",
+            "platform/darwin-arm64/riscv64-softmmu-config-target.h",
+            "platform/darwin-arm64/x86_64-softmmu-config-devices.h",
+            "platform/darwin-arm64/x86_64-softmmu-config-target.h",
+        ],
+        "@platforms//os:linux": [
+            "platform/linux-x86_64/aarch64-softmmu-config-devices.h",
+            "platform/linux-x86_64/aarch64-softmmu-config-target.h",
+            "platform/linux-x86_64/config-host.h",
+            "platform/linux-x86_64/riscv64-softmmu-config-devices.h",
+            "platform/linux-x86_64/riscv64-softmmu-config-target.h",
+            "platform/linux-x86_64/x86_64-softmmu-config-devices.h",
+            "platform/linux-x86_64/x86_64-softmmu-config-target.h",
+        ],
+        "//conditions:default": [],
+    }) + glob(["include/**"]) + glob(["linux-headers/**/*.h"]),
+    copts = ["-fwrapv"],
+    # Note that . is needed for config-poison.h.
+    includes = [
+        ".",
+        "google/drivers",
+        "include",
+        "linux-headers",
+    ] + select({
+        "@platforms//os:windows": ["platform/windows-amd64"],
+        "@platforms//os:macos": ["platform/darwin-arm64"],
+        "@platforms//os:linux": ["platform/linux-x86_64"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@glib//glib:glib_import",
+        "@glib//gmodule:gmodule_import",
+        "@libslirp//:headers",
+    ] + select({
+        "@platforms//os:windows": ["@aemu//windows:compat-hdrs"],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "qemu-headers-exported",
+    defines = ["QEMU_HEADERS_EXPORT"],
+    visibility = ["//visibility:public"],
+    deps = [":qemu-headers"],
+)
+
+cc_library(
+    name = "qemu-version-header",
+    hdrs = ["qemu-version.h"],
+    visibility = ["//visibility:public"],
+)
+
+# Set of common build rules that we want to merge in
+# This makes sure we have all we need available.
+filegroup(
+    name = "qemu-roms",
+    srcs = [
+        "pc-bios/bios.bin",
+        "pc-bios/bios-256k.bin",
+        "pc-bios/efi-e1000.rom",
+        "pc-bios/efi-e1000e.rom",
+        "pc-bios/efi-virtio.rom",
+        "pc-bios/kvmvapic.bin",
+        "pc-bios/linuxboot_dma.bin",
+        "pc-bios/multiboot_dma.bin",
+        "pc-bios/vgabios-cirrus.bin",
+        "pc-bios/vgabios-stdvga.bin",
+        "pc-bios/vgabios-virtio.bin",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "qemu-keymaps",
+    srcs = [
+        "pc-bios/keymaps/ar",
+        "pc-bios/keymaps/bepo",
+        "pc-bios/keymaps/cz",
+        "pc-bios/keymaps/da",
+        "pc-bios/keymaps/de",
+        "pc-bios/keymaps/de-ch",
+        "pc-bios/keymaps/en-gb",
+        "pc-bios/keymaps/en-us",
+        "pc-bios/keymaps/es",
+        "pc-bios/keymaps/et",
+        "pc-bios/keymaps/fi",
+        "pc-bios/keymaps/fo",
+        "pc-bios/keymaps/fr",
+        "pc-bios/keymaps/fr-be",
+        "pc-bios/keymaps/fr-ca",
+        "pc-bios/keymaps/fr-ch",
+        "pc-bios/keymaps/hr",
+        "pc-bios/keymaps/hu",
+        "pc-bios/keymaps/is",
+        "pc-bios/keymaps/it",
+        "pc-bios/keymaps/ja",
+        "pc-bios/keymaps/lt",
+        "pc-bios/keymaps/lv",
+        "pc-bios/keymaps/mk",
+        "pc-bios/keymaps/nl",
+        "pc-bios/keymaps/no",
+        "pc-bios/keymaps/pl",
+        "pc-bios/keymaps/pt",
+        "pc-bios/keymaps/pt-br",
+        "pc-bios/keymaps/ru",
+        "pc-bios/keymaps/sl",
+        "pc-bios/keymaps/sv",
+        "pc-bios/keymaps/th",
+        "pc-bios/keymaps/tr",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "trace_backend",
+    build_setting_default = "nop",
+    values = [
+        "nop",
+        "log",
+        "simple",
+        "goldfish",
+    ],
+)
+
+config_setting(
+    name = "trace_log_enabled",
+    flag_values = {":trace_backend": "log"},
+)
+
+config_setting(
+    name = "trace_simple_enabled",
+    flag_values = {":trace_backend": "simple"},
+)
+
+config_setting(
+    name = "goldfish_enabled",
+    flag_values = {":trace_backend": "goldfish"},
+)
+
+TRACE_BACKEND = select({
+    ":trace_log_enabled": "log",
+    ":trace_simple_enabled": "simple",
+    ":goldfish_enabled": "goldfish",
+    "//conditions:default": "nop",
+})
+
+cc_library(
+    name = "trace_backend_deps",
+    srcs = select({
+        ":trace_simple_enabled": [
+            "trace/control.h",
+            "trace/control-internal.h",
+            "trace/event-internal.h",
+            "trace/simple.c",
+        ],
+        ":goldfish_enabled": [
+            "google/drivers/trace/goldfish.c",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        ":trace_simple_enabled": ["trace/simple.h"],
+        ":goldfish_enabled": ["google/drivers/trace/goldfish.h"],
+        "//conditions:default": [],
+    }),
+    defines = select({
+        ":trace_simple_enabled": ["CONFIG_TRACE_SIMPLE"],
+        ":trace_log_enabled": ["CONFIG_TRACE_LOG"],
+        ":goldfish_enabled": ["CONFIG_TRACE_GOLDFISH"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [":qemu-headers"],
+)

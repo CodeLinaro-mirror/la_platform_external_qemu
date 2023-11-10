@@ -1,0 +1,4 @@
+LIBRARY qemu-system-riscv64.exe
+EXPORTS
+    ; Note that building this binary is currently disabled and
+    ; the contents of this file became stale and were removed.

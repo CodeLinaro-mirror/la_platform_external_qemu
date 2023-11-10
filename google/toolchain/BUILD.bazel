@@ -1,0 +1,251 @@
+# Copyright 2026 - The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@aemu//tools/toolchain:amc.bzl", "amc_generator", "amc_pkg_config", "amc_toolchain")
+load("@bazel_lib//lib:copy_file.bzl", "copy_file")
+load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@bazel_lib//lib:diff_test.bzl", "diff_test")
+load("@bazel_lib//lib:directory_path.bzl", "make_directory_path")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:zip.bzl", "pkg_zip")
+load(":naming.bzl", "build_id_from_command_line")
+
+package(default_visibility = ["//visibility:public"])
+
+# This has moved to @aemu//tools/toolchain
+# as the toolchain generator is now a generic toolchain configurator
+alias(
+    name = "amc",
+    actual = "@aemu//tools/toolchain:amc",
+    visibility = ["//visibility:public"],
+)
+
+# Prebuilt Packages for QEMU dependencies
+amc_pkg_config(
+    name = "zlib_pc",
+    package_name = "zlib",
+    library = "@zlib",
+    version = "1.2.10",
+)
+
+amc_pkg_config(
+    name = "pcre2_pc",
+    package_name = "pcre2",
+    library = "@pcre2",
+    version = "10.42",
+)
+
+# Windows platform specific dependencies
+amc_pkg_config(
+    name = "gnulib_pc",
+    package_name = "gnulib",
+    library = "@glib//glib:gnulib",
+    version = "2.77.2",
+)
+
+amc_pkg_config(
+    name = "dirent_pc",
+    package_name = "dirent",
+    library = "@glib//glib/dirent",
+    version = "2.77.2",
+)
+
+amc_pkg_config(
+    name = "gmodule_pc",
+    package_name = "gmodule-export-2.0",
+    library = "@glib//gmodule",
+    link_flags = select({
+        "@platforms//os:linux": "-pthread",
+        "@platforms//os:macos": "-pthread",
+        "@platforms//os:windows": "",
+    }),
+    requires = ["pcre2"],
+    version = "2.77.2",
+)
+
+amc_pkg_config(
+    name = "glib_pc",
+    package_name = "glib-2.0",
+    library = "@glib//glib",
+    link_flags = select({
+        "@platforms//os:linux": "-pthread",
+        "@platforms//os:macos": "-liconv",
+        "@platforms//os:windows": "",
+    }),
+    requires = [
+        "pcre2",
+        "gmodule-export-2.0",
+    ] + select({
+        "@platforms//os:windows": [
+            "zlib",
+            "gnulib",
+            "dirent",
+        ],
+        "//conditions:default": [],
+    }),
+    version = "2.77.2",
+)
+
+amc_pkg_config(
+    name = "pixman_simd_pc",
+    package_name = "pixman_simd",
+    library = "@pixman//:pixman_simd",
+    version = "0.42.3",
+)
+
+amc_pkg_config(
+    name = "pixman_pc",
+    package_name = "pixman-1",
+    library = "@pixman//:pixman-1",
+    requires = ["pixman_simd"],
+    version = "0.42.3",
+)
+
+amc_pkg_config(
+    name = "libfdt_pc",
+    package_name = "libfdt",
+    library = "@dtc//:libfdt",
+    version = "1.6.0",
+)
+
+amc_pkg_config(
+    name = "rutabaga_gfx_ffi_pc",
+    package_name = "rutabaga_gfx_ffi",
+    archive_library = "@rutabaga_gfx//:rutabaga_ffi",
+    library = "@rutabaga_gfx//:rutabaga_c_ffi",
+    version = "0.1.2",
+)
+
+# Linux platform specific dependencies
+amc_pkg_config(
+    name = "libpulse_pc",
+    package_name = "libpulse",
+    library = "@gcc_lib//:libpulse",
+    version = "3.0",
+)
+
+amc_pkg_config(
+    name = "alsa_pc",
+    package_name = "alsa",
+    library = "@gcc_lib//:libasound",
+    version = "1.0.25",
+)
+
+amc_toolchain(
+    name = "toolchain",
+    compat_lib = select({
+        "@platforms//os:linux": "//google/compat/linux:compat",
+        "@platforms//os:windows": "//google/compat/windows:compat",
+        "//conditions:default": None,
+    }),
+    rustc = "@rules_rust//rust/toolchain:current_rustc_files",
+    target_platform = select({
+        "@platforms//os:linux": "linux-x86_64",
+        "@platforms//os:macos": "darwin-aarch64",
+        "@platforms//os:windows": "windows-msvc-x86_64",
+    }),
+)
+
+amc_generator(
+    name = "generated",
+    srcs = ["@qemu//:qemu_sources"],
+    config = "qemu-build-config.jsonc",
+    packages = [
+        ":glib_pc",
+        ":gmodule_pc",
+        ":libfdt_pc",
+        ":pcre2_pc",
+        ":pixman_pc",
+        ":pixman_simd_pc",
+        ":rutabaga_gfx_ffi_pc",
+        ":zlib_pc",
+    ] + select({
+        "@platforms//os:linux": [
+            ":alsa_pc",
+            ":libpulse_pc",
+        ],
+        "@platforms//os:windows": [
+            ":dirent_pc",
+            ":gnulib_pc",
+        ],
+        "//conditions:default": [],
+    }),
+    target_platform = select({
+        "@platforms//os:linux": "linux-x64",
+        "@platforms//os:macos": "mac-aarch64",
+        "@platforms//os:windows": "windows-x64",
+    }),
+    toolchain = ":toolchain",
+)
+
+make_directory_path(
+    name = "platform_dir",
+    directory = ":generated",
+    path = "build/bazel/platform",
+)
+
+copy_to_directory(
+    name = "platform_new_copy",
+    srcs = [":platform_dir"],
+    out = "platform",
+    exclude_srcs_patterns = ["**/run"],
+    replace_prefixes = {
+        "generated/build/bazel/platform": "",
+    },
+)
+
+pkg_files(
+    name = "zip_files",
+    srcs = [":platform_new_copy"],
+)
+
+build_id_from_command_line(
+    name = "build_id",
+    build_setting_default = "developer",
+)
+
+pkg_zip(
+    name = "zip",
+    srcs = [":zip_files"],
+    package_file_name = select({
+        "@platforms//os:linux": "bazel-linux-x86_64-{build_id}.zip",
+        "@platforms//os:macos": "bazel-darwin-arm64-{build_id}.zip",
+        "@platforms//os:windows": "bazel-windows-x86_64-{build_id}.zip",
+    }),
+    package_variables = ":build_id",
+)
+
+copy_to_directory(
+    name = "platform_orig_copy",
+    srcs = ["//:platform_files"],
+    out = "platform_orig",
+    replace_prefixes = {
+        "platform/": "",
+    },
+)
+
+diff_test(
+    name = "generated_diff",
+    file1 = ":platform_orig_copy",
+    file2 = ":platform_new_copy",
+)
