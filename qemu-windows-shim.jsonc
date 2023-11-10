@@ -1,0 +1,278 @@
+{
+  // This will be at the start of the bazel file.
+  "bazel_prefix": "load(\"//build/bazel/rules:windows_resources.bzl\", \"windows_resources\")\ncc_library(name='libqemuutilstubs',srcs=['stubs/error-printf.c','stubs/is-daemonized.c','stubs/monitor-core.c',],hdrs=['config-poison.h','include/block/aio.h','include/block/aio-wait.h','include/block/block.h','include/block/block-common.h','include/block/block-global-state.h','include/block/block-io.h','include/block/blockjob.h','include/block/graph-lock.h','include/exec/hwaddr.h','include/exec/poison.h','include/glib-compat.h','include/hw/hotplug.h','include/hw/qdev-core.h','include/hw/resettable.h','include/monitor/monitor.h','include/qapi/util.h','include/qemu/atomic.h','include/qemu/bitmap.h','include/qemu/bitops.h','include/qemu/bswap.h','include/qemu/clang-tsa.h','include/qemu/compiler.h','include/qemu/coroutine.h','include/qemu/coroutine-core.h','include/qemu/coroutine-tls.h','include/qemu/error-report.h','include/qemu/event_notifier.h','include/qemu/host-utils.h','include/qemu/int128.h','include/qemu/iov.h','include/qemu/job.h','include/qemu/lockable.h','include/qemu/main-loop.h','include/qemu/module.h','include/qemu/notify.h','include/qemu/osdep.h','include/qemu/processor.h','include/qemu/progress_meter.h','include/qemu/qsp.h','include/qemu/queue.h','include/qemu/ratelimit.h','include/qemu/rcu.h','include/qemu/rcu_queue.h','include/qemu/readline.h','include/qemu/sys_membarrier.h','include/qemu/thread.h','include/qemu/thread-win32.h','include/qemu/timer.h','include/qemu/transactions.h','include/qemu/typedefs.h','include/qom/object.h','include/sysemu/event-loop-base.h','include/sysemu/os-win32.h','platform/windows-amd64/config-host.h','qapi/qapi-builtin-types.h','qapi/qapi-commands-block.h','qapi/qapi-commands-block-core.h','qapi/qapi-commands-common.h','qapi/qapi-commands-crypto.h','qapi/qapi-commands-job.h','qapi/qapi-commands-machine.h','qapi/qapi-commands-machine-common.h','qapi/qapi-commands-misc.h','qapi/qapi-commands-run-state.h','qapi/qapi-commands-sockets.h','qapi/qapi-emit-events.h','qapi/qapi-types-audio.h','qapi/qapi-types-block.h','qapi/qapi-types-block-core.h','qapi/qapi-types-common.h','qapi/qapi-types-crypto.h','qapi/qapi-types-error.h','qapi/qapi-types-job.h','qapi/qapi-types-machine.h','qapi/qapi-types-machine-common.h','qapi/qapi-types-misc.h','qapi/qapi-types-net.h','qapi/qapi-types-run-state.h','qapi/qapi-types-sockets.h','qapi/qapi-types-ui.h',],copts=['-Wno-constant-conversion','-Wno-macro-redefined','-Wno-invalid-noreturn','-Wno-bitfield-constant-conversion','-Wno-int-to-void-pointer-cast','-Wno-unused-command-line-argument','-Wno-undef','-Wno-microsoft-enum-forward-reference','-Wno-microsoft-include','-Wno-deprecated-declarations','-fms-extensions','-march=native','-UNDEBUG'],defines=['_GNU_SOURCE','_FILE_OFFSET_BITS=64','_LARGEFILE_SOURCE','GLIB_STATIC_COMPILATION',],includes=['.','host/include/x86_64','platform/windows-amd64','qapi','trace','include',],visibility=['//visibility:public'],deps=['//third_party/qemu/google/compat/windows:compat','@glib//:glib-static','@glib//:gmodule-static','@pixman//:pixman-1','@pixman//:pixman_simd','@zlib',],)",
+  // These are shims we should apply to the various targets
+  "shims": [
+    {
+      "target": "generate_shared_QAPI_source_files",
+      "shims": {
+        "cmd": "$(location :qapi-gen) -o $(RULEDIR)/qapi -b $(location qapi/qapi-schema.json)",
+        "cmd_bat": "$(location :qapi-gen) -o $(RULEDIR)/qapi -b $(location qapi/qapi-schema.json)"
+      }
+    },
+    {
+      "target": "generate_config-poison_h",
+      "shims": {
+        // TODO: It would be nice if we could generalize this in the generator
+        "cmd": "$(location :make-config-poison) $(SRCS) > $(location config-poison.h)",
+        "cmd_bat": "$(location :make-config-poison) $(SRCS) > $(location config-poison.h)"
+      }
+    },
+    {
+      "target": "keymap-gen",
+      "shims": {
+        "srcs": [
+          "subprojects/keycodemapdb/tools/keymap-gen.py"
+        ]
+      }
+    },
+    {
+      "target": "qemu-system-aarch64",
+      "shims": {
+        "_bzl_type": "cc_interface_binary",
+        "-deps": [
+          "libmodinfo-aarch64-softmmu_c"
+        ],
+        // Replace standard launcher with google launcher
+        "-srcs": ["system/main.c"],
+        "+srcs": ["google/system/aemu_main.cpp"],
+        "+deps": [
+          "libqemu-aarch64-softmmu",
+          "//hardware/generic/goldfish/emulator/plugin/registration:aarch64",
+          "//hardware/generic/goldfish/emulator/crashreport:init",
+          "//hardware/generic/goldfish/android/system"
+        ],
+        "visibility": [
+          "//visibility:public"
+        ],
+        "win_def_file": "platform/windows-amd64/qemu-system-aarch64.def"
+      }
+    },
+    {
+      "target": "qemu-system-riscv64",
+      "shims": {
+        "_bzl_type": "cc_interface_binary",
+        // Replace standard launcher with google launcher
+        "-srcs": ["system/main.c"],
+        "+srcs": ["google/system/aemu_main.cpp"],
+        "-deps": [
+          "libmodinfo-riscv64-softmmu_c"
+        ],
+        "+deps": [
+          "libqemu-riscv64-softmmu",
+          "//hardware/generic/goldfish/emulator/plugin/registration:riscv64",
+          "//hardware/generic/goldfish/emulator/crashreport:init",
+          "//hardware/generic/goldfish/android/system"
+        ],
+        "visibility": [
+          "//visibility:public"
+        ],
+        "win_def_file": "platform/windows-amd64/qemu-system-riscv64.def"
+      }
+    },
+    {
+      "target": "qemu-system-x86_64",
+      "shims": {
+        "_bzl_type": "cc_interface_binary",
+        // Replace standard launcher with google launcher
+        "-srcs": ["system/main.c"],
+        "+srcs": ["google/system/aemu_main.cpp"],
+        "-deps": [
+          "libmodinfo-x86_64-softmmu_c"
+        ],
+        "+deps": [
+          "libqemu-x86_64-softmmu",
+          "//hardware/generic/goldfish/emulator/plugin/registration:x86_64",
+          "//hardware/generic/goldfish/emulator/crashreport:init",
+          "//hardware/generic/goldfish/android/system"
+        ],
+        "visibility": [
+          "//visibility:public"
+        ],
+        "win_def_file": "platform/windows-amd64/qemu-system-x86_64.def"
+      }
+    },
+    {
+      "target": "qemu-img",
+      "shims": {
+        "+deps": [
+          "libqemuutilstubs"
+        ]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "py_binary",
+        // For some reason bazel on windows is not able to figure out
+        // the import path, so let's just explicitly add it.
+        "imports": [
+          "scripts"
+        ]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "cc_shared_library",
+        // xs4all!
+        "visibility": [
+          "//visibility:public"
+        ]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "cc_library|cc_binary",
+        // Remove our compat libs if present
+        "-hdrs": [
+          ".*subprojects.*"
+        ],
+        "+copts": [
+          "-Wno-constant-conversion",
+          "-Wno-macro-redefined",
+          "-Wno-invalid-noreturn",
+          "-Wno-bitfield-constant-conversion",
+          "-Wno-int-to-void-pointer-cast",
+          "-Wno-unused-command-line-argument",
+          "-Wno-undef",
+          "-Wno-microsoft-enum-forward-reference",
+          "-Wno-microsoft-include",
+          "-Wno-deprecated-declarations",
+          "-fms-extensions",
+          "-march=native",
+          // QEMU does not support NDEBUG (see qemu/osdep.h), so explicitly disable it
+          "-UNDEBUG"
+        ],
+        // xs4all!
+        "visibility": [
+          "//visibility:public"
+        ],
+        // Not yet clear how to handle object includes,
+        // so let's strip them.
+        "-deps": [
+          "libmodinfo-.*",
+          "libcommon_.*",
+          "libmodule-common"
+        ],
+        // We need a compat layer for some windows magic.
+        "+deps": [
+          "//third_party/qemu/google/compat/windows:compat"
+        ]
+      }
+    },
+    {
+      "target": "libqemu-.*-softmmu$|libqemu-.*-softmmu_common$|libcommon$",
+      "shims": {
+        "+srcs": [
+          "hw/display/virtio-gpu.c",
+          "hw/display/virtio-gpu-base.c",
+          "hw/display/virtio-gpu-udmabuf-stubs.c"
+        ]
+      }
+    },
+    {
+      "target": "libqemu-.*-softmmu|libqemu-.*-softmmu_common|libcommon",
+      // TODO: Figure out why we are not setting
+      // this to alwayslink..
+      "shims": {
+        "restrict_to": "cc_library",
+        "alwayslink": 1
+      }
+    },
+    {
+      "target": "libqemuutil",
+      "shims": {
+        "restrict_to": "cc_library",
+        // TODO: Another qemu stub linker order issue. This should likely be
+        // addressed in the meson build.
+        "-srcs": [
+          "stubs/blk-exp-close-all.c",
+          "stubs/blk-commit-all.c",
+          "stubs/monitor-core.c",
+          "stubs/error-printf.c"
+        ]
+      }
+    },
+    {
+      "target": "accel-tcg-x86_64|hw-display-virtio-gpu-pci|hw-display-virtio-gpu|hw-display-virtio-vga-gl|hw-display-virtio-vga",
+      "shims": {
+        "+deps": [
+          ":qemu-system-x86_64.if"
+        ]
+      }
+    }
+    // Sample shim that show cases how you can
+    // add and remove dependencies to all cc_ like
+    // rules.
+    // {
+    //     "target" : ".*",
+    //     "shims" :{
+    //    Use restrict_to to limit this shim to rules
+    //    of the given type. For example cc_library, cc_binary
+    //         "restrict_to" : "cc_.*",
+    //    Add the following items to the "deps" set
+    //         "+deps": ["to_be_added"],
+    //    remove these items from the "deps" set
+    //         "-deps": ["block"]
+    //    replace the "deps" completely:
+    //        "deps": ["a", "b"]
+    //     }
+    // }
+  ],
+  // These are the bazel mappings we are going to use for
+  // external dependencies. For every pkg config dependency
+  // you will need to provide a bazel target
+  "external_deps": {
+    "glib-2.0": [
+      "@glib//:glib-static",
+      "@glib//:gmodule-static"
+    ],
+    "gmodule-export-2.0": [
+      "@glib//:gmodule-static"
+    ],
+    "zlib": [
+      "@zlib//:zlib"
+    ],
+    "pixman-1": [
+      "@pixman//:pixman-1",
+      "@pixman//:pixman_simd"
+    ],
+    "libfdt": [
+      "//third_party/dtc:libfdt"
+    ],
+    "libpulse": [
+      "@pulse//:libpulse"
+    ],
+    "vhost-user": [
+      "//third_party/qemu/subprojects/libvhost-user:vhost-user"
+    ],
+    "vhost-user-glib": [
+      "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib"
+    ],
+    "rutabaga_gfx_ffi": [
+      "@crosvm//:rutabaga_c_ffi"
+    ]
+  },
+  // The actual set of targets you wish to generate bazel targets for.
+  // These are the targets that will be exported.
+  "export": [
+    "qemu-system-x86_64",
+    "qemu-system-aarch64",
+    "qemu-system-riscv64",
+    "qemu-img",
+    // Here we have the windows modules:
+    "accel-tcg-x86_64",
+    "hw-display-virtio-gpu",
+    "hw-display-virtio-vga",
+    "hw-display-virtio-vga-gl",
+    "hw-display-virtio-gpu-pci",
+    "hw-display-virtio-gpu-rutabaga",
+    "hw-display-virtio-gpu-pci-rutabaga"
+  ],
+  "exclude": [
+    "vhost-user",
+    "vhost-user-glib"
+  ]
+}
