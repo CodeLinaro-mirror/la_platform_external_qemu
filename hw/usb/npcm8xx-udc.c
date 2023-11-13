@@ -92,6 +92,25 @@ REG32(USBMODE, 0x1A8)
     FIELD(USBMODE, ENDIAN_SELECT, 2, 1)
     FIELD(USBMODE, SETUP_LOCKOUT_MODE, 3, 1)
     FIELD(USBMODE, STREAM_DISABLE_MODE, 4, 1)
+/* Endpoint Setup Status Register */
+REG32(ENDPTSETUPSTAT, 0x1AC)
+    FIELD(ENDPTSETUPSTAT, SETUP_STATUS, 0, 5)
+/* Endpoint Initialization Register */
+REG32(ENDPTPRIME, 0x1B0)
+    FIELD(ENDPTPRIME, RX_BUFFER, 0, 7)
+    FIELD(ENDPTPRIME, TX_BUFFER, 16, 7)
+/* Endpoint De-Initialization Register*/
+REG32(ENDPTFLUSH, 0x1B4)
+    FIELD(ENDPTFLUSH, RX_BUFFER, 0, 7)
+    FIELD(ENDPTFLUSH, TX_BUFFER, 16, 7)
+/* Endpoint Status Register */
+REG32(ENDPTSTAT, 0x1B8)
+    FIELD(ENDPTSTAT, RX_BUFFER, 0, 7)
+    FIELD(ENDPTSTAT, TX_BUFFER, 16, 7)
+/* Endpoint Complete Register */
+REG32(ENDPTCOMPLETE, 0x1BC)
+    FIELD(ENDPTCOMPLETE, RX_BUFFER, 0, 7)
+    FIELD(ENDPTCOMPLETE, TX_BUFFER, 16, 7)
 /* Endpoint Control 0 Register */
 #define ENDPTCTRL0_INIT_VALUE 0x800080
 REG32(ENDPTCTRL0, 0x1C0)
@@ -258,6 +277,21 @@ static uint64_t npcm8xx_udc_read(void *opaque, hwaddr offset, unsigned size)
     case A_USBMODE:
         value = registers->mode;
         break;
+    case A_ENDPTSETUPSTAT:
+        value = registers->endpoint_setup_status;
+        break;
+    case A_ENDPTPRIME:
+        value = registers->endpoint_prime;
+        break;
+    case A_ENDPTFLUSH:
+        value = registers->endpoint_flush;
+        break;
+    case A_ENDPTSTAT:
+        value = registers->endpoint_status;
+        break;
+    case A_ENDPTCOMPLETE:
+        value = registers->endpoint_complete;
+        break;
     case A_ENDPTCTRL0:
         value = registers->ep0_control;
         break;
@@ -310,6 +344,25 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
         break;
     case A_USBMODE:
         registers->mode = value;
+        break;
+    case A_ENDPTSETUPSTAT:
+        registers->endpoint_setup_status &= ~value;
+        break;
+    case A_ENDPTPRIME:
+        registers->endpoint_prime = value;
+        break;
+    case A_ENDPTFLUSH:
+        registers->endpoint_flush = value;
+        break;
+    case A_ENDPTSTAT:
+        /* Read-only register */
+        qemu_log_mask(LOG_GUEST_ERROR,
+                        "%s: Attempted to write to read-only register 0x%x\n",
+                        DEVICE(opaque)->canonical_path,
+                        A_ENDPTSTAT);
+        break;
+    case A_ENDPTCOMPLETE:
+        registers->endpoint_complete &= ~value;
         break;
     case A_ENDPTCTRL0:
         npcm8xx_udc_write_endptctrl0(udc, value);
