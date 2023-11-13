@@ -181,9 +181,11 @@ static int mock_target_handle_ccc_write(I3CTarget *i3c, const uint8_t *data,
     *num_sent = 1;
     switch (s->curr_ccc) {
     case I3C_CCC_ENEC:
+    case I3C_CCCD_ENEC:
         s->can_ibi = true;
         break;
     case I3C_CCC_DISEC:
+    case I3C_CCCD_DISEC:
         s->can_ibi = false;
         break;
     case I3C_CCC_ENTDAA:
