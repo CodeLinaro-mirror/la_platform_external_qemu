@@ -221,6 +221,10 @@ static void mock_target_do_ibi(MockTargetState *s)
     if (nack) {
         DB_PRINTF("NACKed from controller when sending target interrupt.\n");
     }
+    nack = i3c_target_ibi_finish(&s->i3c, 0x00);
+    if (nack) {
+        DB_PRINTF("NACKed from controller when finishing target interrupt.\n");
+    }
 }
 
 static void mock_target_timer_elapsed(void *opaque)
