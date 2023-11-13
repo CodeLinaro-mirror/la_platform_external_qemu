@@ -42,6 +42,20 @@ typedef enum SVCI3CState {
     SVC_I3C_STATE_IBI_RCV  = 0x07,
 } SVCI3CState;
 
+typedef enum SVCI3CIBIResp {
+    SVC_I3C_IBI_RESP_ACK                = 0x00,
+    SVC_I3C_IBI_RESP_NACK               = 0x01,
+    SVC_I3C_IBI_RESP_ACK_WITH_MDB_CHECK = 0x02,
+    SVC_I3C_IBI_RESP_MANUAL             = 0x03,
+} SVCI3CIBIResp;
+
+typedef enum SVCI3CIBIType {
+    SVC_I3C_IBI_TYPE_NONE = 0x00,
+    SVC_I3C_IBI_TYPE_IBI  = 0x01,
+    SVC_I3C_IBI_TYPE_MR   = 0x02,
+    SVC_I3C_IBI_TYPE_HJ   = 0x03,
+} SVCI3CIBIType;
+
 /*
  * Transfer information used for transfers initiated by the user writing to the
  * MWMSG_SDR register.

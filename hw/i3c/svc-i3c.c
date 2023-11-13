@@ -335,18 +335,101 @@ static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
     return value;
 }
 
+static void svc_i3c_rxfifo_push(SVCI3C *s, const uint8_t *buf, size_t num_bytes)
+{
+    uint32_t trig_threshold = svc_i3c_rxtrig_threshold(s);
+
+    for (int i = 0; i < num_bytes; i++) {
+        if (fifo8_is_full(&s->rx_fifo)) {
+            break;
+        }
+
+        fifo8_push(&s->rx_fifo, buf[i]);
+        trace_svc_i3c_rxfifo_push(object_get_canonical_path(OBJECT(s)), buf[i]);
+        if (fifo8_num_used(&s->rx_fifo) >= trig_threshold) {
+            ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
+        }
+    }
+
+    svc_i3c_update_irq(s);
+}
+
 static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 {
-    return 0;
+    SVCI3C *s = SVC_I3C(bus->qbus.parent);
+    int ret = 0;
+
+    /* Update our status to say we have an IBI. */
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_IBI_RCV);
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, IBIWON, 1);
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, SLVSTART, 1);
+
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, IBIADDR, addr);
+    if (addr == I3C_HJ_ADDR) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, IBITYPE, SVC_I3C_IBI_TYPE_HJ);
+    } else if (is_recv) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, IBITYPE, SVC_I3C_IBI_TYPE_IBI);
+    } else {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, IBITYPE, SVC_I3C_IBI_TYPE_MR);
+    }
+
+    /* If we're auto-responding, respond based on MCTRL.IBIRESP. */
+    if (ARRAY_FIELD_EX32(s->regs, MCTRL, REQUEST) == SVC_I3C_REQUEST_AUTO_IBI) {
+        /*
+         * Only NACK if we're configured to do so. Otherwise ACK.
+         * In the case of a manual ACK/NACK, we will ACK/NACK in ibi_recv or
+         * ibi_finish.
+         */
+        ret = (ARRAY_FIELD_EX32(s->regs, MCTRL, IBIRESP) ==
+               SVC_I3C_IBI_RESP_NACK);
+    } else if (ARRAY_FIELD_EX32(s->regs, MCTRL, IBIRESP) ==
+               SVC_I3C_IBI_RESP_MANUAL) {
+        /*
+         * In this mode, it is expected that the driver IRQ handler ACKs or
+         * NACks the incoming IBI, rather than the controller doing it
+         * automatically. However, the entire IBI happens atomically, so by the
+         * time the guest is able to service the IRQ, the IBI would have
+         * finished.
+         */
+        qemu_log_mask(LOG_UNIMP, "%s: Manual IBI ACKing/NACKing is "
+                      "unsupported. NACKing.",
+                      object_get_canonical_path(OBJECT(s)));
+        ret = -1;
+    }
+
+    trace_svc_i3c_ibi(object_get_canonical_path(OBJECT(s)), addr, is_recv,
+                      ret == 0);
+    svc_i3c_update_irq(s);
+    return ret;
 }
 
 static int svc_i3c_ibi_recv(I3CBus *bus, uint8_t data)
 {
+    SVCI3C *s = SVC_I3C(bus->qbus.parent);
+
+    /*
+     * Check IBIRULES to determine if we should ACK/NACK, if MCTRL.IBIRESP is
+     * MDB-aware.
+     */
+    if (ARRAY_FIELD_EX32(s->regs, MCTRL, IBIRESP) ==
+        SVC_I3C_IBI_RESP_ACK_WITH_MDB_CHECK) {
+        if (ARRAY_FIELD_EX32(s->regs, IBIRULES, NOBYTE)) {
+            return -1;
+        }
+    }
+
+    trace_svc_i3c_ibi_recv(object_get_canonical_path(OBJECT(s)), data);
+    svc_i3c_rxfifo_push(s, &data, sizeof(data));
+
     return 0;
 }
 
 static int svc_i3c_ibi_finish(I3CBus *bus)
 {
+    SVCI3C *s = SVC_I3C(bus->qbus.parent);
+
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+    trace_svc_i3c_ibi_finish(object_get_canonical_path(OBJECT(s)));
     return 0;
 }
 
@@ -472,25 +555,6 @@ static int svc_i3c_tx(SVCI3C *s)
 
     trace_svc_i3c_send(object_get_canonical_path(OBJECT(s)), xfer_size);
     return ret;
-}
-
-static void svc_i3c_rxfifo_push(SVCI3C *s, const uint8_t *buf, size_t num_bytes)
-{
-    uint32_t trig_threshold = svc_i3c_rxtrig_threshold(s);
-
-    for (int i = 0; i < num_bytes; i++) {
-        if (fifo8_is_full(&s->rx_fifo)) {
-            break;
-        }
-
-        fifo8_push(&s->rx_fifo, buf[i]);
-        trace_svc_i3c_rxfifo_push(object_get_canonical_path(OBJECT(s)), buf[i]);
-        if (fifo8_num_used(&s->rx_fifo) >= trig_threshold) {
-            ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
-        }
-    }
-
-    svc_i3c_update_irq(s);
 }
 
 static int svc_i3c_rx(SVCI3C *s)
