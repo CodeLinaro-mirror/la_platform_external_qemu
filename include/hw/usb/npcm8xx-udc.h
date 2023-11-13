@@ -25,6 +25,11 @@ typedef struct NPCM8xxUDCRegisters {
     uint32_t endpoint_list_address;
     uint32_t port_control_status;
     uint32_t mode;
+    uint32_t endpoint_setup_status;
+    uint32_t endpoint_prime;
+    uint32_t endpoint_flush;
+    uint32_t endpoint_status;
+    uint32_t endpoint_complete;
     uint32_t ep0_control;
     uint32_t ep1_control;
     uint32_t ep2_control;
