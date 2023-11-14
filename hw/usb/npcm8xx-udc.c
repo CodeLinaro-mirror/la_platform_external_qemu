@@ -10,6 +10,7 @@
 #include "qemu/osdep.h"
 #include "hw/usb/npcm8xx-udc.h"
 
+#include "exec/cpu-common.h"
 #include "exec/memory.h"
 #include "hw/irq.h"
 #include "hw/qdev-core.h"
@@ -238,6 +239,69 @@ static inline void npcm8xx_udc_write_portsc1(NPCM8xxUDC *udc, uint32_t value)
         value | (registers->port_control_status & read_only_mask);
 }
 
+static inline void npcm8xx_udc_send_data(NPCM8xxUDC *udc,
+                                         TransferDescriptor td_head)
+{
+    while ((td_head.next_pointer & TD_NEXT_POINTER_VALID_MASK) == 0) {
+        TransferDescriptor next_td;
+        cpu_physical_memory_read(td_head.next_pointer, &next_td,
+                                 sizeof(TransferDescriptor));
+        int data_size = (next_td.info & TD_INFO_TOTAL_BYTES_MASK) >>
+                        TD_INFO_TOTAL_BYTES_SHIFT;
+        int sent_data_size = 0;
+
+        /* TODO(b/309701600): Implement send mechanism in following CLs. */
+
+        if (data_size == sent_data_size) {
+            /* Clear status if transfer succeeds */
+            next_td.info &= ~TD_INFO_STATUS_MASK;
+        }
+
+        cpu_physical_memory_write(td_head.next_pointer, &next_td,
+                                  sizeof(TransferDescriptor));
+        td_head = next_td;
+    }
+}
+
+static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
+{
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    QueueHead qh;
+    registers->endpoint_prime = value;
+
+    if (!udc->running) {
+        qemu_log_mask(
+            LOG_GUEST_ERROR,
+            "%s[%u]: Attempted to send data when device is not running\n",
+            DEVICE(udc)->canonical_path, udc->device_index);
+        return;
+    }
+
+    if (!udc->attached) {
+        qemu_log_mask(
+            LOG_GUEST_ERROR,
+            "%s[%u]: Attempted to send data when device is not attached\n",
+            DEVICE(udc)->canonical_path, udc->device_index);
+        return;
+    }
+
+    uint8_t tx_endpoints = FIELD_EX32(value, ENDPTPRIME, TX_BUFFER);
+    if (tx_endpoints) {
+        const uint32_t tx_qh_base_address =
+            registers->endpoint_list_address + sizeof(QueueHead);
+        for (uint8_t tx_endpoint_index = 0; tx_endpoints != 0;
+             tx_endpoint_index += 2, tx_endpoints >>= 1) {
+            cpu_physical_memory_read(
+                tx_qh_base_address + tx_endpoint_index * sizeof(QueueHead), &qh,
+                sizeof(QueueHead));
+            npcm8xx_udc_send_data(udc, qh.td);
+        }
+    }
+
+    registers->endpoint_complete = value;
+    registers->endpoint_status = value;
+}
+
 static inline void npcm8xx_udc_write_endptctrl0(NPCM8xxUDC *udc, uint32_t value)
 {
     NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
@@ -349,10 +413,11 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
         registers->endpoint_setup_status &= ~value;
         break;
     case A_ENDPTPRIME:
-        registers->endpoint_prime = value;
+        npcm8xx_udc_write_endptprime(udc, value);
         break;
     case A_ENDPTFLUSH:
-        registers->endpoint_flush = value;
+        /* Write to endpoint flush clears endpoint status bits. */
+        registers->endpoint_status &= ~value;
         break;
     case A_ENDPTSTAT:
         /* Read-only register */

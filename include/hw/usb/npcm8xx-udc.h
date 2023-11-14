@@ -18,6 +18,31 @@
 #define TYPE_NPCM8XX_UDC "npcm8xx-udc"
 OBJECT_DECLARE_SIMPLE_TYPE(NPCM8xxUDC, NPCM8XX_UDC)
 
+typedef struct TransferDescriptor {
+    uint32_t next_pointer;
+    uint32_t info;
+    uint32_t buffer_pointers[5];
+} TransferDescriptor;
+
+#define TD_NEXT_POINTER_VALID_MASK 1
+#define TD_INFO_TOTAL_BYTES_SHIFT 16
+#define TD_INFO_TOTAL_BYTES_MASK 0x7FFF0000
+#define TD_INFO_INTERRUPT_ON_COMPLETE_MASK 0x8000
+#define TD_INFO_STATUS_MASK 0xF
+
+typedef struct QueueHead {
+    uint32_t endpoint_info;
+    uint32_t current_pointer;
+    TransferDescriptor td;
+    uint32_t reserved;
+    uint32_t setup[2];
+    uint32_t padding[4];
+} QueueHead;
+
+#define QH_EP_INFO_MAX_PACKET_LENGTH_SHIFT 16
+#define QH_EP_INFO_MAX_PACKET_LENGTH_MASK 0x3FF0000
+#define QH_EP_INFO_INTERRUPT_ON_SETUP_MASK 0x8000
+
 typedef struct NPCM8xxUDCRegisters {
     uint32_t command;
     uint32_t status;
