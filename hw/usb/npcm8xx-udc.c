@@ -10,6 +10,9 @@
 #include "qemu/osdep.h"
 #include "hw/usb/npcm8xx-udc.h"
 
+#include <libusb.h>
+#include <usbredirproto.h>
+
 #include "exec/cpu-common.h"
 #include "exec/memory.h"
 #include "hw/irq.h"
@@ -19,6 +22,7 @@
 #include "hw/sysbus.h"
 #include "hw/usb/redirect-host.h"
 #include "migration/vmstate.h"
+#include "qemu/error-report.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
 #include "qemu/typedefs.h"
@@ -26,6 +30,7 @@
 #include "trace.h"
 
 #define NPCM8XX_MEMORY_ADDRESS_SIZE 0x1000
+#define HIGH_SPEED_MAX_PACKET_SIZE 0x512
 
 /* Device Control Capability Parameters Register */
 #define DCCPARAMS_INIT_VALUE 0x83
@@ -72,7 +77,7 @@ REG32(USBINTR, 0x148)
 REG32(ENDPOINTLISTADDR, 0x158)
     FIELD(ENDPOINTLISTADDR, EPBASE, 11, 21)
 /* Device Controller Port Status/Controller 1 Register */
-#define PORTSC1_INIT_VALUE 0x1000000
+#define PORTSC1_INIT_VALUE 0x9000204
 REG32(PORTSC1, 0x184)
     FIELD(PORTSC1, CURRENT_CONNECT_STATUS, 0, 1)
     FIELD(PORTSC1, PORT_ENABLE, 2, 1)
@@ -152,6 +157,42 @@ REG32(ENDPTCTRL2, 0x1C8)
     FIELD(ENDPTCTRL2, TX_DATA_TOGGLE_RESET, 22, 1)
     FIELD(ENDPTCTRL2, TX_ENABLE, 23, 1)
 
+static inline void npcm8xx_udc_control_transfer(NPCM8xxUDC *udc,
+                                                uint8_t request_type,
+                                                uint8_t request, uint16_t value,
+                                                uint16_t index, uint16_t length)
+{
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    uint32_t ep0_qh_address = registers->endpoint_list_address;
+    uint32_t setup1 = request_type | (request << 8) | (value << 16);
+    uint32_t setup2 = index | (length << 16);
+
+    cpu_physical_memory_write(ep0_qh_address + 40, &setup1, 4);
+    cpu_physical_memory_write(ep0_qh_address + 44, &setup2, 4);
+
+    registers->endpoint_setup_status |= 1;
+    registers->status |= R_USBSTS_USB_INTERRUPT_MASK;
+}
+
+static inline void npcm8xx_udc_initiate_usbredir_request(
+    NPCM8xxUDC *udc, int request_type, bool require_if_and_ep_info)
+{
+    udc->usbredir_request.request_type = request_type;
+    udc->usbredir_request.active = true;
+    udc->usbredir_request.require_if_and_ep_info = require_if_and_ep_info;
+
+    if (require_if_and_ep_info) {
+        /**
+         * Use max packet size because we need the entire configuration
+         * descriptor.
+         */
+        npcm8xx_udc_control_transfer(udc, LIBUSB_ENDPOINT_IN,
+                                     LIBUSB_REQUEST_GET_DESCRIPTOR,
+                                     LIBUSB_DT_CONFIG << 8, 0,
+                                     HIGH_SPEED_MAX_PACKET_SIZE);
+    }
+}
+
 static void npcm8xx_udc_reset(DeviceState *dev)
 {
     NPCM8xxUDC *udc = NPCM8XX_UDC(dev);
@@ -221,6 +262,20 @@ static inline void npcm8xx_udc_write_usbsts(NPCM8xxUDC *udc, uint32_t value)
     registers->status =
         FIELD_DP32(registers->status, USBSTS, DCSUSPEND, dcsuspend_bit);
 
+    /**
+     * All USB transfers are only valid after firmware handles the port change
+     * interrupt, so device_connect request can only be sent afterwards.
+     * Clearing port change detect status is the best way to tell if the
+     * firmware has processed the port information, so the device_connect
+     * request is sent, if the firmware tries to clear port change status.
+     */
+    if (udc->running && udc->attached) {
+        if (FIELD_EX32(value, USBSTS, PORT_CHANGE_DETECT)) {
+            npcm8xx_udc_initiate_usbredir_request(udc, usb_redir_device_connect,
+                                                  true);
+        }
+    }
+
     npcm8xx_udc_update_irq(udc);
 }
 
@@ -239,6 +294,144 @@ static inline void npcm8xx_udc_write_portsc1(NPCM8xxUDC *udc, uint32_t value)
         value | (registers->port_control_status & read_only_mask);
 }
 
+static inline uint8_t ep_address_to_usbredir_ep_index(uint8_t endpoint_address)
+{
+    return ((endpoint_address & 0x80) >> 3) | (endpoint_address & 0x0f);
+}
+
+static inline int read_interface_info(
+    struct usb_redir_interface_info_header *interface_info,
+    struct libusb_interface_descriptor *interface_desc)
+{
+    int index = interface_desc->bInterfaceNumber;
+    interface_info->interface[index] = index;
+    interface_info->interface_class[index] = interface_desc->bInterfaceClass;
+    interface_info->interface_subclass[index] =
+        interface_desc->bInterfaceSubClass;
+    interface_info->interface_protocol[index] =
+        interface_desc->bInterfaceProtocol;
+
+    return interface_desc->bLength;
+}
+
+static inline int read_ep_info(
+    struct usb_redir_ep_info_header *ep_info,
+    struct libusb_interface_descriptor *interface_desc,
+    struct libusb_endpoint_descriptor *ep_desc)
+{
+    int read_bytes = 0;
+
+    for (int i = 0; i < interface_desc->bNumEndpoints; i++) {
+        int ep_index =
+            ep_address_to_usbredir_ep_index(ep_desc[i].bEndpointAddress);
+        ep_info->interface[ep_index] = interface_desc->bInterfaceNumber;
+        ep_info->type[ep_index] = ep_desc[i].bmAttributes & 0x3;
+        ep_info->max_packet_size[ep_index] = ep_desc[i].wMaxPacketSize;
+        ep_info->interval[ep_index] = ep_desc[i].bInterval;
+        read_bytes += ep_desc->bLength;
+    }
+
+    return read_bytes;
+}
+
+static inline struct usb_redir_device_connect_header make_device_info(
+    struct libusb_device_descriptor *device_desc)
+{
+    struct usb_redir_device_connect_header device_info;
+    device_info.device_class = device_desc->bDeviceClass;
+    device_info.device_subclass = device_desc->bDeviceSubClass;
+    device_info.device_protocol = device_desc->bDeviceProtocol;
+    device_info.device_version_bcd = device_desc->bcdUSB;
+    device_info.vendor_id = device_desc->idVendor;
+    device_info.product_id = device_desc->idProduct;
+    device_info.speed = usb_redir_speed_high;
+    return device_info;
+}
+
+static inline int usbredir_send_if_and_ep_info(USBRedirectHost *usbredir_host,
+                                               uint8_t *data)
+{
+    struct usb_redir_interface_info_header interface_info;
+    struct usb_redir_ep_info_header ep_info;
+    uint8_t *init_data_ptr = data;
+    for (int i = 0; i < 32; i++) {
+        ep_info.type[i] = usb_redir_type_invalid;
+    }
+
+    struct libusb_config_descriptor *config_desc = (void *)data;
+    interface_info.interface_count = config_desc->bNumInterfaces;
+    data += config_desc->bLength;
+
+    for (int i = 0; i < interface_info.interface_count; i++) {
+        struct libusb_interface_descriptor *interface_desc = (void *)data;
+        data += read_interface_info(&interface_info, interface_desc);
+        data += read_ep_info(&ep_info, interface_desc, (void *)data);
+    }
+
+    if (usbredir_host_send_ep_info(usbredir_host, &ep_info) != 0) {
+        return 0;
+    }
+    if (usbredir_host_send_interface_info(usbredir_host, &interface_info) !=
+        0) {
+        return 0;
+    }
+
+    return data - init_data_ptr;
+}
+
+static inline int usbredir_send_device_connect(USBRedirectHost *usbredir_host,
+                                               uint8_t *data)
+{
+    struct libusb_device_descriptor *device_desc = (void *)data;
+    struct usb_redir_device_connect_header device_info =
+        make_device_info(device_desc);
+    if (usbredir_host_send_device_connect(usbredir_host, &device_info) != 0) {
+        return 0;
+    }
+    return device_desc->bLength;
+}
+
+static inline int npcm8xx_udc_send_data_over_usbredir(NPCM8xxUDC *udc,
+                                                      uint8_t *data,
+                                                      int data_size)
+{
+    if (!udc->attached) {
+        qemu_log_mask(LOG_GUEST_ERROR, "Not ready to send");
+    }
+
+    if (udc->usbredir_request.active) {
+        if (udc->usbredir_request.require_if_and_ep_info) {
+            if (usbredir_send_if_and_ep_info(udc->usbredir_host, data) ==
+                data_size) {
+                udc->usbredir_request.require_if_and_ep_info = false;
+
+                /* After success switch request type here */
+                switch (udc->usbredir_request.request_type) {
+                case usb_redir_device_connect:
+                    npcm8xx_udc_control_transfer(
+                        udc, LIBUSB_ENDPOINT_IN,
+                        LIBUSB_REQUEST_GET_DESCRIPTOR,
+                        LIBUSB_DT_DEVICE << 8, 0, LIBUSB_DT_DEVICE_SIZE);
+                    break;
+                }
+                return data_size;
+            }
+        } else {
+            switch (udc->usbredir_request.request_type) {
+            case usb_redir_device_connect:
+                if (usbredir_send_device_connect(udc->usbredir_host, data) ==
+                    data_size) {
+                    udc->usbredir_request.active = false;
+                    return data_size;
+                }
+                break;
+            }
+        }
+    }
+
+    return 0;
+}
+
 static inline void npcm8xx_udc_send_data(NPCM8xxUDC *udc,
                                          TransferDescriptor td_head)
 {
@@ -250,15 +443,23 @@ static inline void npcm8xx_udc_send_data(NPCM8xxUDC *udc,
                         TD_INFO_TOTAL_BYTES_SHIFT;
         int sent_data_size = 0;
 
-        /* TODO(b/309701600): Implement send mechanism in following CLs. */
+        uint8_t *data = g_malloc(data_size);
+        cpu_physical_memory_read(next_td.buffer_pointers[0], data, data_size);
+        sent_data_size =
+            npcm8xx_udc_send_data_over_usbredir(udc, data, data_size);
+
+        g_free(data);
 
         if (data_size == sent_data_size) {
             /* Clear status if transfer succeeds */
             next_td.info &= ~TD_INFO_STATUS_MASK;
+            cpu_physical_memory_write(td_head.next_pointer, &next_td,
+                                      sizeof(TransferDescriptor));
+        } else {
+            error_report("%s: unable to send data via usbredir host.",
+                         DEVICE(udc)->canonical_path);
         }
 
-        cpu_physical_memory_write(td_head.next_pointer, &next_td,
-                                  sizeof(TransferDescriptor));
         td_head = next_td;
     }
 }
@@ -300,6 +501,7 @@ static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
 
     registers->endpoint_complete = value;
     registers->endpoint_status = value;
+    npcm8xx_udc_update_irq(udc);
 }
 
 static inline void npcm8xx_udc_write_endptctrl0(NPCM8xxUDC *udc, uint32_t value)

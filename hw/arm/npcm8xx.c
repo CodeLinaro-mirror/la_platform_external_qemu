@@ -29,6 +29,7 @@
 #include "hw/qdev-core.h"
 #include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
+#include "hw/usb/npcm8xx-udc.h"
 #include "hw/usb/redirect-host.h"
 #include "qapi/error.h"
 #include "qemu/units.h"
@@ -745,6 +746,7 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
                            npcm8xx_irq(s, NPCM8XX_UDC0_IRQ + i));
     }
 
+    npcm8xx_udc_bind_usbredir_host(&s->udc[0], &s->usbredir_host);
     usbredir_host_set_ops(&s->usbredir_host, s->udc[0].usbredir_ops,
                           &s->udc[0]);
 

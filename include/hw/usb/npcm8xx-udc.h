@@ -62,13 +62,21 @@ typedef struct NPCM8xxUDCRegisters {
 
 #define NPCM8XX_UDC_NUM_REGS (sizeof(NPCM8xxUDCRegisters) / 4)
 
+typedef struct UsbRedirRequest {
+    bool require_if_and_ep_info;
+    int request_type;
+    bool active;
+} UsbRedirRequest;
+
 typedef struct NPCM8xxUDC {
     SysBusDevice parent;
     MemoryRegion mr;
     qemu_irq irq;
     uint8_t device_index;
 
+    USBRedirectHost *usbredir_host;
     const USBRedirectHostOps *usbredir_ops;
+    UsbRedirRequest usbredir_request;
 
     /*
      * Registers are stored as array instead of NPCM8xxUDCRegisters because
@@ -80,5 +88,16 @@ typedef struct NPCM8xxUDC {
     bool running;
     bool attached;
 } NPCM8xxUDC;
+
+/**
+ * npcm8xx_udc_bind_usbredir_host - Binds a usbredir host to NPCM8xx UDC
+ * @udc - The NPCM8xx UDC
+ * @usbredir_host - The usbredir host
+ */
+static inline void npcm8xx_udc_bind_usbredir_host(
+    NPCM8xxUDC *udc, USBRedirectHost *usbredir_host)
+{
+    udc->usbredir_host = usbredir_host;
+}
 
 #endif /* NPCM8XX_UDC_H */

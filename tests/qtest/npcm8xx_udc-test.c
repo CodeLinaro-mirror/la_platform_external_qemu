@@ -43,7 +43,7 @@ static void test_register_access(void)
 
     new_value = readl(NPCM8xxUDC_BASE_ADDR + R_PORTSC1);
     g_assert_cmphex(new_value, !=, init_value);
-    g_assert_cmphex(new_value, ==, 0xd3fff07e);
+    g_assert_cmphex(new_value, ==, 0xDBFFF27E);
 
     /* Test ENDPTCTRL0 register */
     init_value = readl(NPCM8xxUDC_BASE_ADDR + R_ENDPTCTRL0);
