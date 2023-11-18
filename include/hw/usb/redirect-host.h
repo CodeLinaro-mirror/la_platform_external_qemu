@@ -23,6 +23,7 @@ OBJECT_DECLARE_SIMPLE_TYPE(USBRedirectHost, USB_REDIR_HOST)
 /* Callback functions defined by a USB device to handle usbredir event. */
 typedef struct USBRedirectHostOps {
     void (*on_attach)(void *opaque);
+    void (*reset)(void *opaque);
 } USBRedirectHostOps;
 
 typedef struct USBRedirectHost {

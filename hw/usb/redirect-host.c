@@ -114,6 +114,12 @@ static void usbredir_host_parser_hello(void *priv,
     usbredir_host->device_ops->on_attach(usbredir_host->opaque);
 }
 
+static void usbredir_host_parser_reset(void *priv)
+{
+    USBRedirectHost *usbredir_host = priv;
+    usbredir_host->device_ops->reset(usbredir_host->opaque);
+}
+
 static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
 {
     uint32_t caps[USB_REDIR_CAPS_SIZE] = {
@@ -133,6 +139,7 @@ static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
     usbredir_host->parser->log_func = usbredir_host_parser_log;
     usbredir_host->parser->read_func = usbredir_host_parser_read;
     usbredir_host->parser->write_func = usbredir_host_parser_write;
+    usbredir_host->parser->reset_func = usbredir_host_parser_reset;
     usbredir_host->parser->hello_func = usbredir_host_parser_hello;
 
     usbredirparser_caps_set_cap(caps, usb_redir_cap_connect_device_version);
