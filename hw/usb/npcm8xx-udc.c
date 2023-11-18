@@ -675,8 +675,25 @@ static void npcm8xx_udc_usbredir_attach(void *opaque)
     npcm8xx_udc_update_irq(udc);
 }
 
+static void npcm8xx_udc_usbredir_reset(void *opaque)
+{
+    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+
+    if (udc->attached) {
+        /* Undefined behavior, so do nothing. */
+        qemu_log_mask(
+            LOG_GUEST_ERROR,
+            "%s: usbredir reset request failed to reset the device.",
+            DEVICE(opaque)->canonical_path);
+        return;
+    }
+
+    npcm8xx_udc_reset(DEVICE(udc));
+}
+
 static const USBRedirectHostOps npcm8xx_udc_usbredir_ops = {
     .on_attach = npcm8xx_udc_usbredir_attach,
+    .reset = npcm8xx_udc_usbredir_reset,
 };
 
 static const VMStateDescription vmstate_npcm8xx_udc = {
