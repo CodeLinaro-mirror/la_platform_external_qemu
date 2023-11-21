@@ -425,6 +425,27 @@ static inline int usbredir_send_control_packet(NPCM8xxUDC *udc, uint8_t *data,
     return data_size;
 }
 
+static inline int usbredir_send_configuration_status(
+    USBRedirectHost *usbredir_host,
+    struct libusb_config_descriptor *config_desc,
+    uint8_t requested_config_value)
+{
+    struct usb_redir_configuration_status_header config_status = {
+        .configuration = config_desc->bConfigurationValue,
+        .status = usb_redir_success,
+    };
+
+    if (config_desc->bConfigurationValue != requested_config_value) {
+        config_status.status = usb_redir_inval;
+    }
+
+    if (usbredir_host_send_config_status(usbredir_host, &config_status) != 0) {
+        return 0;
+    }
+
+    return config_desc->bLength;
+}
+
 static inline int npcm8xx_udc_send_data_over_usbredir(NPCM8xxUDC *udc,
                                                       uint8_t *data,
                                                       int data_size)
@@ -446,9 +467,18 @@ static inline int npcm8xx_udc_send_data_over_usbredir(NPCM8xxUDC *udc,
                         udc, LIBUSB_ENDPOINT_IN,
                         LIBUSB_REQUEST_GET_DESCRIPTOR,
                         LIBUSB_DT_DEVICE << 8, 0, LIBUSB_DT_DEVICE_SIZE);
-                    break;
+                    return data_size;
+                case usb_redir_set_configuration:
+                    if (usbredir_send_configuration_status(
+                            udc->usbredir_host, (void *)data,
+                            udc->usb_redir_configuration_value) ==
+                        LIBUSB_DT_CONFIG_SIZE) {
+                        udc->usbredir_request.active = false;
+                        return data_size;
+                    } else {
+                        return 0;
+                    }
                 }
-                return data_size;
             }
         } else {
             switch (udc->usbredir_request.request_type) {
@@ -466,6 +496,9 @@ static inline int npcm8xx_udc_send_data_over_usbredir(NPCM8xxUDC *udc,
                     return data_size;
                 }
                 break;
+            case usb_redir_set_configuration:
+                npcm8xx_udc_initiate_usbredir_request(udc,
+                                         usb_redir_set_configuration, true);
             }
         }
     }
@@ -511,8 +544,6 @@ static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
     QueueHead qh_in;
     const uint32_t rx_qh_base_address = registers->endpoint_list_address;
     const uint32_t tx_qh_base_address = rx_qh_base_address + sizeof(QueueHead);
-
-    registers->endpoint_prime = value;
 
     if (!udc->running) {
         qemu_log_mask(
@@ -753,10 +784,24 @@ static void npcm8xx_udc_usbredir_control_transfer(
     npcm8xx_udc_update_irq(udc);
 }
 
+static void npcm8xx_udc_usbredir_set_config(void *opaque, uint8_t configuration)
+{
+    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+
+    udc->usb_redir_configuration_value = configuration;
+    npcm8xx_udc_control_transfer(udc, LIBUSB_ENDPOINT_OUT,
+                                 LIBUSB_REQUEST_SET_CONFIGURATION,
+                                 configuration, 0, 0);
+    npcm8xx_udc_initiate_usbredir_request(udc, usb_redir_set_configuration,
+                                          false);
+    npcm8xx_udc_update_irq(udc);
+}
+
 static const USBRedirectHostOps npcm8xx_udc_usbredir_ops = {
     .on_attach = npcm8xx_udc_usbredir_attach,
     .reset = npcm8xx_udc_usbredir_reset,
     .control_transfer = npcm8xx_udc_usbredir_control_transfer,
+    .set_config = npcm8xx_udc_usbredir_set_config,
 };
 
 static const VMStateDescription vmstate_npcm8xx_udc = {

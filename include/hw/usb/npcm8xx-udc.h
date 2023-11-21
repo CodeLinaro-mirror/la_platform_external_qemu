@@ -87,6 +87,8 @@ typedef struct NPCM8xxUDC {
     uint32_t registers[NPCM8XX_UDC_NUM_REGS];
     bool running;
     bool attached;
+    bool connected;
+    uint8_t usb_redir_configuration_value;
 } NPCM8xxUDC;
 
 /**
