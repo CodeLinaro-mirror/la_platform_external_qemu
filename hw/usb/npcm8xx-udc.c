@@ -348,6 +348,20 @@ static inline struct usb_redir_device_connect_header make_device_info(
     return device_info;
 }
 
+static inline struct usb_redir_control_packet_header make_control_packet(
+    uint8_t address, uint32_t *setup)
+{
+    struct usb_redir_control_packet_header control_packet;
+
+    control_packet.endpoint = address;
+    control_packet.requesttype = setup[0] & 0xFF;
+    control_packet.request = (setup[0] & 0xFF00) >> 8;
+    control_packet.value = (setup[0] & 0xFFFF0000) >> 16;
+    control_packet.index = (setup[1] & 0xFFFF);
+
+    return control_packet;
+}
+
 static inline int usbredir_send_if_and_ep_info(USBRedirectHost *usbredir_host,
                                                uint8_t *data)
 {
@@ -391,6 +405,26 @@ static inline int usbredir_send_device_connect(USBRedirectHost *usbredir_host,
     return device_desc->bLength;
 }
 
+static inline int usbredir_send_control_packet(NPCM8xxUDC *udc, uint8_t *data,
+                                               int data_size)
+{
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    struct usb_redir_control_packet_header control_packet;
+    QueueHead qh;
+
+    cpu_physical_memory_read(registers->endpoint_list_address, &qh,
+                             sizeof(QueueHead));
+    control_packet = make_control_packet(LIBUSB_ENDPOINT_IN, qh.setup);
+    control_packet.length = data_size;
+    control_packet.status = usb_redir_success;
+    if (usbredir_host_send_control_transfer(udc->usbredir_host, &control_packet,
+                                            data, data_size) != 0) {
+        return 0;
+    }
+
+    return data_size;
+}
+
 static inline int npcm8xx_udc_send_data_over_usbredir(NPCM8xxUDC *udc,
                                                       uint8_t *data,
                                                       int data_size)
@@ -420,6 +454,13 @@ static inline int npcm8xx_udc_send_data_over_usbredir(NPCM8xxUDC *udc,
             switch (udc->usbredir_request.request_type) {
             case usb_redir_device_connect:
                 if (usbredir_send_device_connect(udc->usbredir_host, data) ==
+                    data_size) {
+                    udc->usbredir_request.active = false;
+                    return data_size;
+                }
+                break;
+            case usb_redir_control_packet:
+                if (usbredir_send_control_packet(udc, data, data_size) ==
                     data_size) {
                     udc->usbredir_request.active = false;
                     return data_size;
@@ -467,7 +508,10 @@ static inline void npcm8xx_udc_send_data(NPCM8xxUDC *udc,
 static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
 {
     NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
-    QueueHead qh;
+    QueueHead qh_in;
+    const uint32_t rx_qh_base_address = registers->endpoint_list_address;
+    const uint32_t tx_qh_base_address = rx_qh_base_address + sizeof(QueueHead);
+
     registers->endpoint_prime = value;
 
     if (!udc->running) {
@@ -488,14 +532,12 @@ static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
 
     uint8_t tx_endpoints = FIELD_EX32(value, ENDPTPRIME, TX_BUFFER);
     if (tx_endpoints) {
-        const uint32_t tx_qh_base_address =
-            registers->endpoint_list_address + sizeof(QueueHead);
         for (uint8_t tx_endpoint_index = 0; tx_endpoints != 0;
              tx_endpoint_index += 2, tx_endpoints >>= 1) {
             cpu_physical_memory_read(
-                tx_qh_base_address + tx_endpoint_index * sizeof(QueueHead), &qh,
-                sizeof(QueueHead));
-            npcm8xx_udc_send_data(udc, qh.td);
+                tx_qh_base_address + tx_endpoint_index * sizeof(QueueHead),
+                &qh_in, sizeof(QueueHead));
+            npcm8xx_udc_send_data(udc, qh_in.td);
         }
     }
 
@@ -691,9 +733,30 @@ static void npcm8xx_udc_usbredir_reset(void *opaque)
     npcm8xx_udc_reset(DEVICE(udc));
 }
 
+static void npcm8xx_udc_usbredir_control_transfer(
+    void *opaque, struct usb_redir_control_packet_header *control_packet,
+    uint8_t *data, int data_len)
+{
+    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+
+    if ((control_packet->endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK) != 0) {
+        control_packet->status = usb_redir_inval;
+        control_packet->length = 0;
+        usbredir_host_send_control_transfer(udc->usbredir_host, control_packet,
+                                            NULL, 0);
+    }
+
+    npcm8xx_udc_control_transfer(udc, control_packet->requesttype,
+                                 control_packet->request, control_packet->value,
+                                 control_packet->index, control_packet->length);
+    npcm8xx_udc_initiate_usbredir_request(udc, usb_redir_control_packet, false);
+    npcm8xx_udc_update_irq(udc);
+}
+
 static const USBRedirectHostOps npcm8xx_udc_usbredir_ops = {
     .on_attach = npcm8xx_udc_usbredir_attach,
     .reset = npcm8xx_udc_usbredir_reset,
+    .control_transfer = npcm8xx_udc_usbredir_control_transfer,
 };
 
 static const VMStateDescription vmstate_npcm8xx_udc = {
