@@ -29,6 +29,7 @@ typedef struct USBRedirectHostOps {
     void (*control_transfer)(
         void *opaque, struct usb_redir_control_packet_header *control_packet,
         uint8_t *data, int data_len);
+    void (*set_config)(void *opaque, uint8_t configuration);
 } USBRedirectHostOps;
 
 typedef struct USBRedirectHost {
@@ -135,6 +136,33 @@ static inline int usbredir_host_send_control_transfer(
     usbredirparser_send_control_packet(usbredir_host->parser,
                                        usbredir_host->latest_packet_id,
                                        control_packet, data, data_len);
+    return usbredirparser_do_write(usbredir_host->parser);
+}
+
+/**
+ * usbredir_host_send_config_status - Sends a configuration status with usbredir
+ * protocol
+ * @usbredir_host - A usbredir host to send control packet with
+ * @config_status - The configuration status response
+ *
+ * Returns 0 on success.
+ */
+static inline int usbredir_host_send_config_status(
+    USBRedirectHost *usbredir_host,
+    struct usb_redir_configuration_status_header *config_status)
+{
+    if (!usbredir_host->received_transfer) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: Attempted to send configuration status when no "
+                      "configuration requests received",
+                      object_get_canonical_path(OBJECT(usbredir_host)));
+        return -1;
+    }
+
+    usbredir_host->received_transfer = false;
+    usbredirparser_send_configuration_status(usbredir_host->parser,
+                                             usbredir_host->latest_packet_id,
+                                             config_status);
     return usbredirparser_do_write(usbredir_host->parser);
 }
 
