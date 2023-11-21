@@ -15,6 +15,8 @@
 
 #include "chardev/char-fe.h"
 #include "hw/qdev-core.h"
+#include "qemu/log.h"
+#include "qemu/queue.h"
 #include "qemu/typedefs.h"
 
 #define TYPE_USB_REDIR_HOST "usbredir-host"
@@ -24,6 +26,9 @@ OBJECT_DECLARE_SIMPLE_TYPE(USBRedirectHost, USB_REDIR_HOST)
 typedef struct USBRedirectHostOps {
     void (*on_attach)(void *opaque);
     void (*reset)(void *opaque);
+    void (*control_transfer)(
+        void *opaque, struct usb_redir_control_packet_header *control_packet,
+        uint8_t *data, int data_len);
 } USBRedirectHostOps;
 
 typedef struct USBRedirectHost {
@@ -34,6 +39,8 @@ typedef struct USBRedirectHost {
     int read_size;
     gint write_ready_watch;
     struct usbredirparser *parser;
+    uint64_t latest_packet_id;
+    bool received_transfer;
     const USBRedirectHostOps *device_ops;
     void *opaque;
 } USBRedirectHost;
@@ -96,6 +103,38 @@ static inline int usbredir_host_send_device_connect(
     struct usb_redir_device_connect_header *device_info)
 {
     usbredirparser_send_device_connect(usbredir_host->parser, device_info);
+    return usbredirparser_do_write(usbredir_host->parser);
+}
+
+/**
+ * usbredir_host_send_control_transfer - Sends a control packet with usbredir
+ * protocol
+ * @usbredir_host - A usbredir host to send control packet with
+ * @control_packet - The control packet response
+ * @data - The data to send out to usbredir guest
+ * @data - The length of the data
+ *
+ * Returns 0 on success.
+ */
+static inline int usbredir_host_send_control_transfer(
+    USBRedirectHost *usbredir_host,
+    struct usb_redir_control_packet_header *control_packet, uint8_t *data,
+    int data_len)
+{
+    if (!usbredir_host->received_transfer) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: Attempted to send control transfer response when no "
+                      "requests received",
+                      object_get_canonical_path(OBJECT(usbredir_host)));
+
+        return -1;
+    }
+
+    /* Set received_transfer to false to mark this transfer done. */
+    usbredir_host->received_transfer = false;
+    usbredirparser_send_control_packet(usbredir_host->parser,
+                                       usbredir_host->latest_packet_id,
+                                       control_packet, data, data_len);
     return usbredirparser_do_write(usbredir_host->parser);
 }
 

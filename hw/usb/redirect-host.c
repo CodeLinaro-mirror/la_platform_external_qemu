@@ -120,6 +120,19 @@ static void usbredir_host_parser_reset(void *priv)
     usbredir_host->device_ops->reset(usbredir_host->opaque);
 }
 
+static void usbredir_host_parser_control_transfer(
+    void *priv, uint64_t id,
+    struct usb_redir_control_packet_header *control_packet, uint8_t *data,
+    int data_len)
+{
+    USBRedirectHost *usbredir_host = priv;
+
+    usbredir_host->received_transfer = true;
+    usbredir_host->latest_packet_id = id;
+    usbredir_host->device_ops->control_transfer(
+        usbredir_host->opaque, control_packet, data, data_len);
+}
+
 static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
 {
     uint32_t caps[USB_REDIR_CAPS_SIZE] = {
@@ -141,6 +154,8 @@ static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
     usbredir_host->parser->write_func = usbredir_host_parser_write;
     usbredir_host->parser->reset_func = usbredir_host_parser_reset;
     usbredir_host->parser->hello_func = usbredir_host_parser_hello;
+    usbredir_host->parser->control_packet_func =
+        usbredir_host_parser_control_transfer;
 
     usbredirparser_caps_set_cap(caps, usb_redir_cap_connect_device_version);
     usbredirparser_caps_set_cap(caps, usb_redir_cap_ep_info_max_packet_size);
