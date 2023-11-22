@@ -6,7 +6,7 @@ project('qemu', ['c'], meson_version: '>=1.5.0',
                           # support old meson anyway
                           (meson.version().version_compare('>= 1.9') ? ['rust_std=2021', 'build.rust_std=2021'] : []),
 
-        version: files('VERSION'))
+        version: files('_VERSION')) # AEMU
 
 add_test_setup('quick', exclude_suites: ['slow', 'thorough'], is_default: true,
                env: ['RUST_BACKTRACE=1'])
@@ -15,7 +15,7 @@ add_test_setup('slow', exclude_suites: ['thorough'],
 add_test_setup('thorough',
                env: ['G_TEST_SLOW=1', 'SPEED=thorough', 'RUST_BACKTRACE=1'])
 
-meson.add_postconf_script(find_program('scripts/symlink-install-tree.py'))
+# doesn't work on windows for some reason... meson.add_postconf_script(find_program('scripts/symlink-install-tree.py'))
 
 ####################
 # Global variables #
@@ -76,7 +76,7 @@ have_user = have_linux_user or have_bsd_user
 # Programs #
 ############
 
-sh = find_program('sh')
+#AEMU sh = find_program('sh')
 python = import('python').find_installation()
 
 cc = meson.get_compiler('c')
@@ -171,7 +171,7 @@ edk2_targets = [ 'arm-softmmu', 'aarch64-softmmu', 'i386-softmmu', 'x86_64-softm
 unpack_edk2_blobs = false
 foreach target : edk2_targets
   if target in target_dirs
-    bzip2 = find_program('bzip2', required: get_option('install_blobs'))
+    bzip2 = find_program('bzip2', required: false) # AEMU
     unpack_edk2_blobs = bzip2.found()
     break
   endif
@@ -257,9 +257,9 @@ have_ga = get_option('guest_agent') \
   .allowed()
 have_block = have_system or have_tools
 
+# AEMU For the android build we have removed the modules restriction
+# AEMU under windows, this is not properly supported by the ninja build!
 enable_modules = get_option('modules') \
-  .require(host_os != 'windows',
-           error_message: 'Modules are not available for Windows') \
   .require(not get_option('prefer_static'),
            error_message: 'Modules are incompatible with static linking') \
   .allowed()
@@ -374,11 +374,7 @@ elif host_os == 'sunos'
   qemu_common_flags += '-D__EXTENSIONS__'
 elif host_os == 'haiku'
   qemu_common_flags += ['-DB_USE_POSITIVE_POSIX_ERRORS', '-D_BSD_SOURCE', '-fPIC']
-elif host_os == 'windows'
-  # plugins use delaylib, and clang needs to be used with lld to make it work.
-  if compiler.get_id() == 'clang' and compiler.get_linker_id() != 'ld.lld'
-    error('On windows, you need to use lld with clang - use msys2 clang64/clangarm64 env')
-  endif
+  #AEMU
 endif
 
 # Choose instruction set (currently x86-only)
@@ -684,12 +680,6 @@ hardening_flags = [
     # it harder to take advantage of uninitialized stack
     # data to drive exploits
     '-ftrivial-auto-var-init=zero',
-    # Ensure GCC zero-initializes padding bits and trailing fields in
-    # unions. This avoids potentially leaking host data into the guest
-    # when we init a struct and copy it into guest memory.  GCC prior
-    # to GCC 15 and clang don't have this, but they zero the padding
-    # and trailing portions of a union by default.
-    '-fzero-init-padding-bits=all',
 ]
 
 # Zero out registers used during a function call
@@ -1271,6 +1261,8 @@ endif
 slirp = not_found
 if not get_option('slirp').auto() or have_system
   slirp = dependency('slirp', required: get_option('slirp'),
+                     fallback: ['libslirp', 'libslirp_dep'], # AEMU
+                     static: get_option('prefer_static'), # AEMU
                      method: 'pkg-config')
   # slirp < 4.7 is incompatible with CFI support in QEMU.  This is because
   # it passes function pointers within libslirp as callbacks for timers.
@@ -2079,7 +2071,13 @@ if fdt_opt in ['enabled', 'system'] or (fdt_opt == 'auto' and have_system)
     fdt_opt = 'system'
   elif fdt_opt != 'system'
     fdt_opt = get_option('wrap_mode') == 'nodownload' ? 'disabled' : 'internal'
-    fdt = not_found
+    fdt = dependency('libfdt', version: '>=1.5.1', required: false, # AEMU
+                     method: 'pkg-config') # AEMU
+    if not fdt.found() # AEMU
+      fdt = not_found
+    else # AEMU
+      fdt_opt = 'enabled' # AEMU
+    endif # AEMU
   else
     error('system libfdt is too old (1.5.1 or newer required)')
   endif
@@ -2896,7 +2894,7 @@ config_host_data.set('CONFIG_PTHREAD_CONDATTR_SETCLOCK', cc.links(osdep_prefix +
 
   int main(void)
   {
-    pthread_condattr_t attr;
+    pthread_condattr_t attr
     pthread_condattr_init(&attr);
     pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
     return 0;
@@ -3461,7 +3459,7 @@ genh += custom_target('config-poison.h',
                       input: [target_configs_h],
                       output: 'config-poison.h',
                       capture: true,
-                      command: [find_program('scripts/make-config-poison.sh'),
+                      command: [find_program('scripts/make-config-poison.py'), # AEMU
                                 target_configs_h])
 
 if fdt_required.length() > 0
@@ -3474,6 +3472,7 @@ endif
 
 libvfio_user_dep = not_found
 if have_system and vfio_user_server_allowed
+  error('This is not allowed in emulator build') # AEMU
   libvfio_user_proj = subproject('libvfio-user', required: true)
   libvfio_user_dep = libvfio_user_proj.get_variable('libvfio_user_dep')
 endif
@@ -3511,7 +3510,7 @@ run = configure_file(input: 'run.in',
                      configuration: run_config)
 run_command('chmod', 'a+x', run, check: true)
 
-hxtool = find_program('scripts/hxtool')
+hxtool = find_program('scripts/hxtool.py') # AEMU
 shaderinclude = find_program('scripts/shaderinclude.py')
 qapi_gen = find_program('scripts/qapi-gen.py')
 qapi_gen_depends = [ meson.current_source_dir() / 'scripts/qapi/__init__.py',
@@ -3561,7 +3560,7 @@ svd_gen_header = [
   python, files('scripts/svd-gen-header.py')
 ]
 
-qemu_version_cmd = [find_program('scripts/qemu-version.sh'),
+qemu_version_cmd = [find_program('scripts/qemu-version.py'), # AEMU
                     meson.current_source_dir(),
                     get_option('pkgversion'), meson.project_version()]
 qemu_version = custom_target('qemu-version.h',
@@ -3737,6 +3736,7 @@ specific_fuzz_ss = ss.source_set()
 specific_ss = ss.source_set()
 rust_devices_ss = ss.source_set()
 stub_ss = ss.source_set()
+print_stub_ss = ss.source_set() # AEMU
 trace_ss = ss.source_set()
 user_ss = ss.source_set()
 util_ss = ss.source_set()
@@ -3800,6 +3800,15 @@ event_loop_base = declare_dependency(objects: event_loop_base.extract_all_object
                                      dependencies: [qom])
 
 stub_ss = stub_ss.apply({})
+
+print_stub_ss = print_stub_ss.apply({}) # AEMU
+libprint_stub = static_library('printstub', # AEMU
+                             build_by_default: false, # AEMU
+                             name_suffix: 'fa', # AEMU
+                             sources: print_stub_ss.sources() + genh, # AEMU
+                             dependencies: [print_stub_ss.dependencies()]) # AEMU
+print_stub = declare_dependency(link_with: libprint_stub) # AEMU
+
 
 util_ss.add_all(trace_ss)
 util_ss = util_ss.apply({})
@@ -4087,11 +4096,11 @@ block = declare_dependency(objects: libblock.extract_all_objects(recursive: fals
 
 blockdev_ss = blockdev_ss.apply({})
 libblockdev = static_library('blockdev', blockdev_ss.sources() + genh,
-                             dependencies: blockdev_ss.dependencies(),
+                             dependencies: blockdev_ss.dependencies() + [vhost_user], # AEMU
                              build_by_default: false)
 
 blockdev = declare_dependency(objects: libblockdev.extract_all_objects(recursive: false),
-                              dependencies: [blockdev_ss.dependencies(), block, event_loop_base])
+                              dependencies: [blockdev_ss.dependencies(), block, event_loop_base, vhost_user]) # AEMU
 
 qmp_ss = qmp_ss.apply({})
 libqmp = static_library('qmp', qmp_ss.sources() + genh,
@@ -4513,21 +4522,23 @@ subdir('qga')
 if xkbcommon.found()
   # used for the update-keymaps target, so include rules even if !have_tools
   qemu_keymap = executable('qemu-keymap', files('qemu-keymap.c', 'ui/input-keymap.c') + genh,
-                           dependencies: [qemuutil, xkbcommon], install: have_tools)
+                           dependencies: [qemuutil, print_stub, xkbcommon], install: have_tools) # AEMU
 endif
 
 if have_tools
   link_args = enable_modules ? ['@block.syms'] : []
   qemu_img = executable('qemu-img', [files('qemu-img.c'), hxdep],
              link_args: link_args, link_depends: block_syms,
-             dependencies: [authz, block, crypto, io, qom, qemuutil], install: true)
+             dependencies: [authz, block, crypto, io, qom, qemuutil, print_stub], install: true) # AEMU
   qemu_io = executable('qemu-io', files('qemu-io.c'),
              link_args: link_args, link_depends: block_syms,
-             dependencies: [block, qemuutil], install: true)
-  qemu_nbd = executable('qemu-nbd', files('qemu-nbd.c'),
-               link_args: link_args, link_depends: block_syms,
-               dependencies: [blockdev, qemuutil, selinux],
-               install: true)
+             dependencies: [block, qemuutil, print_stub], install: true) # AEMU
+  if build_machine.system() != 'windows' # AEMU
+    qemu_nbd = executable('qemu-nbd', files('qemu-nbd.c'),
+                 link_args: link_args, link_depends: block_syms,
+                 dependencies: [blockdev, qemuutil, selinux, print_stub],
+                 install: true) # AEMU
+  endif # AEMU
 
   subdir('storage-daemon')
 
@@ -4541,7 +4552,7 @@ if have_tools
   subdir('contrib/elf2dmp')
 
   executable('qemu-edid', files('qemu-edid.c', 'hw/display/edid-generate.c'),
-             dependencies: [qemuutil, rt],
+             dependencies: [qemuutil, print_stub, rt], # AEMU
              install: true)
 
   if have_vhost_user
@@ -4554,18 +4565,18 @@ if have_tools
 
   if host_os == 'linux'
     executable('qemu-bridge-helper', files('qemu-bridge-helper.c'),
-               dependencies: [qemuutil, libcap_ng],
+               dependencies: [qemuutil, print_stub, libcap_ng], # AEMU
                install: true,
                install_dir: get_option('libexecdir'))
 
     executable('qemu-pr-helper', files('scsi/qemu-pr-helper.c', 'scsi/utils.c'),
-               dependencies: [authz, crypto, io, qom, qemuutil,
+               dependencies: [authz, crypto, io, qom, qemuutil, print_stub, # AEMU
                               libcap_ng, mpathpersist],
                install: true)
 
     if cpu == 'x86_64'
       executable('qemu-vmsr-helper', files('tools/i386/qemu-vmsr-helper.c'),
-               dependencies: [authz, crypto, io, qom, qemuutil,
+               dependencies: [authz, crypto, io, qom, qemuutil, print_stub, # AEMU
                               libcap_ng, mpathpersist],
                install: true)
     endif
@@ -4607,7 +4618,7 @@ subdir('scripts')
 subdir('tools')
 subdir('pc-bios')
 subdir('docs')
-subdir('pyvenv')
+# AEMU: subdir('pyvenv')
 # Tests are disabled on emscripten because they rely on host features that aren't
 # supported by emscripten (e.g. fork and unix socket).
 if host_os != 'emscripten'
