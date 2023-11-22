@@ -396,6 +396,7 @@ foreach speed : ['quick', 'thorough']
   endforeach
 endforeach
 
+true_cmd = find_program('../../scripts/true.py')
 run_target('precache-functional',
            depends: precache_all,
-           command: ['true'])
+           command: true_cmd)

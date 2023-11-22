@@ -17,7 +17,8 @@ endif
 if t.length() > 0
   alias_target('test-plugins', t)
 else
-  run_target('test-plugins', command: find_program('true'))
+  true_cmd = find_program('../../../scripts/true.py')
+  run_target('test-plugins', command: true_cmd)
 endif
 
 plugin_modules += t
