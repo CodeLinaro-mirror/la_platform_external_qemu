@@ -55,6 +55,8 @@
 #include "qemu/job.h"
 #include "qemu/main-loop.h"
 #include "block/snapshot.h"
+#include "block/block-io.h"
+#include "block/block-global-state.h"
 #include "block/thread-pool.h"
 #include "qemu/cutils.h"
 #include "io/channel-buffer.h"
