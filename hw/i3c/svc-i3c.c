@@ -175,8 +175,10 @@ static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
 {
     SVCI3C *s = SVC_I3C(opaque);
     uint32_t addr = offset >> 2;
+    uint32_t value = s->regs[addr];
 
-    return s->regs[addr];
+    trace_svc_i3c_read(object_get_canonical_path(OBJECT(s)), offset, value);
+    return value;
 }
 
 static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
