@@ -8713,8 +8713,7 @@ static int maybe_do_fake_open(CPUArchState *cpu_env, int dirfd,
                               const char *fname, int flags, mode_t mode,
                               int openat2_resolve, bool safe)
 {
-    g_autofree char *proc_name = NULL;
-    const char *pathname;
+    g_autofree char *pathname = NULL;
     struct fake_open {
         const char *filename;
         int (*fill)(CPUArchState *cpu_env, int fd);
@@ -8739,12 +8738,45 @@ static int maybe_do_fake_open(CPUArchState *cpu_env, int dirfd,
         { NULL, NULL, NULL }
     };
 
-    /* if this is a file from /proc/ filesystem, expand full name */
-    proc_name = realpath(fname, NULL);
-    if (proc_name && strncmp(proc_name, "/proc/", 6) == 0) {
-        pathname = proc_name;
+    if (strncmp(fname, "/proc/", 6) == 0) {
+        pathname = g_strdup(fname);
     } else {
-        pathname = fname;
+        g_autofree char *proc_name = NULL;
+        struct stat proc_stat;
+        int fd;
+
+        if (safe) {
+            fd = safe_openat(dirfd, path(fname), flags, mode);
+        } else {
+            fd = openat(dirfd, path(fname), flags, mode);
+        }
+        if (fd < 0) {
+            return fd;
+        }
+
+        /*
+         * Try to get the real path of the file we just opened. We avoid calling
+         * `realpath(3)` because it calls `readlink(2)` on symlinks which
+         * changes their atime. Note that since `/proc/self/exe` is a symlink,
+         * `pathname` will never resolve to it (neither will `realpath(3)`).
+         * That's why we check `fname` against the "/proc/" prefix first.
+         */
+        proc_name = g_strdup_printf("/proc/self/fd/%d", fd);
+        if (lstat(proc_name, &proc_stat) < 0 || !S_ISLNK(proc_stat.st_mode)) {
+            /* No procfs or something weird. Not going to dig further. */
+            return fd;
+        }
+        pathname = g_new0(char, proc_stat.st_size + 1);
+        if (readlink(proc_name, pathname, proc_stat.st_size + 1) !=
+            proc_stat.st_size) {
+            return fd;
+        }
+
+        /* if this is not a file from /proc/ filesystem, the fd is good as-is */
+        if (strncmp(pathname, "/proc/", 6) != 0) {
+            return fd;
+        }
+        close(fd);
     }
 
     if (is_proc_myself(pathname, "exe")) {
@@ -8812,9 +8844,9 @@ int do_guest_openat(CPUArchState *cpu_env, int dirfd, const char *pathname,
     }
 
     if (safe) {
-        return safe_openat(dirfd, path(pathname), flags, mode);
+        return safe_openat(dirfd, pathname, flags, mode);
     } else {
-        return openat(dirfd, path(pathname), flags, mode);
+        return openat(dirfd, pathname, flags, mode);
     }
 }
 
