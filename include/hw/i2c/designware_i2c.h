@@ -16,7 +16,7 @@
 #define DESIGNWARE_I2C_RX_FIFO_SIZE 16
 #define DESIGNWARE_I2C_TX_FIFO_SIZE 16
 
-typedef enum DesignWareI2CStatus {
+typedef enum DesignWareI2CStatus : uint32_t {
     DW_I2C_STATUS_IDLE,
     DW_I2C_STATUS_SENDING_ADDRESS,
     DW_I2C_STATUS_SENDING,

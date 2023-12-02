@@ -36,7 +36,7 @@
 
 #define ZDMA_R_MAX (0x204 / 4)
 
-typedef enum {
+typedef enum : uint32_t {
     DISABLED = 0,
     ENABLED = 1,
     PAUSED = 2,

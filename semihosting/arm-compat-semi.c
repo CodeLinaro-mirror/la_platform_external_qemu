@@ -529,9 +529,10 @@ void do_common_semihosting(CPUState *cs)
         GET_ARG(0);
         GET_ARG(1);
         GET_ARG(2);
-        len = asprintf(&s, "%s/qemu-%x%02x", g_get_tmp_dir(),
+        char tmp_path[1024];
+        len = snprintf(tmp_path, sizeof(tmp_path), "%s/qemu-%x%02x", g_get_tmp_dir(),
                        getpid(), (int)arg1 & 0xff);
-        if (len < 0) {
+        if (len < 0 || len >= sizeof(tmp_path)) {
             common_semi_set_ret(cs, -1);
             break;
         }
@@ -540,18 +541,15 @@ void do_common_semihosting(CPUState *cs)
         len++;
         /* Make sure there's enough space in the buffer */
         if (len > arg2) {
-            free(s);
             common_semi_set_ret(cs, -1);
             break;
         }
         p = lock_user(VERIFY_WRITE, arg0, len, 0);
         if (!p) {
-            free(s);
             goto do_fault;
         }
-        memcpy(p, s, len);
+        memcpy(p, tmp_path, len);
         unlock_user(p, arg0, len);
-        free(s);
         common_semi_set_ret(cs, 0);
         break;
     }
