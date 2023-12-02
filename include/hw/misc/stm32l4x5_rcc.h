@@ -36,7 +36,7 @@ typedef enum PllCommonChannels {
 } PllCommonChannels;
 
 /* NB: Prescaler are assimilated to mux with one source and one output */
-typedef enum RccClockMux {
+typedef enum RccClockMux : uint32_t {
     /* Internal muxes that arent't exposed publicly to other peripherals */
     RCC_CLOCK_MUX_SYSCLK,
     RCC_CLOCK_MUX_PLL_INPUT,
@@ -133,7 +133,7 @@ typedef enum RccClockMux {
     RCC_NUM_CLOCK_MUX
 } RccClockMux;
 
-typedef enum RccPll {
+typedef enum RccPll : uint32_t {
     RCC_PLL_PLL,
     RCC_PLL_PLLSAI1,
     RCC_PLL_PLLSAI2,

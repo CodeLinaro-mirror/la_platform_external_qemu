@@ -71,7 +71,7 @@
                                  PIXMAN_FORMAT_G(f) +   \
                                  PIXMAN_FORMAT_B(f))
 
-typedef enum {
+typedef enum : uint32_t {
     /* 32bpp formats */
     PIXMAN_a8r8g8b8 =    PIXMAN_FORMAT(32, PIXMAN_TYPE_ARGB, 8, 8, 8, 8),
     PIXMAN_x8r8g8b8 =    PIXMAN_FORMAT(32, PIXMAN_TYPE_ARGB, 0, 8, 8, 8),

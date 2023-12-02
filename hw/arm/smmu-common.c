@@ -313,13 +313,13 @@ void smmu_iotlb_inv_asid_vmid(SMMUState *s, int asid, int vmid)
     g_hash_table_foreach_remove(s->iotlb, smmu_hash_remove_by_asid_vmid, &info);
 }
 
-void smmu_iotlb_inv_vmid(SMMUState *s, int vmid)
+void smmu_iotlb_inv_vmid(SMMUState *s, uint16_t vmid)
 {
     trace_smmu_iotlb_inv_vmid(vmid);
     g_hash_table_foreach_remove(s->iotlb, smmu_hash_remove_by_vmid, &vmid);
 }
 
-inline void smmu_iotlb_inv_vmid_s1(SMMUState *s, int vmid)
+void smmu_iotlb_inv_vmid_s1(SMMUState *s, int vmid)
 {
     trace_smmu_iotlb_inv_vmid_s1(vmid);
     g_hash_table_foreach_remove(s->iotlb, smmu_hash_remove_by_vmid_s1, &vmid);
