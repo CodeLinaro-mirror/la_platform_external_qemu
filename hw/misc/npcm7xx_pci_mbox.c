@@ -2,7 +2,7 @@
 /*
  * Nuvoton NPCM7xx PCI Mailbox Module
  *
- * Copyright 2021 Google LLC
+ * Copyright 2024 Google LLC
  */
 
 #include "qemu/osdep.h"
@@ -16,6 +16,7 @@
 #include "qapi/error.h"
 #include "qapi/visitor.h"
 #include "qemu/bitops.h"
+#include "qemu/bswap.h"
 #include "qemu/error-report.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
@@ -61,28 +62,41 @@ static void npcm7xx_pci_mbox_send_response(NPCM7xxPCIMBoxState *s, uint8_t code)
 {
     qemu_chr_fe_write(&s->chr, &code, 1);
     if (code == NPCM7XX_PCI_MBOX_OK && s->op == NPCM7XX_PCI_MBOX_OP_READ) {
-        qemu_chr_fe_write(&s->chr, (uint8_t *)(&s->data), s->size);
+        /* Since we cast &s->data to a uint8_t *, we silently assume little
+         * endianness. For big endian machines swap the bytes, so the chardev
+         * data matches the original string.
+         */
+        le64_to_cpus(&s->data);
+        qemu_chr_fe_write_all(&s->chr, (uint8_t *)(&s->data), s->size);
     }
 }
 
 static void npcm7xx_pci_mbox_handle_read(NPCM7xxPCIMBoxState *s)
 {
+    uint8_t offset_bytes[4];
     MemTxResult r = memory_region_dispatch_read(
         &s->ram, s->offset, &s->data, MO_LE | size_memop(s->size),
         MEMTXATTRS_UNSPECIFIED);
 
-    npcm7xx_pci_mbox_send_response(s, (uint8_t)r);
+    stl_le_p(offset_bytes, r);
+    npcm7xx_pci_mbox_send_response(s, offset_bytes[0]);
 }
 
 static void npcm7xx_pci_mbox_handle_write(NPCM7xxPCIMBoxState *s)
 {
+    uint8_t offset_bytes[4];
     MemTxResult r = memory_region_dispatch_write(
         &s->ram, s->offset, s->data, MO_LE | size_memop(s->size),
         MEMTXATTRS_UNSPECIFIED);
 
-    npcm7xx_pci_mbox_send_response(s, (uint8_t)r);
+    stl_le_p(offset_bytes, r);
+    npcm7xx_pci_mbox_send_response(s, offset_bytes[0]);
 }
 
+/*
+ * The device is using a Little Endian Protocol.
+ * If running into errors, please check what protocol is being expected.
+ */
 static void npcm7xx_pci_mbox_receive_char(NPCM7xxPCIMBoxState *s, uint8_t byte)
 {
     switch (s->state) {
@@ -143,7 +157,8 @@ static void npcm7xx_pci_mbox_receive_char(NPCM7xxPCIMBoxState *s, uint8_t byte)
     }
 }
 
-static uint64_t npcm7xx_pci_mbox_read(void *opaque, hwaddr offset, unsigned size)
+static uint64_t npcm7xx_pci_mbox_read(void *opaque, hwaddr offset,
+                                      unsigned size)
 {
     NPCM7xxPCIMBoxState *s = NPCM7XX_PCI_MBOX(opaque);
     uint16_t value = 0;
