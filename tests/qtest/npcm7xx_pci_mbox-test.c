@@ -102,6 +102,7 @@ static void receive_data(uint64_t offset, uint8_t *buf, size_t len)
 
     while (len > 0) {
         uint8_t size;
+        uint8_t offset_bytes[8];
 
         if (len >= 8) {
             size = 8;
@@ -118,7 +119,8 @@ static void receive_data(uint64_t offset, uint8_t *buf, size_t len)
         rv = write(fd, &op, 1);
         g_assert_cmpint(rv, ==, 1);
         /* Write offset */
-        rv = write(fd, (uint8_t *)&offset, sizeof(uint64_t));
+        stq_le_p(offset_bytes, offset);
+        rv = write(fd, offset_bytes, sizeof(uint64_t));
         g_assert_cmpint(rv, ==, sizeof(uint64_t));
         /* Write size */
         g_assert_cmpint(write(fd, &size, 1), ==, 1);
@@ -141,6 +143,7 @@ static void send_data(uint64_t offset, const uint8_t *buf, size_t len)
 
     while (len > 0) {
         uint8_t size;
+        uint8_t offset_bytes[8];
 
         if (len >= 8) {
             size = 8;
@@ -157,7 +160,8 @@ static void send_data(uint64_t offset, const uint8_t *buf, size_t len)
         rv = write(fd, &op, 1);
         g_assert_cmpint(rv, ==, 1);
         /* Write offset */
-        rv = write(fd, (uint8_t *)&offset, sizeof(uint64_t));
+        stq_le_p(offset_bytes, offset);
+        rv = write(fd, offset_bytes, sizeof(uint64_t));
         g_assert_cmpint(rv, ==, sizeof(uint64_t));
         /* Write size */
         g_assert_cmpint(write(fd, &size, 1), ==, 1);
