@@ -360,7 +360,7 @@ static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
     int ret = 0;
 
     /* Update our status to say we have an IBI. */
-    ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_IBI_RCV);
+    ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_SLV_REQ);
     ARRAY_FIELD_DP32(s->regs, MSTATUS, IBIWON, 1);
     ARRAY_FIELD_DP32(s->regs, MSTATUS, SLVSTART, 1);
 
@@ -428,7 +428,6 @@ static int svc_i3c_ibi_finish(I3CBus *bus)
 {
     SVCI3C *s = SVC_I3C(bus->qbus.parent);
 
-    ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
     trace_svc_i3c_ibi_finish(object_get_canonical_path(OBJECT(s)));
     return 0;
 }
