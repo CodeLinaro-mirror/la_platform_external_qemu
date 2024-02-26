@@ -19,7 +19,7 @@ arm_common_ss.add(when: 'CONFIG_ZYNQ', if_true: files('xilinx_zynq.c'))
 arm_common_ss.add(when: 'CONFIG_SABRELITE', if_true: files('sabrelite.c'))
 
 # Board with remote USB device controller
-if usbredir.found()
+if libusb.found() and usbredir.found()
   arm_common_ss.add(when: 'CONFIG_NPCM8XX', if_true: [usbredir, files('npcm8xx.c', 'npcm8xx_boards.c')])
 endif
 
