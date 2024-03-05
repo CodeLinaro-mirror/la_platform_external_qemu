@@ -24,13 +24,22 @@ OBJECT_DECLARE_SIMPLE_TYPE(USBRedirectHost, USB_REDIR_HOST)
 
 /* Callback functions defined by a USB device to handle usbredir event. */
 typedef struct USBRedirectHostOps {
-    void (*on_attach)(void *opaque);
+    uint8_t (*on_attach)(void *opaque);
     void (*reset)(void *opaque);
-    void (*control_transfer)(
-        void *opaque, struct usb_redir_control_packet_header *control_packet,
-        uint8_t *data, int data_len);
-    void (*set_config)(void *opaque, uint8_t configuration);
+    void (*control_transfer)(void *opaque, uint8_t endpoint_address,
+                             uint8_t request_type, uint8_t request,
+                             uint16_t value, uint16_t index, uint16_t length,
+                             uint8_t *data, int data_len);
 } USBRedirectHostOps;
+
+typedef struct UsbRedirRequest {
+    bool require_if_and_ep_info;
+    bool requested_config_descriptor;
+    int request_type;
+    bool active;
+} UsbRedirRequest;
+
+#define USBREDIR_HEADER_CACHE_SIZE 10
 
 typedef struct USBRedirectHost {
     DeviceState parent_obj;
@@ -39,12 +48,33 @@ typedef struct USBRedirectHost {
     const uint8_t *read_cache;
     int read_size;
     gint write_ready_watch;
+
     struct usbredirparser *parser;
     uint64_t latest_packet_id;
-    bool received_transfer;
     const USBRedirectHostOps *device_ops;
     void *opaque;
+    uint8_t control_endpoint_address;
+
+    UsbRedirRequest request;
+    uint8_t usbredir_header_cache[USBREDIR_HEADER_CACHE_SIZE];
 } USBRedirectHost;
+
+/**
+ * usbredir_host_attach_complete - Notify usbredir host that the attach workflow
+ *   has completed.
+ * @usbredir_host - The usbredir host to be notified
+ */
+void usbredir_host_attach_complete(USBRedirectHost *usbredir_host);
+
+/**
+ * usbredir_host_control_transfer_complete - Notify usbredir host that the
+ *   control transfer has completed and send control data if any.
+ * @usbredir_host - The usbredir host to be notified
+ * @data - The pointer to the control data
+ * @data_len - The length of the control data
+ */
+int usbredir_host_control_transfer_complete(USBRedirectHost *usbredir_host,
+                                            uint8_t *data, int data_len);
 
 /**
  * usbredir_host_set_ops - Sets callback functions that controls a USB device.
@@ -58,112 +88,6 @@ static inline void usbredir_host_set_ops(USBRedirectHost *usbredir_host,
 {
     usbredir_host->device_ops = device_ops;
     usbredir_host->opaque = opaque;
-}
-
-/**
- * usbredir_host_send_ep_info - Sends an endpoint descriptor with usbredir
- * protocol
- * @usbredir_host - A usbredir host to send endpoint descriptor with.
- * @ep_info - The endpoint descriptor
- *
- * Returns 0 on success.
- */
-static inline int usbredir_host_send_ep_info(
-    USBRedirectHost *usbredir_host, struct usb_redir_ep_info_header *ep_info)
-{
-    usbredirparser_send_ep_info(usbredir_host->parser, ep_info);
-    return usbredirparser_do_write(usbredir_host->parser);
-}
-
-/**
- * usbredir_host_send_interface_info - Sends an interface descriptor with
- * usbredir protocol
- * @usbredir_host - A usbredir host to send interface descriptor with.
- * @interface_info - The interface descriptor
- *
- * Returns 0 on success.
- */
-static inline int usbredir_host_send_interface_info(
-    USBRedirectHost *usbredir_host,
-    struct usb_redir_interface_info_header *interface_info)
-{
-    usbredirparser_send_interface_info(usbredir_host->parser, interface_info);
-    return usbredirparser_do_write(usbredir_host->parser);
-}
-
-/**
- * usbredir_host_send_device_connect - Sends a device descriptor with usbredir
- * protocol
- * @usbredir_host - A usbredir host to send device descriptor with.
- * @device_info - The device descriptor
- *
- * Returns 0 on success.
- */
-static inline int usbredir_host_send_device_connect(
-    USBRedirectHost *usbredir_host,
-    struct usb_redir_device_connect_header *device_info)
-{
-    usbredirparser_send_device_connect(usbredir_host->parser, device_info);
-    return usbredirparser_do_write(usbredir_host->parser);
-}
-
-/**
- * usbredir_host_send_control_transfer - Sends a control packet with usbredir
- * protocol
- * @usbredir_host - A usbredir host to send control packet with
- * @control_packet - The control packet response
- * @data - The data to send out to usbredir guest
- * @data - The length of the data
- *
- * Returns 0 on success.
- */
-static inline int usbredir_host_send_control_transfer(
-    USBRedirectHost *usbredir_host,
-    struct usb_redir_control_packet_header *control_packet, uint8_t *data,
-    int data_len)
-{
-    if (!usbredir_host->received_transfer) {
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Attempted to send control transfer response when no "
-                      "requests received",
-                      object_get_canonical_path(OBJECT(usbredir_host)));
-
-        return -1;
-    }
-
-    /* Set received_transfer to false to mark this transfer done. */
-    usbredir_host->received_transfer = false;
-    usbredirparser_send_control_packet(usbredir_host->parser,
-                                       usbredir_host->latest_packet_id,
-                                       control_packet, data, data_len);
-    return usbredirparser_do_write(usbredir_host->parser);
-}
-
-/**
- * usbredir_host_send_config_status - Sends a configuration status with usbredir
- * protocol
- * @usbredir_host - A usbredir host to send control packet with
- * @config_status - The configuration status response
- *
- * Returns 0 on success.
- */
-static inline int usbredir_host_send_config_status(
-    USBRedirectHost *usbredir_host,
-    struct usb_redir_configuration_status_header *config_status)
-{
-    if (!usbredir_host->received_transfer) {
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Attempted to send configuration status when no "
-                      "configuration requests received",
-                      object_get_canonical_path(OBJECT(usbredir_host)));
-        return -1;
-    }
-
-    usbredir_host->received_transfer = false;
-    usbredirparser_send_configuration_status(usbredir_host->parser,
-                                             usbredir_host->latest_packet_id,
-                                             config_status);
-    return usbredirparser_do_write(usbredir_host->parser);
 }
 
 #endif /* REDIRECT_HOST_H */

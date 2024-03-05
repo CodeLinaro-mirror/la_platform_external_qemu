@@ -10,6 +10,9 @@
 #include "qemu/osdep.h"
 #include "hw/usb/redirect-host.h"
 
+#include "libusb.h"
+#include <stdbool.h>
+#include <string.h>
 #include <usbredirparser.h>
 #include <usbredirproto.h>
 
@@ -26,6 +29,217 @@
 #include "system/runstate.h"
 
 #define VERSION "qemu usb-redir host " QEMU_VERSION
+#define HS_USB_MAX_PACKET_SIZE 512
+#define USB_GET_CONFIGURATION_DATA_SIZE 1
+
+void usbredir_host_attach_complete(USBRedirectHost *usbredir_host)
+{
+    /* Start the device connect workflow once the device is attached. */
+    usbredir_host->request.request_type = usb_redir_device_connect;
+    usbredir_host->request.active = true;
+    usbredir_host->request.require_if_and_ep_info = true;
+    usbredir_host->device_ops->control_transfer(
+        usbredir_host->opaque, usbredir_host->control_endpoint_address,
+        LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_DESCRIPTOR,
+        LIBUSB_DT_CONFIG << 8, 0, HS_USB_MAX_PACKET_SIZE, NULL, 0);
+}
+
+static inline int read_interface_info(
+    struct usb_redir_interface_info_header *interface_info,
+    struct libusb_interface_descriptor *interface_desc)
+{
+    int index = interface_desc->bInterfaceNumber;
+    interface_info->interface[index] = index;
+    interface_info->interface_class[index] = interface_desc->bInterfaceClass;
+    interface_info->interface_subclass[index] =
+        interface_desc->bInterfaceSubClass;
+    interface_info->interface_protocol[index] =
+        interface_desc->bInterfaceProtocol;
+
+    return interface_desc->bLength;
+}
+
+static inline uint8_t ep_address_to_usbredir_ep_index(uint8_t endpoint_address)
+{
+    return ((endpoint_address & 0x80) >> 3) | (endpoint_address & 0x0f);
+}
+
+static inline int read_ep_info(
+    struct usb_redir_ep_info_header *ep_info,
+    struct libusb_interface_descriptor *interface_desc,
+    struct libusb_endpoint_descriptor *ep_desc)
+{
+    int read_bytes = 0;
+
+    for (int i = 0; i < interface_desc->bNumEndpoints; i++) {
+        int ep_index =
+            ep_address_to_usbredir_ep_index(ep_desc[i].bEndpointAddress);
+        ep_info->interface[ep_index] = interface_desc->bInterfaceNumber;
+        ep_info->type[ep_index] = ep_desc[i].bmAttributes & 0x3;
+        ep_info->max_packet_size[ep_index] = ep_desc[i].wMaxPacketSize;
+        ep_info->interval[ep_index] = ep_desc[i].bInterval;
+        read_bytes += ep_desc->bLength;
+    }
+
+    return read_bytes;
+}
+
+static inline int send_interface_and_ep_info(struct usbredirparser *parser,
+                                             uint8_t *data)
+{
+    struct usb_redir_interface_info_header interface_info;
+    struct usb_redir_ep_info_header ep_info;
+    uint8_t *init_data_ptr = data;
+    for (int i = 0; i < 32; i++) {
+        ep_info.type[i] = usb_redir_type_invalid;
+    }
+
+    struct libusb_config_descriptor *config_desc = (void *)data;
+    interface_info.interface_count = config_desc->bNumInterfaces;
+    data += config_desc->bLength;
+
+    for (int i = 0; i < interface_info.interface_count; i++) {
+        struct libusb_interface_descriptor *interface_desc = (void *)data;
+        data += read_interface_info(&interface_info, interface_desc);
+        data += read_ep_info(&ep_info, interface_desc, (void *)data);
+    }
+
+    usbredirparser_send_ep_info(parser, &ep_info);
+
+    if (usbredirparser_do_write(parser) != 0) {
+        return 0;
+    }
+
+    usbredirparser_send_interface_info(parser, &interface_info);
+
+    if (usbredirparser_do_write(parser) != 0) {
+        return 0;
+    }
+
+    return data - init_data_ptr;
+}
+
+static inline struct usb_redir_device_connect_header make_device_connect_header(
+    struct libusb_device_descriptor *device_desc)
+{
+    struct usb_redir_device_connect_header device_connect;
+    device_connect.device_class = device_desc->bDeviceClass;
+    device_connect.device_subclass = device_desc->bDeviceSubClass;
+    device_connect.device_protocol = device_desc->bDeviceProtocol;
+    device_connect.device_version_bcd = device_desc->bcdUSB;
+    device_connect.vendor_id = device_desc->idVendor;
+    device_connect.product_id = device_desc->idProduct;
+    device_connect.speed = usb_redir_speed_high;
+    return device_connect;
+}
+
+static inline int usbredir_host_handle_device_connect(
+    USBRedirectHost *usbredir_host, uint8_t *data)
+{
+    if (usbredir_host->request.require_if_and_ep_info) {
+        usbredir_host->request.require_if_and_ep_info = false;
+        usbredir_host->device_ops->control_transfer(
+            usbredir_host->opaque, usbredir_host->control_endpoint_address,
+            LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_DESCRIPTOR,
+            LIBUSB_DT_DEVICE << 8, 0, LIBUSB_DT_DEVICE_SIZE, NULL, 0);
+        return send_interface_and_ep_info(usbredir_host->parser, data);
+    }
+
+    struct libusb_device_descriptor *device_desc = (void *)data;
+    struct usb_redir_device_connect_header device_info =
+        make_device_connect_header(device_desc);
+
+    usbredirparser_send_device_connect(usbredir_host->parser, &device_info);
+
+    if (usbredirparser_do_write(usbredir_host->parser) != 0) {
+        return 0;
+    }
+
+    usbredir_host->request.active = false;
+    return device_desc->bLength;
+}
+
+static inline int usbredir_host_send_control_packet(
+    USBRedirectHost *usbredir_host, uint8_t *data, int data_size)
+{
+    struct usb_redir_control_packet_header *control_packet =
+        (void *)usbredir_host->usbredir_header_cache;
+
+    control_packet->length = data_size;
+    control_packet->status = usb_redir_success;
+
+    usbredirparser_send_control_packet(usbredir_host->parser,
+                                       usbredir_host->latest_packet_id,
+                                       control_packet, data, data_size);
+
+    if (usbredirparser_do_write(usbredir_host->parser) != 0) {
+        return 0;
+    }
+
+    return data_size;
+}
+
+static inline int usbredir_host_handle_configuration_status(
+    USBRedirectHost *usbredir_host, uint8_t *data)
+{
+    if (usbredir_host->request.require_if_and_ep_info) {
+        if (usbredir_host->request.requested_config_descriptor) {
+            usbredir_host->request.require_if_and_ep_info = false;
+            usbredir_host->device_ops->control_transfer(
+                usbredir_host->opaque, usbredir_host->control_endpoint_address,
+                LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_CONFIGURATION, 0, 0,
+                USB_GET_CONFIGURATION_DATA_SIZE, NULL, 0);
+            return send_interface_and_ep_info(usbredir_host->parser, data);
+        } else {
+            usbredir_host->request.requested_config_descriptor = true;
+            usbredir_host->device_ops->control_transfer(
+                usbredir_host->opaque, usbredir_host->control_endpoint_address,
+                LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_DESCRIPTOR,
+                LIBUSB_DT_CONFIG << 8, 0, HS_USB_MAX_PACKET_SIZE, NULL, 0);
+            return 0;
+        }
+    }
+
+    struct usb_redir_set_configuration_header *set_config =
+        (void *)usbredir_host->usbredir_header_cache;
+    struct usb_redir_configuration_status_header config_status = {
+        .status = set_config->configuration == *data ? usb_redir_success
+                                                     : usb_redir_ioerror,
+        .configuration = *data,
+    };
+
+    usbredirparser_send_configuration_status(
+        usbredir_host->parser, usbredir_host->latest_packet_id, &config_status);
+
+    if (usbredirparser_do_write(usbredir_host->parser) != 0) {
+        return 0;
+    }
+
+    usbredir_host->request.active = false;
+    return USB_GET_CONFIGURATION_DATA_SIZE;
+}
+
+int usbredir_host_control_transfer_complete(USBRedirectHost *usbredir_host,
+                                            uint8_t *data, int data_len)
+{
+    if (!usbredir_host->request.active) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "BAD! You haven't received control transfer.");
+        return 0;
+    }
+
+    switch (usbredir_host->request.request_type) {
+    case usb_redir_device_connect:
+        return usbredir_host_handle_device_connect(usbredir_host, data);
+    case usb_redir_control_packet:
+        return usbredir_host_send_control_packet(usbredir_host, data,
+                                                 data_len);
+    case usb_redir_set_configuration:
+        return usbredir_host_handle_configuration_status(usbredir_host,
+                                                         data);
+    }
+    return 0;
+}
 
 static void usbredir_host_parser_log(void *priv, int level, const char *msg)
 {
@@ -127,22 +341,56 @@ static void usbredir_host_parser_control_transfer(
 {
     USBRedirectHost *usbredir_host = priv;
 
-    usbredir_host->received_transfer = true;
+    if (USBREDIR_HEADER_CACHE_SIZE <
+        sizeof(struct usb_redir_control_packet_header)) {
+        g_autofree char *path = object_get_canonical_path(
+            OBJECT(usbredir_host));
+        error_report(
+            "%s: usb_redir_control_packet_header overflowed request cache.",
+            path);
+        return;
+    }
+
     usbredir_host->latest_packet_id = id;
+    usbredir_host->request.request_type = usb_redir_control_packet;
+    usbredir_host->request.active = true;
+    usbredir_host->request.require_if_and_ep_info = false;
+    memcpy(usbredir_host->usbredir_header_cache, control_packet,
+           sizeof(struct usb_redir_control_packet_header));
     usbredir_host->device_ops->control_transfer(
-        usbredir_host->opaque, control_packet, data, data_len);
+        usbredir_host->opaque, usbredir_host->control_endpoint_address,
+        control_packet->requesttype, control_packet->request,
+        control_packet->value, control_packet->index, control_packet->length,
+        data, data_len);
 }
 
 static void usbredir_host_parser_set_config(
     void *priv, uint64_t id,
-    struct usb_redir_set_configuration_header *set_config
-)
+    struct usb_redir_set_configuration_header *set_config)
 {
     USBRedirectHost *usbredir_host = priv;
+
+    if (USBREDIR_HEADER_CACHE_SIZE <
+        sizeof(struct usb_redir_set_configuration_header)) {
+        g_autofree char *path = object_get_canonical_path(
+            OBJECT(usbredir_host));
+        error_report(
+            "%s: usb_redir_set_configuration_header overflowed request cache.",
+            path);
+        return;
+    }
+
     usbredir_host->latest_packet_id = id;
-    usbredir_host->received_transfer = true;
-    usbredir_host->device_ops->set_config(usbredir_host->opaque,
-                                          set_config->configuration);
+    usbredir_host->request.active = true;
+    usbredir_host->request.request_type = usb_redir_set_configuration;
+    usbredir_host->request.require_if_and_ep_info = true;
+    usbredir_host->request.requested_config_descriptor = false;
+    memcpy(usbredir_host->usbredir_header_cache, set_config,
+           sizeof(struct usb_redir_set_configuration_header));
+    usbredir_host->device_ops->control_transfer(
+        usbredir_host->opaque, usbredir_host->control_endpoint_address,
+        LIBUSB_ENDPOINT_OUT, LIBUSB_REQUEST_SET_CONFIGURATION,
+        set_config->configuration, 0, 0, NULL, 0);
 }
 
 static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)

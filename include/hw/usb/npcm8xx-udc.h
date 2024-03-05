@@ -62,12 +62,6 @@ typedef struct NPCM8xxUDCRegisters {
 
 #define NPCM8XX_UDC_NUM_REGS (sizeof(NPCM8xxUDCRegisters) / 4)
 
-typedef struct UsbRedirRequest {
-    bool require_if_and_ep_info;
-    int request_type;
-    bool active;
-} UsbRedirRequest;
-
 typedef struct NPCM8xxUDC {
     SysBusDevice parent;
     MemoryRegion mr;
@@ -76,7 +70,6 @@ typedef struct NPCM8xxUDC {
 
     USBRedirectHost *usbredir_host;
     const USBRedirectHostOps *usbredir_ops;
-    UsbRedirRequest usbredir_request;
 
     /*
      * Registers are stored as array instead of NPCM8xxUDCRegisters because
@@ -87,7 +80,6 @@ typedef struct NPCM8xxUDC {
     uint32_t registers[NPCM8XX_UDC_NUM_REGS];
     bool running;
     bool attached;
-    bool connected;
     uint8_t usb_redir_configuration_value;
 } NPCM8xxUDC;
 
