@@ -31,6 +31,7 @@
 #define VERSION "qemu usb-redir host " QEMU_VERSION
 #define HS_USB_MAX_PACKET_SIZE 512
 #define USB_GET_CONFIGURATION_DATA_SIZE 1
+#define USB_GET_INTERFACE_DATA_SIZE 1
 
 void usbredir_host_attach_complete(USBRedirectHost *usbredir_host)
 {
@@ -219,6 +220,48 @@ static inline int usbredir_host_handle_configuration_status(
     return USB_GET_CONFIGURATION_DATA_SIZE;
 }
 
+static inline int usbredir_host_handle_interface_status(
+    USBRedirectHost *usbredir_host, uint8_t *data)
+{
+    struct usb_redir_set_alt_setting_header *set_alt =
+        (void *)usbredir_host->usbredir_header_cache;
+
+    if (usbredir_host->request.require_if_and_ep_info) {
+        if (usbredir_host->request.requested_config_descriptor) {
+            usbredir_host->request.require_if_and_ep_info = false;
+            usbredir_host->device_ops->control_transfer(
+                usbredir_host->opaque, usbredir_host->control_endpoint_address,
+                LIBUSB_ENDPOINT_IN | LIBUSB_RECIPIENT_INTERFACE,
+                LIBUSB_REQUEST_GET_INTERFACE, 0, set_alt->interface,
+                USB_GET_INTERFACE_DATA_SIZE, NULL, 0);
+            return send_interface_and_ep_info(usbredir_host->parser, data);
+        } else {
+            usbredir_host->request.requested_config_descriptor = true;
+            usbredir_host->device_ops->control_transfer(
+                usbredir_host->opaque, usbredir_host->control_endpoint_address,
+                LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_DESCRIPTOR,
+                LIBUSB_DT_CONFIG << 8, 0, HS_USB_MAX_PACKET_SIZE, NULL, 0);
+            return 0;
+        }
+    }
+
+    struct usb_redir_alt_setting_status_header alt_status = {
+        .status = set_alt->alt == *data ? usb_redir_success : usb_redir_ioerror,
+        .alt = *data,
+        .interface = set_alt->interface,
+    };
+
+    usbredirparser_send_alt_setting_status(
+        usbredir_host->parser, usbredir_host->latest_packet_id, &alt_status);
+
+    if (usbredirparser_do_write(usbredir_host->parser)) {
+        return 0;
+    }
+
+    usbredir_host->request.active = false;
+    return USB_GET_INTERFACE_DATA_SIZE;
+}
+
 int usbredir_host_control_transfer_complete(USBRedirectHost *usbredir_host,
                                             uint8_t *data, int data_len)
 {
@@ -237,6 +280,8 @@ int usbredir_host_control_transfer_complete(USBRedirectHost *usbredir_host,
     case usb_redir_set_configuration:
         return usbredir_host_handle_configuration_status(usbredir_host,
                                                          data);
+    case usb_redir_set_alt_setting:
+        return usbredir_host_handle_interface_status(usbredir_host, data);
     }
     return 0;
 }
@@ -393,6 +438,35 @@ static void usbredir_host_parser_set_config(
         set_config->configuration, 0, 0, NULL, 0);
 }
 
+static void usbredir_host_parser_set_alt(
+    void *priv, uint64_t id, struct usb_redir_set_alt_setting_header *set_alt)
+{
+    USBRedirectHost *usbredir_host = priv;
+
+    if (USBREDIR_HEADER_CACHE_SIZE <
+        sizeof(struct usb_redir_set_alt_setting_header)) {
+        g_autofree char *path = object_get_canonical_path(
+            OBJECT(usbredir_host));
+        error_report(
+            "%s: usb_redir_set_alt_setting_header overflowed request cache.",
+            path);
+        return;
+    }
+
+    usbredir_host->latest_packet_id = id;
+    usbredir_host->request.active = true;
+    usbredir_host->request.request_type = usb_redir_set_alt_setting;
+    usbredir_host->request.require_if_and_ep_info = true;
+    usbredir_host->request.requested_config_descriptor = false;
+    memcpy(usbredir_host->usbredir_header_cache, set_alt,
+           sizeof(struct usb_redir_set_alt_setting_header));
+    usbredir_host->device_ops->control_transfer(
+        usbredir_host->opaque, usbredir_host->control_endpoint_address,
+        LIBUSB_ENDPOINT_OUT | LIBUSB_RECIPIENT_INTERFACE,
+        LIBUSB_REQUEST_SET_INTERFACE, set_alt->alt, set_alt->interface, 0, NULL,
+        0);
+}
+
 static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
 {
     uint32_t caps[USB_REDIR_CAPS_SIZE] = {
@@ -418,6 +492,7 @@ static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
         usbredir_host_parser_control_transfer;
     usbredir_host->parser->set_configuration_func =
         usbredir_host_parser_set_config;
+    usbredir_host->parser->set_alt_setting_func = usbredir_host_parser_set_alt;
 
     usbredirparser_caps_set_cap(caps, usb_redir_cap_connect_device_version);
     usbredirparser_caps_set_cap(caps, usb_redir_cap_ep_info_max_packet_size);
