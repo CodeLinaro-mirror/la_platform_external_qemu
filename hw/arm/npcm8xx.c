@@ -746,9 +746,9 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
                            npcm8xx_irq(s, NPCM8XX_UDC0_IRQ + i));
     }
 
-    npcm8xx_udc_bind_usbredir_host(&s->udc[0], &s->usbredir_host);
-    usbredir_host_set_ops(&s->usbredir_host, s->udc[0].usbredir_ops,
-                          &s->udc[0]);
+    npcm8xx_udc_bind_usbredir_host(&s->udc[6], &s->usbredir_host);
+    usbredir_host_set_ops(&s->usbredir_host, s->udc[6].usbredir_ops,
+                          &s->udc[6]);
 
     /* PWM Modules. Cannot fail. */
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm8xx_pwm_addr) != ARRAY_SIZE(s->pwm));
