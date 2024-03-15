@@ -81,6 +81,8 @@ typedef struct NPCM8xxUDC {
     bool running;
     bool attached;
     uint8_t usb_redir_configuration_value;
+
+    uint32_t next_rx_td_pointer;
 } NPCM8xxUDC;
 
 /**
