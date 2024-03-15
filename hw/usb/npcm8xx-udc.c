@@ -272,37 +272,36 @@ static inline void npcm8xx_udc_write_portsc1(NPCM8xxUDC *udc, uint32_t value)
 
 static inline void npcm8xx_udc_send_data(NPCM8xxUDC *udc,
                                          uint8_t endpoint_number,
-                                         TransferDescriptor td_head)
+                                         TransferDescriptor *td_head)
 {
-    while ((td_head.next_pointer & TD_NEXT_POINTER_VALID_MASK) == 0) {
-        TransferDescriptor next_td;
-        cpu_physical_memory_read(td_head.next_pointer, &next_td,
-                                 sizeof(TransferDescriptor));
-        int data_size = (next_td.info & TD_INFO_TOTAL_BYTES_MASK) >>
-                        TD_INFO_TOTAL_BYTES_SHIFT;
-        int sent_data_size = 0;
+    TransferDescriptor next_td;
+    cpu_physical_memory_read(td_head->next_pointer, &next_td,
+                             sizeof(TransferDescriptor));
+    int data_size =
+        (next_td.info & TD_INFO_TOTAL_BYTES_MASK) >> TD_INFO_TOTAL_BYTES_SHIFT;
+    int sent_data_size = 0;
 
-        uint8_t *data = g_malloc(data_size);
-        cpu_physical_memory_read(next_td.buffer_pointers[0], data, data_size);
+    uint8_t *data = g_malloc(data_size);
+    cpu_physical_memory_read(next_td.buffer_pointers[0], data, data_size);
 
-        if (endpoint_number == 0) {
-            sent_data_size = usbredir_host_control_transfer_complete(
-                udc->usbredir_host, data, data_size);
-        }
+    if (endpoint_number == 0) {
+        sent_data_size = usbredir_host_control_transfer_complete(
+            udc->usbredir_host, data, data_size);
+    } else {
+        sent_data_size =
+            usbredir_host_data_in_complete(udc->usbredir_host, data, data_size);
+    }
 
-        g_free(data);
+    g_free(data);
 
-        if (data_size == sent_data_size) {
-            /* Clear status if transfer succeeds */
-            next_td.info &= ~TD_INFO_STATUS_MASK;
-            cpu_physical_memory_write(td_head.next_pointer, &next_td,
-                                      sizeof(TransferDescriptor));
-        } else {
-            error_report("%s: unable to send data via usbredir host.",
-                         DEVICE(udc)->canonical_path);
-        }
-
-        td_head = next_td;
+    if (data_size == sent_data_size) {
+        /* Clear status if transfer succeeds */
+        next_td.info = TD_INFO_INTERRUPT_ON_COMPLETE_MASK;
+        cpu_physical_memory_write(td_head->next_pointer + 4, &next_td.info,
+                                  sizeof(uint32_t));
+    } else {
+        error_report("%s: unable to send data via usbredir host.",
+                     DEVICE(udc)->canonical_path);
     }
 }
 
@@ -329,19 +328,45 @@ static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
         return;
     }
 
+    /*
+     * The software write to the register must occur before processing RX
+     * transfer descriptor because once the UDC's RX status is available to the
+     * usbredir host, the usbredir host might send new message, causing the UDC
+     * to clear endpoint status register.
+     */
+    registers->endpoint_status |= (value & R_ENDPTPRIME_RX_BUFFER_MASK);
+    registers->endpoint_complete |= (value & R_ENDPTPRIME_TX_BUFFER_MASK);
+
+    /* Process TX transfer descriptor */
     uint8_t tx_endpoints = FIELD_EX32(value, ENDPTPRIME, TX_BUFFER);
-    if (tx_endpoints) {
-        for (uint8_t ep_num = 0; tx_endpoints != 0;
-             ++ep_num, tx_endpoints >>= 1) {
-            cpu_physical_memory_read(
-                tx_qh_base_address + (ep_num << 1) * sizeof(QueueHead),
-                &qh_in, sizeof(QueueHead));
-            npcm8xx_udc_send_data(udc, ep_num, qh_in.td);
+    for (uint8_t ep_num = 0; tx_endpoints != 0;
+            ++ep_num, tx_endpoints >>= 1) {
+        if ((tx_endpoints & 1) == 0) {
+            continue;
         }
+
+        cpu_physical_memory_read(
+            tx_qh_base_address + (ep_num << 1) * sizeof(QueueHead),
+            &qh_in, sizeof(QueueHead));
+        npcm8xx_udc_send_data(udc, ep_num, &qh_in.td);
     }
 
-    registers->endpoint_complete = value;
-    registers->endpoint_status = value;
+    /* Process RX transfer descriptor */
+    uint8_t rx_endpoints = value & R_ENDPTPRIME_RX_BUFFER_MASK;
+    for (uint8_t ep_num = 0; rx_endpoints != 0;
+            rx_endpoints >>= 1, ++ep_num) {
+        if ((rx_endpoints & 1) == 0) {
+            continue;
+        }
+
+        /*
+         * Notify usbredir host that the most recently received message has
+         * been processed, and the UDC is now available to process new message.
+         */
+        usbredir_host_data_out_complete(udc->usbredir_host, ep_num);
+    }
+
+    registers->status |= R_USBSTS_USB_INTERRUPT_MASK;
     npcm8xx_udc_update_irq(udc);
 }
 
@@ -549,10 +574,56 @@ static void npcm8xx_udc_usbredir_control_transfer(
     npcm8xx_udc_update_irq(udc);
 }
 
+static void npcm8xx_udc_usbredir_write_data(void *opaque,
+                                            uint8_t endpoint_address,
+                                            uint8_t *data, int data_len)
+{
+    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    QueueHead rx_qh;
+    TransferDescriptor rx_td;
+    uint32_t request_len;
+    uint32_t current_rx_td_pointer;
+    const uint32_t qh_base_address = registers->endpoint_list_address;
+    const uint8_t ep_num = endpoint_address & LIBUSB_ENDPOINT_ADDRESS_MASK;
+
+    cpu_physical_memory_read(
+        qh_base_address + (ep_num << 1) * sizeof(QueueHead), &rx_qh,
+        sizeof(QueueHead));
+
+    if (udc->next_rx_td_pointer) {
+        current_rx_td_pointer = udc->next_rx_td_pointer;
+    } else {
+        current_rx_td_pointer = rx_qh.td.next_pointer;
+    }
+
+    cpu_physical_memory_read(current_rx_td_pointer, &rx_td,
+                             sizeof(TransferDescriptor));
+    request_len = rx_td.info >> TD_INFO_TOTAL_BYTES_SHIFT;
+    rx_td.info = ((request_len - data_len) << TD_INFO_TOTAL_BYTES_SHIFT) |
+                 TD_INFO_INTERRUPT_ON_COMPLETE_MASK;
+
+    cpu_physical_memory_write(current_rx_td_pointer + 4, &rx_td.info,
+                              sizeof(uint32_t));
+    cpu_physical_memory_write(rx_td.buffer_pointers[0], data, data_len);
+
+    if ((rx_td.next_pointer & 1) == 0) {
+        udc->next_rx_td_pointer = rx_td.next_pointer;
+    } else {
+        udc->next_rx_td_pointer = 0;
+    }
+
+    registers->endpoint_complete |= (1 << ep_num);
+    registers->endpoint_status &= ~R_ENDPTSTAT_RX_BUFFER_MASK;
+    registers->status |= R_USBSTS_USB_INTERRUPT_MASK;
+    npcm8xx_udc_update_irq(udc);
+}
+
 static const USBRedirectHostOps npcm8xx_udc_usbredir_ops = {
     .on_attach = npcm8xx_udc_usbredir_attach,
     .reset = npcm8xx_udc_usbredir_reset,
     .control_transfer = npcm8xx_udc_usbredir_control_transfer,
+    .data_out = npcm8xx_udc_usbredir_write_data,
 };
 
 static const VMStateDescription vmstate_npcm8xx_udc = {
