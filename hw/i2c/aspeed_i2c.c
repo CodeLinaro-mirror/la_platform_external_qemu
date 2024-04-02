@@ -404,6 +404,93 @@ static uint8_t aspeed_i2c_get_addr(AspeedI2CBus *bus)
     }
 }
 
+static int aspeed_i2c_handle_start_cmd(AspeedI2CBus *bus)
+{
+    uint32_t reg_intr_sts = aspeed_i2c_bus_intr_sts_offset(bus);
+    uint32_t reg_cmd = aspeed_i2c_bus_cmd_offset(bus);
+    uint32_t reg_dma_len = aspeed_i2c_bus_dma_len_offset(bus);
+
+    uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
+        I2CD_MSTARTR : I2CD_MSTART;
+    uint8_t addr;
+
+    aspeed_i2c_set_state(bus, state);
+
+    addr = aspeed_i2c_get_addr(bus);
+    if (i2c_start_transfer(bus->bus, extract32(addr, 1, 7),
+                           extract32(addr, 0, 1))) {
+        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_NAK, 1);
+        if (aspeed_i2c_bus_pkt_mode_en(bus)) {
+            ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_FAIL, 1);
+        }
+    } else {
+        /* START doesn't set TX_ACK in packet mode */
+        if (!aspeed_i2c_bus_pkt_mode_en(bus)) {
+            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_ACK, 1);
+        }
+    }
+
+    SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_START_CMD, 0);
+
+    if (SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, TX_DMA_EN)) {
+        if (bus->regs[reg_dma_len] == 0) {
+            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_TX_CMD, 0);
+        }
+    } else if (!SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, TX_BUFF_EN)) {
+        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_TX_CMD, 0);
+    }
+
+    /* No slave found */
+    if (!i2c_bus_busy(bus->bus)) {
+        if (aspeed_i2c_bus_pkt_mode_en(bus)) {
+            ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_FAIL, 1);
+            ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_DONE, 1);
+        }
+        return 1;
+    }
+
+    aspeed_i2c_set_state(bus, I2CD_MACTIVE);
+    return 0;
+}
+
+static void aspeed_i2c_handle_tx_cmd(AspeedI2CBus *bus)
+{
+    uint32_t reg_intr_sts = aspeed_i2c_bus_intr_sts_offset(bus);
+    uint32_t reg_cmd = aspeed_i2c_bus_cmd_offset(bus);
+
+    aspeed_i2c_set_state(bus, I2CD_MTXD);
+    if (aspeed_i2c_bus_send(bus)) {
+        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_NAK, 1);
+        i2c_end_transfer(bus->bus);
+    } else {
+        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_ACK, 1);
+    }
+    SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_TX_CMD, 0);
+    aspeed_i2c_set_state(bus, I2CD_MACTIVE);
+}
+
+static void aspeed_i2c_handle_stop_cmd(AspeedI2CBus *bus)
+{
+    uint32_t reg_intr_sts = aspeed_i2c_bus_intr_sts_offset(bus);
+    uint32_t reg_cmd = aspeed_i2c_bus_cmd_offset(bus);
+
+    if (!(aspeed_i2c_get_state(bus) & I2CD_MACTIVE)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: abnormal stop\n", __func__);
+        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, ABNORMAL, 1);
+        if (aspeed_i2c_bus_pkt_mode_en(bus)) {
+            ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_FAIL, 1);
+        }
+    } else {
+        aspeed_i2c_set_state(bus, I2CD_MSTOP);
+        i2c_end_transfer(bus->bus);
+        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, NORMAL_STOP, 1);
+    }
+    SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_STOP_CMD, 0);
+    aspeed_i2c_set_state(bus, I2CD_IDLE);
+
+    i2c_schedule_pending_master(bus->bus);
+}
+
 static bool aspeed_i2c_check_sram(AspeedI2CBus *bus)
 {
     AspeedI2CState *s = bus->controller;
@@ -468,7 +555,6 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
 {
     uint32_t reg_intr_sts = aspeed_i2c_bus_intr_sts_offset(bus);
     uint32_t reg_cmd = aspeed_i2c_bus_cmd_offset(bus);
-    uint32_t reg_dma_len = aspeed_i2c_bus_dma_len_offset(bus);
 
     if (!aspeed_i2c_check_sram(bus)) {
         return;
@@ -479,57 +565,14 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
     }
 
     if (SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_START_CMD)) {
-        uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
-            I2CD_MSTARTR : I2CD_MSTART;
-        uint8_t addr;
-
-        aspeed_i2c_set_state(bus, state);
-
-        addr = aspeed_i2c_get_addr(bus);
-        if (i2c_start_transfer(bus->bus, extract32(addr, 1, 7),
-                               extract32(addr, 0, 1))) {
-            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_NAK, 1);
-            if (aspeed_i2c_bus_pkt_mode_en(bus)) {
-                ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_FAIL, 1);
-            }
-        } else {
-            /* START doesn't set TX_ACK in packet mode */
-            if (!aspeed_i2c_bus_pkt_mode_en(bus)) {
-                SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_ACK, 1);
-            }
-        }
-
-        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_START_CMD, 0);
-
-        if (SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, TX_DMA_EN)) {
-            if (bus->regs[reg_dma_len] == 0) {
-                SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_TX_CMD, 0);
-            }
-        } else if (!SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, TX_BUFF_EN)) {
-            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_TX_CMD, 0);
-        }
-
-        /* No slave found */
-        if (!i2c_bus_busy(bus->bus)) {
-            if (aspeed_i2c_bus_pkt_mode_en(bus)) {
-                ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_FAIL, 1);
-                ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_DONE, 1);
-            }
+        /* No one responded. */
+        if (aspeed_i2c_handle_start_cmd(bus)) {
             return;
         }
-        aspeed_i2c_set_state(bus, I2CD_MACTIVE);
     }
 
     if (SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_TX_CMD)) {
-        aspeed_i2c_set_state(bus, I2CD_MTXD);
-        if (aspeed_i2c_bus_send(bus)) {
-            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_NAK, 1);
-            i2c_end_transfer(bus->bus);
-        } else {
-            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_ACK, 1);
-        }
-        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_TX_CMD, 0);
-        aspeed_i2c_set_state(bus, I2CD_MACTIVE);
+        aspeed_i2c_handle_tx_cmd(bus);
     }
 
     if ((SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_RX_CMD) ||
@@ -539,21 +582,7 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
     }
 
     if (SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_STOP_CMD)) {
-        if (!(aspeed_i2c_get_state(bus) & I2CD_MACTIVE)) {
-            qemu_log_mask(LOG_GUEST_ERROR, "%s: abnormal stop\n", __func__);
-            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, ABNORMAL, 1);
-            if (aspeed_i2c_bus_pkt_mode_en(bus)) {
-                ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_FAIL, 1);
-            }
-        } else {
-            aspeed_i2c_set_state(bus, I2CD_MSTOP);
-            i2c_end_transfer(bus->bus);
-            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, NORMAL_STOP, 1);
-        }
-        SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, M_STOP_CMD, 0);
-        aspeed_i2c_set_state(bus, I2CD_IDLE);
-
-        i2c_schedule_pending_master(bus->bus);
+        aspeed_i2c_handle_stop_cmd(bus);
     }
 
     if (aspeed_i2c_bus_pkt_mode_en(bus)) {
