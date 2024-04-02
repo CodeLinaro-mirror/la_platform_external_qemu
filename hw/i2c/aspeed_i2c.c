@@ -404,7 +404,8 @@ static uint8_t aspeed_i2c_get_addr(AspeedI2CBus *bus)
     }
 }
 
-static int aspeed_i2c_handle_start_cmd(AspeedI2CBus *bus)
+static int aspeed_i2c_handle_start_cmd(AspeedI2CBus *bus, uint8_t addr,
+                                       bool is_recv)
 {
     uint32_t reg_intr_sts = aspeed_i2c_bus_intr_sts_offset(bus);
     uint32_t reg_cmd = aspeed_i2c_bus_cmd_offset(bus);
@@ -412,13 +413,10 @@ static int aspeed_i2c_handle_start_cmd(AspeedI2CBus *bus)
 
     uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
         I2CD_MSTARTR : I2CD_MSTART;
-    uint8_t addr;
 
     aspeed_i2c_set_state(bus, state);
 
-    addr = aspeed_i2c_get_addr(bus);
-    if (i2c_start_transfer(bus->bus, extract32(addr, 1, 7),
-                           extract32(addr, 0, 1))) {
+    if (i2c_start_transfer(bus->bus, addr, is_recv)) {
         SHARED_ARRAY_FIELD_DP32(bus->regs, reg_intr_sts, TX_NAK, 1);
         if (aspeed_i2c_bus_pkt_mode_en(bus)) {
             ARRAY_FIELD_DP32(bus->regs, I2CM_INTR_STS, PKT_CMD_FAIL, 1);
@@ -555,6 +553,9 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
 {
     uint32_t reg_intr_sts = aspeed_i2c_bus_intr_sts_offset(bus);
     uint32_t reg_cmd = aspeed_i2c_bus_cmd_offset(bus);
+    uint8_t addr;
+    bool is_recv;
+    bool is_txrx;
 
     if (!aspeed_i2c_check_sram(bus)) {
         return;
@@ -564,10 +565,33 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
         aspeed_i2c_bus_cmd_dump(bus);
     }
 
+    addr = aspeed_i2c_get_addr(bus);
+    is_recv = extract32(addr, 0, 1);
+    addr = extract32(addr, 1, 7);
+    /*
+     * If we're doing a START, TX, and RX in the same command with packet mode
+     * enabled, we have to handle STARTs and reSTARTs differently.
+     */
+    is_txrx = SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_RX_CMD)    &&
+              SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_TX_CMD)    &&
+              SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_START_CMD) &&
+              aspeed_i2c_bus_pkt_mode_en(bus);
+
     if (SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_START_CMD)) {
-        /* No one responded. */
-        if (aspeed_i2c_handle_start_cmd(bus)) {
-            return;
+        if (is_txrx) {
+            /*
+             * If we're doing both a TX and RX in one command, the first START
+             * has RnW=0.
+             */
+            if (aspeed_i2c_handle_start_cmd(bus, addr, false)) {
+                /* No one responded. */
+                return;
+            }
+        } else {
+            if (aspeed_i2c_handle_start_cmd(bus, addr, is_recv)) {
+                /* No one responded. */
+                return;
+            }
         }
     }
 
@@ -578,6 +602,16 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
     if ((SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_RX_CMD) ||
          SHARED_ARRAY_FIELD_EX32(bus->regs, reg_cmd, M_S_RX_CMD_LAST)) &&
         !SHARED_ARRAY_FIELD_EX32(bus->regs, reg_intr_sts, RX_DONE)) {
+        if (is_txrx) {
+            /*
+             * If we're doing both a TX and RX in one command, there's a reSTART
+             * with RnW=1 before the receive.
+             */
+            if (aspeed_i2c_handle_start_cmd(bus, addr, true)) {
+                /* No one responded. */
+                return;
+            }
+        }
         aspeed_i2c_handle_rx_cmd(bus);
     }
 
