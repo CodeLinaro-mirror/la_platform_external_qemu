@@ -24,8 +24,10 @@
 #define PECI_CMD                0xC
 #define PECI_CTL2               0x10
 #define PECI_WR_LENGTH          0x1C
-#define PECI_PDDR               0x2C
+#define PECI_PDRR               0x2C /* PECI Data Rate Register */
 #define PECI_DAT_INOUT(reg)    (0x100 + (reg) * 4)
+
+#define PECI_PDRR_DEFAULT       0x8F
 
 static uint64_t npcm7xx_peci_read(void *opaque, hwaddr offset, unsigned size)
 {
@@ -66,9 +68,8 @@ static uint64_t npcm7xx_peci_read(void *opaque, hwaddr offset, unsigned size)
         ret = ps->pcmd.wr_length;
         break;
 
-    case PECI_PDDR:
-        qemu_log_mask(LOG_UNIMP, "%s: PECI PDDR is unimplemented.\n", __func__);
-        ret = ps->pddr;  /* undoc register */
+    case PECI_PDRR:
+        ret = ps->pdrr;
         break;
 
     case PECI_DAT_INOUT(0) ... PECI_DAT_INOUT(63):
@@ -134,8 +135,8 @@ static void npcm7xx_peci_write(void *opaque, hwaddr offset, uint64_t input,
         ps->pcmd.wr_length = data;
         break;
 
-    case PECI_PDDR:
-        ps->pddr = data;
+    case PECI_PDRR:
+        ps->pdrr = data;
         break;
 
     case PECI_DAT_INOUT(0) ... PECI_DAT_INOUT(63):
@@ -156,6 +157,7 @@ static void npcm7xx_peci_reset(Object *obj, ResetType type)
     NPCM7xxPECIState *ps = NPCM7XX_PECI(obj);
 
     ps->status = PECI_CTL_STS_DONE_EN;
+    ps->pdrr = PECI_PDRR_DEFAULT;
 }
 
 static const MemoryRegionOps npcm7xx_peci_ops = {

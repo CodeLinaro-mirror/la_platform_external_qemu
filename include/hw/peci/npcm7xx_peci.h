@@ -27,7 +27,7 @@ typedef struct NPCM7xxPECIState {
     /* Registers */
     uint8_t       status;
     uint8_t       ctl2;
-    uint8_t       pddr;
+    uint8_t       pdrr;
 } NPCM7xxPECIState;
 
 #define TYPE_NPCM7XX_PECI "npcm7xx-peci"
