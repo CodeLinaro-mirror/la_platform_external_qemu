@@ -27,6 +27,8 @@
 #define PECI_PDRR               0x2C /* PECI Data Rate Register */
 #define PECI_DAT_INOUT(reg)    (0x100 + (reg) * 4)
 
+#define PECI_CTL_STS_W1C_MASK \
+            (PECI_CTL_STS_CRC_ERR | PECI_CTL_STS_ABRT_ERR | PECI_CTL_STS_DONE)
 #define PECI_PDRR_DEFAULT       0x8F
 
 static uint64_t npcm7xx_peci_read(void *opaque, hwaddr offset, unsigned size)
@@ -45,7 +47,7 @@ static uint64_t npcm7xx_peci_read(void *opaque, hwaddr offset, unsigned size)
     switch (offset) {
     case PECI_CTL_STS:
         ret = ps->status;
-        ps->status &= ~PECI_CTL_STS_CRC_ERR;
+        ps->status &= ~(PECI_CTL_STS_CRC_ERR | PECI_CTL_STS_ABRT_ERR);
         break;
 
     case PECI_RD_LENGTH:
@@ -112,6 +114,11 @@ static void npcm7xx_peci_write(void *opaque, hwaddr offset, uint64_t input,
             ps->status |= PECI_CTL_STS_DONE;
             ps->status &= ~PECI_CTL_STS_START_BUSY;
             qemu_irq_raise(ps->irq);
+        }
+
+        /* clear status bits upon driver request */
+        if (data & PECI_CTL_STS_W1C_MASK) {
+            ps->status &= ~(data & PECI_CTL_STS_W1C_MASK);
         }
         break;
 
