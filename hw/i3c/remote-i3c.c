@@ -64,6 +64,100 @@ typedef struct {
     uint32_t ibi_bytes_rxed;
 } RemoteI3C;
 
+static void remote_i3c_rx_ibi(RemoteI3C *i3c, const uint8_t *buf, int size)
+{
+    uint32_t p_buf = 0;
+    while (p_buf < size) {
+        switch (i3c->ibi_rx_state) {
+        /* This is the start of a new IBI request. */
+        case IBI_RX_STATE_DONE:
+            i3c->ibi_rx_state = IBI_RX_STATE_READ_ADDR;
+            p_buf++;
+            break;
+        case IBI_RX_STATE_READ_ADDR:
+            i3c->ibi_data.addr = buf[p_buf];
+            p_buf++;
+            i3c->ibi_rx_state = IBI_RX_STATE_READ_RNW;
+            break;
+        case IBI_RX_STATE_READ_RNW:
+            i3c->ibi_data.is_recv = buf[p_buf];
+            p_buf++;
+            i3c->ibi_rx_state = IBI_RX_STATE_READ_SIZE;
+            break;
+        case IBI_RX_STATE_READ_SIZE:
+            i3c->ibi_data.num_bytes |= ((uint32_t)buf[p_buf] <<
+                                        (8 * i3c->ibi_bytes_rxed));
+            i3c->ibi_bytes_rxed++;
+            p_buf++;
+            /*
+             * If we're done reading the num_bytes portion, move on to reading
+             * data.
+             */
+            if (i3c->ibi_bytes_rxed == sizeof(i3c->ibi_data.num_bytes)) {
+                i3c->ibi_data.num_bytes = le32_to_cpu(i3c->ibi_data.num_bytes);
+                i3c->ibi_bytes_rxed = 0;
+                i3c->ibi_rx_state = IBI_RX_STATE_READ_DATA;
+                /* If there's no data to read, we're done. */
+                if (i3c->ibi_data.num_bytes == 0) {
+                    /*
+                     * Sanity check to see if the remote target is doing
+                     * something wonky. This would only happen if it sends
+                     * another IBI before the first one has been ACKed/NACKed
+                     * by the controller.
+                     * We'll try to recover by just exiting early and discarding
+                     * the leftover bytes.
+                     */
+                    if (p_buf < size) {
+                        qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target "
+                                      "sent trailing bytes at the end of the "
+                                      "IBI request.",
+                            object_get_canonical_path(OBJECT(i3c)),
+                                                      i3c->cfg.name);
+                        return;
+                    }
+                    i3c->ibi_rx_state = IBI_RX_STATE_DONE;
+                } else {
+                    /*
+                     * We have IBI bytes to read, allocate memory for it.
+                     * Freed when we're done sending the IBI to the controller.
+                     */
+                    i3c->ibi_data.data = g_new0(uint8_t,
+                                                i3c->ibi_data.num_bytes);
+                }
+            }
+            break;
+        case IBI_RX_STATE_READ_DATA:
+            i3c->ibi_data.data[i3c->ibi_bytes_rxed] = buf[p_buf];
+            i3c->ibi_bytes_rxed++;
+            p_buf++;
+            if (i3c->ibi_bytes_rxed == i3c->ibi_data.num_bytes) {
+                /*
+                 * Sanity check to see if the remote target is doing something
+                 * wonky. This would only happen if it sends another IBI before
+                 * the first one has been ACKed/NACKed by the controller.
+                 * We'll try to recover by just exiting early and discarding the
+                 * leftover bytes.
+                 */
+                if (p_buf < size) {
+                    qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target "
+                                  "sent trailing bytes at the end of the "
+                                  "IBI request.",
+                        object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name);
+                    return;
+                }
+                i3c->ibi_rx_state = IBI_RX_STATE_DONE;
+            }
+            break;
+        default:
+            qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target IBI state "
+                          "machine reached unknown state 0x%x\n",
+                          object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name,
+                          i3c->ibi_rx_state);
+            g_assert_not_reached();
+        }
+    }
+}
+
 static uint32_t remote_i3c_recv(I3CTarget *t, uint8_t *data,
                                 uint32_t num_to_read)
 {
@@ -183,12 +277,37 @@ static int remote_i3c_handle_ccc_write(I3CTarget *t, const uint8_t *data,
     return 0;
 }
 
+static bool remote_i3c_read_target_match(RemoteI3C *i3c)
+{
+    uint8_t byte;
+
+    /*
+     * The response is 1 byte and is 1 if the remote target matched the
+     * address, or 0 if the target did not match.
+     */
+    qemu_chr_fe_read_all(&i3c->chr, &byte, sizeof(byte));
+    /*
+     * It's possible for the remote target to be sending an IBI at the same
+     * time that we send a START and do address matching. Let the remote target
+     * win.
+     */
+    if (byte == REMOTE_I3C_IBI) {
+        remote_i3c_rx_ibi(i3c, &byte, sizeof(byte));
+        return false;
+    } else if (byte != 0 && byte != 1) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s Received unknown byte 0x%.2x during "
+                      "address match\n",
+                      object_get_canonical_path(OBJECT(i3c)), byte);
+    }
+
+    return byte == 1;
+}
+
 static bool remote_i3c_target_match(I3CTarget *t, uint8_t address,
                                     bool broadcast, bool in_entdaa)
 {
     RemoteI3C *i3c = REMOTE_I3C(t);
     uint8_t request[3];
-    uint8_t matched;
 
     /*
      * If we have a transfer buffered, send it out before we do target matching
@@ -196,6 +315,11 @@ static bool remote_i3c_target_match(I3CTarget *t, uint8_t address,
      */
     if (remote_i3c_tx_in_progress(i3c)) {
         remote_i3c_chr_send_bytes(i3c);
+    }
+
+    /* We're in the middle of an IBI, NACK. */
+    if (i3c->ibi_rx_state != IBI_RX_STATE_DONE) {
+        return false;
     }
 
     /*
@@ -208,12 +332,7 @@ static bool remote_i3c_target_match(I3CTarget *t, uint8_t address,
     request[1] = address;
     request[2] = in_entdaa;
     qemu_chr_fe_write_all(&i3c->chr, request, sizeof(request));
-    /*
-     * The response is 1 byte and is non-zero if the remote target matched the
-     * address, or zero if the target did not match.
-     */
-    qemu_chr_fe_read_all(&i3c->chr, &matched, sizeof(matched));
-    return !!matched;
+    return remote_i3c_read_target_match(i3c);
 }
 
 static int remote_i3c_event(I3CTarget *t, enum I3CEvent event)
@@ -268,100 +387,6 @@ static void remote_i3c_chr_event(void *opaque, QEMUChrEvent evt)
         break;
     default:
         g_assert_not_reached();
-    }
-}
-
-static void remote_i3c_rx_ibi(RemoteI3C *i3c, const uint8_t *buf, int size)
-{
-    uint32_t p_buf = 0;
-    while (p_buf < size) {
-        switch (i3c->ibi_rx_state) {
-        /* This is the start of a new IBI request. */
-        case IBI_RX_STATE_DONE:
-            i3c->ibi_rx_state = IBI_RX_STATE_READ_ADDR;
-            p_buf++;
-            break;
-        case IBI_RX_STATE_READ_ADDR:
-            i3c->ibi_data.addr = buf[p_buf];
-            p_buf++;
-            i3c->ibi_rx_state = IBI_RX_STATE_READ_RNW;
-            break;
-        case IBI_RX_STATE_READ_RNW:
-            i3c->ibi_data.is_recv = buf[p_buf];
-            p_buf++;
-            i3c->ibi_rx_state = IBI_RX_STATE_READ_SIZE;
-            break;
-        case IBI_RX_STATE_READ_SIZE:
-            i3c->ibi_data.num_bytes |= ((uint32_t)buf[p_buf] <<
-                                        (8 * i3c->ibi_bytes_rxed));
-            i3c->ibi_bytes_rxed++;
-            p_buf++;
-            /*
-             * If we're done reading the num_bytes portion, move on to reading
-             * data.
-             */
-            if (i3c->ibi_bytes_rxed == sizeof(i3c->ibi_data.num_bytes)) {
-                i3c->ibi_data.num_bytes = le32_to_cpu(i3c->ibi_data.num_bytes);
-                i3c->ibi_bytes_rxed = 0;
-                i3c->ibi_rx_state = IBI_RX_STATE_READ_DATA;
-                /* If there's no data to read, we're done. */
-                if (i3c->ibi_data.num_bytes == 0) {
-                    /*
-                     * Sanity check to see if the remote target is doing
-                     * something wonky. This would only happen if it sends
-                     * another IBI before the first one has been ACKed/NACKed
-                     * by the controller.
-                     * We'll try to recover by just exiting early and discarding
-                     * the leftover bytes.
-                     */
-                    if (p_buf < size) {
-                        qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target "
-                                      "sent trailing bytes at the end of the "
-                                      "IBI request.",
-                            object_get_canonical_path(OBJECT(i3c)),
-                                                      i3c->cfg.name);
-                        return;
-                    }
-                    i3c->ibi_rx_state = IBI_RX_STATE_DONE;
-                } else {
-                    /*
-                     * We have IBI bytes to read, allocate memory for it.
-                     * Freed when we're done sending the IBI to the controller.
-                     */
-                    i3c->ibi_data.data = g_new0(uint8_t,
-                                                i3c->ibi_data.num_bytes);
-                }
-            }
-            break;
-        case IBI_RX_STATE_READ_DATA:
-            i3c->ibi_data.data[i3c->ibi_bytes_rxed] = buf[p_buf];
-            i3c->ibi_bytes_rxed++;
-            p_buf++;
-            if (i3c->ibi_bytes_rxed == i3c->ibi_data.num_bytes) {
-                /*
-                 * Sanity check to see if the remote target is doing something
-                 * wonky. This would only happen if it sends another IBI before
-                 * the first one has been ACKed/NACKed by the controller.
-                 * We'll try to recover by just exiting early and discarding the
-                 * leftover bytes.
-                 */
-                if (p_buf < size) {
-                    qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target "
-                                  "sent trailing bytes at the end of the "
-                                  "IBI request.",
-                        object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name);
-                    return;
-                }
-                i3c->ibi_rx_state = IBI_RX_STATE_DONE;
-            }
-            break;
-        default:
-            qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target IBI state "
-                          "machine reached unknown state 0x%x\n",
-                          object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name,
-                          i3c->ibi_rx_state);
-            g_assert_not_reached();
-        }
     }
 }
 
