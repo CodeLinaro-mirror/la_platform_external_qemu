@@ -16,9 +16,11 @@
 
 #include "qemu/osdep.h"
 #include "libqtest-single.h"
+#include "socket_util.h"
 #include "hw/registerfields.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/remote-i3c.h"
+#include <bits/types/struct_timeval.h>
 #include "hw/i3c/aspeed_i3c.h"
 #include "hw/i3c/dw-i3c.h"
 
@@ -107,37 +109,6 @@ typedef union DWI3CResponse {
 
 static int sock;
 static int fd;
-
-static in_port_t open_socket(void)
-{
-    struct sockaddr_in myaddr;
-    struct timeval timeout = { .tv_sec = 1, };
-    socklen_t addrlen;
-
-    myaddr.sin_family = AF_INET;
-    myaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    myaddr.sin_port = 0;
-    sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    g_assert(sock != -1);
-    g_assert(bind(sock, (struct sockaddr *) &myaddr, sizeof(myaddr)) != -1);
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-
-    addrlen = sizeof(myaddr);
-    g_assert(getsockname(sock, (struct sockaddr *) &myaddr , &addrlen) != -1);
-    g_assert(listen(sock, 1) != -1);
-    return ntohs(myaddr.sin_port);
-}
-
-static void setup_fd(void)
-{
-    fd_set readfds;
-
-    FD_ZERO(&readfds);
-    FD_SET(sock, &readfds);
-    g_assert(select(sock + 1, &readfds, NULL, NULL, NULL) == 1);
-
-    fd = accept(sock, NULL, 0);
-}
 
 static DWI3CTransferCmd aspeed_i3c_create_xfer_cmd(uint8_t cmd,
                                                        uint8_t dev_index,
@@ -597,7 +568,8 @@ int main(int argc, char **argv)
     /* Global register base address + offset of first controller. */
     uint32_t i3c_controller_num = 0;
     g_test_init(&argc, &argv, NULL);
-    port = open_socket();
+    struct timeval timeout = { .tv_sec = 1 };
+    port = socket_util_open_socket(&sock, &timeout);
 
     global_qtest = qtest_initf("-machine ast2600-evb "
                 "-chardev socket,id=remote-i3c-chr,port=%d,host=localhost "
@@ -610,7 +582,7 @@ int main(int argc, char **argv)
                 "bcr=0x55,"
                 "static-address=%d",
                 port, TYPE_REMOTE_I3C, TARGET_ADDR);
-    setup_fd();
+    fd = socket_util_setup_fd(sock);
 
     /* Remote target RXing, i.e. controller -> target. */
     qtest_add_data_func("remote-i3c-rx", (void *)&i3c_controller_num,
