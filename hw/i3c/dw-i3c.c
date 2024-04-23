@@ -598,6 +598,7 @@ static void dw_i3c_send_disec(DWI3C *s)
                                      /*is_recv=*/false, /*is_i2c=*/false);
     }
     dw_i3c_send_byte(s, s->ibi_data.disec_byte, /*is_i2c=*/false);
+    dw_i3c_end_transfer(s, /*is_i2c=*/false);
 }
 
 static int dw_i3c_handle_hj(DWI3C *s)
