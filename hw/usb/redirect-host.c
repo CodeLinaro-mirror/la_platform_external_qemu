@@ -488,6 +488,7 @@ static void usbredir_host_parser_hello(void *priv,
 {
     USBRedirectHost *usbredir_host = priv;
     usbredir_host->device_ops->on_attach(usbredir_host->opaque);
+    usbredirparser_do_write(usbredir_host->parser);
 }
 
 static void usbredir_host_parser_reset(void *priv)
@@ -652,7 +653,6 @@ static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
     usbredirparser_caps_set_cap(caps, usb_redir_cap_32bits_bulk_length);
     usbredirparser_init(usbredir_host->parser, VERSION, caps,
                         USB_REDIR_CAPS_SIZE, usbredirparser_fl_usb_host);
-    usbredirparser_do_write(usbredir_host->parser);
 }
 
 static void usbredir_host_destroy_parser(USBRedirectHost *usbredir_host)
