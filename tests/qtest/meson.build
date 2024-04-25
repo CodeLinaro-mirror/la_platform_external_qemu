@@ -213,8 +213,8 @@ qtests_npcm7xx = \
    'npcm7xx_watchdog_timer-test'] + \
    (slirp.found() ? ['npcm7xx_emc-test'] : [])
 qtests_npcm8xx = \
-  ['npcm_gmac-test',
-   'npcm8xx_udc-test']
+  ['npcm_gmac-test'] + \
+  (usbredir.found() ? ['npcm8xx_udc-test'] : [])
 qtests_aspeed = \
   ['aspeed_hace-test',
    'aspeed_smc-test',
@@ -401,6 +401,10 @@ qtests = {
   'aspeed_smc-test': files('aspeed-smc-utils.c', 'aspeed_smc-test.c'),
   'ast2700-smc-test': files('aspeed-smc-utils.c', 'ast2700-smc-test.c'),
 }
+
+if usbredir.found()
+  qtests += {'npcm8xx_udc-test': [usbredir, files('fake-usbredir-guest.c')]}
+endif
 
 if vnc.found()
   gvnc = dependency('gvnc-1.0', method: 'pkg-config', required: false)
