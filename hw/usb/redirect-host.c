@@ -659,6 +659,7 @@ static void usbredir_host_destroy_parser(USBRedirectHost *usbredir_host)
 {
     if (usbredir_host->parser) {
         usbredirparser_destroy(usbredir_host->parser);
+        usbredir_host->parser = NULL;
     }
 }
 
