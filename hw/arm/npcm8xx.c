@@ -55,6 +55,7 @@
 #define NPCM8XX_RNG_BA          0xf000b000
 #define NPCM8XX_PCIERC_BA       0xe1000000
 #define NPCM8XX_PCIE_ROOT_BA    0xe8000000
+#define NPCM8XX_ESPI_BA         0xf009f000
 
 /* ADC Module */
 #define NPCM8XX_ADC_BA          0xf000c000
@@ -97,6 +98,7 @@ enum NPCM8xxInterrupt {
     NPCM8XX_GMAC2_IRQ,
     NPCM8XX_GMAC3_IRQ,
     NPCM8XX_GMAC4_IRQ,
+    NPCM8XX_ESPI_IRQ,
     NPCM8XX_MMC_IRQ             = 26,
     NPCM8XX_PSPI_IRQ            = 28,
     NPCM8XX_TIMER0_IRQ          = 32,   /* Timer Module 0 */
@@ -486,6 +488,8 @@ static void npcm8xx_init(Object *obj)
     object_initialize_child(obj, "mmc", &s->mmc, TYPE_NPCM7XX_SDHCI);
     object_initialize_child(obj, "pspi", &s->pspi, TYPE_NPCM_PSPI);
     object_initialize_child(obj, "pcierc", &s->pcierc, TYPE_NPCM_PCIERC);
+
+    object_initialize_child(obj, "espi", &s->espi, TYPE_NPCM_ESPI);
 }
 
 static void npcm8xx_realize(DeviceState *dev, Error **errp)
@@ -814,6 +818,12 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->pcierc), 0,
                        npcm8xx_irq(s, NPCM8XX_PCIE_RC_IRQ));
 
+    /* ESPI */
+    sysbus_realize(SYS_BUS_DEVICE(&s->espi), &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->espi), 0, NPCM8XX_ESPI_BA);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->espi), 0,
+                       npcm8xx_irq(s, NPCM8XX_ESPI_IRQ));
+
     create_unimplemented_device("npcm8xx.shm",          0xc0001000,   4 * KiB);
     create_unimplemented_device("npcm8xx.gicextra",     0xdfffa000,  24 * KiB);
     create_unimplemented_device("npcm8xx.vdmx",         0xe0800000,   4 * KiB);
@@ -821,7 +831,6 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("npcm8xx.gfxi",         0xf000e000,   4 * KiB);
     create_unimplemented_device("npcm8xx.fsw",          0xf000f000,   4 * KiB);
     create_unimplemented_device("npcm8xx.bt",           0xf0030000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.espi",         0xf009f000,   4 * KiB);
     create_unimplemented_device("npcm8xx.peci",         0xf0100000,   4 * KiB);
     create_unimplemented_device("npcm8xx.siox[1]",      0xf0101000,   4 * KiB);
     create_unimplemented_device("npcm8xx.siox[2]",      0xf0102000,   4 * KiB);
