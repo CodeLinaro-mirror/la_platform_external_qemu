@@ -37,6 +37,7 @@
 #include "hw/sd/npcm7xx_sdhci.h"
 #include "hw/timer/npcm7xx_timer.h"
 #include "hw/ssi/npcm7xx_fiu.h"
+#include "hw/ssi/npcm_espi.h"
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
 #include "target/arm/cpu.h"
@@ -108,6 +109,7 @@ struct NPCM8xxState {
     NPCMPCIERCState     pcierc;
     SVCI3C              i3c[6];
     NPCM8xxGDMA         gdma[3];
+    NPCMESPIState       espi;
 };
 
 struct NPCM8xxClass {

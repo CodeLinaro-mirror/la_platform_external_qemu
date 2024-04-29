@@ -52,6 +52,7 @@
 #define NPCM8XX_RNG_BA          0xf000b000
 #define NPCM8XX_PCIERC_BA       0xe1000000
 #define NPCM8XX_PCIE_ROOT_BA    0xe8000000
+#define NPCM8XX_ESPI_BA         0xf009f000
 
 /* ADC Module */
 #define NPCM8XX_ADC_BA          0xf000c000
@@ -91,6 +92,7 @@ enum NPCM8xxInterrupt {
     NPCM8XX_GMAC2_IRQ,
     NPCM8XX_GMAC3_IRQ,
     NPCM8XX_GMAC4_IRQ,
+    NPCM8XX_ESPI_IRQ,
     NPCM8XX_MMC_IRQ             = 26,
     NPCM8XX_TIMER0_IRQ          = 32,   /* Timer Module 0 */
     NPCM8XX_TIMER1_IRQ,
@@ -500,6 +502,7 @@ static void npcm8xx_init(Object *obj)
     for (i = 0; i < ARRAY_SIZE(s->gdma); i++) {
         object_initialize_child(obj, "gdma[*]", &s->gdma[i], TYPE_NPCM8XX_GDMA);
     }
+    object_initialize_child(obj, "espi", &s->espi, TYPE_NPCM_ESPI);
 }
 
 static void npcm8xx_realize(DeviceState *dev, Error **errp)
@@ -798,6 +801,12 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->pcierc), 0,
                        npcm8xx_irq(s, NPCM8XX_PCIE_RC_IRQ));
 
+    /* ESPI */
+    sysbus_realize(SYS_BUS_DEVICE(&s->espi), &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->espi), 0, NPCM8XX_ESPI_BA);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->espi), 0,
+                       npcm8xx_irq(s, NPCM8XX_ESPI_IRQ));
+
     /* I3C */
     for (i = 0; i < ARRAY_SIZE(s->i3c); i++) {
         object_property_set_int(OBJECT(&s->i3c[i]), "device-id", i,
@@ -823,7 +832,6 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("npcm8xx.gfxi",         0xf000e000,   4 * KiB);
     create_unimplemented_device("npcm8xx.fsw",          0xf000f000,   4 * KiB);
     create_unimplemented_device("npcm8xx.bt",           0xf0030000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.espi",         0xf009f000,   4 * KiB);
     create_unimplemented_device("npcm8xx.peci",         0xf0100000,   4 * KiB);
     create_unimplemented_device("npcm8xx.siox[1]",      0xf0101000,   4 * KiB);
     create_unimplemented_device("npcm8xx.siox[2]",      0xf0102000,   4 * KiB);
