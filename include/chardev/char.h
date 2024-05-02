@@ -315,14 +315,14 @@ struct ChardevClass {
     char *(*chr_get_filename)(Chardev *s);
 };
 
-Chardev *qemu_chardev_new(const char *id, const char *typename,
+Chardev *qemu_chardev_new(const char *id, const char *type_name,
                           ChardevBackend *backend, GMainContext *context,
                           Error **errp);
 
 extern int term_escape_char;
 
 GSource *qemu_chr_timeout_add_ms(Chardev *chr, guint ms,
-                                 GSourceFunc func, void *private);
+                                 GSourceFunc func, void *internal);
 
 void suspend_mux_open(void);
 void resume_mux_open(void);
