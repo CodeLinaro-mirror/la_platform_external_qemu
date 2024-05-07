@@ -307,7 +307,7 @@ static bool remote_i3c_target_match(I3CTarget *t, uint8_t address, bool is_recv,
                                     bool broadcast, bool in_entdaa)
 {
     RemoteI3C *i3c = REMOTE_I3C(t);
-    uint8_t request[3];
+    uint8_t request[4];
 
     /*
      * If we have a transfer buffered, send it out before we do target matching
@@ -323,14 +323,16 @@ static bool remote_i3c_target_match(I3CTarget *t, uint8_t address, bool is_recv,
     }
 
     /*
-     * Request format is 3 bytes:
+     * Request format is 4 bytes:
      * - byte 0 is the request type
      * - byte 1 is the address being matched against
-     * - byte 2 is if the bus is in ENTDAA
+     * - byte 2 is the RnW bit
+     * - byte 3 is if the bus is in ENTDAA
      */
     request[0] = REMOTE_I3C_TARGET_MATCH;
     request[1] = address;
-    request[2] = in_entdaa;
+    request[2] = is_recv;
+    request[3] = in_entdaa;
     qemu_chr_fe_write_all(&i3c->chr, request, sizeof(request));
     return remote_i3c_read_target_match(i3c);
 }

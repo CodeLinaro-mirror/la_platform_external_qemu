@@ -37,6 +37,12 @@
  * - 1-byte RnW boolean
  * - 4-byte length of IBI payload from target as a LE uint32 (can be 0)
  * - n-byte IBI payload
+ *
+ * Target match request (controller -> target)
+ * - 1-byte opcode
+ * - 1-byte target address
+ * - 1-byte RnW boolean
+ * - 1-byte bus in ENTDAA boolean
  */
 
 #ifndef REMOTE_I3C_H_
