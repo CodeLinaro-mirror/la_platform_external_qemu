@@ -569,7 +569,7 @@ int main(int argc, char **argv)
     uint32_t i3c_controller_num = 0;
     g_test_init(&argc, &argv, NULL);
     struct timeval timeout = { .tv_sec = 1 };
-    port = socket_util_open_socket(&sock, &timeout);
+    port = socket_util_open_socket(&sock, &timeout, NULL);
 
     global_qtest = qtest_initf("-machine ast2600-evb "
                 "-chardev socket,id=remote-i3c-chr,port=%d,host=localhost "
