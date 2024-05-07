@@ -89,7 +89,7 @@ bool i3c_bus_busy(I3CBus *bus)
 }
 
 static bool i3c_target_match(I3CTarget *candidate, uint8_t address,
-                             bool broadcast, bool in_entdaa)
+                             bool is_recv, bool broadcast, bool in_entdaa)
 {
     /* Once a target has a dynamic address, it only responds to that. */
     uint8_t targ_addr = candidate->address ? candidate->address :
@@ -116,11 +116,12 @@ static bool i3c_target_match(I3CTarget *candidate, uint8_t address,
     return targ_addr == address || broadcast;
 }
 
-bool i3c_target_match_and_add(I3CBus *bus, I3CTarget *target, uint8_t address)
+bool i3c_target_match_and_add(I3CBus *bus, I3CTarget *target, uint8_t address,
+                              enum I3CEvent event)
 {
     I3CTargetClass *tc = I3C_TARGET_GET_CLASS(target);
-    bool matched = tc->target_match(target, address, bus->broadcast,
-                                    bus->in_entdaa);
+    bool matched = tc->target_match(target, address, event == I3C_START_RECV,
+                                    bus->broadcast, bus->in_entdaa);
 
     if (matched) {
         I3CNode *node = g_new(struct I3CNode, 1);
@@ -130,7 +131,7 @@ bool i3c_target_match_and_add(I3CBus *bus, I3CTarget *target, uint8_t address)
     return matched;
 }
 
-bool i3c_scan_bus(I3CBus *bus, uint8_t address)
+bool i3c_scan_bus(I3CBus *bus, uint8_t address, enum I3CEvent event)
 {
     BusChild *child;
     I3CNode *node, *next;
@@ -145,7 +146,7 @@ bool i3c_scan_bus(I3CBus *bus, uint8_t address)
         DeviceState *qdev = child->child;
         I3CTarget *target = I3C_TARGET(qdev);
 
-        if (i3c_target_match_and_add(bus, target, address)) {
+        if (i3c_target_match_and_add(bus, target, address, event)) {
             return true;
         }
     }
@@ -192,7 +193,7 @@ static int i3c_do_start_transfer(I3CBus *bus, uint8_t address,
     }
 
     /* No one responded to the address, NACK it. */
-    if (!i3c_scan_bus(bus, address)) {
+    if (!i3c_scan_bus(bus, address, event)) {
         return -1;
     }
 

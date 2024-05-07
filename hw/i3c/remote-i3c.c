@@ -303,7 +303,7 @@ static bool remote_i3c_read_target_match(RemoteI3C *i3c)
     return byte == 1;
 }
 
-static bool remote_i3c_target_match(I3CTarget *t, uint8_t address,
+static bool remote_i3c_target_match(I3CTarget *t, uint8_t address, bool is_recv,
                                     bool broadcast, bool in_entdaa)
 {
     RemoteI3C *i3c = REMOTE_I3C(t);
