@@ -17,7 +17,8 @@
  * Opens a local TCP socket.
  */
 static inline in_port_t socket_util_open_socket(int *sock,
-                                                struct timeval *recv_timeout)
+                                                struct timeval *recv_timeout,
+                                                struct timeval *send_timeout)
 {
     struct sockaddr_in myaddr;
     socklen_t addrlen;
@@ -32,6 +33,11 @@ static inline in_port_t socket_util_open_socket(int *sock,
 
     if (recv_timeout != NULL) {
         setsockopt(*sock, SOL_SOCKET, SO_RCVTIMEO, recv_timeout,
+                   sizeof(struct timeval));
+    }
+
+    if (send_timeout != NULL) {
+        setsockopt(*sock, SOL_SOCKET, SO_SNDTIMEO, send_timeout,
                    sizeof(struct timeval));
     }
 
