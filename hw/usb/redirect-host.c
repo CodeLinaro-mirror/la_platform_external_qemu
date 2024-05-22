@@ -657,6 +657,9 @@ static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
 
 static void usbredir_host_destroy_parser(USBRedirectHost *usbredir_host)
 {
+    if (usbredir_host->device_ops->on_detach) {
+        usbredir_host->device_ops->on_detach(usbredir_host->opaque);
+    }
     if (usbredir_host->parser) {
         usbredirparser_destroy(usbredir_host->parser);
         usbredir_host->parser = NULL;

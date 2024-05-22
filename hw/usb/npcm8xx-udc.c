@@ -542,6 +542,21 @@ static uint8_t npcm8xx_udc_usbredir_attach(void *opaque)
     return NPCM8XX_CONTROL_EP_ADDRESS;
 }
 
+static void npcm8xx_udc_usbredir_detach(void *opaque)
+{
+    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+
+    udc->attached = false;
+
+    if (udc->running) {
+        registers->port_control_status = PORTSC1_INIT_VALUE;
+        registers->status |= R_USBSTS_PORT_CHANGE_DETECT_MASK;
+    }
+
+    npcm8xx_udc_update_irq(udc);
+}
+
 static void npcm8xx_udc_usbredir_reset(void *opaque)
 {
     NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
@@ -621,6 +636,7 @@ static void npcm8xx_udc_usbredir_write_data(void *opaque,
 
 static const USBRedirectHostOps npcm8xx_udc_usbredir_ops = {
     .on_attach = npcm8xx_udc_usbredir_attach,
+    .on_detach = npcm8xx_udc_usbredir_detach,
     .reset = npcm8xx_udc_usbredir_reset,
     .control_transfer = npcm8xx_udc_usbredir_control_transfer,
     .data_out = npcm8xx_udc_usbredir_write_data,
