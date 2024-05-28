@@ -206,7 +206,7 @@ static int mock_target_handle_ccc_write(I3CTarget *i3c, const uint8_t *data,
         return -1;
     }
 
-    trace_mock_target_handle_ccc_read(*num_sent, num_to_send);
+    trace_mock_target_handle_ccc_write(*num_sent, num_to_send);
     return 0;
 }
 
