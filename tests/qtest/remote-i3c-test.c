@@ -294,7 +294,8 @@ static void send_and_verify(uint32_t i3c_base, const uint32_t *data, size_t len)
                                                              expected_data_len);
     remote_target_expected_data[0] = REMOTE_I3C_SEND;
     uint32_t *p32 = (uint32_t *)&remote_target_expected_data[1];
-    *p32 = GUINT32_TO_LE(data_size);
+    uint32_t data_size_le = GUINT32_TO_LE(data_size);
+    memcpy(p32, &data_size_le, sizeof(data_size_le));
     memcpy(&remote_target_expected_data[5], data, data_size);
     remote_target_expected_data[data_size + 5] = REMOTE_I3C_STOP;
 
