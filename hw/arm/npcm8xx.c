@@ -583,6 +583,7 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     /* ADC Modules. Cannot fail. */
     qdev_connect_clock_in(DEVICE(&s->adc), "clock", qdev_get_clock_out(
                           DEVICE(&s->clk), "adc-clock"));
+    object_property_set_uint(OBJECT(&s->adc), "iref", 1200000, &error_abort);
     sysbus_realize(SYS_BUS_DEVICE(&s->adc), &error_abort);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->adc), 0, NPCM8XX_ADC_BA);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->adc), 0,
