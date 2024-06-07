@@ -36,6 +36,7 @@
  * @irq: GIC interrupt line to fire on expiration (if enabled).
  * @con: The Control Register.
  * @data: The Data Buffer.
+ * @data_max: The maximum return value for data, architecture specified.
  * @clock: The ADC Clock.
  * @adci: The input voltage in units of uV. 1uv = 1e-6V.
  * @vref: The external reference voltage.
@@ -52,6 +53,7 @@ struct NPCM7xxADCState {
     qemu_irq     irq;
     uint32_t     con;
     uint32_t     data;
+    uint32_t     data_max;
     Clock       *clock;
 
     /* Voltages are in unit of uV. 1V = 1000000uV. */

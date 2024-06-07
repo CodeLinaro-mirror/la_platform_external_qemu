@@ -39,7 +39,7 @@ REG32(NPCM7XX_ADC_DATA, 0x4)
 #define NPCM7XX_ADC_CON_CONV    BIT(13)
 #define NPCM7XX_ADC_CON_DIV(rv) extract32(rv, 1, 8)
 
-#define NPCM7XX_ADC_MAX_RESULT      1023
+#define NPCM7XX_ADC_DEFAULT_MAX     1023
 #define NPCM7XX_ADC_DEFAULT_IREF    2000000
 #define NPCM7XX_ADC_CONV_CYCLES     20
 #define NPCM7XX_ADC_RESET_CYCLES    10
@@ -53,13 +53,13 @@ static void npcm7xx_adc_reset(NPCM7xxADCState *s)
     s->data = 0x00000000;
 }
 
-static uint32_t npcm7xx_adc_convert(uint32_t input, uint32_t ref)
+static uint32_t npcm7xx_adc_convert(uint32_t input, uint32_t ref, uint32_t max)
 {
     uint32_t result;
 
-    result = input * (NPCM7XX_ADC_MAX_RESULT + 1) / ref;
-    if (result > NPCM7XX_ADC_MAX_RESULT) {
-        result = NPCM7XX_ADC_MAX_RESULT;
+    result = input * (max + 1) / ref;
+    if (result > max) {
+        result = max;
     }
 
     return result;
@@ -103,7 +103,7 @@ static void npcm7xx_adc_convert_done(void *opaque)
                       __func__, input);
         return;
     }
-    s->data = npcm7xx_adc_convert(s->adci[input], ref);
+    s->data = npcm7xx_adc_convert(s->adci[input], ref, s->data_max);
     if (s->con & NPCM7XX_ADC_CON_INT_EN) {
         s->con |= NPCM7XX_ADC_CON_INT;
         qemu_irq_raise(s->irq);
@@ -114,9 +114,9 @@ static void npcm7xx_adc_convert_done(void *opaque)
 static void npcm7xx_adc_calibrate(NPCM7xxADCState *adc)
 {
     adc->calibration_r_values[0] = npcm7xx_adc_convert(NPCM7XX_ADC_R0_INPUT,
-            adc->iref);
+            adc->iref, adc->data_max);
     adc->calibration_r_values[1] = npcm7xx_adc_convert(NPCM7XX_ADC_R1_INPUT,
-            adc->iref);
+            adc->iref, adc->data_max);
 }
 
 static void npcm7xx_adc_write_con(NPCM7xxADCState *s, uint32_t new_con)
@@ -269,6 +269,7 @@ static const VMStateDescription vmstate_npcm7xx_adc = {
 
 static const Property npcm7xx_timer_properties[] = {
     DEFINE_PROP_UINT32("iref", NPCM7xxADCState, iref, NPCM7XX_ADC_DEFAULT_IREF),
+    DEFINE_PROP_UINT32("max-data", NPCM7xxADCState, data_max, NPCM7XX_ADC_DEFAULT_MAX),
 };
 
 static void npcm7xx_adc_class_init(ObjectClass *klass, void *data)
