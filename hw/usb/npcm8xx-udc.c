@@ -416,7 +416,8 @@ static uint64_t npcm8xx_udc_read(void *opaque, hwaddr offset, unsigned size)
         value = registers->endpoint_prime;
         break;
     case A_ENDPTFLUSH:
-        value = registers->endpoint_flush;
+        /* There's nothing to flush, and the device will always appear ready. */
+        value = 0;
         break;
     case A_ENDPTSTAT:
         value = registers->endpoint_status;
@@ -484,7 +485,10 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
         npcm8xx_udc_write_endptprime(udc, value);
         break;
     case A_ENDPTFLUSH:
-        /* Write to endpoint flush clears endpoint status bits. */
+        /**
+         * Write to endpoint flush clears endpoint status bits, but no buffer
+         * is flushed because this model doesn't own any transfer buffer.
+         */
         registers->endpoint_status &= ~value;
         break;
     case A_ENDPTSTAT:
