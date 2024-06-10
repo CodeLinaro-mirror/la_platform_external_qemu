@@ -52,6 +52,11 @@ config AMDSBTSI
     bool
     depends on I2C
 
+config MAX6581
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
 config MAX_16600
     bool
     depends on I2C

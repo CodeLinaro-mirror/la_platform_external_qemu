@@ -1,0 +1,124 @@
+/*
+ * MAX6581 temperature sensor
+ *
+ * Features:
+ *  - 7 external diode temperature inputs
+ *
+ * Datasheet:
+ * https://www.analog.com/media/en/technical-documentation/data-sheets/MAX6581.pdf
+ *
+ * Copyright 2024 Google LLC
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#ifndef QEMU_MAX6581_H
+#define QEMU_MAX6581_H
+
+#include "qemu/osdep.h"
+#include "hw/i2c/smbus_slave.h"
+#include "hw/registerfields.h"
+#include "qemu/compiler.h"
+#include "qom/object.h"
+
+REG8(REMOTE_1_TEMPERATURE, 0x01)
+REG8(REMOTE_2_TEMPERATURE, 0x02)
+REG8(REMOTE_3_TEMPERATURE, 0x03)
+REG8(REMOTE_4_TEMPERATURE, 0x04)
+REG8(REMOTE_5_TEMPERATURE, 0x05)
+REG8(REMOTE_6_TEMPERATURE, 0x06)
+REG8(LOCAL_TEMPERATURE, 0x07)
+REG8(REMOTE_7_TEMPERATURE, 0x08)
+
+/* Duplicate entry for REMOTE_1_EXTENDED_TEMPERATURE at 0x09 and 0x51 */
+
+REG8(MANUFACTURER_ID, 0x0A)
+REG8(REVISION_CODE, 0x0F)
+
+REG8(REMOTE_1_ALERT_HIGH_LIMIT, 0x11)
+REG8(REMOTE_2_ALERT_HIGH_LIMIT, 0x12)
+REG8(REMOTE_3_ALERT_HIGH_LIMIT, 0x13)
+REG8(REMOTE_4_ALERT_HIGH_LIMIT, 0x14)
+REG8(REMOTE_5_ALERT_HIGH_LIMIT, 0x15)
+REG8(REMOTE_6_ALERT_HIGH_LIMIT, 0x16)
+REG8(LOCAL_ALERT_HIGH_LIMIT, 0x17)
+REG8(REMOTE_7_ALERT_HIGH_LIMIT, 0x18)
+
+REG8(LOCAL_OVERT_HIGH_LIMIT, 0x20)
+REG8(REMOTE_1_OVERT_HIGH_LIMIT, 0x21)
+REG8(REMOTE_2_OVERT_HIGH_LIMIT, 0x22)
+REG8(REMOTE_3_OVERT_HIGH_LIMIT, 0x23)
+REG8(REMOTE_4_OVERT_HIGH_LIMIT, 0x24)
+REG8(REMOTE_5_OVERT_HIGH_LIMIT, 0x25)
+REG8(REMOTE_6_OVERT_HIGH_LIMIT, 0x26)
+REG8(REMOTE_7_OVERT_HIGH_LIMIT, 0x27)
+
+REG8(ALERT_LOW_LIMITS, 0x30)
+
+REG8(CONFIGURATION, 0x41)
+
+REG8(ALERT_MASK, 0x42)
+REG8(OVERT_MASK, 0x43)
+
+REG8(ALERT_HIGH_STATUS, 0x44)
+REG8(OVERT_STATUS, 0x45)
+REG8(DIODE_FAULT_STATUS, 0x46)
+REG8(ALERT_LOW_STATUS, 0x47)
+
+REG8(ALERT_LOW_DISABLE, 0x48)
+
+REG8(RESISTANCE_CANCELLATION, 0x4A)
+
+REG8(TRANSISTOR_IDEALITY, 0x4B)
+REG8(IDEALITY_SELECT, 0x4C)
+
+REG8(OFFSET, 0x4D)
+REG8(OFFSET_SELECT, 0x4E)
+
+REG8(REMOTE_1_EXTENDED_TEMPERATURE, 0x51)
+REG8(REMOTE_2_EXTENDED_TEMPERATURE, 0x52)
+REG8(REMOTE_3_EXTENDED_TEMPERATURE, 0x53)
+REG8(REMOTE_4_EXTENDED_TEMPERATURE, 0x54)
+REG8(REMOTE_5_EXTENDED_TEMPERATURE, 0x55)
+REG8(REMOTE_6_EXTENDED_TEMPERATURE, 0x56)
+REG8(LOCAL_EXTENDED_TEMPERATURE, 0x57)
+REG8(REMOTE_7_EXTENDED_TEMPERATURE, 0x58)
+
+#define MAX6581_NUM_REG (A_REMOTE_7_EXTENDED_TEMPERATURE + 1)
+#define MAX6581_NUM_TEMPS 8
+
+#define MAX6581_EXTENDED_ENABLED(ms_) \
+            (((ms_)->regs[A_CONFIGURATION]) & 2)
+
+typedef struct MAX6581State {
+    SMBusDevice parent;
+
+    /* registers */
+    uint8_t regs[MAX6581_NUM_REG];
+
+    /* ix2 transaction state */
+    uint8_t command;
+    bool i2c_cmd_event;
+} MAX6581State;
+
+#define TYPE_MAX6581 "max6581"
+OBJECT_DECLARE_SIMPLE_TYPE(MAX6581State, MAX6581)
+
+/**
+ * get_temperature:
+ * @temp_reg: the device register
+ *
+ */
+uint8_t max6581_get_temperature(uint8_t *temp_reg);
+
+/**
+ * set_temperature:
+ * @temp_reg: the device register
+ * @temperature: the temperature to be written in degrees
+ *
+ * Take a temperature in degrees between 254C and 0C and store it in
+ * @temp_reg.
+ */
+void max6581_set_temperature(uint8_t *temp_reg, uint8_t value);
+
+#endif
