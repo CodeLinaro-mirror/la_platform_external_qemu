@@ -30,8 +30,22 @@ typedef struct FakeUsbredirGuest {
     sem_t ep_info_sem;
     bool received_ep_info;
     struct usb_redir_ep_info_header ep_info;
+    bool device_connected;
     sem_t device_info_sem;
     struct usb_redir_device_connect_header device_info;
+    bool sent_control_in_transfer;
+    sem_t control_transfer_sem;
+    struct usb_redir_control_packet_header control_packet;
+    uint8_t *control_transfer_data;
+    uint16_t control_transfer_length;
+    bool sent_bulk_transfer;
+    sem_t bulk_transfer_sem;
+    struct usb_redir_bulk_packet_header bulk_packet;
+    uint8_t *bulk_data;
+    uint16_t bulk_data_length;
+    uint8_t configuration_value;
+    uint8_t interface_num;
+    uint8_t alt_setting;
 } FakeUsbredirGuest;
 
 /**
@@ -115,5 +129,77 @@ void fake_usbredir_guest_assert_contains_endpoint(
 void fake_usbredir_guest_assert_device(
     FakeUsbredirGuest *faker,
     const struct libusb_device_descriptor *device_desc);
+
+/**
+ * fake_usbredir_guest_control_transfer:
+ * @faker: Fake usbredir guest.
+ * @request_type: USB control transfer request type.
+ * @request: USB control transfer request.
+ * @value: USB control transfer value.
+ * @index: USB control transfer index.
+ * @data: USB control transfer data.
+ * @length: USB control transfer length.
+ * Send the control transfer from the fake usbredir guest to the connected
+ * device.
+ */
+void fake_usbredir_guest_control_transfer(FakeUsbredirGuest *faker,
+                                          uint8_t request_type, uint8_t request,
+                                          uint16_t value, uint16_t index,
+                                          unsigned char *data, uint16_t length);
+
+/**
+ * fake_usbredir_guest_bulk_transfer:
+ * @faker: Fake usbredir guest.
+ * @endpoint: Device endpoint to read/write to.
+ * @data: Data to be read/written.
+ * @length: Length of the buffer or the data to be written.
+ * Send the bulk transfer from the fake usbredir guest to the connected device.
+ */
+void fake_usbredir_guest_bulk_transfer(FakeUsbredirGuest *faker,
+                                       uint8_t endpoint, uint8_t *data,
+                                       uint32_t length);
+
+/**
+ * fake_usbredir_guest_assert_control_transfer_data:
+ * @faker: Fake usbredir guest.
+ * @data: Expected control transfer data.
+ * @length: Expected data length.
+ * Assert the fake usbredir guest has received the control transfer data.
+ */
+void fake_usbredir_guest_assert_control_transfer_received(
+    FakeUsbredirGuest *faker, uint8_t *data, uint16_t length);
+
+/**
+ * fake_usbredir_guest_assert_bulk_transfer:
+ * @faker: Fake usbredir guest.
+ * @data: Expected bulk transfer data to be received by the fake.
+ * @length: Expected data length to be received by the fake.
+ * Assert the fake usbredir guest has received the expected bulk transfer data.
+ * After bulk transfer read, this must be called before the next bulk transfer
+ * read in unit testing. Otherwise, the fake usbredir guest will exit because of
+ * unchecked data.
+ */
+void fake_usbredir_guest_assert_bulk_transfer(FakeUsbredirGuest *faker,
+                                              uint8_t *data, uint32_t length);
+
+/**
+ * fake_usbredir_guest_set_configuration:
+ * @faker: Fake usbredir guest.
+ * @configuration_num: The configuration number to be set.
+ * Sets the test USB device configuration number from the fake usbredir guest.
+ */
+void fake_usbredir_guest_set_configuration(FakeUsbredirGuest *faker,
+                                           uint8_t configuration_value);
+
+/**
+ * fake_usbredir_guest_set_alt_interface:
+ * @faker: Fake usbredir guest.
+ * @interface_num: The interface number to be set.
+ * @alt_setting: The alternative setting of ther interface.
+ * Sets the test USB device interface from the fake usbredir guest.
+ */
+void fake_usbredir_guest_set_alt_interface(FakeUsbredirGuest *faker,
+                                           uint8_t interface_num,
+                                           uint8_t alt_setting);
 
 #endif /* FAKE_USBREDIR_GUEST_H */
