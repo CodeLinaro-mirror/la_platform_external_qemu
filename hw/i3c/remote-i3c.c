@@ -66,6 +66,8 @@ typedef struct {
 
 static void remote_i3c_rx_ibi(RemoteI3C *i3c, const uint8_t *buf, int size)
 {
+    g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
+
     uint32_t p_buf = 0;
     while (p_buf < size) {
         switch (i3c->ibi_rx_state) {
@@ -110,9 +112,7 @@ static void remote_i3c_rx_ibi(RemoteI3C *i3c, const uint8_t *buf, int size)
                     if (p_buf < size) {
                         qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target "
                                       "sent trailing bytes at the end of the "
-                                      "IBI request.",
-                            object_get_canonical_path(OBJECT(i3c)),
-                                                      i3c->cfg.name);
+                                      "IBI request.", path, i3c->cfg.name);
                         return;
                     }
                     i3c->ibi_rx_state = IBI_RX_STATE_DONE;
@@ -141,8 +141,7 @@ static void remote_i3c_rx_ibi(RemoteI3C *i3c, const uint8_t *buf, int size)
                 if (p_buf < size) {
                     qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target "
                                   "sent trailing bytes at the end of the "
-                                  "IBI request.",
-                        object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name);
+                                  "IBI request.", path, i3c->cfg.name);
                     return;
                 }
                 i3c->ibi_rx_state = IBI_RX_STATE_DONE;
@@ -151,8 +150,7 @@ static void remote_i3c_rx_ibi(RemoteI3C *i3c, const uint8_t *buf, int size)
         default:
             qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Remote target IBI state "
                           "machine reached unknown state 0x%x\n",
-                          object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name,
-                          i3c->ibi_rx_state);
+                          path, i3c->cfg.name, i3c->ibi_rx_state);
             g_assert_not_reached();
         }
     }
@@ -221,8 +219,9 @@ static bool remote_i3c_tx_fifo_push(RemoteI3C *i3c, const uint8_t *data,
      * STOP or START.
      */
     if (fifo8_num_free(&i3c->tx_fifo) < num_to_send) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
         qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: TX FIFO buffer full.\n",
-                      object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name);
+                      path, i3c->cfg.name);
         num_to_push = fifo8_num_free(&i3c->tx_fifo);
         ack = false;
     }
@@ -295,9 +294,9 @@ static bool remote_i3c_read_target_match(RemoteI3C *i3c)
         remote_i3c_rx_ibi(i3c, &byte, sizeof(byte));
         return false;
     } else if (byte != 0 && byte != 1) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
         qemu_log_mask(LOG_GUEST_ERROR, "%s Received unknown byte 0x%.2x during "
-                      "address match\n",
-                      object_get_canonical_path(OBJECT(i3c)), byte);
+                      "address match\n", path, byte);
     }
 
     return byte == 1;
@@ -341,6 +340,7 @@ static int remote_i3c_event(I3CTarget *t, enum I3CEvent event)
 {
     RemoteI3C *i3c = REMOTE_I3C(t);
     uint8_t type;
+
     trace_remote_i3c_event(i3c->cfg.name, event);
     switch (event) {
     case I3C_START_RECV:
@@ -356,10 +356,12 @@ static int remote_i3c_event(I3CTarget *t, enum I3CEvent event)
         type = REMOTE_I3C_NACK;
         break;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Unknown I3C event %d\n",
-                      object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name,
-                                                event);
-        return -1;
+        {
+            g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Unknown I3C event %d\n",
+                          path, i3c->cfg.name, event);
+            return -1;
+        }
     }
 
     /*
@@ -439,6 +441,7 @@ static int remote_i3c_chr_can_receive(void *opaque)
 static void remote_i3c_chr_receive(void *opaque, const uint8_t *buf, int size)
 {
     RemoteI3C *i3c = REMOTE_I3C(opaque);
+    g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
 
     /*
      * The only things we expect to receive unprompted are:
@@ -462,8 +465,7 @@ static void remote_i3c_chr_receive(void *opaque, const uint8_t *buf, int size)
         break;
     case REMOTE_I3C_RX_NACK:
         qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Received NACK from remote "
-                      "target\n", object_get_canonical_path(OBJECT(i3c)),
-                      i3c->cfg.name);
+                      "target\n", path, i3c->cfg.name);
         break;
     case REMOTE_I3C_IBI:
         remote_i3c_rx_ibi(i3c, buf, size);
@@ -474,8 +476,7 @@ static void remote_i3c_chr_receive(void *opaque, const uint8_t *buf, int size)
         break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Unknown response 0x%x\n",
-                      object_get_canonical_path(OBJECT(i3c)), i3c->cfg.name,
-                      buf[0]);
+                      path, i3c->cfg.name, buf[0]);
         break;
     }
 }
