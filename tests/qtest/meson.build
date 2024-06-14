@@ -288,6 +288,7 @@ qos_test_ss.add(
   'es1370-test.c',
   'lsm303dlhc-mag-test.c',
   'isl_pmbus_vr-test.c',
+  'max6581-test.c',
   'max16600-test.c',
   'max20730-test.c',
   'max34451-test.c',
