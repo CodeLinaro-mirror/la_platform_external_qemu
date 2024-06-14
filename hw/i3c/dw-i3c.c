@@ -423,8 +423,9 @@ static int dw_i3c_send_start(DWI3C *s, uint8_t addr, bool is_recv, bool is_i2c)
         ret = i3c_start_transfer(s->bus, addr, is_recv);
     }
     if (ret) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: NACKed on TX with addr 0x%.2x\n",
-                      object_get_canonical_path(OBJECT(s)), addr);
+                      path, addr);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_HALT);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_STATUS,
@@ -456,8 +457,9 @@ static int dw_i3c_send(DWI3C *s, const uint8_t *data, uint32_t num_to_send,
         ret = i3c_send(s->bus, data, num_to_send, num_sent);
     }
     if (ret) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: NACKed sending byte 0x%.2x\n",
-                      object_get_canonical_path(OBJECT(s)), data[*num_sent]);
+                      path, data[*num_sent]);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_HALT);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_STATUS,
@@ -497,8 +499,8 @@ static int dw_i3c_recv_data(DWI3C *s, bool is_i2c, uint8_t *data,
     /* I3C devices can NACK if the controller sends an unsupported CCC. */
     ret = i3c_recv(s->bus, data, num_to_read, num_read);
     if (ret) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: NACKed receiving byte\n",
-                      object_get_canonical_path(OBJECT(s)));
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: NACKed receiving byte\n", path);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_HALT);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_STATUS,
@@ -553,8 +555,9 @@ static inline bool dw_i3c_target_is_i2c(DWI3C *s, uint16_t offset)
 static uint8_t dw_i3c_target_addr(DWI3C *s, uint16_t offset)
 {
     if (offset > s->cfg.num_addressable_devices) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Device addr table offset %d out of "
-                      "bounds\n", object_get_canonical_path(OBJECT(s)), offset);
+                      "bounds\n", path, offset);
         /* If we're out of bounds, return an address of 0. */
         return 0;
     }
@@ -983,8 +986,9 @@ static void dw_i3c_reset_ctrl_w(DWI3C *s, uint32_t val)
 static uint32_t dw_i3c_pop_rx(DWI3C *s)
 {
     if (fifo32_is_empty(&s->rx_queue)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Tried to read RX FIFO when empty\n",
-                      object_get_canonical_path(OBJECT(s)));
+                      path);
         return 0;
     }
 
@@ -1026,8 +1030,9 @@ static uint32_t dw_i3c_ibi_queue_r(DWI3C *s)
 static uint32_t dw_i3c_resp_queue_port_r(DWI3C *s)
 {
     if (fifo32_is_empty(&s->resp_queue)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Tried to read response FIFO when "
-                      "empty\n", object_get_canonical_path(OBJECT(s)));
+                      "empty\n", path);
         return 0;
     }
 
@@ -1107,8 +1112,9 @@ static void dw_i3c_resp_queue_push(DWI3C *s, uint8_t err, uint8_t tid,
 static void dw_i3c_push_tx(DWI3C *s, uint32_t val)
 {
     if (fifo32_is_full(&s->tx_queue)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Tried to push to TX FIFO when "
-                      "full\n", object_get_canonical_path(OBJECT(s)));
+                      "full\n", path);
         return;
     }
 
@@ -1130,8 +1136,9 @@ static void dw_i3c_push_tx(DWI3C *s, uint32_t val)
 static uint32_t dw_i3c_pop_tx(DWI3C *s)
 {
     if (fifo32_is_empty(&s->tx_queue)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Tried to pop from TX FIFO when "
-                      "empty\n", object_get_canonical_path(OBJECT(s)));
+                      "empty\n", path);
         return 0;
     }
 
@@ -1154,8 +1161,9 @@ static uint32_t dw_i3c_pop_tx(DWI3C *s)
 static void dw_i3c_push_rx(DWI3C *s, uint32_t val)
 {
     if (fifo32_is_full(&s->rx_queue)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Tried to push to RX FIFO when "
-                      "full\n", object_get_canonical_path(OBJECT(s)));
+                      "full\n", path);
         return;
     }
     trace_dw_i3c_push_rx(s->cfg.id, val);
@@ -1185,8 +1193,9 @@ static void dw_i3c_short_transfer(DWI3C *s, DWI3CTransferCmd cmd,
 
     /* Can't do reads on a short transfer. */
     if (cmd.rnw) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Cannot do a read on a short "
-                      "transfer\n", object_get_canonical_path(OBJECT(s)));
+                      "transfer\n", path);
         return;
     }
 
@@ -1397,15 +1406,15 @@ static void dw_i3c_transfer_cmd(DWI3C *s, DWI3CTransferCmd cmd,
 
     /* User is trying to do HDR transfers, see if we can do them. */
     if (cmd.speed == 0x06 && !dw_i3c_has_hdr_ddr(s)) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: HDR DDR is not supported\n",
-                      object_get_canonical_path(OBJECT(s)));
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: HDR DDR is not supported\n", path);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_HALT);
         return;
     }
     if (cmd.speed == 0x05 && !dw_i3c_has_hdr_ts(s)) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: HDR TS is not supported\n",
-                      object_get_canonical_path(OBJECT(s)));
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: HDR TS is not supported\n", path);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_HALT);
         return;
@@ -1416,8 +1425,9 @@ static void dw_i3c_transfer_cmd(DWI3C *s, DWI3CTransferCmd cmd,
     } else if (arg_attr == DW_I3C_CMD_ATTR_SHORT_DATA_ARG) {
         dw_i3c_short_transfer(s, cmd, arg.short_arg);
     } else {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Unknown command queue cmd_attr 0x%x"
-                      "\n", object_get_canonical_path(OBJECT(s)), arg_attr);
+                      "\n", path, arg_attr);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_HALT);
     }
@@ -1427,8 +1437,9 @@ static void dw_i3c_update_char_table(DWI3C *s, uint8_t offset, uint64_t pid,
                                      uint8_t bcr, uint8_t dcr, uint8_t addr)
 {
     if (offset > s->cfg.num_addressable_devices) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Device char table offset %d out of "
-                      "bounds\n", object_get_canonical_path(OBJECT(s)), offset);
+                      "bounds\n", path, offset);
         /* If we're out of bounds, do nothing. */
         return;
     }
@@ -1514,15 +1525,16 @@ static void dw_i3c_addr_assign_cmd(DWI3C *s, DWI3CAddrAssignCmd cmd)
         uint32_t num_read;
         if (dw_i3c_recv_data(s, /*is_i2c=*/false, target_info.b,
                                         I3C_ENTDAA_SIZE, &num_read)) {
+            g_autofree char *path = object_get_canonical_path(OBJECT(s));
             qemu_log_mask(LOG_GUEST_ERROR, "%s: Target NACKed ENTDAA CCC\n",
-                          object_get_canonical_path(OBJECT(s)));
+                          path);
             err = DW_I3C_RESP_QUEUE_ERR_DAA_NACK;
             goto transfer_done;
         }
         if (dw_i3c_send_byte(s, addr, /*is_i2c=*/false)) {
+            g_autofree char *path = object_get_canonical_path(OBJECT(s));
             qemu_log_mask(LOG_GUEST_ERROR, "%s: Target NACKed addr 0x%.2x "
-                          "during ENTDAA\n",
-                          object_get_canonical_path(OBJECT(s)), addr);
+                          "during ENTDAA\n", path, addr);
             err = DW_I3C_RESP_QUEUE_ERR_DAA_NACK;
             break;
         }
@@ -1553,9 +1565,9 @@ transfer_done:
 static uint32_t dw_i3c_cmd_queue_pop(DWI3C *s)
 {
     if (fifo32_is_empty(&s->cmd_queue)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Tried to dequeue command queue "
-                      "when it was empty\n",
-                      object_get_canonical_path(OBJECT(s)));
+                      "when it was empty\n", path);
         return 0;
     }
     uint32_t val = fifo32_pop(&s->cmd_queue);
@@ -1612,9 +1624,12 @@ static void dw_i3c_cmd_queue_execute(DWI3C *s)
             break;
         case DW_I3C_CMD_ATTR_TRANSFER_ARG:
         case DW_I3C_CMD_ATTR_SHORT_DATA_ARG:
-            qemu_log_mask(LOG_GUEST_ERROR, "%s: Command queue received argument"
-                          " packet when it expected a command packet\n",
-                          object_get_canonical_path(OBJECT(s)));
+            {
+                g_autofree char *path = object_get_canonical_path(OBJECT(s));
+                qemu_log_mask(LOG_GUEST_ERROR, "%s: Command queue received "
+                              "argument packet when it expected a command "
+                              "packet\n", path);
+            }
             break;
         default:
             /*
@@ -1630,8 +1645,9 @@ static void dw_i3c_cmd_queue_execute(DWI3C *s)
 static void dw_i3c_cmd_queue_push(DWI3C *s, uint32_t val)
 {
     if (fifo32_is_full(&s->cmd_queue)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Command queue received packet when "
-                      "already full\n", object_get_canonical_path(OBJECT(s)));
+                      "already full\n", path);
         return;
     }
     trace_dw_i3c_cmd_queue_push(s->cfg.id, val);
@@ -1670,9 +1686,11 @@ static void dw_i3c_cmd_queue_port_w(DWI3C *s, uint32_t val)
         dw_i3c_cmd_queue_push(s, val);
         break;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: Command queue received packet with "
-                      "unknown cmd attr 0x%x\n",
-                      object_get_canonical_path(OBJECT(s)), cmd_attr);
+        {
+            g_autofree char *path = object_get_canonical_path(OBJECT(s));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: Command queue received packet "
+                          "with unknown cmd attr 0x%x\n", path, cmd_attr);
+        }
         break;
     }
 }
