@@ -231,6 +231,7 @@ static uint32_t svc_i3c_mdatactrl_r(SVCI3C *s)
 static void svc_i3c_rxfifo_pop(SVCI3C *s, uint8_t *buf, int num_bytes)
 {
     uint32_t trig_threshold = svc_i3c_rxtrig_threshold(s);
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     for (int i = 0; i < num_bytes; i++) {
         if (fifo8_is_empty(&s->rx_fifo)) {
@@ -239,7 +240,7 @@ static void svc_i3c_rxfifo_pop(SVCI3C *s, uint8_t *buf, int num_bytes)
         }
 
         buf[i] = fifo8_pop(&s->rx_fifo);
-        trace_svc_i3c_rxfifo_pop(object_get_canonical_path(OBJECT(s)), buf[i]);
+        trace_svc_i3c_rxfifo_pop(path, buf[i]);
         if (fifo8_num_used(&s->rx_fifo) < trig_threshold) {
             ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 0);
         }
@@ -267,6 +268,7 @@ static uint32_t svc_i3c_mrdatah_r(SVCI3C *s)
 static uint32_t svc_i3c_mrmsg_sdr_r(SVCI3C *s)
 {
     uint16_t word = 0;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     if (!s->mwmsg_xfer_in_progress) {
         return 0;
@@ -298,13 +300,12 @@ static uint32_t svc_i3c_mrmsg_sdr_r(SVCI3C *s)
         if (s->mwmsg_xfer.end_with_stop) {
             if (s->mwmsg_xfer.is_i2c) {
                 legacy_i2c_end_transfer(s->bus);
-                trace_svc_i3c_end_transfer(
-                    object_get_canonical_path(OBJECT(s)));
+                trace_svc_i3c_end_transfer(path);
             }
         }
     }
 
-    trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), sizeof(word));
+    trace_svc_i3c_recv(path, sizeof(word));
     return word;
 }
 
@@ -313,6 +314,7 @@ static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
     SVCI3C *s = SVC_I3C(opaque);
     uint32_t addr = offset >> 2;
     uint32_t value;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     switch (addr) {
     case R_MDATACTRL:
@@ -331,13 +333,14 @@ static uint64_t svc_i3c_read(void *opaque, hwaddr offset, unsigned size)
         value = s->regs[addr];
     }
 
-    trace_svc_i3c_read(object_get_canonical_path(OBJECT(s)), offset, value);
+    trace_svc_i3c_read(path, offset, value);
     return value;
 }
 
 static void svc_i3c_rxfifo_push(SVCI3C *s, const uint8_t *buf, size_t num_bytes)
 {
     uint32_t trig_threshold = svc_i3c_rxtrig_threshold(s);
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     for (int i = 0; i < num_bytes; i++) {
         if (fifo8_is_full(&s->rx_fifo)) {
@@ -345,7 +348,7 @@ static void svc_i3c_rxfifo_push(SVCI3C *s, const uint8_t *buf, size_t num_bytes)
         }
 
         fifo8_push(&s->rx_fifo, buf[i]);
-        trace_svc_i3c_rxfifo_push(object_get_canonical_path(OBJECT(s)), buf[i]);
+        trace_svc_i3c_rxfifo_push(path, buf[i]);
         if (fifo8_num_used(&s->rx_fifo) >= trig_threshold) {
             ARRAY_FIELD_DP32(s->regs, MSTATUS, RXPEND, 1);
         }
@@ -358,6 +361,7 @@ static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 {
     SVCI3C *s = SVC_I3C(bus->qbus.parent);
     int ret = 0;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     /* Update our status to say we have an IBI. */
     ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_SLV_REQ);
@@ -392,13 +396,11 @@ static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
          * finished.
          */
         qemu_log_mask(LOG_UNIMP, "%s: Manual IBI ACKing/NACKing is "
-                      "unsupported. NACKing.",
-                      object_get_canonical_path(OBJECT(s)));
+                      "unsupported. NACKing.", path);
         ret = -1;
     }
 
-    trace_svc_i3c_ibi(object_get_canonical_path(OBJECT(s)), addr, is_recv,
-                      ret == 0);
+    trace_svc_i3c_ibi(path, addr, is_recv, ret == 0);
     svc_i3c_update_irq(s);
     return ret;
 }
@@ -406,6 +408,7 @@ static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 static int svc_i3c_ibi_recv(I3CBus *bus, uint8_t data)
 {
     SVCI3C *s = SVC_I3C(bus->qbus.parent);
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     /*
      * Check IBIRULES to determine if we should ACK/NACK, if MCTRL.IBIRESP is
@@ -418,7 +421,7 @@ static int svc_i3c_ibi_recv(I3CBus *bus, uint8_t data)
         }
     }
 
-    trace_svc_i3c_ibi_recv(object_get_canonical_path(OBJECT(s)), data);
+    trace_svc_i3c_ibi_recv(path, data);
     svc_i3c_rxfifo_push(s, &data, sizeof(data));
 
     return 0;
@@ -427,14 +430,16 @@ static int svc_i3c_ibi_recv(I3CBus *bus, uint8_t data)
 static int svc_i3c_ibi_finish(I3CBus *bus)
 {
     SVCI3C *s = SVC_I3C(bus->qbus.parent);
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
-    trace_svc_i3c_ibi_finish(object_get_canonical_path(OBJECT(s)));
+    trace_svc_i3c_ibi_finish(path);
     return 0;
 }
 
 static void svc_i3c_end_transfer(SVCI3C *s)
 {
     bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     if (is_i2c) {
         legacy_i2c_end_transfer(s->bus);
@@ -454,7 +459,7 @@ static void svc_i3c_end_transfer(SVCI3C *s)
     }
 
     s->in_entdaa = false;
-    trace_svc_i3c_end_transfer(object_get_canonical_path(OBJECT(s)));
+    trace_svc_i3c_end_transfer(path);
 }
 
 static uint32_t svc_i3c_txtrig_threshold(SVCI3C *s)
@@ -481,6 +486,7 @@ static uint32_t svc_i3c_txtrig_threshold(SVCI3C *s)
 static uint32_t svc_i3c_txfifo_pop(SVCI3C *s, uint8_t *buf, uint32_t num_bytes)
 {
     uint32_t trig_threshold = svc_i3c_txtrig_threshold(s);
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     uint32_t i;
 
     for (i = 0; i < num_bytes; i++) {
@@ -488,7 +494,7 @@ static uint32_t svc_i3c_txfifo_pop(SVCI3C *s, uint8_t *buf, uint32_t num_bytes)
             break;
         }
         buf[i] = fifo8_pop(&s->tx_fifo);
-        trace_svc_i3c_txfifo_pop(object_get_canonical_path(OBJECT(s)), buf[i]);
+        trace_svc_i3c_txfifo_pop(path, buf[i]);
 
         if (fifo8_num_used(&s->tx_fifo) <= trig_threshold) {
             ARRAY_FIELD_DP32(s->regs, MSTATUS, TXNOTFULL, 0);
@@ -502,6 +508,7 @@ static uint32_t svc_i3c_txfifo_pop(SVCI3C *s, uint8_t *buf, uint32_t num_bytes)
 static void svc_i3c_txfifo_push(SVCI3C *s, const uint8_t *buf, int num_bytes)
 {
     uint32_t trig_threshold = svc_i3c_txtrig_threshold(s);
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     for (int i = 0; i < num_bytes; i++) {
         if (fifo8_is_full(&s->tx_fifo)) {
@@ -510,7 +517,7 @@ static void svc_i3c_txfifo_push(SVCI3C *s, const uint8_t *buf, int num_bytes)
         }
 
         fifo8_push(&s->tx_fifo, buf[i]);
-        trace_svc_i3c_txfifo_push(object_get_canonical_path(OBJECT(s)), buf[i]);
+        trace_svc_i3c_txfifo_push(path, buf[i]);
         if (fifo8_num_used(&s->tx_fifo) <= trig_threshold) {
             ARRAY_FIELD_DP32(s->regs, MSTATUS, TXNOTFULL, 1);
         }
@@ -525,6 +532,7 @@ static int svc_i3c_tx(SVCI3C *s)
     bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
     uint32_t xfer_size = 0;
     uint8_t i3c_buf[SVC_I3C_FIFO_SIZE];
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     if (!svc_i3c_is_enabled(s)) {
         return 0;
@@ -552,12 +560,13 @@ static int svc_i3c_tx(SVCI3C *s)
         }
     }
 
-    trace_svc_i3c_send(object_get_canonical_path(OBJECT(s)), xfer_size);
+    trace_svc_i3c_send(path, xfer_size);
     return ret;
 }
 
 static int svc_i3c_rx(SVCI3C *s)
 {
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
     uint8_t num_bytes = ARRAY_FIELD_EX32(s->regs, MCTRL, RDTERM);
     uint8_t i3c_buf[SVC_I3C_FIFO_SIZE];
@@ -579,7 +588,7 @@ static int svc_i3c_rx(SVCI3C *s)
 
         num_bytes -= num_to_read;
         xfer_done = num_bytes == 0;
-        trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), num_to_read);
+        trace_svc_i3c_recv(path, num_to_read);
     } else {
         uint32_t bytes_read;
         uint32_t xfer_size = SVC_I3C_FIFO_SIZE > num_bytes ? num_bytes :
@@ -598,7 +607,7 @@ static int svc_i3c_rx(SVCI3C *s)
          * requested from it, meaning it has nothing left to send.
          */
         xfer_done = (bytes_read < xfer_size) || (num_bytes == 0);
-        trace_svc_i3c_recv(object_get_canonical_path(OBJECT(s)), bytes_read);
+        trace_svc_i3c_recv(path, bytes_read);
     }
 
     if (xfer_done) {
@@ -611,6 +620,7 @@ static int svc_i3c_rx(SVCI3C *s)
 
 static void svc_i3c_send_start(SVCI3C *s)
 {
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     bool is_read = ARRAY_FIELD_EX32(s->regs, MCTRL, DIR);
     uint8_t addr = ARRAY_FIELD_EX32(s->regs, MCTRL, ADDR);
     bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
@@ -636,12 +646,13 @@ static void svc_i3c_send_start(SVCI3C *s)
         ARRAY_FIELD_DP32(s->regs, MSTATUS, NACKED, 0);
     }
 
-    trace_svc_i3c_start_transfer(object_get_canonical_path(OBJECT(s)));
+    trace_svc_i3c_start_transfer(path);
     svc_i3c_update_irq(s);
 }
 
 static void svc_i3c_do_entdaa(SVCI3C *s)
 {
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     uint8_t target_data[I3C_ENTDAA_SIZE];
     uint32_t num_read;
 
@@ -670,12 +681,10 @@ static void svc_i3c_do_entdaa(SVCI3C *s)
         uint8_t addr = ARRAY_FIELD_EX32(s->regs, MWDATAB, DATA);
         if (i3c_send_byte(s->bus, addr)) {
             qemu_log_mask(LOG_GUEST_ERROR, "%s: Target NACKed address 0x%.2x"
-                          "during assignment in ENTDAA.",
-                          object_get_canonical_path(OBJECT(s)), addr);
+                          "during assignment in ENTDAA.", path, addr);
             svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
         } else {
-            trace_svc_i3c_addr_assign(object_get_canonical_path(OBJECT(s)),
-                                      addr);
+            trace_svc_i3c_addr_assign(path, addr);
         }
         ARRAY_FIELD_DP32(s->regs, MSTATUS, BETWEEN, 0);
     }
@@ -692,8 +701,7 @@ static void svc_i3c_do_entdaa(SVCI3C *s)
     /* If a target NACKed at this point, it's misbehaving, so log it. */
     if (i3c_recv(s->bus, target_data, I3C_ENTDAA_SIZE, &num_read)) {
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Target ACKed ENTDAA reSTART, "
-                      "but NACKed PID reading.",
-                      object_get_canonical_path(OBJECT(s)));
+                      "but NACKed PID reading.", path);
         svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
         return;
     }
@@ -704,8 +712,7 @@ static void svc_i3c_do_entdaa(SVCI3C *s)
      */
     if (num_read != I3C_ENTDAA_SIZE) {
         qemu_log_mask(LOG_GUEST_ERROR, "%s: Target sent %d bytes during, "
-                      "ENTDAA read instead of %d",
-                      object_get_canonical_path(OBJECT(s)), num_read,
+                      "ENTDAA read instead of %d", path, num_read,
                       I3C_ENTDAA_SIZE);
     }
     svc_i3c_rxfifo_push(s, target_data, num_read);
@@ -932,6 +939,7 @@ static void svc_i3c_mwmsg_sdr_w(SVCI3C *s, uint32_t val)
         s->mwmsg_xfer_in_progress = true;
     } else {
         uint16_t word = FIELD_EX32(val, MWMSG_SDR, DATA);
+        g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
         /* Transmit the word. */
         for (int i = 0; i < sizeof(word); i++) {
@@ -954,7 +962,7 @@ static void svc_i3c_mwmsg_sdr_w(SVCI3C *s, uint32_t val)
                     return;
                 }
             }
-            trace_svc_i3c_send(object_get_canonical_path(OBJECT(s)), 1);
+            trace_svc_i3c_send(path, 1);
 
             word >>= 8;
             s->mwmsg_xfer.len--;
@@ -977,9 +985,10 @@ static void svc_i3c_write(void *opaque, hwaddr offset, uint64_t value,
     SVCI3C *s = SVC_I3C(opaque);
     uint32_t addr = offset >> 2;
     uint32_t val32 = (uint32_t)value;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     val32 &= ~svc_i3c_ro[addr];
-    trace_svc_i3c_write(object_get_canonical_path(OBJECT(s)), offset, val32);
+    trace_svc_i3c_write(path, offset, val32);
     switch (addr) {
     case R_MSTATUS:
         svc_i3c_mstatus_w(s, val32);
