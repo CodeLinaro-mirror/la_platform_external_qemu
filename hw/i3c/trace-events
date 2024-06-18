@@ -125,3 +125,10 @@ hci_pio_read(const char *name, uint64_t offset, uint32_t data) "%s: read: offset
 hci_pio_write(const char *name, uint64_t offset, uint32_t data) "%s: write: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
 hci_pio_xfer(const char *name, uint64_t xfer) "%s: Transfer started: 0x%.16" PRIx64
 hci_pio_push_resp(const char *name, uint32_t resp) "%s: response 0x%.8" PRIx32 " pushed to response queue"
+
+# sbrmi-i3c.c
+sbrmi_i3c_target_rx_single(const char *name, int command_code, uint8_t data) "device name '%s' cc 0x%x single rx 0x%x"
+sbrmi_i3c_target_rx(const char *name, int command_code, uint32_t num_to_read) "device name '%s' cc 0x%x block rx read %d bytes"
+sbrmi_i3c_target_tx_single(const char *name, int command_code, uint8_t data) "device name '%s' cc 0x%x single tx 0x%x"
+sbrmi_i3c_target_tx(const char *name, int command_code, uint32_t num_to_send) "device name '%s' cc 0x%x block tx write %d bytes"
+sbrmi_i3c_target_event(const char *name, int event) "device name '%s' ====== event 0x%x ======"
