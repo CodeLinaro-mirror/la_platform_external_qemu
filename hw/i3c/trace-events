@@ -69,3 +69,10 @@ svc_i3c_addr_assign(char *device, uint8_t addr) "%s: assigned address 0x%.2" PRI
 svc_i3c_ibi(char *device, uint8_t addr, bool is_recv, bool ack) "%s: received IBI from 0x%" PRIx8 " RnW=%d ACKed=%d"
 svc_i3c_ibi_recv(char *device, uint8_t byte) "%s: received IBI byte 0x%.2" PRIx8
 svc_i3c_ibi_finish(char *device) "%s: IBI done"
+
+# sbrmi-i3c.c
+sbrmi_i3c_target_rx_single(const char *name, int command_code, uint8_t data) "device name '%s' cc 0x%x single rx 0x%x"
+sbrmi_i3c_target_rx(const char *name, int command_code, uint32_t num_to_read) "device name '%s' cc 0x%x block rx read %d bytes"
+sbrmi_i3c_target_tx_single(const char *name, int command_code, uint8_t data) "device name '%s' cc 0x%x single tx 0x%x"
+sbrmi_i3c_target_tx(const char *name, int command_code, uint32_t num_to_send) "device name '%s' cc 0x%x block tx write %d bytes"
+sbrmi_i3c_target_event(const char *name, int event) "device name '%s' ====== event 0x%x ======"
