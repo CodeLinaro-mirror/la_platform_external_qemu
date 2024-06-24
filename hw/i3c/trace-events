@@ -75,4 +75,7 @@ sbrmi_i3c_target_rx_single(const char *name, int command_code, uint8_t data) "de
 sbrmi_i3c_target_rx(const char *name, int command_code, uint32_t num_to_read) "device name '%s' cc 0x%x block rx read %d bytes"
 sbrmi_i3c_target_tx_single(const char *name, int command_code, uint8_t data) "device name '%s' cc 0x%x single tx 0x%x"
 sbrmi_i3c_target_tx(const char *name, int command_code, uint32_t num_to_send) "device name '%s' cc 0x%x block tx write %d bytes"
+sbrmi_i3c_target_tx_new_command(const char *name, int command_code, int command_recv) "device name '%s' new command 0x%x byte offset %d"
 sbrmi_i3c_target_event(const char *name, int event) "device name '%s' ====== event 0x%x ======"
+sbrmi_i3c_target_mb_get_dimm_thermal_sensor(const char *name, uint32_t data_in, uint32_t data_out) "device name '%s' data_in 0x%x data_out 0x%x"
+

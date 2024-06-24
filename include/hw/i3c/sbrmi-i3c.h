@@ -92,6 +92,49 @@ typedef enum {
 #define SBRMI_BIT_INBNDMSG_INST7_MB_SEND (7)
 #define SBRMI_BIT_INBNDMSG_INST7_MB_SEND_LEN (1)
 
+#define MAX_UMC_NUM (12)
+#define MAX_DIMM_PER_UMC (2)
+#define MAX_THERMAL_SENSOR_PER_DIMM (2)
+
+/* BIT definition for data_in of SBRMI_MAILBOX_CMD_GET_DIMM_THERMAL_SENSOR */
+#define GET_DIMM_THERMAL_DI_DIMM_ADDR (0)
+#define GET_DIMM_THERMAL_DI_DIMM_ADDR_LEN (8)
+
+/* BIT definition for data_out of SBRMI_MAILBOX_CMD_GET_DIMM_THERMAL_SENSOR */
+#define GET_DIMM_THERMAL_DO_DIMM_ADDR (0)
+#define GET_DIMM_THERMAL_DO_DIMM_ADDR_LEN (8)
+#define GET_DIMM_THERMAL_DO_UPDATE_RATE (8)
+#define GET_DIMM_THERMAL_DO_UPDATE_RATE_LEN (9)
+#define GET_DIMM_THERMAL_DO_TEMP (21)
+#define GET_DIMM_THERMAL_DO_TEMP_LEN (11)
+
+
+/* BIT definition for UMC dimm address */
+#define UMC_DIMM_ADDR_ID (0)
+#define UMC_DIMM_ADDR_ID_LEN (4)
+#define UMC_DIMM_ADDR_DIMM (4)
+#define UMC_DIMM_ADDR_DIMM_LEN (1)
+#define UMC_DIMM_ADDR_TS (6)
+#define UMC_DIMM_ADDR_TS_LEN (1)
+#define UMC_DIMM_ADDR_MODE (7)
+#define UMC_DIMM_ADDR_MODE_LEN (1)
+
+struct Dimm {
+  /* 2 thermal sensors per dimm */
+  uint16_t temp[MAX_THERMAL_SENSOR_PER_DIMM];
+  /* update rate per sensor in ms */
+  uint16_t update_rate[MAX_THERMAL_SENSOR_PER_DIMM];
+};
+
+struct Umc {
+  /*
+   * Unified Memory Controller
+   * PPR Vol 5 for AMD Family 1Ah Model 02h C0, Chapter 12
+   * each UMC controlls 2 dimms.
+   */
+  struct Dimm dimm[MAX_DIMM_PER_UMC];
+};
+
 struct SbrmiI3cTargetState {
     I3CTarget i3c;
 
@@ -106,9 +149,12 @@ struct SbrmiI3cTargetState {
 
     /* mailbox state */
     SbrmiMailboxCmd mailbox_command;
-    uint8_t mailbox_data_in[SBRMI_MAILBOX_CMD_DATA_IN_SIZE];
-    uint8_t mailbox_data_out[SBRMI_MAILBOX_CMD_DATA_OUT_SIZE];
+    uint32_t mailbox_data_in;
+    uint32_t mailbox_data_out;
     SbrmiMailboxError mailbox_error;
+
+    /* UMC state */
+    struct Umc umc[MAX_UMC_NUM];
 
     struct {
         char *name;

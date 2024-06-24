@@ -23,6 +23,7 @@
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/sbrmi-i3c.h"
 #include "hw/qdev-properties.h"
+#include "qapi/visitor.h"
 #include "qemu/error-report.h"
 #include "trace.h"
 
@@ -40,18 +41,66 @@ static bool sbrmi_i3c_target_command_code_complete(SbrmiI3cTargetState *s)
     }
 }
 
+static int sbrmi_i3c_target_mb_get_dimm_thermal_sensor(SbrmiI3cTargetState *s)
+{
+    uint32_t dimm_address = extract32(s->mailbox_data_in,
+                                      GET_DIMM_THERMAL_DI_DIMM_ADDR,
+                                      GET_DIMM_THERMAL_DI_DIMM_ADDR_LEN);
+    uint32_t umc_index = extract32(dimm_address, UMC_DIMM_ADDR_ID,
+                                   UMC_DIMM_ADDR_ID_LEN);
+    uint32_t mode = extract32(dimm_address, UMC_DIMM_ADDR_MODE,
+                              UMC_DIMM_ADDR_MODE_LEN);
+    uint32_t ts = extract32(dimm_address, UMC_DIMM_ADDR_TS,
+                            UMC_DIMM_ADDR_TS_LEN);
+    uint32_t dimm = extract32(dimm_address, UMC_DIMM_ADDR_DIMM,
+                              UMC_DIMM_ADDR_DIMM_LEN);
+    uint32_t data_out = 0;
+
+    if (!mode) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "Dimm address encode mode 0 is not supported\n");
+        return -1;
+    }
+
+    if (ts) {
+        qemu_log_mask(LOG_GUEST_ERROR, "Dimm address TS1 is not supported\n");
+        return -1;
+    }
+
+    if (dimm) {
+        qemu_log_mask(LOG_GUEST_ERROR, "Dimm address Dimm1 is not supported\n");
+        return -1;
+    }
+
+    /* prepare for data out */
+    data_out = deposit32(data_out, GET_DIMM_THERMAL_DO_DIMM_ADDR,
+                         GET_DIMM_THERMAL_DO_DIMM_ADDR_LEN,
+                         dimm_address);
+    data_out = deposit32(data_out, GET_DIMM_THERMAL_DO_UPDATE_RATE,
+                         GET_DIMM_THERMAL_DO_UPDATE_RATE_LEN,
+                         s->umc[umc_index].dimm[dimm].update_rate[ts]);
+    data_out = deposit32(data_out, GET_DIMM_THERMAL_DO_TEMP,
+                         GET_DIMM_THERMAL_DO_TEMP_LEN,
+                         s->umc[umc_index].dimm[dimm].temp[ts]);
+
+    s->mailbox_data_out = data_out;
+
+    trace_sbrmi_i3c_target_mb_get_dimm_thermal_sensor(s->cfg.name,
+                                                      s->mailbox_data_in,
+                                                      s->mailbox_data_out);
+    return 0;
+}
+
 static int sbrmi_i3c_target_mailbox_handler(SbrmiI3cTargetState *s)
 {
     switch (s->mailbox_command) {
     case SBRMI_MAILBOX_CMD_GET_DIMM_THERMAL_SENSOR:
+        return sbrmi_i3c_target_mb_get_dimm_thermal_sensor(s);
     case SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_LIMIT:
     case SBRMI_MAILBOX_CMD_READ_MAX_PACKAGE_POWER_LIMIT:
     case SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_CONSUMPTION:
         /* TODO(b/347796186): return mock data */
-        s->mailbox_data_out[0] = 0x0;
-        s->mailbox_data_out[1] = 0x0;
-        s->mailbox_data_out[2] = 0x0;
-        s->mailbox_data_out[3] = 0x0;
+        s->mailbox_data_out = 0x0;
         s->mailbox_error = SBRMI_MAILBOX_ERROR_NONE;
         break;
     default:
@@ -67,8 +116,8 @@ static void sbrmi_i3c_target_mailbox_reset(SbrmiI3cTargetState *s)
     /* SB-RMI Soft Mailbox Message. 0 is not defined */
     s->mailbox_command = 0;
     s->mailbox_error = SBRMI_MAILBOX_ERROR_NONE;
-    memset(s->mailbox_data_in, 0, sizeof(s->mailbox_data_in));
-    memset(s->mailbox_data_out, 0, sizeof(s->mailbox_data_out));
+    s->mailbox_data_in = 0;
+    s->mailbox_data_out = 0;
 }
 
 static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
@@ -104,16 +153,16 @@ static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
         *data = s->mailbox_command;
         break;
     case SBRMI_REG_OUTBNDMSG_INST1:
-        *data = s->mailbox_data_out[0];
+        *data = extract32(s->mailbox_data_out, 0, 8);
         break;
     case SBRMI_REG_OUTBNDMSG_INST2:
-        *data = s->mailbox_data_out[1];
+        *data = extract32(s->mailbox_data_out, 8, 8);
         break;
     case SBRMI_REG_OUTBNDMSG_INST3:
-        *data = s->mailbox_data_out[2];
+        *data = extract32(s->mailbox_data_out, 16, 8);
         break;
     case SBRMI_REG_OUTBNDMSG_INST4:
-        *data = s->mailbox_data_out[3];
+        *data = extract32(s->mailbox_data_out, 24, 8);
         break;
     case SBRMI_REG_OUTBNDMSG_INST7:
         *data = s->mailbox_error;
@@ -145,18 +194,21 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
         return -1;
     }
 
-    if (num_to_send == 1) {
-        trace_sbrmi_i3c_target_tx_single(s->cfg.name, s->command_code, *data);
-    } else {
-        trace_sbrmi_i3c_target_tx(s->cfg.name, s->command_code, num_to_send);
-    }
-
     if (!sbrmi_i3c_target_command_code_complete(s)) {
         /* receiving command code */
         s->command_code |= ((*data) << s->command_code_received);
         s->command_code_received++;
         *num_sent = 1;
+        trace_sbrmi_i3c_target_tx_new_command(s->cfg.name, s->command_code,
+                                              s->command_code_received);
         return 0;
+    }
+
+    /* command code is complete*/
+    if (num_to_send == 1) {
+        trace_sbrmi_i3c_target_tx_single(s->cfg.name, s->command_code, *data);
+    } else {
+        trace_sbrmi_i3c_target_tx(s->cfg.name, s->command_code, num_to_send);
     }
 
     switch (s->command_code) {
@@ -174,16 +226,16 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
         s->mailbox_command = *data;
         break;
     case SBRMI_REG_INBNDMSG_INST1:
-        s->mailbox_data_in[0] = *data;
+        s->mailbox_data_in = deposit32(s->mailbox_data_in, 0, 8, *data);
         break;
     case SBRMI_REG_INBNDMSG_INST2:
-        s->mailbox_data_in[1] = *data;
+        s->mailbox_data_in = deposit32(s->mailbox_data_in, 8, 8, *data);
         break;
     case SBRMI_REG_INBNDMSG_INST3:
-        s->mailbox_data_in[2] = *data;
+        s->mailbox_data_in = deposit32(s->mailbox_data_in, 16, 8, *data);
         break;
     case SBRMI_REG_INBNDMSG_INST4:
-        s->mailbox_data_in[3] = *data;
+        s->mailbox_data_in = deposit32(s->mailbox_data_in, 24, 8, *data);
         break;
     case SBRMI_REG_INBNDMSG_INST7:
         /* Set bit 7 to 1 to send message to firmware */
@@ -268,6 +320,25 @@ static int sbrmi_i3c_target_event(I3CTarget *i3c, enum I3CEvent event)
     return 0;
 }
 
+static void sbrmi_i3c_target_sensor_get(Object *obj, Visitor *v, const char *name,
+                             void *opaque, Error **errp)
+{
+    visit_type_uint16(v, name, (uint16_t *)(opaque), errp);
+}
+
+static void sbrmi_i3c_target_sensor_set(Object *obj, Visitor *v, const char *name,
+                             void *opaque, Error **errp)
+{
+    uint16_t *internal = opaque;
+    uint16_t value;
+
+    if (!visit_type_uint16(v, name, &value, errp)) {
+        return;
+    }
+
+    *internal = value;
+}
+
 static void sbrmi_i3c_target_reset(I3CTarget *i3c)
 {
     SbrmiI3cTargetState *s = SBRMI_I3C_TARGET(i3c);
@@ -280,8 +351,6 @@ static void sbrmi_i3c_target_reset(I3CTarget *i3c)
     s->sbrmi_control = deposit32(s->sbrmi_control,
                                  SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE,
                                  SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE_LEN, 1);
-
-
     sbrmi_i3c_target_mailbox_reset(s);
 }
 
@@ -293,7 +362,20 @@ static void sbrmi_i3c_target_realize(DeviceState *dev, Error **errp)
 
 static void sbrmi_i3c_target_init(Object *obj)
 {
-    /*TODO(b/347796186): add target property for mocking e.g. temperature */
+    SbrmiI3cTargetState *s = SBRMI_I3C_TARGET(obj);
+    for (int i = 0; i < MAX_UMC_NUM; i++) {
+        /*
+         * Each UMC support 2 dimms and each dimm has 2 sensors.
+         * Only use the first dimm first sensor for now.
+         * Temperature (Deg C) is an 11-bit signed value, with
+         * a scaling factor of 0.25. Thus 3FFh=255.75 (1023*0.25),
+         * 400h= -256 (-1024*0.25), 1h=0.25 and 7FFh= -0.25 (-1*0.25)
+         */
+        object_property_add(obj, "temp[*]", "uint16",
+                            sbrmi_i3c_target_sensor_get,
+                            sbrmi_i3c_target_sensor_set,
+                            NULL, &s->umc[i].dimm[0].temp[0]);
+    }
     return;
 }
 
