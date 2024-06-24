@@ -78,4 +78,7 @@ sbrmi_i3c_target_tx(const char *name, int command_code, uint32_t num_to_send) "d
 sbrmi_i3c_target_tx_new_command(const char *name, int command_code, int command_recv) "device name '%s' new command 0x%x byte offset %d"
 sbrmi_i3c_target_event(const char *name, int event) "device name '%s' ====== event 0x%x ======"
 sbrmi_i3c_target_mb_get_dimm_thermal_sensor(const char *name, uint32_t data_in, uint32_t data_out) "device name '%s' data_in 0x%x data_out 0x%x"
+sbrmi_i3c_target_mb_read_power_limit(const char *name, uint32_t power_limit) "device name '%s' power_limit 0x%x"
+sbrmi_i3c_target_mb_read_max_power_limit(const char *name, uint32_t power_limit) "device name '%s' max_power_limit 0x%x"
+sbrmi_i3c_target_mb_read_power(const char *name, uint32_t power_limit) "device name '%s' power 0x%x"
 

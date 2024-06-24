@@ -91,18 +91,43 @@ static int sbrmi_i3c_target_mb_get_dimm_thermal_sensor(SbrmiI3cTargetState *s)
     return 0;
 }
 
+static int sbrmi_i3c_target_mb_read_power_limit(SbrmiI3cTargetState *s)
+{
+    s->mailbox_data_out = s->power_limit;
+
+    trace_sbrmi_i3c_target_mb_read_power_limit(s->cfg.name,
+                                               s->mailbox_data_out);
+    return 0;
+}
+
+static int sbrmi_i3c_target_mb_read_max_power_limit(SbrmiI3cTargetState *s)
+{
+    s->mailbox_data_out = s->max_power_limit;
+
+    trace_sbrmi_i3c_target_mb_read_max_power_limit(s->cfg.name,
+                                                   s->mailbox_data_out);
+    return 0;
+}
+
+static int sbrmi_i3c_target_mb_read_power(SbrmiI3cTargetState *s)
+{
+    s->mailbox_data_out = s->power;
+
+    trace_sbrmi_i3c_target_mb_read_power(s->cfg.name, s->mailbox_data_out);
+    return 0;
+}
+
 static int sbrmi_i3c_target_mailbox_handler(SbrmiI3cTargetState *s)
 {
     switch (s->mailbox_command) {
     case SBRMI_MAILBOX_CMD_GET_DIMM_THERMAL_SENSOR:
         return sbrmi_i3c_target_mb_get_dimm_thermal_sensor(s);
     case SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_LIMIT:
+        return sbrmi_i3c_target_mb_read_power_limit(s);
     case SBRMI_MAILBOX_CMD_READ_MAX_PACKAGE_POWER_LIMIT:
+        return sbrmi_i3c_target_mb_read_max_power_limit(s);
     case SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_CONSUMPTION:
-        /* TODO(b/347796186): return mock data */
-        s->mailbox_data_out = 0x0;
-        s->mailbox_error = SBRMI_MAILBOX_ERROR_NONE;
-        break;
+        return sbrmi_i3c_target_mb_read_power(s);
     default:
         qemu_log_mask(LOG_GUEST_ERROR, "Unhandled mailbox command 0x%.2x\n",
                       s->mailbox_command);
@@ -320,19 +345,38 @@ static int sbrmi_i3c_target_event(I3CTarget *i3c, enum I3CEvent event)
     return 0;
 }
 
-static void sbrmi_i3c_target_sensor_get(Object *obj, Visitor *v, const char *name,
-                             void *opaque, Error **errp)
+static void sbrmi_i3c_target_temperature_get(Object *obj, Visitor *v,
+                             const char *name, void *opaque, Error **errp)
 {
     visit_type_uint16(v, name, (uint16_t *)(opaque), errp);
 }
 
-static void sbrmi_i3c_target_sensor_set(Object *obj, Visitor *v, const char *name,
-                             void *opaque, Error **errp)
+static void sbrmi_i3c_target_temperature_set(Object *obj, Visitor *v,
+                             const char *name, void *opaque, Error **errp)
 {
     uint16_t *internal = opaque;
     uint16_t value;
 
     if (!visit_type_uint16(v, name, &value, errp)) {
+        return;
+    }
+
+    *internal = value;
+}
+
+static void sbrmi_i3c_target_power_get(Object *obj, Visitor *v,
+                            const char *name, void *opaque, Error **errp)
+{
+    visit_type_uint32(v, name, (uint32_t *)(opaque), errp);
+}
+
+static void sbrmi_i3c_target_power_set(Object *obj, Visitor *v,
+                            const char *name, void *opaque, Error **errp)
+{
+    uint32_t *internal = opaque;
+    uint32_t value;
+
+    if (!visit_type_uint32(v, name, &value, errp)) {
         return;
     }
 
@@ -372,10 +416,28 @@ static void sbrmi_i3c_target_init(Object *obj)
          * 400h= -256 (-1024*0.25), 1h=0.25 and 7FFh= -0.25 (-1*0.25)
          */
         object_property_add(obj, "temp[*]", "uint16",
-                            sbrmi_i3c_target_sensor_get,
-                            sbrmi_i3c_target_sensor_set,
+                            sbrmi_i3c_target_temperature_get,
+                            sbrmi_i3c_target_temperature_set,
                             NULL, &s->umc[i].dimm[0].temp[0]);
     }
+
+    /* power cap */
+    object_property_add(obj, "power_limit", "uint32",
+                        sbrmi_i3c_target_power_get,
+                        sbrmi_i3c_target_power_set,
+                        NULL, &s->power_limit);
+
+    /* max power cap */
+    object_property_add(obj, "max_power_limit", "uint32",
+                        sbrmi_i3c_target_power_get,
+                        sbrmi_i3c_target_power_set,
+                        NULL, &s->max_power_limit);
+
+    /* power input */
+    object_property_add(obj, "power", "uint32",
+                        sbrmi_i3c_target_power_get,
+                        sbrmi_i3c_target_power_set,
+                        NULL, &s->power);
     return;
 }
 

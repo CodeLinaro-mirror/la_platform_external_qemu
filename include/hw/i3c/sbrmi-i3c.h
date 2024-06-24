@@ -155,6 +155,12 @@ struct SbrmiI3cTargetState {
 
     /* UMC state */
     struct Umc umc[MAX_UMC_NUM];
+    /* power limit in mWatts */
+    uint32_t power_limit;
+    /* max power limit in mWatts */
+    uint32_t max_power_limit;
+    /* Read the average package power consumption in mWatts */
+    uint32_t power;
 
     struct {
         char *name;
