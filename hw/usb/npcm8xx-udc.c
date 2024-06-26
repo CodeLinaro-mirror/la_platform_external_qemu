@@ -178,6 +178,12 @@ static void npcm8xx_udc_reset(DeviceState *dev)
     NPCM8xxUDC *udc = NPCM8XX_UDC(dev);
     udc->running = false;
 
+    /* Clear register */
+    for (int i = 0; i < NPCM8XX_UDC_NUM_REGS; ++i) {
+        udc->registers[i] = 0;
+    }
+
+    /* Set initial values */
     NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
     registers->status = USBSTS_INIT_VALUE;
     registers->interrupt_enable = USBINTR_INIT_VALUE;
