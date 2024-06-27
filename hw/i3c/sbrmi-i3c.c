@@ -145,6 +145,159 @@ static void sbrmi_i3c_target_mailbox_reset(SbrmiI3cTargetState *s)
     s->mailbox_data_out = 0;
 }
 
+static void sbrmi_i3c_target_cpuid_read_handler(SbrmiI3cTargetState *s)
+{
+    int read_length =
+            s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_READ_LENGTH] + 1;
+    uint32_t cpuid_fn =
+            s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_FUNCTION_0] |
+            (s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_FUNCTION_1] << 8) |
+            (s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_FUNCTION_2] << 16) |
+            (s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_FUNCTION_3] << 24);
+    uint8_t is_ecx_edx = extract8(
+        s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_WRITE_DATA_9], 0, 1);
+
+    /* prepare for data out */
+    memset(s->cpu_reg_read_data, 0, sizeof(s->cpu_reg_read_data));
+    s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_READ_LENGTH] = read_length;
+    s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_STATUS] = 0;
+
+    /* See PPR Vol 1 for AMD Family 1Ah Model 02h C0, 2.1.18 */
+    switch (cpuid_fn) {
+    case 0:
+        if (is_ecx_edx) {
+            /* ECX = vendor3 */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_0] =
+                    extract32(s->cpu.vendor3, 0, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_1] =
+                    extract32(s->cpu.vendor3, 8, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_2] =
+                    extract32(s->cpu.vendor3, 16, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_3] =
+                    extract32(s->cpu.vendor3, 24, 8);
+            /* EDX = vendor2 */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_0] =
+                    extract32(s->cpu.vendor2, 0, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_1] =
+                    extract32(s->cpu.vendor2, 8, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_2] =
+                    extract32(s->cpu.vendor2, 16, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_3] =
+                    extract32(s->cpu.vendor2, 24, 8);
+        } else {
+            /* EAX ignored for now */
+            /* EBX = vendor1 */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_0] =
+                    extract32(s->cpu.vendor1, 0, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_1] =
+                    extract32(s->cpu.vendor1, 8, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_2] =
+                    extract32(s->cpu.vendor1, 16, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_3] =
+                    extract32(s->cpu.vendor1, 24, 8);
+        }
+        break;
+    case 1:
+        if (is_ecx_edx) {
+            /* ECX = ecx_fn1 */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_0] =
+                    extract32(s->cpu.ecx_fn1, 0, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_1] =
+                    extract32(s->cpu.ecx_fn1, 8, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_2] =
+                    extract32(s->cpu.ecx_fn1, 16, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_3] =
+                    extract32(s->cpu.ecx_fn1, 24, 8);
+            /* EDX = edx_fn1 */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_0] =
+                    extract32(s->cpu.edx_fn1, 0, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_1] =
+                    extract32(s->cpu.edx_fn1, 8, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_2] =
+                    extract32(s->cpu.edx_fn1, 16, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_3] =
+                    extract32(s->cpu.edx_fn1, 24, 8);
+        } else {
+            /* EAX = version */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_0] =
+                    extract32(s->cpu.version, 0, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_1] =
+                    extract32(s->cpu.version, 8, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_2] =
+                    extract32(s->cpu.version, 16, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_3] =
+                    extract32(s->cpu.version, 24, 8);
+            /*
+             * EBX[15:8] = (CLFlush fixed 8, see CPUID_Fn00000001_EBX
+             * in PPR Vol 1 for AMD Family 1Ah Model 02h C0)
+             */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_1] = 8;
+            /* EBX[23:16] = (nr_cores * nr_thread) */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_2] =
+                    (s->cpu.nr_cores * s->cpu.nr_thread) & 0xff;
+            /* EBX[31:24] = apic_id */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_3] =
+                    s->cpu.apic_id & 0xff;
+        }
+        break;
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "Unsupported CPUID function 0x%.8x\n", cpuid_fn);
+        return;
+    }
+
+    s->cpu_reg_read_data_ptr = 0;
+}
+static bool sbrmi_i3c_target_cpu_reg_write_data_complete(SbrmiI3cTargetState *s)
+{
+    int write_length = 0;
+
+    /* make sure we received the data length */
+    if (!s->cpu_reg_write_data_ptr) {
+        return false;
+    }
+    write_length =
+        s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_WRITE_LENGTH] + 1;
+
+    return (s->cpu_reg_write_data_ptr >= write_length);
+}
+
+static int sbrmi_i3c_target_cpu_reg_handler(SbrmiI3cTargetState *s)
+{
+    /* Write phase completed, dispatch the command based on code */
+    int command_code =
+        s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_COMMAND];
+
+    trace_sbrmi_i3c_target_cpu_reg_handler(s->cfg.name, command_code);
+
+    switch (command_code) {
+    case SBRMI_READ_CPUID_COMMAND_CODE:
+        sbrmi_i3c_target_cpuid_read_handler(s);
+        break;
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "Unsupported CPUID command 0x%.2x\n", command_code);
+        return -1;
+    }
+
+    /*
+     * Set HwAlertSts to indicate a command complete.
+     * Will be cleared by BMC after reading the data.
+     */
+    s->sbrmi_status = deposit32(s->sbrmi_status,
+                                SBRMI_BIT_HW_ALERT_STATUS,
+                                SBRMI_BIT_HW_ALERT_STATUS_LEN, 1);
+    return 0;
+}
+
+static void sbrmi_i3c_target_cpu_reg_reset(SbrmiI3cTargetState *s)
+{
+    s->cpu_reg_write_data_ptr = 0;
+    s->cpu_reg_read_data_ptr = 0;
+    memset(s->cpu_reg_write_data, 0, sizeof(s->cpu_reg_write_data));
+    memset(s->cpu_reg_read_data, 0, sizeof(s->cpu_reg_read_data));
+}
+
 static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
                                uint32_t num_to_read)
 {
@@ -192,6 +345,29 @@ static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
     case SBRMI_REG_OUTBNDMSG_INST7:
         *data = s->mailbox_error;
         break;
+    case SBRMI_REG_THREADNUMBER:
+        *data = s->cpu.nr_thread;
+        break;
+    case SBRMI_READ_CPU_REG_CMD:
+    {
+        /* total read bytes is the read data length + 1(length) */
+        int remain_read = (s->cpu_reg_read_data[0] + 1) -
+                           s->cpu_reg_read_data_ptr;
+        if (remain_read > num_to_read) {
+            /* copy num_to_read bytes to data and increase the ptr */
+            memcpy(data, s->cpu_reg_read_data + s->cpu_reg_read_data_ptr,
+                   num_to_read);
+            s->cpu_reg_read_data_ptr += num_to_read;
+        } else {
+            /* copy all remaining bytes to data and increase the ptr */
+            memcpy(data, s->cpu_reg_read_data + s->cpu_reg_read_data_ptr,
+                   remain_read);
+            s->cpu_reg_read_data_ptr += remain_read;
+            /* complete the cpu register read phase. */
+            sbrmi_i3c_target_cpu_reg_reset(s);
+        }
+        break;
+    }
     default:
         qemu_log_mask(LOG_GUEST_ERROR, "Unhandled command 0x%.2x\n",
                       s->command_code);
@@ -245,6 +421,12 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
                                         SBRMI_BIT_SW_ALERT_STATUS,
                                         SBRMI_BIT_SW_ALERT_STATUS_LEN, 0);
         }
+        if (extract8(*data, SBRMI_BIT_HW_ALERT_STATUS,
+                     SBRMI_BIT_HW_ALERT_STATUS_LEN)) {
+            s->sbrmi_status = deposit32(s->sbrmi_status,
+                                        SBRMI_BIT_HW_ALERT_STATUS,
+                                        SBRMI_BIT_HW_ALERT_STATUS_LEN, 0);
+        }
         break;
     case SBRMI_REG_INBNDMSG_INST0:
         /* sbrmi mailbox command start */
@@ -291,6 +473,26 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
                  * when SBRMI::Control[MbCmplSwAlertEnable]==0.
                  * We don't do it because we are not saving the register today.
                  */
+            }
+        }
+        break;
+    case SBRMI_READ_CPU_REG_CMD:
+        /* Save the write data to cpu_reg_write_data */
+        if ((s->cpu_reg_write_data_ptr + num_to_send) >
+            sizeof(s->cpu_reg_write_data)) {
+            qemu_log_mask(LOG_GUEST_ERROR, "CPUID write data overflow\n");
+            return -1;
+        }
+        memcpy(s->cpu_reg_write_data + s->cpu_reg_write_data_ptr, data,
+               num_to_send);
+        s->cpu_reg_write_data_ptr += num_to_send;
+
+        /* Check write data completed. */
+        if (sbrmi_i3c_target_cpu_reg_write_data_complete(s)) {
+            if (sbrmi_i3c_target_cpu_reg_handler(s)) {
+                qemu_log_mask(LOG_GUEST_ERROR,
+                              "sbrmi_i3c_target_cpuid_write_handler failed\n");
+                return -1;
             }
         }
         break;
@@ -345,6 +547,52 @@ static int sbrmi_i3c_target_event(I3CTarget *i3c, enum I3CEvent event)
     return 0;
 }
 
+static void sbrmi_i3c_get_cpu_vendor(Object *obj, Visitor *v,
+                                     const char *name, void *opaque,
+                                     Error **errp)
+{
+    SbrmiI3cTargetState *s = SBRMI_I3C_TARGET(obj);
+    g_autofree char *value = g_new0(char, CPUID_VENDOR_SZ + 1);
+
+    /* uint32_t to vendor string*/
+    for (int i = 0; i < 4; i++) {
+        value[i] = s->cpu.vendor1 >> (8 * i);
+        value[i + 4] = s->cpu.vendor2 >> (8 * i);
+        value[i + 8] = s->cpu.vendor3 >> (8 * i);
+    }
+    value[CPUID_VENDOR_SZ] = '\0';
+
+    visit_type_str(v, name, &value, errp);
+}
+
+static void sbrmi_i3c_set_cpu_vendor(Object *obj, Visitor *v,
+                                     const char *name, void *opaque,
+                                     Error **errp)
+{
+    SbrmiI3cTargetState *s = SBRMI_I3C_TARGET(obj);
+    char *value;
+
+    if (!visit_type_str(v, name, &value, errp)) {
+        return;
+    }
+
+    if (strlen(value) != CPUID_VENDOR_SZ) {
+        qemu_log_mask(LOG_GUEST_ERROR, "Property vendor must be %d bytes\n",
+                      CPUID_VENDOR_SZ);
+        return;
+    }
+
+    /* vendor string to uint32_t */
+    s->cpu.vendor1 = 0;
+    s->cpu.vendor2 = 0;
+    s->cpu.vendor3 = 0;
+    for (int i = 0; i < 4; i++) {
+        s->cpu.vendor1 |= ((uint8_t)value[i]) << (8 * i);
+        s->cpu.vendor2 |= ((uint8_t)value[i + 4]) << (8 * i);
+        s->cpu.vendor3 |= ((uint8_t)value[i + 8]) << (8 * i);
+    }
+}
+
 static void sbrmi_i3c_target_reset(I3CTarget *i3c)
 {
     SbrmiI3cTargetState *s = SBRMI_I3C_TARGET(i3c);
@@ -396,6 +644,35 @@ static void sbrmi_i3c_target_init(Object *obj)
     object_property_add_uint32_ptr(obj, "power",
                         &s->power,
                         OBJ_PROP_FLAG_READWRITE);
+    /* cpu vendor */
+    object_property_add(obj, "cpu_vendor", "string",
+                        sbrmi_i3c_get_cpu_vendor,
+                        sbrmi_i3c_set_cpu_vendor,
+                        NULL, NULL);
+    /* cpuid_version */
+    object_property_add_uint32_ptr(obj, "cpu_version",
+                                    &s->cpu.version,
+                                    OBJ_PROP_FLAG_READWRITE);
+    /* apic_id */
+    object_property_add_uint32_ptr(obj, "apic_id",
+                                    &s->cpu.apic_id,
+                                    OBJ_PROP_FLAG_READWRITE);
+    /* nr_cores */
+    object_property_add_uint32_ptr(obj, "nr_cores",
+                                    &s->cpu.nr_cores,
+                                    OBJ_PROP_FLAG_READWRITE);
+    /* nr_thread */
+    object_property_add_uint32_ptr(obj, "nr_thread",
+                                    &s->cpu.nr_thread,
+                                    OBJ_PROP_FLAG_READWRITE);
+    /* ecx_fn1 */
+    object_property_add_uint32_ptr(obj, "ecx_fn1",
+                                    &s->cpu.ecx_fn1,
+                                    OBJ_PROP_FLAG_READWRITE);
+    /* edx_fn1 */
+    object_property_add_uint32_ptr(obj, "edx_fn1",
+                                    &s->cpu.edx_fn1,
+                                    OBJ_PROP_FLAG_READWRITE);
 }
 
 static const Property sbrmi_i3c_props[] = {
