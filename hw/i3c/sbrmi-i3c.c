@@ -345,44 +345,6 @@ static int sbrmi_i3c_target_event(I3CTarget *i3c, enum I3CEvent event)
     return 0;
 }
 
-static void sbrmi_i3c_target_temperature_get(Object *obj, Visitor *v,
-                             const char *name, void *opaque, Error **errp)
-{
-    visit_type_uint16(v, name, (uint16_t *)(opaque), errp);
-}
-
-static void sbrmi_i3c_target_temperature_set(Object *obj, Visitor *v,
-                             const char *name, void *opaque, Error **errp)
-{
-    uint16_t *internal = opaque;
-    uint16_t value;
-
-    if (!visit_type_uint16(v, name, &value, errp)) {
-        return;
-    }
-
-    *internal = value;
-}
-
-static void sbrmi_i3c_target_power_get(Object *obj, Visitor *v,
-                            const char *name, void *opaque, Error **errp)
-{
-    visit_type_uint32(v, name, (uint32_t *)(opaque), errp);
-}
-
-static void sbrmi_i3c_target_power_set(Object *obj, Visitor *v,
-                            const char *name, void *opaque, Error **errp)
-{
-    uint32_t *internal = opaque;
-    uint32_t value;
-
-    if (!visit_type_uint32(v, name, &value, errp)) {
-        return;
-    }
-
-    *internal = value;
-}
-
 static void sbrmi_i3c_target_reset(I3CTarget *i3c)
 {
     SbrmiI3cTargetState *s = SBRMI_I3C_TARGET(i3c);
@@ -415,30 +377,25 @@ static void sbrmi_i3c_target_init(Object *obj)
          * a scaling factor of 0.25. Thus 3FFh=255.75 (1023*0.25),
          * 400h= -256 (-1024*0.25), 1h=0.25 and 7FFh= -0.25 (-1*0.25)
          */
-        object_property_add(obj, "temp[*]", "uint16",
-                            sbrmi_i3c_target_temperature_get,
-                            sbrmi_i3c_target_temperature_set,
-                            NULL, &s->umc[i].dimm[0].temp[0]);
+        object_property_add_uint16_ptr(obj, "temp[*]",
+                            &s->umc[i].dimm[0].temp[0],
+                            OBJ_PROP_FLAG_READWRITE);
     }
 
     /* power cap */
-    object_property_add(obj, "power_limit", "uint32",
-                        sbrmi_i3c_target_power_get,
-                        sbrmi_i3c_target_power_set,
-                        NULL, &s->power_limit);
+    object_property_add_uint32_ptr(obj, "power_limit",
+                        &s->power_limit,
+                        OBJ_PROP_FLAG_READWRITE);
 
     /* max power cap */
-    object_property_add(obj, "max_power_limit", "uint32",
-                        sbrmi_i3c_target_power_get,
-                        sbrmi_i3c_target_power_set,
-                        NULL, &s->max_power_limit);
+    object_property_add_uint32_ptr(obj, "max_power_limit",
+                        &s->max_power_limit,
+                        OBJ_PROP_FLAG_READWRITE);
 
     /* power input */
-    object_property_add(obj, "power", "uint32",
-                        sbrmi_i3c_target_power_get,
-                        sbrmi_i3c_target_power_set,
-                        NULL, &s->power);
-    return;
+    object_property_add_uint32_ptr(obj, "power",
+                        &s->power,
+                        OBJ_PROP_FLAG_READWRITE);
 }
 
 static const Property sbrmi_i3c_props[] = {
