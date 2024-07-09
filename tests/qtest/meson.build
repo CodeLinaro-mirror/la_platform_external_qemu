@@ -318,7 +318,7 @@ qos_test_ss.add(
   'tda387xx-test.c',
   'tmp105-test.c',
   'emc141x-test.c',
-  'tmp_sbtsi-test.c',
+  'sbtsi-i2c-test.c',
   'usb-hcd-ohci-test.c',
   'virtio-test.c',
   'virtio-blk-test.c',

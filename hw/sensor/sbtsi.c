@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * AMD SBI Temperature Sensor Interface (SB-TSI)
+ * Forked from tmp_sbtsi to isolate the transport layer.
  *
- * Copyright 2021 Google LLC
+ * Copyright 2024 Google LLC
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -14,83 +15,16 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * for more details.
  */
-
 #include "qemu/osdep.h"
-#include "hw/i2c/smbus_slave.h"
 #include "hw/irq.h"
+#include "hw/qdev-core.h"
+#include "hw/i2c/smbus_slave.h"
+#include "hw/sensor/sbtsi.h"
 #include "migration/vmstate.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
 #include "qemu/log.h"
-#include "qemu/module.h"
 #include "trace.h"
-
-#define TYPE_SBTSI "sbtsi"
-#define SBTSI(obj) OBJECT_CHECK(SBTSIState, (obj), TYPE_SBTSI)
-
-/**
- * SBTSIState:
- * temperatures are in units of 0.125 degrees
- * @temperature: Temperature
- * @limit_low: Lowest temperature
- * @limit_high: Highest temperature
- * @status: The status register
- * @config: The config register
- * @alert_config: The config for alarm_l output.
- * @addr: The address to read/write for the next cmd.
- * @alarm: The alarm_l output pin (GPIO)
- */
-typedef struct SBTSIState {
-    SMBusDevice parent;
-
-    uint32_t temperature;
-    uint32_t limit_low;
-    uint32_t limit_high;
-    uint8_t status;
-    uint8_t config;
-    uint8_t alert_config;
-    uint8_t addr;
-    qemu_irq alarm;
-} SBTSIState;
-
-/*
- * SB-TSI registers only support SMBus byte data access. "_INT" registers are
- * the integer part of a temperature value or limit, and "_DEC" registers are
- * corresponding decimal parts.
- */
-#define SBTSI_REG_TEMP_INT      0x01 /* RO */
-#define SBTSI_REG_STATUS        0x02 /* RO */
-#define SBTSI_REG_CONFIG        0x03 /* RO */
-#define SBTSI_REG_TEMP_HIGH_INT 0x07 /* RW */
-#define SBTSI_REG_TEMP_LOW_INT  0x08 /* RW */
-#define SBTSI_REG_CONFIG_WR     0x09 /* RW */
-#define SBTSI_REG_TEMP_DEC      0x10 /* RO */
-#define SBTSI_REG_TEMP_HIGH_DEC 0x13 /* RW */
-#define SBTSI_REG_TEMP_LOW_DEC  0x14 /* RW */
-#define SBTSI_REG_ALERT_CONFIG  0xBF /* RW */
-#define SBTSI_REG_MAN           0xFE /* RO */
-#define SBTSI_REG_REV           0xFF /* RO */
-
-#define SBTSI_STATUS_HIGH_ALERT BIT(4)
-#define SBTSI_STATUS_LOW_ALERT  BIT(3)
-#define SBTSI_CONFIG_ALERT_MASK BIT(7)
-#define SBTSI_ALARM_EN          BIT(0)
-
-#define SBTSI_LIMIT_LOW_DEFAULT (0)
-#define SBTSI_LIMIT_HIGH_DEFAULT (560)
-#define SBTSI_MAN_DEFAULT (0)
-#define SBTSI_REV_DEFAULT (4)
-#define SBTSI_ALARM_L "alarm_l"
-
-/* The temperature we stored are in units of 0.125 degrees. */
-#define SBTSI_TEMP_UNIT_IN_MILLIDEGREE 125
-
-/*
- * The integer part and decimal of the temperature both 8 bits.
- * Only the top 3 bits of the decimal parts are used.
- * So the max temperature is (2^8-1) + (2^3-1)/8 = 255.875 degrees.
- */
-#define SBTSI_TEMP_MAX 255875
 
 /* The integer part of the temperature in terms of 0.125 degrees. */
 static uint8_t get_temp_int(uint32_t temp)
@@ -153,12 +87,11 @@ static void sbtsi_update_alarm(SBTSIState *s)
     }
 }
 
-static uint8_t sbtsi_read_byte(SMBusDevice *d)
+uint8_t sbtsi_read(SBTSIState *s, uint8_t addr)
 {
-    SBTSIState *s = SBTSI(d);
     uint8_t data = 0;
 
-    switch (s->addr) {
+    switch (addr) {
     case SBTSI_REG_TEMP_INT:
         data = get_temp_int(s->temperature);
         break;
@@ -208,18 +141,19 @@ static uint8_t sbtsi_read_byte(SMBusDevice *d)
     default:
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: reading from invalid reg: 0x%02x\n",
-                __func__, s->addr);
+                __func__, addr);
         break;
     }
 
-    trace_tmp_sbtsi_read_data(s->addr, data);
+    trace_sbtsi_read(addr, data);
     return data;
 }
 
-static void sbtsi_write(SBTSIState *s, uint8_t data)
+void sbtsi_write(SBTSIState *s, uint8_t addr, uint8_t data)
 {
-    trace_tmp_sbtsi_write_data(s->addr, data);
-    switch (s->addr) {
+    trace_sbtsi_write(addr, data);
+
+    switch (addr) {
     case SBTSI_REG_CONFIG_WR:
         s->config = data;
         break;
@@ -252,35 +186,28 @@ static void sbtsi_write(SBTSIState *s, uint8_t data)
     case SBTSI_REG_REV:
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: writing to read only reg: 0x%02x data: 0x%02x\n",
-                __func__, s->addr, data);
+                __func__, addr, data);
         break;
 
     default:
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: writing to invalid reg: 0x%02x data: 0x%02x\n",
-                __func__, s->addr, data);
+                __func__, addr, data);
         break;
     }
     sbtsi_update_alarm(s);
 }
 
-static int sbtsi_write_data(SMBusDevice *d, uint8_t *buf, uint8_t len)
+void sbtsi_reset(SBTSIState *s)
 {
-    SBTSIState *s = SBTSI(d);
+    s->config = 0;
+    s->limit_low = SBTSI_LIMIT_LOW_DEFAULT;
+    s->limit_high = SBTSI_LIMIT_HIGH_DEFAULT;
+}
 
-    if (len == 0) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: writing empty data\n", __func__);
-        return -1;
-    }
-
-    s->addr = buf[0];
-    if (len > 1) {
-        sbtsi_write(s, buf[1]);
-        if (len > 2) {
-            qemu_log_mask(LOG_GUEST_ERROR, "%s: extra data at end\n", __func__);
-        }
-    }
-    return 0;
+void sbtsi_hold_reset(SBTSIState *s, ResetType type)
+{
+    qemu_irq_lower(s->alarm);
 }
 
 /* Units are millidegrees. */
@@ -332,30 +259,9 @@ static const VMStateDescription vmstate_sbtsi = {
         VMSTATE_UINT32(limit_high, SBTSIState),
         VMSTATE_UINT8(config, SBTSIState),
         VMSTATE_UINT8(status, SBTSIState),
-        VMSTATE_UINT8(addr, SBTSIState),
         VMSTATE_END_OF_LIST()
     }
 };
-
-static void sbtsi_enter_reset(Object *obj, ResetType type)
-{
-    SBTSIState *s = SBTSI(obj);
-    SMBusDeviceClass *sdc = SMBUS_DEVICE_GET_CLASS(&s->parent);
-
-    s->config = 0;
-    s->limit_low = SBTSI_LIMIT_LOW_DEFAULT;
-    s->limit_high = SBTSI_LIMIT_HIGH_DEFAULT;
-    if (sdc->parent_phases.enter) {
-        sdc->parent_phases.enter(obj, type);
-    }
-}
-
-static void sbtsi_hold_reset(Object *obj, ResetType type)
-{
-    SBTSIState *s = SBTSI(obj);
-
-    qemu_irq_lower(s->alarm);
-}
 
 static void sbtsi_init(Object *obj)
 {
@@ -370,21 +276,14 @@ static void sbtsi_init(Object *obj)
 
 static void sbtsi_class_init(ObjectClass *klass, void *data)
 {
-    ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
-    SMBusDeviceClass *k = SMBUS_DEVICE_CLASS(klass);
-
-    dc->desc = "SB-TSI Temperature Sensor";
+    dc->desc = "SB-TSI Sensor";
     dc->vmsd = &vmstate_sbtsi;
-    k->write_data = sbtsi_write_data;
-    k->receive_byte = sbtsi_read_byte;
-    rc->phases.enter = sbtsi_enter_reset;
-    rc->phases.hold = sbtsi_hold_reset;
 }
 
 static const TypeInfo sbtsi_info = {
     .name          = TYPE_SBTSI,
-    .parent        = TYPE_SMBUS_DEVICE,
+    .parent        = TYPE_DEVICE,
     .instance_size = sizeof(SBTSIState),
     .instance_init = sbtsi_init,
     .class_init    = sbtsi_class_init,

@@ -61,3 +61,7 @@ config BCM2835_I2C
 config CMIS
     bool
     select I2C
+
+config SBTSI_I2C
+    bool
+    select SMBUS

@@ -296,7 +296,8 @@ static void quanta_gbs_i2c_init(NPCM7xxState *soc)
 
 
     /* i2c-2: */
-    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 2), "sbtsi", 0x4c);
+    i2c_slave_create_simple(
+        npcm7xx_i2c_get_bus(soc, 2), "sbtsi-i2c-target", 0x4c);
 
     /* i2c-5: */
     /* mb_fru */
