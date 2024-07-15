@@ -23,9 +23,36 @@
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/sbrmi-i3c.h"
 #include "hw/qdev-properties.h"
+#include "qapi/error.h"
 #include "qapi/visitor.h"
-#include "qemu/error-report.h"
 #include "trace.h"
+
+I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
+                                   uint64_t pid, const char *cpu_vendor)
+{
+    I3CTarget *target = i3c_target_new(TYPE_SBRMI_I3C_TARGET, addr,
+                             /*dcr=*/0, /*bcr=*/0, pid);
+    object_property_set_str(OBJECT(target), "device-name", name,
+                               &error_abort);
+    /* cpu register mockup */
+    object_property_set_str(OBJECT(target), "cpu_vendor", cpu_vendor,
+                               &error_abort);
+    object_property_set_uint(OBJECT(target), "cpu_version", 0x0b00f10,
+                               &error_abort);
+    object_property_set_uint(OBJECT(target), "apic_id", 0,
+                               &error_abort);
+    object_property_set_uint(OBJECT(target), "nr_cores", 128,
+                               &error_abort);
+    object_property_set_uint(OBJECT(target), "nr_thread", 1,
+                               &error_abort);
+    object_property_set_uint(OBJECT(target), "ecx_fn1", 0xffffffff,
+                               &error_abort);
+    object_property_set_uint(OBJECT(target), "edx_fn1", 0xffffffff,
+                               &error_abort);
+    target->address = 0;
+
+    return target;
+}
 
 static bool sbrmi_i3c_target_command_code_complete(SbrmiI3cTargetState *s)
 {

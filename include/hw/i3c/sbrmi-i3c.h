@@ -242,4 +242,6 @@ struct SbrmiI3cTargetState {
     } cfg;
 };
 
+I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
+                                   uint64_t pid, const char *cpu_vendor);
 #endif  /* SBRMI_I3C_H_ */
