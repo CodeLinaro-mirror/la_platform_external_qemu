@@ -144,6 +144,14 @@ static int sbrmi_i3c_target_mb_read_power(SbrmiI3cTargetState *s)
     return 0;
 }
 
+static int sbrmi_i3c_target_mb_get_ucode_revision(SbrmiI3cTargetState *s)
+{
+    s->mailbox_data_out = s->cpu.ucode_rev;
+    trace_sbrmi_i3c_target_mb_get_ucode_revision(s->cfg.name,
+                                                 s->mailbox_data_out);
+    return 0;
+}
+
 static int sbrmi_i3c_target_mailbox_handler(SbrmiI3cTargetState *s)
 {
     switch (s->mailbox_command) {
@@ -155,6 +163,8 @@ static int sbrmi_i3c_target_mailbox_handler(SbrmiI3cTargetState *s)
         return sbrmi_i3c_target_mb_read_max_power_limit(s);
     case SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_CONSUMPTION:
         return sbrmi_i3c_target_mb_read_power(s);
+    case SBRMI_MAILBOX_CMD_GET_UCODE_REVISION:
+        return sbrmi_i3c_target_mb_get_ucode_revision(s);
     default:
         qemu_log_mask(LOG_GUEST_ERROR, "Unhandled mailbox command 0x%.2x\n",
                       s->mailbox_command);
@@ -699,6 +709,10 @@ static void sbrmi_i3c_target_init(Object *obj)
     /* edx_fn1 */
     object_property_add_uint32_ptr(obj, "edx_fn1",
                                     &s->cpu.edx_fn1,
+                                    OBJ_PROP_FLAG_READWRITE);
+    /* ucode_rev */
+    object_property_add_uint32_ptr(obj, "ucode_rev",
+                                    &s->cpu.ucode_rev,
                                     OBJ_PROP_FLAG_READWRITE);
 }
 

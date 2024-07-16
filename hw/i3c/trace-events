@@ -82,6 +82,7 @@ sbrmi_i3c_target_mb_read_power_limit(const char *name, uint32_t power_limit) "de
 sbrmi_i3c_target_mb_read_max_power_limit(const char *name, uint32_t power_limit) "device name '%s' max_power_limit 0x%x"
 sbrmi_i3c_target_mb_read_power(const char *name, uint32_t power_limit) "device name '%s' power 0x%x"
 sbrmi_i3c_target_cpu_reg_handler(const char *name, uint8_t command_code) "device name '%s' command 0x%x"
+sbrmi_i3c_target_mb_get_ucode_revision(const char *name, uint32_t ucode) "device name '%s' ucode 0x%x"
 
 # sbtsi-i3c.c
 sbtsi_i3c_target_tx(const char *name, int command_code, uint8_t data) "device name '%s' cc 0x%x single tx 0x%x"

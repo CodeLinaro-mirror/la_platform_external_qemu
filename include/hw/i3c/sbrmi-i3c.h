@@ -63,6 +63,7 @@ typedef enum {
     SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_LIMIT = 0x3,
     SBRMI_MAILBOX_CMD_READ_MAX_PACKAGE_POWER_LIMIT = 0x4,
     SBRMI_MAILBOX_CMD_GET_DIMM_THERMAL_SENSOR = 0x48,
+    SBRMI_MAILBOX_CMD_GET_UCODE_REVISION = 0x60,
 } SbrmiMailboxCmd;
 
 /* mailbox error code */
@@ -192,6 +193,8 @@ struct Cpu {
   uint32_t ecx_fn1;
   /* edx in cpuid_fn1 */
   uint32_t edx_fn1;
+  /* ucode_rev for GET_UCODE_REVISION command */
+  uint32_t ucode_rev;
 };
 
 struct SbrmiI3cTargetState {
