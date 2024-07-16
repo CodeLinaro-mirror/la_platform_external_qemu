@@ -28,7 +28,8 @@
 #include "trace.h"
 
 I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
-                                   uint64_t pid, const char *cpu_vendor)
+                                   uint64_t pid, const char *cpu_vendor,
+                                   uint32_t ucode_rev)
 {
     I3CTarget *target = i3c_target_new(TYPE_SBRMI_I3C_TARGET, addr,
                              /*dcr=*/0, /*bcr=*/0, pid);
@@ -48,6 +49,8 @@ I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
     object_property_set_uint(OBJECT(target), "ecx_fn1", 0xffffffff,
                                &error_abort);
     object_property_set_uint(OBJECT(target), "edx_fn1", 0xffffffff,
+                               &error_abort);
+    object_property_set_uint(OBJECT(target), "ucode_rev", ucode_rev,
                                &error_abort);
     target->address = 0;
 
