@@ -152,9 +152,62 @@ static int sbrmi_i3c_target_mb_get_ucode_revision(SbrmiI3cTargetState *s)
     return 0;
 }
 
+static int sbrmi_i3c_target_mb_get_dimm_power_consumption(
+                                                SbrmiI3cTargetState *s)
+{
+    uint32_t dimm_address = extract32(s->mailbox_data_in,
+                                      GET_DIMM_POWER_DI_DIMM_ADDR,
+                                      GET_DIMM_POWER_DI_DIMM_ADDR_LEN);
+    uint32_t umc_index = extract32(dimm_address, UMC_DIMM_ADDR_ID,
+                                   UMC_DIMM_ADDR_ID_LEN);
+    uint32_t mode = extract32(dimm_address, UMC_DIMM_ADDR_MODE,
+                              UMC_DIMM_ADDR_MODE_LEN);
+    uint32_t ts = extract32(dimm_address, UMC_DIMM_ADDR_TS,
+                            UMC_DIMM_ADDR_TS_LEN);
+    uint32_t dimm = extract32(dimm_address, UMC_DIMM_ADDR_DIMM,
+                              UMC_DIMM_ADDR_DIMM_LEN);
+    uint32_t data_out = 0;
+
+    if (!mode) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "Dimm address encode mode 0 is not supported\n");
+        return -1;
+    }
+
+    if (ts) {
+        qemu_log_mask(LOG_GUEST_ERROR, "Dimm address TS1 is not supported\n");
+        return -1;
+    }
+
+    if (dimm) {
+        qemu_log_mask(LOG_GUEST_ERROR, "Dimm address Dimm1 is not supported\n");
+        return -1;
+    }
+
+    /* prepare for data out */
+    data_out = deposit32(data_out, GET_DIMM_POWER_DO_DIMM_ADDR,
+                         GET_DIMM_POWER_DO_DIMM_ADDR_LEN,
+                         dimm_address);
+    data_out = deposit32(data_out, GET_DIMM_POWER_DO_UPDATE_RATE,
+                         GET_DIMM_POWER_DO_UPDATE_RATE_LEN,
+                         s->umc[umc_index].dimm[dimm].update_rate[ts]);
+    data_out = deposit32(data_out, GET_DIMM_POWER_DO_POWER,
+                         GET_DIMM_POWER_DO_POWER_LEN,
+                         s->umc[umc_index].dimm[dimm].power);
+
+    s->mailbox_data_out = data_out;
+
+    trace_sbrmi_i3c_target_mb_get_dimm_power_consumption(s->cfg.name,
+                                                      s->mailbox_data_in,
+                                                      s->mailbox_data_out);
+    return 0;
+}
+
 static int sbrmi_i3c_target_mailbox_handler(SbrmiI3cTargetState *s)
 {
     switch (s->mailbox_command) {
+    case SBRMI_MAILBOX_CMD_GET_DIMM_POWER_CONSUMPTION:
+        return sbrmi_i3c_target_mb_get_dimm_power_consumption(s);
     case SBRMI_MAILBOX_CMD_GET_DIMM_THERMAL_SENSOR:
         return sbrmi_i3c_target_mb_get_dimm_thermal_sensor(s);
     case SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_LIMIT:
@@ -664,6 +717,11 @@ static void sbrmi_i3c_target_init(Object *obj)
          */
         object_property_add_uint16_ptr(obj, "temp[*]",
                             &s->umc[i].dimm[0].temp[0],
+                            OBJ_PROP_FLAG_READWRITE);
+
+        /* 15-bit unsigned value representing power consumed in mW (0-32767) */
+        object_property_add_uint16_ptr(obj, "power[*]",
+                            &s->umc[i].dimm[0].power,
                             OBJ_PROP_FLAG_READWRITE);
     }
 

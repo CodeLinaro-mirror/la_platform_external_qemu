@@ -62,6 +62,7 @@ typedef enum {
     SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_CONSUMPTION = 0x1,
     SBRMI_MAILBOX_CMD_READ_PACKAGE_POWER_LIMIT = 0x3,
     SBRMI_MAILBOX_CMD_READ_MAX_PACKAGE_POWER_LIMIT = 0x4,
+    SBRMI_MAILBOX_CMD_GET_DIMM_POWER_CONSUMPTION = 0x47,
     SBRMI_MAILBOX_CMD_GET_DIMM_THERMAL_SENSOR = 0x48,
     SBRMI_MAILBOX_CMD_GET_UCODE_REVISION = 0x60,
 } SbrmiMailboxCmd;
@@ -112,6 +113,20 @@ typedef enum {
 #define GET_DIMM_THERMAL_DO_TEMP (21)
 #define GET_DIMM_THERMAL_DO_TEMP_LEN (11)
 
+/* BIT definition for data_in of SBRMI_MAILBOX_CMD_GET_DIMM_POWER_CONSUMPTION */
+#define GET_DIMM_POWER_DI_DIMM_ADDR (0)
+#define GET_DIMM_POWER_DI_DIMM_ADDR_LEN (8)
+
+/*
+ * BIT definition for data_out of SBRMI_MAILBOX_CMD_GET_DIMM_POWER_CONSUMPTION
+ */
+#define GET_DIMM_POWER_DO_DIMM_ADDR (0)
+#define GET_DIMM_POWER_DO_DIMM_ADDR_LEN (8)
+#define GET_DIMM_POWER_DO_UPDATE_RATE (8)
+#define GET_DIMM_POWER_DO_UPDATE_RATE_LEN (9)
+#define GET_DIMM_POWER_DO_POWER (17)
+#define GET_DIMM_POWER_DO_POWER_LEN (15)
+
 /* BIT definition for UMC dimm address */
 #define UMC_DIMM_ADDR_ID (0)
 #define UMC_DIMM_ADDR_ID_LEN (4)
@@ -159,7 +174,9 @@ typedef enum {
 } SbrmiReadCpuidReadDataOffset;
 
 struct Dimm {
-  /* 2 thermal sensors per dimm */
+  /* dimm power sensor in mWatts 15 bits */
+  uint16_t power;
+  /* 2 thermal sensors per dimm 11 bits */
   uint16_t temp[MAX_THERMAL_SENSOR_PER_DIMM];
   /* update rate per sensor in ms */
   uint16_t update_rate[MAX_THERMAL_SENSOR_PER_DIMM];
