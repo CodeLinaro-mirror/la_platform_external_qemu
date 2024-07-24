@@ -7,6 +7,7 @@
 /libvfio-user
 /slirp
 /anyhow-*
+/mcux-soc-svd
 /arbitrary-int-*
 /attrs-*
 /bilge-*
