@@ -113,3 +113,5 @@ arm_common_ss.add(files('boot.c'))
 
 hw_arch += {'arm': arm_ss}
 hw_common_arch += {'arm': arm_common_ss}
+
+subdir('svd')
