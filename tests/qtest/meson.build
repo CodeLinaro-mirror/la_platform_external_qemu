@@ -257,6 +257,7 @@ qtests_arm = \
   (config_all_devices.has_key('CONFIG_FLEXCOMM') ? [
       'flexcomm-test',
       'flexcomm-usart-test',
+      'flexcomm-i2c-test',
     ] : []) + \
   ['arm-cpu-features',
    'boot-serial-test']
