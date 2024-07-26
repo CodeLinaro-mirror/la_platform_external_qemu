@@ -212,7 +212,7 @@ static void adm1266_init(Object *obj)
 {
     PMBusDevice *pmdev = PMBUS_DEVICE(obj);
     uint64_t flags = PB_HAS_VOUT_MODE | PB_HAS_VOUT | PB_HAS_VOUT_MARGIN |
-                     PB_HAS_VOUT_RATING | PB_HAS_STATUS_MFR_SPECIFIC;
+                     PB_HAS_VOUT_RATING;
 
     for (int i = 0; i < ADM1266_NUM_PAGES; i++) {
         pmbus_page_config(pmdev, i, flags);
