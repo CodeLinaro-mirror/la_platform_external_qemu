@@ -258,6 +258,7 @@ qtests_arm = \
       'flexcomm-test',
       'flexcomm-usart-test',
       'flexcomm-i2c-test',
+      'flexcomm-spi-test',
     ] : []) + \
   ['arm-cpu-features',
    'boot-serial-test']
