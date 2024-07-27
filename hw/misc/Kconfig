@@ -266,5 +266,6 @@ config FLEXCOMM
     bool
     select REGISTER
     select I2C
+    select SSI
 
 source macio/Kconfig
