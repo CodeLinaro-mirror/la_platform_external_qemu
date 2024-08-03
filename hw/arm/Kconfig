@@ -713,5 +713,8 @@ config ARMSSE
 
 config RT500
     bool
+    select ARM_V7M
     select FLEXCOMM
     select RT500_CLKCTL
+    select FLEXSPI
+    select RT500_RSTCTL
