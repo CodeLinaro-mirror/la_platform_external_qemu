@@ -98,6 +98,7 @@ arm_common_ss.add(when: 'CONFIG_XEN', if_true: files(
 ))
 
 arm_ss.add(when: 'CONFIG_RT500', if_true: files('rt500.c'))
+arm_common_ss.add(when: 'CONFIG_RT595_EVK', if_true: files('rt595-evk.c'))
 
 arm_common_ss.add(when: 'CONFIG_ARM_SMMUV3', if_true: files('smmu-common.c'))
 arm_common_ss.add(when: 'CONFIG_COLLIE', if_true: files('collie.c'))

@@ -718,3 +718,9 @@ config RT500
     select RT500_CLKCTL
     select FLEXSPI
     select RT500_RSTCTL
+
+config RT595_EVK
+    bool
+    default y
+    depends on TCG && ARM
+    select RT500
