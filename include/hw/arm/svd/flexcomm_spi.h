@@ -6,7 +6,7 @@
 #ifndef HW_ARM_SVD_FLEXCOMM_SPI_H
 #define HW_ARM_SVD_FLEXCOMM_SPI_H
 
-#include "hw/register.h"
+#include "hw/core/register.h"
 
 /* Serial Peripheral Interfaces (SPI) */
 #define FLEXCOMM_SPI_REGS_NO (1024)
