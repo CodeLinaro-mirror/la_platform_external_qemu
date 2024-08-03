@@ -260,6 +260,7 @@ qtests_arm = \
       'flexcomm-i2c-test',
       'flexcomm-spi-test',
     ] : []) + \
+  (config_all_devices.has_key('CONFIG_RT500_CLKCTL') ? ['rt500-clkctl-test'] : []) + \
   ['arm-cpu-features',
    'boot-serial-test']
 
