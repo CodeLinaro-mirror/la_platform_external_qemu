@@ -84,6 +84,7 @@ sbrmi_i3c_target_mb_read_power(const char *name, uint32_t power_limit) "device n
 sbrmi_i3c_target_cpu_reg_handler(const char *name, uint8_t command_code) "device name '%s' command 0x%x"
 sbrmi_i3c_target_mb_get_ucode_revision(const char *name, uint32_t ucode) "device name '%s' ucode 0x%x"
 sbrmi_i3c_target_mb_get_dimm_power_consumption(const char *name, uint32_t data_in, uint32_t data_out) "device name '%s' data_in 0x%x data_out 0x%x"
+sbrmi_i3c_target_mb_unknown_command(const char *name, int command, uint32_t data_in, uint32_t data_out) "device name '%s' command 0x%x data_in 0x%x data_out 0x%x"
 
 # sbtsi-i3c.c
 sbtsi_i3c_target_tx(const char *name, int command_code, uint8_t data) "device name '%s' cc 0x%x single tx 0x%x"

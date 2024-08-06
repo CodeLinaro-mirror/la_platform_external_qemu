@@ -37,7 +37,7 @@ I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
     /* cpu register mockup */
     object_property_set_str(OBJECT(target), "cpu_vendor", cpu_vendor,
                                &error_abort);
-    object_property_set_uint(OBJECT(target), "cpu_version", 0x0b00f10,
+    object_property_set_uint(OBJECT(target), "cpu_version", 0x0b00f20,
                                &error_abort);
     object_property_set_uint(OBJECT(target), "apic_id", 0,
                                &error_abort);
@@ -203,6 +203,17 @@ static int sbrmi_i3c_target_mb_get_dimm_power_consumption(
     return 0;
 }
 
+static int sbrmi_i3c_target_mb_unknown_command(SbrmiI3cTargetState *s)
+{
+    s->mailbox_data_out = 0;
+
+    trace_sbrmi_i3c_target_mb_unknown_command(s->cfg.name,
+                                              s->mailbox_command,
+                                              s->mailbox_data_in,
+                                              s->mailbox_data_out);
+    return 0;
+}
+
 static int sbrmi_i3c_target_mailbox_handler(SbrmiI3cTargetState *s)
 {
     switch (s->mailbox_command) {
@@ -219,9 +230,7 @@ static int sbrmi_i3c_target_mailbox_handler(SbrmiI3cTargetState *s)
     case SBRMI_MAILBOX_CMD_GET_UCODE_REVISION:
         return sbrmi_i3c_target_mb_get_ucode_revision(s);
     default:
-        qemu_log_mask(LOG_GUEST_ERROR, "Unhandled mailbox command 0x%.2x\n",
-                      s->mailbox_command);
-        return -1;
+        return sbrmi_i3c_target_mb_unknown_command(s);
     }
     return 0;
 }
