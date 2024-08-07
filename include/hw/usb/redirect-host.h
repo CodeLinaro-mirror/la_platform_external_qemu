@@ -55,6 +55,16 @@ typedef struct BulkHeader {
     QTAILQ_ENTRY(BulkHeader) next;
 } BulkHeader;
 typedef QTAILQ_HEAD(BulkHeaderQueue, BulkHeader) BulkHeaderQueue;
+
+typedef struct BulkPacket {
+    struct usb_redir_bulk_packet_header header;
+    uint64_t id;
+    uint8_t *data;
+    int data_len;
+    QTAILQ_ENTRY(BulkPacket) next;
+} BulkPacket;
+typedef QTAILQ_HEAD(BulkPacketQueue, BulkPacket) BulkPacketQueue;
+
 #define USBREDIR_HEADER_CACHE_SIZE 10
 
 typedef struct USBRedirectHost {
@@ -76,9 +86,8 @@ typedef struct USBRedirectHost {
 
     /* For bulk transfer. */
     BulkDataQueue bulk_in_data_cache;
-    BulkDataQueue bulk_out_data_cache;
     BulkHeaderQueue bulk_in_header_cache;
-    BulkHeaderQueue bulk_out_header_cache;
+    BulkPacketQueue bulk_out_packet_cache;
 } USBRedirectHost;
 
 /**
