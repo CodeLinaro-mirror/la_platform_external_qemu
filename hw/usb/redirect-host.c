@@ -35,6 +35,30 @@
 #define USB_GET_CONFIGURATION_DATA_SIZE 1
 #define USB_GET_INTERFACE_DATA_SIZE 1
 
+static void bulk_packet_queue_add(BulkPacketQueue *queue, uint64_t id,
+                                  struct usb_redir_bulk_packet_header *header,
+                                  uint8_t *data, int data_len)
+{
+    BulkPacket *new_entry = g_new0(BulkPacket, 1);
+
+    g_assert(header);
+
+    new_entry->id = id;
+
+    if (data) {
+        new_entry->data = g_new(uint8_t, data_len);
+        new_entry->data_len = data_len;
+
+        g_assert(new_entry->data);
+    }
+
+    memcpy(&new_entry->header, header,
+           sizeof(struct usb_redir_bulk_packet_header));
+    memcpy(new_entry->data, data, data_len);
+
+    QTAILQ_INSERT_TAIL(queue, new_entry, next);
+}
+
 static void bulk_header_queue_add(BulkHeaderQueue *queue, uint64_t id,
                                   struct usb_redir_bulk_packet_header *header)
 {
@@ -70,25 +94,21 @@ static void bulk_header_queue_remove(BulkHeaderQueue *queue, BulkHeader *entry)
     g_free(entry);
 }
 
-static void bulk_data_queue_clean(BulkDataQueue *queue)
+static void bulk_packet_queue_remove(BulkPacketQueue *queue, BulkPacket *entry)
 {
-    BulkData *entry, *next_entry;
-
-    QTAILQ_FOREACH_SAFE(entry, queue, next, next_entry)
-    {
-        bulk_data_queue_remove(queue, entry);
-    }
+    g_free(entry->data);
+    QTAILQ_REMOVE(queue, entry, next);
+    g_free(entry);
 }
 
-static void bulk_header_queue_clean(BulkHeaderQueue *queue)
-{
-    BulkHeader *entry, *next_entry;
-
-    QTAILQ_FOREACH_SAFE(entry, queue, next, next_entry)
-    {
-        bulk_header_queue_remove(queue, entry);
-    }
-}
+#define QUEUE_CLEAN(queue, entry_type, callback)            \
+    do {                                                    \
+        entry_type *entry, *next_entry;                     \
+        QTAILQ_FOREACH_SAFE(entry, queue, next, next_entry) \
+        {                                                   \
+            callback(queue, entry);                         \
+        }                                                   \
+    } while (0)
 
 void usbredir_host_attach_complete(USBRedirectHost *usbredir_host)
 {
@@ -370,18 +390,18 @@ int usbredir_host_data_in_complete(USBRedirectHost *usbredir_host,
 int usbredir_host_data_out_complete(USBRedirectHost *usbredir_host,
                                     uint8_t endpoint_address)
 {
-    if (QTAILQ_EMPTY(&usbredir_host->bulk_out_header_cache)) {
+    if (QTAILQ_EMPTY(&usbredir_host->bulk_out_packet_cache)) {
         error_report("usbredir_host_data_out_complete no request.");
         return 0;
     }
 
-    BulkHeader *request = QTAILQ_FIRST(&usbredir_host->bulk_out_header_cache);
-    request->header.status = request->header.endpoint == endpoint_address
-                                 ? usb_redir_success
-                                 : usb_redir_ioerror;
-    usbredirparser_send_bulk_packet(usbredir_host->parser, request->id,
-                                    &request->header, NULL, 0);
-    bulk_header_queue_remove(&usbredir_host->bulk_out_header_cache, request);
+    BulkPacket *packet = QTAILQ_FIRST(&usbredir_host->bulk_out_packet_cache);
+    packet->header.status = packet->header.endpoint == endpoint_address
+                                ? usb_redir_success
+                                : usb_redir_ioerror;
+    usbredirparser_send_bulk_packet(usbredir_host->parser, packet->id,
+                                    &packet->header, NULL, 0);
+    bulk_packet_queue_remove(&usbredir_host->bulk_out_packet_cache, packet);
 
     if (usbredirparser_do_write(usbredir_host->parser) != 0) {
         error_report("usbredir_host_data_out_complete failed do write.");
@@ -389,15 +409,12 @@ int usbredir_host_data_out_complete(USBRedirectHost *usbredir_host,
     }
 
     /* Push next message if any. */
-    if (!QTAILQ_EMPTY(&usbredir_host->bulk_out_data_cache)) {
-        BulkData *next_data = QTAILQ_FIRST(&usbredir_host->bulk_out_data_cache);
-        BulkHeader *next_header =
-            QTAILQ_FIRST(&usbredir_host->bulk_out_header_cache);
-        usbredir_host->device_ops->data_out(usbredir_host->opaque,
-                                            next_header->header.endpoint,
-                                            next_data->data,
-                                            next_data->data_len);
-        bulk_data_queue_remove(&usbredir_host->bulk_out_data_cache, next_data);
+    if (!QTAILQ_EMPTY(&usbredir_host->bulk_out_packet_cache)) {
+        BulkPacket *next_packet =
+            QTAILQ_FIRST(&usbredir_host->bulk_out_packet_cache);
+        usbredir_host->device_ops->data_out(
+            usbredir_host->opaque, next_packet->header.endpoint,
+            next_packet->data, next_packet->data_len);
     }
 
     return 0;
@@ -606,16 +623,16 @@ static void usbredir_host_bulk_transfer(
         /*
          * If the USB device is already processing data, cache the incoming data
          */
-        if (QTAILQ_EMPTY(&usbredir_host->bulk_out_header_cache)) {
+        if (QTAILQ_EMPTY(&usbredir_host->bulk_out_packet_cache)) {
             usbredir_host->device_ops->data_out(usbredir_host->opaque,
                                                 bulk_packet_header->endpoint,
                                                 data, data_len);
+            bulk_packet_queue_add(&usbredir_host->bulk_out_packet_cache, id,
+                                  bulk_packet_header, NULL, 0);
         } else {
-            bulk_data_queue_add(&usbredir_host->bulk_out_data_cache, data,
-                                data_len);
+            bulk_packet_queue_add(&usbredir_host->bulk_out_packet_cache, id,
+                                  bulk_packet_header, data, data_len);
         }
-        bulk_header_queue_add(&usbredir_host->bulk_out_header_cache, id,
-                              bulk_packet_header);
     }
 }
 
@@ -716,9 +733,8 @@ static void usbredir_host_realize(DeviceState *dev, Error **errp)
                                  usbredir_host_chardev_event_handler, NULL,
                                  usbredir_host, NULL, true);
         QTAILQ_INIT(&usbredir_host->bulk_in_header_cache);
-        QTAILQ_INIT(&usbredir_host->bulk_out_header_cache);
         QTAILQ_INIT(&usbredir_host->bulk_in_data_cache);
-        QTAILQ_INIT(&usbredir_host->bulk_out_data_cache);
+        QTAILQ_INIT(&usbredir_host->bulk_out_packet_cache);
     } else {
         g_autofree char *path = object_get_canonical_path(
             OBJECT(dev));
@@ -732,10 +748,12 @@ static void usbredir_host_unrealize(DeviceState *dev)
 
     qemu_chr_fe_deinit(&usbredir_host->chr, true);
     usbredir_host_destroy_parser(usbredir_host);
-    bulk_header_queue_clean(&usbredir_host->bulk_in_header_cache);
-    bulk_header_queue_clean(&usbredir_host->bulk_out_header_cache);
-    bulk_data_queue_clean(&usbredir_host->bulk_in_data_cache);
-    bulk_data_queue_clean(&usbredir_host->bulk_out_data_cache);
+    QUEUE_CLEAN(&usbredir_host->bulk_in_header_cache, BulkHeader,
+                bulk_header_queue_remove);
+    QUEUE_CLEAN(&usbredir_host->bulk_in_data_cache, BulkData,
+                bulk_data_queue_remove);
+    QUEUE_CLEAN(&usbredir_host->bulk_out_packet_cache, BulkPacket,
+                bulk_packet_queue_remove);
 }
 
 static const Property usbredir_host_properties[] = {
