@@ -47,6 +47,7 @@
 #include "hw/intc/arm_gicv3.h"
 #include "hw/misc/aspeed_ltpi.h"
 #include "hw/arm/aspeed_ast1700.h"
+#include "hw/misc/pci_mbox.h"
 
 #define VBOOTROM_FILE_NAME  "ast27x0_bootrom.bin"
 
@@ -108,6 +109,7 @@ struct AspeedSoCState {
     AspeedPECIState peci;
     SerialMM uart[ASPEED_UARTS_NUM];
     Clock *sysclk;
+    PCIMBoxState pci_mbox;
     UnimplementedDeviceState iomem;
     UnimplementedDeviceState iomem0;
     UnimplementedDeviceState iomem1;

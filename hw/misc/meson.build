@@ -174,3 +174,5 @@ system_ss.add(when: 'CONFIG_SPI_TESTER', if_true: files('spi_tester.c'))
 system_ss.add(when: 'CONFIG_FLEXCOMM', if_true: files('flexcomm.c'))
 system_ss.add(when: 'CONFIG_RT500_CLKCTL', if_true: files('rt500_clkctl0.c', 'rt500_clkctl1.c'))
 system_ss.add(when: 'CONFIG_RT500_RSTCTL', if_true: files('rt500_rstctl.c'))
+
+system_ss.add(when: 'CONFIG_PCI_MBOX', if_true: files('pci_mbox.c'))

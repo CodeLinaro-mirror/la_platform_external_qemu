@@ -144,6 +144,9 @@ static const int aspeed_soc_ast2600_irqmap[] = {
     [ASPEED_DEV_I3C]       = 102,   /* 102 -> 107 */
 };
 
+#define AST_BMC_DEV_MEM_SIZE    0x100000
+#define AST_BMC_DEV_MEM_ADDR    0xbff00000
+
 static qemu_irq aspeed_soc_ast2600_get_irq(AspeedSoCState *s, int dev)
 {
     Aspeed2600SoCState *a = ASPEED2600_SOC(s);
@@ -283,6 +286,10 @@ static void aspeed_soc_ast2600_init(Object *obj)
     for (i = 0; i < ASPEED_FSI_NUM; i++) {
         object_initialize_child(obj, "fsi[*]", &s->fsi[i], TYPE_ASPEED_APB2OPB);
     }
+
+    object_initialize_child(obj, "pci-mbox", &s->pci_mbox, TYPE_PCI_MBOX);
+    object_property_set_uint(OBJECT(&s->pci_mbox), "ram-size",
+                             AST_BMC_DEV_MEM_SIZE, &error_fatal);
 }
 
 /*
@@ -752,6 +759,16 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
                    &s->ibt.iomem);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->ibt), 0,
                        aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_IBT));
+
+    /* Host2Bmc PCI Mbox */
+    Chardev *chardev = qemu_chr_find("pci0");
+    if (chardev) {
+        qdev_prop_set_chr(DEVICE(&s->pci_mbox), "chardev", chardev);
+    } else {
+        warn_report("PCI Mailbox does not have a chardev backend.");
+    }
+    sysbus_realize(SYS_BUS_DEVICE(&s->pci_mbox), &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->pci_mbox), 0, AST_BMC_DEV_MEM_ADDR);
 }
 
 static bool aspeed_soc_ast2600_boot_from_emmc(AspeedSoCState *s)

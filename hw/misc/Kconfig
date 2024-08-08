@@ -286,4 +286,7 @@ config RT500_RSTCTL
     bool
     select REGISTER
 
+config PCI_MBOX
+    bool
+
 source macio/Kconfig
