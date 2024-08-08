@@ -33,13 +33,17 @@ typedef struct FakeUsbredirGuest {
     bool device_connected;
     sem_t device_info_sem;
     struct usb_redir_device_connect_header device_info;
-    bool sent_control_in_transfer;
     sem_t control_transfer_sem;
+    bool control_transfer_inflight;
+    uint64_t control_transfer_id;
+    bool control_transfer_canceled;
     struct usb_redir_control_packet_header control_packet;
     uint8_t *control_transfer_data;
     uint16_t control_transfer_length;
-    bool sent_bulk_transfer;
     sem_t bulk_transfer_sem;
+    bool bulk_transfer_inflight;
+    uint64_t bulk_transfer_id;
+    bool bulk_transfer_canceled;
     struct usb_redir_bulk_packet_header bulk_packet;
     uint8_t *bulk_data;
     uint16_t bulk_data_length;
@@ -201,5 +205,12 @@ void fake_usbredir_guest_set_configuration(FakeUsbredirGuest *faker,
 void fake_usbredir_guest_set_alt_interface(FakeUsbredirGuest *faker,
                                            uint8_t interface_num,
                                            uint8_t alt_setting);
+
+/**
+ * fake_usbredir_guest_cancel_data_packet:
+ * @faker: Fake usbredir guest.
+ * Cancels the most recently sent data packet.
+ */
+void fake_usbredir_guest_cancel_transfer(FakeUsbredirGuest *faker);
 
 #endif /* FAKE_USBREDIR_GUEST_H */
