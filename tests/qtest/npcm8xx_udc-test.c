@@ -8,6 +8,7 @@
  */
 
 #include <libusb-1.0/libusb.h>
+#include <string.h>
 
 #include "qemu/osdep.h"
 #include "hw/usb/npcm8xx-udc.h"
@@ -798,6 +799,61 @@ static void test_usbredir_host_bulk_transfer_read(const void *data)
     close(fd);
 }
 
+static void test_usbredir_host_cancel_data_packet(const void *data)
+{
+    FakeUsbredirGuest faker = {};
+    uint32_t endpoint_address = LIBUSB_ENDPOINT_IN + 1;
+    uint8_t test_bulk_data[] = {0x1, 0x2, 0x3, 0x4};
+    TestData *test_data = (TestData *)data;
+    int fd = socket_util_setup_fd(test_data->sock);
+
+    fake_usbredir_guest_init(&faker, fd);
+    fake_usbredir_guest_start(&faker);
+
+    /* Make sure fake usbredir guest is ready before writing to it. */
+    g_assert(fake_usbredir_guest_helloed(&faker));
+
+    npcm8xx_udc_init();
+    npcm8xx_udc_run();
+    npcm8xx_udc_handle_port_connect();
+    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+                               test_data->serialized_config_desc_length,
+                               (void *)&fake_usb_device_desc,
+                               fake_usb_device_desc.bLength);
+
+    /* Send dummy control transfer. */
+    fake_usbredir_guest_control_transfer(&faker, 0, 0, 0, 0, NULL, 0);
+
+    /* Cancel it. */
+    fake_usbredir_guest_cancel_transfer(&faker);
+
+    /* Assert that fake received canceled packet. */
+    fake_usbredir_guest_assert_control_transfer_received(&faker, NULL, 0);
+
+    /* Send bulk transfer OUT. */
+    fake_usbredir_guest_bulk_transfer(&faker, 1, test_bulk_data,
+                                      sizeof(test_bulk_data));
+
+    /* Cancel it. */
+    fake_usbredir_guest_cancel_transfer(&faker);
+
+    /* Assert that fake received canceled packet. */
+    fake_usbredir_guest_assert_bulk_transfer(&faker, NULL, 0);
+
+    /* Send bulk transfer IN. */
+    fake_usbredir_guest_bulk_transfer(&faker, endpoint_address, NULL,
+                                      sizeof(test_bulk_data));
+
+    /* Cancel it. */
+    fake_usbredir_guest_cancel_transfer(&faker);
+
+    /* Assert that fake received canceled packet. */
+    fake_usbredir_guest_assert_bulk_transfer(&faker, NULL, 0);
+
+    fake_usbredir_guest_stop(&faker);
+    close(fd);
+}
+
 static inline void setup_test_data(TestData *test_data, int sock)
 {
     size_t length = 0;
@@ -864,6 +920,8 @@ int main(int argc, char **argv)
                         &test_data, test_usbredir_host_bulk_transfer_write);
     qtest_add_data_func("/npcm8xx_udc/usbredir_host_bulk_transfer_read",
                         &test_data, test_usbredir_host_bulk_transfer_read);
+    qtest_add_data_func("/npcm8xx_udc/usbredir_host_cancel_data_packet",
+                        &test_data, test_usbredir_host_cancel_data_packet);
 
     ret = g_test_run();
     qtest_end();

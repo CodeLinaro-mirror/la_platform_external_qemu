@@ -636,6 +636,75 @@ static void usbredir_host_bulk_transfer(
     }
 }
 
+static void usbredir_host_parser_cancel_data(void *priv, uint64_t id)
+{
+    USBRedirectHost *usbredir_host = priv;
+    BulkHeader *bulk_header, *next_bulk_header;
+    BulkPacket *bulk_packet, *next_bulk_packet;
+
+    if (usbredir_host->request.active &&
+        usbredir_host->latest_packet_id == id) {
+        usbredir_host->request.active = false;
+
+        struct usb_redir_control_packet_header *control_header =
+            (struct usb_redir_control_packet_header *)
+                usbredir_host->usbredir_header_cache;
+        control_header->status = usb_redir_cancelled;
+        control_header->length = 0;
+        usbredirparser_send_control_packet(usbredir_host->parser, id,
+                                           control_header, NULL, 0);
+
+        if (usbredirparser_do_write(usbredir_host->parser) != 0) {
+            error_report("Failed to send cancelled control packet, id: %lu",
+                         id);
+        }
+
+        return;
+    }
+
+    QTAILQ_FOREACH_SAFE(bulk_header, &usbredir_host->bulk_in_header_cache, next,
+                        next_bulk_header)
+    {
+        if (bulk_header->id == id) {
+            bulk_header->header.length = 0;
+            bulk_header->header.length_high = 0;
+            bulk_header->header.status = usb_redir_cancelled;
+            usbredirparser_send_bulk_packet(usbredir_host->parser, id,
+                                            &bulk_header->header, NULL, 0);
+            QTAILQ_REMOVE(&usbredir_host->bulk_in_header_cache, bulk_header,
+                          next);
+            if (usbredirparser_do_write(usbredir_host->parser) != 0) {
+                error_report("Failed to send cancelled bulk packet, id: %lu",
+                             id);
+            }
+
+            return;
+        }
+    }
+
+    QTAILQ_FOREACH_SAFE(bulk_packet, &usbredir_host->bulk_out_packet_cache,
+                        next, next_bulk_packet)
+    {
+        if (bulk_packet->id == id) {
+            bulk_packet->header.length = 0;
+            bulk_packet->header.length_high = 0;
+            bulk_packet->header.status = usb_redir_cancelled;
+            usbredirparser_send_bulk_packet(usbredir_host->parser, id,
+                                            &bulk_packet->header, NULL, 0);
+            QTAILQ_REMOVE(&usbredir_host->bulk_out_packet_cache, bulk_packet,
+                          next);
+            if (usbredirparser_do_write(usbredir_host->parser) != 0) {
+                error_report("Failed to send cancelled bulk packet, id: %lu",
+                             id);
+            }
+
+            return;
+        }
+    }
+
+    error_report("Cannot find canceled packet, id %lu", id);
+}
+
 static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
 {
     uint32_t caps[USB_REDIR_CAPS_SIZE] = {
@@ -657,6 +726,8 @@ static void usbredir_host_create_parser(USBRedirectHost *usbredir_host)
     usbredir_host->parser->write_func = usbredir_host_parser_write;
     usbredir_host->parser->reset_func = usbredir_host_parser_reset;
     usbredir_host->parser->hello_func = usbredir_host_parser_hello;
+    usbredir_host->parser->cancel_data_packet_func =
+        usbredir_host_parser_cancel_data;
     usbredir_host->parser->control_packet_func =
         usbredir_host_parser_control_transfer;
     usbredir_host->parser->bulk_packet_func = usbredir_host_bulk_transfer;
