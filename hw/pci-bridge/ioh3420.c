@@ -38,6 +38,7 @@
 #define IOH_EP_MSI_NR_VECTOR            2
 #define IOH_EP_EXP_OFFSET               0x90
 #define IOH_EP_AER_OFFSET               0x100
+#define IOH_EP_ACS_OFFSET               0x2BC
 
 /*
  * If two MSI vector are allocated, Advanced Error Interrupt Message Number
@@ -114,6 +115,7 @@ static void ioh3420_class_init(ObjectClass *klass, void *data)
     rpc->aer_offset = IOH_EP_AER_OFFSET;
     rpc->ssvid_offset = IOH_EP_SSVID_OFFSET;
     rpc->ssid = IOH_EP_SSVID_SSID;
+    rpc->acs_offset = IOH_EP_ACS_OFFSET;
 }
 
 static const TypeInfo ioh3420_info = {
