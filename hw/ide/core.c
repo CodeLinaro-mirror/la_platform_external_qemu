@@ -127,6 +127,7 @@ static void ide_identify_size(IDEState *s)
 
 static void ide_identify(IDEState *s)
 {
+    int n;
     uint16_t *p;
     unsigned int oldsize;
     IDEDevice *dev = s->unit ? s->bus->slave : s->bus->master;
@@ -238,6 +239,14 @@ static void ide_identify(IDEState *s)
 
 fill_buffer:
     memcpy(s->io_buffer, p, sizeof(s->identify_data));
+
+    /* enable checksum per ACS-3 */
+    s->io_buffer[510] = 0xA5;
+    /* compute checksum */
+    for (n = 0; n < 511; n++) {
+        s->io_buffer[511] += s->io_buffer[n];
+    }
+    s->io_buffer[511] = 0x100 - s->io_buffer[511];
 }
 
 static void ide_atapi_identify(IDEState *s)
