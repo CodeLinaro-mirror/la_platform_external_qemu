@@ -791,8 +791,9 @@ void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
     err = slirp_remove_hostfwd(s->slirp, is_udp, host_addr.sin_addr, host_port);
 #endif
 
-    monitor_printf(mon, "host forwarding rule for %s %s\n", src_str,
-                   err ? "not found" : "removed");
+    if (err) {
+        monitor_printf(mon, "host forwarding rule for %s not found", src_str);
+    }
     return;
 
  fail_syntax:
