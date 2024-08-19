@@ -35,6 +35,8 @@ typedef void EndTransferFunc(IDEState *);
 #define TYPE_IDE_DEVICE "ide-device"
 OBJECT_DECLARE_TYPE(IDEDevice, IDEDeviceClass, IDE_DEVICE)
 
+#define ATA_PASSWORD_LENGTH 32  /* Length of ATA master & user passwords */
+
 typedef enum { IDE_HD, IDE_CD, IDE_CFATA } IDEDriveKind;
 
 struct unreported_events {
@@ -140,6 +142,10 @@ struct IDEState {
     uint8_t *smart_selftest_data;
     /* AHCI */
     int ncq_queues;
+    /* Security */
+    char master_password[ATA_PASSWORD_LENGTH];
+    char user_password[ATA_PASSWORD_LENGTH];
+    bool security_enabled;
 };
 
 struct IDEDeviceClass {

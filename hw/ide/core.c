@@ -43,6 +43,7 @@
 #include "system/runstate.h"
 #include "ide-internal.h"
 #include "trace.h"
+#include "string.h"
 
 /* These values were based on a Seagate ST3500418AS but have been modified
    to make more sense in QEMU */
@@ -110,6 +111,9 @@ static void put_le16(uint16_t *p, unsigned int v)
     *p = cpu_to_le16(v);
 }
 
+/* MASTER PASSWORD CAPABILITY bit */
+#define SEC_MPCAPMAX  (1U << 8)
+
 static void ide_identify_size(IDEState *s)
 {
     uint16_t *p = (uint16_t *)s->identify_data;
@@ -128,7 +132,7 @@ static void ide_identify_size(IDEState *s)
 static void ide_identify(IDEState *s)
 {
     uint16_t *p;
-    unsigned int oldsize;
+    unsigned int oldsize, security_state;
     IDEDevice *dev = s->unit ? s->bus->slave : s->bus->master;
 
     p = (uint16_t *)s->identify_data;
@@ -226,6 +230,16 @@ static void ide_identify(IDEState *s)
         put_le16(p + 110, s->wwn >> 16);
         put_le16(p + 111, s->wwn);
     }
+
+    /* Security-related identify fields. */
+    security_state = 0;
+    security_state |= 1; /* security supported */
+    if (s->security_enabled) {
+        security_state |= (1 << 1); /* security enabled */
+        security_state |= SEC_MPCAPMAX; /* always max security */
+    }
+    put_le16(p + 128, security_state);
+
     if (dev && dev->conf.discard_granularity) {
         put_le16(p + 169, 1); /* TRIM support */
     }
@@ -1102,6 +1116,83 @@ static void ide_sector_write(IDEState *s)
                                    &s->qiov, 0, ide_sector_write_cb, s);
 }
 
+static void ide_security_set_pass(IDEState *s)
+{
+    bool master_password_flag;
+
+    s->pio_aiocb = NULL;
+
+    master_password_flag = s->io_buffer[0] & 0x01;
+    if (master_password_flag) {
+        memcpy(s->master_password, s->io_buffer + 2,
+                sizeof(s->master_password));
+    } else {
+        memcpy(s->user_password, s->io_buffer + 2, sizeof(s->user_password));
+        s->security_enabled = true;
+        s->identify_set = 0;
+    }
+
+    s->status = READY_STAT | SEEK_STAT;
+    ide_cmd_done(s);
+    ide_bus_set_irq(s->bus);
+}
+
+static void ide_security_unlock(IDEState *s)
+{
+    bool master_password_flag;
+
+    s->pio_aiocb = NULL;
+
+    master_password_flag = s->io_buffer[0] & 0x01;
+    if (master_password_flag) {
+        ide_abort_command(s);
+        return;
+    } else {
+        if (memcmp(s->user_password, s->io_buffer + 2,
+                    sizeof(s->user_password)) != 0) {
+            ide_abort_command(s);
+            return;
+        }
+    }
+
+    s->status = READY_STAT | SEEK_STAT;
+    ide_cmd_done(s);
+    ide_bus_set_irq(s->bus);
+}
+
+static void ide_security_disable(IDEState *s)
+{
+    bool master_password_flag;
+
+    s->pio_aiocb = NULL;
+
+    master_password_flag = s->io_buffer[0] & 0x01;
+    if (s->security_enabled) {
+        if (master_password_flag) {
+            ide_abort_command(s);
+            return;
+        } else {
+            if (memcmp(s->user_password, s->io_buffer + 2,
+                        sizeof(s->user_password)) != 0) {
+                ide_abort_command(s);
+                return;
+            }
+            s->security_enabled = false;
+            memset(s->user_password, 0, sizeof(s->user_password));
+            s->identify_set = 0;
+        }
+    } else {
+        if (!master_password_flag) {
+            ide_abort_command(s);
+            return;
+        }
+    }
+
+    s->status = READY_STAT | SEEK_STAT;
+    ide_cmd_done(s);
+    ide_bus_set_irq(s->bus);
+}
+
 static void ide_flush_cb(void *opaque, int ret)
 {
     IDEState *s = opaque;
@@ -1750,6 +1841,29 @@ abort_cmd:
     return true;
 }
 
+static bool cmd_security_set_pass(IDEState *s, uint8_t cmd)
+{
+    s->req_nb_sectors = 1;
+    s->status = SEEK_STAT | READY_STAT;
+    ide_transfer_start(s, s->io_buffer, 512, ide_security_set_pass);
+    return false;
+}
+
+static bool cmd_security_unlock(IDEState *s, uint8_t cmd)
+{
+    s->req_nb_sectors = 1;
+    s->status = SEEK_STAT | READY_STAT;
+    ide_transfer_start(s, s->io_buffer, 512, ide_security_unlock);
+    return false;
+}
+
+static bool cmd_security_disable(IDEState *s, uint8_t cmd)
+{
+    s->req_nb_sectors = 1;
+    s->status = SEEK_STAT | READY_STAT;
+    ide_transfer_start(s, s->io_buffer, 512, ide_security_disable);
+    return false;
+}
 
 /*** ATAPI commands ***/
 
@@ -2142,6 +2256,9 @@ static const struct {
     [IBM_SENSE_CONDITION]         = { cmd_ibm_sense_condition, CFA_OK | SET_DSC },
     [CFA_WEAR_LEVEL]              = { cmd_cfa_erase_sectors, HD_CFA_OK | SET_DSC },
     [WIN_READ_NATIVE_MAX]         = { cmd_read_native_max, HD_CFA_OK | SET_DSC },
+    [WIN_SECURITY_SET_PASS]       = { cmd_security_set_pass, HD_OK },
+    [WIN_SECURITY_UNLOCK]         = { cmd_security_unlock, HD_OK },
+    [WIN_SECURITY_DISABLE]        = { cmd_security_disable, HD_OK },
 };
 
 static bool ide_cmd_permitted(IDEState *s, uint32_t cmd)
@@ -2663,6 +2780,10 @@ int ide_init_drive(IDEState *s, IDEDevice *dev, IDEDriveKind kind, Error **errp)
     } else {
         pstrcpy(s->version, sizeof(s->version), QEMU_HW_VERSION);
     }
+
+    memset(s->master_password, 0, sizeof(s->master_password));
+    memset(s->user_password, 0, sizeof(s->user_password));
+    s->security_enabled = false;
 
     ide_reset(s);
     blk_iostatus_enable(s->blk);
