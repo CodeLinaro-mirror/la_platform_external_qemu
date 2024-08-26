@@ -538,6 +538,7 @@ static void qtest_process_command(CharFrontend *chr, gchar **words)
             address_space_write(first_cpu->as, addr, MEMTXATTRS_UNSPECIFIED,
                                 &data, 8);
         }
+        /* TODO(jrreinhart): Return FAIL if address_space_write() fails. */
         qtest_send(chr, "OK\n");
     } else if (strcmp(words[0], "readb") == 0 ||
                strcmp(words[0], "readw") == 0 ||
@@ -571,6 +572,7 @@ static void qtest_process_command(CharFrontend *chr, gchar **words)
                                &value, 8);
             tswap64s(&value);
         }
+        /* TODO(jrreinhart): Send FAIL if address_space_read() fails. */
         qtest_sendf(chr, "OK 0x%016" PRIx64 "\n", value);
     } else if (strcmp(words[0], "read") == 0) {
         g_autoptr(GString) enc = NULL;
@@ -592,6 +594,7 @@ static void qtest_process_command(CharFrontend *chr, gchar **words)
 
         enc = qemu_hexdump_line(NULL, data, len, 0, 0);
 
+        /* TODO(jrreinhart): Send FAIL if address_space_read() fails. */
         qtest_sendf(chr, "OK 0x%s\n", enc->str);
 
         g_free(data);
@@ -611,6 +614,7 @@ static void qtest_process_command(CharFrontend *chr, gchar **words)
         address_space_read(first_cpu->as, addr, MEMTXATTRS_UNSPECIFIED, data,
                            len);
         b64_data = g_base64_encode(data, len);
+        /* TODO(jrreinhart): Send FAIL if address_space_read() fails. */
         qtest_sendf(chr, "OK %s\n", b64_data);
 
         g_free(data);
@@ -646,6 +650,7 @@ static void qtest_process_command(CharFrontend *chr, gchar **words)
                             len);
         g_free(data);
 
+        /* TODO(jrreinhart): Return FAIL if address_space_write() fails. */
         qtest_send(chr, "OK\n");
     } else if (strcmp(words[0], "memset") == 0) {
         uint64_t addr, len;
@@ -669,6 +674,7 @@ static void qtest_process_command(CharFrontend *chr, gchar **words)
             g_free(data);
         }
 
+        /* TODO(jrreinhart): Return FAIL if address_space_write() fails. */
         qtest_send(chr, "OK\n");
     }  else if (strcmp(words[0], "b64write") == 0) {
         uint64_t addr, len;
@@ -700,6 +706,7 @@ static void qtest_process_command(CharFrontend *chr, gchar **words)
         address_space_write(first_cpu->as, addr, MEMTXATTRS_UNSPECIFIED, data,
                             len);
 
+        /* TODO(jrreinhart): Return FAIL if address_space_write() fails. */
         qtest_send(chr, "OK\n");
     } else if (strcmp(words[0], "endianness") == 0) {
         if (target_big_endian()) {
