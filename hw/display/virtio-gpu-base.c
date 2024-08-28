@@ -75,6 +75,10 @@ virtio_gpu_base_generate_edid(VirtIOGPUBase *g, int scanout,
         }
     }
 
+    if (virtio_gpu_edid_name_enabled(g->conf)) {
+        info.name = qemu_console_get_name(g->scanout[scanout].con, NULL);
+    }
+
     edid->size = cpu_to_le32(sizeof(edid->edid));
     qemu_edid_generate(edid->edid, sizeof(edid->edid), &info);
 }

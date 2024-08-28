@@ -101,6 +101,7 @@ enum virtio_gpu_base_conf_flags {
     VIRTIO_GPU_FLAG_VENUS_ENABLED,
     VIRTIO_GPU_FLAG_RESOURCE_UUID_ENABLED,
     VIRTIO_GPU_FLAG_DRM_ENABLED,
+    VIRTIO_GPU_FLAG_EDID_NAME_ENABLED,
 };
 
 #define virtio_gpu_virgl_enabled(_cfg) \
@@ -125,6 +126,8 @@ enum virtio_gpu_base_conf_flags {
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_VENUS_ENABLED))
 #define virtio_gpu_drm_enabled(_cfg) \
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_DRM_ENABLED))
+#define virtio_gpu_edid_name_enabled(_cfg) \
+    (_cfg.flags & (1 << VIRTIO_GPU_FLAG_EDID_NAME_ENABLED))
 
 struct virtio_gpu_base_conf {
     uint32_t max_outputs;
@@ -175,6 +178,8 @@ struct VirtIOGPUBaseClass {
     DEFINE_PROP_VIRTIO_GPU_OUTPUT_LIST("outputs", _state, _conf.outputs), \
     DEFINE_PROP_BIT("edid", _state, _conf.flags, \
                     VIRTIO_GPU_FLAG_EDID_ENABLED, true), \
+    DEFINE_PROP_BIT("edid_name", _state, _conf.flags, \
+                    VIRTIO_GPU_FLAG_EDID_NAME_ENABLED, false), \
     DEFINE_PROP_UINT32("xres", _state, _conf.xres, 1280), \
     DEFINE_PROP_UINT32("yres", _state, _conf.yres, 800)
 
