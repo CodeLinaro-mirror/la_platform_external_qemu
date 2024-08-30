@@ -15,9 +15,27 @@
 #include <usbredirparser.h>
 #include <usbredirproto.h>
 
+#include "qemu/queue.h"
+
+typedef struct DataPacket {
+    uint64_t id;
+    bool canceled;
+    bool done;
+    uint8_t *data;
+    uint16_t data_length;
+} DataPacket;
+
+typedef struct BulkDataPacket {
+    DataPacket packet;
+    struct usb_redir_bulk_packet_header header;
+    QTAILQ_ENTRY(BulkDataPacket) next;
+} BulkDataPacket;
+typedef QTAILQ_HEAD(BulkDataPacketQueue, BulkDataPacket) BulkDataPacketQueue;
+
 typedef struct FakeUsbredirGuest {
     struct usbredirparser *parser;
     int fd;
+    uint64_t packet_id;
 
     GThread *parser_thread;
     GMutex flag_mu;
@@ -41,12 +59,7 @@ typedef struct FakeUsbredirGuest {
     uint8_t *control_transfer_data;
     uint16_t control_transfer_length;
     sem_t bulk_transfer_sem;
-    bool bulk_transfer_inflight;
-    uint64_t bulk_transfer_id;
-    bool bulk_transfer_canceled;
-    struct usb_redir_bulk_packet_header bulk_packet;
-    uint8_t *bulk_data;
-    uint16_t bulk_data_length;
+    BulkDataPacketQueue bulk_data_packet_queue;
     uint8_t configuration_value;
     uint8_t interface_num;
     uint8_t alt_setting;

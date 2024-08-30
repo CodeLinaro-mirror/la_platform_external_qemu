@@ -854,6 +854,46 @@ static void test_usbredir_host_cancel_data_packet(const void *data)
     close(fd);
 }
 
+static void test_usbredir_host_cancel_burst_data_packets(const void *data)
+{
+    FakeUsbredirGuest faker = {};
+    uint32_t endpoint_address = LIBUSB_ENDPOINT_IN + 1;
+    uint8_t test_bulk_data[] = {0x1, 0x2, 0x3, 0x4};
+    const int transfer_count = 10;
+    TestData *test_data = (TestData *)data;
+    int fd = socket_util_setup_fd(test_data->sock);
+
+    fake_usbredir_guest_init(&faker, fd);
+    fake_usbredir_guest_start(&faker);
+
+    /* Make sure fake usbredir guest is ready before writing to it. */
+    g_assert(fake_usbredir_guest_helloed(&faker));
+
+    npcm8xx_udc_init();
+    npcm8xx_udc_run();
+    npcm8xx_udc_handle_port_connect();
+    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+                               test_data->serialized_config_desc_length,
+                               (void *)&fake_usb_device_desc,
+                               fake_usb_device_desc.bLength);
+
+    /* Do series of read transfer. */
+    for (int i = 0; i < transfer_count; ++i) {
+        fake_usbredir_guest_bulk_transfer(&faker, endpoint_address, NULL,
+                                        sizeof(test_bulk_data));
+    }
+
+    fake_usbredir_guest_cancel_transfer(&faker);
+
+    /* Expect all read transfers to be canceled. */
+    for (int i = 0; i < transfer_count; ++i) {
+        fake_usbredir_guest_assert_bulk_transfer(&faker, NULL, 0);
+    }
+
+    fake_usbredir_guest_stop(&faker);
+    close(fd);
+}
+
 static inline void setup_test_data(TestData *test_data, int sock)
 {
     size_t length = 0;
@@ -922,6 +962,9 @@ int main(int argc, char **argv)
                         &test_data, test_usbredir_host_bulk_transfer_read);
     qtest_add_data_func("/npcm8xx_udc/usbredir_host_cancel_data_packet",
                         &test_data, test_usbredir_host_cancel_data_packet);
+    qtest_add_data_func("/npcm8xx_udc/usbredir_host_cancel_burst_data_packets",
+                        &test_data,
+                        test_usbredir_host_cancel_burst_data_packets);
 
     ret = g_test_run();
     qtest_end();
