@@ -199,7 +199,12 @@ void gdb_memtox(GString *buf, const char *mem, int len)
     }
 }
 
-static uint32_t gdb_get_cpu_pid(CPUState *cpu)
+bool gdb_is_multiprocess(void)
+{
+    return gdbserver_state.multiprocess;
+}
+
+uint32_t gdb_get_cpu_pid(CPUState *cpu)
 {
 #ifdef CONFIG_USER_ONLY
     return getpid();
