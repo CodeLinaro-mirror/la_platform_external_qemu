@@ -35,6 +35,7 @@
 #include "qemu/guest-random.h"
 #include "qemu/timer.h"
 #include "exec/cputlb.h"
+#include "exec/gdbstub.h"
 #include "exec/hwaddr.h"
 #include "exec/tb-flush.h"
 #include "exec/translation-block.h"
@@ -134,11 +135,15 @@ static int tcg_insert_breakpoint(CPUState *cs, int type, vaddr addr, vaddr len)
 {
     CPUState *cpu;
     int err = 0;
+    bool match_pid = gdb_is_multiprocess();
 
     switch (type) {
     case GDB_BREAKPOINT_SW:
     case GDB_BREAKPOINT_HW:
         CPU_FOREACH(cpu) {
+            if (match_pid && gdb_get_cpu_pid(cpu) != gdb_get_cpu_pid(cs)) {
+                continue;
+            }
             err = cpu_breakpoint_insert(cpu, addr, BP_GDB, NULL);
             if (err) {
                 break;
@@ -149,6 +154,9 @@ static int tcg_insert_breakpoint(CPUState *cs, int type, vaddr addr, vaddr len)
     case GDB_WATCHPOINT_READ:
     case GDB_WATCHPOINT_ACCESS:
         CPU_FOREACH(cpu) {
+            if (match_pid && gdb_get_cpu_pid(cpu) != gdb_get_cpu_pid(cs)) {
+                continue;
+            }
             err = cpu_watchpoint_insert(cpu, addr, len,
                                         xlat_gdb_type(cpu, type), NULL);
             if (err) {
@@ -165,11 +173,15 @@ static int tcg_remove_breakpoint(CPUState *cs, int type, vaddr addr, vaddr len)
 {
     CPUState *cpu;
     int err = 0;
+    bool match_pid = gdb_is_multiprocess();
 
     switch (type) {
     case GDB_BREAKPOINT_SW:
     case GDB_BREAKPOINT_HW:
         CPU_FOREACH(cpu) {
+            if (match_pid && gdb_get_cpu_pid(cpu) != gdb_get_cpu_pid(cs)) {
+                continue;
+            }
             err = cpu_breakpoint_remove(cpu, addr, BP_GDB);
             if (err) {
                 break;
@@ -180,6 +192,9 @@ static int tcg_remove_breakpoint(CPUState *cs, int type, vaddr addr, vaddr len)
     case GDB_WATCHPOINT_READ:
     case GDB_WATCHPOINT_ACCESS:
         CPU_FOREACH(cpu) {
+            if (match_pid && gdb_get_cpu_pid(cpu) != gdb_get_cpu_pid(cs)) {
+                continue;
+            }
             err = cpu_watchpoint_remove(cpu, addr, len,
                                         xlat_gdb_type(cpu, type));
             if (err) {
