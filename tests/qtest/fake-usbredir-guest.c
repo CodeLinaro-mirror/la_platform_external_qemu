@@ -113,35 +113,37 @@ static void parser_control_transfer(
     g_assert(faker->device_connected);
     g_mutex_unlock(&faker->flag_mu);
 
-    faker->control_transfer_inflight = false;
+    g_assert(faker->control_data_packet);
 
-    if (faker->control_transfer_canceled) {
+    faker->control_data_packet->packet.done = true;
+
+    if (faker->control_data_packet->packet.canceled) {
         g_assert(control_header->status == usb_redir_cancelled);
         g_assert_cmphex(control_header->length, ==, 0);
-
-        /* Clear canceled status. */
-        faker->control_transfer_canceled = false;
     } else {
         g_assert(control_header->status == usb_redir_success);
         g_assert_cmphex(control_header->length, <=,
-                        faker->control_packet.length);
+                        faker->control_data_packet->header.length);
 
         if (control_header->requesttype & LIBUSB_ENDPOINT_IN) {
-            faker->control_transfer_length = data_len;
-            faker->control_transfer_data = g_new(uint8_t, data_len);
-            memcpy(faker->control_transfer_data, data, data_len);
+            faker->control_data_packet->packet.data_length = data_len;
+            faker->control_data_packet->packet.data = g_new(uint8_t, data_len);
+            memcpy(faker->control_data_packet->packet.data, data, data_len);
         }
     }
 
-    sem_post(&faker->control_transfer_sem);
-
     g_assert_cmphex(control_header->endpoint, ==,
-                    faker->control_packet.endpoint);
+                    faker->control_data_packet->header.endpoint);
     g_assert_cmphex(control_header->requesttype, ==,
-                    faker->control_packet.requesttype);
-    g_assert_cmphex(control_header->request, ==, faker->control_packet.request);
-    g_assert_cmphex(control_header->value, ==, faker->control_packet.value);
-    g_assert_cmphex(control_header->index, ==, faker->control_packet.index);
+                    faker->control_data_packet->header.requesttype);
+    g_assert_cmphex(control_header->request, ==,
+                    faker->control_data_packet->header.request);
+    g_assert_cmphex(control_header->value, ==,
+                    faker->control_data_packet->header.value);
+    g_assert_cmphex(control_header->index, ==,
+                    faker->control_data_packet->header.index);
+
+    sem_post(&faker->control_transfer_sem);
 }
 
 static void parser_bulk_transfer(
@@ -179,12 +181,12 @@ static void parser_bulk_transfer(
         }
     }
 
-    sem_post(&faker->bulk_transfer_sem);
-
     g_assert_cmphex(bulk_header->endpoint, ==,
                     bulk_data_packet->header.endpoint);
     g_assert_cmphex(bulk_header->stream_id, ==,
                     bulk_data_packet->header.stream_id);
+
+    sem_post(&faker->bulk_transfer_sem);
 }
 
 static void parser_configuration_status(
@@ -228,10 +230,8 @@ void fake_usbredir_guest_init(FakeUsbredirGuest *faker, int fd)
 
     faker->fd = fd;
     faker->packet_id = 0;
-    faker->control_transfer_data = NULL;
     faker->configuration_value = 0;
-    faker->control_transfer_id = 0;
-    faker->control_transfer_canceled = false;
+    faker->control_data_packet = NULL;
     QTAILQ_INIT(&faker->bulk_data_packet_queue);
 
     faker->parser->priv = faker;
@@ -278,7 +278,7 @@ void fake_usbredir_guest_stop(FakeUsbredirGuest *faker)
 {
     g_thread_join(faker->parser_thread);
     g_mutex_clear(&faker->flag_mu);
-    g_free(faker->control_transfer_data);
+    g_free(faker->control_data_packet);
     sem_destroy(&faker->helloed_sem);
     sem_destroy(&faker->if_info_sem);
     sem_destroy(&faker->ep_info_sem);
@@ -382,28 +382,36 @@ void fake_usbredir_guest_control_transfer(FakeUsbredirGuest *faker,
                                           uint16_t value, uint16_t index,
                                           unsigned char *data, uint16_t length)
 {
+    struct usb_redir_control_packet_header *control_header;
     int write_length = 0;
 
     g_mutex_lock(&faker->flag_mu);
     g_assert(faker->device_connected);
     g_mutex_unlock(&faker->flag_mu);
 
+    /* Assert that control data packet should be uninitialized. */
+    g_assert(faker->control_data_packet == NULL);
+
+    faker->control_data_packet = g_new0(ControlDataPacket, 1);
+
+    faker->control_data_packet->packet.id = faker->packet_id++;
+
     if (!(request_type & LIBUSB_ENDPOINT_IN)) {
         write_length = length;
     }
 
-    faker->control_packet.endpoint = request_type & LIBUSB_ENDPOINT_IN;
-    faker->control_packet.requesttype = request_type;
-    faker->control_packet.request = request;
-    faker->control_packet.value = value;
-    faker->control_packet.index = index;
-    faker->control_packet.length = length;
+    control_header = &faker->control_data_packet->header;
+    control_header->endpoint = request_type & LIBUSB_ENDPOINT_IN;
+    control_header->requesttype = request_type;
+    control_header->request = request;
+    control_header->value = value;
+    control_header->index = index;
+    control_header->length = length;
 
-    usbredirparser_send_control_packet(
-        faker->parser, faker->control_transfer_id++, &faker->control_packet,
-        data, write_length);
+    usbredirparser_send_control_packet(faker->parser,
+                                       faker->control_data_packet->packet.id,
+                                       control_header, data, write_length);
     g_assert(usbredirparser_do_write(faker->parser) == 0);
-    faker->control_transfer_inflight = true;
 }
 
 void fake_usbredir_guest_bulk_transfer(FakeUsbredirGuest *faker,
@@ -437,14 +445,17 @@ void fake_usbredir_guest_assert_control_transfer_received(
     FakeUsbredirGuest *faker, uint8_t *data, uint16_t length)
 {
     sem_wait(&faker->control_transfer_sem);
-    g_assert(!faker->control_transfer_inflight);
+    g_assert(faker->control_data_packet != NULL);
+    g_assert(faker->control_data_packet->packet.done);
 
-    if (faker->control_transfer_data != NULL) {
-        g_assert_cmpmem(data, length, faker->control_transfer_data,
-                        faker->control_transfer_length);
-        g_free(faker->control_transfer_data);
-        faker->control_transfer_data = NULL;
+    if (data != NULL) {
+        g_assert_cmpmem(data, length, faker->control_data_packet->packet.data,
+                        faker->control_data_packet->packet.data_length);
+        g_free(faker->control_data_packet->packet.data);
     }
+
+    g_free(faker->control_data_packet);
+    faker->control_data_packet = NULL;
 }
 
 void fake_usbredir_guest_assert_bulk_transfer(FakeUsbredirGuest *faker,
@@ -513,10 +524,11 @@ void fake_usbredir_guest_cancel_transfer(FakeUsbredirGuest *faker)
     g_assert(&faker->device_connected);
     g_mutex_unlock(&faker->flag_mu);
 
-    if (faker->control_transfer_inflight && !faker->control_transfer_canceled) {
-        faker->control_transfer_canceled = true;
-        usbredirparser_send_cancel_data_packet(faker->parser,
-                                               faker->control_transfer_id - 1);
+    if (faker->control_data_packet &&
+        !faker->control_data_packet->packet.canceled) {
+        faker->control_data_packet->packet.canceled = true;
+        usbredirparser_send_cancel_data_packet(
+            faker->parser, faker->control_data_packet->packet.id);
     }
 
     QTAILQ_FOREACH(bulk_data_packet, &faker->bulk_data_packet_queue, next)
