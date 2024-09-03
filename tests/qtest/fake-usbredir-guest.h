@@ -25,6 +25,11 @@ typedef struct DataPacket {
     uint16_t data_length;
 } DataPacket;
 
+typedef struct ControlDataPacket {
+    DataPacket packet;
+    struct usb_redir_control_packet_header header;
+} ControlDataPacket;
+
 typedef struct BulkDataPacket {
     DataPacket packet;
     struct usb_redir_bulk_packet_header header;
@@ -52,12 +57,7 @@ typedef struct FakeUsbredirGuest {
     sem_t device_info_sem;
     struct usb_redir_device_connect_header device_info;
     sem_t control_transfer_sem;
-    bool control_transfer_inflight;
-    uint64_t control_transfer_id;
-    bool control_transfer_canceled;
-    struct usb_redir_control_packet_header control_packet;
-    uint8_t *control_transfer_data;
-    uint16_t control_transfer_length;
+    ControlDataPacket *control_data_packet;
     sem_t bulk_transfer_sem;
     BulkDataPacketQueue bulk_data_packet_queue;
     uint8_t configuration_value;
