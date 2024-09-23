@@ -112,7 +112,7 @@ static const MemoryRegionOps npcm_espi_memops = {
     .write = npcm_espi_core_write,
     .endianness = DEVICE_LITTLE_ENDIAN,
     .valid = {
-        .min_access_size = 4,
+        .min_access_size = 1,
         .max_access_size = 4,
         .unaligned = false,
     }
