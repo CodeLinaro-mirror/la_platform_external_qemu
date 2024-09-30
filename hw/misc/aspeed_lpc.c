@@ -367,6 +367,7 @@ static void aspeed_kcs_handle_req(IPMIInterface *ii, uint8_t msg_id,
 {
     IPMIInterfaceClass *iic = IPMI_INTERFACE_GET_CLASS(ii);
     AspeedKCSChannel *c = iic->get_backend_data(ii);
+    int str_index = aspeed_kcs_channel_map[c->channel_id].str;
 
     /* Drop the request if the last request is still not handled. */
     if (c->inlen > 0) {
@@ -378,6 +379,10 @@ static void aspeed_kcs_handle_req(IPMIInterface *ii, uint8_t msg_id,
     if (req_len > MAX_IPMI_MSG_SIZE) {
         /* Truncate the extra bytes that don't fit. */
         req_len = MAX_IPMI_MSG_SIZE;
+    }
+    if (KCS_ST_STATE(c->owner->regs[str_index]) != IDLE_STATE) {
+        /* drop the request if the we are still handling previous message */
+        return;
     }
     memcpy(c->inmsg, req, req_len);
     c->inpos = 0;
