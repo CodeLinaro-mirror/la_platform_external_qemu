@@ -678,7 +678,8 @@ static void svc_i3c_do_entdaa(SVCI3C *s)
      * get NACKed if no one left on the bus needs an address.
      */
     if (ARRAY_FIELD_EX32(s->regs, MSTATUS, BETWEEN)) {
-        uint8_t addr = ARRAY_FIELD_EX32(s->regs, MWDATAB, DATA);
+        uint8_t addr = 0;
+        svc_i3c_txfifo_pop(s, &addr, sizeof(addr));
         if (i3c_send_byte(s->bus, addr)) {
             qemu_log_mask(LOG_GUEST_ERROR, "%s: Target NACKed address 0x%.2x"
                           "during assignment in ENTDAA.", path, addr);
@@ -861,12 +862,11 @@ static void svc_i3c_mwdatab_w(SVCI3C *s, uint32_t val)
      */
     if (ARRAY_FIELD_EX32(s->regs, MSTATUS, STATE) == SVC_I3C_STATE_DAA) {
         /*
-         * Temporarily store the address and do ENTDAA. This register is WO, so
-         * the address is cleared once it's sent.
+         * If we're in DAA, this is the address byte to assign to the target.
+         * It will be popped from the FIFO when the user continues DAA by
+         * writing a process DAA request.
          */
-        ARRAY_FIELD_DP32(s->regs, MWDATAB, DATA, val);
-        svc_i3c_do_entdaa(s);
-        ARRAY_FIELD_DP32(s->regs, MWDATAB, DATA, 0);
+        svc_i3c_txfifo_push(s, &byte, sizeof(byte));
         return;
     }
 
