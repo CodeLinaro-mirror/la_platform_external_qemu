@@ -149,7 +149,10 @@ static inline int read_ep_info(
     int read_bytes = 0;
 
     for (int i = 0; i < interface_desc->bNumEndpoints; i++) {
-        struct libusb_endpoint_descriptor *ep_desc = (void *)data;
+        /* Copy data to a local struct to avoid alignment issues. */
+        struct libusb_endpoint_descriptor ep_desc_local;
+        memcpy(&ep_desc_local, data, MIN(sizeof(ep_desc_local), data[0]));
+        struct libusb_endpoint_descriptor *ep_desc = &ep_desc_local;
         int ep_index =
             ep_address_to_usbredir_ep_index(ep_desc->bEndpointAddress);
         ep_info->interface[ep_index] = interface_desc->bInterfaceNumber;
@@ -178,7 +181,12 @@ static inline int send_interface_and_ep_info(struct usbredirparser *parser,
     data += config_desc->bLength;
 
     for (int i = 0; i < interface_info.interface_count; i++) {
-        struct libusb_interface_descriptor *interface_desc = (void *)data;
+        /* Copy data to a local struct to avoid alignment issues. */
+        struct libusb_interface_descriptor interface_desc_local;
+        memcpy(&interface_desc_local, data, MIN(sizeof(interface_desc_local),
+                                                data[0]));
+        struct libusb_interface_descriptor *interface_desc =
+            &interface_desc_local;
         data += read_interface_info(&interface_info, interface_desc);
         data += read_ep_info(&ep_info, interface_desc, data);
     }
