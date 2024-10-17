@@ -718,6 +718,7 @@ config RT500
     select RT500_CLKCTL
     select FLEXSPI
     select RT500_RSTCTL
+    select OSTIMER
 
 config RT595_EVK
     bool

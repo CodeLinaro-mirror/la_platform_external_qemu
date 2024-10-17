@@ -13,6 +13,7 @@
 #include "hw/misc/flexcomm.h"
 #include "hw/misc/rt500_clkctl0.h"
 #include "hw/misc/rt500_clkctl1.h"
+#include "hw/timer/ostimer.h"
 #include "hw/ssi/flexspi.h"
 #include "hw/misc/rt500_rstctl.h"
 
@@ -33,6 +34,7 @@ typedef struct RT500State {
     RT500ClkCtl1State clkctl1;
     FlexSpiState flexspi[RT500_FLEXSPI_NUM];
     RT500RstCtlState rstctl[RT500_RSTCTL_NUM];
+    OsTimerState ostimer;
 
     Clock *sysclk;
     Clock *refclk;

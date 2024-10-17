@@ -72,6 +72,8 @@ static void rt500_init(Object *obj)
     object_initialize_child(obj, "clkctl0", &s->clkctl0, TYPE_RT500_CLKCTL0);
     object_initialize_child(obj, "clkctl1", &s->clkctl1, TYPE_RT500_CLKCTL1);
 
+    object_initialize_child(obj, "ostimer", &s->ostimer, TYPE_OSTIMER);
+
     /* Initialize clocks */
     s->sysclk = qdev_init_clock_in(DEVICE(s), "sysclk", NULL, NULL, 0);
     s->refclk = qdev_init_clock_in(DEVICE(s), "refclk", NULL, NULL, 0);
@@ -264,6 +266,14 @@ static void rt500_realize(DeviceState *dev, Error **errp)
     qdev_connect_clock_in(DEVICE(&s->clkctl1), "sysclk", s->sysclk);
     sysbus_realize_and_unref(SYS_BUS_DEVICE(DEVICE(&s->clkctl1)), errp);
     sysbus_mmio_map(SYS_BUS_DEVICE(DEVICE(&s->clkctl1)), 0, RT500_CLKCTL1_BASE);
+
+    qdev_connect_clock_in(DEVICE(&s->ostimer), "clk",
+                        qdev_get_clock_out(DEVICE(&s->clkctl1), "ostimer_clk"));
+    sysbus_realize_and_unref(SYS_BUS_DEVICE(DEVICE(&s->ostimer)), errp);
+    sysbus_mmio_map(SYS_BUS_DEVICE(DEVICE(&s->ostimer)), 0,
+                    RT500_OSTIMER0_BASE);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->ostimer), 0,
+               qdev_get_gpio_in(DEVICE(&s->armv7m), RT500_OS_EVENT_IRQn));
 
     /* Setup FlexSPI */
     for (int i = 0; i < RT500_FLEXSPI_NUM; i++) {
