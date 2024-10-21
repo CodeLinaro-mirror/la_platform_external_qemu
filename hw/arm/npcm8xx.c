@@ -782,6 +782,9 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     for (i = 0; i < ARRAY_SIZE(s->gmac); i++) {
         SysBusDevice *sbd = SYS_BUS_DEVICE(&s->gmac[i]);
 
+        /* This is used to make sure that the NIC can create the device */
+        qemu_configure_nic_device(DEVICE(sbd), false, NULL);
+
         /*
          * The device exists regardless of whether it's connected to a QEMU
          * netdev backend. So always instantiate it even if there is no
