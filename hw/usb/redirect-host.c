@@ -817,7 +817,7 @@ static void usbredir_host_realize(DeviceState *dev, Error **errp)
     } else {
         g_autofree char *path = object_get_canonical_path(
             OBJECT(dev));
-        qemu_log_mask(LOG_TRACE, "%s: continuing without chardev", path);
+        qemu_log_mask(LOG_TRACE, "%s: continuing without chardev\n", path);
     }
 }
 
