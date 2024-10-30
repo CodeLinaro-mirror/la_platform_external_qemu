@@ -49,7 +49,7 @@ endif
 
 # usb device controllers
 if libusb.found() and usbredir.found()
-  system_ss.add(when: 'CONFIG_USB_NPCM8XX', if_true: [libusb, files('npcm8xx-udc.c')])
+  system_ss.add(when: 'CONFIG_USB_NPCM', if_true: [libusb, files('npcm-udc.c')])
   system_ss.add(when: 'CONFIG_USB_REDIRECT_HOST', if_true: [usbredir, files('redirect-host.c')])
 endif
 

@@ -214,7 +214,7 @@ qtests_npcm7xx = \
    (slirp.found() ? ['npcm7xx_emc-test'] : [])
 qtests_npcm8xx = \
   ['npcm_gmac-test'] + \
-  (libusb.found() and usbredir.found() ? ['npcm8xx_udc-test'] : [])
+  (libusb.found() and usbredir.found() ? ['npcm_udc-test'] : [])
 qtests_aspeed = \
   ['aspeed_hace-test',
    'aspeed_smc-test',
@@ -403,7 +403,7 @@ qtests = {
 }
 
 if libusb.found() and usbredir.found()
-  qtests += {'npcm8xx_udc-test': [usbredir, files('fake-usbredir-guest.c')]}
+  qtests += {'npcm_udc-test': [usbredir, files('fake-usbredir-guest.c')]}
 endif
 
 if vnc.found()

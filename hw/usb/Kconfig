@@ -148,7 +148,7 @@ config USB_CHIPIDEA
     bool
     select USB_EHCI_SYSBUS
 
-config USB_NPCM8XX
+config USB_NPCM
     bool
     select USB_REDIRECT_HOST
 

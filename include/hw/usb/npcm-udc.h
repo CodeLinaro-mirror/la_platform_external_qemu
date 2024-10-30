@@ -1,5 +1,5 @@
 /*
- * Nuvoton NPCM8mnx USB 2.0 Device Controller
+ * Nuvoton NPCM USB 2.0 Device Controller
  *
  * Copyright (C) 2023 Google, LLC
  *
@@ -7,16 +7,16 @@
  *
  */
 
-#ifndef NPCM8XX_UDC_H
-#define NPCM8XX_UDC_H
+#ifndef NPCM_UDC_H
+#define NPCM_UDC_H
 
 #include "hw/sysbus.h"
 #include "hw/usb/redirect-host.h"
 #include "qemu/typedefs.h"
 #include "qom/object.h"
 
-#define TYPE_NPCM8XX_UDC "npcm8xx-udc"
-OBJECT_DECLARE_SIMPLE_TYPE(NPCM8xxUDC, NPCM8XX_UDC)
+#define TYPE_NPCM_UDC "npcm-udc"
+OBJECT_DECLARE_SIMPLE_TYPE(NPCMUDC, NPCM_UDC)
 
 typedef struct TransferDescriptor {
     uint32_t next_pointer;
@@ -43,7 +43,7 @@ typedef struct QueueHead {
 #define QH_EP_INFO_MAX_PACKET_LENGTH_MASK 0x3FF0000
 #define QH_EP_INFO_INTERRUPT_ON_SETUP_MASK 0x8000
 
-typedef struct NPCM8xxUDCRegisters {
+typedef struct NPCMUDCRegisters {
     uint32_t command;
     uint32_t status;
     uint32_t interrupt_enable;
@@ -57,11 +57,11 @@ typedef struct NPCM8xxUDCRegisters {
     uint32_t ep0_control;
     uint32_t ep1_control;
     uint32_t ep2_control;
-} NPCM8xxUDCRegisters;
+} NPCMUDCRegisters;
 
-#define NPCM8XX_UDC_NUM_REGS (sizeof(NPCM8xxUDCRegisters) / 4)
+#define NPCM_UDC_NUM_REGS (sizeof(NPCMUDCRegisters) / 4)
 
-typedef struct NPCM8xxUDC {
+typedef struct NPCMUDC {
     SysBusDevice parent;
     MemoryRegion mr;
     qemu_irq irq;
@@ -71,28 +71,28 @@ typedef struct NPCM8xxUDC {
     const USBRedirectHostOps *usbredir_ops;
 
     /*
-     * Registers are stored as array instead of NPCM8xxUDCRegisters because
+     * Registers are stored as array instead of NPCMUDCRegisters because
      * I want to store registers value into the VM state description without
      * manually declaring and storing VM state description fields for each
      * register.
      */
-    uint32_t registers[NPCM8XX_UDC_NUM_REGS];
+    uint32_t registers[NPCM_UDC_NUM_REGS];
     bool running;
     bool attached;
     uint8_t usb_redir_configuration_value;
 
     uint32_t next_rx_td_pointer;
-} NPCM8xxUDC;
+} NPCMUDC;
 
 /**
- * npcm8xx_udc_bind_usbredir_host - Binds a usbredir host to NPCM8xx UDC
- * @udc - The NPCM8xx UDC
+ * npcm_udc_bind_usbredir_host - Binds a usbredir host to NPCM UDC
+ * @udc - The NPCM UDC
  * @usbredir_host - The usbredir host
  */
-static inline void npcm8xx_udc_bind_usbredir_host(
-    NPCM8xxUDC *udc, USBRedirectHost *usbredir_host)
+static inline void npcm_udc_bind_usbredir_host(NPCMUDC *udc,
+                                               USBRedirectHost *usbredir_host)
 {
     udc->usbredir_host = usbredir_host;
 }
 
-#endif /* NPCM8XX_UDC_H */
+#endif /* NPCM_UDC_H */

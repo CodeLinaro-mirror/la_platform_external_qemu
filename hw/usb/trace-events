@@ -369,6 +369,6 @@ canokey_handle_data_in(uint8_t ep_in, uint32_t in_len) "ep %d len %d"
 canokey_realize(void)
 canokey_unrealize(void)
 
-# npcm8xx-udc.c
-npcm8xx_udc_read(uint8_t device_index, uint64_t offset, uint64_t data) "NPCM8xx USB Device Controller[%u]: offset 0x%" PRIx64 " data 0x%" PRIx64
-npcm8xx_udc_write(uint8_t device_index, uint64_t offset, uint64_t data) "NPCM8xx USB Device Controller[%u]: offset 0x%" PRIx64 " data 0x%" PRIx64
+# npcm-udc.c
+npcm_udc_read(uint8_t device_index, uint64_t offset, uint64_t data) "NPCM USB Device Controller[%u]: offset 0x%" PRIx64 " data 0x%" PRIx64
+npcm_udc_write(uint8_t device_index, uint64_t offset, uint64_t data) "NPCM USB Device Controller[%u]: offset 0x%" PRIx64 " data 0x%" PRIx64

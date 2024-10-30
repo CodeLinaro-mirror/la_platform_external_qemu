@@ -1,5 +1,5 @@
 /*
- * Nuvoton NPCM8mnx USB 2.0 Device Controller
+ * Nuvoton NPCM USB 2.0 Device Controller
  *
  * Copyright (C) 2023 Google, LLC
  *
@@ -8,7 +8,7 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/usb/npcm8xx-udc.h"
+#include "hw/usb/npcm-udc.h"
 
 #include <libusb.h>
 
@@ -28,8 +28,8 @@
 #include "qom/object.h"
 #include "trace.h"
 
-#define NPCM8XX_MEMORY_ADDRESS_SIZE 0x1000
-#define NPCM8XX_CONTROL_EP_ADDRESS 0
+#define NPCM_UDC_MEMORY_ADDRESS_SIZE 0x1000
+#define NPCM_UDC_CONTROL_EP_ADDRESS 0
 
 /* Device Control Capability Parameters Register */
 #define DCCPARAMS_INIT_VALUE 0x83
@@ -156,35 +156,18 @@ REG32(ENDPTCTRL2, 0x1C8)
     FIELD(ENDPTCTRL2, TX_DATA_TOGGLE_RESET, 22, 1)
     FIELD(ENDPTCTRL2, TX_ENABLE, 23, 1)
 
-static inline void npcm8xx_udc_control_transfer(NPCM8xxUDC *udc,
-                                                uint8_t request_type,
-                                                uint8_t request, uint16_t value,
-                                                uint16_t index, uint16_t length)
+static void npcm_udc_reset(DeviceState *dev)
 {
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
-    uint32_t ep0_qh_address = registers->endpoint_list_address;
-    uint32_t setup1 = request_type | (request << 8) | (value << 16);
-    uint32_t setup2 = index | (length << 16);
-
-    cpu_physical_memory_write(ep0_qh_address + 40, &setup1, 4);
-    cpu_physical_memory_write(ep0_qh_address + 44, &setup2, 4);
-
-    registers->endpoint_setup_status |= 1;
-    registers->status |= R_USBSTS_USB_INTERRUPT_MASK;
-}
-
-static void npcm8xx_udc_reset(DeviceState *dev)
-{
-    NPCM8xxUDC *udc = NPCM8XX_UDC(dev);
+    NPCMUDC *udc = NPCM_UDC(dev);
     udc->running = false;
 
     /* Clear register */
-    for (int i = 0; i < NPCM8XX_UDC_NUM_REGS; ++i) {
+    for (int i = 0; i < NPCM_UDC_NUM_REGS; ++i) {
         udc->registers[i] = 0;
     }
 
     /* Set initial values */
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
     registers->status = USBSTS_INIT_VALUE;
     registers->interrupt_enable = USBINTR_INIT_VALUE;
     registers->endpoint_list_address = ENDPOINTLISTADDR_INIT_VALUE;
@@ -196,9 +179,26 @@ static void npcm8xx_udc_reset(DeviceState *dev)
     registers->command = USBCMD_INIT_VALUE & ~R_USBCMD_RESET_MASK;
 }
 
-static inline void npcm8xx_udc_update_irq(NPCM8xxUDC *udc)
+static inline void npcm_udc_control_transfer(NPCMUDC *udc,
+                                             uint8_t request_type,
+                                             uint8_t request, uint16_t value,
+                                             uint16_t index, uint16_t length)
 {
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
+    uint32_t ep0_qh_address = registers->endpoint_list_address;
+    uint32_t setup1 = request_type | (request << 8) | (value << 16);
+    uint32_t setup2 = index | (length << 16);
+
+    cpu_physical_memory_write(ep0_qh_address + 40, &setup1, 4);
+    cpu_physical_memory_write(ep0_qh_address + 44, &setup2, 4);
+
+    registers->endpoint_setup_status |= 1;
+    registers->status |= R_USBSTS_USB_INTERRUPT_MASK;
+}
+
+static inline void npcm_udc_update_irq(NPCMUDC *udc)
+{
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
     if (udc->running) {
         qemu_set_irq(udc->irq, registers->interrupt_enable & registers->status);
     } else {
@@ -206,14 +206,14 @@ static inline void npcm8xx_udc_update_irq(NPCM8xxUDC *udc)
     }
 }
 
-static inline void npcm8xx_udc_write_usbcmd(NPCM8xxUDC *udc, uint32_t value)
+static inline void npcm_udc_write_usbcmd(NPCMUDC *udc, uint32_t value)
 {
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
 
     registers->command = value;
 
     if (FIELD_EX32(registers->command, USBCMD, RESET)) {
-        npcm8xx_udc_reset(DEVICE(udc));
+        npcm_udc_reset(DEVICE(udc));
     }
 
     /* Handle run/stop bit toggle */
@@ -228,13 +228,13 @@ static inline void npcm8xx_udc_write_usbcmd(NPCM8xxUDC *udc, uint32_t value)
             registers->status |= R_USBSTS_PORT_CHANGE_DETECT_MASK;
         }
 
-        npcm8xx_udc_update_irq(udc);
+        npcm_udc_update_irq(udc);
     }
 }
 
-static inline void npcm8xx_udc_write_usbsts(NPCM8xxUDC *udc, uint32_t value)
+static inline void npcm_udc_write_usbsts(NPCMUDC *udc, uint32_t value)
 {
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
 
     /* Clear read-only bits */
     value = FIELD_DP32(value, USBSTS, SYSTEM_ERROR, 0);
@@ -258,12 +258,12 @@ static inline void npcm8xx_udc_write_usbsts(NPCM8xxUDC *udc, uint32_t value)
         }
     }
 
-    npcm8xx_udc_update_irq(udc);
+    npcm_udc_update_irq(udc);
 }
 
-static inline void npcm8xx_udc_write_portsc1(NPCM8xxUDC *udc, uint32_t value)
+static inline void npcm_udc_write_portsc1(NPCMUDC *udc, uint32_t value)
 {
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
 
     /* Clear read-only bits */
     uint32_t read_only_mask =
@@ -276,9 +276,9 @@ static inline void npcm8xx_udc_write_portsc1(NPCM8xxUDC *udc, uint32_t value)
         value | (registers->port_control_status & read_only_mask);
 }
 
-static inline void npcm8xx_udc_send_data(NPCM8xxUDC *udc,
-                                         uint8_t endpoint_number,
-                                         TransferDescriptor *td_head)
+static inline void npcm_udc_send_data(NPCMUDC *udc,
+                                      uint8_t endpoint_number,
+                                      TransferDescriptor *td_head)
 {
     TransferDescriptor next_td;
     cpu_physical_memory_read(td_head->next_pointer, &next_td,
@@ -311,9 +311,9 @@ static inline void npcm8xx_udc_send_data(NPCM8xxUDC *udc,
     }
 }
 
-static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
+static inline void npcm_udc_write_endptprime(NPCMUDC *udc, uint32_t value)
 {
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
     QueueHead qh_in;
     const uint32_t rx_qh_base_address = registers->endpoint_list_address;
     const uint32_t tx_qh_base_address = rx_qh_base_address + sizeof(QueueHead);
@@ -354,7 +354,7 @@ static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
         cpu_physical_memory_read(
             tx_qh_base_address + (ep_num << 1) * sizeof(QueueHead),
             &qh_in, sizeof(QueueHead));
-        npcm8xx_udc_send_data(udc, ep_num, &qh_in.td);
+        npcm_udc_send_data(udc, ep_num, &qh_in.td);
     }
 
     /* Process RX transfer descriptor */
@@ -373,12 +373,12 @@ static inline void npcm8xx_udc_write_endptprime(NPCM8xxUDC *udc, uint32_t value)
     }
 
     registers->status |= R_USBSTS_USB_INTERRUPT_MASK;
-    npcm8xx_udc_update_irq(udc);
+    npcm_udc_update_irq(udc);
 }
 
-static inline void npcm8xx_udc_write_endptctrl0(NPCM8xxUDC *udc, uint32_t value)
+static inline void npcm_udc_write_endptctrl0(NPCMUDC *udc, uint32_t value)
 {
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
 
     /* Clear read-only bits */
     uint32_t read_only_mask =
@@ -387,10 +387,10 @@ static inline void npcm8xx_udc_write_endptctrl0(NPCM8xxUDC *udc, uint32_t value)
     registers->ep0_control = value | (registers->ep0_control & read_only_mask);
 }
 
-static uint64_t npcm8xx_udc_read(void *opaque, hwaddr offset, unsigned size)
+static uint64_t npcm_udc_read(void *opaque, hwaddr offset, unsigned size)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDC *udc = NPCM_UDC(opaque);
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
     uint32_t value = 0;
 
     switch (offset) {
@@ -447,15 +447,15 @@ static uint64_t npcm8xx_udc_read(void *opaque, hwaddr offset, unsigned size)
             DEVICE(opaque)->canonical_path, offset);
     }
 
-    trace_npcm8xx_udc_read(udc->device_index, offset, value);
+    trace_npcm_udc_read(udc->device_index, offset, value);
     return value;
 }
 
-static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
+static void npcm_udc_write(void *opaque, hwaddr offset, uint64_t value,
                               unsigned size)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDC *udc = NPCM_UDC(opaque);
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
 
     switch (offset) {
     case A_DCCPARAMS:
@@ -466,20 +466,20 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
                         A_DCCPARAMS);
         break;
     case A_USBCMD:
-        npcm8xx_udc_write_usbcmd(udc, value);
+        npcm_udc_write_usbcmd(udc, value);
         break;
     case A_USBSTS:
-        npcm8xx_udc_write_usbsts(udc, value);
+        npcm_udc_write_usbsts(udc, value);
         break;
     case A_USBINTR:
         registers->interrupt_enable = value;
-        npcm8xx_udc_update_irq(udc);
+        npcm_udc_update_irq(udc);
         break;
     case A_ENDPOINTLISTADDR:
         registers->endpoint_list_address = value;
         break;
     case A_PORTSC1:
-        npcm8xx_udc_write_portsc1(udc, value);
+        npcm_udc_write_portsc1(udc, value);
         break;
     case A_USBMODE:
         registers->mode = value;
@@ -488,7 +488,7 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
         registers->endpoint_setup_status &= ~value;
         break;
     case A_ENDPTPRIME:
-        npcm8xx_udc_write_endptprime(udc, value);
+        npcm_udc_write_endptprime(udc, value);
         break;
     case A_ENDPTFLUSH:
         /**
@@ -508,7 +508,7 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
         registers->endpoint_complete &= ~value;
         break;
     case A_ENDPTCTRL0:
-        npcm8xx_udc_write_endptctrl0(udc, value);
+        npcm_udc_write_endptctrl0(udc, value);
         break;
     case A_ENDPTCTRL1:
         registers->ep1_control = value;
@@ -523,12 +523,12 @@ static void npcm8xx_udc_write(void *opaque, hwaddr offset, uint64_t value,
             DEVICE(opaque)->canonical_path, offset);
     }
 
-    trace_npcm8xx_udc_write(udc->device_index, offset, value);
+    trace_npcm_udc_write(udc->device_index, offset, value);
 }
 
-static const MemoryRegionOps npcm8xx_udc_mr_ops = {
-    .read = npcm8xx_udc_read,
-    .write = npcm8xx_udc_write,
+static const MemoryRegionOps npcm_udc_mr_ops = {
+    .read = npcm_udc_read,
+    .write = npcm_udc_write,
     .valid = {
         .min_access_size = 4,
         .max_access_size = 4,
@@ -536,10 +536,10 @@ static const MemoryRegionOps npcm8xx_udc_mr_ops = {
     },
 };
 
-static uint8_t npcm8xx_udc_usbredir_attach(void *opaque)
+static uint8_t npcm_udc_usbredir_attach(void *opaque)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDC *udc = NPCM_UDC(opaque);
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
 
     udc->attached = true;
 
@@ -548,14 +548,14 @@ static uint8_t npcm8xx_udc_usbredir_attach(void *opaque)
         registers->status |= R_USBSTS_PORT_CHANGE_DETECT_MASK;
     }
 
-    npcm8xx_udc_update_irq(udc);
-    return NPCM8XX_CONTROL_EP_ADDRESS;
+    npcm_udc_update_irq(udc);
+    return NPCM_UDC_CONTROL_EP_ADDRESS;
 }
 
-static void npcm8xx_udc_usbredir_detach(void *opaque)
+static void npcm_udc_usbredir_detach(void *opaque)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDC *udc = NPCM_UDC(opaque);
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
 
     udc->attached = false;
 
@@ -564,12 +564,12 @@ static void npcm8xx_udc_usbredir_detach(void *opaque)
         registers->status |= R_USBSTS_PORT_CHANGE_DETECT_MASK;
     }
 
-    npcm8xx_udc_update_irq(udc);
+    npcm_udc_update_irq(udc);
 }
 
-static void npcm8xx_udc_usbredir_reset(void *opaque)
+static void npcm_udc_usbredir_reset(void *opaque)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+    NPCMUDC *udc = NPCM_UDC(opaque);
 
     if (udc->attached) {
         /* Undefined behavior, so do nothing. */
@@ -580,31 +580,31 @@ static void npcm8xx_udc_usbredir_reset(void *opaque)
         return;
     }
 
-    npcm8xx_udc_reset(DEVICE(udc));
+    npcm_udc_reset(DEVICE(udc));
 }
 
-static void npcm8xx_udc_usbredir_control_transfer(
+static void npcm_udc_usbredir_control_transfer(
     void *opaque, uint8_t endpoint_address, uint8_t request_type,
     uint8_t request, uint16_t value, uint16_t index, uint16_t length,
     uint8_t *data, int data_len)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
+    NPCMUDC *udc = NPCM_UDC(opaque);
 
     if ((endpoint_address & LIBUSB_ENDPOINT_ADDRESS_MASK) != 0) {
         usbredir_host_control_transfer_complete(udc->usbredir_host, NULL, 0);
     }
 
-    npcm8xx_udc_control_transfer(udc, request_type, request, value, index,
+    npcm_udc_control_transfer(udc, request_type, request, value, index,
                                  length);
-    npcm8xx_udc_update_irq(udc);
+    npcm_udc_update_irq(udc);
 }
 
-static void npcm8xx_udc_usbredir_write_data(void *opaque,
-                                            uint8_t endpoint_address,
-                                            uint8_t *data, int data_len)
+static void npcm_udc_usbredir_write_data(void *opaque,
+                                         uint8_t endpoint_address,
+                                         uint8_t *data, int data_len)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(opaque);
-    NPCM8xxUDCRegisters *registers = (NPCM8xxUDCRegisters *)udc->registers;
+    NPCMUDC *udc = NPCM_UDC(opaque);
+    NPCMUDCRegisters *registers = (NPCMUDCRegisters *)udc->registers;
     QueueHead rx_qh;
     TransferDescriptor rx_td;
     uint32_t request_len;
@@ -641,60 +641,60 @@ static void npcm8xx_udc_usbredir_write_data(void *opaque,
     registers->endpoint_complete |= (1 << ep_num);
     registers->endpoint_status &= ~R_ENDPTSTAT_RX_BUFFER_MASK;
     registers->status |= R_USBSTS_USB_INTERRUPT_MASK;
-    npcm8xx_udc_update_irq(udc);
+    npcm_udc_update_irq(udc);
 }
 
-static const USBRedirectHostOps npcm8xx_udc_usbredir_ops = {
-    .on_attach = npcm8xx_udc_usbredir_attach,
-    .on_detach = npcm8xx_udc_usbredir_detach,
-    .reset = npcm8xx_udc_usbredir_reset,
-    .control_transfer = npcm8xx_udc_usbredir_control_transfer,
-    .data_out = npcm8xx_udc_usbredir_write_data,
+static const USBRedirectHostOps npcm_udc_usbredir_ops = {
+    .on_attach = npcm_udc_usbredir_attach,
+    .on_detach = npcm_udc_usbredir_detach,
+    .reset = npcm_udc_usbredir_reset,
+    .control_transfer = npcm_udc_usbredir_control_transfer,
+    .data_out = npcm_udc_usbredir_write_data,
 };
 
-static const VMStateDescription vmstate_npcm8xx_udc = {
-    .name = TYPE_NPCM8XX_UDC,
+static const VMStateDescription vmstate_npcm_udc = {
+    .name = TYPE_NPCM_UDC,
     .version_id = 0,
     .minimum_version_id = 0,
     .fields = (VMStateField[]){
-        VMSTATE_UINT32_ARRAY(registers, NPCM8xxUDC, NPCM8XX_UDC_NUM_REGS),
+        VMSTATE_UINT32_ARRAY(registers, NPCMUDC, NPCM_UDC_NUM_REGS),
         VMSTATE_END_OF_LIST(),
     }
 };
 
-static void npcm8xx_udc_realize(DeviceState *dev, Error **err)
+static void npcm_udc_realize(DeviceState *dev, Error **err)
 {
-    NPCM8xxUDC *udc = NPCM8XX_UDC(dev);
-    memory_region_init_io(&udc->mr, OBJECT(udc), &npcm8xx_udc_mr_ops, udc,
-                          TYPE_NPCM8XX_UDC, NPCM8XX_MEMORY_ADDRESS_SIZE);
+    NPCMUDC *udc = NPCM_UDC(dev);
+    memory_region_init_io(&udc->mr, OBJECT(udc), &npcm_udc_mr_ops, udc,
+                          TYPE_NPCM_UDC, NPCM_UDC_MEMORY_ADDRESS_SIZE);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &udc->mr);
     sysbus_init_irq(SYS_BUS_DEVICE(dev), &udc->irq);
-    udc->usbredir_ops = &npcm8xx_udc_usbredir_ops;
+    udc->usbredir_ops = &npcm_udc_usbredir_ops;
 }
 
-static const Property npcm8xx_udc_properties[] = {
-    DEFINE_PROP_UINT8("device-index", NPCM8xxUDC, device_index, 0xff),
+static const Property npcm_udc_properties[] = {
+    DEFINE_PROP_UINT8("device-index", NPCMUDC, device_index, 0xff),
 };
 
-static void npcm8xx_udc_class_init(ObjectClass *klass, void *data)
+static void npcm_udc_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    device_class_set_props(dc, npcm8xx_udc_properties);
-    dc->realize = npcm8xx_udc_realize;
-    device_class_set_legacy_reset(dc, npcm8xx_udc_reset);
-    dc->vmsd = &vmstate_npcm8xx_udc;
+    device_class_set_props(dc, npcm_udc_properties);
+    dc->realize = npcm_udc_realize;
+    device_class_set_legacy_reset(dc, npcm_udc_reset);
+    dc->vmsd = &vmstate_npcm_udc;
 }
 
-static const TypeInfo npcm8xx_udc_info = {
-    .name = TYPE_NPCM8XX_UDC,
+static const TypeInfo npcm_udc_info = {
+    .name = TYPE_NPCM_UDC,
     .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(NPCM8xxUDC),
-    .class_init = npcm8xx_udc_class_init,
+    .instance_size = sizeof(NPCMUDC),
+    .class_init = npcm_udc_class_init,
 };
 
-static void npcm8xx_udc_register_type(void)
+static void npcm_udc_register_type(void)
 {
-    type_register_static(&npcm8xx_udc_info);
+    type_register_static(&npcm_udc_info);
 }
 
-type_init(npcm8xx_udc_register_type)
+type_init(npcm_udc_register_type)
