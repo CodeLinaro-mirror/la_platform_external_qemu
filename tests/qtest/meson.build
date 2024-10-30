@@ -424,7 +424,7 @@ qtests = {
 }
 
 if libusb.found() and usbredir.found()
-  qtests += {'npcm8xx_udc-test': [usbredir, files('fake-usbredir-guest.c')]}
+  qtests += {'npcm_udc-test': [usbredir, files('fake-usbredir-guest.c')]}
 endif
 
 if vnc.found()

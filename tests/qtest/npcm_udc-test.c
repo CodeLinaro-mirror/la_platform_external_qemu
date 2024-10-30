@@ -1,5 +1,5 @@
 /*
- * QTests for Nuvoton NPCM8mnx USB Device Controller
+ * QTests for Nuvoton NPCM USB Device Controller
  *
  * Copyright (C) 2023 Google, LLC
  *
@@ -7,11 +7,11 @@
  *
  */
 
-#include <libusb-1.0/libusb.h>
-#include <string.h>
-
 #include "qemu/osdep.h"
-#include "hw/usb/npcm8xx-udc.h"
+#include "hw/usb/npcm-udc.h"
+
+#include <libusb-1.0/libusb.h>
+
 #include "fake-usbredir-guest.h"
 #include "libqtest-single.h"
 #include "socket_util.h"
@@ -19,8 +19,8 @@
 #define MILLI_SECOND 1000
 
 /* Device values */
-#define NPCM8xxUDC6_BASE_ADDR 0xf0836000
-#define NPCM8xxUDC6_IRQ 57
+#define NPCM_UDC6_BASE_ADDR 0xf0836000
+#define NPCM_UDC6_IRQ 57
 
 /* Fake test values */
 #define EP_TD_BASE_ADDR 0x800000
@@ -153,85 +153,85 @@ static inline void make_control_transfer_packet(uint32_t *target,
 }
 
 /* NPCM UDC Driver */
-static inline void npcm8xx_udc_reset(void)
+static inline void npcm_udc_reset(void)
 {
     uint32_t command;
     /* Disable interrupt */
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBINTR, 0);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBINTR, 0);
 
     /* Stop the UDC */
-    command = readl(NPCM8xxUDC6_BASE_ADDR + R_USBCMD);
+    command = readl(NPCM_UDC6_BASE_ADDR + R_USBCMD);
     command &= ~F_USBCMD_RUN;
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBCMD, command);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBCMD, command);
 
     /* Reset the UDC */
     command |= F_USBCMD_RESET;
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBCMD, command);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBCMD, command);
 
     /* Make sure the UDC has reset */
-    command = readl(NPCM8xxUDC6_BASE_ADDR + R_USBCMD);
+    command = readl(NPCM_UDC6_BASE_ADDR + R_USBCMD);
     g_assert((command & F_USBCMD_RESET) == 0);
 }
 
-static inline void npcm8xx_udc_init(void)
+static inline void npcm_udc_init(void)
 {
     int ep_count;
     uint32_t mode, params, ep_ctrl;
-    npcm8xx_udc_reset();
+    npcm_udc_reset();
 
     /* Set up UDC mode */
-    mode = readl(NPCM8xxUDC6_BASE_ADDR + R_USBMODE);
+    mode = readl(NPCM_UDC6_BASE_ADDR + R_USBMODE);
     mode |= F_USBMODE_BIG_ENDIANNESS | F_USBMODE_SETUP_LOCKOUT_OFF;
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBMODE, mode);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBMODE, mode);
 
     /* Set endpoint transfer descriptor address */
-    writel(NPCM8xxUDC6_BASE_ADDR + R_ENDPOINTLISTADDR, EP_TD_BASE_ADDR);
+    writel(NPCM_UDC6_BASE_ADDR + R_ENDPOINTLISTADDR, EP_TD_BASE_ADDR);
 
     /*
      * Initialize all endpoints except endpoint 0 because ep0 is initialized by
      * default.
      */
-    params = readl(NPCM8xxUDC6_BASE_ADDR + R_DCCPARAMS);
+    params = readl(NPCM_UDC6_BASE_ADDR + R_DCCPARAMS);
     ep_count = params & M_DCCPARAMS_DEVICE_ENDPOINT_NUMBER;
     for (int i = 1; i < ep_count; i++) {
-        uint64_t addr = NPCM8xxUDC6_BASE_ADDR + R_ENDPTCTRL0 + (4 * i);
+        uint64_t addr = NPCM_UDC6_BASE_ADDR + R_ENDPTCTRL0 + (4 * i);
         ep_ctrl = readl(addr);
         ep_ctrl |= F_ENDPTCTRL_TX_BULK_TYPE | F_ENDPTCTRL_RX_BULK_TYPE;
         writel(addr, ep_ctrl);
     }
 }
 
-static inline void npcm8xx_udc_run(void)
+static inline void npcm_udc_run(void)
 {
     uint32_t command, interrupt;
 
     /* Enable interrupts */
     interrupt =
         F_USBINTR_USB_INTERRUPT | F_USBINTR_USB_PORT_CHANGE_DETECT_INTERRUPT;
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBINTR, interrupt);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBINTR, interrupt);
 
     /* Run the UDC */
-    command = readl(NPCM8xxUDC6_BASE_ADDR + R_USBCMD);
+    command = readl(NPCM_UDC6_BASE_ADDR + R_USBCMD);
     command |= F_USBCMD_RUN;
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBCMD, command);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBCMD, command);
 }
 
-static inline void npcm8xx_udc_handle_port_connect(void)
+static inline void npcm_udc_handle_port_connect(void)
 {
     uint32_t port_status, usb_status;
 
     /* Assert IRQ */
-    port_status = readl(NPCM8xxUDC6_BASE_ADDR + R_PORTSC1);
+    port_status = readl(NPCM_UDC6_BASE_ADDR + R_PORTSC1);
     g_assert_true(port_status & M_PORTSC1_CONNECT_STATUS);
-    usb_status = readl(NPCM8xxUDC6_BASE_ADDR + R_USBSTS);
+    usb_status = readl(NPCM_UDC6_BASE_ADDR + R_USBSTS);
     g_assert_true(usb_status & M_USBSTS_PORT_CHANGE_DETECT);
 
     /* Clear USB interrupt status */
     usb_status &= M_USBSTS_PORT_CHANGE_DETECT;
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBSTS, usb_status);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBSTS, usb_status);
 }
 
-static inline void npcm8xx_udc_init_tx_queue_head(uint32_t endpoint_mask)
+static inline void npcm_udc_init_tx_queue_head(uint32_t endpoint_mask)
 {
     QueueHead tx_qh = {};
     TransferDescriptor tx_td = {};
@@ -252,7 +252,7 @@ static inline void npcm8xx_udc_init_tx_queue_head(uint32_t endpoint_mask)
     }
 }
 
-static inline void npcm8xx_udc_init_rx_queue_head(uint32_t endpoint_mask)
+static inline void npcm_udc_init_rx_queue_head(uint32_t endpoint_mask)
 {
     QueueHead rx_qh = {};
     TransferDescriptor rx_td = {};
@@ -272,17 +272,17 @@ static inline void npcm8xx_udc_init_rx_queue_head(uint32_t endpoint_mask)
     }
 }
 
-static inline void npcm8xx_udc_assert_and_clear_irq(uint32_t expected_status)
+static inline void npcm_udc_assert_and_clear_irq(uint32_t expected_status)
 {
     uint32_t actual_status;
 
-    g_assert_true(get_irq(NPCM8xxUDC6_IRQ));
-    actual_status = readl(NPCM8xxUDC6_BASE_ADDR + R_USBSTS);
+    g_assert_true(get_irq(NPCM_UDC6_IRQ));
+    actual_status = readl(NPCM_UDC6_BASE_ADDR + R_USBSTS);
     g_assert_cmphex(actual_status, ==, expected_status);
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBSTS, actual_status);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBSTS, actual_status);
 }
 
-static inline void npcm8xx_udc_assert_receive_control_transfer(
+static inline void npcm_udc_assert_receive_control_transfer(
     uint8_t request_type, uint8_t request, uint16_t value, uint16_t index,
     uint16_t length)
 {
@@ -294,8 +294,8 @@ static inline void npcm8xx_udc_assert_receive_control_transfer(
                                  request, value, index, length);
 
     /* Assert IRQ and interrupt status */
-    npcm8xx_udc_assert_and_clear_irq(F_USBSTS_USB_INTERRUPT);
-    ep_setup_status = readl(NPCM8xxUDC6_BASE_ADDR + R_ENDPTSETUPSTAT);
+    npcm_udc_assert_and_clear_irq(F_USBSTS_USB_INTERRUPT);
+    ep_setup_status = readl(NPCM_UDC6_BASE_ADDR + R_ENDPTSETUPSTAT);
     g_assert_true(ep_setup_status & 1);
 
     /* Verify the control transfer is a standard GET_DESCRIPTOR */
@@ -304,8 +304,8 @@ static inline void npcm8xx_udc_assert_receive_control_transfer(
     g_assert_cmphex(ep0_rx_qh.setup[1], ==, expected_control_packets[1]);
 }
 
-static inline void npcm8xx_udc_send(uint8_t endpoint_address, uint8_t *data,
-                                    int length)
+static inline void npcm_udc_send(uint8_t endpoint_address, uint8_t *data,
+                                 int length)
 {
     TransferDescriptor tx_td;
     uint8_t ep_num = endpoint_address & LIBUSB_ENDPOINT_ADDRESS_MASK;
@@ -321,29 +321,29 @@ static inline void npcm8xx_udc_send(uint8_t endpoint_address, uint8_t *data,
     memwrite(BASE_EP_IN_TD_BUFFER_POINTER, data, length);
 
     /* Prime the endpoint */
-    writel(NPCM8xxUDC6_BASE_ADDR + R_ENDPTPRIME, endpoint_mask);
+    writel(NPCM_UDC6_BASE_ADDR + R_ENDPTPRIME, endpoint_mask);
 }
 
-static inline void npcm8xx_udc_assert_sent(uint8_t endpoint_address)
+static inline void npcm_udc_assert_sent(uint8_t endpoint_address)
 {
     uint32_t endpoint_complete, actual_status;
     uint8_t ep_num = endpoint_address & LIBUSB_ENDPOINT_ADDRESS_MASK;
     uint32_t endpoint_mask = (1 << ep_num) << R_ENDPTPRIME_TX_BUFFER_SHIFT;
 
-    g_assert_true(get_irq(NPCM8xxUDC6_IRQ));
-    actual_status = readl(NPCM8xxUDC6_BASE_ADDR + R_USBSTS);
+    g_assert_true(get_irq(NPCM_UDC6_IRQ));
+    actual_status = readl(NPCM_UDC6_BASE_ADDR + R_USBSTS);
     g_assert_cmphex(actual_status, ==, F_USBSTS_USB_INTERRUPT);
-    endpoint_complete = readl(NPCM8xxUDC6_BASE_ADDR + R_ENDPTCOMPLETE);
+    endpoint_complete = readl(NPCM_UDC6_BASE_ADDR + R_ENDPTCOMPLETE);
     g_assert_cmphex(endpoint_complete, ==, endpoint_mask);
 
     /* Clear endpoint complete */
-    writel(NPCM8xxUDC6_BASE_ADDR + R_ENDPTCOMPLETE, endpoint_complete);
-    endpoint_complete = readl(NPCM8xxUDC6_BASE_ADDR + R_ENDPTCOMPLETE);
+    writel(NPCM_UDC6_BASE_ADDR + R_ENDPTCOMPLETE, endpoint_complete);
+    endpoint_complete = readl(NPCM_UDC6_BASE_ADDR + R_ENDPTCOMPLETE);
     g_assert_cmphex(endpoint_complete, ==, 0);
 }
 
-static inline void npcm8xx_udc_prepare_receive(uint8_t endpoint_address,
-                                               uint16_t buffer_length)
+static inline void npcm_udc_prepare_receive(uint8_t endpoint_address,
+                                            uint16_t buffer_length)
 {
     TransferDescriptor rx_td = {};
     uint64_t td_pointer;
@@ -359,10 +359,10 @@ static inline void npcm8xx_udc_prepare_receive(uint8_t endpoint_address,
     memwrite(td_pointer, &rx_td, sizeof(TransferDescriptor));
 }
 
-static inline void npcm8xx_udc_assert_received(uint8_t endpoint_address,
-                                               uint32_t buffer_length,
-                                               uint8_t *expected_data,
-                                               uint32_t expected_length)
+static inline void npcm_udc_assert_received(uint8_t endpoint_address,
+                                            uint32_t buffer_length,
+                                            uint8_t *expected_data,
+                                            uint32_t expected_length)
 {
     TransferDescriptor rx_td = {};
     uint64_t td_pointer = BASE_EP_OUT_NEXT_TD_POINTER +
@@ -386,30 +386,30 @@ static inline void npcm8xx_udc_assert_received(uint8_t endpoint_address,
     g_free(actual_data_buffer);
 }
 
-static inline void npcm8xx_udc_connect_device(uint8_t *config_desc,
-                                              int config_desc_length,
-                                              uint8_t *dev_desc,
-                                              int dev_desc_length)
+static inline void npcm_udc_connect_device(uint8_t *config_desc,
+                                           int config_desc_length,
+                                           uint8_t *dev_desc,
+                                           int dev_desc_length)
 {
     uint32_t endpoint_mask;
 
-    npcm8xx_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
+    npcm_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
                                                 LIBUSB_REQUEST_GET_DESCRIPTOR,
                                                 LIBUSB_DT_CONFIG << 8, 0, 512);
 
     endpoint_mask = 1 << R_ENDPTPRIME_TX_BUFFER_SHIFT;
-    npcm8xx_udc_init_tx_queue_head(endpoint_mask);
-    npcm8xx_udc_send(0, config_desc, config_desc_length);
-    npcm8xx_udc_assert_sent(0);
+    npcm_udc_init_tx_queue_head(endpoint_mask);
+    npcm_udc_send(0, config_desc, config_desc_length);
+    npcm_udc_assert_sent(0);
 
     /* NPCM UDC should send device descriptor now */
-    npcm8xx_udc_assert_receive_control_transfer(
+    npcm_udc_assert_receive_control_transfer(
         LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_DESCRIPTOR,
         LIBUSB_DT_DEVICE << 8, 0, LIBUSB_DT_DEVICE_SIZE);
-    npcm8xx_udc_send(0, (void *)&fake_usb_device_desc,
+    npcm_udc_send(0, (void *)&fake_usb_device_desc,
                      fake_usb_device_desc.bLength);
-    npcm8xx_udc_assert_sent(0);
-    npcm8xx_udc_assert_and_clear_irq(F_USBSTS_USB_INTERRUPT);
+    npcm_udc_assert_sent(0);
+    npcm_udc_assert_and_clear_irq(F_USBSTS_USB_INTERRUPT);
 }
 
 /* NPCM UDC Unit Tests */
@@ -420,31 +420,31 @@ static void test_register_access(void)
     uint32_t new_value = 0;
 
     /* Test DCCPARAMS register */
-    init_value = readl(NPCM8xxUDC6_BASE_ADDR + R_DCCPARAMS);
-    writel(NPCM8xxUDC6_BASE_ADDR + R_DCCPARAMS, ~init_value);
-    g_assert_cmphex(readl(NPCM8xxUDC6_BASE_ADDR + R_DCCPARAMS), ==, init_value);
+    init_value = readl(NPCM_UDC6_BASE_ADDR + R_DCCPARAMS);
+    writel(NPCM_UDC6_BASE_ADDR + R_DCCPARAMS, ~init_value);
+    g_assert_cmphex(readl(NPCM_UDC6_BASE_ADDR + R_DCCPARAMS), ==, init_value);
 
     /* Test USBSTS register */
-    init_value = readl(NPCM8xxUDC6_BASE_ADDR + R_USBSTS);
-    writel(NPCM8xxUDC6_BASE_ADDR + R_USBSTS, test_write_value);
+    init_value = readl(NPCM_UDC6_BASE_ADDR + R_USBSTS);
+    writel(NPCM_UDC6_BASE_ADDR + R_USBSTS, test_write_value);
 
-    new_value = readl(NPCM8xxUDC6_BASE_ADDR + R_USBSTS);
+    new_value = readl(NPCM_UDC6_BASE_ADDR + R_USBSTS);
     g_assert_cmphex(new_value, !=, init_value);
     g_assert_cmphex(new_value, ==, 0x100);
 
     /* Test PORTSC1 register */
-    init_value = readl(NPCM8xxUDC6_BASE_ADDR + R_PORTSC1);
-    writel(NPCM8xxUDC6_BASE_ADDR + R_PORTSC1, test_write_value);
+    init_value = readl(NPCM_UDC6_BASE_ADDR + R_PORTSC1);
+    writel(NPCM_UDC6_BASE_ADDR + R_PORTSC1, test_write_value);
 
-    new_value = readl(NPCM8xxUDC6_BASE_ADDR + R_PORTSC1);
+    new_value = readl(NPCM_UDC6_BASE_ADDR + R_PORTSC1);
     g_assert_cmphex(new_value, !=, init_value);
     g_assert_cmphex(new_value, ==, 0xDBFFF27E);
 
     /* Test ENDPTCTRL0 register */
-    init_value = readl(NPCM8xxUDC6_BASE_ADDR + R_ENDPTCTRL0);
-    writel(NPCM8xxUDC6_BASE_ADDR + R_ENDPTCTRL0, test_write_value);
+    init_value = readl(NPCM_UDC6_BASE_ADDR + R_ENDPTCTRL0);
+    writel(NPCM_UDC6_BASE_ADDR + R_ENDPTCTRL0, test_write_value);
 
-    new_value = readl(NPCM8xxUDC6_BASE_ADDR + R_ENDPTCTRL0);
+    new_value = readl(NPCM_UDC6_BASE_ADDR + R_ENDPTCTRL0);
     g_assert_cmphex(new_value, !=, init_value);
     g_assert_cmphex(new_value, ==, 0xffffffff);
 }
@@ -471,16 +471,16 @@ static void test_run_device(const void *data)
     fake_usbredir_guest_init(&faker, fd);
     fake_usbredir_guest_start(&faker);
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
+    npcm_udc_init();
+    npcm_udc_run();
 
     fake_usbredir_guest_stop(&faker);
 
     /* Verify the UDC is in run state */
-    g_assert_true(get_irq(NPCM8xxUDC6_IRQ));
-    port_status = readl(NPCM8xxUDC6_BASE_ADDR + R_PORTSC1);
+    g_assert_true(get_irq(NPCM_UDC6_IRQ));
+    port_status = readl(NPCM_UDC6_BASE_ADDR + R_PORTSC1);
     g_assert_true(port_status & M_PORTSC1_CONNECT_STATUS);
-    usb_status = readl(NPCM8xxUDC6_BASE_ADDR + R_USBSTS);
+    usb_status = readl(NPCM_UDC6_BASE_ADDR + R_USBSTS);
     g_assert_true(usb_status & M_USBSTS_PORT_CHANGE_DETECT);
 
     close(fd);
@@ -498,13 +498,13 @@ static void test_connect_device_port(const void *data)
     /* Make sure fake usbredir guest is ready before checking port status. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
 
     fake_usbredir_guest_stop(&faker);
 
-    npcm8xx_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
+    npcm_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
                                                 LIBUSB_REQUEST_GET_DESCRIPTOR,
                                                 LIBUSB_DT_CONFIG << 8, 0, 512);
 
@@ -524,19 +524,19 @@ static void test_connect_device(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
                                                 LIBUSB_REQUEST_GET_DESCRIPTOR,
                                                 LIBUSB_DT_CONFIG << 8, 0, 512);
 
     /* Reply configuration descriptor */
     endpoint_mask = 1 << R_ENDPTPRIME_TX_BUFFER_SHIFT;
-    npcm8xx_udc_init_tx_queue_head(endpoint_mask);
-    npcm8xx_udc_send(0, test_data->serialized_config_desc,
+    npcm_udc_init_tx_queue_head(endpoint_mask);
+    npcm_udc_send(0, test_data->serialized_config_desc,
                      test_data->serialized_config_desc_length);
-    npcm8xx_udc_assert_sent(0);
+    npcm_udc_assert_sent(0);
 
     /* Verify faker's interface */
     fake_usbredir_guest_assert_num_interfaces(&faker, 1);
@@ -550,12 +550,12 @@ static void test_connect_device(const void *data)
         &faker, &fake_usb_ep_desc[1], fake_usb_if_desc.bInterfaceNumber);
 
     /* NPCM UDC should send device descriptor now */
-    npcm8xx_udc_assert_receive_control_transfer(
+    npcm_udc_assert_receive_control_transfer(
         LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_DESCRIPTOR,
         LIBUSB_DT_DEVICE << 8, 0, LIBUSB_DT_DEVICE_SIZE);
-    npcm8xx_udc_send(0, (void *)&fake_usb_device_desc,
+    npcm_udc_send(0, (void *)&fake_usb_device_desc,
                      fake_usb_device_desc.bLength);
-    npcm8xx_udc_assert_sent(0);
+    npcm_udc_assert_sent(0);
 
     fake_usbredir_guest_stop(&faker);
 
@@ -577,10 +577,10 @@ static void test_control_transfer(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_connect_device(test_data->serialized_config_desc,
                                test_data->serialized_config_desc_length,
                                (void *)&fake_usb_device_desc,
                                fake_usb_device_desc.bLength);
@@ -592,16 +592,16 @@ static void test_control_transfer(const void *data)
         LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_CONFIG << 8, 0, NULL, 512);
 
     /* Wait for the control transfer to come through. */
-    while (!get_irq(NPCM8xxUDC6_IRQ)) {
+    while (!get_irq(NPCM_UDC6_IRQ)) {
         /* Do nothing. */
     }
 
-    npcm8xx_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
+    npcm_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
                                                 LIBUSB_REQUEST_GET_DESCRIPTOR,
                                                 LIBUSB_DT_CONFIG << 8, 0, 512);
-    npcm8xx_udc_send(0, (void *)&fake_usb_config_desc,
+    npcm_udc_send(0, (void *)&fake_usb_config_desc,
                      fake_usb_config_desc.bLength);
-    npcm8xx_udc_assert_sent(0);
+    npcm_udc_assert_sent(0);
     fake_usbredir_guest_assert_control_transfer_received(
         &faker, (void *)&fake_usb_config_desc, fake_usb_config_desc.bLength);
 
@@ -623,10 +623,10 @@ static void test_usbredir_host_set_configuration(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_connect_device(test_data->serialized_config_desc,
                                test_data->serialized_config_desc_length,
                                (void *)&fake_usb_device_desc,
                                fake_usb_device_desc.bLength);
@@ -635,23 +635,23 @@ static void test_usbredir_host_set_configuration(const void *data)
         &faker, fake_usb_config_desc.bConfigurationValue);
 
     /* Wait for the control transfer to come through. */
-    while (!get_irq(NPCM8xxUDC6_IRQ)) {
+    while (!get_irq(NPCM_UDC6_IRQ)) {
         /* Do nothing. */
     }
 
     /* First receive the set configuration control transfer */
-    npcm8xx_udc_assert_receive_control_transfer(
+    npcm_udc_assert_receive_control_transfer(
         LIBUSB_ENDPOINT_OUT, LIBUSB_REQUEST_SET_CONFIGURATION,
         fake_usb_config_desc.bConfigurationValue, 0, 0);
     /* Response with empty data to ACK the request */
-    npcm8xx_udc_send(endpoint_mask, NULL, 0);
+    npcm_udc_send(endpoint_mask, NULL, 0);
 
-    npcm8xx_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
+    npcm_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
                                                 LIBUSB_REQUEST_GET_DESCRIPTOR,
                                                 LIBUSB_DT_CONFIG << 8, 0, 512);
-    npcm8xx_udc_send(0, test_data->serialized_config_desc,
+    npcm_udc_send(0, test_data->serialized_config_desc,
                      test_data->serialized_config_desc_length);
-    npcm8xx_udc_assert_sent(0);
+    npcm_udc_assert_sent(0);
 
     fake_usbredir_guest_stop(&faker);
     close(fd);
@@ -670,10 +670,10 @@ static void test_usbredir_host_set_alt_setting(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_connect_device(test_data->serialized_config_desc,
                                test_data->serialized_config_desc_length,
                                (void *)&fake_usb_device_desc,
                                fake_usb_device_desc.bLength);
@@ -683,24 +683,24 @@ static void test_usbredir_host_set_alt_setting(const void *data)
                                           fake_usb_if_desc.bAlternateSetting);
 
     /* Wait for the control transfer to come through. */
-    while (!get_irq(NPCM8xxUDC6_IRQ)) {
+    while (!get_irq(NPCM_UDC6_IRQ)) {
         /* Do nothing. */
     }
 
     /* First receive the set alt setting control transfer */
-    npcm8xx_udc_assert_receive_control_transfer(
+    npcm_udc_assert_receive_control_transfer(
         LIBUSB_ENDPOINT_OUT | LIBUSB_RECIPIENT_INTERFACE,
         LIBUSB_REQUEST_SET_INTERFACE, fake_usb_if_desc.bAlternateSetting,
         fake_usb_if_desc.bInterfaceNumber, 0);
     /* Response with empty data to ACK the request */
-    npcm8xx_udc_send(endpoint_mask, NULL, 0);
+    npcm_udc_send(endpoint_mask, NULL, 0);
 
-    npcm8xx_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
+    npcm_udc_assert_receive_control_transfer(LIBUSB_ENDPOINT_IN,
                                                 LIBUSB_REQUEST_GET_DESCRIPTOR,
                                                 LIBUSB_DT_CONFIG << 8, 0, 512);
-    npcm8xx_udc_send(0, test_data->serialized_config_desc,
+    npcm_udc_send(0, test_data->serialized_config_desc,
                      test_data->serialized_config_desc_length);
-    npcm8xx_udc_assert_sent(0);
+    npcm_udc_assert_sent(0);
 
     fake_usbredir_guest_stop(&faker);
     close(fd);
@@ -722,37 +722,37 @@ static void test_usbredir_host_bulk_transfer_write(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_connect_device(test_data->serialized_config_desc,
                                test_data->serialized_config_desc_length,
                                (void *)&fake_usb_device_desc,
                                fake_usb_device_desc.bLength);
 
-    npcm8xx_udc_init_rx_queue_head(endpoint_mask);
-    npcm8xx_udc_prepare_receive(endpoint_address, sizeof(test_bulk_data));
+    npcm_udc_init_rx_queue_head(endpoint_mask);
+    npcm_udc_prepare_receive(endpoint_address, sizeof(test_bulk_data));
 
     /* Write test bulk data. */
     fake_usbredir_guest_bulk_transfer(&faker, endpoint_address, test_bulk_data,
                                       sizeof(test_bulk_data));
 
     /* Wait for the bulk transfer to come through. */
-    while (!get_irq(NPCM8xxUDC6_IRQ)) {
+    while (!get_irq(NPCM_UDC6_IRQ)) {
         /* Do nothing. */
     }
 
     /* Assert transfer status */
-    npcm8xx_udc_assert_and_clear_irq(F_USBSTS_USB_INTERRUPT);
-    ep_complete = readl(NPCM8xxUDC6_BASE_ADDR + R_ENDPTCOMPLETE);
+    npcm_udc_assert_and_clear_irq(F_USBSTS_USB_INTERRUPT);
+    ep_complete = readl(NPCM_UDC6_BASE_ADDR + R_ENDPTCOMPLETE);
     g_assert_cmphex(ep_complete, ==, endpoint_mask);
 
     /* Assert the correctness of the transferred data */
-    npcm8xx_udc_assert_received(endpoint_address, sizeof(test_bulk_data),
+    npcm_udc_assert_received(endpoint_address, sizeof(test_bulk_data),
                                 test_bulk_data, sizeof(test_bulk_data));
 
     /* Ack the bulk transfer write */
-    writel(NPCM8xxUDC6_BASE_ADDR + R_ENDPTPRIME, endpoint_mask);
+    writel(NPCM_UDC6_BASE_ADDR + R_ENDPTPRIME, endpoint_mask);
 
     fake_usbredir_guest_assert_bulk_transfer(&faker, NULL, 0);
 
@@ -775,22 +775,22 @@ static void test_usbredir_host_bulk_transfer_read(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_connect_device(test_data->serialized_config_desc,
                                test_data->serialized_config_desc_length,
                                (void *)&fake_usb_device_desc,
                                fake_usb_device_desc.bLength);
 
-    npcm8xx_udc_init_tx_queue_head(endpoint_mask);
+    npcm_udc_init_tx_queue_head(endpoint_mask);
 
     /* Request bulk transfer out. */
     fake_usbredir_guest_bulk_transfer(&faker, endpoint_address, NULL,
                                       sizeof(test_bulk_data));
 
-    npcm8xx_udc_send(endpoint_address, test_bulk_data, sizeof(test_bulk_data));
-    npcm8xx_udc_assert_sent(endpoint_address);
+    npcm_udc_send(endpoint_address, test_bulk_data, sizeof(test_bulk_data));
+    npcm_udc_assert_sent(endpoint_address);
 
     fake_usbredir_guest_assert_bulk_transfer(&faker, test_bulk_data,
                                              sizeof(test_bulk_data));
@@ -813,10 +813,10 @@ static void test_usbredir_host_cancel_data_packet(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_connect_device(test_data->serialized_config_desc,
                                test_data->serialized_config_desc_length,
                                (void *)&fake_usb_device_desc,
                                fake_usb_device_desc.bLength);
@@ -869,10 +869,10 @@ static void test_usbredir_host_cancel_burst_data_packets(const void *data)
     /* Make sure fake usbredir guest is ready before writing to it. */
     g_assert(fake_usbredir_guest_helloed(&faker));
 
-    npcm8xx_udc_init();
-    npcm8xx_udc_run();
-    npcm8xx_udc_handle_port_connect();
-    npcm8xx_udc_connect_device(test_data->serialized_config_desc,
+    npcm_udc_init();
+    npcm_udc_run();
+    npcm_udc_handle_port_connect();
+    npcm_udc_connect_device(test_data->serialized_config_desc,
                                test_data->serialized_config_desc_length,
                                (void *)&fake_usb_device_desc,
                                fake_usb_device_desc.bLength);
@@ -942,27 +942,27 @@ int main(int argc, char **argv)
     qtest_irq_intercept_in(global_qtest, "/machine/soc/gic");
 
     setup_test_data(&test_data, sock);
-    qtest_add_func("/npcm8xx_udc/register_access", test_register_access);
-    qtest_add_data_func("/npcm8xx_udc/attach_device", &test_data,
+    qtest_add_func("/npcm_udc/register_access", test_register_access);
+    qtest_add_data_func("/npcm_udc/attach_device", &test_data,
                         test_attach_device);
-    qtest_add_data_func("/npcm8xx_udc/run_device", &test_data, test_run_device);
-    qtest_add_data_func("/npcm8xx_udc/connect_device_port", &test_data,
+    qtest_add_data_func("/npcm_udc/run_device", &test_data, test_run_device);
+    qtest_add_data_func("/npcm_udc/connect_device_port", &test_data,
                         test_connect_device_port);
-    qtest_add_data_func("/npcm8xx_udc/connect_device", &test_data,
+    qtest_add_data_func("/npcm_udc/connect_device", &test_data,
                         test_connect_device);
-    qtest_add_data_func("/npcm8xx_udc/control_transfer", &test_data,
+    qtest_add_data_func("/npcm_udc/control_transfer", &test_data,
                         test_control_transfer);
-    qtest_add_data_func("/npcm8xx_udc/usbredir_host_set_configuration",
+    qtest_add_data_func("/npcm_udc/usbredir_host_set_configuration",
                         &test_data, test_usbredir_host_set_configuration);
-    qtest_add_data_func("/npcm8xx_udc/usbredir_host_set_alt_setting",
+    qtest_add_data_func("/npcm_udc/usbredir_host_set_alt_setting",
                         &test_data, test_usbredir_host_set_alt_setting);
-    qtest_add_data_func("/npcm8xx_udc/usbredir_host_bulk_transfer_write",
+    qtest_add_data_func("/npcm_udc/usbredir_host_bulk_transfer_write",
                         &test_data, test_usbredir_host_bulk_transfer_write);
-    qtest_add_data_func("/npcm8xx_udc/usbredir_host_bulk_transfer_read",
+    qtest_add_data_func("/npcm_udc/usbredir_host_bulk_transfer_read",
                         &test_data, test_usbredir_host_bulk_transfer_read);
-    qtest_add_data_func("/npcm8xx_udc/usbredir_host_cancel_data_packet",
+    qtest_add_data_func("/npcm_udc/usbredir_host_cancel_data_packet",
                         &test_data, test_usbredir_host_cancel_data_packet);
-    qtest_add_data_func("/npcm8xx_udc/usbredir_host_cancel_burst_data_packets",
+    qtest_add_data_func("/npcm_udc/usbredir_host_cancel_burst_data_packets",
                         &test_data,
                         test_usbredir_host_cancel_burst_data_packets);
 

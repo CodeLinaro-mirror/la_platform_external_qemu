@@ -30,7 +30,7 @@
 #include "hw/core/qdev.h"
 #include "hw/core/qdev-properties.h"
 #include "hw/core/sysbus.h"
-#include "hw/usb/npcm8xx-udc.h"
+#include "hw/usb/npcm-udc.h"
 #include "hw/usb/redirect-host.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
@@ -516,7 +516,7 @@ static void npcm8xx_init(Object *obj)
                             TYPE_USB_REDIR_HOST);
 
     for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
-        object_initialize_child(obj, "udc[*]", &s->udc[i], TYPE_NPCM8XX_UDC);
+        object_initialize_child(obj, "udc[*]", &s->udc[i], TYPE_NPCM_UDC);
     }
 
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm8xx_fiu) != ARRAY_SIZE(s->fiu));
@@ -770,7 +770,7 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
                            npcm8xx_irq(s, NPCM8XX_UDC0_IRQ + i));
     }
 
-    npcm8xx_udc_bind_usbredir_host(&s->udc[6], &s->usbredir_host);
+    npcm_udc_bind_usbredir_host(&s->udc[6], &s->usbredir_host);
     usbredir_host_set_ops(&s->usbredir_host, s->udc[6].usbredir_ops,
                           &s->udc[6]);
 
