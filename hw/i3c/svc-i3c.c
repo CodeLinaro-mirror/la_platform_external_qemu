@@ -432,6 +432,10 @@ static int svc_i3c_ibi_finish(I3CBus *bus)
     SVCI3C *s = SVC_I3C(bus->qbus.parent);
     g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
+    if (ARRAY_FIELD_EX32(s->regs, MCTRL, REQUEST) == SVC_I3C_REQUEST_AUTO_IBI) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+    }
+
     trace_svc_i3c_ibi_finish(path);
     return 0;
 }
