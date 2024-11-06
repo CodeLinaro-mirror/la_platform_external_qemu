@@ -121,7 +121,8 @@ static void pmbus_generic_init(Object *obj)
                       PB_HAS_IOUT_GAIN | PB_HAS_POUT | PB_HAS_PIN | PB_HAS_EIN |
                       PB_HAS_EOUT | PB_HAS_POUT_RATING | PB_HAS_PIN_RATING |
                       PB_HAS_TEMPERATURE | PB_HAS_TEMP2 | PB_HAS_TEMP3 |
-                      PB_HAS_TEMP_RATING | PB_HAS_FAN | PB_HAS_MFR_INFO;
+                      PB_HAS_TEMP_RATING | PB_HAS_FAN | PB_HAS_MFR_INFO |
+                      PB_HAS_VCAP;
 
     for (int i = 0; i < PB_GENERIC_NUM_PAGES; i++) {
         pmbus_page_config(pmdev, i, flags);
