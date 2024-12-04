@@ -126,452 +126,451 @@ static void pmbus_generic_init(Object *obj)
 
     for (int i = 0; i < PB_GENERIC_NUM_PAGES; i++) {
         pmbus_page_config(pmdev, i, flags);
-
-        object_property_add(obj, "operation[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].operation);
-
-        object_property_add(obj, "on_off_config[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].on_off_config);
-
-        object_property_add(obj, "write_protect[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].write_protect);
-
-        object_property_add(obj, "phase[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].phase);
-
-        object_property_add(obj, "vout_mode[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].vout_mode);
-
-        object_property_add(obj, "vout_command[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_command);
-
-        object_property_add(obj, "vout_trim[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_trim);
-
-        object_property_add(obj, "vout_cal_offset[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_cal_offset);
-
-        object_property_add(obj, "vout_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_max);
-
-        object_property_add(obj, "vout_margin_high[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_margin_high);
-
-        object_property_add(obj, "vout_margin_low[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_margin_low);
-
-        object_property_add(obj, "vout_transition_rate[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_transition_rate);
-
-        object_property_add(obj, "vout_droop[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_droop);
-
-        object_property_add(obj, "vout_scale_loop[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_scale_loop);
-
-        object_property_add(obj, "vout_scale_monitor[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_scale_monitor);
-
-        object_property_add(obj, "vout_min[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_min);
-
-        object_property_add(obj, "pout_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].pout_max);
-
-        object_property_add(obj, "max_duty[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].max_duty);
-
-        object_property_add(obj, "frequency_switch[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].frequency_switch);
-
-        object_property_add(obj, "vin_on[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vin_on);
-
-        object_property_add(obj, "vin_off[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vin_off);
-
-        object_property_add(obj, "iout_cal_gain[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iout_cal_gain);
-
-        object_property_add(obj, "iout_cal_offset[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iout_cal_offset);
-
-        object_property_add(obj, "fan_config_1_2[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].fan_config_1_2);
-
-        object_property_add(obj, "fan_command_1[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].fan_command_1);
-
-        object_property_add(obj, "fan_command_2[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].fan_command_2);
-
-        object_property_add(obj, "fan_config_3_4[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].fan_config_3_4);
-
-        object_property_add(obj, "fan_command_3[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].fan_command_3);
-
-        object_property_add(obj, "fan_command_4[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].fan_command_4);
-
-        object_property_add(obj, "vout_ov_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_ov_fault_limit);
-
-        object_property_add(obj, "vout_ov_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].vout_ov_fault_response);
-
-        object_property_add(obj, "vout_ov_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_ov_warn_limit);
-
-        object_property_add(obj, "vout_uv_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_uv_warn_limit);
-
-        object_property_add(obj, "vout_uv_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vout_uv_fault_limit);
-
-        object_property_add(obj, "vout_uv_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].vout_uv_fault_response);
-
-        object_property_add(obj, "iout_oc_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iout_oc_fault_limit);
-
-        object_property_add(obj, "iout_oc_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].iout_oc_fault_response);
-
-        object_property_add(obj, "iout_oc_lv_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iout_oc_lv_fault_limit);
-
-        object_property_add(obj, "iout_oc_lv_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].iout_oc_lv_fault_response);
-
-        object_property_add(obj, "iout_oc_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iout_oc_warn_limit);
-
-        object_property_add(obj, "iout_uc_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iout_uc_fault_limit);
-
-        object_property_add(obj, "iout_uc_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].iout_uc_fault_response);
-
-        object_property_add(obj, "ot_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].ot_fault_limit);
-
-        object_property_add(obj, "ot_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].ot_fault_response);
-
-        object_property_add(obj, "ot_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].ot_warn_limit);
-
-        object_property_add(obj, "ut_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].ut_warn_limit);
-
-        object_property_add(obj, "ut_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].ut_fault_limit);
-
-        object_property_add(obj, "ut_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].ut_fault_response);
-
-        object_property_add(obj, "vin_ov_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vin_ov_fault_limit);
-
-        object_property_add(obj, "vin_ov_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].vin_ov_fault_response);
-
-        object_property_add(obj, "vin_ov_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vin_ov_warn_limit);
-
-        object_property_add(obj, "vin_uv_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vin_uv_warn_limit);
-
-        object_property_add(obj, "vin_uv_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].vin_uv_fault_limit);
-
-        object_property_add(obj, "vin_uv_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].vin_uv_fault_response);
-
-        object_property_add(obj, "iin_oc_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iin_oc_fault_limit);
-
-        object_property_add(obj, "iin_oc_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].iin_oc_fault_response);
-
-        object_property_add(obj, "iin_oc_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].iin_oc_warn_limit);
-
-        object_property_add(obj, "power_good_on[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].power_good_on);
-
-        object_property_add(obj, "power_good_off[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].power_good_off);
-
-        object_property_add(obj, "ton_delay[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].ton_delay);
-
-        object_property_add(obj, "ton_rise[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].ton_rise);
-
-        object_property_add(obj, "ton_max_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].ton_max_fault_limit);
-
-        object_property_add(obj, "ton_max_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].ton_max_fault_response);
-
-        object_property_add(obj, "toff_delay[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].toff_delay);
-
-        object_property_add(obj, "toff_fall[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].toff_fall);
-
-        object_property_add(obj, "toff_max_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].toff_max_warn_limit);
-
-        object_property_add(obj, "pout_op_fault_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].pout_op_fault_limit);
-
-        object_property_add(obj, "pout_op_fault_response[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].pout_op_fault_response);
-
-        object_property_add(obj, "pout_op_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].pout_op_warn_limit);
-
-        object_property_add(obj, "pin_op_warn_limit[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].pin_op_warn_limit);
-
-        object_property_add(obj, "status_word[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].status_word);
-
-        object_property_add(obj, "status_vout[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_vout);
-
-        object_property_add(obj, "status_iout[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_iout);
-
-        object_property_add(obj, "status_input[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_input);
-
-        object_property_add(obj, "status_temperature[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_temperature);
-
-        object_property_add(obj, "status_cml[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_cml);
-
-        object_property_add(obj, "status_other[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_other);
-
-        object_property_add(obj, "status_mfr_specific[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_mfr_specific);
-
-        object_property_add(obj, "status_fans_1_2[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_fans_1_2);
-
-        object_property_add(obj, "status_fans_3_4[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].status_fans_3_4);
-
-        object_property_add(obj, "read_vin[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_vin);
-
-        object_property_add(obj, "read_iin[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_iin);
-
-        object_property_add(obj, "read_vcap[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_vcap);
-
-        object_property_add(obj, "read_vout[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_vout);
-
-        object_property_add(obj, "read_iout[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_iout);
-
-        object_property_add(obj, "read_temperature_1[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_temperature_1);
-
-        object_property_add(obj, "read_temperature_2[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_temperature_2);
-
-        object_property_add(obj, "read_temperature_3[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_temperature_3);
-
-        object_property_add(obj, "read_fan_speed_1[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_fan_speed_1);
-
-        object_property_add(obj, "read_fan_speed_2[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_fan_speed_2);
-
-        object_property_add(obj, "read_fan_speed_3[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_fan_speed_3);
-
-        object_property_add(obj, "read_fan_speed_4[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_fan_speed_4);
-
-        object_property_add(obj, "read_duty_cycle[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_duty_cycle);
-
-        object_property_add(obj, "read_frequency[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_frequency);
-
-        object_property_add(obj, "read_pout[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_pout);
-
-        object_property_add(obj, "read_pin[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].read_pin);
-
-        object_property_add(obj, "revision[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].revision);
-
-        object_property_add(obj, "mfr_vin_min[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_vin_min);
-
-        object_property_add(obj, "mfr_vin_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_vin_max);
-
-        object_property_add(obj, "mfr_iin_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_iin_max);
-
-        object_property_add(obj, "mfr_pin_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_pin_max);
-
-        object_property_add(obj, "mfr_vout_min[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_vout_min);
-
-        object_property_add(obj, "mfr_vout_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_vout_max);
-
-        object_property_add(obj, "mfr_iout_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_iout_max);
-
-        object_property_add(obj, "mfr_pout_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_pout_max);
-
-        object_property_add(obj, "mfr_tambient_max[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_tambient_max);
-
-        object_property_add(obj, "mfr_tambient_min[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_tambient_min);
-
-        object_property_add(obj, "mfr_pin_accuracy[*]", "uint8",
-                            pmbus_generic_get8, pmbus_generic_set8, NULL,
-                            &pmdev->pages[i].mfr_pin_accuracy);
-
-        object_property_add(obj, "mfr_max_temp_1[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_max_temp_1);
-
-        object_property_add(obj, "mfr_max_temp_2[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_max_temp_2);
-
-        object_property_add(obj, "mfr_max_temp_3[*]", "uint16",
-                            pmbus_generic_get16, pmbus_generic_set16, NULL,
-                            &pmdev->pages[i].mfr_max_temp_3);
-
     }
+
+    object_property_add(obj, "operation", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].operation);
+
+    object_property_add(obj, "on_off_config", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].on_off_config);
+
+    object_property_add(obj, "write_protect", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].write_protect);
+
+    object_property_add(obj, "phase", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].phase);
+
+    object_property_add(obj, "vout_mode", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].vout_mode);
+
+    object_property_add(obj, "vout_command", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_command);
+
+    object_property_add(obj, "vout_trim", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_trim);
+
+    object_property_add(obj, "vout_cal_offset", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_cal_offset);
+
+    object_property_add(obj, "vout_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_max);
+
+    object_property_add(obj, "vout_margin_high", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_margin_high);
+
+    object_property_add(obj, "vout_margin_low", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_margin_low);
+
+    object_property_add(obj, "vout_transition_rate", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_transition_rate);
+
+    object_property_add(obj, "vout_droop", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_droop);
+
+    object_property_add(obj, "vout_scale_loop", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_scale_loop);
+
+    object_property_add(obj, "vout_scale_monitor", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_scale_monitor);
+
+    object_property_add(obj, "vout_min", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_min);
+
+    object_property_add(obj, "pout_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].pout_max);
+
+    object_property_add(obj, "max_duty", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].max_duty);
+
+    object_property_add(obj, "frequency_switch", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].frequency_switch);
+
+    object_property_add(obj, "vin_on", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vin_on);
+
+    object_property_add(obj, "vin_off", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vin_off);
+
+    object_property_add(obj, "iout_cal_gain", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iout_cal_gain);
+
+    object_property_add(obj, "iout_cal_offset", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iout_cal_offset);
+
+    object_property_add(obj, "fan_config_1_2", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].fan_config_1_2);
+
+    object_property_add(obj, "fan_command_1", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].fan_command_1);
+
+    object_property_add(obj, "fan_command_2", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].fan_command_2);
+
+    object_property_add(obj, "fan_config_3_4", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].fan_config_3_4);
+
+    object_property_add(obj, "fan_command_3", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].fan_command_3);
+
+    object_property_add(obj, "fan_command_4", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].fan_command_4);
+
+    object_property_add(obj, "vout_ov_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_ov_fault_limit);
+
+    object_property_add(obj, "vout_ov_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].vout_ov_fault_response);
+
+    object_property_add(obj, "vout_ov_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_ov_warn_limit);
+
+    object_property_add(obj, "vout_uv_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_uv_warn_limit);
+
+    object_property_add(obj, "vout_uv_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vout_uv_fault_limit);
+
+    object_property_add(obj, "vout_uv_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].vout_uv_fault_response);
+
+    object_property_add(obj, "iout_oc_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iout_oc_fault_limit);
+
+    object_property_add(obj, "iout_oc_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].iout_oc_fault_response);
+
+    object_property_add(obj, "iout_oc_lv_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iout_oc_lv_fault_limit);
+
+    object_property_add(obj, "iout_oc_lv_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].iout_oc_lv_fault_response);
+
+    object_property_add(obj, "iout_oc_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iout_oc_warn_limit);
+
+    object_property_add(obj, "iout_uc_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iout_uc_fault_limit);
+
+    object_property_add(obj, "iout_uc_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].iout_uc_fault_response);
+
+    object_property_add(obj, "ot_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].ot_fault_limit);
+
+    object_property_add(obj, "ot_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].ot_fault_response);
+
+    object_property_add(obj, "ot_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].ot_warn_limit);
+
+    object_property_add(obj, "ut_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].ut_warn_limit);
+
+    object_property_add(obj, "ut_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].ut_fault_limit);
+
+    object_property_add(obj, "ut_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].ut_fault_response);
+
+    object_property_add(obj, "vin_ov_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vin_ov_fault_limit);
+
+    object_property_add(obj, "vin_ov_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].vin_ov_fault_response);
+
+    object_property_add(obj, "vin_ov_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vin_ov_warn_limit);
+
+    object_property_add(obj, "vin_uv_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vin_uv_warn_limit);
+
+    object_property_add(obj, "vin_uv_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].vin_uv_fault_limit);
+
+    object_property_add(obj, "vin_uv_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].vin_uv_fault_response);
+
+    object_property_add(obj, "iin_oc_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iin_oc_fault_limit);
+
+    object_property_add(obj, "iin_oc_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].iin_oc_fault_response);
+
+    object_property_add(obj, "iin_oc_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].iin_oc_warn_limit);
+
+    object_property_add(obj, "power_good_on", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].power_good_on);
+
+    object_property_add(obj, "power_good_off", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].power_good_off);
+
+    object_property_add(obj, "ton_delay", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].ton_delay);
+
+    object_property_add(obj, "ton_rise", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].ton_rise);
+
+    object_property_add(obj, "ton_max_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].ton_max_fault_limit);
+
+    object_property_add(obj, "ton_max_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].ton_max_fault_response);
+
+    object_property_add(obj, "toff_delay", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].toff_delay);
+
+    object_property_add(obj, "toff_fall", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].toff_fall);
+
+    object_property_add(obj, "toff_max_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].toff_max_warn_limit);
+
+    object_property_add(obj, "pout_op_fault_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].pout_op_fault_limit);
+
+    object_property_add(obj, "pout_op_fault_response", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].pout_op_fault_response);
+
+    object_property_add(obj, "pout_op_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].pout_op_warn_limit);
+
+    object_property_add(obj, "pin_op_warn_limit", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].pin_op_warn_limit);
+
+    object_property_add(obj, "status_word", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].status_word);
+
+    object_property_add(obj, "status_vout", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_vout);
+
+    object_property_add(obj, "status_iout", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_iout);
+
+    object_property_add(obj, "status_input", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_input);
+
+    object_property_add(obj, "status_temperature", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_temperature);
+
+    object_property_add(obj, "status_cml", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_cml);
+
+    object_property_add(obj, "status_other", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_other);
+
+    object_property_add(obj, "status_mfr_specific", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_mfr_specific);
+
+    object_property_add(obj, "status_fans_1_2", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_fans_1_2);
+
+    object_property_add(obj, "status_fans_3_4", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].status_fans_3_4);
+
+    object_property_add(obj, "read_vin", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_vin);
+
+    object_property_add(obj, "read_iin", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_iin);
+
+    object_property_add(obj, "read_vcap", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_vcap);
+
+    object_property_add(obj, "read_vout", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_vout);
+
+    object_property_add(obj, "read_iout", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_iout);
+
+    object_property_add(obj, "read_temperature_1", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_temperature_1);
+
+    object_property_add(obj, "read_temperature_2", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_temperature_2);
+
+    object_property_add(obj, "read_temperature_3", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_temperature_3);
+
+    object_property_add(obj, "read_fan_speed_1", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_fan_speed_1);
+
+    object_property_add(obj, "read_fan_speed_2", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_fan_speed_2);
+
+    object_property_add(obj, "read_fan_speed_3", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_fan_speed_3);
+
+    object_property_add(obj, "read_fan_speed_4", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_fan_speed_4);
+
+    object_property_add(obj, "read_duty_cycle", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_duty_cycle);
+
+    object_property_add(obj, "read_frequency", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_frequency);
+
+    object_property_add(obj, "read_pout", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_pout);
+
+    object_property_add(obj, "read_pin", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].read_pin);
+
+    object_property_add(obj, "revision", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].revision);
+
+    object_property_add(obj, "mfr_vin_min", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_vin_min);
+
+    object_property_add(obj, "mfr_vin_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_vin_max);
+
+    object_property_add(obj, "mfr_iin_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_iin_max);
+
+    object_property_add(obj, "mfr_pin_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_pin_max);
+
+    object_property_add(obj, "mfr_vout_min", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_vout_min);
+
+    object_property_add(obj, "mfr_vout_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_vout_max);
+
+    object_property_add(obj, "mfr_iout_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_iout_max);
+
+    object_property_add(obj, "mfr_pout_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_pout_max);
+
+    object_property_add(obj, "mfr_tambient_max", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_tambient_max);
+
+    object_property_add(obj, "mfr_tambient_min", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_tambient_min);
+
+    object_property_add(obj, "mfr_pin_accuracy", "uint8",
+                        pmbus_generic_get8, pmbus_generic_set8, NULL,
+                        &pmdev->pages[0].mfr_pin_accuracy);
+
+    object_property_add(obj, "mfr_max_temp_1", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_max_temp_1);
+
+    object_property_add(obj, "mfr_max_temp_2", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_max_temp_2);
+
+    object_property_add(obj, "mfr_max_temp_3", "uint16",
+                        pmbus_generic_get16, pmbus_generic_set16, NULL,
+                        &pmdev->pages[0].mfr_max_temp_3);
 
     object_property_add(obj, "num_pages", "uint8",
                         pmbus_generic_get8, pmbus_generic_set8,
