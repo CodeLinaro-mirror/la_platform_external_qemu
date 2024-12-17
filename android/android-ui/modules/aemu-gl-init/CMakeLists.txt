@@ -26,7 +26,7 @@ android_add_test(
   SRC android/opengl/emugl_config_unittest.cpp
       android/opengl/EmuglBackendList_unittest.cpp
       android/opengl/EmuglBackendScanner_unittest.cpp
-  DEPS aemu-gl-init android-emu-base android-emu-base-headers
+  DEPS aemu-gl-init android-emu android-emu-base android-emu-base-headers
        android-emu-feature gmock_main qemu-host-common-headers)
 
 target_include_directories(aemu-gl-init_unittests PRIVATE src)
