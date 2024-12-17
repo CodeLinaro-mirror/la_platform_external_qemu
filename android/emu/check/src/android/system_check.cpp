@@ -57,7 +57,7 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
     const int minNumCores = isXrAvd ? 4 : 2;
     const int idealMinNumCores = isXrAvd ? 8 : 4;
     if (numCores < minNumCores) {
-        // < 0.1% of our users as of 11/24
+        // < 0.1% of our users as of November 2024
         return {
                 .description =
                         absl::StrFormat("AVD '%s' requires %d CPU cores to "
@@ -66,7 +66,7 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
                 .status = AvdCompatibility::Error,
         };
     } else if (numCores < idealMinNumCores) {
-        // < 2% of our users as of 11/24
+        // < 2% of our users as of November 2024
         return {
                 .description =
                         absl::StrFormat("AVD '%s' will run more smoothly with "
