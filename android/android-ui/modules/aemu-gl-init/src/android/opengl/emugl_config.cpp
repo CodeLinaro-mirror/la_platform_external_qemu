@@ -29,6 +29,7 @@
 #include "android/opengl/EmuglBackendList.h"
 #include "android/opengl/gpuinfo.h"
 #include "android/skin/backend-defs.h"
+#include "android/cpu_accelerator.h"
 #include "host-common/crash-handler.h"
 #include "host-common/feature_control.h"
 #include "host-common/opengles.h"
@@ -858,7 +859,7 @@ bool emuglConfig_init(EmuglConfig* config,
              "GPU emulation enabled using '%s' mode", gpu_mode);
     setCurrentRenderer(gpu_mode);
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
     // todo: add the amd/intel gpu quirks
     const bool hwGpuRequested =
             (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST);
@@ -876,30 +877,44 @@ bool emuglConfig_init(EmuglConfig* config,
         // where kvm apparently error out with Bad Address
         emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
                                             &vkPatch, nullptr, nullptr);
-        bool isAMD = (vkVendor && strncmp("AMD", vkVendor, 3) == 0);
-        bool isIntel = (vkVendor && strncmp("Intel", vkVendor, 5) == 0);
-        if (isAMD) {
-            feature_set_if_not_overridden(
-                    kFeature_VulkanAllocateDeviceMemoryOnly, true);
-            if (fc::isEnabled(fc::VulkanAllocateDeviceMemoryOnly)) {
-                dinfo("Enabled VulkanAllocateDeviceMemoryOnly feature for "
-                      "gpu "
-                      "vendor %s on Linux\n",
-                      vkVendor);
-            }
-        }
-        if (isIntel || isAMD) {
-            feature_set_if_not_overridden(kFeature_VulkanAllocateHostMemory,
-                                          true);
-            if (fc::isEnabled(fc::VulkanAllocateHostMemory)) {
-                dinfo("Enabled VulkanAllocateHostMemory feature for "
-                      "gpu "
-                      "vendor %s on Linux\n",
-                      vkVendor);
-            }
-        }
-
         if (vkVendor) {
+            bool isAMD = (strncmp("AMD", vkVendor, 3) == 0);
+            bool isIntel = (strncmp("Intel", vkVendor, 5) == 0);
+            bool isNvidia = (strncmp("NVIDIA", vkVendor, 6) == 0);
+            if (isAMD) {
+                feature_set_if_not_overridden(
+                        kFeature_VulkanAllocateDeviceMemoryOnly, true);
+                if (fc::isEnabled(fc::VulkanAllocateDeviceMemoryOnly)) {
+                    dinfo("Enabled VulkanAllocateDeviceMemoryOnly feature for "
+                          "gpu "
+                          "vendor %s on Linux\n",
+                          vkVendor);
+                }
+            }
+            bool hostMemoryOnWindows = false;
+            bool hostMemoryOnLinux = false;
+#if defined(__linux__)
+            hostMemoryOnLinux = (isIntel || isAMD);
+#endif
+#if defined(_WIN32)
+            // bug: 382621412
+            // Nvidia GPUs can create BSODs and hangs when AEHD is enabled.
+            AndroidCpuAccelerator accelerator =
+                    androidCpuAcceleration_getAccelerator();
+            hostMemoryOnWindows =
+                    isNvidia && (accelerator == ANDROID_CPU_ACCELERATOR_AEHD);
+#endif
+            if (hostMemoryOnLinux || hostMemoryOnWindows) {
+                feature_set_if_not_overridden(kFeature_VulkanAllocateHostMemory,
+                                              true);
+                if (fc::isEnabled(fc::VulkanAllocateHostMemory)) {
+                    dinfo("Enabled VulkanAllocateHostMemory feature for "
+                          "gpu "
+                          "vendor %s on Linux\n",
+                          vkVendor);
+                }
+            }
+
             free(vkVendor);
         }
     }

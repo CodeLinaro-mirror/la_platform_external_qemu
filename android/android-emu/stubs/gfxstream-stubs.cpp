@@ -64,16 +64,6 @@ namespace crashreport {
     CrashReporter* CrashReporter::get() { return 0; }
 }
 
-CpuAccelerator GetCurrentCpuAccelerator() {
-#if defined(__linux__)
-    return CPU_ACCELERATOR_KVM;
-#elif defined(__APPLE__)
-    return CPU_ACCELERATOR_HVF;
-#else
-    return CPU_ACCELERATOR_HAX;
-#endif
-}
-
 } // namespace android
 
 void tinyepoxy_init(const gfxstream::gl::GLESv2Dispatch* gles, int version) {
