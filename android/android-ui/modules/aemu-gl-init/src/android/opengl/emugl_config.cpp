@@ -350,7 +350,8 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
     return selectedGpuIndex;
 }
 
-bool emuglConfig_get_vulkan_hardware_gpu_support_info(DeviceSupportInfo* outProps);
+bool emuglConfig_get_vulkan_hardware_gpu_support_info(
+        DeviceSupportInfo* outProps);
 
 void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
                                          int* major,
@@ -364,7 +365,7 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     }
 
     DeviceSupportInfo vkProps;
-    if(!emuglConfig_get_vulkan_hardware_gpu_support_info(&vkProps)) {
+    if (!emuglConfig_get_vulkan_hardware_gpu_support_info(&vkProps)) {
         return;
     }
 
@@ -378,9 +379,9 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     // depend on string comparison for vendor matching.
     std::string vendorName = physicalProp.deviceName;
     std::vector<std::pair<uint32_t, std::string>> vendorIdPairs = {
-        {4318, "NVIDIA"},
-        {32902, "Intel"},
-        {4098, "AMD"},
+            {4318, "NVIDIA"},
+            {32902, "Intel"},
+            {4098, "AMD"},
     };
     for (auto& p : vendorIdPairs) {
         if (physicalProp.vendorID == p.first) {
@@ -402,12 +403,12 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     }
 }
 
-
 static bool sVkPropsInitialized = false;
 DeviceSupportInfo sVkProps = {};
 
-bool emuglConfig_get_vulkan_hardware_gpu_support_info(DeviceSupportInfo* outProps) {
-    if(!outProps) {
+bool emuglConfig_get_vulkan_hardware_gpu_support_info(
+        DeviceSupportInfo* outProps) {
+    if (!outProps) {
         derror("%s: Invalid argument!", __func__);
         return false;
     }
@@ -431,7 +432,7 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(DeviceSupportInfo* outProp
         dwarning("%s: cannot open vulkan lib %s\n", __func__, mylibname);
         return false;
     }
-    #define GET_VK_PROC(lib, name) reinterpret_cast<PFN_##name>(GetProcAddress(lib, #name));
+    auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(library, "vkGetInstanceProcAddr"));
 #else
     const auto launcherDir =
             android::base::System::get()->getLauncherDirectory();
@@ -442,26 +443,24 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(DeviceSupportInfo* outProp
     if (!library) {
         dwarning("%s: failed to open %s", __func__, fulllibname);
         return false;
-    } else {
-        dprint("%s: successfully opened %s", __func__, fulllibname);
     }
-    #define GET_VK_PROC(lib, name) reinterpret_cast<PFN_##name>(dlsym(lib, #name));
+    auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(library, "vkGetInstanceProcAddr"));
 #endif
 
-    auto* pvkCreateInstance = GET_VK_PROC(library, vkCreateInstance);
-    auto* pvkEnumeratePhysicalDevices = GET_VK_PROC(library, vkEnumeratePhysicalDevices);
-    auto* pvkGetPhysicalDeviceProperties = GET_VK_PROC(library, vkGetPhysicalDeviceProperties);
-    auto* pvkGetPhysicalDeviceMemoryProperties = GET_VK_PROC(library, vkGetPhysicalDeviceMemoryProperties)
-    auto* pvkGetPhysicalDeviceQueueFamilyProperties = GET_VK_PROC(library, vkGetPhysicalDeviceQueueFamilyProperties);
-    auto* pvkDestroyInstance = GET_VK_PROC(library, vkDestroyInstance);
-#undef GET_VK_PROC
-
-    if (!pvkCreateInstance || !pvkEnumeratePhysicalDevices ||
-        !pvkGetPhysicalDeviceProperties || !pvkDestroyInstance ||
-        !pvkGetPhysicalDeviceMemoryProperties) {
-        derror("Failed to load Vulkan functions!");
+    if (!pvkGetInstanceProcAddr) {
+        derror("Failed to load vkGetInstanceProcAddr function!");
         return false;
     }
+
+#define GET_VK_INSTANCE_PROC(inst, name) \
+    PFN_##name(pvkGetInstanceProcAddr(inst, #name));
+
+    auto* pvkCreateInstance = GET_VK_INSTANCE_PROC(nullptr, vkCreateInstance);
+    if (!pvkCreateInstance) {
+        derror("Failed to load vkCreateInstance function!");
+        return false;
+    }
+
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "DetectGpuInfo";
@@ -491,10 +490,29 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(DeviceSupportInfo* outProp
 
     if (result != VK_SUCCESS) {
         derror("%s: Failed to create vulkan instance. Error: [%s] %d\n",
-                 __func__, string_VkResult(result), result);
+               __func__, string_VkResult(result), result);
         return false;
     }
     dprint("%s: Successfully created vulkan instance\n", __func__);
+
+    auto* pvkDestroyInstance = GET_VK_INSTANCE_PROC(instance, vkDestroyInstance);
+    auto* pvkEnumeratePhysicalDevices =
+            GET_VK_INSTANCE_PROC(instance, vkEnumeratePhysicalDevices);
+    auto* pvkGetPhysicalDeviceProperties =
+            GET_VK_INSTANCE_PROC(instance, vkGetPhysicalDeviceProperties);
+    auto* pvkGetPhysicalDeviceMemoryProperties =
+            GET_VK_INSTANCE_PROC(instance, vkGetPhysicalDeviceMemoryProperties);
+    auto* pvkGetPhysicalDeviceQueueFamilyProperties =
+            GET_VK_INSTANCE_PROC(instance, vkGetPhysicalDeviceQueueFamilyProperties);
+
+#undef GET_VK_INSTANCE_PROC
+
+    if (!pvkEnumeratePhysicalDevices ||
+        !pvkGetPhysicalDeviceProperties || !pvkDestroyInstance ||
+        !pvkGetPhysicalDeviceMemoryProperties || !pvkGetPhysicalDeviceQueueFamilyProperties) {
+        derror("Failed to load Vulkan functions!");
+        return false;
+    }
 
     uint32_t deviceCount = 0;
     result = pvkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
@@ -529,7 +547,7 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(DeviceSupportInfo* outProp
                                        &deviceInfos[i].physdevProps);
 
         pvkGetPhysicalDeviceMemoryProperties(devices[i],
-                                       &deviceInfos[i].memProperties);
+                                             &deviceInfos[i].memProperties);
 
         deviceInfos[i].hasGraphicsQueueFamily = false;
         {
@@ -559,7 +577,6 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(DeviceSupportInfo* outProp
     sVkPropsInitialized = true;
 
     *outProps = sVkProps;
-
 
     pvkDestroyInstance(instance, nullptr);
 
