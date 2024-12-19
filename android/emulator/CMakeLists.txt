@@ -171,5 +171,5 @@ install(FILES ${ANDROID_QEMU2_TOP_DIR}/LICENSES/LICENSE.APACHE2 DESTINATION .
 
 # Duplicate install for windows (emulator-check needs these)
 if(WINDOWS_MSVC_X86_64)
-  install(TARGETS android-emu-agents libprotobuf DESTINATION .)
+  install(TARGETS android-emu-agents libprotobuf RUNTIME DESTINATION .)
 endif()
