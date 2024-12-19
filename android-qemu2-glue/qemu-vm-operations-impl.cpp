@@ -89,7 +89,8 @@ extern "C" {
 #include <string_view>
 #include <vector>                                     // for vector
 
-#define  DD(...)    VERBOSE_PRINT(snapshot,__VA_ARGS__)
+#define DD(...) VERBOSE_PRINT(snapshot, __VA_ARGS__)
+#define DMEM(...) VERBOSE_PRINT(memory, __VA_ARGS__)
 
 using android::base::PathUtils;
 using android::base::pj;
@@ -182,6 +183,13 @@ private:
     LineConsumerCallback userOut;
     LineConsumerCallback userErr;
 };
+
+struct MemoryMapping {
+    uint64_t hva;
+    uint64_t memory_size;
+};
+// Key is gpa
+static std::unordered_map<uint64_t, MemoryMapping> sMemoryMap;
 
 }  // namespace
 
@@ -841,15 +849,40 @@ static void set_snapshot_callbacks(void* opaque,
     }
 }
 
+
 static void map_user_backed_ram(uint64_t gpa, void* hva, uint64_t size) {
     android::RecursiveScopedVmLock vmlock;
-    qemu_user_backed_ram_map(
-            gpa, hva, size,
-            USER_BACKED_RAM_FLAGS_READ | USER_BACKED_RAM_FLAGS_WRITE);
+    DMEM("%s: gpa:0x%lx hva:0x%lx size:0x%lx", __func__, gpa, (uintptr_t)hva, size);
+    auto [it, inserted] = sMemoryMap.insert({gpa, MemoryMapping{(uint64_t)(uintptr_t)hva, size}});
+    if (!inserted) {
+        // User didn't call unmap before mapping to the same gpa.
+        DMEM("Overriding memory-mapped region: "
+             "curr {gpa:0x%lx hva:0x%lx size=0x%lx} next {gpa:0x%lx hva:0x%lx size=0x%lx}",
+             it->first, it->second.hva, it->second.memory_size, gpa,
+             (uint64_t)(uintptr_t)hva, size);
+        qemu_user_backed_ram_unmap(it->first, it->second.memory_size);
+        it->second.hva = (uint64_t)(uintptr_t)hva;
+        it->second.memory_size = size;
+    }
+    qemu_user_backed_ram_map(gpa, hva, size,
+                              USER_BACKED_RAM_FLAGS_READ | USER_BACKED_RAM_FLAGS_WRITE);
 }
 
 static void unmap_user_backed_ram(uint64_t gpa, uint64_t size) {
     android::RecursiveScopedVmLock vmlock;
+    DMEM("%s: gpa:0x%lx size:0x%lx", __func__, gpa, size);
+    auto res = sMemoryMap.find(gpa);
+    if (res == sMemoryMap.end()) {
+        derror("Tried to unmap non-existant memory region {gpa:0x%lx size:0x%lx}. Ignoring.",
+             gpa, size);
+        return;
+    } else if (res->second.memory_size != size) {
+        derror("Tried to unmap with size mismatch "
+               "(params {gpa=0x%lx size=0x%lx}, actual {gpa=0x%lx hva=0x%lx size=0x%lx}). "
+               "Ignoring.", gpa, size, res->first, res->second.hva, res->second.memory_size);
+        return;
+    }
+    sMemoryMap.erase(res);
     qemu_user_backed_ram_unmap(gpa, size);
 }
 
