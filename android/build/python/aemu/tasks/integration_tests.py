@@ -57,7 +57,7 @@ class IntegrationTestTask(BuildTask):
         self.dist = distribution_directory
         self.build_directory = Path(build_directory)
         self.target = target
-        self.logdir = Path(distribution_directory or build_directory) / "testlogs"
+        self.logdir = Path(distribution_directory or build_directory) / "logs"
         self.launcher = (
             self.aosp
             / "external"
@@ -83,6 +83,8 @@ class IntegrationTestTask(BuildTask):
                 "--test_suite",
                 "presubmit_emulator_test_suite",
                 "--failures_as_errors",
+                "--log-level",
+                "WARNING",
             ]
             + self.build_target_opt
         )
@@ -111,6 +113,8 @@ class IntegrationTestTask(BuildTask):
                 "--logdir",
                 self.logdir,
                 "--failures_as_errors",
+                "--log-level",
+                "WARNING",
             ]
             + self.build_target_opt
         )
@@ -126,8 +130,6 @@ class IntegrationTestTask(BuildTask):
             if " Displays:" not in result:
                 logging.warning("No display found! Ignoring emulator tests.")
                 return
-
-
 
         if platform.system() != "Windows":
             repo = f"file://{repo}"
