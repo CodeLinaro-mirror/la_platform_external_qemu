@@ -2731,6 +2731,11 @@ extern "C" int main(int argc, char** argv) {
         fc::setIfNotOverriden(fc::VsockSnapshotLoadFixed_b231345789, true);
     }
 
+    // XR image needs this feature to pass modifier keys to the guest.
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_DEV_2024) {
+        fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
+    }
+
     // Support for changing default lcd-density
     if (hw->hw_lcd_density) {
         args.add("-lcd-density");
