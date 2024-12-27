@@ -13,6 +13,7 @@
 # limitations under the License.
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 import aemu.discovery.emulator_discovery
 import psutil
@@ -30,7 +31,7 @@ def tmp_directory(tmp_path_factory):
 
 
 @pytest.fixture
-def fake_emu_pid_file(tmp_directory, mocker):
+def fake_emu_pid_file(tmp_directory):
     def write_pid_file(number):
         fn = Path(tmp_directory / f"pid_123{number}.ini")
         with open(fn, "w") as w:
@@ -42,6 +43,16 @@ def fake_emu_pid_file(tmp_directory, mocker):
             w.write("cmdline=unused\n")
             w.write("grpc.port={}\n".format(8554 + number * 2))
 
+        return fn
+
+    return write_pid_file
+
+
+@pytest.fixture
+def fake_emu_alive_pid_file(tmp_directory, fake_emu_pid_file, mocker):
+
+    def patch_pid_file(number):
+        fake_emu_pid_file(number)
         mocker.patch.object(
             aemu.discovery.emulator_discovery,
             "get_discovery_directories",
@@ -50,7 +61,7 @@ def fake_emu_pid_file(tmp_directory, mocker):
         mocker.patch.object(EmulatorDescription, "is_alive", return_value=True)
         mocker.patch.object(psutil, "pid_exists", return_value=True)
 
-    return write_pid_file
+    return patch_pid_file
 
 
 @pytest.fixture
@@ -66,34 +77,60 @@ def bad_emu_pid_file(tmp_directory, mocker):
     )
 
 
-def test_no_pid_file_means_no_emulator(mocker):
-    mocker.patch.object(os.path, "exists", return_value=True)
-    mocker.patch.object(os, "listdir", return_value=["pid_nope.ini"])
-    emu = EmulatorDiscovery()
-    assert emu.available() == 0
+def test_no_pid_file_means_no_emulator(tmp_directory):
+    with patch(
+        "aemu.discovery.emulator_discovery.get_discovery_directories",
+        return_value=[tmp_directory],
+    ):
+        emu = EmulatorDiscovery()
+        assert (
+            emu.available() == 0
+        ), "An empty discovery directory should have no emulators"
+
+
+def test_dead_pid_doesnot_get_discovered(tmp_directory, fake_emu_pid_file):
+    with patch(
+        "aemu.discovery.emulator_discovery.get_discovery_directories",
+        return_value=[tmp_directory],
+    ):
+        fn = fake_emu_pid_file(1)
+        emu = EmulatorDiscovery()
+        assert emu.available() == 0, "Dead pid, should not be discovered"
+
+
+def test_dead_pid_gets_cleaned(tmp_directory, fake_emu_pid_file):
+    with patch(
+        "aemu.discovery.emulator_discovery.get_discovery_directories",
+        return_value=[tmp_directory],
+    ):
+        fn = fake_emu_pid_file(1)
+        assert fn.exists()
+        emu = EmulatorDiscovery()
+        assert emu.available() == 0
+        assert not fn.exists(), "Non existent pid file should have been deleted."
 
 
 def test_bad_pid_file_means_no_emulator(bad_emu_pid_file):
     assert EmulatorDiscovery().available() == 0
 
 
-def test_can_parse_and_read_emu_file(fake_emu_pid_file):
-    fake_emu_pid_file(0)
+def test_can_parse_and_read_emu_file(fake_emu_alive_pid_file):
+    fake_emu_alive_pid_file(0)
     emu = EmulatorDiscovery()
     assert emu.available() == 1
     assert emu.find_by_pid(1230) is not None
     assert emu.find_by_pid(1230).name() == "emulator-5554"
 
 
-def test_finds_default_emulator(mocker, fake_emu_pid_file):
-    fake_emu_pid_file(0)
+def test_finds_default_emulator(mocker, fake_emu_alive_pid_file):
+    fake_emu_alive_pid_file(0)
     assert get_default_emulator() is not None
     assert get_default_emulator().name() == "emulator-5554"
 
 
-def test_finds_two_emulators(fake_emu_pid_file):
-    fake_emu_pid_file(0)
-    fake_emu_pid_file(1)
+def test_finds_two_emulators(fake_emu_alive_pid_file):
+    fake_emu_alive_pid_file(0)
+    fake_emu_alive_pid_file(1)
 
     discovery = EmulatorDiscovery()
     assert discovery.available() == 2

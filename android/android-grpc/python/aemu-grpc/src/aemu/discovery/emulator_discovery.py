@@ -26,6 +26,7 @@ from aemu.discovery.emulator_description import (
 
 _LOGGER = logging.getLogger("aemu-grpc")
 
+
 class EmulatorNotFound(Exception):
     pass
 
@@ -59,8 +60,12 @@ class EmulatorDiscovery(object):
                             )
                             if emu.is_alive():
                                 emulators.add(emu)
+                            else:
+                                self._erase(file)
                         except Exception as err:
-                            _LOGGER.error("Failed to parse %s due to %s, ignoring", file, err)
+                            _LOGGER.error(
+                                "Failed to parse %s due to %s, ignoring", file, err
+                            )
 
         return emulators
 
@@ -82,6 +87,36 @@ class EmulatorDiscovery(object):
                     isi = line.index("=")
                     emu[line[:isi]] = line[isi + 1 :]
         return emu
+
+    def _erase(self, file: Path) -> None:
+        """Erases a dangling discovery file and its associated directory.
+
+        This method attempts to delete the specified discovery `.ini` file and
+        the corresponding directory that holds emulator instance information.
+        It's primarily used for cleanup when an emulator instance is no longer active.
+
+        Args:
+            file: The Path object representing the discovery `.ini` file to be deleted.
+                This file is expected to match the naming pattern 'pid_<PID>.ini'.
+
+        Raises:
+            AssertionError: If the provided `file` does not match the expected
+                            pid file naming convention.
+        """
+        assert self._PID_FILE_.match(
+            file.name
+        ), "Erase should be called with a pid file"
+
+        try:
+            file.unlink(missing_ok=True)
+            _LOGGER.debug("Deleted discovery file: %s", file)
+            dir_to_delete = file.with_suffix("")  # Remove .ini suffix
+            shutil.rmtree(str(dir_to_delete))
+            _LOGGER.debug("Deleted discovery directory: %s", dir_to_delete)
+        except FileNotFoundError:
+            _LOGGER.debug("Directory '%s' not found.", dir_to_delete)
+        except OSError as e:
+            _LOGGER.debug(f"Error deleting directory '%s' due to: %s", dir_to_delete, e)
 
     def available(self) -> int:
         """The number of discovered emulators.
