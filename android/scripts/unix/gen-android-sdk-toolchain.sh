@@ -512,11 +512,9 @@ prepare_build_for_darwin() {
     OSX_VERSION=$(sw_vers -productVersion)
     OSX_DEPLOYMENT_TARGET=10.14
     OSX_REQUIRED=10.14
-    MIN_XCODE=10
-    OSX_DESIRED=12.2
+    MIN_XCODE=14.3
 
     # This is the list of supported SDKs,
-    OSX_SDK_SUPPORTED="${OSX_REQUIRED} 10.15 10.16 11.0 11.1 11.2 11.3 11.4 11.5 11.6 12.0 12.1 12.3 13.0 13.1 13.3 14.0 14.2 14.4 14.5 15.0 15.1"
     OSX_XCODE=$(xcodebuild -version | tr '\n' ' ')
     OSX_SDK_INSTALLED_LIST=$(xcodebuild -showsdks 2>/dev/null | \
             egrep --color=never -o " macosx\d+.\d+$" | sed -e "s/.*macosx//g" | sort -n | \
@@ -525,13 +523,6 @@ prepare_build_for_darwin() {
         panic "Please install XCode for compatible with os version: $OSX_VERSION on this machine!"
     fi
     log "OSX ($OSX_VERSION): Installed SDKs: $OSX_SDK_INSTALLED_LIST"
-    for supported_sdk in $(echo "$OSX_SDK_SUPPORTED" | tr ' ' '\n' | sort -r)
-    do
-        POSSIBLE_OSX_SDK_VERSION=$(echo "$OSX_SDK_INSTALLED_LIST" | tr ' ' '\n' | grep $supported_sdk | head -1)
-        if [ -n "$POSSIBLE_OSX_SDK_VERSION" ]; then
-            OSX_SDK_VERSION=$POSSIBLE_OSX_SDK_VERSION
-        fi
-    done
 
     # Extract the Xcode version, and use version sort to stack the installed version
     # on top of what you have. If your version is to low it ends up on top.
