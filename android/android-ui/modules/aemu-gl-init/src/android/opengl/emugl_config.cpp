@@ -248,6 +248,29 @@ struct DeviceSupportInfo {
             *patch = VK_API_VERSION_PATCH(physdevProps.apiVersion);
         }
     }
+
+    std::string getDriverVersionStr() const {
+        bool isNvidia = (physdevProps.vendorID == 4318);
+        std::string driverVersionStr;
+        if (isNvidia) {
+            // Decode Nvidia driver version to make it meaningful to the users
+            // Reference: VulkanDeviceInfo::getDriverVersion() at
+            // https://github.com/SaschaWillems/VulkanCapsViewer/blob/master/vulkanDeviceInfo.cpp
+            // 10 bits = major version (up to r1023)
+            // 8 bits = minor version (up to 255)
+            // 8 bits = secondary branch version/build version (up to 255)
+            // 6 bits = tertiary branch/build version (up to 63)
+            const uint32_t major = (physdevProps.driverVersion >> 22) & 0x3ff;
+            const uint32_t minor = (physdevProps.driverVersion >> 14) & 0x0ff;
+
+            return std::to_string(major) + "." + std::to_string(minor);
+        }
+
+        // Use regular VK_API_VERSION encoding to print the version.
+        return std::to_string(VK_API_VERSION_MAJOR(physdevProps.driverVersion)) + "." +
+               std::to_string(VK_API_VERSION_MINOR(physdevProps.driverVersion)) + "." +
+               std::to_string(VK_API_VERSION_PATCH(physdevProps.driverVersion));
+    }
 };
 
 // Checks if the user enforced a specific GPU, it can be done via index or name.
@@ -364,8 +387,9 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
         return;
     }
 
-    DeviceSupportInfo vkProps;
+    DeviceSupportInfo vkProps = {};
     if (!emuglConfig_get_vulkan_hardware_gpu_support_info(&vkProps)) {
+        *vendor = nullptr;
         return;
     }
 
@@ -404,7 +428,7 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
 }
 
 static bool sVkPropsInitialized = false;
-DeviceSupportInfo sVkProps = {};
+static DeviceSupportInfo sVkProps = {};
 
 bool emuglConfig_get_vulkan_hardware_gpu_support_info(
         DeviceSupportInfo* outProps) {
@@ -568,6 +592,20 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
                 }
             }
         }
+
+        // Put the GPU information into the logs to be able to track down any
+        // errors more easily
+        const VkPhysicalDeviceProperties& physdevProps =
+                deviceInfos[i].physdevProps;
+        const char* deviceType =
+                string_VkPhysicalDeviceType(physdevProps.deviceType);
+        int vkMajor, vkMinor, vkPatch;
+        deviceInfos[i].getApiVersion(&vkMajor, &vkMinor, &vkPatch);
+        std::string driverVersionStr = deviceInfos[i].getDriverVersionStr();
+        dinfo("%s: Found physical GPU '%s', type: %s, apiVersion: %d.%d.%d, "
+              "driverVersion: %s\n",
+              __func__, physdevProps.deviceName, deviceType, vkMajor, vkMinor,
+              vkPatch, driverVersionStr.c_str());
     }
 
     uint32_t selectedGpuIndex = getSelectedGpuIndex(deviceInfos);
