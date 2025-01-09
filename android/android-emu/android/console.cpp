@@ -4434,7 +4434,7 @@ static int do_resize_display(ControlClient client, char* args) {
     }
     control_write(client,
                   "KO usage: \"resize-display <index>\" "
-                  "0: phone\t1: unfolded\t2: tablet\t3: desktop\n");
+                  "0: phone\t1: unfolded\t2: tablet\n");
     return -1;
 }
 
@@ -4609,12 +4609,11 @@ extern const CommandDefRec main_commands[] = {
 
         {"resize-display", "resize the display resolution to the preset size",
          "Allows you to resize the default display resolution to the following "
-         "preset sizes\n"
+         "preset sizes (for example)\n"
          "\tindex: size type, width-height-dpi\n"
          "\t0: phone size, 1080-2340-420\n"
          "\t1: unfolded size, 1768-2208-420\n"
          "\t2: tablet size, 1920-1200-240\n"
-         "\t3: desktop size, 1920-1080-160\n"
          "As an example: 'resize-display 2' resizes the default display to the "
          "size of tablet",
          NULL, do_resize_display, NULL},

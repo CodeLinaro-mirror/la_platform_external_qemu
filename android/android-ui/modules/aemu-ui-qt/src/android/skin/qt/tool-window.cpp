@@ -1184,9 +1184,6 @@ void ToolWindow::presetSizeAdvance(PresetEmulatorSizeType newSize) {
         case PRESET_SIZE_TABLET:
             updateMsg += "Tablet\n";
             break;
-        case PRESET_SIZE_DESKTOP:
-            updateMsg += "Desktop\n";
-            break;
         default:;
     }
     updateMsg += std::to_string(info.width) + " x " +
@@ -1231,10 +1228,6 @@ void ToolWindow::resizableChangeIcon(PresetEmulatorSizeType type) {
         case PRESET_SIZE_TABLET:
             ChangeIcon(mToolsUi->resizable_button, "display_mode_tablet_expand",
                        "Display mode: Tablet");
-            break;
-        case PRESET_SIZE_DESKTOP:
-            ChangeIcon(mToolsUi->resizable_button,
-                       "display_mode_desktop_expand", "Display mode: Desktop");
             break;
         default:
             LOG(ERROR) << "Invalid display mode " << type;

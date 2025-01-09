@@ -35,7 +35,6 @@ private slots:
     void on_size_phone_clicked();
     void on_size_unfolded_clicked();
     void on_size_tablet_clicked();
-    void on_size_desktop_clicked();
 
 private:
     Ui::ResizableDialog *ui;

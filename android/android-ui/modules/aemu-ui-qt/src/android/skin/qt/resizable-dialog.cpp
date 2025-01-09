@@ -47,12 +47,6 @@ void ResizableDialog::on_size_tablet_clicked() {
     accept();   // hides dialog
 }
 
-void ResizableDialog::on_size_desktop_clicked() {
-    saveSize(PRESET_SIZE_DESKTOP);
-    emit newResizableRequested(PRESET_SIZE_DESKTOP);
-    accept();   // hides dialog
-}
-
 void ResizableDialog::showEvent(QShowEvent* event) {
     QDialog::showEvent(event);
 }

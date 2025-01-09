@@ -19,10 +19,9 @@ ANDROID_BEGIN_HEADER
 
 enum PresetEmulatorSizeType {
     PRESET_SIZE_PHONE = 0,
-    PRESET_SIZE_UNFOLDED,
-    PRESET_SIZE_TABLET,
-    PRESET_SIZE_DESKTOP,
-    PRESET_SIZE_MAX,    // max value for resizable type
+    PRESET_SIZE_UNFOLDED = 1,
+    PRESET_SIZE_TABLET = 2,
+    PRESET_SIZE_MAX = 3,  // max value for resizable type, ignore desktop
 };
 
 struct PresetEmulatorSizeInfo {

@@ -43,12 +43,13 @@ public:
     ResizableConfig() {
         std::string configStr(getConsoleAgents()->settings->hw()->hw_resizable_configs);
         if (configStr == "") {
-            configStr = "phone-0-1080-2340-420, unfolded-1-1768-2208-420,"
-                        "tablet-2-1920-1200-240, desktop-3-1920-1080-160";
+            configStr =
+                    "phone-0-1080-2340-420, unfolded-1-1768-2208-420,"
+                    "tablet-2-1920-1200-240";
         }
         std::vector<std::string> entrys;
         android::base::splitTokens(configStr, &entrys, ",");
-        if (entrys.size() != PRESET_SIZE_MAX) {
+        if (entrys.size() < PRESET_SIZE_MAX) {
             LOG(ERROR) << "Failed to parse resizable config " << configStr;
             return;
         }
@@ -63,11 +64,8 @@ public:
             }
             int id = std::stoi(tokens[1]);
             if (id < 0 || id >= PRESET_SIZE_MAX) {
-                LOG(ERROR) << "Failed to parse resizable config entry, "
-                              "incorrect index "
-                           << tokens[1];
-                mConfigs.clear();
-                return;
+                LOG(WARNING) << "Ignore unsupported resizable config " << entry;
+                continue;
             }
             int width = std::stoi(tokens[2]);
             int height = std::stoi(tokens[3]);
@@ -166,8 +164,7 @@ public:
     }
 
     bool shouldApplyLargeDisplaySetting(enum PresetEmulatorSizeType id) {
-        if (id == PRESET_SIZE_UNFOLDED || id == PRESET_SIZE_TABLET ||
-            id == PRESET_SIZE_DESKTOP) {
+        if (id == PRESET_SIZE_UNFOLDED || id == PRESET_SIZE_TABLET) {
             return true;
         }
         return false;
@@ -212,7 +209,6 @@ public:
               metrics.set_display_phone_count(mTypeCount[PRESET_SIZE_PHONE]);
               metrics.set_display_foldable_count(mTypeCount[PRESET_SIZE_UNFOLDED]);
               metrics.set_display_tablet_count(mTypeCount[PRESET_SIZE_TABLET]);
-              metrics.set_display_desktop_count(mTypeCount[PRESET_SIZE_DESKTOP]);
               event->mutable_emulator_details()
                    ->mutable_resizable_display()
                    ->CopyFrom(metrics);
