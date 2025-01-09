@@ -430,7 +430,7 @@ class VulkanTest : public ::testing::Test {
 protected:
     void SetUp() override {
         TestSystem::setEnvironmentVariable(
-            "VK_ICD_FILENAMES",
+            "VK_DRIVER_FILES",
             testIcdFilename());
 
         goldfish_vk::init_vulkan_dispatch_from_system_loader(
@@ -446,7 +446,7 @@ protected:
     void TearDown() override {
         teardownVulkanTest(&mVk, mDevice, mInstance);
         TestSystem::setEnvironmentVariable(
-            "VK_ICD_FILENAMES", "");
+            "VK_DRIVER_FILES", "");
     }
 
     VulkanDispatch mVk;
