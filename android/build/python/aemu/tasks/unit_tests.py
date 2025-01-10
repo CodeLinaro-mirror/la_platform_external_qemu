@@ -20,6 +20,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from aemu.process.command import Command, CommandFailedException
+from aemu.platform.toolchains import Toolchain
 from aemu.process.log_handler import LogHandler
 from aemu.tasks.build_task import BuildTask
 
@@ -133,9 +134,11 @@ class CoverageReportTask(BuildTask):
         self,
         aosp: Path,
         destination: Path,
+        target: str
     ):
         super().__init__()
         self.aosp = Path(aosp)
+        self.toolchain = Toolchain(aosp, target)
         self.destination = Path(destination)
 
     def lcov_out(self, logline: str):
@@ -147,7 +150,7 @@ class CoverageReportTask(BuildTask):
         logging.info("****josh: " + logline)
 
     def do_run(self):
-        clang_version = "clang-r487747c"
+        clang_version = self.toolchain.clang_version()
         clang_path = (
             self.aosp
             / "prebuilts"

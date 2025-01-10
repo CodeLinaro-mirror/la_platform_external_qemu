@@ -38,9 +38,11 @@ if("${RUNTIME_OS_DEPENDENCIES}" STREQUAL "")
   get_filename_component(RESOLVED_FILENAME "${RESOLVED_SO}" NAME)
   get_filename_component(LINKED_FILENAME "${STD_OUT}" NAME)
 
+  # Note we are using copies v.s. symlinks as we cannot distribute
+  # symlinks.
   internal_set_env_cache(
     RUNTIME_OS_DEPENDENCIES
-    "${STD_OUT}>lib64/${RESOLVED_FILENAME};${STD_OUT}>lib64/${LINKED_FILENAME}")
+    "${STD_OUT}>lib64/libc++.so;${STD_OUT}>lib64/libc++.so.1")
 
   # Configure the RPATH be dynamic..
   #

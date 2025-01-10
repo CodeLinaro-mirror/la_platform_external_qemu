@@ -365,6 +365,7 @@ if(LINUX_X86_64)
   # This should make sure we have sufficient information left to properly print
   # std::string etc. see b/156534499 for details.
   add_c_flag("-fno-limit-debug-info")
+  add_c_flag("-Wno-everything")
 elseif(LINUX_AARCH64)
   set(ANDROID_NASM_TYPE elf64)
   add_c_flag("-fpermissive")

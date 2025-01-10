@@ -86,7 +86,7 @@ def get_tasks(args) -> List[BuildTask]:
             AccelerationCheckTask(args.out).enable(run_tests),
             EmugenTestTask(args.aosp, args.out).enable(run_tests).enable(False),
             GenEntriesTestTask(args.aosp, args.out),
-            CoverageReportTask(aosp=args.aosp, destination=args.out).enable(run_tests),
+            CoverageReportTask(aosp=args.aosp, destination=args.out, target=args.target).enable(run_tests),
             PackageSamplesTask(
                 args.aosp, args.out, args.dist, args.target, args.sdk_build_number
             ),
