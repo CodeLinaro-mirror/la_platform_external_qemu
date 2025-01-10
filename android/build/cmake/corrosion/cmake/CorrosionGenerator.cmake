@@ -230,6 +230,13 @@ function(_generator_add_target manifest ix cargo_version profile)
     get_source_file_property(is_windows_gnu ${manifest} CORROSION_PLATFORM_IS_WINDOWS_GNU)
     get_source_file_property(is_macos ${manifest} CORROSION_PLATFORM_IS_MACOS)
 
+    # On macOS, we need to set the `XCODE_PATH` environment variable to the path of the macOS SDK's libraries.
+    execute_process(
+        COMMAND xcode-select -p
+        OUTPUT_VARIABLE XCODE_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    message(STATUS "Xcode path: ${XCODE_PATH}")
 
     string(REPLACE "\\" "/" manifest_path "${manifest_path}")
 
@@ -277,7 +284,7 @@ function(_generator_add_target manifest ix cargo_version profile)
                 )
                 if(is_macos)
                     set_property(TARGET ${target_name}-static
-                            PROPERTY INTERFACE_LINK_DIRECTORIES "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+                            PROPERTY INTERFACE_LINK_DIRECTORIES "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib"
                     )
                 endif()
             endif()
@@ -304,7 +311,7 @@ function(_generator_add_target manifest ix cargo_version profile)
             add_dependencies(${target_name}-shared cargo-build_${target_name})
             if(is_macos)
                 set_property(TARGET ${target_name}-shared
-                        PROPERTY INTERFACE_LINK_DIRECTORIES "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+                        PROPERTY INTERFACE_LINK_DIRECTORIES "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib"
                         )
             endif()
         endif()
@@ -327,7 +334,7 @@ function(_generator_add_target manifest ix cargo_version profile)
         add_dependencies(${target_name} cargo-build_${target_name})
         if(is_macos)
             set_property(TARGET ${target_name}
-                    PROPERTY INTERFACE_LINK_DIRECTORIES "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+                    PROPERTY INTERFACE_LINK_DIRECTORIES "${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib"
             )
         endif()
     else()

@@ -172,14 +172,22 @@ function(_add_cargo_build)
 
     set(target_artifact_dir "$<IF:${if_not_host_build_condition},${_CORROSION_RUST_CARGO_TARGET},${_CORROSION_RUST_CARGO_HOST_TARGET}>")
 
+    # On macOS, we need to set the `XCODE_PATH` environment variable to the path of the macOS SDK's libraries.
+    execute_process(
+        COMMAND xcode-select -p
+        OUTPUT_VARIABLE XCODE_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    message(STATUS "Xcode path: ${XCODE_PATH}")
+
     # Rust will add `-lSystem` as a flag for the linker on macOS. Adding the -L flag via RUSTFLAGS only fixes the
     # problem partially - buildscripts still break, since they won't receive the RUSTFLAGS. This seems to only be a
     # problem if we specify the linker ourselves (which we do, since this is necessary for e.g. linking C++ code).
     # We can however set `LIBRARY_PATH`, which is propagated to the build-script-build properly.
     if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        set(cargo_library_path "LIBRARY_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib")
+        set(cargo_library_path "LIBRARY_PATH=${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib")
     elseif(CMAKE_CROSSCOMPILING AND CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-        set(cargo_library_path "$<IF:${if_not_host_build_condition},,LIBRARY_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib>")
+        set(cargo_library_path "$<IF:${if_not_host_build_condition},,LIBRARY_PATH=${XCODE_PATH}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib>")
     endif()
 
     if(cargo_profile_name)
