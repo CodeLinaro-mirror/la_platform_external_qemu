@@ -39,7 +39,7 @@ static void setIcdPath(const std::string& path) {
     } else {
         LOG(DEBUG) << "setIcdPath: path doesn't exist: " << path;
     }
-    System::get()->envSet("VK_DRIVER_FILES", path);
+    System::get()->envSet("VK_ICD_FILENAMES", path);
 }
 
 static std::string icdJsonNameToProgramAndLauncherPaths(
@@ -66,7 +66,7 @@ static const char* getTestIcdFilename() {
 static void initIcdPaths(bool forTesting) {
     auto androidIcd = System::get()->envGet("ANDROID_EMU_VK_ICD");
     if (System::get()->envGet("ANDROID_EMU_SANDBOX") == "1") {
-        // Rely on user to set VK_DRIVER_FILES
+        // Rely on user to set VK_ICD_FILENAMES
         return;
     } else {
         if (forTesting || androidIcd == "swiftshader") {
