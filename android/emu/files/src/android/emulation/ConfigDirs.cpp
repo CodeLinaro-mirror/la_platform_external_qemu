@@ -235,16 +235,6 @@ auto ConfigDirs::isValidSdkRoot(const std::string& rootPath, bool verbose)
         }
         return false;
     }
-    std::string platformsPath = PathUtils::join(rootPath, "platforms");
-    if (!system->pathIsDir(platformsPath)) {
-        if (verbose) {
-            dwarning(
-                    "platforms subdirectory is missing under "
-                    "%s, please install it",
-                    rootPath.c_str());
-        }
-        return false;
-    }
     std::string platformToolsPath = PathUtils::join(rootPath, "platform-tools");
     if (!system->pathIsDir(platformToolsPath)) {
         if (verbose) {
