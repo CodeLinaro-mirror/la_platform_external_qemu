@@ -331,100 +331,97 @@ static void runAdbScripts(emulation::AdbInterface* adbInterface,
     }
 }
 
-static void qemuMiscPipeDecodeAndExecute(const std::vector<uint8_t>& input,
-                                         std::vector<uint8_t>* outputp) {
-    std::vector<uint8_t> & output = *outputp;
+static void bootCompleteFunction() {
     bool restartFrameWork = false;
+    // bug: 152636877
+    auto bootTimeInMs =
+            (long long)(get_uptime_ms() - s_reset_request_uptime_ms);
+    dinfo("Boot completed in %lld ms", bootTimeInMs);
+    android::metrics::MetricsReporter::get().report(
+            [=](android_studio::AndroidStudioEvent* event) {
+                auto boot_info =
+                        event->mutable_emulator_details()->mutable_boot_info();
+                boot_info->set_boot_status(
+                        android_studio::EmulatorBootInfo::BOOT_COMPLETED);
+                boot_info->set_duration_ms(bootTimeInMs);
+            });
+    fflush(stdout);
 
-    if (beginWith(input, "heartbeat")) {
-        fillWithOK(output);
-        guest_heart_beat_count ++;
-        return;
-    } else if (beginWith(input, "bootcomplete")) {
-        fillWithOK(output);
-        // bug: 152636877
-        auto bootTimeInMs = (long long)(get_uptime_ms() - s_reset_request_uptime_ms);
-        dinfo("Boot completed in %lld ms",  bootTimeInMs);
-        android::metrics::MetricsReporter::get().report(
-                [=](android_studio::AndroidStudioEvent* event) {
-                    auto boot_info = event->mutable_emulator_details()
-                                             ->mutable_boot_info();
-                    boot_info->set_boot_status(
-                            android_studio::EmulatorBootInfo::BOOT_COMPLETED);
-                    boot_info->set_duration_ms(bootTimeInMs);
-                });
-        fflush(stdout);
+    if (getConsoleAgents()->settings->avdInfo()) {
+        const char* avd_dir =
+                avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo());
+        if (avd_dir) {
+            const auto bootcomplete_ini =
+                    std::string{android::base::PathUtils::join(
+                            avd_dir, "bootcompleted.ini")};
+            path_empty_file(bootcomplete_ini.c_str());
+        }
+    }
+    getConsoleAgents()->settings->set_guest_boot_completed(true);
+    if (getConsoleAgents()->settings->hw()->test_quitAfterBootTimeOut > 0) {
+        getConsoleAgents()->vm->vmShutdown();
+    } else {
+        auto adbInterface = emulation::AdbInterface::getGlobal();
+        if (!adbInterface)
+            return;
 
-        if (getConsoleAgents()->settings->avdInfo()) {
-            const char* avd_dir = avdInfo_getContentPath(
-                    getConsoleAgents()->settings->avdInfo());
-            if (avd_dir) {
-                const auto bootcomplete_ini =
-                        std::string{android::base::PathUtils::join(
-                                avd_dir, "bootcompleted.ini")};
-                path_empty_file(bootcomplete_ini.c_str());
+        dinfo("Increasing screen off timeout, "
+              "logcat buffer size to 2M.");
+
+        const char* pTimeout = avdInfo_screen_off_timeout(
+                avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()));
+        adbInterface->enqueueCommand({"shell", "settings", "put", "system",
+                                      "screen_off_timeout", pTimeout});
+        adbInterface->enqueueCommand({"shell", "logcat", "-G", "2M"});
+        // Turn auto-rotate to on by default for non-Automotive devices
+        if (!android_is_automotive()) {
+            adbInterface->enqueueCommand({"shell", "settings", "put", "system",
+                                          "accelerometer_rotation", "1"});
+        }
+
+        if (resizableEnabled()) {
+            const int config_id = user_config_get_resizable_config();
+            if (config_id >= 0) {
+                char str_config_id[64] = {};
+                snprintf(str_config_id, sizeof(str_config_id), "%d", config_id);
+                adbInterface->enqueueCommand(
+                        {"emu", "resize-display", str_config_id});
+            }
+        } else {
+            // If hw.display.settings.xml set as freeform, config guest
+            if ((android_op_wipe_data ||
+                 !path_exists(getConsoleAgents()
+                                      ->settings->hw()
+                                      ->disk_dataPartition_path))) {
+                if (!strcmp(getConsoleAgents()
+                                    ->settings->hw()
+                                    ->display_settings_xml,
+                            "freeform")) {
+                    adbInterface->enqueueCommand(
+                            {"shell", "settings", "put", "global", "sf", "1"});
+                    adbInterface->enqueueCommand(
+                            {"shell", "settings", "put", "global",
+                             "enable_freeform_support", "1"});
+                    adbInterface->enqueueCommand(
+                            {"shell", "settings", "put", "global",
+                             "force_resizable_activities", "1"});
+                    restartFrameWork = true;
+                }
             }
         }
-        getConsoleAgents()->settings->set_guest_boot_completed(true);
-        if (getConsoleAgents()->settings->hw()->test_quitAfterBootTimeOut > 0) {
-            getConsoleAgents()->vm->vmShutdown();
-        } else {
-            auto adbInterface = emulation::AdbInterface::getGlobal();
-            if (!adbInterface) return;
 
-            dinfo("Increasing screen off timeout, "
-                    "logcat buffer size to 2M.");
+        miscPipeSetAndroidOverlay(adbInterface);
 
-            const char* pTimeout = avdInfo_screen_off_timeout(avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()));
-            adbInterface->enqueueCommand(
-                { "shell", "settings", "put", "system",
-                  "screen_off_timeout", pTimeout});
-            adbInterface->enqueueCommand(
-                { "shell", "logcat", "-G", "2M" });
-            // Turn auto-rotate to on by default for non-Automotive devices
-            if (!android_is_automotive()) {
-                adbInterface->enqueueCommand(
-                    { "shell", "settings", "put", "system",
-                      "accelerometer_rotation", "1"});
-            }
+        if (restart_when_stalled > 0 && num_watchdog == 0) {
+            std::thread{watchDogFunction, 1}.detach();
+        }
 
-            if (resizableEnabled()) {
-                const int config_id = user_config_get_resizable_config();
-                if (config_id >= 0) {
-                    char str_config_id[64] = {};
-                    snprintf(str_config_id, sizeof(str_config_id), "%d",
-                             config_id);
-                    adbInterface->enqueueCommand(
-                            {"emu", "resize-display", str_config_id});
-                }
-            } else {
-                // If hw.display.settings.xml set as freeform, config guest
-                if ((android_op_wipe_data || !path_exists(getConsoleAgents()->settings->hw()->disk_dataPartition_path))) {
-                    if (!strcmp(getConsoleAgents()->settings->hw()->display_settings_xml, "freeform")) {
-                        adbInterface->enqueueCommand(
-                            { "shell", "settings", "put", "global", "sf", "1" });
-                        adbInterface->enqueueCommand(
-                            { "shell", "settings", "put", "global",
-                              "enable_freeform_support", "1" });
-                        adbInterface->enqueueCommand(
-                            { "shell", "settings", "put", "global",
-                              "force_resizable_activities", "1" });
-                        restartFrameWork = true;
-                    }
-                }
-            }
+        if (getConsoleAgents()->settings->hw()->test_monitorAdb &&
+            num_hostcts_watchdog == 0) {
+            std::thread{watchHostCtsFunction, 30}.detach();
+        }
 
-            miscPipeSetAndroidOverlay(adbInterface);
-
-            if (restart_when_stalled > 0 && num_watchdog == 0) {
-                std::thread{watchDogFunction, 1}.detach();
-            }
-
-            if (getConsoleAgents()->settings->hw()->test_monitorAdb && num_hostcts_watchdog == 0) {
-                std::thread{watchHostCtsFunction, 30}.detach();
-            }
-
-            if (getConsoleAgents()->settings->avdInfo()) {
+        if (getConsoleAgents()->settings->avdInfo()) {
 #ifdef __linux__
                 char* datadir = avdInfo_getDataInitDirPath(getConsoleAgents()->settings->avdInfo());
                 if (datadir) {
@@ -610,6 +607,19 @@ static void qemuMiscPipeDecodeAndExecute(const std::vector<uint8_t>& input,
                       "setprop", "ctl.restart", "zygote" });
             }
         }
+}
+
+static void qemuMiscPipeDecodeAndExecute(const std::vector<uint8_t>& input,
+                                         std::vector<uint8_t>* outputp) {
+    std::vector<uint8_t>& output = *outputp;
+
+    if (beginWith(input, "heartbeat")) {
+        fillWithOK(output);
+        guest_heart_beat_count++;
+        return;
+    } else if (beginWith(input, "bootcomplete")) {
+        fillWithOK(output);
+        std::thread{bootCompleteFunction}.detach();
 
         return;
     } else if (beginWith(input, "get_random=")) {
