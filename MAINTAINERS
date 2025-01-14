@@ -2028,6 +2028,12 @@ F: qapi/pci.json
 F: docs/pci*
 F: docs/specs/*pci*
 
+PCI PLX VSwitches
+M: Nabih Estefan <nabihestefan@google.com>
+S: Supported
+F: hw/pci-bridge/plx_vswitch*
+F: include/hw/pci-bridge/plx_vswitch.h
+
 PCIE DOE
 M: Huai-Cheng Kuo <hchkuo@avery-design.com.tw>
 M: Chris Browy <cbrowy@avery-design.com>
