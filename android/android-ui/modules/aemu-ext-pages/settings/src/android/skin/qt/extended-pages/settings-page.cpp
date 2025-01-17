@@ -786,6 +786,7 @@ static SaveSnapshotOnExit getSaveOnExitChoice() {
 #endif
 
 static void set_guestGlesDriver_to(WinsysGuestGlesDriverPreference v) {
+    dinfo("Setting preferred gles driver from UI");
     QSettings settings;
     settings.setValue(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, v);
 }

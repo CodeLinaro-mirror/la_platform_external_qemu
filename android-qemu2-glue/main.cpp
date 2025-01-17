@@ -1244,11 +1244,6 @@ static int startEmulatorWithMinConfig(int argc,
                 WINSYS_GLESBACKEND_PREFERENCE_ANGLE);
     }
 
-    WinsysGuestGlesDriverPreference uiPreferredGuestRenderer =
-            skin_winsys_get_preferred_gles_driver();
-
-    skin_winsys_set_preferred_gles_driver(uiPreferredGuestRenderer);
-
     char* accel_status = NULL;
     CpuAccelMode accel_mode = ACCEL_AUTO;
 
@@ -1291,17 +1286,6 @@ static int startEmulatorWithMinConfig(int argc,
                     break;
                 default:
                     dinfo("Guest Driver: Auto (ext controls)");
-            }
-        } else {
-            if (fc::isEnabled(fc::GuestAngle)) {
-                dinfo("Guest Driver: Angle (enabled from -feature GuestAngle)");
-                skin_winsys_set_preferred_gles_driver(
-                        WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE);
-            } else {
-                dinfo("Guest Driver: Native (disabled from -feature "
-                      "-GuestAngle)");
-                skin_winsys_set_preferred_gles_driver(
-                        WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE);
             }
         }
 
@@ -3305,19 +3289,8 @@ extern "C" int main(int argc, char** argv) {
                     default:
                         dinfo("Guest Driver: Auto (ext controls)");
                 }
-            } else {
-                if (fc::isEnabled(fc::GuestAngle)) {
-                    dinfo("Guest Driver: Angle (enabled from -feature "
-                          "GuestAngle)");
-                    skin_winsys_set_preferred_gles_driver(
-                            WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE);
-                } else {
-                    dinfo("Guest Driver: Native (disabled from -feature "
-                          "-GuestAngle)");
-                    skin_winsys_set_preferred_gles_driver(
-                            WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE);
-                }
             }
+
 
             if (skin_winsys_get_preferred_gles_apilevel() ==
                         WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT ||
