@@ -124,7 +124,10 @@ if(WIN32)
 
   # Including windows.h will cause issues with std::min/std::max
   add_definitions(-DNOMINMAX -D_CRT_SECURE_NO_WARNINGS -D_USE_MATH_DEFINES
-                  -DWIN32_LEAN_AND_MEAN)
+                  -DWIN32_LEAN_AND_MEAN
+                  # Workaround for https://stackoverflow.com/questions/78598141/first-stdmutexlock-crashes-in-application-built-with-latest-visual-studio
+                  #  You can define _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR as an escape hatch.
+                  -D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 else()
   set(CMAKE_SYSTEM_NAME WinMSVCCrossCompile)
   toolchain_generate("${ANDROID_TARGET_TAG}")
