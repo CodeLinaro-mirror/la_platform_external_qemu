@@ -3338,6 +3338,9 @@ static void android_teardown_metrics()
     android_metrics_stop(METRICS_STOP_GRACEFUL);
 }
 
+
+extern void android_report_compatibility_checks();
+
 static const char openglInitFailureMessage[] =
     "OpenGLES emulation failed to initialize. "
     "Please consider the following troubleshooting steps:\n\n"
@@ -3352,6 +3355,7 @@ static const char openglInitFailureMessage[] =
 static bool android_reporting_setup(void)
 {
     android_init_metrics();
+    android_report_compatibility_checks();
     registerCrashInfo();
 
     if (!is_opengl_alive) {

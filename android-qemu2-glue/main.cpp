@@ -346,6 +346,18 @@ static int genHwIniFile(AndroidHwConfig* hw, const char* coreHwIniPath) {
     return 0;
 }
 
+extern "C" void android_report_compatibility_checks() {
+    // Reload the compatibility checks and report them.
+    bool reportMetrics = !getConsoleAgents()->settings->is_fuchsia() &&
+                         !getConsoleAgents()->settings->android_qemu_mode();
+
+    if (reportMetrics) {
+        auto results = AvdCompatibilityManager::instance().check(
+                getConsoleAgents()->settings->avdInfo());
+        AvdCompatibilityManager::instance().reportMetrics(results);
+    }
+}
+
 static void updateDataSystemSubdirectory(const char* dataDirectory,
                                          const char* skin,
                                          const char* srcDir,
@@ -380,7 +392,7 @@ static void prepareSkinConfig(AndroidHwConfig* hw, const char* dataDirectory) {
     if (android_foldable_is_pixel_fold()) {
         const char* skin = nullptr;
         if (((hw->hw_device_name &&
-              !strncmp("pixel_fold",hw->hw_device_name, 10)) ||
+              !strncmp("pixel_fold", hw->hw_device_name, 10)) ||
              resizableEnabled34())) {
             skin = "pixel_fold";
         } else {
@@ -470,7 +482,8 @@ static bool creatUserDataExt4Img(AndroidHwConfig* hw,
                                  const char* dataDirectory) {
     std::string empty_data_path =
             PathUtils::join(dataDirectory, "empty_data_disk");
-    const bool shouldUseEmptyDataImg = path_exists(empty_data_path.c_str()) && !(android_foldable_is_pixel_fold());
+    const bool shouldUseEmptyDataImg = path_exists(empty_data_path.c_str()) &&
+                                       !(android_foldable_is_pixel_fold());
     if (shouldUseEmptyDataImg) {
         android_createEmptyExt4Image(
                 hw->disk_dataPartition_path,
@@ -699,13 +712,13 @@ private:
                     return {};
                 }
                 {
-                    std::unique_ptr<char, void(*)(void*)> avdVendorImagePath(
+                    std::unique_ptr<char, void (*)(void*)> avdVendorImagePath(
                             avdInfo_getVendorImagePath(m_avd), free);
-                    std::unique_ptr<char, void(*)(void*)> vendorInitImagePath(
+                    std::unique_ptr<char, void (*)(void*)> vendorInitImagePath(
                             avdInfo_getVendorInitImagePath(m_avd), free);
-                    vendorImagePath = std::string(
-                            avdVendorImagePath.get()
-                                    ?: vendorInitImagePath.get());
+                    vendorImagePath =
+                            std::string(avdVendorImagePath.get()
+                                                ?: vendorInitImagePath.get());
                 }
                 if (writable) {
                     const char* systemDir = avdInfo_getContentPath(m_avd);
@@ -1099,12 +1112,12 @@ bool handleCpuAccelerationForMinConfig(int argc,
                 ANDROID_CPU_ACCELERATOR_WHPX);
     } else if (hasEnableAehd) {
         dprint("%s: Selecting AEHD for CPU acceleration", __func__);
-        androidCpuAcceleration_resetCpuAccelerator(ANDROID_CPU_ACCELERATOR_AEHD);
+        androidCpuAcceleration_resetCpuAccelerator(
+                ANDROID_CPU_ACCELERATOR_AEHD);
     }
 
     return true;
 }
-
 
 static void set_first_gps_location(const std::string& AVDconfPath) {
     double latitude = {37.422};
@@ -1236,7 +1249,6 @@ static int startEmulatorWithMinConfig(int argc,
 
     skin_winsys_set_preferred_gles_driver(uiPreferredGuestRenderer);
 
-
     char* accel_status = NULL;
     CpuAccelMode accel_mode = ACCEL_AUTO;
 
@@ -1258,8 +1270,10 @@ static int startEmulatorWithMinConfig(int argc,
         if (apiLevel >= 31) {
             if (skin_winsys_get_preferred_gles_apilevel() ==
                 WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT) {
-                dwarning("API level %d requires OpenGL ES 3.0+, attempting to"
-                    " turn on OpenGL ES 3.0/3.1", apiLevel);
+                dwarning(
+                        "API level %d requires OpenGL ES 3.0+, attempting to"
+                        " turn on OpenGL ES 3.0/3.1",
+                        apiLevel);
             }
             // API 31 needs GLES 3.0+ to boot
             fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion, true);
@@ -1281,10 +1295,13 @@ static int startEmulatorWithMinConfig(int argc,
         } else {
             if (fc::isEnabled(fc::GuestAngle)) {
                 dinfo("Guest Driver: Angle (enabled from -feature GuestAngle)");
-                skin_winsys_set_preferred_gles_driver(WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE);
+                skin_winsys_set_preferred_gles_driver(
+                        WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE);
             } else {
-                dinfo("Guest Driver: Native (disabled from -feature -GuestAngle)");
-                skin_winsys_set_preferred_gles_driver(WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE);
+                dinfo("Guest Driver: Native (disabled from -feature "
+                      "-GuestAngle)");
+                skin_winsys_set_preferred_gles_driver(
+                        WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE);
             }
         }
 
@@ -1634,15 +1651,15 @@ extern "C" int main(int argc, char** argv) {
             rl.rlim_cur = desiredLimit;
             ret = setrlimit(RLIMIT_NOFILE, &rl);
             if (0 == ret) {
-                D("Raised open files limit to %u",  desiredLimit);
+                D("Raised open files limit to %u", desiredLimit);
             } else {
                 derror("%s: Failed to raise files limit. errno %d", __func__,
                        errno);
             }
             ret = getrlimit(RLIMIT_NOFILE, &rl);
             if (0 == ret) {
-                D("Num files limit (after): cur max %u %u",
-                  rl.rlim_cur, rl.rlim_max);
+                D("Num files limit (after): cur max %u %u", rl.rlim_cur,
+                  rl.rlim_max);
             } else {
                 derror("%s: Failed to query files limit. errno %d", __func__,
                        errno);
@@ -1671,7 +1688,7 @@ extern "C" int main(int argc, char** argv) {
 
     // Make the console agents available.
     const char* factory = "";
-    for(int i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-debug-events") == 0) {
             factory = "debug";
         }
@@ -2010,8 +2027,8 @@ extern "C" int main(int argc, char** argv) {
 #ifdef __APPLE__
 
             // BUG: 294436742
-            // intel mac does not have good performance with filebacked quickboot;
-            // apple silicon has it disabled anyway
+            // intel mac does not have good performance with filebacked
+            // quickboot; apple silicon has it disabled anyway
             // TODO: Fix file-backed RAM snapshot support.
             feature_set_if_not_overridden(kFeature_QuickbootFileBacked,
                                           false /* not to enable */);
@@ -2324,7 +2341,7 @@ extern "C" int main(int argc, char** argv) {
                             "snapshot, forcing code boot");
                     opts->no_snapshot_load = true;
                     Snapshotter::get().setDownloadableSnapshotFailure(
-                                DownloadableSnapshotFailure::IncompatibleAvd);
+                            DownloadableSnapshotFailure::IncompatibleAvd);
                 }
 
                 if (!startFromScratch) {
@@ -2821,29 +2838,36 @@ extern "C" int main(int argc, char** argv) {
     bool isATV = avdInfo_getAvdFlavor(
                          getConsoleAgents()->settings->avdInfo()) == AVD_TV;
     if (isATV && feature_is_enabled(kFeature_VirtioWifi) && opts->no_ethernet) {
-        dinfo("Do not initialize netdev virtio-net for Android TV virtual device"
-            " because option no-ethernet is provided.");
+        dinfo("Do not initialize netdev virtio-net for Android TV virtual "
+              "device"
+              " because option no-ethernet is provided.");
     } else {
         args.add("-netdev");
         if (opts->net_tap) {
             const char* upScript =
                     opts->net_tap_script_up ? opts->net_tap_script_up : "no";
-            const char* downScript =
-                    opts->net_tap_script_down ? opts->net_tap_script_down : "no";
+            const char* downScript = opts->net_tap_script_down
+                                             ? opts->net_tap_script_down
+                                             : "no";
             args.addFormat("tap,id=mynet,script=%s,downscript=%s,ifname=%s",
                            upScript, downScript, opts->net_tap);
         } else if (opts->net_socket) {
             args.addFormat("socket,id=mynet,%s", opts->net_socket);
-         }
+        }
 #if defined(__APPLE__) && defined(__aarch64__)
         else if (opts->vmnet_bridged) {
             args.addFormat("vmnet-bridged,id=mynet,ifname=%s%s",
-                               opts->vmnet_bridged, opts->vmnet_isolated ? ",isolated=on" : "");
+                           opts->vmnet_bridged,
+                           opts->vmnet_isolated ? ",isolated=on" : "");
         } else if (opts->vmnet_shared) {
-            if(opts->vmnet_start_address && opts->vmnet_end_address && opts->vmnet_subnet_mask) {
-                args.addFormat("vmnet-shared,id=mynet,start-address=%s,end-address=%s,subnet-mask=%s%s",
-                               opts->vmnet_start_address, opts->vmnet_end_address, opts->vmnet_subnet_mask,
-                               opts->vmnet_isolated ? ",isolated=on" : "");
+            if (opts->vmnet_start_address && opts->vmnet_end_address &&
+                opts->vmnet_subnet_mask) {
+                args.addFormat(
+                        "vmnet-shared,id=mynet,start-address=%s,end-address=%s,"
+                        "subnet-mask=%s%s",
+                        opts->vmnet_start_address, opts->vmnet_end_address,
+                        opts->vmnet_subnet_mask,
+                        opts->vmnet_isolated ? ",isolated=on" : "");
             } else {
                 args.addFormat("vmnet-shared,id=mynet%s",
                                opts->vmnet_isolated ? ",isolated=on" : "");
@@ -2855,12 +2879,14 @@ extern "C" int main(int argc, char** argv) {
                 dwarning("-net-tap-script-up ignored without -net-tap option");
             }
             if (opts->net_tap_script_down) {
-                dwarning("-net-tap-script-down ignored without -net-tap option");
+                dwarning(
+                        "-net-tap-script-down ignored without -net-tap option");
             }
             if (opts->network_user_mode_options &&
                 android_validate_user_mode_networking_option(
                         opts->network_user_mode_options)) {
-                args.addFormat("user,id=mynet,%s", opts->network_user_mode_options);
+                args.addFormat("user,id=mynet,%s",
+                               opts->network_user_mode_options);
             } else {
                 args.add("user,id=mynet");
             }
@@ -3018,7 +3044,8 @@ extern "C" int main(int argc, char** argv) {
     }
 
     // Note: The UI might override this location.
-    set_first_gps_location(PathUtils::join(avdInfo_getContentPath(avd), "AVDconf"));
+    set_first_gps_location(
+            PathUtils::join(avdInfo_getContentPath(avd), "AVDconf"));
     getConsoleAgents()->location->gpsSetPassiveUpdate(!opts->no_passive_gps);
 
     // rng
@@ -3056,12 +3083,17 @@ extern "C" int main(int argc, char** argv) {
 #if defined(__APPLE__) && defined(__aarch64__)
         else if (opts->vmnet_bridged) {
             args.addFormat("vmnet-bridged,id=virtio-wifi,ifname=%s%s",
-                           opts->vmnet_bridged, opts->vmnet_isolated ? ",isolated=on" : "");
+                           opts->vmnet_bridged,
+                           opts->vmnet_isolated ? ",isolated=on" : "");
         } else if (opts->vmnet_shared) {
-            if(opts->vmnet_start_address && opts->vmnet_end_address && opts->vmnet_subnet_mask) {
-                args.addFormat("vmnet-shared,id=virtio-wifi,start-address=%s,end-address=%s,subnet-mask=%s%s",
-                               opts->vmnet_start_address, opts->vmnet_end_address, opts->vmnet_subnet_mask,
-                               opts->vmnet_isolated ? ",isolated=on" : "");
+            if (opts->vmnet_start_address && opts->vmnet_end_address &&
+                opts->vmnet_subnet_mask) {
+                args.addFormat(
+                        "vmnet-shared,id=virtio-wifi,start-address=%s,end-"
+                        "address=%s,subnet-mask=%s%s",
+                        opts->vmnet_start_address, opts->vmnet_end_address,
+                        opts->vmnet_subnet_mask,
+                        opts->vmnet_isolated ? ",isolated=on" : "");
             } else {
                 args.addFormat("vmnet-shared,id=virtio-wifi%s",
                                opts->vmnet_isolated ? ",isolated=on" : "");
@@ -3275,18 +3307,23 @@ extern "C" int main(int argc, char** argv) {
                 }
             } else {
                 if (fc::isEnabled(fc::GuestAngle)) {
-                    dinfo("Guest Driver: Angle (enabled from -feature GuestAngle)");
-                    skin_winsys_set_preferred_gles_driver(WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE);
+                    dinfo("Guest Driver: Angle (enabled from -feature "
+                          "GuestAngle)");
+                    skin_winsys_set_preferred_gles_driver(
+                            WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE);
                 } else {
-                    dinfo("Guest Driver: Native (disabled from -feature -GuestAngle)");
-                    skin_winsys_set_preferred_gles_driver(WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE);
+                    dinfo("Guest Driver: Native (disabled from -feature "
+                          "-GuestAngle)");
+                    skin_winsys_set_preferred_gles_driver(
+                            WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE);
                 }
             }
 
             if (skin_winsys_get_preferred_gles_apilevel() ==
                         WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT ||
                 System::get()->getProgramBitness() == 32) {
-                fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion, false);
+                fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion,
+                                                     false);
             }
 
             // In build environment, enable gles3 if possible
@@ -3299,10 +3336,14 @@ extern "C" int main(int argc, char** argv) {
             if (apiLevel >= 31) {
                 if (skin_winsys_get_preferred_gles_apilevel() ==
                     WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT) {
-                    dwarning("API level %d requires OpenGL ES 3.0+, attempting to"
-                        " turn on OpenGL ES 3.0/3.1", apiLevel);
+                    dwarning(
+                            "API level %d requires OpenGL ES 3.0+, attempting "
+                            "to"
+                            " turn on OpenGL ES 3.0/3.1",
+                            apiLevel);
                 }
-                fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion, true);
+                fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion,
+                                                     true);
             }
 
 #ifdef __linux__
@@ -3373,15 +3414,17 @@ extern "C" int main(int argc, char** argv) {
         if (feature_is_enabled(kFeature_PlayStoreImage) ||
             !android_op_writable_system ||
             feature_is_enabled(kFeature_DynamicPartition)) {
-            std::unique_ptr<char, void(*)(void*)> verifiedBootParamsPath(
+            std::unique_ptr<char, void (*)(void*)> verifiedBootParamsPath(
                     avdInfo_getVerifiedBootParamsPath(avd), free);
             android::verifiedboot::getParametersFromFile(
                     verifiedBootParamsPath.get(),  // NULL here is OK
                     &verified_boot_params);
             if (feature_is_enabled(kFeature_DynamicPartition)) {
                 std::string boot_dev("androidboot.boot_devices=");
-                std::unique_ptr<char, void(*)(void*)> dynamicPartitionBootDevice(
-                        avdInfo_getDynamicPartitionBootDevice(avd), free);
+                std::unique_ptr<char, void (*)(void*)>
+                        dynamicPartitionBootDevice(
+                                avdInfo_getDynamicPartitionBootDevice(avd),
+                                free);
                 boot_dev.append(dynamicPartitionBootDevice.get());
                 verified_boot_params.push_back(boot_dev);
             }
@@ -3418,7 +3461,8 @@ extern "C" int main(int argc, char** argv) {
             fc::isEnabled(fc::AndroidbootProps2)) {
             if (VERBOSE_CHECK(init)) {
                 dinfo("Android bootconfig:");
-                for (const std::pair<std::string, std::string>& kv : userspaceBootOpts) {
+                for (const std::pair<std::string, std::string>& kv :
+                     userspaceBootOpts) {
                     dinfo("  %s=\"%s\"", kv.first.c_str(), kv.second.c_str());
                 }
             }
@@ -3443,11 +3487,12 @@ extern "C" int main(int argc, char** argv) {
             }
         }
 
-        std::string systemImageKernelCommandLine = android::qemu::loadKernelCmdLineFromAvd(avd);
+        std::string systemImageKernelCommandLine =
+                android::qemu::loadKernelCmdLineFromAvd(avd);
         std::string append_arg = emulator_getKernelParameters(
                 opts, kTarget.androidArch, apiLevel, real_console_tty_prefix,
-                systemImageKernelCommandLine.c_str(),
-                hw->kernel_parameters, hw->kernel_path, &verified_boot_params,
+                systemImageKernelCommandLine.c_str(), hw->kernel_parameters,
+                hw->kernel_path, &verified_boot_params,
                 rendererConfig.glFramebufferSizeBytes, pstore,
                 hw->hw_arc /* isCros */,
                 std::move(kernelCmdLineUserspaceBootOpts));

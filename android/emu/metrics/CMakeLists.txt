@@ -78,17 +78,27 @@ target_include_directories(
     src ${ANDROID_QEMU2_TOP_DIR}/android/android-emu
     ${CMAKE_CURRENT_BINARY_DIR}
     ${ANDROID_QEMU2_TOP_DIR}/android-qemu2-glue/config/${ANDROID_TARGET_TAG})
-android_install_shared_library(TARGET android-emu-metrics)
+android_install_shared_library(TARGET android-emu-metrics DUPLICATE_FOR_WINDOWS)
 
 if(NOT LINUX_AARCH64)
+  android_add_library(
+    TARGET android-emu-metrics-mock-reporter
+    LICENSE Apache-2.0
+    SRC test/android/metrics/tests/MockMetricsReporter.cpp
+        test/android/metrics/tests/MockMetricsWriter.cpp
+    WINDOWS # These classes are internal to the dll, so we just dupe them for
+            # the unit tests
+            src/android/metrics/AsyncMetricsReporter.cpp
+            src/android/metrics/NullMetricsReporter.cpp
+            src/android/metrics/NullMetricsWriter.cpp
+    DEPS android-emu android-emu-base-headers android-emu-metrics gtest)
+  target_include_directories(android-emu-metrics-mock-reporter PUBLIC test src)
   android_add_test(
     TARGET android-emu-metrics_unittests
     SRC test/android/CommonReportedInfo_unittest.cpp
         test/android/metrics/tests/AsyncMetricsReporter_unittest.cpp
         test/android/metrics/tests/FileMetricsWriter_unittest.cpp
         test/android/metrics/tests/MetricsReporter_unittest.cpp
-        test/android/metrics/tests/MockMetricsReporter.cpp
-        test/android/metrics/tests/MockMetricsWriter.cpp
         test/android/metrics/tests/NullMetricsClasses_unittest.cpp
         test/android/metrics/tests/Percentiles_unittest.cpp
         test/android/metrics/tests/PeriodicReporter_unittest.cpp
@@ -103,7 +113,9 @@ if(NOT LINUX_AARCH64)
 
   target_compile_options(android-emu-metrics_unittests PRIVATE -O0)
   target_include_directories(android-emu-metrics_unittests PRIVATE src test)
-  target_link_libraries(android-emu-metrics_unittests
-                        PRIVATE gmock_main android-emu android-emu-base-headers android-emu-metrics)
+  target_link_libraries(
+    android-emu-metrics_unittests
+    PRIVATE gmock_main android-emu android-emu-base-headers android-emu-metrics
+            android-emu-metrics-mock-reporter)
 
 endif()

@@ -17,31 +17,42 @@ namespace android {
 namespace emulation {
 
 using android::base::System;
+using namespace android_studio;
 
 // A check to make sure there is a enough disk space available
 // for the given avd.
 AvdCompatibilityCheckResult hasSufficientDiskSpace(AvdInfo* avd) {
+    android_studio::EmulatorCompatibilityInfo metrics;
+    metrics.set_check(EmulatorCompatibilityInfo::
+                              AVD_COMPATIBILITY_CHECK_INSUFFICIENT_DISK_SPACE);
     if (avd == nullptr) {
-        return {
-                .description = "No avd present, cannot check for disk space",
+        metrics.set_check(
+                EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_NO_AVD);
+        return {.description = "No avd present, cannot check for disk space",
                 .status = AvdCompatibility::Warning,
-        };
+                .metrics = metrics};
     }
     const char* name = avdInfo_getName(avd);
-    bool underPressure = System::isUnderDiskPressure(avdInfo_getContentPath(avd));
+    System::FileSize freeDisk;
+    bool underPressure =
+            System::isUnderDiskPressure(avdInfo_getContentPath(avd), &freeDisk);
     if (underPressure) {
-        return {
-                .description = absl::StrFormat(
-                        "Your device does not have enough disk space to run avd: `%s`", name),
+        metrics.set_check(
+                EmulatorCompatibilityInfo::
+                        AVD_COMPATIBILITY_CHECK_INSUFFICIENT_DISK_SPACE);
+        metrics.set_details(std::to_string(freeDisk));
+        return {.description =
+                        absl::StrFormat("Your device does not have enough disk "
+                                        "space to run avd: `%s`",
+                                        name),
                 .status = AvdCompatibility::Error,
-        };
+                .metrics = metrics};
     }
 
-    return {
-            .description = absl::StrFormat(
+    return {.description = absl::StrFormat(
                     "Disk space requirements to run avd: `%s` are met", name),
             .status = AvdCompatibility::Ok,
-    };
+            .metrics = metrics};
 };
 
 REGISTER_COMPATIBILITY_CHECK(hasSufficientDiskSpace);

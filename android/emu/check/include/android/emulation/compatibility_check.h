@@ -19,6 +19,7 @@
 #include <vector>
 #include "absl/strings/str_format.h"
 #include "android/avd/info.h"
+#include "studio_stats.pb.h"
 
 namespace android {
 namespace emulation {
@@ -61,6 +62,13 @@ struct AvdCompatibilityCheckResult {
      * @brief The AvdCompatibility status indicating the level of compatibility.
      */
     AvdCompatibility status;
+
+    /**
+     * @brief Metrics that should be reported. Only warning and error status
+     * will be reported. Please make sure to fill out the details of this protobuf
+     * message when creating new checks.
+     */
+    android_studio::EmulatorCompatibilityInfo metrics;
 };
 
 /**
@@ -102,6 +110,19 @@ public:
      */
     bool hasCompatibilityErrors(
             const std::vector<AvdCompatibilityCheckResult>& results);
+
+
+    /**
+     * @brief Report metrics for the collected compatbility checks.
+     *
+     * This will collect all gathered metrics during the checking phase and report
+     * them to our metrics endpoint. Only warning and errors will be collected.
+     *
+     * @param results A vector of AvdCompatibilityCheckResult structs containing
+     * the check outcomes.
+
+     */
+    void reportMetrics(const std::vector<AvdCompatibilityCheckResult>& results);
 
     /**
      * @brief Constructs an issue string (error or warning) from the given
@@ -217,5 +238,6 @@ void AbslStringify(Sink& sink, AvdCompatibility status) {
             ABSL_UNREACHABLE();
     }
 }
+
 }  // namespace emulation
 }  // namespace android

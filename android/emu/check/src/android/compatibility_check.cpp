@@ -22,11 +22,13 @@
 #include "absl/strings/str_format.h"
 #include "android/avd/info.h"
 #include "android/base/logging/StudioMessage.h"
-
+#include "android/metrics/MetricsReporter.h"
 namespace android {
 namespace emulation {
 
 using base::EXIT_WITH_FATAL_MESSAGE;
+using namespace android_studio;
+using android::metrics::MetricsReporter;
 
 AvdCompatibilityManager& AvdCompatibilityManager::instance() {
     static AvdCompatibilityManager sInstance;
@@ -55,6 +57,37 @@ std::vector<AvdCompatibilityCheckResult> AvdCompatibilityManager::check(
     }
     mRanChecks = true;
     return mResults;
+}
+
+void AvdCompatibilityManager::reportMetrics(
+        const std::vector<AvdCompatibilityCheckResult>& results) {
+    for (auto result : results) {
+        switch (result.status) {
+            case AvdCompatibility::Ok:
+                result.metrics.set_status(
+                        EmulatorCompatibilityInfo::AVD_COMPATIBILITY_STATUS_OK);
+                break;
+            case AvdCompatibility::Warning:
+                result.metrics.set_status(
+                        EmulatorCompatibilityInfo::
+                                AVD_COMPATIBILITY_STATUS_WARNING);
+                break;
+            case AvdCompatibility::Error:
+                result.metrics.set_status(
+                        EmulatorCompatibilityInfo::
+                                AVD_COMPATIBILITY_STATUS_ERROR);
+                break;
+        };
+        // We only report error messages.
+        if (result.status != AvdCompatibility::Ok) {
+            MetricsReporter::get().report(
+                    [result](android_studio::AndroidStudioEvent* event) {
+                        auto info = event->mutable_emulator_details()
+                                            ->mutable_emu_compat_info();
+                        info->CopyFrom(result.metrics);
+                    });
+        }
+    }
 }
 
 bool AvdCompatibilityManager::hasCompatibilityErrors(
@@ -116,6 +149,5 @@ std::vector<std::string_view> AvdCompatibilityManager::registeredChecks() {
     }
     return result;
 }
-
 }  // namespace emulation
 }  // namespace android
