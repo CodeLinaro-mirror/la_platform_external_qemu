@@ -86,9 +86,10 @@ class CTestTask(BuildTask):
             }
 
             if self.gfxstream:
-                env["VK_ICD_FILENAMES"] = str(
+                env["VK_DRIVER_FILES"] = str(
                     self.destination / "lib64" / "vulkan" / "vk_swiftshader_icd.json"
                 )
+                env["VK_ICD_FILENAMES"] = env["VK_DRIVER_FILES"]
                 env["LD_LIBRARY_PATH"] = str(
                     str(self.destination / "lib64" / "vulkan")
                     + ":"

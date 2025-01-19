@@ -195,10 +195,11 @@ export CTEST_PROGRESS_OUTPUT=1
 OLD_DIR=$PWD
 cd $OPT_OUT
 
-# gfxstream relies on VK_ICD_FILENAMES to switch between different vulkan
+# gfxstream relies on VK_DRIVER_FILES to switch between different vulkan
 # libraries. We want to use swiftshader_vk in unittests.
 if [ "$OPT_GFXSTREAM" ] ; then
-    export VK_ICD_FILENAMES=$PWD/lib64/vulkan/vk_swiftshader_icd.json
+    export VK_DRIVER_FILES=$PWD/lib64/vulkan/vk_swiftshader_icd.json
+    export VK_ICD_FILENAMES=VK_DRIVER_FILES
     # Path to the vulkan ICD loader used for testing, libvulkan.so
     export LD_LIBRARY_PATH=$PWD/lib64/vulkan:$PWD/lib64/gles_swiftshader
 fi

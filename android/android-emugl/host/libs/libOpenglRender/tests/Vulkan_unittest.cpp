@@ -430,6 +430,9 @@ class VulkanTest : public ::testing::Test {
 protected:
     void SetUp() override {
         TestSystem::setEnvironmentVariable(
+            "VK_DRIVER_FILES",
+            testIcdFilename());
+        TestSystem::setEnvironmentVariable(
             "VK_ICD_FILENAMES",
             testIcdFilename());
 
@@ -445,6 +448,8 @@ protected:
 
     void TearDown() override {
         teardownVulkanTest(&mVk, mDevice, mInstance);
+        TestSystem::setEnvironmentVariable(
+            "VK_DRIVER_FILES", "");
         TestSystem::setEnvironmentVariable(
             "VK_ICD_FILENAMES", "");
     }
