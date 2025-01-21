@@ -373,6 +373,80 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
     return selectedGpuIndex;
 }
 
+static std::string sVkRuntimePath;
+
+const char* emuglConfig_get_vulkan_runtime_full_path() {
+    if (sVkRuntimePath.size()) {
+        return sVkRuntimePath.c_str();
+    }
+
+    const std::string explicitPath = System::getEnvironmentVariable("ANDROID_EMU_VK_LOADER_PATH");
+    if (!explicitPath.empty()) {
+        sVkRuntimePath = explicitPath;
+        return sVkRuntimePath.c_str();
+    }
+
+#if defined(_WIN32)
+    const char* myLibName = "vulkan-1.dll";
+#elif defined(__linux__)
+    const char* myLibName = "libvulkan.so";
+#elif defined(__APPLE__)
+    const char* myLibName = "libvulkan.dylib";
+#endif
+
+    const std::string localVkRuntimePath = android::base::PathUtils::join(
+            android::base::System::get()->getLauncherDirectory(), "lib64",
+            "vulkan", myLibName);
+
+    // Use local by default, switch to system if it's newer on supported
+    // platforms
+    std::string selectedPath = localVkRuntimePath;
+
+#if defined(_WIN32)
+    const std::string systemVkRuntimePath = myLibName;
+
+    // Make sure users can enforce the selection with an envvar
+    const std::string vkRuntimeOption =
+            System::getEnvironmentVariable("ANDROID_EMU_VK_RUNTIME");
+    if (vkRuntimeOption == "SYSTEM") {
+        selectedPath = systemVkRuntimePath;
+    } else if (vkRuntimeOption == "LOCAL") {
+        selectedPath = localVkRuntimePath;
+    } else {
+        // Check if the locally distributed version of the vulkan runtime is
+        // newer
+        int globalMajor, globalMinor, globalBuild_1, globalBuild_2;
+        int localMajor, localMinor, localBuild_1, localBuild_2;
+        dprint("%s: Checking for %s versions", __func__, myLibName);
+        if (System::queryFileVersionInfo(systemVkRuntimePath.c_str(),
+                                         &globalMajor, &globalMinor,
+                                         &globalBuild_1, &globalBuild_2) &&
+            System::queryFileVersionInfo(localVkRuntimePath.c_str(),
+                                         &localMajor, &localMinor,
+                                         &localBuild_1, &localBuild_2)) {
+            dprint("%s version: %d.%d.%d.%d", systemVkRuntimePath.c_str(),
+                   globalMajor, globalMinor, globalBuild_1, globalBuild_2);
+            dprint("%s version: %d.%d.%d.%d", localVkRuntimePath.c_str(),
+                   localMajor, localMinor, localBuild_1, localBuild_2);
+
+            if ((localMajor > globalMajor) ||
+                (localMajor == globalMajor && localMinor > globalMinor) ||
+                (localMajor == globalMajor && localMinor == globalMinor &&
+                 localBuild_1 > globalBuild_1)) {
+                // Use globally available runtime if newer
+                selectedPath = systemVkRuntimePath;
+            }
+        }
+    }
+#endif
+
+    sVkRuntimePath = selectedPath;
+    dprint("%s: Using vulkan runtime path: %s", __func__,
+           sVkRuntimePath.c_str());
+
+    return sVkRuntimePath.c_str();
+}
+
 bool emuglConfig_get_vulkan_hardware_gpu_support_info(
         DeviceSupportInfo* outProps);
 
@@ -392,6 +466,7 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
         *vendor = nullptr;
         return;
     }
+    const char* mylibname = emuglConfig_get_vulkan_runtime_full_path();
 
     const VkPhysicalDeviceProperties& physicalProp = vkProps.physdevProps;
     const VkPhysicalDeviceMemoryProperties& memProps = vkProps.memProperties;
@@ -442,13 +517,7 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
         return true;
     }
 
-#if defined(_WIN32)
-    const char* mylibname = "vulkan-1.dll";
-#elif defined(__linux__)
-    const char* mylibname = "libvulkan.so";
-#elif defined(__APPLE__)
-    const char* mylibname = "libvulkan.dylib";
-#endif
+    const char* mylibname = emuglConfig_get_vulkan_runtime_full_path();
 
 #if defined(_WIN32)
     HMODULE library = LoadLibraryA(mylibname);
@@ -458,14 +527,9 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
     }
     auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(library, "vkGetInstanceProcAddr"));
 #else
-    const auto launcherDir =
-            android::base::System::get()->getLauncherDirectory();
-    const auto strlibname = android::base::PathUtils::join(launcherDir, "lib64",
-                                                           "vulkan", mylibname);
-    const char* fulllibname = strlibname.c_str();
-    auto library = dlopen(fulllibname, RTLD_NOW);
+    auto library = dlopen(mylibname, RTLD_NOW);
     if (!library) {
-        dwarning("%s: failed to open %s", __func__, fulllibname);
+        dwarning("%s: failed to open %s", __func__, mylibname);
         return false;
     }
     auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(library, "vkGetInstanceProcAddr"));
