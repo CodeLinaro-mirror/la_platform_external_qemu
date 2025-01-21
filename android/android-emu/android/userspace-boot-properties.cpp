@@ -228,7 +228,8 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         autoRotateProp = "androidboot.qemu.autorotate";
         qemuExternalDisplays = "androidboot.qemu.external.displays";
         qemuDualModeMouseDriverProp = "androidboot.qemu.dual_mode_mouse_driver";
-        qemuDualModeMouseHideGuestCursorProp = "androidboot.qemu.dual_mode_mouse_hide_guest_cursor";
+        qemuDualModeMouseHideGuestCursorProp =
+                "androidboot.qemu.dual_mode_mouse_hide_guest_cursor";
     } else {
         androidbootVerityMode = nullptr;
         checkjniProp = "android.checkjni";
@@ -264,7 +265,8 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         autoRotateProp = "qemu.autorotate";
         qemuExternalDisplays = "qemu.external.displays";
         qemuDualModeMouseDriverProp = "qemu.dual_mode_mouse_driver";
-        qemuDualModeMouseHideGuestCursorProp = "qemu.dual_mode_mouse_hide_guest_cursor";
+        qemuDualModeMouseHideGuestCursorProp =
+                "qemu.dual_mode_mouse_hide_guest_cursor";
     }
 
     std::vector<std::pair<std::string, std::string>> params;
@@ -278,6 +280,19 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
 
     params.push_back({"androidboot.hardware", "ranchu"});
     const char* qemuUirendererPropValue = nullptr;
+
+    bool isVkNVIDIA = false;
+    if (fc::isEnabled(fc::Vulkan)) {
+        const bool hwGpuRequested =
+                (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST);
+        if (!isMac && hwGpuRequested) {
+            char* vkVendor = nullptr;
+            int vkMajor, vkMinor, vkPatch;
+            emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
+                                                &vkPatch, nullptr, nullptr);
+            isVkNVIDIA = (vkVendor && strncmp("NVIDIA", vkVendor, 6) == 0);
+        }
+    }
 
     if (opts->guest_angle) {
         dwarning(
@@ -308,34 +323,12 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         // GuestAngle boot parameters are only valid for some system images with
         // API level 34 and above.
         if (apiLevel >= 34) {
-
-            bool isNVIDIA = false;
-            const bool hwGpuRequested =
-                    (emuglConfig_get_current_renderer() ==
-                        SELECTED_RENDERER_HOST);
-            if (!isMac && hwGpuRequested) {
-                char* vkVendor = nullptr;
-                int vkMajor, vkMinor, vkPatch;
-                emuglConfig_get_vulkan_hardware_gpu(
-                        &vkVendor, &vkMajor, &vkMinor, &vkPatch, nullptr, nullptr);
-                isNVIDIA = (vkVendor && strncmp("NVIDIA", vkVendor, 6) == 0);
-            }
-
-            if (isNVIDIA) {
-                // NVIDIA cards can satisfy 2-graphics-queue requirement
-                // for SkiaVK, and it works better with GuestAngle.
-                qemuUirendererPropValue = "skiavk";
-                params.push_back(
-                        {"androidboot.debug.renderengine.backend",
-                            "skiavk"});
-            }
-
             if (angle_overrides_disabled.empty()) {
                 // b/264575911: Nvidia seems to have issues with YUV samplers
                 // with 'lowp' and 'mediump' precision qualifiers.
                 // This should ideally use graphicsdetecto rresults at
                 // GraphicsDetectorVkPrecisionQualifiersOnYuvSamplers.cpp
-                if (isNVIDIA) {
+                if (isVkNVIDIA) {
                     // enablePrecisionQualifiers
                     angle_overrides_disabled = "enablePrec*";
 
@@ -352,8 +345,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
                 // created even without the above extensions.
                 // TODO(b/238024366): this may not fit into character
                 // limitations
-                const char* extensionLimitStr =
-                        "exposeN*";
+                const char* extensionLimitStr = "exposeN*";
                 const int MAX_PARAM_LENGTH = 92;
                 const bool safeToAdd =
                         (angle_overrides_disabled.size() +
@@ -367,7 +359,8 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
                     WARN("Cannot add angle boot parameter '%s', character "
                          "limit exceeded (len=%u max=%u).",
                          extensionLimitStr,
-                         angle_overrides_disabled.size() + strlen(extensionLimitStr),
+                         angle_overrides_disabled.size() +
+                                 strlen(extensionLimitStr),
                          MAX_PARAM_LENGTH);
                 }
             }
@@ -470,7 +463,8 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     if (opts->xts && fc::isEnabled(fc::AndroidVirtualizationFramework)) {
         params.push_back({"androidboot.hypervisor.version", "gfapi-35"});
         params.push_back({"androidboot.hypervisor.vm.supported", "1"});
-        params.push_back({"androidboot.hypervisor.protected_vm.supported", "0"});
+        params.push_back(
+                {"androidboot.hypervisor.protected_vm.supported", "0"});
     }
 
     if (apiLevel >= 31 && androidbootVerityMode) {
@@ -484,8 +478,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     // Android media profile selection
     // 1. If the SelectMediaProfileConfig is on, then select
     // <media_profile_name> if the resolution is above 1080p (1920x1080).
-    if (fc::isEnabled(fc::DynamicMediaProfile) &&
-        qemuMediaProfileVideoProp) {
+    if (fc::isEnabled(fc::DynamicMediaProfile) && qemuMediaProfileVideoProp) {
         if ((hw->hw_lcd_width > 1920 && hw->hw_lcd_height > 1080) ||
             (hw->hw_lcd_width > 1080 && hw->hw_lcd_height > 1920)) {
             dwarning(
@@ -499,12 +492,11 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
 
     // Set vsync rate
     if (opts->vsync_rate) {
-      std::string param = opts->vsync_rate;
-      params.push_back({qemuVsyncProp, param});
+        std::string param = opts->vsync_rate;
+        params.push_back({qemuVsyncProp, param});
     } else {
-      params.push_back({qemuVsyncProp, StringFormat("%u", hw->hw_lcd_vsync)});
+        params.push_back({qemuVsyncProp, StringFormat("%u", hw->hw_lcd_vsync)});
     }
-
 
     // Set gl transport props
     params.push_back({qemuGltransportNameProp, hw->hw_gltransport});
@@ -520,6 +512,24 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     // GLESDynamicVersion = on (i.e., is a reasonably good driver)
     params.push_back({qemuOpenglesVersionProp,
                       StringFormat("%d", bootPropOpenglesVersion)});
+
+    // SkiaVK requires multiple graphics queues and it works better with
+    // GuestAngle. This behavior requires system image to support overriding
+    // hwui and renderengine backends, which is only guaranteed to be supported
+    // on XR and API level 36+ AVD images. Some AVD images with API level 34
+    // will also support it.
+    const bool avdSupportsSkiaVk =
+            ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle)) ||
+             apiLevel >= 36);
+    const bool gpuSupportsSkiaVk =
+            fc::isEnabled(fc::Vulkan) &&
+            (fc::isEnabled(fc::VulkanVirtualQueue) || isVkNVIDIA);
+    const bool enableSkiaVk = avdSupportsSkiaVk && gpuSupportsSkiaVk;
+    if (enableSkiaVk) {
+        qemuUirendererPropValue = "skiavk";
+        qemuUirendererProp = "androidboot.debug.hwui.renderer";
+        params.push_back({"androidboot.debug.renderengine.backend", "skiavk"});
+    }
 
     if (fc::isEnabled(fc::GLESDynamicVersion) && !qemuUirendererPropValue) {
         qemuUirendererPropValue = "skiagl";
@@ -687,7 +697,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     }
 
     if (hw->hw_lcd_circular) {
-      params.push_back({emulatorCircularProp, "1"});
+        params.push_back({emulatorCircularProp, "1"});
     }
 
     if (fc::isEnabled(fc::VirtioDualModeMouse)) {
