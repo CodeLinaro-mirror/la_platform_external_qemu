@@ -1379,7 +1379,7 @@
       <string notr="true">border: 0px;</string>
      </property>
      <property name="title">
-      <string>Guest Gles Driver Preference (requires restart)</string>
+      <string>Guest GLES Driver Preference (requires restart)</string>
      </property>
      <property name="ColorGroup" stdset="0">
       <string>Title</string>

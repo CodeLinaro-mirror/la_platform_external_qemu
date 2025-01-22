@@ -351,36 +351,96 @@ SettingsPage::SettingsPage(QWidget* parent)
         }
     }
 
-    WinsysGuestGlesDriverPreference settings_guestGlesDriver_pref = static_cast<WinsysGuestGlesDriverPreference>(
-                    settings.value(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, 0)
-                            .toInt());
+    {
+        bool isMac = false;
+#ifdef __APPLE__
+        isMac = true;
+#endif
+        auto avdInfo = getConsoleAgents()->settings->avdInfo();
+        const int apiLevel = avdInfo_getApiLevel(avdInfo);
+        const bool isXR = (avdInfo_getAvdFlavor(avdInfo) == AVD_DEV_2024);
 
-    mUi->set_guestGlesDriverPrefComboBox->setCurrentIndex(settings_guestGlesDriver_pref);
-    for (int i = 0; i < mUi->set_guestGlesDriverPrefComboBox->count(); i++) {
-        WinsysGuestGlesDriverPreference guestGlesDriverPreference =
-                (WinsysGuestGlesDriverPreference)(mUi->set_guestGlesDriverPrefComboBox
-                                                     ->itemData(i)
-                                                     .toInt());
+        // ANGLE is only supported on new API levels and XR
+        bool supportsGuestAngle = (apiLevel >= 35);
+        bool supportsNativeGles = true;
+        if (isXR) {
+            // We don't support Native GLES on XR, but we support Angle on API 34
+            supportsGuestAngle = true;
+            supportsNativeGles = !isMac;
+        }
 
-        if ((int)settings_guestGlesDriver_pref == guestGlesDriverPreference) {
-            switch (settings_guestGlesDriver_pref) {
-                case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO:
-                case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE:
-                case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
-                    mUi->set_guestGlesDriverPrefComboBox->setCurrentIndex(i);
-                    break;
-                default:
-                    dwarning(
-                            "%s: unknown Guest Renderer preference value 0x%x. "
-                            "Setting to auto.",
-                            __func__, (unsigned int)settings_guestGlesDriver_pref);
-                    mUi->set_guestGlesDriverPrefComboBox->setCurrentIndex(
-                            WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO);
-                    break;
+        dinfo("AVD supportsNativeGLES=%d, supportsGuestAngle=%d", supportsNativeGles, supportsGuestAngle);
+        for (int i = 0; i < mUi->set_guestGlesDriverPrefComboBox->count(); i++) {
+            mUi->set_guestGlesDriverPrefComboBox->setItemData(i, QVariant(i));
+        }
+        //Remove unsupported guest drivers
+        for (int i = 0; i < mUi->set_guestGlesDriverPrefComboBox->count();) {
+            WinsysGuestGlesDriverPreference driverPreferenceOption =
+                    (WinsysGuestGlesDriverPreference)(mUi->set_guestGlesDriverPrefComboBox
+                                                              ->itemData(i)
+                                                              .toInt());
+            if (driverPreferenceOption == WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE && !supportsGuestAngle) {
+                mUi->set_guestGlesDriverPrefComboBox->removeItem(i);
+                dinfo("Platform does not support Guest Angle");
+            } else if (driverPreferenceOption == WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE && !supportsNativeGles) {
+                mUi->set_guestGlesDriverPrefComboBox->removeItem(i);
+                dinfo("Platform does not support Native GLES");
+            } else {
+                i++;
+            }
+        }
+        std::unique_ptr<QSettings> settings;
+        const char* avdPath = avdInfo_getContentPath(avdInfo);
+        if (avdPath) {
+            QString avdSettingsFile =
+                    avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
+            settings = std::make_unique<QSettings>(avdSettingsFile,
+                                                   QSettings::IniFormat);
+        } else {
+            dwarning("Settings will not be saved as avdPath could not be retrieved.");
+            settings = std::make_unique<QSettings>();
+        }
+        WinsysGuestGlesDriverPreference settings_guestGlesDriver_pref =
+                static_cast<WinsysGuestGlesDriverPreference>(
+                        settings->value(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE,
+                                       WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO)
+                                .toInt());
+        for (int i = 0; i < mUi->set_guestGlesDriverPrefComboBox->count(); i++) {
+            WinsysGuestGlesDriverPreference driverPreferenceOption =
+                    (WinsysGuestGlesDriverPreference)(mUi->set_guestGlesDriverPrefComboBox
+                                                              ->itemData(i)
+                                                              .toInt());
+            if ((int)settings_guestGlesDriver_pref == driverPreferenceOption) {
+                switch (settings_guestGlesDriver_pref) {
+                    case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO: {
+                        mUi->set_guestGlesDriverPrefComboBox->setCurrentIndex(i);
+                        break;
+                    }
+                    case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE: {
+                        if (supportsGuestAngle) {
+                            mUi->set_guestGlesDriverPrefComboBox->setCurrentIndex(i);
+                        }
+                        break;
+                    }
+                    case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE: {
+                        if (supportsNativeGles) {
+                            mUi->set_guestGlesDriverPrefComboBox->setCurrentIndex(i);
+                        }
+                        break;
+                    }
+                    default: {
+                        dwarning(
+                                "%s: unknown GLES driver preference value 0x%x. "
+                                "Setting to auto.",
+                                __func__, (unsigned int)settings_guestGlesDriver_pref);
+                        mUi->set_guestGlesDriverPrefComboBox->setCurrentIndex(
+                                WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO);
+                        break;
+                    }
+                }
             }
         }
     }
-
     WinsysPreferredGlesBackend settings_glesbackend_pref =
             static_cast<WinsysPreferredGlesBackend>(
                     settings.value(Ui::Settings::GLESBACKEND_PREFERENCE, 0)
@@ -786,9 +846,14 @@ static SaveSnapshotOnExit getSaveOnExitChoice() {
 #endif
 
 static void set_guestGlesDriver_to(WinsysGuestGlesDriverPreference v) {
-    dinfo("Setting preferred gles driver from UI");
-    QSettings settings;
-    settings.setValue(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, v);
+    const char* avdPath = avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo());
+    if (avdPath) {
+        QString avdSettingsFile = avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
+        QSettings avdSpecificSettings(avdSettingsFile, QSettings::IniFormat);
+        avdSpecificSettings.setValue(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, v);
+    } else {
+        dwarning("Avd path could not be resolved. Settings will not be saved.");
+    }
 }
 
 static void set_glesBackend_to(WinsysPreferredGlesBackend v) {
@@ -836,11 +901,12 @@ void SettingsPage::on_set_glesApiLevelPrefComboBox_currentIndexChanged(
 }
 void SettingsPage::on_set_guestGlesDriverPrefComboBox_currentIndexChanged(
         int index) {
+    int originalIndexBeforeItemRemoval = mUi->set_guestGlesDriverPrefComboBox->itemData(index).toInt();
     switch (index) {
         case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO:
         case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE:
         case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
-            set_guestGlesDriver_to((WinsysGuestGlesDriverPreference)index);
+            set_guestGlesDriver_to((WinsysGuestGlesDriverPreference)originalIndexBeforeItemRemoval);
             break;
         default:
             break;

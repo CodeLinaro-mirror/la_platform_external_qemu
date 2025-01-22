@@ -50,6 +50,7 @@
 #include "android/cmdline-option.h"
 #include "host-common/MultiDisplay.h"
 #include "host-common/multi_display_agent.h"
+#include "android/avd/info.h"
 #include "android/console.h"
 #include "android/location/MapsKey.h"
 #include "android/qt/qt_path.h"
@@ -499,16 +500,33 @@ WinsysPreferredGlesBackend skin_winsys_override_glesbackend_if_auto(
 
 extern WinsysGuestGlesDriverPreference skin_winsys_get_preferred_gles_driver() {
     D("skin_winsys_get_preferred_gles_driver");
-    QSettings settings;
-    return (WinsysGuestGlesDriverPreference)settings
-            .value(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, 0)
-            .toInt();
+    const char* avdPath = avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo());
+    if (avdPath) {
+        QString avdSettingsFile = avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
+        QSettings avdSpecificSettings(avdSettingsFile, QSettings::IniFormat);
+        return (WinsysGuestGlesDriverPreference)avdSpecificSettings
+                .value(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, 0)
+                .toInt();
+    } else {
+        D("Could not retrieve avd path. Returning Auto");
+        return WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO;
+    }
 }
 
 void skin_winsys_set_preferred_gles_driver(WinsysGuestGlesDriverPreference renderer) {
     D("skin_winsys_set_preferred_gles_driver");
-    QSettings settings;
-    settings.setValue(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, renderer);
+
+    const char* avdPath = avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo());
+    if (avdPath) {
+        QString avdSettingsFile =
+                avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
+        QSettings avdSpecificSettings(avdSettingsFile, QSettings::IniFormat);
+        avdSpecificSettings.setValue(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE,
+                                     renderer);
+    } else {
+        D("Tried to save avd specific GLES driver preferences, but avd path "
+          "could not be found");
+    }
 }
 
 extern WinsysPreferredGlesBackend skin_winsys_get_preferred_gles_backend() {
