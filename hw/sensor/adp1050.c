@@ -50,7 +50,7 @@ static uint8_t adp1050_read_byte(PMBusDevice *pmdev)
 {
     ADP1050State *s = ADP1050(pmdev);
 
-    switch (pmdev->page) {
+    switch (pmdev->code) {
     case PMBUS_MFR_ID:
         pmbus_send8(pmdev, s->mfr_id);
         break;
@@ -93,7 +93,7 @@ static int adp1050_write_data(PMBusDevice *pmdev, const uint8_t *buf,
 {
     ADP1050State *s = ADP1050(pmdev);
 
-    switch (pmdev->page) {
+    switch (pmdev->code) {
     case PMBUS_MFR_ID:
         s->mfr_id = pmbus_receive8(pmdev);
         break;
