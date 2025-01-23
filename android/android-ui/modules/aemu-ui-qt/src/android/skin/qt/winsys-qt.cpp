@@ -758,6 +758,11 @@ void myMessageOutput(QtMsgType type,
     QString _msg;
     QByteArray localMsg;
 
+    // Let's not report empty messages.
+    if (msg.isEmpty()) {
+        return;
+    }
+
     switch (type) {
         case QtDebugMsg:
             QTextStream(&_msg) << "Debug: ";
