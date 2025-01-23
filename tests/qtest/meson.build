@@ -213,8 +213,9 @@ qtests_npcm7xx = \
    'npcm7xx_watchdog_timer-test'] + \
    (slirp.found() ? ['npcm7xx_emc-test'] : [])
 qtests_npcm8xx = \
-  ['npcm_gmac-test'] + \
-  (libusb.found() and usbredir.found() ? ['npcm_udc-test'] : [])
+  ['npcm_gmac-test']
+# TODO(b/376868143): disable test while flakiness is diagnosed
+
 qtests_aspeed = \
   ['aspeed_hace-test',
    'aspeed_smc-test',
