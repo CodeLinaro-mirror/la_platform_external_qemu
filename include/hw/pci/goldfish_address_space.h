@@ -23,8 +23,13 @@ typedef struct GoldfishAddressSpaceOpsTag {
     int (*save)(QEMUFile *file);
 } GoldfishAddressSpaceOps;
 
+extern int goldfish_as_oob_access;
+
 extern void
 goldfish_address_space_set_service_ops(const GoldfishAddressSpaceOps* ops);
+
+extern void goldfish_address_space_map_hook(uint64_t gpa, uint64_t size);
+extern int goldfish_address_space_is_oob(uint64_t offset, uint64_t size);
 
 /* Called by the host to reserve a shared region. Guest users can then
  * suballocate into this region. This saves us a lot of KVM slots.
