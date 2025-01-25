@@ -57,14 +57,14 @@ class VisualStudioNativeWorkloadNotFoundException(Exception):
 
 
 class WindowsEnvironment(BaseEnvironment):
-    def __init__(self, aosp: Path):
+    def __init__(self, aosp: Path, visual_studio_version: str):
         assert platform.system() == "Windows"
         super().__init__(aosp)
+        self.visual_studio_version = visual_studio_version
         for key in os.environ:
             self[key.upper()] = os.environ[key]
 
         vs = self._visual_studio()
-        logging.info("Loading environment from %s", vs)
         env_lines = subprocess.check_output(
             [vs, "&&", "set"], encoding="utf-8"
         ).splitlines()
@@ -104,9 +104,12 @@ class WindowsEnvironment(BaseEnvironment):
                 "-format",
                 "json",
                 "-utf8",
+                "-version",
+                self.visual_studio_version,
             ]
         )
         vsresult = json.loads(res)
+        logging.info("Discovered: %s", vsresult)
         if len(vsresult) == 0:
             raise VisualStudioNativeWorkloadNotFoundException(
                 "No visual studio with the native desktop load available."
@@ -127,14 +130,14 @@ class WindowsEnvironment(BaseEnvironment):
 
 ENVIRONMENT = None
 
-def get_default_environment(aosp: Path):
+
+def get_default_environment(aosp: Path, visual_studio_version: str):
     global ENVIRONMENT
 
     if ENVIRONMENT is None:
         if platform.system() == "Windows":
-            ENVIRONMENT = WindowsEnvironment(aosp)
+            ENVIRONMENT = WindowsEnvironment(aosp, visual_studio_version)
         else:
             ENVIRONMENT = PosixEnvironment(aosp)
 
     return ENVIRONMENT
-

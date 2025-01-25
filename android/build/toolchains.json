@@ -1,4 +1,5 @@
 {
     "clang": "clang-r530567",
-    "rust": "1.73.0"
+    "rust": "1.73.0",
+    "visual_studio_version": "[16, 17)"
 }

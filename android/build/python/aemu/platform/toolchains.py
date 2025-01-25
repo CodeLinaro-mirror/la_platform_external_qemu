@@ -59,7 +59,6 @@ class Toolchain:
         ) as f:
             self.versions = json.load(f)
 
-
     def _infer_target(self, target):
         """Infers the full target name  given the potential partial target name.
 
@@ -145,6 +144,10 @@ class Toolchain:
     def rust_version(self) -> str:
         """Returns the clang compiler version, as specified in the toolchain.json file"""
         return self.versions["rust"]
+
+    def visual_studio_version(self) -> str:
+        """Returns the visual studio version range, or [16, 17) if not present in the toolchain.json file"""
+        return self.versions.get("visual_studio_version", "[16, 17)")
 
     def is_crosscompile(self) -> bool:
         """True if the given target needs to be cross compiled.

@@ -72,7 +72,11 @@ def get_tasks(args) -> List[BuildTask]:
             dist=args.dist,
             features=args.feature,
         ),
-        CompileTask(args.aosp, args.out),
+        CompileTask(
+            args.aosp,
+            args.out,
+            args.target,
+        ),
     ]
     if not args.gfxstream_only:
         tasks += [
@@ -86,7 +90,9 @@ def get_tasks(args) -> List[BuildTask]:
             AccelerationCheckTask(args.out).enable(run_tests),
             EmugenTestTask(args.aosp, args.out).enable(run_tests).enable(False),
             GenEntriesTestTask(args.aosp, args.out),
-            CoverageReportTask(aosp=args.aosp, destination=args.out, target=args.target).enable(run_tests),
+            CoverageReportTask(
+                aosp=args.aosp, destination=args.out, target=args.target
+            ).enable(run_tests),
             PackageSamplesTask(
                 args.aosp, args.out, args.dist, args.target, args.sdk_build_number
             ),
@@ -113,6 +119,7 @@ def main(args):
     if args.prebuilts is not None:
         logging.info("Building the prebuilts [{}]".format(args.prebuilts))
         from aemu.prebuilts import buildPrebuilts
+
         buildPrebuilts(args)
         return
 
@@ -231,8 +238,10 @@ def launch():
         dest="prebuilts",
         action="store",
         nargs="*",
-        help=("Builds the specified prebuilts (i.e. --prebuilts qt ffmpeg), or all prebuilts if no "
-              "argument is provided"),
+        help=(
+            "Builds the specified prebuilts (i.e. --prebuilts qt ffmpeg), or all prebuilts if no "
+            "argument is provided"
+        ),
     )
     parser.add_argument(
         "--verbose",

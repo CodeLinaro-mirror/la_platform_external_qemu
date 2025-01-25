@@ -18,6 +18,8 @@ import re
 import shutil
 from pathlib import Path
 
+
+from aemu.platform.toolchains import Toolchain
 from aemu.process.command import Command
 from aemu.process.log_handler import LogHandler
 from aemu.process.environment import get_default_environment
@@ -29,12 +31,10 @@ class CompileTask(BuildTask):
 
     NINJA_FILTER = re.compile(r"^\[\d+/\d+\]")
 
-    def __init__(
-        self,
-        aosp: Path,
-        destination: Path,
-    ):
+    def __init__(self, aosp: Path, destination: Path, target: str):
         super().__init__()
+        self.toolchain = Toolchain(aosp, target)
+
         # Stripping is meaning less in windows world
         target = "install"
         if platform.system() != "Windows":
@@ -50,7 +50,7 @@ class CompileTask(BuildTask):
             "--target",
             target,
         ]
-        self.env = get_default_environment(aosp)
+        self.env = get_default_environment(aosp, self.toolchain.visual_studio_version())
 
     def filter_ninja_error(self, logline: str):
         """Filters ninja lines to std out, and failures to stderr

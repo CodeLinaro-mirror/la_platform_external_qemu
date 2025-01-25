@@ -113,7 +113,7 @@ class ConfigureTask(BuildTask):
             self.cmake_cmd.append(aosp / "external" / "qemu")
 
         self._add_sdk_revision(aosp)
-        self.env = get_default_environment(aosp)
+        self.env = get_default_environment(aosp, self.toolchain.visual_studio_version())
         self.log_dir = Path(dist or destination) / "testlogs"
         self.destination = Path(destination)
 
