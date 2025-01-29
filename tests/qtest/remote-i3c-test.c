@@ -20,9 +20,10 @@
 #include "hw/registerfields.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/remote-i3c.h"
-#include <bits/types/struct_timeval.h>
+#include <sys/time.h>
 #include "hw/i3c/aspeed_i3c.h"
 #include "hw/i3c/dw-i3c.h"
+#include <glib.h>
 
 /* Starting address of the AST2600 I3C block. */
 #define ASPEED_I3C_BASE 0x1e7a0000
@@ -293,7 +294,7 @@ static void send_and_verify(uint32_t i3c_base, const uint32_t *data, size_t len)
                                                              expected_data_len);
     remote_target_expected_data[0] = REMOTE_I3C_SEND;
     uint32_t *p32 = (uint32_t *)&remote_target_expected_data[1];
-    *p32 = htole32(data_size);
+    *p32 = GUINT32_TO_LE(data_size);
     memcpy(&remote_target_expected_data[5], data, data_size);
     remote_target_expected_data[data_size + 5] = REMOTE_I3C_STOP;
 
@@ -335,7 +336,7 @@ static void *remote_target_thread(void *arg)
             /* Read in the number of bytes the CCC has. */
             g_assert(read(fd, &bytes_to_recv_le, sizeof(bytes_to_recv_le)) ==
                           sizeof(bytes_to_recv_le));
-            bytes_to_recv = le32toh(bytes_to_recv_le);
+            bytes_to_recv = GUINT32_FROM_LE(bytes_to_recv_le);
             /* Read the CCC and do nothing with it. */
             g_assert(read(fd, data_recv, bytes_to_recv) == bytes_to_recv);
             break;
@@ -343,7 +344,7 @@ static void *remote_target_thread(void *arg)
             /* Read in the number of bytes the controller is sending us. */
             g_assert(read(fd, &bytes_to_recv_le, sizeof(bytes_to_recv_le)) ==
                           sizeof(bytes_to_recv_le));
-            bytes_to_recv = le32toh(bytes_to_recv_le);
+            bytes_to_recv = GUINT32_FROM_LE(bytes_to_recv_le);
 
             /* Read the data from the controller and verify it. */
             g_assert(read(fd, data_recv, bytes_to_recv) == bytes_to_recv);
@@ -353,7 +354,7 @@ static void *remote_target_thread(void *arg)
             /* Read in the number of bytes the controller wants. */
             g_assert(read(fd, &bytes_to_send_le, sizeof(bytes_to_send_le)) ==
                           sizeof(bytes_to_send_le));
-            bytes_to_send = le32toh(bytes_to_send_le);
+            bytes_to_send = GUINT32_FROM_LE(bytes_to_send_le);
 
             /*
              * Send the data. We first send the number of bytes we're sending as
@@ -482,7 +483,7 @@ static void remote_i3c_ibi(const uint32_t *data, uint32_t len)
     ibi_req[0] = REMOTE_I3C_IBI;
     ibi_req[1] = TARGET_ADDR;
     ibi_req[2] = 1; /* RnW = 1 to make this a target interrupt request. */
-    len_le = htole32(len);
+    len_le = GUINT32_TO_LE(len);
     memcpy(&ibi_req[3], &len_le, sizeof(len_le));
     memcpy(&ibi_req[7], data, len);
 
