@@ -185,7 +185,7 @@ endif()
 android_license(
   LIBNAME flatbuffers URL "https://github.com/google/flatbuffers"
   TARGET flatc flatbuffers SPDX Apache-2.0
-  LOCAL ${AOSP_ROOT}/external/flatbuffers/LICENSE.txt LICENSE Apache-2.0)
+  LOCAL ${AOSP_ROOT}/external/flatbuffers/LICENSE LICENSE Apache-2.0)
 
 # Let's bring the grpc module.
 cmake_policy(SET CMP0079 NEW)
