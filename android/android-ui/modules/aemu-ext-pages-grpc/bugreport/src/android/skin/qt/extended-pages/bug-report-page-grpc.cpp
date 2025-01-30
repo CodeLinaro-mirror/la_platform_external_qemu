@@ -430,13 +430,15 @@ bool BugreportPageGrpc::saveBugReportTo(std::string_view savingPath) {
 }
 
 bool BugreportPageGrpc::launchIssueTracker() {
+    std::string bugTemplate;
     QString reproSteps = mUi->bug_reproStepsTextEdit->toPlainText();
     reproSteps.truncate(kReproStepsCharacterLimit);
     mReproSteps = reproSteps.toStdString();
     // launch the issue tracker in a separate thread
-    std::string bugTemplate = mReportingFields.dump();
 
     StringAppendFormat(&bugTemplate, BUG_REPORT_TEMPLATE, mReproSteps);
+    bugTemplate += "\n\n-------\n\n";
+    bugTemplate += mReportingFields.dump();
     std::string encodedArgs =
             Uri::FormatEncodeArguments(FILE_BUG_URL, bugTemplate);
     QUrl url(QString::fromStdString(encodedArgs));
