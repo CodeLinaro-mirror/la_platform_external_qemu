@@ -197,6 +197,25 @@ static android::snapshot::FailureReason sFailureReason =
         android::snapshot::FailureReason::Empty;
 static bool sExiting = false;
 
+static bool need_skip_snapshot_save = false;
+
+static void set_skip_snapshot_save(bool skip) {
+    need_skip_snapshot_save = skip;
+}
+static bool is_snapshot_save_skipped() {
+    return need_skip_snapshot_save;
+}
+
+static SnapshotSkipReason skip_snapshot_save_reason = SNAPSHOT_SKIP_UNKNOWN;
+
+static void set_skip_snapshot_save_reason(SnapshotSkipReason reason) {
+    skip_snapshot_save_reason = reason;
+}
+
+static SnapshotSkipReason get_skip_snapshot_save_reason() {
+    return skip_snapshot_save_reason;
+}
+
 static bool qemu_snapshot_list(void* opaque,
                                LineConsumerCallback outConsumer,
                                LineConsumerCallback errConsumer) {
@@ -223,7 +242,16 @@ static bool qemu_snapshot_last_loaded(void* opaque,
 static bool qemu_snapshot_save(const char* name,
                                void* opaque,
                                LineConsumerCallback errConsumer) {
+    // TODO: remove this or add the same safety checks as Quickboot::save
     android::RecursiveScopedVmLock vmlock;
+    if (is_snapshot_save_skipped()) {
+        std::string err = std::string("Snapshot cannot be saved. Reason: ") +
+                          std::to_string(get_skip_snapshot_save_reason());
+        DD("extract error %s\n", err.c_str());
+        errConsumer(opaque, err.c_str(), err.size());
+        return -1;
+    }
+
     bool wasVmRunning = runstate_is_running() != 0;
     vm_stop(RUN_STATE_SAVE_VM);
 
@@ -390,8 +418,6 @@ static std::vector<json> qcow2_drives() {
     DD("Found %d drives", drives.size());
     return drives;
 }
-
-static void set_skip_snapshot_save(bool used);
 
 static bool import_snapshot(const char* name,
                             void* opaque,
@@ -921,22 +947,6 @@ static bool is_real_audio_allowed() {
     return qemu_is_real_audio_allowed();
 }
 
-static bool need_skip_snapshot_save = false;
-
-static void set_skip_snapshot_save(bool skip) {
-    need_skip_snapshot_save = skip;
-}
-
-static SnapshotSkipReason skip_snapshot_save_reason = SNAPSHOT_SKIP_UNKNOWN;
-
-static void set_skip_snapshot_save_reason(SnapshotSkipReason reason) {
-    skip_snapshot_save_reason = reason;
-}
-
-static SnapshotSkipReason get_skip_snapshot_save_reason() {
-    return skip_snapshot_save_reason;
-}
-
 static bool does_snapshot_use_vulkan = false;
 
 static void set_stat_snasphot_use_vulkan() {
@@ -945,10 +955,6 @@ static void set_stat_snasphot_use_vulkan() {
 
 static bool snapshot_use_vulkan() {
     return does_snapshot_use_vulkan;
-}
-
-static bool is_snapshot_save_skipped() {
-    return need_skip_snapshot_save;
 }
 
 static void system_reset_request() {

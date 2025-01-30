@@ -2436,6 +2436,12 @@ static int do_snapshot_save(ControlClient client, char* args) {
                 "KO: Argument missing, try 'avd snapshot save <name>'\r\n");
         return -1;
     }
+    if (vmopers(client)->isSnapshotSaveSkipped()) {
+        control_write(client, "KO: Snapshot save is skipped. Reason: %d\r\n",
+                      vmopers(client)->getSkipSnapshotSaveReason());
+        return -1;
+    }
+
     D(("Snapshot saving to %s\n", args));
     bool success =
             vmopers(client)->snapshotSave(args, client, control_write_err_cb);
