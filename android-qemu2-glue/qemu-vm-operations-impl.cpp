@@ -245,8 +245,9 @@ static bool qemu_snapshot_save(const char* name,
     // TODO: remove this or add the same safety checks as Quickboot::save
     android::RecursiveScopedVmLock vmlock;
     if (is_snapshot_save_skipped()) {
-        std::string err = std::string("Snapshot cannot be saved. Reason: ") +
-                          std::to_string(get_skip_snapshot_save_reason());
+        std::string err =
+                std::string("Snapshot cannot be saved. Reason: ") +
+                toString_SnapshotSkipReason(get_skip_snapshot_save_reason());
         DD("extract error %s\n", err.c_str());
         errConsumer(opaque, err.c_str(), err.size());
         return -1;

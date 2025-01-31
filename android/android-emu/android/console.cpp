@@ -2437,8 +2437,8 @@ static int do_snapshot_save(ControlClient client, char* args) {
         return -1;
     }
     if (vmopers(client)->isSnapshotSaveSkipped()) {
-        control_write(client, "KO: Snapshot save is skipped. Reason: %d\r\n",
-                      vmopers(client)->getSkipSnapshotSaveReason());
+        control_write(client, "KO: Snapshot save is skipped. Reason: %s\r\n",
+                      toString_SnapshotSkipReason(vmopers(client)->getSkipSnapshotSaveReason()));
         return -1;
     }
 

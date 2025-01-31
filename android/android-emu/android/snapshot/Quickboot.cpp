@@ -723,11 +723,11 @@ bool Quickboot::save(std::string_view name) {
     }
 
     if (mVmOps.isSnapshotSaveSkipped()) {
+        SnapshotSkipReason vmReason = mVmOps.getSkipSnapshotSaveReason();
         dwarning(
                 "Not saving state: current state "
-                "does not support snapshotting");
+                "does not support snapshotting. Reason: %s", toString_SnapshotSkipReason(vmReason));
         Snapshotter::get().deleteSnapshot(c_str(name));
-        SnapshotSkipReason vmReason = mVmOps.getSkipSnapshotSaveReason();
         FailureReason statReason = FailureReason::Empty;
         switch (vmReason) {
             case SNAPSHOT_SKIP_UNSUPPORTED_VK_APP:
