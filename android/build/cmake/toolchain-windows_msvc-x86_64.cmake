@@ -100,8 +100,11 @@ if(WIN32)
   set(CMAKE_CXX_RESPONSE_FILE_LINK_FLAG "@")
   set(CMAKE_NINJA_FORCE_RESPONSE_FILE 1 CACHE INTERNAL "")
 
-  # Add compiler definition for Win7
-  add_definitions("-D_WIN32_WINNT=0x0601")
+  # Windows 10 1507 "Threshold"  (EOL October 14, 2025)
+  add_definitions("-D_WIN32_WINNT=0x0A00")
+  add_definitions("-DWINVER=0x0A00")
+  add_definitions("-DNTDDI_VERSION=0x0A000000")
+
   # When configuring cmake on windows, it will do a series of compiler checks we
   # want to make sure it never tries to fall back to the msvc linker. CMake will
   # call the linker directly, v.s. through clang when cross building.
