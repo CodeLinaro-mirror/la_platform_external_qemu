@@ -353,16 +353,23 @@ SettingsPage::SettingsPage(QWidget* parent)
 
     {
         bool isMac = false;
-#ifdef __APPLE__
-        isMac = true;
-#endif
         auto avdInfo = getConsoleAgents()->settings->avdInfo();
         const int apiLevel = avdInfo_getApiLevel(avdInfo);
+
+        // ANGLE is only supported on new API levels (unless XR)
+        bool supportsGuestAngle = apiLevel >= 35;
         const bool isXR = (avdInfo_getAvdFlavor(avdInfo) == AVD_DEV_2024);
 
-        // ANGLE is only supported on new API levels and XR
-        bool supportsGuestAngle = (apiLevel >= 35);
+        // We support NativeGles everywhere (unless XR)
         bool supportsNativeGles = true;
+
+#ifdef __APPLE__
+        isMac = true;
+#ifndef __arm64__
+        // We don't support GuestAngle on Intel Mac regardless of API
+        supportsGuestAngle = false;
+#endif
+#endif
         if (isXR) {
             // We don't support Native GLES on XR, but we support Angle on API 34
             supportsGuestAngle = true;
