@@ -2331,6 +2331,10 @@ static void help_support_multiple_input_modalites(stralloc_t* out) {
     PRINTF("  Deprecated: Support different kind of input modalities.\n");
 }
 
+static void help_systemui_renderer(stralloc_t* out) {
+    PRINTF("  Set guest side renderer backend. Available options: skiagl, skiavk\n");
+}
+
 #define  help_no_skin   NULL
 #define  help_netspeed  help_shaper
 #define  help_netdelay  help_shaper

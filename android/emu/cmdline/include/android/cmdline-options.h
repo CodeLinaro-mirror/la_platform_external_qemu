@@ -371,6 +371,10 @@ OPT_PARAM(android_serialno,
 
 OPT_FLAG(support_multiple_input_modalites, "deprecated: Support different input modalities")
 
+OPT_PARAM(systemui_renderer,
+          "<option list>",
+          "Set guest side renderer backend. Available options: skiagl, skiavk")
+
 #undef CFG_FLAG
 #undef CFG_PARAM
 #undef OPT_FLAG

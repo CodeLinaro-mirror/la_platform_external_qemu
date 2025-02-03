@@ -167,6 +167,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     const char* qemuDrawFlushIntervalProp;
     const char* qemuOpenglesVersionProp;
     const char* qemuUirendererProp;
+    const char* qemuRenderengineProp;
     const char* dalvikVmHeapsizeProp;
     const char* qemuLegacyFakeCameraProp;
     const char* qemuCameraProtocolVerProp;
@@ -208,6 +209,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
                 "androidboot.qemu.gltransport.drawFlushInterval";
         qemuOpenglesVersionProp = "androidboot.opengles.version";
         qemuUirendererProp = "androidboot.debug.hwui.renderer";
+        qemuRenderengineProp = "androidboot.debug.renderengine.backend";
         dalvikVmHeapsizeProp = "androidboot.dalvik.vm.heapsize";
         qemuLegacyFakeCameraProp = "androidboot.qemu.legacy_fake_camera";
         qemuCameraProtocolVerProp = "androidboot.qemu.camera_protocol_ver";
@@ -245,6 +247,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         qemuDrawFlushIntervalProp = "qemu.gltransport.drawFlushInterval";
         qemuOpenglesVersionProp = "qemu.opengles.version";
         qemuUirendererProp = "qemu.uirenderer";
+        qemuRenderengineProp = nullptr;
         dalvikVmHeapsizeProp = "qemu.dalvik.vm.heapsize";
         qemuLegacyFakeCameraProp = "qemu.legacy_fake_camera";
         qemuCameraProtocolVerProp = "qemu.camera_protocol_ver";
@@ -279,7 +282,6 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     }
 
     params.push_back({"androidboot.hardware", "ranchu"});
-    const char* qemuUirendererPropValue = nullptr;
 
     bool isVkNVIDIA = false;
     if (fc::isEnabled(fc::Vulkan)) {
@@ -513,22 +515,31 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     params.push_back({qemuOpenglesVersionProp,
                       StringFormat("%d", bootPropOpenglesVersion)});
 
-    // SkiaVK requires multiple graphics queues and it works better with
-    // GuestAngle. This behavior requires system image to support overriding
-    // hwui and renderengine backends, which is only guaranteed to be supported
-    // on XR and API level 36+ AVD images. Some AVD images with API level 34
-    // will also support it.
-    const bool avdSupportsSkiaVk =
-            ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle)) ||
-             apiLevel >= 36);
-    const bool gpuSupportsSkiaVk =
-            fc::isEnabled(fc::Vulkan) &&
-            (fc::isEnabled(fc::VulkanVirtualQueue) || isVkNVIDIA);
-    const bool enableSkiaVk = avdSupportsSkiaVk && gpuSupportsSkiaVk;
-    if (enableSkiaVk) {
-        qemuUirendererPropValue = "skiavk";
-        qemuUirendererProp = "androidboot.debug.hwui.renderer";
-        params.push_back({"androidboot.debug.renderengine.backend", "skiavk"});
+    const char* qemuUirendererPropValue = nullptr;
+    const char* qemuRenderenginePropValue = nullptr;
+    if (opts->systemui_renderer) {
+        // Enforce user given renderer backend parameter, this path is not
+        // guaranteed to work but will give users an option to select different
+        // backend in case of any issues.
+        qemuUirendererPropValue = opts->systemui_renderer;
+        qemuRenderenginePropValue = opts->systemui_renderer;
+    } else {
+        // SkiaVK requires multiple graphics queues and it works better with
+        // GuestAngle. This behavior requires system image to support overriding
+        // hwui and renderengine backends, which is only guaranteed to be supported
+        // on XR and API level 36+ AVD images. Some AVD images with API level 34
+        // will also support it.
+        const bool avdSupportsSkiaVk =
+                ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle)) ||
+                apiLevel >= 36);
+        const bool gpuSupportsSkiaVk =
+                fc::isEnabled(fc::Vulkan) &&
+                (fc::isEnabled(fc::VulkanVirtualQueue) || isVkNVIDIA);
+        const bool enableSkiaVk = avdSupportsSkiaVk && gpuSupportsSkiaVk;
+        if (enableSkiaVk) {
+            qemuUirendererPropValue = "skiavk";
+            qemuRenderenginePropValue = "skiavk";
+        }
     }
 
     if (fc::isEnabled(fc::GLESDynamicVersion) && !qemuUirendererPropValue) {
@@ -537,6 +548,9 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
 
     if (qemuUirendererPropValue) {
         params.push_back({qemuUirendererProp, qemuUirendererPropValue});
+    }
+    if (qemuRenderengineProp && qemuRenderenginePropValue) {
+        params.push_back({qemuRenderengineProp, qemuRenderenginePropValue});
     }
 
     if (androidbootLogcatProp) {
