@@ -13,6 +13,7 @@
 
 #include <functional>
 #include <iosfwd>  // for string
+#include <string>
 #include <string_view>
 
 namespace android {
