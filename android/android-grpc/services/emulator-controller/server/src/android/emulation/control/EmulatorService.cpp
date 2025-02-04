@@ -205,7 +205,19 @@ public:
                 [agent, request]() {
                     struct timeval tVal;
                     memset(&tVal, 0, sizeof(tVal));
-                    gettimeofday(&tVal, NULL);
+                    auto now = std::chrono::system_clock::now();
+                    auto duration = now.time_since_epoch();
+                    auto seconds =
+                            std::chrono::duration_cast<std::chrono::seconds>(
+                                    duration);
+                    auto microseconds =
+                            std::chrono::duration_cast<
+                                    std::chrono::microseconds>(duration) -
+                            std::chrono::duration_cast<std::chrono::seconds>(
+                                    duration);
+
+                    tVal.tv_sec = seconds.count();
+                    tVal.tv_usec = microseconds.count();
                     agent->gpsSendLoc(request.latitude(), request.longitude(),
                                       request.altitude(), request.speed(),
                                       request.bearing(), request.satellites(),
