@@ -531,11 +531,15 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         // will also support it.
         const bool avdSupportsSkiaVk =
                 ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle)) ||
-                apiLevel >= 36);
+                 apiLevel >= 36);
         const bool gpuSupportsSkiaVk =
                 fc::isEnabled(fc::Vulkan) &&
                 (fc::isEnabled(fc::VulkanVirtualQueue) || isVkNVIDIA);
-        const bool enableSkiaVk = avdSupportsSkiaVk && gpuSupportsSkiaVk;
+        // TODO(b/394566319): InternalEmulationFailure errors when skiavk is used without minigbm
+        const bool systemSupportsSkiaVk = fc::isEnabled(fc::Minigbm);
+
+        const bool enableSkiaVk =
+                avdSupportsSkiaVk && gpuSupportsSkiaVk && systemSupportsSkiaVk;
         if (enableSkiaVk) {
             qemuUirendererPropValue = "skiavk";
             qemuRenderenginePropValue = "skiavk";
