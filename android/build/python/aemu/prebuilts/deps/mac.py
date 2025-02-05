@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import glob
 import logging
 import os
 import re
@@ -22,8 +23,8 @@ import aemu.prebuilts.deps.common as deps_common
 
 # Some prebuilts do not work with python 3.12, so let's hardcode the 3.11 version in our
 # buildbots.
-MAC_ARM64_PYTHON_3_11 = os.path.join("/opt", "homebrew", "Cellar", "python@3.11", "3.11.9_1", "libexec", "bin")
-MAC_X64_PYTHON_3_11 = os.path.join("/usr", "local", "Cellar", "python@3.11", "3.11.9_1", "libexec", "bin")
+MAC_ARM64_PYTHON_3_11 = os.path.join("/opt", "homebrew", "Cellar", "python@3.11")
+MAC_X64_PYTHON_3_11 = os.path.join("/usr", "local", "Cellar", "python@3.11")
 
 def checkMacOsSDKVersion(min_vers):
     vers_regex = "macosx([0-9]*\.[0-9]*)"
@@ -45,5 +46,9 @@ def addHomebrewPython311ToPath(host_arch):
 
     if not os.path.exists(pydir):
         logging.fatal(f"Python 3.11 installation [{pydir}] is not found.")
-        exit(-1)
-    deps_common.addToSearchPath(pydir)
+
+    # Find where the python3 binary is in the installation directory
+    paths = glob.glob(os.path.join(pydir, "**", "python3"), recursive=True)
+    if not paths:
+        logging.fatal(f"Found python installation [{pydir}], but no python3 binary found inside.")
+    deps_common.addToSearchPath(paths[0])
