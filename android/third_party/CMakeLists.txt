@@ -352,6 +352,9 @@ set(ANGLE_REPO_ROOT ${ANDROID_QEMU2_TOP_DIR}/../../external/angle)
 add_library(gfxstream_egl_headers INTERFACE)
 target_include_directories(gfxstream_egl_headers
                            INTERFACE ${ANGLE_REPO_ROOT}/include)
+add_library(gfxstream_glm_headers INTERFACE)
+target_include_directories(gfxstream_glm_headers
+                           INTERFACE ${GFXSTREAM_REPO_ROOT}/third-party/glm/include)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/host/backend
                  ${GFXSTREAM_PREFIX}-host-backend)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/host/tracing

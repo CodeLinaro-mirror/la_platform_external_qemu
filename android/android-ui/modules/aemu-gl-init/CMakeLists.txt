@@ -11,6 +11,7 @@ android_qt_lib(
        android-emu-files
        android-emu-utils
        android-hw-config
+       gfxstream_vulkan_headers
        qemu-host-common-headers
        ui::common)
 # target_include_directories(aemu-gl-init PRIVATE .)

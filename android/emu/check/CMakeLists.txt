@@ -19,6 +19,7 @@ android_add_library(
        android-emu-files
        android-emu-metrics
        android-hw-config
+       gfxstream_vulkan_headers
        protobuf::libprotobuf
        qemu-host-common-headers)
 target_include_directories(android-emu-check-impl PUBLIC include)
