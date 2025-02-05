@@ -119,7 +119,9 @@ def getClangDirectory():
     clang_path = AOSP_ROOT / "prebuilts" / "clang" / "host" / f"{platform.system().lower()}-x86"
     with open(toolchain_json_file, 'r') as f:
         toolchain_json = json.load(f)
-        clang_path = clang_path / toolchain_json['clang']
+        # IMPORTANT: We use 'clang_emu_prebuilts' because some of our prebuilts [Qt] got broken
+        # by a clang compiler update.
+        clang_path = clang_path / toolchain_json['clang_emu_prebuilts']
     return clang_path
 
 def addToSearchPath(searchDir):
