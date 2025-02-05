@@ -289,6 +289,13 @@ int android_startOpenglesRenderer(
     sRenderLib->setAvdInfo(guestPhoneApi, guestApiLevel);
     sRenderLib->setCrashReporter(&crashhandler_die_format);
 
+    if (android::featurecontrol::isEnabled(android::featurecontrol::Minigbm)) {
+        // TODO(b/373686455): Disabling VulkanbatchedDescriptorSetUpdate on minigbm results in
+        // crash.
+        android::featurecontrol::setIfNotOverriden(
+            android::featurecontrol::VulkanBatchedDescriptorSetUpdate, true);
+    }
+
     gfxstream::host::FeatureSet gfxstreamFeatures;
 #if defined(AEMU_GFXSTREAM_BACKEND)
     using GfxstreamFeaturePtr =
