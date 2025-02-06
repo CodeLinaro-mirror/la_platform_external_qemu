@@ -20,6 +20,7 @@ import zipfile
 import aemu.prebuilts.angle as angle
 import aemu.prebuilts.qt as qt
 import aemu.prebuilts.moltenvk as moltenvk
+import aemu.prebuilts.lavapipe as lavapipe
 
 HOST_OS = platform.system().lower()
 
@@ -30,6 +31,11 @@ _prebuilt_funcs = {
     'angle': angle.buildPrebuilt,
     # Add more prebuilts here
 }
+
+if HOST_OS == "linux":
+    _prebuilt_funcs.update({
+        'lavapipe': lavapipe.buildPrebuilt,
+    })
 
 if HOST_OS == "darwin":
     _prebuilt_funcs.update({
