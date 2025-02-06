@@ -389,7 +389,7 @@ def mac_postInstall(installdir):
     def changeToQt6Rpaths(file):
         libs = subprocess.check_output(["otool", "-LX", file], cwd=installdir,
                                         env=os.environ.copy(), encoding="utf-8").split("\n")
-        qtlib_regex = ".*(libQt6.*AndroidEmu)\.6\.dylib"
+        qtlib_regex = r".*(libQt6.*AndroidEmu)\.6\.dylib"
         for lib in libs:
             s = re.search(qtlib_regex, lib)
             if s:
