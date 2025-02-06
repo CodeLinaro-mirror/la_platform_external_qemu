@@ -51,4 +51,4 @@ def addHomebrewPython311ToPath(host_arch):
     paths = glob.glob(os.path.join(pydir, "**", "python3"), recursive=True)
     if not paths:
         logging.fatal(f"Found python installation [{pydir}], but no python3 binary found inside.")
-    deps_common.addToSearchPath(paths[0])
+    deps_common.addToSearchPath(os.path.dirname(paths[0]))
