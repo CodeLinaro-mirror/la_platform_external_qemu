@@ -225,6 +225,7 @@ def launch():
         "--gfxstream",
         action="store_true",
         dest="gfxstream",
+        default=True,
         help="Build gfxstream libs/tests",
     )
     parser.add_argument(
