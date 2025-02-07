@@ -81,13 +81,15 @@ extern "C" {
 #ifdef accept
 #undef accept
 #endif
-#include <stdarg.h>                                   // for va_end, va_list
-#include <string.h>                                   // for strcmp, strlen
-#include <algorithm>                                  // for find_if
-#include <cstdio>                                     // for NULL, rename
-#include <string>                                     // for string, operator+
+#include <stdarg.h>   // for va_end, va_list
+#include <string.h>   // for strcmp, strlen
+#include <algorithm>  // for find_if
+#include <cstdio>     // for NULL, rename
+#include <memory>
+#include <string>     // for string, operator+
 #include <string_view>
-#include <vector>                                     // for vector
+#include <unordered_map>
+#include <vector>  // for vector
 
 #define DD(...) VERBOSE_PRINT(snapshot, __VA_ARGS__)
 #define DMEM(...) VERBOSE_PRINT(memory, __VA_ARGS__)
@@ -103,6 +105,9 @@ using json = nlohmann::json;
 
 static const char* kImportSuffix = "_import.qcow2";
 static std::string sLastLoadedSnapshot = "";
+
+static std::unordered_map<uint64_t, std::string> s_vulkanTable;
+static std::mutex s_vulkanTableLock;
 
 static bool qemu_vm_stop() {
     vm_stop(RUN_STATE_PAUSED);
@@ -199,17 +204,53 @@ static bool sExiting = false;
 
 static bool need_skip_snapshot_save = false;
 
-static void set_skip_snapshot_save(bool skip) {
-    need_skip_snapshot_save = skip;
-}
-static bool is_snapshot_save_skipped() {
-    return need_skip_snapshot_save;
-}
+static bool does_snapshot_use_vulkan = false;
 
 static SnapshotSkipReason skip_snapshot_save_reason = SNAPSHOT_SKIP_UNKNOWN;
 
+static void set_skip_snapshot_save(bool skip) {
+    need_skip_snapshot_save = skip;
+}
+
+static bool is_snapshot_save_skipped() {
+    // if set, respect and skip
+    if (need_skip_snapshot_save) {
+        return true;
+    }
+
+    // if vulkan snapshot is enabled
+    if (does_snapshot_use_vulkan) {
+        // for now, it is not really stable
+        // assume user is aware of that
+        return false;
+    }
+
+    // otherwise, check the vulkan apps
+    // skip if there is vulkan apps
+    const std::lock_guard<std::mutex> lock(s_vulkanTableLock);
+    if (s_vulkanTable.size() > 0) {
+        skip_snapshot_save_reason = SNAPSHOT_SKIP_UNSUPPORTED_VK_APP;
+        return true;
+    }
+    return false;
+}
+
 static void set_skip_snapshot_save_reason(SnapshotSkipReason reason) {
     skip_snapshot_save_reason = reason;
+}
+
+static void android_vulkan_instance_register(uint64_t id, const char* name) {
+    const std::lock_guard<std::mutex> lock(s_vulkanTableLock);
+    s_vulkanTable[id] = name;
+    LOG(DEBUG) << "Registering VkInstance " << id << " name " << name
+               << ", total is " << s_vulkanTable.size();
+}
+
+static void android_vulkan_instance_unregister(uint64_t id) {
+    const std::lock_guard<std::mutex> lock(s_vulkanTableLock);
+    s_vulkanTable.erase(id);
+    LOG(DEBUG) << "Unregistering VkInstance " << id << ", total is "
+               << s_vulkanTable.size();
 }
 
 static SnapshotSkipReason get_skip_snapshot_save_reason() {
@@ -948,8 +989,6 @@ static bool is_real_audio_allowed() {
     return qemu_is_real_audio_allowed();
 }
 
-static bool does_snapshot_use_vulkan = false;
-
 static void set_stat_snasphot_use_vulkan() {
     does_snapshot_use_vulkan = true;
 }
@@ -1237,6 +1276,8 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
                 [](QemuShutdownCause c) {
                     qemu_system_shutdown_request((ShutdownCause)c);
                 },
+        .vulkanInstanceRegister = android_vulkan_instance_register,
+        .vulkanInstanceUnregister = android_vulkan_instance_unregister,
         .setSkipSnapshotSaveReason = set_skip_snapshot_save_reason,
         .getSkipSnapshotSaveReason = get_skip_snapshot_save_reason,
         .setStatSnapshotUseVulkan = set_stat_snasphot_use_vulkan,
