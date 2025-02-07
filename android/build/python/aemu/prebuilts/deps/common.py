@@ -66,7 +66,7 @@ def checkPythonVersion(min_vers):
     if sys.version_info < min_vers:
         raise Exception(f"Python version {sys.version} does not meet minimum requirements")
 
-def checkExeVersion(exe, exe_version_arg, vers_regex=r"[0-9]*\.[0-9]*\.[0-9]*", min_vers=None):
+def checkExeVersion(exe, exe_version_arg, vers_regex=r"\d+\.\d+\.\d+", min_vers=None):
     """Checks the version of an executable against `min_vers`.
 
     Args:
@@ -98,19 +98,19 @@ def checkNinjaVersion(min_vers=None):
 def checkNodeJsVersion(min_vers=None):
     checkExeVersion(exe="node", exe_version_arg="--version",  min_vers=min_vers)
 def checkBisonVersion(min_vers=None):
-    checkExeVersion(exe="bison", exe_version_arg="--version", vers_regex=r"[0-9]*\.[0-9]*",
+    checkExeVersion(exe="bison", exe_version_arg="--version", vers_regex=r"\d+\.\d+",
                     min_vers=min_vers)
 
 def checkFlexVersion(min_vers=None):
-    checkExeVersion(exe="flex", exe_version_arg="--version", vers_regex=r"[0-9]*\.[0-9]*",
+    checkExeVersion(exe="flex", exe_version_arg="--version", vers_regex=r"\d+\.\d+",
                     min_vers=min_vers)
 
 def checkGperfVersion(min_vers=None):
-    checkExeVersion(exe="gperf", exe_version_arg="--version", vers_regex=r"[0-9]*\.[0-9]*",
+    checkExeVersion(exe="gperf", exe_version_arg="--version", vers_regex=r"\d+\.\d+",
                     min_vers=min_vers)
 
 def checkMesonVersion(min_vers=None):
-    checkExeVersion(exe="meson", exe_version_arg="--version", vers_regex=r"[0-9]*\.[0-9]*",
+    checkExeVersion(exe="meson", exe_version_arg="--version", vers_regex=r"\d+\.\d+",
                     min_vers=min_vers)
 
 def checkPythonPackage(name):
