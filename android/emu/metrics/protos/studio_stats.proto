@@ -2318,6 +2318,7 @@ message EmulatorDetails {
         HARDWARE_VK = 1;
         SWIFTSHADER_VK = 2; // Swiftshader software renderer
         MOLTEN_VK = 3; // Mac only
+        LAVAPIPE_VK = 4; // Lavapipe software renderer
     }
 }
 
