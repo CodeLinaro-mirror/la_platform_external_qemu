@@ -75,13 +75,13 @@ def configureLavapipeBuild(srcdir, builddir):
     deps_common.addToSearchPath(str(toolchain_dir))
     logging.info("[%s] Running %s in %s", builddir, config_script, srcdir)
     logging.info(conf_args)
-    subprocess.check_output(args=conf_args, cwd=srcdir, env=os.environ.copy())
+    subprocess.run(args=conf_args, stderr=subprocess.STDOUT, check=True, cwd=srcdir, env=os.environ.copy())
     logging.info("%s succeeded", config_script)
 
 def buildLavapipe(srcdir, builddir):
     ninja_build_cmd = ["ninja" + EXE_SUFFIX, "-C", builddir]
     logging.info(ninja_build_cmd)
-    subprocess.check_output(args=ninja_build_cmd, cwd=srcdir, env=os.environ.copy())
+    subprocess.run(args=ninja_build_cmd, stderr=subprocess.STDOUT, check=True, cwd=srcdir, env=os.environ.copy())
     logging.info("Build succeeded")
 
 def installLavapipe(builddir, installdir):
