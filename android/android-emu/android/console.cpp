@@ -4126,6 +4126,8 @@ static int do_multi_display_add(ControlClient client, char* args) {
     // kMaxArgs is max number of arguments that we have to process (options +
     // parameters, if any, and the filename)
     const int kMaxArgs = 5;
+    constexpr int kMinId = 1;
+    constexpr int kMaxId = 8;
 
     // Count number of arguments
     std::vector<std::string> splitArgs;
@@ -4140,8 +4142,11 @@ static int do_multi_display_add(ControlClient client, char* args) {
     }
 
     int id = std::stoi(splitArgs[0]);
-    if (id < 1 || id > 10) {
-        control_write(client, "KO: invalid display id\r\n");
+    if (id < kMinId || id > kMaxId) {
+        control_write(client,
+                      "KO: invalid display id; valid ids are from %d to %d "
+                      "inclusive\r\n",
+                      kMinId, kMaxId);
         return -1;
     }
 
