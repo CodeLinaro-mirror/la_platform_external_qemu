@@ -22,12 +22,15 @@
  * THE SOFTWARE.
  */
 
+#include <arpa/inet.h>
+#include <stdbool.h>
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "net/slirp.h"
 #include <stdbool.h>
 #include <sys/socket.h>
 
+#include "trace.h"
 
 #if defined(CONFIG_SMBD_COMMAND)
 #include <pwd.h>
@@ -83,7 +86,8 @@ struct slirp_config_str {
 
 struct GuestFwd {
     CharBackend hd;
-    struct in_addr server;
+    struct in_addr server; /* IPv4 Server address */
+    struct in6_addr server_v6; /* IPv6 Server address */
     int port;
     Slirp *slirp;
 };
@@ -114,6 +118,13 @@ static void slirp_smb_cleanup(SlirpState *s);
 #else
 static inline void slirp_smb_cleanup(SlirpState *s) { }
 #endif
+
+/* Should only be used here */
+enum GFwdProtocols {
+    GFWD_TCP = 1,
+    GFWD_UDP = 2,
+    GFWD_MAX = 3, /* Invalid */
+};
 
 static ssize_t net_slirp_send_packet(const void *pkt, size_t pkt_len,
                                      void *opaque)
@@ -1133,36 +1144,106 @@ static ssize_t guestfwd_write(const void *buf, size_t len, void *chr)
 
 static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
 {
-    /* TODO: IPv6 */
     struct in_addr server = { .s_addr = 0 };
-    struct GuestFwd *fwd;
+    struct in6_addr server_v6 = IN6ADDR_ANY_INIT;
+    struct in6_addr target_v6 = IN6ADDR_ANY_INIT;
+    struct GuestFwd *fwd = NULL;
     const char *p;
     char buf[128];
     char *end;
-    int port;
+    long port;
+    long target_port;
+    enum GFwdProtocols protocol = GFWD_MAX;
+    bool v6_only = false;
+    char addrstr[INET6_ADDRSTRLEN];
 
+    /*
+     * TODO(b/314977108): reimplement this parsing logic in following cl,
+     * as it became very long.
+     */
     p = config_str;
     if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
         goto fail_syntax;
     }
-    if (strcmp(buf, "tcp") && buf[0] != '\0') {
-        goto fail_syntax;
-    }
-    if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
-        goto fail_syntax;
-    }
-    if (buf[0] != '\0' && !inet_aton(buf, &server)) {
-        goto fail_syntax;
-    }
-    if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
-        goto fail_syntax;
-    }
-    port = strtol(buf, &end, 10);
-    if (*end != '\0' || port < 1 || port > 65535) {
+    if (strcmp(buf, "tcp") == 0) {
+        protocol = GFWD_TCP;
+    } else if (strcmp(buf, "udp") == 0) {
+        protocol = GFWD_UDP;
+    } else if (buf[0] != '\0') {
         goto fail_syntax;
     }
 
-    snprintf(buf, sizeof(buf), "guestfwd.tcp.%d", port);
+    /*
+     * Parse address, only supports v6 to v6 or v4 to v4.
+     * Example v6 usage:
+     * guestfwd=tcp:[fec0::105]:6657-tcp:[::1]:6655
+     */
+    if (p[0] == '[') {
+        v6_only = true;
+    }
+
+    if (v6_only == true) {
+        p++;
+        if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
+            goto fail_syntax;
+        }
+        if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, &server_v6)) {
+            goto fail_syntax;
+        }
+        /* Skip the `:` */
+        p++;
+        /* Parse the server port */
+        if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
+            goto fail_syntax;
+        }
+        qemu_strtol(buf, (const char **) &end, 10, &port);
+        if (*end != '\0' || port < 1 || port > 65535) {
+            goto fail_syntax;
+        }
+
+        inet_ntop(AF_INET6, &server_v6, addrstr, INET6_ADDRSTRLEN);
+        trace_slirp_guestfwd_parse(addrstr, port);
+
+        /*
+         * Skip the "tcp:[", leaving the tcp here to make it consistent with
+         * the IPv4 syntax.
+         */
+        p = p + 5;
+        /* Parse the target address */
+        if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
+            goto fail_syntax;
+        }
+        if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, &target_v6)) {
+            goto fail_syntax;
+        }
+        /* Skip the `:` */
+        p++;
+        /* Parse the target port, until the end of line */
+        if (get_str_sep(buf, sizeof(buf), &p, '\0') < 0) {
+            goto fail_syntax;
+        }
+        qemu_strtol(buf, (const char **) &end, 10, &target_port);
+        if (*end != '\0' || target_port < 1 || port > 65535) {
+            goto fail_syntax;
+        }
+        inet_ntop(AF_INET6, &target_v6, addrstr, INET6_ADDRSTRLEN);
+        trace_slirp_guestfwd_parse(addrstr, target_port);
+    } else {
+        if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+            goto fail_syntax;
+        }
+        if (buf[0] != '\0' && !inet_aton(buf, &server)) {
+            goto fail_syntax;
+        }
+        if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
+            goto fail_syntax;
+        }
+        qemu_strtol(buf, (const char **) &end, 10, &port);
+        if (*end != '\0' || port < 1 || port > 65535) {
+            goto fail_syntax;
+        }
+    }
+    snprintf(buf, sizeof(buf), "guestfwd.tcp.%d", (int) port);
 
     if (g_str_has_prefix(p, "cmd:")) {
         if (slirp_add_exec(s->slirp, &p[4], &server, port) < 0) {
@@ -1171,48 +1252,61 @@ static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
             return -1;
         }
     } else {
-        Error *err = NULL;
-        /*
-         * FIXME: sure we want to support implicit
-         * muxed monitors here?
-         */
-        Chardev *chr = qemu_chr_new_mux_mon(buf, p, NULL);
+        if (!v6_only) {
+            Error *err = NULL;
+            /*
+             * FIXME: sure we want to support implicit
+             * muxed monitors here?
+             */
+            Chardev *chr = qemu_chr_new_mux_mon(buf, p, NULL);
 
-        if (!chr) {
-            error_setg(errp, "Could not open guest forwarding device '%s'",
-                       buf);
-            return -1;
+            if (!chr) {
+                error_setg(errp, "Could not open guest forwarding device '%s'",
+                           buf);
+                return -1;
+            }
+
+            fwd = g_new(struct GuestFwd, 1);
+            qemu_chr_fe_init(&fwd->hd, chr, &err);
+            if (err) {
+                error_propagate(errp, err);
+                object_unparent(OBJECT(chr));
+                g_free(fwd);
+                return -1;
+            }
+            if (slirp_add_guestfwd(s->slirp, guestfwd_write, &fwd->hd,
+                                   &server, port) < 0) {
+                goto fail_parsing;
+            }
+            fwd->server = server;
+            fwd->port = port;
+            fwd->slirp = s->slirp;
+            qemu_chr_fe_set_handlers(&fwd->hd, guestfwd_can_read, guestfwd_read,
+                                     NULL, NULL, fwd, NULL, true);
+            s->fwd = g_slist_append(s->fwd, fwd);
+        } else {
+            /*
+             * Parse target v6, we do not use char-socket backend, like the v4.
+             */
+            if (slirp_add_guestxfwd(s->slirp, &server_v6, port, &target_v6,
+                                    target_port, protocol) < 0) {
+                goto fail_parsing;
+            }
         }
-
-        fwd = g_new(struct GuestFwd, 1);
-        qemu_chr_fe_init(&fwd->hd, chr, &err);
-        if (err) {
-            error_propagate(errp, err);
-            object_unparent(OBJECT(chr));
-            g_free(fwd);
-            return -1;
-        }
-
-        if (slirp_add_guestfwd(s->slirp, guestfwd_write, &fwd->hd,
-                               &server, port) < 0) {
-            error_setg(errp, "Conflicting/invalid host:port in guest "
-                       "forwarding rule '%s'", config_str);
-            qemu_chr_fe_deinit(&fwd->hd, true);
-            g_free(fwd);
-            return -1;
-        }
-        fwd->server = server;
-        fwd->port = port;
-        fwd->slirp = s->slirp;
-
-        qemu_chr_fe_set_handlers(&fwd->hd, guestfwd_can_read, guestfwd_read,
-                                 NULL, NULL, fwd, NULL, true);
-        s->fwd = g_slist_append(s->fwd, fwd);
     }
     return 0;
 
  fail_syntax:
     error_setg(errp, "Invalid guest forwarding rule '%s'", config_str);
+    return -1;
+
+ fail_parsing:
+    error_setg(errp, "Conflicting/invalid host:port in guest "
+              "forwarding rule '%s'", config_str);
+    if (fwd) {
+        qemu_chr_fe_deinit(&fwd->hd, true);
+        g_free(fwd);
+    }
     return -1;
 }
 
