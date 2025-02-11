@@ -15,6 +15,7 @@
 #include "android/emulation/control/adb/AdbInterface.h"
 
 #include <assert.h>    // for assert
+#include <fcntl.h>     // for O_CREAT, O_EXCL, O_RDONLY
 #include <inttypes.h>  // for PRId64
 #include <stdint.h>    // for int64_t
 #include <cstdio>      // for printf
@@ -24,15 +25,20 @@
 #include <sstream>     // for basic_stri...
 #include <string>      // for string
 #include <string_view>
-#include <thread>      // for thread
-#include <tuple>       // for tie, tuple
-#include <utility>     // for pair, move
+#include <thread>   // for thread
+#include <tuple>    // for tie, tuple
+#include <utility>  // for pair, move
 
-#include "android/avd/info.h"                              // for avdInfo_ge...
-#include "android/avd/util.h"                              // for ANDROID_AV...
-#include "aemu/base/EnumFlags.h"                        // for operator|
-#include "aemu/base/Log.h"                              // for LogStream
-#include "aemu/base/Optional.h"                         // for Optional
+#include "aemu/base/EnumFlags.h"  // for operator|
+#include "aemu/base/Log.h"        // for LogStream
+#include "aemu/base/Optional.h"   // for Optional
+#include "aemu/base/files/ScopedFd.h"
+#include "aemu/base/misc/FileUtils.h"     // for readFileIntoString, write...
+#include "aemu/base/misc/StringUtils.h"   // for trim
+#include "android/avd/info.h"             // for avdInfo_ge...
+#include "android/avd/util.h"             // for ANDROID_AV...
+#include "android/utils/eintr_wrapper.h"  // for HANDLE_EINTR
+#include "android/utils/file_io.h"
 
 #include "aemu/base/Uuid.h"                             // for Uuid
 #include "aemu/base/files/PathUtils.h"                  // for PathUtils
@@ -645,6 +651,23 @@ void AdbThroughExe::taskFunction(OptionalAdbCommandResult* result) {
     if (command_ran) {
         result->emplace(exit_code,
                         mWantOutput ? mOutputFilePath : std::string());
+        if (exit_code) {
+            std::string failedCmd;
+            for (auto cmd : mCommand) {
+                failedCmd += cmd + " ";
+            }
+            std::string file_contents;
+            base::ScopedFd read(HANDLE_EINTR(android_open(
+                    mOutputFilePath.c_str(), O_RDONLY | O_BINARY)));
+
+            if (read.get() >= 0 &&
+                android::readFileIntoString(read.get(), &file_contents)) {
+                file_contents = android::base::trim(file_contents);
+            }
+
+            LOG(WARNING) << "adb command '" << failedCmd << "' failed: '"
+                         << file_contents << "'";
+        }
     } else {
         // Just in case (e.g. if the command got terminated on timeout).
         path_delete_file(mOutputFilePath.c_str());
