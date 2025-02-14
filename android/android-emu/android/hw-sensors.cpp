@@ -1664,3 +1664,65 @@ bool android_xr_set_viewport_control_mode(int mode) {
                     PHYSICAL_PARAMETER_XR_VIEWPORT_CONTROL_MODE, &f_mode, 1,
                     PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
 }
+
+bool android_xr_set_head_rotation(float x, float y, float z) {
+    float head_rotation_vector[] = {x, y, z};
+    return static_cast<bool>(
+            android_physical_model_set(
+                PHYSICAL_PARAMETER_XR_HEAD_ROTATION,
+                head_rotation_vector, std::size(head_rotation_vector),
+                PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}
+
+bool android_xr_set_head_movement(float delta_x, float delta_y,
+                                         float delta_z) {
+    float head_movement_vector[] = {delta_x, delta_y, delta_z};
+    return static_cast<bool>(
+            android_physical_model_set(
+                PHYSICAL_PARAMETER_XR_HEAD_MOVEMENT,
+                head_movement_vector, std::size(head_movement_vector),
+                PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}
+
+bool android_xr_set_head_angular_velocity(float omega_x,
+                                          float omega_y,
+                                          float omega_z) {
+    float head_angular_velocity_vector[] = {omega_x, omega_y, omega_z};
+    return static_cast<bool>(
+            android_physical_model_set(
+                PHYSICAL_PARAMETER_XR_HEAD_ANGULAR_VELOCITY,
+                head_angular_velocity_vector, std::size(head_angular_velocity_vector),
+                PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}
+
+bool android_xr_set_head_velocity(float x, float y, float z) {
+    float head_velocity_vector[] = {x, y, z};
+    return static_cast<bool>(
+            android_physical_model_set(
+                PHYSICAL_PARAMETER_XR_HEAD_VELOCITY,
+                head_velocity_vector, std::size(head_velocity_vector),
+                PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}
+
+bool android_xr_set_options(int environment, float passthroughCoefficient) {
+    float options_vector[] = {environment, passthroughCoefficient, 0.0f};
+    return static_cast<bool>(
+            android_physical_model_set(
+                PHYSICAL_PARAMETER_XR_OPTIONS,
+                options_vector, std::size(options_vector),
+                PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}
+
+bool android_xr_get_options(int* environment, float* passthroughCoefficient) {
+    float options_vector[] = {0.0f, 0.0f, /* unused */ 0.0f};
+    float* options_data = options_vector;
+    float* const* xr_options = &options_data;
+    bool result = static_cast<bool>(
+            android_physical_model_get(
+                PHYSICAL_PARAMETER_XR_OPTIONS,
+                xr_options, std::size(options_vector),
+                PARAMETER_VALUE_TYPE_CURRENT) >= 0);
+    *environment = static_cast<int>(options_vector[0]);
+    *passthroughCoefficient = options_vector[1];
+    return result;
+}

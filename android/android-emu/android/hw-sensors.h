@@ -176,6 +176,11 @@ typedef enum{
     PHYSICAL_PARAMETER_(XR_ENVIRONMENT_MODE, "xr_environment_mode", XrEnvironmentMode, float) \
     PHYSICAL_PARAMETER_(XR_SCREEN_RECENTER, "xr_screen_recenter", XrScreenRecenter, float) \
     PHYSICAL_PARAMETER_(XR_VIEWPORT_CONTROL_MODE, "xr_viewport_mode", XrViewportControlMode, float) \
+    PHYSICAL_PARAMETER_(XR_HEAD_ROTATION, "xr_head_rotation", XrHeadRotation, vec3) \
+    PHYSICAL_PARAMETER_(XR_HEAD_MOVEMENT, "xr_head_movement", XrHeadMovement, vec3) \
+    PHYSICAL_PARAMETER_(XR_HEAD_ANGULAR_VELOCITY, "xr_head_angular_velocity", XrHeadAngularVelocity, vec3) \
+    PHYSICAL_PARAMETER_(XR_HEAD_VELOCITY, "xr_head_velocity", XrHeadVelocity, vec3) \
+    PHYSICAL_PARAMETER_(XR_OPTIONS, "xr_options", XrOptions, vec3) \
 // clang-format on
 typedef enum {
 #define PHYSICAL_PARAMETER_(x,y,z,w)  PHYSICAL_PARAMETER_##x,
@@ -430,5 +435,14 @@ bool android_xr_set_input_mode(int mode);
 bool android_xr_set_environment_mode(int mode);
 bool android_xr_set_screen_recenter();
 bool android_xr_set_viewport_control_mode(int mode);
+
+bool android_xr_set_head_rotation(float x, float y, float z);
+bool android_xr_set_head_movement(float delta_x, float delta_y,
+                                        float delta_z);
+bool android_xr_set_head_angular_velocity(float omega_x, float omega_y,
+                                                float omega_z);
+bool android_xr_set_head_velocity(float x, float y, float z);
+bool android_xr_set_options(int environment, float passthroughCoefficient);
+bool android_xr_get_options(int* environment, float* passthroughCoefficient);
 
 ANDROID_END_HEADER
