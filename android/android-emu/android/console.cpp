@@ -4157,6 +4157,7 @@ static int do_multi_display_add(ControlClient client, char* args) {
 
     if (client->global->multi_display_agent->setMultiDisplay(
                 id, -1, -1, width, height, dpi, flag, true) < 0) {
+        control_write(client, "KO: setMultiDisplay not supported\r\n");
         return -1;
     }
     client->global->emu_agent->updateUIMultiDisplayPage(id);
@@ -4199,6 +4200,7 @@ static int do_multi_display_del(ControlClient client, char* args) {
 
     if (client->global->multi_display_agent->setMultiDisplay(id, -1, -1, 0, 0,
                                                              0, 0, false) < 0) {
+        control_write(client, "KO: setMultiDisplay not supported\r\n");
         return -1;
     }
     client->global->emu_agent->updateUIMultiDisplayPage(id);
