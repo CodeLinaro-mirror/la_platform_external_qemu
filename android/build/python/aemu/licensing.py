@@ -92,6 +92,8 @@ class Licensing(object):
         "mincore::mincore",
         "imagehlp::imagehlp",
         "setupapi::setupapi",
+        "comsuppw::comsuppw",
+        "wbemuuid::wbemuuid",
         "D3d9.lib"
     ]
 
