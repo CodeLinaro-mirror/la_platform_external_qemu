@@ -459,8 +459,6 @@ private:
     bool hasFrame() const;
     bool hasSkin() const;
 
-    void stopVulkanApps();
-
     void runAdbInstall(const QString& path);
     void installDone(android::emulation::ApkInstaller::Result result,
                      std::string_view errorString);
