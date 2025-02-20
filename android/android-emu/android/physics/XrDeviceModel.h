@@ -32,22 +32,57 @@ class XrDeviceModel {
 public:
     XrDeviceModel();
 
-    // called by physical model to send a XR Input mode to the system.
+    // Send and receive Input Mode (Mouse-KB, hand tracking, eye gaze, etc.) to
+    // the guest operating system.
     void setXrInputMode(float value, PhysicalInterpolation mode);
-    // Required to support PhysicalModel.
     float getXrInputMode(ParameterValueType parameterValueType) const;
-    // called by physical model to send a XR Environment mode to the system.
+
+    // Send and receive Environment Mode to the guest operating system. This is
+    // currently used in standalone emulator path.
     void setXrEnvironmentMode(float value, PhysicalInterpolation mode);
-    // Required to support PhysicalModel.
     float getXrEnvironmentMode(ParameterValueType parameterValueType) const;
-    // called by physical model to send a XR Screen Recenter to the system.
+
+    // Send and receive Screen Recenter event state to the guest operating
+    // system.
     void setXrScreenRecenter(float value, PhysicalInterpolation mode);
-    // Required to support PhysicalModel.
     float getXrScreenRecenter(ParameterValueType parameterValueType) const;
-    // called by physical model to send a Viewport Control mode to the system.
+
+    // Send  and receive Viewport Control Mode to the guest operating system.
     void setXrViewportControlMode(float value, PhysicalInterpolation mode);
-    // Required to support PhysicalModel.
     float getXrViewportControlMode(ParameterValueType parameterValueType) const;
+
+    // Send Head Rotation state to the guest operating system.
+    void setXrHeadRotation(float x,
+                                float y,
+                                float z,
+                                PhysicalInterpolation mode);
+
+    // Send Head Movement to the guest operating system.
+    void setXrHeadMovement(float x,
+                                float y,
+                                float z,
+                                PhysicalInterpolation mode);
+
+    // Send Head Angular Velocity to the guest operating system.
+    void setXrHeadAngularVelocity(float omega_x,
+                                       float omega_y,
+                                       float omega_z,
+                                       PhysicalInterpolation mode);
+
+    // Send Head Velocity to the guest operating system.
+    void setXrHeadVelocity(float x,
+                                float y,
+                                float z,
+                                PhysicalInterpolation mode);
+
+    // Send and receive Passthrough state to the guest operating system.
+    // Passthrough state can also be set in guest OS, thus requiring both getter and setter.
+    // This is currently used in Android Studio integrated emulator path.
+    void setXrOptions(int environment,
+                      float passthroughCoefficient,
+                      PhysicalInterpolation mode);
+    vec3 getXrOptions(
+        ParameterValueType parameterValueType) const;
 
     QemudClient* initializeQemudClient(int channel, const char* client_param);
     void qemudClientRecv(uint8_t* msg, int msglen);

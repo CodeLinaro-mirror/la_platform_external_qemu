@@ -253,6 +253,30 @@ static void android_vulkan_instance_unregister(uint64_t id) {
                << s_vulkanTable.size();
 }
 
+static void android_vulkan_instance_enumerate(uint32_t* pCount,
+                                              uint64_t* pIds,
+                                              char** pNames) {
+    if (!pCount) {
+        return;
+    }
+
+    const std::lock_guard<std::mutex> lock(s_vulkanTableLock);
+    if (!pIds || !pNames) {
+        *pCount = s_vulkanTable.size();
+        return;
+    }
+
+    int idx = 0;
+    for (const auto& [key, value] : s_vulkanTable) {
+        pNames[idx] = strdup(value.c_str());
+        pIds[idx] = key;
+        ++idx;
+        if (idx == *pCount) {
+            return;
+        }
+    }
+}
+
 static SnapshotSkipReason get_skip_snapshot_save_reason() {
     return skip_snapshot_save_reason;
 }
@@ -1278,6 +1302,7 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
                 },
         .vulkanInstanceRegister = android_vulkan_instance_register,
         .vulkanInstanceUnregister = android_vulkan_instance_unregister,
+        .vulkanInstanceEnumerate = android_vulkan_instance_enumerate,
         .setSkipSnapshotSaveReason = set_skip_snapshot_save_reason,
         .getSkipSnapshotSaveReason = get_skip_snapshot_save_reason,
         .setStatSnapshotUseVulkan = set_stat_snasphot_use_vulkan,

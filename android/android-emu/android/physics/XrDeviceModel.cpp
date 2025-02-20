@@ -35,6 +35,7 @@ using xr_emulator_proto::EnvironmentMode;
 using xr_emulator_proto::InputMode;
 using xr_emulator_proto::MsgType;
 using xr_emulator_proto::ViewportControlMode;
+using xr_emulator_proto::XrOptions_Environment;
 
 namespace android {
 namespace physics {
@@ -119,6 +120,81 @@ void XrDeviceModel::setXrViewportControlMode(float value,
 float XrDeviceModel::getXrViewportControlMode(
         ParameterValueType /*parameterValueType*/) const {
     return mLastViewportControlModeRequested;
+}
+
+void XrDeviceModel::setXrHeadRotation(float x,
+                            float y,
+                            float z,
+                            PhysicalInterpolation mode) {
+    D("XrDeviceModel::setXrHeadRotation %f %f %f", x, y, z);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_HEAD_ROTATION);
+    auto rotation_param = request.mutable_xr_head_rotation_event();
+    rotation_param->set_x(x);
+    rotation_param->set_y(y);
+    rotation_param->set_z(z);
+    qemudClientSend(request);
+}
+
+void XrDeviceModel::setXrHeadMovement(float x,
+                                      float y,
+                                      float z,
+                                      PhysicalInterpolation mode) {
+    D("XrDeviceModel::setXrHeadMovement %f %f %f", x, y, z);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_HEAD_MOVEMENT);
+    auto translation_param = request.mutable_xr_head_movement_event();
+    translation_param->set_delta_x(x);
+    translation_param->set_delta_y(y);
+    translation_param->set_delta_z(z);
+    qemudClientSend(request);
+}
+
+void XrDeviceModel::setXrHeadAngularVelocity(float omega_x,
+                              float omega_y,
+                              float omega_z,
+                              PhysicalInterpolation mode) {
+    D("XrDeviceModel::setXrHeadAngularVelocity %f %f %f",
+        omega_x, omega_y, omega_z);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_HEAD_ANGULAR_VELOCITY);
+    auto angular_velocity_param = request.mutable_xr_head_angular_velocity_event();
+    angular_velocity_param->set_omega_x(omega_x);
+    angular_velocity_param->set_omega_y(omega_y);
+    angular_velocity_param->set_omega_z(omega_z);
+    qemudClientSend(request);
+}
+
+void XrDeviceModel::setXrHeadVelocity(float x,
+                            float y,
+                            float z,
+                            PhysicalInterpolation mode) {
+    D("XrDeviceModel::setXrHeadVelocity %f %f %f", x, y, z);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_HEAD_VELOCITY);
+    auto velocity_param = request.mutable_xr_head_velocity_event();
+    velocity_param->set_x(x);
+    velocity_param->set_y(y);
+    velocity_param->set_z(z);
+    qemudClientSend(request);
+}
+
+void XrDeviceModel::setXrOptions(int environment,
+                                float passthroughCoefficient,
+                                PhysicalInterpolation mode) {
+    D("XrDeviceModel::setXrOptions %f %f", environment, passthroughCoefficient);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_OPTIONS);
+    auto xr_options_param = request.mutable_xr_options();
+    xr_options_param->set_environment(static_cast<XrOptions_Environment>(environment));
+    xr_options_param->set_passthrough_coefficient(passthroughCoefficient);
+    qemudClientSend(request);
+}
+
+vec3 XrDeviceModel::getXrOptions(
+        ParameterValueType parameterValueType) const {
+    // TODO(b/396418192): implement toggle environment mode in Android Studio
+    return {0, 0, 0};
 }
 
 void XrDeviceModel::sendXrInputMode(enum XrInputMode mode) {

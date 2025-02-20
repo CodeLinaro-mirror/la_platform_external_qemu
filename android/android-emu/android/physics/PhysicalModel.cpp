@@ -790,9 +790,8 @@ void PhysicalModelImpl::setTargetInternalAccelerometerUncalibrated(vec3, Physica
     targetStateChanged();
 }
 
-void PhysicalModelImpl::setTargetInternalXrInputMode(
-        float value,
-        PhysicalInterpolation mode) {
+void PhysicalModelImpl::setTargetInternalXrInputMode(float value,
+                                                    PhysicalInterpolation mode) {
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -830,6 +829,62 @@ void PhysicalModelImpl::setTargetInternalXrScreenRecenter(
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
         mXrDeviceModel.setXrScreenRecenter(value, mode);
+    }
+    targetStateChanged();
+}
+
+void PhysicalModelImpl::setTargetInternalXrHeadRotation(
+        vec3 value,
+        PhysicalInterpolation mode) {
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrHeadRotation(value.x, value.y, value.z, mode);
+    }
+    targetStateChanged();
+}
+
+void PhysicalModelImpl::setTargetInternalXrHeadMovement(
+        vec3 value,
+        PhysicalInterpolation mode) {
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrHeadMovement(value.x, value.y, value.z, mode);
+    }
+    targetStateChanged();
+}
+
+void PhysicalModelImpl::setTargetInternalXrHeadAngularVelocity(
+        vec3 value,
+        PhysicalInterpolation mode) {
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrHeadAngularVelocity(
+            value.x, value.y, value.z, mode);
+    }
+    targetStateChanged();
+}
+
+void PhysicalModelImpl::setTargetInternalXrHeadVelocity(
+        vec3 value,
+        PhysicalInterpolation mode) {
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrHeadVelocity(value.x, value.y, value.z, mode);
+    }
+    targetStateChanged();
+}
+
+void PhysicalModelImpl::setTargetInternalXrOptions(
+        vec3 value,
+        PhysicalInterpolation mode) {
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrOptions(static_cast<int>(value.x), value.y, mode);
     }
     targetStateChanged();
 }
@@ -982,6 +1037,31 @@ float PhysicalModelImpl::getParameterXrViewportControlMode(
         ParameterValueType parameterValueType) const {
     std::lock_guard<std::recursive_mutex> lock(mMutex);
     return mXrDeviceModel.getXrViewportControlMode(parameterValueType);
+}
+
+vec3 PhysicalModelImpl::getParameterXrHeadRotation(
+        ParameterValueType parameterValueType) const {
+    return {0, 0, 0};
+}
+
+vec3 PhysicalModelImpl::getParameterXrHeadMovement(
+        ParameterValueType parameterValueType) const {
+    return {0, 0, 0};
+}
+
+vec3 PhysicalModelImpl::getParameterXrHeadAngularVelocity(
+        ParameterValueType parameterValueType) const {
+    return {0, 0, 0};
+}
+
+vec3 PhysicalModelImpl::getParameterXrHeadVelocity(
+        ParameterValueType parameterValueType) const {
+    return {0, 0, 0};
+}
+
+vec3 PhysicalModelImpl::getParameterXrOptions(
+        ParameterValueType parameterValueType) const {
+    return {0, 0, 0};
 }
 
 #define GET_FUNCTION_NAME(x) get##x

@@ -58,6 +58,11 @@ message PhysicalModelEvent {
         XR_ENVIRONMENT_MODE = 22;
         XR_SCREEN_RECENTER = 23;
         XR_VIEWPORT_CONTROL_MODE = 24;
+        XR_HEAD_ROTATION = 25;
+        XR_HEAD_MOVEMENT = 26;
+        XR_HEAD_ANGULAR_VELOCITY = 27;
+        XR_HEAD_VELOCITY = 28;
+        XR_OPTIONS = 29;
     }
 
     optional ParameterType type = 1;
