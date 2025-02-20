@@ -732,7 +732,11 @@ bool emuglConfig_init(EmuglConfig* config,
             has_auto_no_window = true;
         } else {
             gpu_enabled = true;
-            gpu_mode = gpu_option;
+            if (!strcmp(gpu_option, "lavapipe")) {
+                gpu_mode = "swiftshader_indirect";
+            } else {
+                gpu_mode = gpu_option;
+            }
         }
     } else {
         // Support "hw.gpu.mode=on" in config.ini
@@ -1052,6 +1056,8 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
 #else
         system->envSet("ANDROID_EMU_VK_ICD", NULL);
 #endif
+    } else if (sGpuOption == "lavapipe") {
+        system->envSet("ANDROID_EMU_VK_ICD", "lavapipe");
     } else
 #ifndef __APPLE__
     // Default to swiftshader vk on mac

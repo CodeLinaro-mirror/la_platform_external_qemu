@@ -871,6 +871,9 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
     } else if (vk_icd == "swiftshader") {
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::SWIFTSHADER_VK);
+    } else if (vk_icd == "lavapipe") {
+        event->mutable_emulator_details()->set_vulkan_icd(
+                android_studio::EmulatorDetails::LAVAPIPE_VK);
     } else if (vk_icd == "moltenvk") {
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::MOLTEN_VK);
