@@ -1195,3 +1195,188 @@ TEST(PhysicalModel, FoldableInitialize) {
     EXPECT_EQ(3, ret.currentPosture);
     physicalModel_free(model);
 }
+
+TEST(PhysicalModel, SetXrHeadRotation) {
+    TestSystem mTestSystem("/", System::kProgramBitness);
+    PhysicalModel* model = physicalModel_new();
+    physicalModel_setCurrentTime(model, 0L);
+
+    vec3 targetRotation;
+    targetRotation.x = 45.0f;
+    targetRotation.y = 10.0f;
+    targetRotation.z = 4.0f;
+    physicalModel_setTargetXrHeadRotation(
+            model, targetRotation, PHYSICAL_INTERPOLATION_STEP);
+
+    static int testContext;
+    static bool targetStateChanged = false;
+    static bool physicalStateChanging = false;
+    const QAndroidPhysicalStateAgent agent = {
+        .onTargetStateChanged = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            targetStateChanged = true;
+        },
+        .onPhysicalStateChanging = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = true;
+        },
+        .onPhysicalStateStabilized = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = false;
+        },
+        .context = &testContext};
+
+    physicalModel_setPhysicalStateAgent(model, &agent);
+    EXPECT_TRUE(targetStateChanged);
+    EXPECT_TRUE(physicalStateChanging);
+
+    physicalModel_free(model);
+}
+
+TEST(PhysicalModel, SetXrHeadMovement) {
+    TestSystem mTestSystem("/", System::kProgramBitness);
+    PhysicalModel* model = physicalModel_new();
+    physicalModel_setCurrentTime(model, 0L);
+
+    vec3 targetMovement;
+    targetMovement.x = 1.0f;
+    targetMovement.y = 2.0f;
+    targetMovement.z = 3.0f;
+    physicalModel_setTargetXrHeadMovement(
+            model, targetMovement, PHYSICAL_INTERPOLATION_STEP);
+
+    static int testContext;
+    static bool targetStateChanged = false;
+    static bool physicalStateChanging = false;
+    const QAndroidPhysicalStateAgent agent = {
+        .onTargetStateChanged = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            targetStateChanged = true;
+        },
+        .onPhysicalStateChanging = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = true;
+        },
+        .onPhysicalStateStabilized = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = false;
+        },
+        .context = &testContext};
+
+    physicalModel_setPhysicalStateAgent(model, &agent);
+    EXPECT_TRUE(targetStateChanged);
+    EXPECT_TRUE(physicalStateChanging);
+
+    physicalModel_free(model);
+}
+
+TEST(PhysicalModel, SetXrOptions) {
+    TestSystem mTestSystem("/", System::kProgramBitness);
+    PhysicalModel* model = physicalModel_new();
+    physicalModel_setCurrentTime(model, 0L);
+
+    vec3 options;
+    options.x = 1.0f; // Mode
+    options.y = 2.0f; // Value
+    options.z = 0.0f; // Unused
+    physicalModel_setTargetXrOptions(
+            model, options, PHYSICAL_INTERPOLATION_STEP);
+
+    static int testContext;
+    static bool targetStateChanged = false;
+    static bool physicalStateChanging = false;
+    const QAndroidPhysicalStateAgent agent = {
+        .onTargetStateChanged = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            targetStateChanged = true;
+        },
+        .onPhysicalStateChanging = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = true;
+        },
+        .onPhysicalStateStabilized = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = false;
+        },
+        .context = &testContext};
+
+    physicalModel_setPhysicalStateAgent(model, &agent);
+    EXPECT_TRUE(targetStateChanged);
+    EXPECT_TRUE(physicalStateChanging);
+
+    physicalModel_free(model);
+}
+
+TEST(PhysicalModel, SetXrHeadAngularVelocity) {
+    TestSystem mTestSystem("/", System::kProgramBitness);
+    PhysicalModel* model = physicalModel_new();
+    physicalModel_setCurrentTime(model, 0L);
+
+    vec3 angularVelocity;
+    angularVelocity.x = 0.5f;
+    angularVelocity.y = 1.0f;
+    angularVelocity.z = 1.5f;
+    physicalModel_setTargetXrHeadAngularVelocity(
+            model, angularVelocity, PHYSICAL_INTERPOLATION_STEP);
+
+    static int testContext;
+    static bool targetStateChanged = false;
+    static bool physicalStateChanging = false;
+    const QAndroidPhysicalStateAgent agent = {
+        .onTargetStateChanged = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            targetStateChanged = true;
+        },
+        .onPhysicalStateChanging = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = true;
+        },
+        .onPhysicalStateStabilized = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = false;
+        },
+        .context = &testContext};
+
+    physicalModel_setPhysicalStateAgent(model, &agent);
+    EXPECT_TRUE(targetStateChanged);
+    EXPECT_TRUE(physicalStateChanging);
+
+    physicalModel_free(model);
+}
+
+TEST(PhysicalModel, SetXrHeadVelocity) {
+    TestSystem mTestSystem("/", System::kProgramBitness);
+    PhysicalModel* model = physicalModel_new();
+    physicalModel_setCurrentTime(model, 0L);
+
+    vec3 velocity;
+    velocity.x = 1.5f;
+    velocity.y = 2.5f;
+    velocity.z = 3.5f;
+    physicalModel_setTargetXrHeadVelocity(
+            model, velocity, PHYSICAL_INTERPOLATION_STEP);
+
+    static int testContext;
+    static bool targetStateChanged = false;
+    static bool physicalStateChanging = false;
+    const QAndroidPhysicalStateAgent agent = {
+        .onTargetStateChanged = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            targetStateChanged = true;
+        },
+        .onPhysicalStateChanging = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = true;
+        },
+        .onPhysicalStateStabilized = [](void* context) {
+            EXPECT_EQ(context, &testContext);
+            physicalStateChanging = false;
+        },
+        .context = &testContext};
+
+    physicalModel_setPhysicalStateAgent(model, &agent);
+    EXPECT_TRUE(targetStateChanged);
+    EXPECT_TRUE(physicalStateChanging);
+
+    physicalModel_free(model);
+}

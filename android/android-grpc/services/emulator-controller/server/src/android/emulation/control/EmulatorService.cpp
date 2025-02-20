@@ -70,6 +70,7 @@
 #include "android/emulation/control/keyboard/PenEventSender.h"
 #include "android/emulation/control/keyboard/TouchEventSender.h"
 #include "android/emulation/control/keyboard/WheelEventSender.h"
+#include "android/emulation/control/xr/XrInputEventSender.h"
 #include "android/emulation/control/location_agent.h"
 #include "android/emulation/control/logcat/LogcatParser.h"
 #include "android/emulation/control/logcat/LogcatStream.h"
@@ -138,6 +139,7 @@ public:
           mPenEventSender(agents),
           mTouchEventSender(agents),
           mWheelEventSender(agents),
+          mXrInputEventSender(agents),
           mCamera(agents->sensors),
           mClipboard(Clipboard::getClipboard(agents->clipboard)),
           mLooper(android::base::ThreadLooper::get()),
@@ -500,6 +502,21 @@ public:
                                 mPenEventSender.send(request->pen_event());
                             } else if (request->has_wheel_event()) {
                                 mWheelEventSender.send(request->wheel_event());
+                            } else if (request->has_xr_command()) {
+                                mXrInputEventSender.sendXrCommand(
+                                    request->xr_command());
+                            } else if (request->has_xr_head_rotation_event()) {
+                                mXrInputEventSender.sendXrHeadRotation(
+                                    request->xr_head_rotation_event());
+                            } else if (request->has_xr_head_movement_event()) {
+                                mXrInputEventSender.sendXrHeadMovement(
+                                    request->xr_head_movement_event());
+                            } else if (request->has_xr_head_angular_velocity_event()) {
+                                mXrInputEventSender.sendXrHeadAngularVelocity(
+                                    request->xr_head_angular_velocity_event());
+                            } else if (request->has_xr_head_velocity_event()) {
+                                mXrInputEventSender.sendXrHeadVelocity(
+                                    request->xr_head_velocity_event());
                             } else {
                                 // Mark the stream as completed, this will
                                 // result in setting that status and scheduling
@@ -1470,6 +1487,44 @@ public:
         return Status::OK;
     }
 
+    Status setXrOptions(ServerContext* context,
+                        const XrOptions* xrOptions,
+                        ::google::protobuf::Empty* reply) {
+        auto agent = mAgents->emu;
+        if (agent->setXrOptions(static_cast<int>(xrOptions->environment()),
+                                xrOptions->passthrough_coefficient()) == false) {
+            return Status(::grpc::StatusCode::FAILED_PRECONDITION,
+                          "Unable to set XrOptions.", "");
+        }
+        return Status::OK;
+    }
+
+    Status getXrOptions(ServerContext* context,
+                        const ::google::protobuf::Empty* empty,
+                        XrOptions* reply) override {
+        if (!isXrGuestOs()) {
+            return Status(::grpc::StatusCode::FAILED_PRECONDITION,
+                          "XR mode is not supported in the current AVD.", "");
+        }
+        auto agent = mAgents->emu;
+        int environment = 0;
+        float passthroughCoefficient = 0;
+        if (agent->getXrOptions(
+                &environment, &passthroughCoefficient) == false) {
+            return Status(::grpc::StatusCode::FAILED_PRECONDITION,
+                          "Unable to get XrOptions.", "");
+        } else {
+            reply->set_environment(static_cast<::android::emulation::control::XrOptions_Environment>(environment));
+            reply->set_passthrough_coefficient(passthroughCoefficient);
+        }
+        return Status::OK;
+    }
+
+    bool isXrGuestOs() {
+        // TODO(b/396418192): implement XR mode in Android Studio
+        return true;
+    }
+
 private:
     const AndroidConsoleAgents* mAgents;
     keyboard::KeyEventSender mKeyEventSender;
@@ -1478,6 +1533,7 @@ private:
     TouchEventSender mTouchEventSender;
     AndroidEventSender mAndroidEventSender;
     WheelEventSender mWheelEventSender;
+    XrInputEventSender mXrInputEventSender;
     SharedMemoryLibrary mSharedMemoryLibrary;
     EventWaiter mNotificationWaiter;
     NotificationStream mNotificationStream;
