@@ -2839,6 +2839,9 @@ message EmulatorHost {
     optional bool virt_support = 2;
 
     // Is the host itself running inside a virtual machine.
+    // Note that emulator running inside the Hyper-V root partition (which is
+    // a VM itself) is NOT considered as "running in vm" which typically means
+    // nested virtualization.
     optional bool running_in_vm = 3;
 
     // May differ from os_architecture field as it is calculated differently,
@@ -2854,6 +2857,12 @@ message EmulatorHost {
     optional uint32 cpuid_type = 8;        // t: [13:12] CPU type
     optional uint32 cpuid_extmodel = 9;    // x: [19:16] extended model
     optional uint32 cpuid_extfamily = 10;  // y: [27:20] extended family
+
+    // CPU brand name such as "Intel Core i9 14900K" and "Apple M1 Pro"
+    optional string cpu_brandname = 11;
+
+    // CPU Architecture, such as x86_64 and arm64.
+    optional string cpu_architecture = 12;
 }
 
 // Detailed profiling information for the gradle build.
