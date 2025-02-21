@@ -34,6 +34,7 @@ class CompileTask(BuildTask):
     def __init__(self, aosp: Path, destination: Path, target: str):
         super().__init__()
         self.toolchain = Toolchain(aosp, target)
+        self.target = self.toolchain.distribution()
 
         # Stripping is meaning less in windows world
         target = "install"
@@ -49,6 +50,17 @@ class CompileTask(BuildTask):
             destination,
             "--target",
             target,
+        ]
+        # The unstripped variant is useful when wanting a full core dump.
+        unstripped_dist_dir = (
+            Path(destination) / "distribution-unstripped" / "emulator"
+        )
+        self.cmake_cmd_unstripped = [
+            shutil.which("cmake", path=str(cmake_dir)),
+            "--install",
+            destination,
+            "--prefix",
+            unstripped_dist_dir,
         ]
         self.env = get_default_environment(aosp, self.toolchain.visual_studio_version())
 
@@ -68,3 +80,7 @@ class CompileTask(BuildTask):
         Command(self.cmake_cmd).with_environment(self.env).with_log_handler(
             ninja_err_filter
         ).run()
+        if self.target == "linux":
+            Command(self.cmake_cmd_unstripped).with_environment(self.env).with_log_handler(
+                ninja_err_filter
+            ).run()
