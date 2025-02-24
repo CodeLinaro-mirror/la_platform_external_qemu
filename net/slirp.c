@@ -123,7 +123,7 @@ static inline void slirp_smb_cleanup(SlirpState *s) { }
 enum GFwdProtocols {
     GFWD_TCP = 1,
     GFWD_UDP = 2,
-    GFWD_MAX = 3, /* Invalid */
+    GFWD_INVALID = 3,
 };
 
 static ssize_t net_slirp_send_packet(const void *pkt, size_t pkt_len,
@@ -1137,9 +1137,135 @@ static void guestfwd_read(void *opaque, const uint8_t *buf, int size)
     slirp_socket_recv(fwd->slirp, fwd->server, fwd->port, buf, size);
 }
 
-static ssize_t guestfwd_write(const void *buf, size_t len, void *chr)
+/*
+ * Write function will be called by slirp side.
+ */
+ static ssize_t guestfwd_write(const void *buf, size_t len, void *chr)
+ {
+     return qemu_chr_fe_write_all(chr, buf, len);
+ }
+
+/* Only allow v6 addresses contain '[]' */
+static inline bool guestfwd_is_v6_only(const char *p)
 {
-    return qemu_chr_fe_write_all(chr, buf, len);
+    return p[0] == '[' ? true : false;
+}
+
+static int guestfwd_parse_v6_addr(char *buf, const char *end, const char *p,
+                                  int *port, int *target_port,
+                                  struct in6_addr *server_v6,
+                                  struct in6_addr *target_v6,
+                                  Error **errp) {
+    /* For debug print */
+    char addrstr[INET6_ADDRSTRLEN];
+
+    /*
+     * Example v6 usage:
+     * guestfwd=tcp:[fec0::105]:6657-tcp:[::1]:6655,
+     * namely guestfwd=protocol:[server_addr]:server_port-protocol:
+     * [target_addr]:target_port
+     */
+
+    p++;
+
+    /*
+     * Parse server address.
+     * get_str_sep() parses the part before delimiter in to buf.
+     */
+    if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
+        error_setg(errp, "Invalid IPv6 server address format: %s", buf);
+        return -1;
+    }
+
+    if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, server_v6)) {
+        error_setg(errp, "Invalid IPv6 server address: %s", buf);
+        return -1;
+    }
+
+    /* Skip the `:` */
+    p++;
+
+    /* Parse the server port */
+    if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
+        error_setg(errp, "Invalid IPv6 server port format: %s", buf);
+        return -1;
+    }
+
+    if (qemu_strtoi(buf, &end, 10, port)) {
+        error_setg(errp, "Invalid IPv6 server port number: %s", buf);
+        return -1;
+    }
+
+    if (*end != '\0' || *port < 1 || *port > 65535) {
+        error_setg(errp, "Invalid IPv6 server port number: %s", buf);
+        return -1;
+    }
+
+    inet_ntop(AF_INET6, server_v6, addrstr, INET6_ADDRSTRLEN);
+    trace_slirp_guestfwd_parse(addrstr, *port);
+
+    /*
+     * Skip the "tcp:[", leaving the tcp here to make it consistent with
+     * the IPv4 syntax.
+     * In IPv4, this prefix is used to let chardev create proper backend.
+     */
+
+    p = p + 5;
+
+    /* Parse the target address */
+    if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
+        error_setg(errp, "Invalid IPv6 target address format: %s", buf);
+        return -1;
+    }
+
+    if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, target_v6)) {
+        error_setg(errp, "Invalid IPv6 target address: %s", buf);
+        return -1;
+    }
+
+    /* Skip the `:` */
+    p++;
+
+    /* Parse the target port, until the end of line */
+    if (get_str_sep(buf, sizeof(buf), &p, '\0') < 0) {
+        error_setg(errp, "Invalid IPv6 target port format: %s", buf);
+        return -1;
+    }
+
+    if (qemu_strtoi(buf, &end, 10, target_port)) {
+        error_setg(errp, "Invalid IPv6 target port number: %s", buf);
+        return -1;
+    }
+
+    if (*end != '\0' || *target_port < 1 || *target_port > 65535) {
+        error_setg(errp, "Invalid IPv6 target port number: %s", buf);
+        return -1;
+    }
+
+    inet_ntop(AF_INET6, target_v6, addrstr, INET6_ADDRSTRLEN);
+    trace_slirp_guestfwd_parse(addrstr, *target_port);
+
+    return 0;
+}
+
+static int guestfwd_parse_v4_addr(char *buf, const char *end, const char *p,
+                                  int *port, struct in_addr *server) {
+    if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+        return -1;
+    }
+    if (buf[0] != '\0' && !inet_aton(buf, server)) {
+        return -1;
+    }
+    if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
+        return -1;
+    }
+    if (qemu_strtoi(buf, &end, 10, port)) {
+        return -1;
+    }
+    if (*end != '\0' || *port < 1 || *port > 65535) {
+        return -1;
+    }
+    return 0;
 }
 
 static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
@@ -1150,20 +1276,18 @@ static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
     struct GuestFwd *fwd = NULL;
     const char *p;
     char buf[128];
-    char *end;
-    long port;
-    long target_port;
-    enum GFwdProtocols protocol = GFWD_MAX;
+    char *end = NULL;
+    /* server port */
+    int port;
+    /* destination/target port */
+    int target_port;
+    enum GFwdProtocols protocol = GFWD_INVALID;
     bool v6_only = false;
-    char addrstr[INET6_ADDRSTRLEN];
 
-    /*
-     * TODO(b/314977108): reimplement this parsing logic in following cl,
-     * as it became very long.
-     */
     p = config_str;
+
     if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
-        goto fail_syntax;
+        protocol = GFWD_INVALID;
     }
     if (strcmp(buf, "tcp") == 0) {
         protocol = GFWD_TCP;
@@ -1175,76 +1299,36 @@ static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
 
     /*
      * Parse address, only supports v6 to v6 or v4 to v4.
-     * Example v6 usage:
-     * guestfwd=tcp:[fec0::105]:6657-tcp:[::1]:6655
+     * v6: the guestfwd should parse both target and destination
+     * port/address.
+     * v4: Only parse the target port and address, the destination info will
+     * be used in char-socket to create socket.
      */
-    if (p[0] == '[') {
-        v6_only = true;
+
+    v6_only = guestfwd_is_v6_only(p);
+
+    if (protocol == GFWD_UDP && v6_only == false) {
+        error_setg(errp, "Invalid protocol, UDP is only supported in"
+        " IPv6 '%s'", config_str);
+        return -1;
     }
 
     if (v6_only == true) {
-        p++;
-        if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
+        if (guestfwd_parse_v6_addr(buf, end, p, &port, &target_port, &server_v6,
+                                   &target_v6, errp) != 0) {
             goto fail_syntax;
         }
-        if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, &server_v6)) {
-            goto fail_syntax;
-        }
-        /* Skip the `:` */
-        p++;
-        /* Parse the server port */
-        if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
-            goto fail_syntax;
-        }
-        qemu_strtol(buf, (const char **) &end, 10, &port);
-        if (*end != '\0' || port < 1 || port > 65535) {
-            goto fail_syntax;
-        }
-
-        inet_ntop(AF_INET6, &server_v6, addrstr, INET6_ADDRSTRLEN);
-        trace_slirp_guestfwd_parse(addrstr, port);
-
-        /*
-         * Skip the "tcp:[", leaving the tcp here to make it consistent with
-         * the IPv4 syntax.
-         */
-        p = p + 5;
-        /* Parse the target address */
-        if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
-            goto fail_syntax;
-        }
-        if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, &target_v6)) {
-            goto fail_syntax;
-        }
-        /* Skip the `:` */
-        p++;
-        /* Parse the target port, until the end of line */
-        if (get_str_sep(buf, sizeof(buf), &p, '\0') < 0) {
-            goto fail_syntax;
-        }
-        qemu_strtol(buf, (const char **) &end, 10, &target_port);
-        if (*end != '\0' || target_port < 1 || port > 65535) {
-            goto fail_syntax;
-        }
-        inet_ntop(AF_INET6, &target_v6, addrstr, INET6_ADDRSTRLEN);
-        trace_slirp_guestfwd_parse(addrstr, target_port);
     } else {
-        if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
-            goto fail_syntax;
-        }
-        if (buf[0] != '\0' && !inet_aton(buf, &server)) {
-            goto fail_syntax;
-        }
-        if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
-            goto fail_syntax;
-        }
-        qemu_strtol(buf, (const char **) &end, 10, &port);
-        if (*end != '\0' || port < 1 || port > 65535) {
+        if (guestfwd_parse_v4_addr(buf, end, p, &port, &server) != 0) {
             goto fail_syntax;
         }
     }
-    snprintf(buf, sizeof(buf), "guestfwd.tcp.%d", (int) port);
+    snprintf(buf, sizeof(buf), "guestfwd.tcp.%d", port);
 
+    /*
+     * Typical usage of guestfwd: send a netcat command to host, and fetch
+     * the result.
+     */
     if (g_str_has_prefix(p, "cmd:")) {
         if (slirp_add_exec(s->slirp, &p[4], &server, port) < 0) {
             error_setg(errp, "Conflicting/invalid host:port in guest "
@@ -1266,6 +1350,10 @@ static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
                 return -1;
             }
 
+            /*
+             * v4 guestfwd: the connection will be established before the boot
+             * up. See char-socket.c for detail.
+             */
             fwd = g_new(struct GuestFwd, 1);
             qemu_chr_fe_init(&fwd->hd, chr, &err);
             if (err) {
@@ -1285,9 +1373,6 @@ static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
                                      NULL, NULL, fwd, NULL, true);
             s->fwd = g_slist_append(s->fwd, fwd);
         } else {
-            /*
-             * Parse target v6, we do not use char-socket backend, like the v4.
-             */
             if (slirp_add_guestxfwd(s->slirp, &server_v6, port, &target_v6,
                                     target_port, protocol) < 0) {
                 goto fail_parsing;
