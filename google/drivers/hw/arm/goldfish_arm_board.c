@@ -21,12 +21,6 @@
 #include "qemu/error-report.h"
 #include "sysemu/device_tree.h"
 
-#if defined(__APPLE__) && defined(__aarch64__)
-#define APPLE_SILICON 1
-#else
-#define APPLE_SILICON 0
-#endif
-
 static const int a15irqmap[] = {
     [VIRT_UART] = 1,
     [VIRT_RTC] = 2,
@@ -34,14 +28,12 @@ static const int a15irqmap[] = {
     [VIRT_GPIO] = 7,
     [VIRT_SECURE_UART] = 8,
     [VIRT_ACPI_GED] = 9,
-    [RANCHU_GOLDFISH_FB] = 16,
+    //[RANCHU_GOLDFISH_FB] = 16,
     [RANCHU_GOLDFISH_BATTERY] = 17,
-    [RANCHU_GOLDFISH_AUDIO] = 18,
-    [RANCHU_GOLDFISH_EVDEV] = 19,
-    [RANCHU_GOLDFISH_PIPE] = 20,
-#if APPLE_SILICON
-    [RANCHU_GOLDFISH_SYNC] = 21,
-#endif
+    //[RANCHU_GOLDFISH_AUDIO] = 18,
+    //[RANCHU_GOLDFISH_EVDEV] = 19,
+    //[RANCHU_GOLDFISH_PIPE] = 20,
+    //[RANCHU_GOLDFISH_SYNC] = 21,
     [VIRT_MMIO] = 32,          /* ...to 16 + NUM_VIRTIO_TRANSPORTS - 1 */
     [VIRT_GIC_V2M] = 64,       /* ...to 48 + NUM_GICV2M_SPIS - 1 */
     [VIRT_PLATFORM_BUS] = 128, /* ...to 112 + PLATFORM_BUS_NUM_IRQS -1 */
@@ -68,7 +60,8 @@ static void goldfish_add_fstab(void *fdt, const char *system_path,
   qemu_fdt_setprop_string(fdt, "/firmware/android/fstab", "compatible",
                           "android,fstab");
 
-  if (system_path) {
+  /* e.g. system=/dev/block/pci/pci0000:00/0000:00:03.0/by-name/system */
+if (system_path) {
     qemu_fdt_add_subnode(fdt, "/firmware/android/fstab/system");
     qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/system", "compatible",
                             "android,system");
@@ -81,7 +74,7 @@ static void goldfish_add_fstab(void *fdt, const char *system_path,
     qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/system", "type",
                             "ext4");
   }
-
+  /* e.g. vendor=/dev/block/pci/pci0000:00/0000:00:07.0/by-name/vendor */
   if (vendor_path) {
     qemu_fdt_add_subnode(fdt, "/firmware/android/fstab/vendor");
     qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/vendor", "compatible",
@@ -149,7 +142,7 @@ static void create_simple_device(const VirtMachineState *vms, int devid,
 static void arm_init_goldfish(MachineState *machine) {
   GSList *machines = object_class_get_list(TYPE_MACHINE, false);
   MachineClass *machine_class;
-  machine_class = find_machine("virt-8.1", machines);
+  machine_class = find_machine("virt-8.2", machines);
   machine_class->init(machine);
 
   GoldfishMachineState *ams = ANDROID_MACHINE(machine);
@@ -164,15 +157,6 @@ static void arm_init_goldfish(MachineState *machine) {
       pci_create_simple(pci_bus, -1, "pci-ohci");
   }
 
-  {
-    PCIBus *pci_bus =
-        (PCIBus *)object_resolve_path_type("", TYPE_PCI_BUS, NULL);
-    if (!pci_bus)
-      error_report(
-          "No PCI bus available to add goldfish_address_space device to.");
-    pci_create_simple(pci_bus, PCI_DEVFN(11, 0), "goldfish_address_space");
-  }
-
   void *fdt = machine->fdt;
   qemu_fdt_setprop_string(fdt, "/", "compatible", "linux,ranchu");
   qemu_fdt_setprop_cell(fdt, "/", "#address-cells", 0x2);
@@ -185,38 +169,17 @@ static void arm_init_goldfish(MachineState *machine) {
                           "android,firmware");
   qemu_fdt_setprop_string(fdt, "/firmware/android", "hardware", "ranchu");
 
-  if (ams->dynamic_partition) {
-    goldfish_add_fstab(fdt, ams->system_device_in_guest,
-                       ams->vendor_device_in_guest);
-  }
 
-  create_simple_device(vms, RANCHU_GOLDFISH_FB, "goldfish_fb",
-                       "google,goldfish-fb\0"
-                       "generic,goldfish-fb",
-                       2, 0, 0);
+  // Device tree fstab seems not to be needed with the dynamic partition boot method.
+  // if (!ams->dynamic_partition) {
+  //   goldfish_add_fstab(fdt, ams->system_device_in_guest,
+  //                      ams->vendor_device_in_guest);
+  // }
+
   create_simple_device(vms, RANCHU_GOLDFISH_BATTERY, "goldfish_battery",
                        "google,goldfish-battery\0"
                        "generic,goldfish-battery",
                        2, 0, 0);
-  create_simple_device(vms, RANCHU_GOLDFISH_AUDIO, "goldfish_audio",
-                       "google,goldfish-audio\0"
-                       "generic,goldfish-audio",
-                       2, 0, 0);
-  create_simple_device(vms, RANCHU_GOLDFISH_EVDEV, "goldfish-events",
-                       "google,goldfish-events-keypad\0"
-                       "generic,goldfish-events-keypad",
-                       2, 0, 0);
-  create_simple_device(vms, RANCHU_GOLDFISH_PIPE, "goldfish_pipe",
-                       "google,android-pipe\0"
-                       "generic,android-pipe",
-                       2, 0, 0);
-
-#if APPLE_SILICON
-  create_simple_device(vms, RANCHU_GOLDFISH_SYNC, "goldfish_sync",
-                       "google,goldfish-sync\0"
-                       "generic,goldfish-sync",
-                       2, 0, 0);
-#endif
 
 #if defined(__linux__) && defined(__aarch64__)
   /* Default GIC type is host: use the same version as the host */
@@ -231,7 +194,7 @@ static void goldfish_instance_init(Object *obj)
 }
 
 static void goldfish_machine_options(MachineClass *mc) {
-  mc->desc = "Android Arm (Ranchu + virt-8.1) Device";
+  mc->desc = "Android Arm (Ranchu + virt-8.2) Device";
   mc->init = arm_init_goldfish;
 }
 
