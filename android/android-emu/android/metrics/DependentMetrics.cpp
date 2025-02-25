@@ -420,6 +420,9 @@ static void fillAvdMetrics(android_studio::AndroidStudioEvent* event) {
     }
     auto buildId = ini.getString("ro.build.fingerprint", "");
     if (buildId.empty()) {
+        buildId = ini.getString("ro.system.build.fingerprint", "");
+    }
+    if (buildId.empty()) {
         buildId = ini.getString("ro.build.display.id", "");
     }
     eventAvdInfo->set_build_id(buildId);
