@@ -312,6 +312,7 @@ qos_test_ss.add(
   'pca9552-test.c',
   'pci-test.c',
   'pcnet-test.c',
+  'pi7c9x3g606gp.c',
   'rs5c372-test.c',
   'sdhci-test.c',
   'spapr-phb-test.c',
