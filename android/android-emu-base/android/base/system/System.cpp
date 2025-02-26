@@ -30,7 +30,6 @@
 #include "android/utils/file_io.h"
 #include "android/utils/path.h"
 #include "android/utils/tempfile.h"
-#include "android/utils/x86_cpuid.h"
 
 #ifdef _WIN32
 #include "aemu/base/files/ScopedRegKey.h"
@@ -269,24 +268,6 @@ bool parseBooleanValue(const char *value, bool def) {
     if (0 == strcmp(value, "NO")) return false;
 
     return def;
-}
-
-static void trimWhitespace(char *name) {
-    char *p, *q, *s;
-
-    p = q = s = name;
-
-    while (*p == ' ')
-        p++;
-
-    while (*p) {
-        if (*p != ' ')
-            s = q;
-
-        *q++ = *p++;
-    }
-
-    *(s + 1) = '\0';
 }
 
 class HostSystem : public System {
@@ -821,36 +802,6 @@ public:
 #endif
     }
 
-#if defined(__x86_64__)
-    static int getCpuBrandNameCpuid(char *name) {
-        char cpuName[48] = { 0 };
-        uint32_t eax = 0;
-
-        android_get_x86_cpuid(0x80000000, 0, &eax, NULL, NULL, NULL);
-
-        if (!(eax & 0x80000000 && eax >= 0x80000004)) {
-            string errorStr =
-                StringFormat("Error in %s: CPU does not support fetching "
-                             "brand name using CPUID.");
-            LOG(DEBUG) << errorStr;
-            return 1;
-        }
-
-        android_get_x86_cpuid(0x80000002, 0, (uint32_t *)&cpuName[0],
-                              (uint32_t *)&cpuName[4], (uint32_t *)&cpuName[8],
-                              (uint32_t *)&cpuName[12]);
-        android_get_x86_cpuid(0x80000003, 0, (uint32_t *)&cpuName[16],
-                              (uint32_t *)&cpuName[20], (uint32_t *)&cpuName[24],
-                              (uint32_t *)&cpuName[28]);
-        android_get_x86_cpuid(0x80000004, 0, (uint32_t *)&cpuName[32],
-                              (uint32_t *)&cpuName[36], (uint32_t *)&cpuName[40],
-                              (uint32_t *)&cpuName[44]);
-
-        trimWhitespace(cpuName);
-        strcpy(name, (char *)cpuName);
-        return 0;
-    }
-#endif
 
     int getCpuCoreCount() const override {
 #ifdef _WIN32
