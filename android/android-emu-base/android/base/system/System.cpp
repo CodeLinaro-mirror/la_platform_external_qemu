@@ -1437,28 +1437,6 @@ public:
     }
 #endif
 
-    int getCpuBrandName(char *name) const override {
-#if defined(__x86_64__)
-        return getCpuBrandNameCpuid(name);
-
-#elif defined(__aarch64__) || defined(_M_ARM64)
-
-#ifdef _WIN32
-	uint32_t core_count, lp_count;
-	return getCpuBrandNameAndCoreCountWMI(name, &core_count, &lp_count);
-#elif defined(__APPLE__) && defined(__MACH__)
-	return getCpuBrandNameSysctl(name);
-#elif defined(__linux__)
-	return getCpuBrandNameProcfs(name);
-#else
-#error "Unsupported platform!"
-#endif //_WIN32
-
-#else
-#error "Unsupported platform!"
-#endif //defined(__x86_64__)
-    }
-
     int getCpuCoreCount() const override {
 #ifdef _WIN32
         SYSTEM_INFO si = {};
