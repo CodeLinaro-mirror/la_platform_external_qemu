@@ -227,6 +227,10 @@ struct DeviceSupportInfo {
     VkPhysicalDeviceMemoryProperties memProperties;
     bool hasGraphicsQueueFamily;
 
+    uint64_t getDeviceMaxAllocationCount() const {
+        return physdevProps.limits.maxMemoryAllocationCount;
+    }
+
     uint64_t getDeviceLocalMemorySize() const {
         uint64_t deviceLocalMemorySize = 0;
         for (uint32_t i = 0; i < memProperties.memoryHeapCount; i++) {
@@ -455,7 +459,8 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
                                          int* minor,
                                          int* patch,
                                          uint64_t* deviceMemBytes,
-                                         uint32_t* driverVersion) {
+                                         uint32_t* driverVersion,
+                                         uint64_t* deviceMaxAllocationCount) {
     if (!vendor || !major || !minor || !patch) {
         derror("%s: Invalid argument!", __func__);
         return;
@@ -496,6 +501,9 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     vkProps.getApiVersion(major, minor, patch);
     if (deviceMemBytes) {
         *deviceMemBytes = vkProps.getDeviceLocalMemorySize();
+    }
+    if (deviceMaxAllocationCount) {
+        *deviceMaxAllocationCount= vkProps.getDeviceMaxAllocationCount();
     }
     if (driverVersion) {
         *driverVersion = physicalProp.driverVersion;
@@ -999,7 +1007,7 @@ bool emuglConfig_init(EmuglConfig* config,
         // to work around the kvm+amdgpu driver bug
         // where kvm apparently error out with Bad Address
         emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
-                                            &vkPatch, nullptr, nullptr);
+                                            &vkPatch, nullptr, nullptr, nullptr);
         if (vkVendor) {
             bool isAMD = (strncmp("AMD", vkVendor, 3) == 0);
             bool isIntel = (strncmp("Intel", vkVendor, 5) == 0);

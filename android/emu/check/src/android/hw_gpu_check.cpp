@@ -102,9 +102,10 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     int vkPatch = 0;
     uint64_t vkDeviceMemBytes = 0;
     uint32_t vkDriverVersion = 0;
+    uint64_t vkDeviceMaxAllocationCount=0;
 
     emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor, &vkPatch,
-                                        &vkDeviceMemBytes, &vkDriverVersion);
+                                        &vkDeviceMemBytes, &vkDriverVersion, &vkDeviceMaxAllocationCount);
     if (!vkVendor) {
         // Could not properly detect the hardware parameters, disable Vulkan
         metrics.set_details("VulkanFail");
@@ -188,9 +189,30 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         };
     }
 
+    // Check maxAllocationCount for GPU.
+    // For XR we will request 8192 for AMD GPUs because in testing we've
+    // encountered issues. Else - require 4096 as per Android Baseline Profile;
+    const uint64_t minAllocationCountRequired =
+            isXrAvd ? (isAMD ? 8192 : 4096) : 4096;
+    if (vkDeviceMaxAllocationCount < minAllocationCountRequired) {
+        metrics.set_check(
+                EmulatorCompatibilityInfo::
+                        AVD_COMPATIBILITY_CHECK_GPU_CHECK_INSUFFICIENT_MEMORY);
+        metrics.set_details(std::to_string(vkDeviceMaxAllocationCount));
+        return {
+                .description = absl::StrFormat(
+                        "GPU does not support enough memory allocations to run "
+                        "avd: `%s`. "
+                        "Available: %llu, minimum required: %llu",
+                        name, vkDeviceMaxAllocationCount,
+                        minAllocationCountRequired),
+                .status = AvdCompatibility::Error,
+                .metrics = metrics,
+        };
+    }
     // Check available GPU memory
     const uint64_t deviceMemMiB = vkDeviceMemBytes / (1024 * 1024);
-    const uint64_t avdMinGpuMemMiB = isXrAvd ? 2048 : 0;
+    const uint64_t avdMinGpuMemMiB = isXrAvd ? (isAMD ? 8192 : 2048) : 0;
     if (deviceMemMiB < avdMinGpuMemMiB) {
         metrics.set_check(
                 EmulatorCompatibilityInfo::
@@ -205,7 +227,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                 .metrics = metrics,
         };
     }
-    const uint64_t avdSuggestedGpuMemMiB = isXrAvd ? 4096 : 0;
+    const uint64_t avdSuggestedGpuMemMiB = isXrAvd ? (isAMD ? 8192: 4096) : 0;
     if (deviceMemMiB < avdSuggestedGpuMemMiB) {
         return {
                 .description = absl::StrFormat(
