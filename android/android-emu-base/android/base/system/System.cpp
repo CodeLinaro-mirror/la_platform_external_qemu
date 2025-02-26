@@ -938,6 +938,33 @@ public:
     }
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+    static int getCpuBrandNameSysctl(char *name) {
+        size_t buf_len;
+
+        if (sysctlbyname("machdep.cpu.brand_string", NULL,
+                         &buf_len, NULL, 0) != 0) {
+            string errorStr =
+                StringFormat("Error in %s: sysctlbyname failed. ");
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        std::string value(buf_len - 1, '\0');
+        if (sysctlbyname("machdep.cpu.brand_string", &value[0],
+                          &buf_len, nullptr, 0) != 0) {
+            string errorStr =
+                StringFormat("Error in %s: sysctlbyname failed. ");
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        strcpy(name, value.c_str());
+        trimWhitespace(name);
+        return 0;
+    }
+#endif
+
 #if defined(__x86_64__)
     static int getCpuBrandNameCpuid(char *name) {
         char cpuName[48] = { 0 };
