@@ -22,7 +22,6 @@ set(WINDOWS_LIBS
     amstrmid
     atls
     cfgmgr32
-    comsuppw
     crypt32
     d3d9
     delayimp
@@ -49,7 +48,6 @@ set(WINDOWS_LIBS
     strmiids
     user32
     version
-    wbemuuid
     wininet
     winhttp
     winmm
