@@ -155,9 +155,6 @@ public:
     };
     virtual WaitExitResult waitForProcessExit(int pid, Duration timeoutMs) const = 0;
 
-    // Get the brand name of hardware CPU
-    virtual int getCpuBrandName(char *name) const = 0;
-
     // Get the number of hardware CPU cores available. Hyperthreading cores are
     // counted as separate here.
     virtual int getCpuCoreCount() const = 0;
