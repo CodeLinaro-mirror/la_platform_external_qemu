@@ -46,6 +46,8 @@
 #include <winioctl.h>
 #include <ntddscsi.h>
 #include <tlhelp32.h>
+#include <comutil.h>
+#include <Wbemidl.h>
 #endif
 
 #ifdef __APPLE__
@@ -820,6 +822,121 @@ public:
         }
 #endif
     }
+
+#ifdef _WIN32
+    static int getCpuBrandNameAndCoreCountWMI(char *name, uint32_t *core_count,
+                                       uint32_t *lp_count) {
+        HRESULT hres;
+        IWbemLocator* pLoc = NULL;
+        IWbemServices* pSvc = NULL;
+        IEnumWbemClassObject* pEnumerator = NULL;
+        IWbemClassObject* pclsObj = NULL;
+        ULONG uReturn = 0;
+        HRESULT hr;
+        VARIANT vtProp;
+        uint32_t numCores = 0;
+        uint32_t numLogicalProcessors = 0;
+        char *cpuName;
+
+        hres = CoInitialize(NULL);
+        if (FAILED(hres)) {
+            string errorStr =
+                StringFormat("Error in %s: Failed to initialize COM library."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        hres = CoCreateInstance(CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER,
+                                IID_IWbemLocator, (LPVOID*)&pLoc);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Failed to create IWbemLocator object."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            CoUninitialize();
+            return 1;
+        }
+
+        hres = pLoc->ConnectServer(_bstr_t(L"ROOT\\CIMV2"), NULL, NULL, 0,
+                                   NULL, 0, 0, &pSvc);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Could not connect."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            pLoc->Release();
+            CoUninitialize();
+            return 1;
+        }
+
+        hres = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE,
+                                 NULL, RPC_C_AUTHN_LEVEL_CALL,
+                                 RPC_C_IMP_LEVEL_IMPERSONATE,
+                                 NULL, EOAC_NONE);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Could not set proxy blanket."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            pSvc->Release();
+            pLoc->Release();
+            CoUninitialize();
+            return 1;
+        }
+
+        hres = pSvc->ExecQuery(bstr_t("WQL"),
+                   bstr_t("SELECT * FROM Win32_Processor"),
+                   WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+                   NULL, &pEnumerator);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Query for Win32_Processor failed."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            pSvc->Release();
+            pLoc->Release();
+            CoUninitialize();
+            return 1;
+        }
+
+        while (pEnumerator)
+        {
+            hr = pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn);
+            if (!uReturn)
+                break;
+
+            VariantInit(&vtProp);
+            hr = pclsObj->Get(L"NumberOfCores", 0, &vtProp, 0, 0);
+            numCores += vtProp.lVal;
+            VariantClear(&vtProp);
+
+            hr = pclsObj->Get(L"NumberOfLogicalProcessors", 0, &vtProp, 0, 0);
+            numLogicalProcessors += vtProp.lVal;
+            VariantClear(&vtProp);
+
+            hr = pclsObj->Get(L"Name", 0, &vtProp, 0, 0);
+            cpuName = _com_util::ConvertBSTRToString(vtProp.bstrVal);
+            trimWhitespace(cpuName);
+            strcpy(name, (char *)cpuName);
+            free(cpuName);
+            VariantClear(&vtProp);
+
+            pclsObj->Release();
+        }
+
+        pSvc->Release();
+        pLoc->Release();
+        pEnumerator->Release();
+        CoUninitialize();
+
+        return 0;
+    }
+#endif
 
 #if defined(__x86_64__)
     static int getCpuBrandNameCpuid(char *name) {

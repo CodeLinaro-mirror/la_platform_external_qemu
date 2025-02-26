@@ -155,7 +155,8 @@ endif()
 
 android_target_link_libraries(
   android-emu-base windows PUBLIC psapi::psapi iphlpapi::iphlpapi
-                                  ws2_32::ws2_32 shlwapi::shlwapi)
+                                  ws2_32::ws2_32 shlwapi::shlwapi
+                                  comsuppw::comsuppw wbemuuid::wbemuuid)
 
 android_target_link_libraries(
   android-emu-base darwin-x86_64
