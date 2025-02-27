@@ -420,6 +420,9 @@ static void fillAvdMetrics(android_studio::AndroidStudioEvent* event) {
     }
     auto buildId = ini.getString("ro.build.fingerprint", "");
     if (buildId.empty()) {
+        buildId = ini.getString("ro.system.build.fingerprint", "");
+    }
+    if (buildId.empty()) {
         buildId = ini.getString("ro.build.display.id", "");
     }
     eventAvdInfo->set_build_id(buildId);
@@ -815,6 +818,7 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
             : (cpuFlags & ANDROID_CPU_INFO_AMD) ? "AMD"
                                                 : "OTHER");
 
+#if defined(__x86_64__)
     uint32_t cpuid_mfs;
     android_get_x86_cpuid(1, 0, &cpuid_mfs, nullptr, nullptr, nullptr);
     uint32_t cpuid_stepping = cpuid_mfs & 0x0000000f;
@@ -829,6 +833,18 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
     event->mutable_emulator_host()->set_cpuid_type(cpuid_type);
     event->mutable_emulator_host()->set_cpuid_extmodel(cpuid_extmodel);
     event->mutable_emulator_host()->set_cpuid_extfamily(cpuid_extfamily);
+    event->mutable_emulator_host()->set_cpu_architecture("x86_64");
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    event->mutable_emulator_host()->set_cpu_architecture("arm64");
+#endif
+
+    // x86_64 CPU brand name returned by CPUID can at most have 48 bytes
+    // including the NULL terminator. But I don't see a definition on the
+    // ARM64 side. To get it safer, use a larger buffer to hold the name.
+    // So far, I have not seen a CPU whose name is 100 bytes long.
+    char cpuBrandName[100];
+    if (!System::get()->getCpuBrandName(cpuBrandName))
+        event->mutable_emulator_host()->set_cpu_brandname(cpuBrandName);
 
     {
         android_studio::EmulatorHost forCommonInfoHost = event->emulator_host();

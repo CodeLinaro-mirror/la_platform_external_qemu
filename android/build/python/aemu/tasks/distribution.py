@@ -90,6 +90,7 @@ class DistributionTask(BuildTask):
 
         self.build_dir = Path(build_directory)
         self.dist_dir = Path(distribution_directory) if distribution_directory else None
+        self.dist_unstripped_dir = Path(self.build_dir) / "distribution-unstripped"
         self.src_dir = Path(aosp) / "external" / "qemu"
         self.data = {
             "aosp": str(aosp),
@@ -104,6 +105,16 @@ class DistributionTask(BuildTask):
             return
 
         self.dist_dir.mkdir(exist_ok=True, parents=True)
+
+        # We are only creating the unstripped zip on linux-x86_64
+        if self.data["target"] == "linux":
+            self.zip_sets["release"].update({
+                # Look for all files under {out}/distribution-unstripped
+                "UNSTRIPPED-sdk-repo-{target}-emu-{sdk_build_number}.zip": [
+                    ("{build_dir}/distribution-unstripped", r".*")
+                ]
+            })
+            self.dist_unstripped_dir.mkdir(exist_ok=True, parents=True)
 
         src_cov_name = Path(self.build_dir) / "lcov"
         if src_cov_name.is_file():

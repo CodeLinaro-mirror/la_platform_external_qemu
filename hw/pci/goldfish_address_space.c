@@ -61,6 +61,7 @@ struct address_block {
             uint64_t available : 1;
         };
     };
+    uint64_t map_size;
 };
 
 /* A dynamic array of address blocks, with the following invariant:
@@ -233,6 +234,7 @@ address_space_allocator_split_block(
     new_block->offset = to_borrow_from->offset + new_size;
     new_block->size = size;
     new_block->available = 1;
+    new_block->map_size = 0;
 
     ++allocator->size;
 
@@ -304,6 +306,7 @@ address_space_allocator_split_block_at_offset(
     new_block->offset = offset;
     new_block->size = size;
     new_block->available = 1;
+    new_block->map_size = 0;
 
     ++allocator->size;
 
@@ -311,6 +314,7 @@ address_space_allocator_split_block_at_offset(
         extra_block->offset = offset + size;
         extra_block->size = old_block_size - size - to_borrow_from->size;
         extra_block->available = 1;
+        extra_block->map_size = 0;
 
         ++allocator->size;
     }
@@ -591,6 +595,8 @@ struct address_space_state {
 
 static struct address_space_state* s_current_state = 0;
 static int s_verbose_logging = 0;
+
+int goldfish_as_oob_access = 1;
 
 #define GOLDFISH_ADDRESS_SPACE(obj) \
     OBJECT_CHECK(struct address_space_state, (obj), \
@@ -955,6 +961,12 @@ static void address_space_pci_realize(PCIDevice *dev, Error **errp) {
     if (verbose_env && !strcmp("1", verbose_env)) {
         s_verbose_logging = 1;
     }
+
+    const char* oob_access = getenv("GOLDFISH_ADDRESS_SPACE_NO_OOB_ACCESS");
+
+    if (oob_access) {
+        goldfish_as_oob_access = 0;
+    }
 }
 
 static void address_space_pci_unrealize(PCIDevice* dev) {
@@ -1115,6 +1127,70 @@ static void address_space_register(void) {
 }
 
 type_init(address_space_register);
+
+void goldfish_address_space_map_hook(uint64_t gpa, uint64_t size)
+{
+    int64_t offset;
+
+    if (!s_current_state)
+        return;
+
+    offset = gpa - s_current_state->area_mem.addr;
+    if (offset < 0)
+        return;
+
+    for (int i = 0; i < s_current_state->allocator.size; i++) {
+        struct address_block *block = &s_current_state->allocator.blocks[i];
+        if (block->available)
+            continue;
+        if (offset == block->offset) {
+            block->map_size = size;
+            break;
+        }
+    }
+
+    return;
+}
+
+#if AS_DEBUG
+static void dump_blocks(void)
+{
+    for (int i = 0; i < s_current_state->allocator.size; i++) {
+        struct address_block *block = &s_current_state->allocator.blocks[i];
+        AS_PRINT(stderr, "block %d offset = 0x%llx, size = 0x%llx, avail = 0x%llx\n",
+                 i, block->offset, block->size, block->available);
+    }
+}
+#endif
+
+int goldfish_address_space_is_oob(uint64_t offset, uint64_t size)
+{
+    uint64_t bytes_found = 0;
+
+    if (!s_current_state)
+        return -EINVAL;
+
+#if AS_DEBUG
+    dump_blocks();
+#endif
+
+    qemu_mutex_lock(&s_current_state->mutex);
+
+    for (int i = 0; i < s_current_state->allocator.size; i++) {
+        struct address_block *block = &s_current_state->allocator.blocks[i];
+        if (block->available)
+            continue;
+        if (offset >= block->offset + block->map_size ||
+            offset + size <= block->offset)
+            continue;
+        bytes_found += MIN(block->offset + block->map_size, offset + size)
+                     - MAX(block->offset, offset);
+    }
+
+    qemu_mutex_unlock(&s_current_state->mutex);
+
+    return bytes_found != size;
+}
 
 /* Host interface */
 int goldfish_address_space_alloc_shared_host_region(
