@@ -131,6 +131,8 @@ public:
 
     void onCrashedSnapshot(const char* name);
 
+    bool stopVulkanAppsIfApplicable();
+
     // Returns an empty string if the AVD was Cold Booted
     const std::string& loadedSnapshotFile() { return mLoadedSnapshotFile; }
 

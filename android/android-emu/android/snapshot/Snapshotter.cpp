@@ -11,20 +11,22 @@
 
 #include "android/snapshot/Snapshotter.h"
 
-#include "host-common/hw-config.h"
-#include "android/avd/info.h"
 #include "aemu/base/Log.h"
-#include "aemu/base/files/PathUtils.h"
-#include "aemu/base/memory/LazyInstance.h"
 #include "aemu/base/Stopwatch.h"
 #include "aemu/base/StringFormat.h"
+#include "aemu/base/files/PathUtils.h"
+#include "aemu/base/memory/LazyInstance.h"
+#include "android/avd/info.h"
+#include "android/console.h"
 #include "android/crashreport/CrashReporter.h"
+#include "android/emulation/control/ApkInstaller.h"
+#include "android/emulation/control/globals_agent.h"
+#include "android/metrics/DependentMetrics.h"
+#include "android/metrics/MetricsReporter.h"
+#include "android/metrics/metrics.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/VmLock.h"
-#include "android/console.h"
-#include "android/metrics/metrics.h"
-#include "android/metrics/MetricsReporter.h"
-#include "android/metrics/DependentMetrics.h"
+#include "host-common/hw-config.h"
 
 #if SNAPSHOT_METRICS
 #include "studio_stats.pb.h"
@@ -805,6 +807,59 @@ bool Snapshotter::isSavingCanceled(const char* name) const {
     }
 
     return false;
+}
+
+bool Snapshotter::stopVulkanAppsIfApplicable() {
+    const bool needToSaveSnapshot =
+            !(getConsoleAgents()->settings->avdParams()->flags &
+              AVDINFO_NO_SNAPSHOT_SAVE_ON_EXIT);
+    const bool needToSaveVulkanApps = android::featurecontrol::isEnabled(
+            android::featurecontrol::VulkanSnapshots);
+
+    if (needToSaveSnapshot && !needToSaveVulkanApps) {
+        // stop vulkan apps
+    } else {
+        // do nothing
+        return false;
+    }
+
+    uint32_t count = 0;
+    auto* vm = getConsoleAgents()->vm;
+    vm->vulkanInstanceEnumerate(&count, nullptr, nullptr);
+    if (!count) {
+        return true;
+    }
+
+    auto adbInterface = android::emulation::AdbInterface::getGlobal();
+    std::vector<uint64_t> ids(count);
+    std::vector<char*> names(count);
+    vm->vulkanInstanceEnumerate(&count, ids.data(), names.data());
+    for (int i = 0; i < count; ++i) {
+        std::string appRealName = std::string(names[i]);
+        free(names[i]);
+        // special handling for chrome, some api such as 35 only reports it
+        // as Chromium, so do a name change
+        if ("Chromium" == std::string(names[i])) {
+            appRealName = "come.android.chrome";
+        }
+        LOG(INFO) << "stopping vulkan app '" << appRealName << "'";
+        adbInterface->runAdbCommand(
+                {"shell", "am", "force-stop", appRealName},
+                [this](const android::emulation::OptionalAdbCommandResult&) {},
+                5000);
+    }
+    constexpr int kMaxTries = 3;
+    for (int numTry = 0; numTry < kMaxTries; ++numTry) {
+        vm->vulkanInstanceEnumerate(&count, nullptr, nullptr);
+        if (!count) {
+            return true;
+        }
+        // gradually increase the wait time from 200ms to 600ms
+        std::this_thread::sleep_for(
+                std::chrono::milliseconds((1 + numTry) * 200));
+    }
+    vm->vulkanInstanceEnumerate(&count, nullptr, nullptr);
+    return (0 == count);
 }
 
 OperationStatus Snapshotter::saveGeneric(const char* name) {

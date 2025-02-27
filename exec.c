@@ -71,6 +71,9 @@
 
 #include "monitor/monitor.h"
 
+#include "hw/acpi/goldfish_defs.h"
+#include "hw/pci/goldfish_address_space.h"
+
 //#define DEBUG_SUBPAGE
 
 #define FLATVIEW_UNUSUAL_ITER_COUNT 128
@@ -2471,11 +2474,13 @@ void qemu_set_user_backed_mapping_funcs(QemuUserBackedRamMapFunc mapFunc,
 
 void qemu_user_backed_ram_map(uint64_t gpa, void *hva, uint64_t size, int flags)
 {
+    goldfish_address_space_map_hook(gpa, size);
     s_user_backed_ram_map(gpa, hva, size, flags);
 }
 
 void qemu_user_backed_ram_unmap(uint64_t gpa, uint64_t size)
 {
+    goldfish_address_space_map_hook(gpa, 0);
     s_user_backed_ram_unmap(gpa, size);
 }
 
@@ -3545,9 +3550,18 @@ static MemTxResult flatview_write_continue(FlatView *fv, hwaddr addr,
             }
         } else {
             /* RAM case */
-            ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
-            memcpy(ptr, buf, l);
-            invalidate_and_set_dirty(mr, addr1, l);
+            if (goldfish_as_oob_access &&
+                !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
+                goldfish_address_space_is_oob(addr1,l)) {
+                fprintf(stderr, "Warning: A write to %s is out-of-bound and is"
+                                " ignored. Offset = 0x%llx, size = %llx\n",
+                                GOLDFISH_ADDRESS_SPACE_AREA_NAME,
+                                addr1, l);
+            } else {
+                ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
+                memcpy(ptr, buf, l);
+                invalidate_and_set_dirty(mr, addr1, l);
+            }
         }
 
         if (release_lock) {
@@ -3643,8 +3657,18 @@ MemTxResult flatview_read_continue(FlatView *fv, hwaddr addr,
             }
         } else {
             /* RAM case */
-            ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
-            memcpy(buf, ptr, l);
+            if (goldfish_as_oob_access &&
+                !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
+                goldfish_address_space_is_oob(addr1,l)) {
+                fprintf(stderr, "Warning: A read to %s is out-of-bound and 0xFF"
+                                " is returned. Offset = 0x%llx, size = %llx\n",
+                                GOLDFISH_ADDRESS_SPACE_AREA_NAME,
+                                addr1, l);
+                memset(buf, 0xFF, l);
+            } else {
+                ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
+                memcpy(buf, ptr, l);
+            }
         }
 
         if (release_lock) {
