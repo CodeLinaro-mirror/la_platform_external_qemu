@@ -675,6 +675,9 @@ void float_get_size(size_t* size) {
     }
 }
 
+/* Get values from a vec3 into an array of pointers to float values.
+ * Note: `out` is an array of pointers to float values to store the components, it is not a pointer to a float array.
+ */
 void vec3_get_values(const vec3 value, float* const* out, const size_t count) {
     if (count > 0)
         *out[0] = value.x;
@@ -684,6 +687,9 @@ void vec3_get_values(const vec3 value, float* const* out, const size_t count) {
         *out[2] = value.z;
 }
 
+/* Get values from a vec4 into an array of pointers to float values.
+ * Note: `out` is an array of pointers to float values to store the components, it is not a pointer to a float array.
+ */
 void vec4_get_values(const vec4 value, float* const* out, const size_t count) {
     if (count > 0) {
         *out[0] = value.x;
@@ -1271,7 +1277,9 @@ extern PhysicalModel* android_physical_model_instance() {
     return hw->physical_model;
 }
 
-/* Get a physical model parameter target value*/
+/* Get a physical model parameter target value.
+ * Note: `out` is an array of pointers to float values to store the parameter values, it is not a pointer to a float array.
+ */
 extern int android_physical_model_get(int physical_parameter,
                                       float* const* out,
                                       const size_t count,
@@ -1715,12 +1723,14 @@ bool android_xr_set_options(int environment, float passthroughCoefficient) {
 
 bool android_xr_get_options(int* environment, float* passthroughCoefficient) {
     float options_vector[] = {0.0f, 0.0f, /* unused */ 0.0f};
-    float* options_data = options_vector;
-    float* const* xr_options = &options_data;
+    float* options_ptrs[3];
+    for (int i = 0; i < std::size(options_vector); i++) {
+        options_ptrs[i] = &options_vector[i];
+    }
     bool result = static_cast<bool>(
             android_physical_model_get(
                 PHYSICAL_PARAMETER_XR_OPTIONS,
-                xr_options, std::size(options_vector),
+                options_ptrs, std::size(options_vector),
                 PARAMETER_VALUE_TYPE_CURRENT) >= 0);
     *environment = static_cast<int>(options_vector[0]);
     *passthroughCoefficient = options_vector[1];
