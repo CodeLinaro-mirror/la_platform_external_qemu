@@ -107,7 +107,10 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor, &vkPatch,
                                         &vkDeviceMemBytes, &vkDriverVersion, &vkDeviceMaxAllocationCount);
     if (!vkVendor) {
-        // Could not properly detect the hardware parameters, disable Vulkan
+        // Could not properly detect the hardware parameters
+        metrics.set_check(
+                EmulatorCompatibilityInfo::
+                        AVD_COMPATIBILITY_CHECK_GPU_CHECK_NO_VULKAN);
         metrics.set_details("VulkanFail");
         return {.description = absl::StrFormat(
                         "Could not detect GPU for Vulkan compatibility "
