@@ -53,42 +53,6 @@ static MachineClass *find_machine(const char *name, GSList *machines) {
   return NULL;
 }
 
-static void goldfish_add_fstab(void *fdt, const char *system_path,
-                               const char *vendor_path) {
-  /* fstab */
-  qemu_fdt_add_subnode(fdt, "/firmware/android/fstab");
-  qemu_fdt_setprop_string(fdt, "/firmware/android/fstab", "compatible",
-                          "android,fstab");
-
-  /* e.g. system=/dev/block/pci/pci0000:00/0000:00:03.0/by-name/system */
-if (system_path) {
-    qemu_fdt_add_subnode(fdt, "/firmware/android/fstab/system");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/system", "compatible",
-                            "android,system");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/system", "dev",
-                            system_path);
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/system",
-                            "fsmgr_flags", "wait");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/system", "mnt_flags",
-                            "ro");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/system", "type",
-                            "ext4");
-  }
-  /* e.g. vendor=/dev/block/pci/pci0000:00/0000:00:07.0/by-name/vendor */
-  if (vendor_path) {
-    qemu_fdt_add_subnode(fdt, "/firmware/android/fstab/vendor");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/vendor", "compatible",
-                            "android,vendor");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/vendor", "dev",
-                            vendor_path);
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/vendor",
-                            "fsmgr_flags", "wait");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/vendor", "mnt_flags",
-                            "ro");
-    qemu_fdt_setprop_string(fdt, "/firmware/android/fstab/vendor", "type",
-                            "ext4");
-  }
-}
 
 static void init_simple_device(DeviceState *dev, const VirtMachineState *vms,
                                int devid, const char *sysbus_name,
@@ -145,7 +109,6 @@ static void arm_init_goldfish(MachineState *machine) {
   machine_class = find_machine("virt-8.2", machines);
   machine_class->init(machine);
 
-  GoldfishMachineState *ams = ANDROID_MACHINE(machine);
   VirtMachineState *vms = VIRT_MACHINE(machine);
 
   if (machine_usb(machine)) {
