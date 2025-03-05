@@ -150,8 +150,6 @@ public:
         return WaitExitResult::Exited;
     }
 
-    int getCpuBrandName(char *name) const override { return 1; }
-
     int getCpuCoreCount() const override { return mCoreCount; }
 
     void setCpuCoreCount(int count) { mCoreCount = count; }
