@@ -1718,9 +1718,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
     fbs_num = cc->need_frame_cache ? 2: 1;
     fbs.resize(fbs_num);
     fbs[0].pixel_format = format;
-    uint64_t start = get_address_space_device_hw_funcs()->getPhysAddrStart();
-    void* address = get_address_space_device_control_ops()->get_host_ptr(
-        get_address_space_device_hw_funcs()->getPhysAddrStart() + offset);
     fbs[0].framebuffer = get_address_space_device_control_ops()->get_host_ptr(
         get_address_space_device_hw_funcs()->getPhysAddrStart() + offset);
     fbs[0].width = width;
