@@ -110,7 +110,7 @@ class DistributionTask(BuildTask):
         if self.data["target"] == "linux":
             self.zip_sets["release"].update({
                 # Look for all files under {out}/distribution-unstripped
-                "sdk-repo-{target}-emulator-{sdk_build_number}-unstripped.zip": [
+                "UNSTRIPPED-sdk-repo-{target}-emu-{sdk_build_number}.zip": [
                     ("{build_dir}/distribution-unstripped", r".*")
                 ]
             })
