@@ -16,10 +16,13 @@
 #include "aemu/base/memory/ScopedPtr.h"
 #include "aemu/base/system/Win32Utils.h"
 #include "aemu/base/threads/Async.h"
+#include "aemu/base/Uuid.h"
 #include "aemu/base/threads/Thread.h"
 #include "android-qemu2-glue/base/files/KernelCmdLineLoader.h"
 #include "android-qemu2-glue/qemu-console-factory.h"
 #include "android/android.h"
+#include "android/metrics/MetricsReporter.h"
+#include "android/metrics/PeriodicReporter.h"
 #include "android/avd/BugreportInfo.h"
 #include "android/base/files/IniFile.h"
 #include "android/base/system/System.h"
@@ -344,18 +347,6 @@ static int genHwIniFile(AndroidHwConfig* hw, const char* coreHwIniPath) {
     }
 
     return 0;
-}
-
-extern "C" void android_report_compatibility_checks() {
-    // Reload the compatibility checks and report them.
-    bool reportMetrics = !getConsoleAgents()->settings->is_fuchsia() &&
-                         !getConsoleAgents()->settings->android_qemu_mode();
-
-    if (reportMetrics) {
-        auto results = AvdCompatibilityManager::instance().check(
-                getConsoleAgents()->settings->avdInfo());
-        AvdCompatibilityManager::instance().reportMetrics(results);
-    }
 }
 
 static void updateDataSystemSubdirectory(const char* dataDirectory,
@@ -1812,9 +1803,21 @@ extern "C" int main(int argc, char** argv) {
     opts->ranchu = 1;
 
     getConsoleAgents()->settings->inject_AvdInfo(avd);
+    bool reportMetrics = !opts->fuchsia;
 
-    // Check compatibility and exit in case of failure..
-    AvdCompatibilityManager::ensureAvdCompatibility(avd);
+    if (reportMetrics) {
+        auto sessionId = android::base::Uuid::generate().toString();
+        android::metrics::MetricsReporter::start(
+                sessionId, EMULATOR_VERSION_STRING,
+                EMULATOR_FULL_VERSION_STRING, QEMU_VERSION);
+        android::metrics::PeriodicReporter::start(
+                &android::metrics::MetricsReporter::get(),
+                android::base::Looper::create());
+    }
+
+    // Check compatibility and exit in case of failure, reporting metrics if
+    // needed
+    AvdCompatibilityManager::ensureAvdCompatibility(avd, reportMetrics);
 
     if (opts->read_only) {
         android::base::disableRestart();
