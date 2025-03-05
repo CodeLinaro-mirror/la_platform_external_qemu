@@ -62,14 +62,14 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         };
 #endif
 
-        // Linux platform is not very well tested on XR scenarios, independently of the GPU
+        // Linux platform is not very well tested on XR scenarios, independently
+        // of the GPU
 // TODO(b/373601997) Change this warning when we will have more tests
 #ifdef __linux__
         return {
-                .description =
-                        absl::StrFormat("`%s` is not yet "
-                                        "fully supported on Linux",
-                                        name),
+                .description = absl::StrFormat("`%s` is not yet "
+                                               "fully supported on Linux",
+                                               name),
                 .status = AvdCompatibility::Warning,
         };
 #endif
@@ -102,15 +102,15 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     int vkPatch = 0;
     uint64_t vkDeviceMemBytes = 0;
     uint32_t vkDriverVersion = 0;
-    uint64_t vkDeviceMaxAllocationCount=0;
+    uint64_t vkDeviceMaxAllocationCount = 0;
 
     emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor, &vkPatch,
-                                        &vkDeviceMemBytes, &vkDriverVersion, &vkDeviceMaxAllocationCount);
+                                        &vkDeviceMemBytes, &vkDriverVersion,
+                                        &vkDeviceMaxAllocationCount);
     if (!vkVendor) {
         // Could not properly detect the hardware parameters
-        metrics.set_check(
-                EmulatorCompatibilityInfo::
-                        AVD_COMPATIBILITY_CHECK_GPU_CHECK_NO_VULKAN);
+        metrics.set_check(EmulatorCompatibilityInfo::
+                                  AVD_COMPATIBILITY_CHECK_GPU_CHECK_NO_VULKAN);
         metrics.set_details("VulkanFail");
         return {.description = absl::StrFormat(
                         "Could not detect GPU for Vulkan compatibility "
@@ -201,7 +201,9 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         metrics.set_check(
                 EmulatorCompatibilityInfo::
                         AVD_COMPATIBILITY_CHECK_GPU_CHECK_INSUFFICIENT_MEMORY);
-        metrics.set_details(std::to_string(vkDeviceMaxAllocationCount));
+        metrics.set_details(absl::StrFormat(
+                "GPU:%s, vkDeviceMaxAllocationCount: %llu", vendorName.c_str(),
+                vkDeviceMaxAllocationCount));
         return {
                 .description = absl::StrFormat(
                         "GPU does not support enough memory allocations to run "
@@ -220,7 +222,8 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         metrics.set_check(
                 EmulatorCompatibilityInfo::
                         AVD_COMPATIBILITY_CHECK_GPU_CHECK_INSUFFICIENT_MEMORY);
-        metrics.set_details(std::to_string(deviceMemMiB));
+        metrics.set_details(absl::StrFormat("GPU:%s, deviceMemMiB: %llu",
+                                            vendorName.c_str(), deviceMemMiB));
         return {
                 .description = absl::StrFormat(
                         "Not enough GPU memory available to run avd: `%s`. "
@@ -230,13 +233,14 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                 .metrics = metrics,
         };
     }
-    const uint64_t avdSuggestedGpuMemMiB = isXrAvd ? (isAMD ? 8192: 4096) : 0;
+    const uint64_t avdSuggestedGpuMemMiB = isXrAvd ? (isAMD ? 8192 : 4096) : 0;
     if (deviceMemMiB < avdSuggestedGpuMemMiB) {
         return {
-                .description = absl::StrFormat(
-                        "GPU memory available (%llu MB) to run avd: `%s` is below "
-                        "the suggested level (%llu MB)",
-                        deviceMemMiB, name, avdMinGpuMemMiB),
+                .description =
+                        absl::StrFormat("GPU memory available (%llu MB) to run "
+                                        "avd: `%s` is below "
+                                        "the suggested level (%llu MB)",
+                                        deviceMemMiB, name, avdMinGpuMemMiB),
                 .status = AvdCompatibility::Warning,
         };
     }
