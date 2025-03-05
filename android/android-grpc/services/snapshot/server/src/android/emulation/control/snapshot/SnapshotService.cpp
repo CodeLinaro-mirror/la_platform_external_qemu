@@ -292,6 +292,9 @@ public:
             return Status::OK;
         }
 
+        using android::snapshot::Snapshotter;
+        Snapshotter::get().stopVulkanAppsIfApplicable();
+
         SnapshotLineConsumer slc(reply);
         bool snapshot_success = false;
         android::base::ThreadLooper::runOnMainLooperAndWaitForCompletion(
