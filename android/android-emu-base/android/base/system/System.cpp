@@ -30,6 +30,7 @@
 #include "android/utils/file_io.h"
 #include "android/utils/path.h"
 #include "android/utils/tempfile.h"
+#include "android/utils/x86_cpuid.h"
 
 #ifdef _WIN32
 #include "aemu/base/files/ScopedRegKey.h"
@@ -45,6 +46,8 @@
 #include <winioctl.h>
 #include <ntddscsi.h>
 #include <tlhelp32.h>
+#include <comutil.h>
+#include <Wbemidl.h>
 #endif
 
 #ifdef __APPLE__
@@ -269,6 +272,324 @@ bool parseBooleanValue(const char *value, bool def) {
 
     return def;
 }
+
+static void trimWhitespace(char *name) {
+    char *p, *q, *s;
+
+    p = q = s = name;
+
+    while (*p == ' ')
+        p++;
+
+    while (*p) {
+        if (*p != ' ')
+            s = q;
+
+        *q++ = *p++;
+    }
+
+    *(s + 1) = '\0';
+}
+
+#if defined(__linux__) && defined(__aarch64__)
+// Following database is copied from lscpu source code and then a few names
+// are adjusted (removed codename from Apple Mx Pro/Max)
+struct id_part {
+    const int id;
+    const char* name;
+};
+
+static const struct id_part arm_part[] = {
+    { 0x810, "ARM810" },
+    { 0x920, "ARM920" },
+    { 0x922, "ARM922" },
+    { 0x926, "ARM926" },
+    { 0x940, "ARM940" },
+    { 0x946, "ARM946" },
+    { 0x966, "ARM966" },
+    { 0xa20, "ARM1020" },
+    { 0xa22, "ARM1022" },
+    { 0xa26, "ARM1026" },
+    { 0xb02, "ARM11 MPCore" },
+    { 0xb36, "ARM1136" },
+    { 0xb56, "ARM1156" },
+    { 0xb76, "ARM1176" },
+    { 0xc05, "Cortex-A5" },
+    { 0xc07, "Cortex-A7" },
+    { 0xc08, "Cortex-A8" },
+    { 0xc09, "Cortex-A9" },
+    { 0xc0d, "Cortex-A17" },	/* Originally A12 */
+    { 0xc0f, "Cortex-A15" },
+    { 0xc0e, "Cortex-A17" },
+    { 0xc14, "Cortex-R4" },
+    { 0xc15, "Cortex-R5" },
+    { 0xc17, "Cortex-R7" },
+    { 0xc18, "Cortex-R8" },
+    { 0xc20, "Cortex-M0" },
+    { 0xc21, "Cortex-M1" },
+    { 0xc23, "Cortex-M3" },
+    { 0xc24, "Cortex-M4" },
+    { 0xc27, "Cortex-M7" },
+    { 0xc60, "Cortex-M0+" },
+    { 0xd01, "Cortex-A32" },
+    { 0xd02, "Cortex-A34" },
+    { 0xd03, "Cortex-A53" },
+    { 0xd04, "Cortex-A35" },
+    { 0xd05, "Cortex-A55" },
+    { 0xd06, "Cortex-A65" },
+    { 0xd07, "Cortex-A57" },
+    { 0xd08, "Cortex-A72" },
+    { 0xd09, "Cortex-A73" },
+    { 0xd0a, "Cortex-A75" },
+    { 0xd0b, "Cortex-A76" },
+    { 0xd0c, "Neoverse-N1" },
+    { 0xd0d, "Cortex-A77" },
+    { 0xd0e, "Cortex-A76AE" },
+    { 0xd13, "Cortex-R52" },
+    { 0xd15, "Cortex-R82" },
+    { 0xd16, "Cortex-R52+" },
+    { 0xd20, "Cortex-M23" },
+    { 0xd21, "Cortex-M33" },
+    { 0xd22, "Cortex-M55" },
+    { 0xd23, "Cortex-M85" },
+    { 0xd40, "Neoverse-V1" },
+    { 0xd41, "Cortex-A78" },
+    { 0xd42, "Cortex-A78AE" },
+    { 0xd43, "Cortex-A65AE" },
+    { 0xd44, "Cortex-X1" },
+    { 0xd46, "Cortex-A510" },
+    { 0xd47, "Cortex-A710" },
+    { 0xd48, "Cortex-X2" },
+    { 0xd49, "Neoverse-N2" },
+    { 0xd4a, "Neoverse-E1" },
+    { 0xd4b, "Cortex-A78C" },
+    { 0xd4c, "Cortex-X1C" },
+    { 0xd4d, "Cortex-A715" },
+    { 0xd4e, "Cortex-X3" },
+    { 0xd4f, "Neoverse-V2" },
+    { 0xd80, "Cortex-A520" },
+    { 0xd81, "Cortex-A720" },
+    { 0xd82, "Cortex-X4" },
+    { 0xd84, "Neoverse-V3" },
+    { 0xd85, "Cortex-X925" },
+    { 0xd87, "Cortex-A725" },
+    { 0xd8e, "Neoverse-N3" },
+    { -1, "unknown" },
+};
+
+static const struct id_part brcm_part[] = {
+    { 0x0f, "Brahma-B15" },
+    { 0x100, "Brahma-B53" },
+    { 0x516, "ThunderX2" },
+    { -1, "unknown" },
+};
+
+static const struct id_part dec_part[] = {
+    { 0xa10, "SA110" },
+    { 0xa11, "SA1100" },
+    { -1, "unknown" },
+};
+
+static const struct id_part cavium_part[] = {
+    { 0x0a0, "ThunderX" },
+    { 0x0a1, "ThunderX-88XX" },
+    { 0x0a2, "ThunderX-81XX" },
+    { 0x0a3, "ThunderX-83XX" },
+    { 0x0af, "ThunderX2-99xx" },
+    { 0x0b0, "OcteonTX2" },
+    { 0x0b1, "OcteonTX2-98XX" },
+    { 0x0b2, "OcteonTX2-96XX" },
+    { 0x0b3, "OcteonTX2-95XX" },
+    { 0x0b4, "OcteonTX2-95XXN" },
+    { 0x0b5, "OcteonTX2-95XXMM" },
+    { 0x0b6, "OcteonTX2-95XXO" },
+    { 0x0b8, "ThunderX3-T110" },
+    { -1, "unknown" },
+};
+
+static const struct id_part apm_part[] = {
+    { 0x000, "X-Gene" },
+    { -1, "unknown" },
+};
+
+static const struct id_part qcom_part[] = {
+    { 0x001, "Oryon" },
+    { 0x00f, "Scorpion" },
+    { 0x02d, "Scorpion" },
+    { 0x04d, "Krait" },
+    { 0x06f, "Krait" },
+    { 0x201, "Kryo" },
+    { 0x205, "Kryo" },
+    { 0x211, "Kryo" },
+    { 0x800, "Falkor-V1/Kryo" },
+    { 0x801, "Kryo-V2" },
+    { 0x802, "Kryo-3XX-Gold" },
+    { 0x803, "Kryo-3XX-Silver" },
+    { 0x804, "Kryo-4XX-Gold" },
+    { 0x805, "Kryo-4XX-Silver" },
+    { 0xc00, "Falkor" },
+    { 0xc01, "Saphira" },
+    { -1, "unknown" },
+};
+
+static const struct id_part samsung_part[] = {
+    { 0x001, "exynos-m1" },
+    { 0x002, "exynos-m3" },
+    { 0x003, "exynos-m4" },
+    { 0x004, "exynos-m5" },
+    { -1, "unknown" },
+};
+
+static const struct id_part nvidia_part[] = {
+    { 0x000, "Denver" },
+    { 0x003, "Denver 2" },
+    { -1, "unknown" },
+};
+
+static const struct id_part marvell_part[] = {
+    { 0x131, "Feroceon-88FR131" },
+    { 0x581, "PJ4/PJ4b" },
+    { 0x584, "PJ4B-MP" },
+    { -1, "unknown" },
+};
+
+static const struct id_part apple_part[] = {
+    { 0x001, "Cyclone" },
+    { 0x004, "Twister" },
+    { 0x005, "Twister/Elba/Malta" },
+    { 0x006, "Hurricane" },
+    { 0x007, "Hurricane/Myst" },
+    { 0x008, "Monsoon" },
+    { 0x009, "Mistral" },
+    { 0x00b, "Vortex" },
+    { 0x00c, "Tempest" },
+    { 0x00f, "M9" },
+    { 0x010, "Vortex/Aruba" },
+    { 0x011, "Tempest/Aruba" },
+    { 0x012, "Lightning" },
+    { 0x013, "Thunder" },
+    { 0x020, "A14" },
+    { 0x021, "A14" },
+    { 0x022, "M1" },
+    { 0x023, "M1" },
+    { 0x024, "M1 Pro" },
+    { 0x025, "M1 Pro" },
+    { 0x026, "M10" },
+    { 0x028, "M1 Max" },
+    { 0x029, "M1 Max" },
+    { 0x030, "A15" },
+    { 0x031, "A15" },
+    { 0x032, "M2" },
+    { 0x033, "M2" },
+    { 0x034, "M2 Pro" },
+    { 0x035, "M2 Pro" },
+    { 0x036, "A16" },
+    { 0x037, "A16" },
+    { 0x038, "M2 Max" },
+    { 0x039, "M2 Max" },
+    { -1, "unknown" },
+};
+
+static const struct id_part faraday_part[] = {
+    { 0x526, "FA526" },
+    { 0x626, "FA626" },
+    { -1, "unknown" },
+};
+
+static const struct id_part intel_part[] = {
+    { 0x200, "i80200" },
+    { 0x210, "PXA250A" },
+    { 0x212, "PXA210A" },
+    { 0x242, "i80321-400" },
+    { 0x243, "i80321-600" },
+    { 0x290, "PXA250B/PXA26x" },
+    { 0x292, "PXA210B" },
+    { 0x2c2, "i80321-400-B0" },
+    { 0x2c3, "i80321-600-B0" },
+    { 0x2d0, "PXA250C/PXA255/PXA26x" },
+    { 0x2d2, "PXA210C" },
+    { 0x411, "PXA27x" },
+    { 0x41c, "IPX425-533" },
+    { 0x41d, "IPX425-400" },
+    { 0x41f, "IPX425-266" },
+    { 0x682, "PXA32x" },
+    { 0x683, "PXA930/PXA935" },
+    { 0x688, "PXA30x" },
+    { 0x689, "PXA31x" },
+    { 0xb11, "SA1110" },
+    { 0xc12, "IPX1200" },
+    { -1, "unknown" },
+};
+
+static const struct id_part fujitsu_part[] = {
+    { 0x001, "A64FX" },
+    { 0x003, "MONAKA" },
+    { -1, "unknown" },
+};
+
+static const struct id_part hisi_part[] = {
+    { 0xd01, "TaiShan-v110" },	/* used in Kunpeng-920 SoC */
+    { 0xd02, "TaiShan-v120" },	/* used in Kirin 990A and 9000S SoCs */
+    { 0xd40, "Cortex-A76" },	/* HiSilicon uses this ID though advertises A76 */
+    { 0xd41, "Cortex-A77" },	/* HiSilicon uses this ID though advertises A77 */
+    { -1, "unknown" },
+};
+
+static const struct id_part ampere_part[] = {
+    { 0xac3, "Ampere-1" },
+    { 0xac4, "Ampere-1a" },
+    { -1, "unknown" },
+};
+
+static const struct id_part ft_part[] = {
+    { 0x303, "FTC310" },
+    { 0x660, "FTC660" },
+    { 0x661, "FTC661" },
+    { 0x662, "FTC662" },
+    { 0x663, "FTC663" },
+    { 0x664, "FTC664" },
+    { 0x862, "FTC862" },
+    { -1, "unknown" },
+};
+
+static const struct id_part ms_part[] = {
+    { 0xd49, "Azure-Cobalt-100" },
+    { -1, "unknown" },
+};
+
+static const struct id_part unknown_part[] = {
+    { -1, "unknown" },
+};
+
+struct hw_impl {
+   const int    id;
+   const struct id_part     *parts;
+   const char   *name;
+};
+
+static const struct hw_impl hw_implementer[] = {
+    { 0x41, arm_part,     "ARM" },
+    { 0x42, brcm_part,    "Broadcom" },
+    { 0x43, cavium_part,  "Cavium" },
+    { 0x44, dec_part,     "DEC" },
+    { 0x46, fujitsu_part, "FUJITSU" },
+    { 0x48, hisi_part,    "HiSilicon" },
+    { 0x49, unknown_part, "Infineon" },
+    { 0x4d, unknown_part, "Motorola/Freescale" },
+    { 0x4e, nvidia_part,  "NVIDIA" },
+    { 0x50, apm_part,     "APM" },
+    { 0x51, qcom_part,    "Qualcomm" },
+    { 0x53, samsung_part, "Samsung" },
+    { 0x56, marvell_part, "Marvell" },
+    { 0x61, apple_part,   "Apple" },
+    { 0x66, faraday_part, "Faraday" },
+    { 0x69, intel_part,   "Intel" },
+    { 0x6d, ms_part,      "Microsoft" },
+    { 0x70, ft_part,      "Phytium" },
+    { 0xc0, ampere_part,  "Ampere" },
+    { -1,   unknown_part, "unknown" },
+};
+#endif
 
 class HostSystem : public System {
 public:
@@ -802,6 +1123,341 @@ public:
 #endif
     }
 
+#ifdef _WIN32
+    static int getCpuBrandNameAndCoreCountWMI(char *name, uint32_t *core_count,
+                                       uint32_t *lp_count) {
+        HRESULT hres;
+        IWbemLocator* pLoc = NULL;
+        IWbemServices* pSvc = NULL;
+        IEnumWbemClassObject* pEnumerator = NULL;
+        IWbemClassObject* pclsObj = NULL;
+        ULONG uReturn = 0;
+        HRESULT hr;
+        VARIANT vtProp;
+        uint32_t numCores = 0;
+        uint32_t numLogicalProcessors = 0;
+        char *cpuName;
+
+        hres = CoInitialize(NULL);
+        if (FAILED(hres)) {
+            string errorStr =
+                StringFormat("Error in %s: Failed to initialize COM library."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        hres = CoCreateInstance(CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER,
+                                IID_IWbemLocator, (LPVOID*)&pLoc);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Failed to create IWbemLocator object."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            CoUninitialize();
+            return 1;
+        }
+
+        hres = pLoc->ConnectServer(_bstr_t(L"ROOT\\CIMV2"), NULL, NULL, 0,
+                                   NULL, 0, 0, &pSvc);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Could not connect."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            pLoc->Release();
+            CoUninitialize();
+            return 1;
+        }
+
+        hres = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE,
+                                 NULL, RPC_C_AUTHN_LEVEL_CALL,
+                                 RPC_C_IMP_LEVEL_IMPERSONATE,
+                                 NULL, EOAC_NONE);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Could not set proxy blanket."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            pSvc->Release();
+            pLoc->Release();
+            CoUninitialize();
+            return 1;
+        }
+
+        hres = pSvc->ExecQuery(bstr_t("WQL"),
+                   bstr_t("SELECT * FROM Win32_Processor"),
+                   WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+                   NULL, &pEnumerator);
+        if (FAILED(hres))
+        {
+            string errorStr =
+                StringFormat("Error in %s: Query for Win32_Processor failed."
+                             " Error code = 0x%x", __func__, hres);
+            LOG(DEBUG) << errorStr;
+            pSvc->Release();
+            pLoc->Release();
+            CoUninitialize();
+            return 1;
+        }
+
+        while (pEnumerator)
+        {
+            hr = pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn);
+            if (!uReturn)
+                break;
+
+            VariantInit(&vtProp);
+            hr = pclsObj->Get(L"NumberOfCores", 0, &vtProp, 0, 0);
+            numCores += vtProp.lVal;
+            VariantClear(&vtProp);
+
+            hr = pclsObj->Get(L"NumberOfLogicalProcessors", 0, &vtProp, 0, 0);
+            numLogicalProcessors += vtProp.lVal;
+            VariantClear(&vtProp);
+
+            hr = pclsObj->Get(L"Name", 0, &vtProp, 0, 0);
+            cpuName = _com_util::ConvertBSTRToString(vtProp.bstrVal);
+            trimWhitespace(cpuName);
+            strcpy(name, (char *)cpuName);
+            free(cpuName);
+            VariantClear(&vtProp);
+
+            pclsObj->Release();
+        }
+
+        pSvc->Release();
+        pLoc->Release();
+        pEnumerator->Release();
+        CoUninitialize();
+
+        return 0;
+    }
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+    static int getCpuBrandNameSysctl(char *name) {
+        size_t buf_len;
+
+        if (sysctlbyname("machdep.cpu.brand_string", NULL,
+                         &buf_len, NULL, 0) != 0) {
+            string errorStr =
+                StringFormat("Error in %s: sysctlbyname failed. ");
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        std::string value(buf_len - 1, '\0');
+        if (sysctlbyname("machdep.cpu.brand_string", &value[0],
+                          &buf_len, nullptr, 0) != 0) {
+            string errorStr =
+                StringFormat("Error in %s: sysctlbyname failed. ");
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        strcpy(name, value.c_str());
+        trimWhitespace(name);
+        return 0;
+    }
+#endif
+
+#if defined(__linux__)
+    static int getCpuBrandNameProcfs(char *name) {
+        char line[200];
+        char *model_name = NULL;
+        int ret = 1;
+
+        FILE* const cpuinfo = fopen("/proc/cpuinfo", "r");
+        if (cpuinfo == NULL) {
+            string errorStr =
+                StringFormat("Error in %s: could not open /proc/cpuinfo.",
+                             __func__);
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+#if defined(__x86_64__)
+        while (fgets(line, sizeof(line), cpuinfo)) {
+            if (!strncmp(line, "model name", 9)) {
+                if ((model_name = strstr(line, ": "))) {
+                    model_name += 2;
+                    *strstr(model_name, "\n") = 0;
+                    ret = 0;
+                    break;
+                }
+            }
+        }
+        if (!model_name) {
+            string errorStr =
+                StringFormat("Error in %s: could not find \"model name\" "
+                             "in /proc/cpuinfo.", __func__);
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        trimWhitespace(model_name);
+        strcpy(name, model_name);
+#elif defined(__aarch64__)
+        char *cpu_impl = NULL;
+        char *cpu_part = NULL;
+        uint32_t cpu_impl_id = 0;
+        uint32_t cpu_part_id = 0;
+        char *cpu_impl_name = NULL;
+        char *cpu_part_name = NULL;
+        int j;
+        const struct id_part *parts = NULL;
+
+        while (fgets(line, sizeof(line), cpuinfo)) {
+            if (!strncmp(line, "CPU implementer", 15)) {
+                if ((cpu_impl = strstr(line, ": "))) {
+                    cpu_impl += 2;
+                    *strstr(cpu_impl, "\n") = 0;
+                    cpu_impl_id = strtol(cpu_impl, NULL, 0);
+                    continue;
+                }
+            }
+            if (!strncmp(line, "CPU part", 8)) {
+                if ((cpu_part = strstr(line, ": "))) {
+                    cpu_part += 2;
+                    *strstr(cpu_part, "\n") = 0;
+                    cpu_part_id = strtol(cpu_part, NULL, 0);
+                    continue;
+                }
+            }
+            if (cpu_impl_id && cpu_part_id)
+                break;
+        }
+
+        if (!cpu_impl_id || !cpu_part_id) {
+            if (!cpu_impl_id) {
+                string errorStr =
+                    StringFormat("Error in %s: could not find \"CPU implementor\" "
+                                 "in /proc/cpuinfo.", __func__);
+                LOG(DEBUG) << errorStr;
+            }
+            if (!cpu_part_id) {
+                string errorStr =
+                    StringFormat("Error in %s: could not find \"CPU part\" "
+                                 "in /proc/cpuinfo.", __func__);
+                LOG(DEBUG) << errorStr;
+            }
+            goto out;
+	}
+
+        /* decode vendor */
+        for (j = 0; hw_implementer[j].id != -1; j++) {
+            if (hw_implementer[j].id == cpu_impl_id) {
+                parts = hw_implementer[j].parts;
+                cpu_impl_name = strdup(hw_implementer[j].name);
+                break;
+            }
+        }
+
+        /* decode model */
+        if (parts) {
+            for (j = 0; parts[j].id != -1; j++) {
+                if (parts[j].id == cpu_part_id) {
+                    cpu_part_name = strdup(parts[j].name);
+                    break;
+                }
+            }
+        }
+
+        if (!cpu_impl_name) {
+            cpu_impl_name = malloc(17);
+            if (!cpu_impl_name) {
+                string errorStr =
+                    StringFormat("Error in %s: memory allocation failed.",
+                                 __func__);
+                LOG(DEBUG) << errorStr;
+                goto out;
+            }
+            memset(cpu_impl_name, 0, 17);
+            snprintf(cpu_impl_name, 17, "Implementer_0x%02x", cpu_impl_id);
+        }
+        if (!cpu_part_name) {
+            cpu_part_name = malloc(11);
+            if (!cpu_part_name) {
+                string errorStr =
+                    StringFormat("Error in %s: memory allocation failed.",
+                                 __func__);
+                LOG(DEBUG) << errorStr;
+                free(cpu_impl_name);
+                goto out;
+            }
+            memset(cpu_part_name, 0, 11);
+            snprintf(cpu_part_name, 11, "Part_0x%03x", cpu_part_id);
+        }
+
+        snprintf(name, strlen(cpu_impl_name) + strlen(cpu_part_name) + 2,
+                 "%s %s", cpu_impl_name, cpu_part_name);
+        free(cpu_impl_name);
+        free(cpu_part_name);
+        ret = 0;
+     out:
+#endif
+
+        fclose(cpuinfo);
+        return ret;
+    }
+#endif
+
+#if defined(__x86_64__)
+    static int getCpuBrandNameCpuid(char *name) {
+        char cpuName[48] = { 0 };
+        uint32_t eax = 0;
+
+        android_get_x86_cpuid(0x80000000, 0, &eax, NULL, NULL, NULL);
+
+        if (!(eax & 0x80000000 && eax >= 0x80000004)) {
+            string errorStr =
+                StringFormat("Error in %s: CPU does not support fetching "
+                             "brand name using CPUID.");
+            LOG(DEBUG) << errorStr;
+            return 1;
+        }
+
+        android_get_x86_cpuid(0x80000002, 0, (uint32_t *)&cpuName[0],
+                              (uint32_t *)&cpuName[4], (uint32_t *)&cpuName[8],
+                              (uint32_t *)&cpuName[12]);
+        android_get_x86_cpuid(0x80000003, 0, (uint32_t *)&cpuName[16],
+                              (uint32_t *)&cpuName[20], (uint32_t *)&cpuName[24],
+                              (uint32_t *)&cpuName[28]);
+        android_get_x86_cpuid(0x80000004, 0, (uint32_t *)&cpuName[32],
+                              (uint32_t *)&cpuName[36], (uint32_t *)&cpuName[40],
+                              (uint32_t *)&cpuName[44]);
+
+        trimWhitespace(cpuName);
+        strcpy(name, (char *)cpuName);
+        return 0;
+    }
+#endif
+
+    int getCpuBrandName(char *name) const override {
+#if defined(__x86_64__)
+        return getCpuBrandNameCpuid(name);
+
+#elif defined(__aarch64__) || defined(_M_ARM64)
+
+#ifdef _WIN32
+	uint32_t core_count, lp_count;
+	return getCpuBrandNameAndCoreCountWMI(name, &core_count, &lp_count);
+#elif defined(__APPLE__) && defined(__MACH__)
+	return getCpuBrandNameSysctl(name);
+#elif defined(__linux__)
+	return getCpuBrandNameProcfs(name);
+#else
+#error "Unsupported platform!"
+#endif //_WIN32
+
+#else
+#error "Unsupported platform!"
+#endif //defined(__x86_64__)
+    }
 
     int getCpuCoreCount() const override {
 #ifdef _WIN32
