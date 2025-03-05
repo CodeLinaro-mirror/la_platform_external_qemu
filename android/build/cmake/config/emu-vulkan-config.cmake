@@ -24,6 +24,9 @@ if(LINUX_X86_64)
       # Swiftshader
       "${PREBUILT_ROOT}/icds/libvk_swiftshader.so>lib64/vulkan/libvk_swiftshader.so"
       "${PREBUILT_ROOT}/icds/vk_swiftshader_icd.json>lib64/vulkan/vk_swiftshader_icd.json"
+      # Lavapipe
+      "${PREBUILT_ROOT}/icds/libvulkan_lvp.so>lib64/vulkan/libvulkan_lvp.so"
+      "${PREBUILT_ROOT}/icds/lvp_icd.x86_64.json>lib64/vulkan/lvp_icd.x86_64.json"
       # for translating shaders to SPIRV
       "${PREBUILT_ROOT}/glslangValidator>lib64/vulkan/glslangValidator"
       ${VULKAN_COMMON_DEPENDENCIES})
