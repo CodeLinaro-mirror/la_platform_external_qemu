@@ -82,10 +82,12 @@ void AvdCompatibilityManager::reportMetrics(
         if (result.status != AvdCompatibility::Ok) {
             MetricsReporter::get().report(
                     [result](android_studio::AndroidStudioEvent* event) {
+
                         auto info = event->mutable_emulator_details()
                                             ->mutable_emu_compat_info();
                         info->CopyFrom(result.metrics);
                     });
+            MetricsReporter::get().finishPendingReports();
         }
     }
 }
@@ -100,9 +102,13 @@ bool AvdCompatibilityManager::hasCompatibilityErrors(
     return false;  // No errors were found in any of the results
 }
 
-void AvdCompatibilityManager::ensureAvdCompatibility(AvdInfo* avd) {
+void AvdCompatibilityManager::ensureAvdCompatibility(AvdInfo* avd, bool reportMetrics) {
     auto acm = AvdCompatibilityManager::instance();
     auto results = acm.check(avd);
+
+    if (reportMetrics) {
+        acm.reportMetrics(results);
+    }
 
     // Prints the results for android studio.
     if (acm.hasCompatibilityErrors(results)) {
