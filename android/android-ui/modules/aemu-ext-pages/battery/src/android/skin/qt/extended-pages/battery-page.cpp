@@ -20,14 +20,16 @@
 #include <QSlider>    // for QSlider
 #include <QVariant>   // for QVariant
 
+#include "aemu/base/async/Looper.h"
+#include "aemu/base/async/ThreadLooper.h"
 #include "android/avd/info.h"                         // for avdInfo_getApiL...
 #include "android/avd/util.h"                         // for path_getAvdCont...
-#include "android/emulation/control/battery_agent.h"  // for BatteryHealth
 #include "android/console.h"                          // for android_hw, and...
+#include "android/emulation/control/battery_agent.h"  // for BatteryHealth
 #include "android/metrics/UiEventTracker.h"
 #include "android/skin/qt/qt-settings.h"  // for PER_AVD_SETTING...
-#include "ui_battery-page.h"              // for BatteryPage
 #include "android/utils/debug.h"
+#include "ui_battery-page.h"  // for BatteryPage
 
 #define DEBUG 0
 /* set  >1 for very verbose debugging */
@@ -188,21 +190,23 @@ void BatteryPage::setBatteryAgent(const QAndroidBatteryAgent* agent) {
 
     if (sBatteryAgent) {
         // Send the current settings to the device
-        if (sBatteryAgent->setChargeLevel) {
-            sBatteryAgent->setChargeLevel(getSavedChargeLevel());
-        }
+        android::base::ThreadLooper::runOnMainLooper([agent]() {
+            if (agent->setChargeLevel) {
+                agent->setChargeLevel(getSavedChargeLevel());
+            }
 
-        if (sBatteryAgent->setCharger) {
-            sBatteryAgent->setCharger(getSavedCharger());
-        }
+            if (agent->setCharger) {
+                agent->setCharger(getSavedCharger());
+            }
 
-        if (sBatteryAgent->health) {
-            sBatteryAgent->setHealth(getSavedHealth());
-        }
+            if (agent->health) {
+                agent->setHealth(getSavedHealth());
+            }
 
-        if (sBatteryAgent->setStatus) {
-            sBatteryAgent->setStatus(getSavedStatus());
-        }
+            if (agent->setStatus) {
+                agent->setStatus(getSavedStatus());
+            }
+        });
     }
 }
 
@@ -223,7 +227,9 @@ void BatteryPage::on_bat_chargerBox_activated(int index) {
 
     if (bCharger >= 0 && bCharger < BATTERY_CHARGER_NUM_ENTRIES) {
         if (sBatteryAgent && sBatteryAgent->setCharger) {
-            sBatteryAgent->setCharger(bCharger);
+            android::base::ThreadLooper::runOnMainLooper([this, bCharger]() {
+                sBatteryAgent->setCharger(bCharger);
+            });
             mDropDownTracker->increment(translate_idx(bCharger));
         }
     }
@@ -236,7 +242,8 @@ void BatteryPage::on_bat_levelSlider_valueChanged(int value) {
     saveChargeLevel(value);
 
     if (sBatteryAgent && sBatteryAgent->setChargeLevel) {
-        sBatteryAgent->setChargeLevel(value);
+        android::base::ThreadLooper::runOnMainLooper(
+                [this, value]() { sBatteryAgent->setChargeLevel(value); });
     }
 }
 
@@ -248,7 +255,8 @@ void BatteryPage::on_bat_healthBox_activated(int index) {
 
     if (bHealth >= 0 && bHealth < BATTERY_HEALTH_NUM_ENTRIES) {
         if (sBatteryAgent && sBatteryAgent->setHealth) {
-            sBatteryAgent->setHealth(bHealth);
+            android::base::ThreadLooper::runOnMainLooper(
+                    [this, bHealth]() { sBatteryAgent->setHealth(bHealth); });
             mDropDownTracker->increment(translate_idx(bHealth));
         }
     }
@@ -262,7 +270,8 @@ void BatteryPage::on_bat_statusBox_activated(int index) {
 
     if (bStatus >= 0 && bStatus < BATTERY_STATUS_NUM_ENTRIES) {
         if (sBatteryAgent && sBatteryAgent->setStatus) {
-            sBatteryAgent->setStatus(bStatus);
+            android::base::ThreadLooper::runOnMainLooper(
+                    [this, bStatus]() { sBatteryAgent->setStatus(bStatus); });
             mDropDownTracker->increment(translate_idx(bStatus));
         }
     }
