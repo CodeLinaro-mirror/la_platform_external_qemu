@@ -192,9 +192,12 @@ public:
      *
      * @param avd A pointer to the AvdInfo struct representing the AVD to be
      * checked.
+     * @param reportMetrics A boolean indicating whether to report metrics for
+     * the compatibility checks. If true, metrics will be reported for warnings
+     * and errors. If false, no metrics will be reported. Defaults to false.
      */
-
-    static void ensureAvdCompatibility(AvdInfo* avd);
+    static void ensureAvdCompatibility(AvdInfo* avd,
+                                       bool reportMetrics = false);
 
 private:
     AvdCompatibilityManager() = default;
