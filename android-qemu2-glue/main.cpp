@@ -1806,13 +1806,13 @@ extern "C" int main(int argc, char** argv) {
     bool reportMetrics = !opts->fuchsia;
 
     if (reportMetrics) {
+        auto looper = android::base::Looper::create();
         auto sessionId = android::base::Uuid::generate().toString();
         android::metrics::MetricsReporter::start(
                 sessionId, EMULATOR_VERSION_STRING,
-                EMULATOR_FULL_VERSION_STRING, QEMU_VERSION);
+                EMULATOR_FULL_VERSION_STRING, QEMU_VERSION, looper);
         android::metrics::PeriodicReporter::start(
-                &android::metrics::MetricsReporter::get(),
-                android::base::Looper::create());
+                &android::metrics::MetricsReporter::get(), looper);
     }
 
     // Check compatibility and exit in case of failure, reporting metrics if

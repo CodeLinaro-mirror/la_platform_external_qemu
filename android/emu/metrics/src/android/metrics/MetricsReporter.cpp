@@ -92,7 +92,8 @@ void warnAboutNoMetricsConsentInput();
 void MetricsReporter::start(const std::string& sessionId,
                             std::string_view emulatorVersion,
                             std::string_view emulatorFullVersion,
-                            std::string_view qemuVersion) {
+                            std::string_view qemuVersion,
+                            base::Looper* looper) {
     MetricsWriter::Ptr writer;
     if (getConsoleAgents()
             ->settings->android_cmdLineOptions()->metrics_to_console) {
@@ -138,7 +139,7 @@ void MetricsReporter::start(const std::string& sessionId,
         writer = FileMetricsWriter::create(
                 sessionId, getSpoolDirectory(),
                 1000,  // record limit per single file
-                base::ThreadLooper::get(),
+                looper,
                 static_cast<long>(10 * 60 *
                                   1000));  // time limit for a single file, ms
     }
