@@ -1634,7 +1634,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
     uint64_t offset;
     std::vector<ClientFrameBuffer> fbs;
     int fbs_num = 0;
-    size_t payload_size;
     uint64_t tick;
     float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
     char tmp[256];
@@ -1718,9 +1717,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
     fbs_num = cc->need_frame_cache ? 2: 1;
     fbs.resize(fbs_num);
     fbs[0].pixel_format = format;
-    uint64_t start = get_address_space_device_hw_funcs()->getPhysAddrStart();
-    void* address = get_address_space_device_control_ops()->get_host_ptr(
-        get_address_space_device_hw_funcs()->getPhysAddrStart() + offset);
     fbs[0].framebuffer = get_address_space_device_control_ops()->get_host_ptr(
         get_address_space_device_hw_funcs()->getPhysAddrStart() + offset);
     fbs[0].width = width;
@@ -1804,32 +1800,18 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
     }
     ++cc->frame_count;
 
-    /*
-     * Build the reply.
-     */
-
-    /* Payload includes "ok:" + requested video and preview frames + an int64
-     * frame timestamp if requested. */
-    payload_size = 3 + (send_frame_time ? 8 : 0);
-
-    /* Send payload size first. */
-    _qemu_client_reply_payload(qc, payload_size);
-
-    /* After that send the 'ok:'. Note that if there is no frames sent, we should
-     * use prefix "ok" instead of "ok:" */
     if (send_frame_time) {
-        qemud_client_send(qc, (const uint8_t*)"ok:", 3);
-    } else {
-        /* Still 3 bytes: zero terminator is required in this case. */
-        qemud_client_send(qc, (const uint8_t*)"ok", 3);
-    }
-
-    // after that send the frame time (if requested). */
-    if (send_frame_time) {
-        int64_t adjusted_time = frame.frame_time +
+        static const uint8_t kOkColon[] = { 'o', 'k', ':' };
+        const int64_t adjusted_time = frame.frame_time +
                 android_sensors_get_time_offset();
 
-        qemud_client_send(qc, (const uint8_t*) &adjusted_time, 8);
+        _qemu_client_reply_payload(qc, sizeof(kOkColon) + sizeof(adjusted_time));
+        qemud_client_send(qc, kOkColon, sizeof(kOkColon));
+        qemud_client_send(qc, (const uint8_t*)&adjusted_time, sizeof(adjusted_time));
+    } else {
+        static const uint8_t kOk[] = { 'o', 'k', 0 };
+        _qemu_client_reply_payload(qc, sizeof(kOk));
+        qemud_client_send(qc, kOk, sizeof(kOk));
     }
 }
 
