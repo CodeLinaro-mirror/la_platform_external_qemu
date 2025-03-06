@@ -18,7 +18,7 @@
 #include <vector>      // for vector
 
 #include "aemu/base/Compiler.h"              // for DISALLOW_COPY_ASSIGN_...
-
+#include "aemu/base/async/ThreadLooper.h"
 #include "aemu/base/synchronization/Lock.h"  // for Lock
 #include "android/base/system/System.h"         // for System, System::Duration
 #include "android/metrics/MetricsWriter.h"      // for MetricsWriter, Metric...
@@ -95,7 +95,8 @@ public:
     static void start(const std::string& sessionId,
                       std::string_view emulatorVersion,
                       std::string_view emulatorFullVersion,
-                      std::string_view qemuVersion);
+                      std::string_view qemuVersion,
+                      android::base::Looper* looper = base::ThreadLooper::get());
     static void stop(MetricsStopReason reason);
     static MetricsReporter& get();
 
