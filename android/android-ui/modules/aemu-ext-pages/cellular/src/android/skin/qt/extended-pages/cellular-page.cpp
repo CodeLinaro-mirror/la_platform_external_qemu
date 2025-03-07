@@ -17,17 +17,19 @@
 #include <QSettings>  // for QSettings
 #include <QVariant>   // for QVariant
 
-#include "android/avd/util.h"                          // for path_getAvdCon...
-#include "host-common/VmLock.h"                  // for RecursiveScope...
+#include "aemu/base/async/Looper.h"
+#include "aemu/base/async/ThreadLooper.h"
+#include "android/avd/util.h"  // for path_getAvdCon...
+#include "android/console.h"   // for android_hw
+#include "android/console.h"
 #include "android/emulation/control/cellular_agent.h"  // for QAndroidCellul...
 #include "android/emulator-window.h"                   // for emulator_windo...
-#include "android/console.h"                           // for android_hw
-#include "android/utils/debug.h"
 #include "android/main-common.h"                       // for emulator_has_n...
 #include "android/metrics/UiEventTracker.h"
 #include "android/skin/qt/qt-settings.h"  // for PER_AVD_SETTIN...
-#include "ui_cellular-page.h"             // for CellularPage
-#include "android/console.h"
+#include "android/utils/debug.h"
+#include "host-common/VmLock.h"  // for RecursiveScope...
+#include "ui_cellular-page.h"    // for CellularPage
 
 class QWidget;
 
@@ -142,8 +144,6 @@ void CellularPage::setCellularAgent(const QAndroidCellularAgent* agent) {
     if (!agent)
         return;
 
-    android::RecursiveScopedVmLock vmlock;
-
     sCellularAgent = agent;
 
     // Network parameters
@@ -154,44 +154,46 @@ void CellularPage::setCellularAgent(const QAndroidCellularAgent* agent) {
         return;
     }
 
-    // Get the settings that were previously saved. Give them
-    // to the device.
+    android::base::ThreadLooper::runOnMainLooper([agent]() {
+        // Get the settings that were previously saved. Give them
+        // to the device.
 
-    // Network type
-    if (sCellularAgent->setStandard) {
-        sCellularAgent->setStandard((CellularStandard)getSavedNetworkType());
-    }
+        // Network type
+        if (agent->setStandard) {
+            agent->setStandard((CellularStandard)getSavedNetworkType());
+        }
 
-    // Signal strength
-    if (sCellularAgent->setSignalStrengthProfile) {
-        sCellularAgent->setSignalStrengthProfile(
-                (CellularSignal)getSavedSignalStrength());
-    }
+        // Signal strength
+        if (agent->setSignalStrengthProfile) {
+            agent->setSignalStrengthProfile(
+                    (CellularSignal)getSavedSignalStrength());
+        }
 
-    // Voice status
-    if (sCellularAgent->setVoiceStatus) {
-        sCellularAgent->setVoiceStatus((CellularStatus)getSavedVoiceStatus());
-    }
+        // Voice status
+        if (agent->setVoiceStatus) {
+            agent->setVoiceStatus((CellularStatus)getSavedVoiceStatus());
+        }
 
-    // Data status
-    if (sCellularAgent->setDataStatus) {
-        sCellularAgent->setDataStatus((CellularStatus)getSavedDataStatus());
-    }
+        // Data status
+        if (agent->setDataStatus) {
+            agent->setDataStatus((CellularStatus)getSavedDataStatus());
+        }
 
-    // Meter status
-    if (sCellularAgent->setMeterStatus) {
-        sCellularAgent->setMeterStatus(
-                (CellularMeterStatus)getSavedMeterStatus());
-    }
+        // Meter status
+        if (agent->setMeterStatus) {
+            agent->setMeterStatus((CellularMeterStatus)getSavedMeterStatus());
+        }
+    });
 }
 
 void CellularPage::on_cell_standardBox_currentIndexChanged(int index) {
     saveNetworkType(index);
 
-    android::RecursiveScopedVmLock vmlock;
     if (sCellularAgent && sCellularAgent->setStandard) {
         CellularStandard cStandard = (CellularStandard)index;
-        sCellularAgent->setStandard(cStandard);
+        const auto* agent = sCellularAgent;
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent, cStandard]() { agent->setStandard(cStandard); });
         mDropDownTracker->increment(translate_idx(cStandard));
     }
 }
@@ -199,10 +201,11 @@ void CellularPage::on_cell_standardBox_currentIndexChanged(int index) {
 void CellularPage::on_cell_voiceStatusBox_currentIndexChanged(int index) {
     saveVoiceStatus(index);
 
-    android::RecursiveScopedVmLock vmlock;
     if (sCellularAgent && sCellularAgent->setVoiceStatus) {
         CellularStatus vStatus = (CellularStatus)index;
-        sCellularAgent->setVoiceStatus(vStatus);
+        const auto* agent = sCellularAgent;
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent, vStatus]() { agent->setVoiceStatus(vStatus); });
         mDropDownTracker->increment(translate_idx(vStatus) + "_VOICE");
     }
 }
@@ -210,10 +213,11 @@ void CellularPage::on_cell_voiceStatusBox_currentIndexChanged(int index) {
 void CellularPage::on_cell_meterStatusBox_currentIndexChanged(int index) {
     saveMeterStatus(index);
 
-    android::RecursiveScopedVmLock vmlock;
     if (sCellularAgent && sCellularAgent->setMeterStatus) {
         CellularMeterStatus mStatus = (CellularMeterStatus)index;
-        sCellularAgent->setMeterStatus(mStatus);
+        const auto* agent = sCellularAgent;
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent, mStatus]() { agent->setMeterStatus(mStatus); });
         mDropDownTracker->increment(translate_idx(mStatus));
     }
 }
@@ -221,10 +225,11 @@ void CellularPage::on_cell_meterStatusBox_currentIndexChanged(int index) {
 void CellularPage::on_cell_dataStatusBox_currentIndexChanged(int index) {
     saveDataStatus(index);
 
-    android::RecursiveScopedVmLock vmlock;
     if (sCellularAgent && sCellularAgent->setDataStatus) {
         CellularStatus dStatus = (CellularStatus)index;
-        sCellularAgent->setDataStatus(dStatus);
+        const auto* agent = sCellularAgent;
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent, dStatus]() { agent->setDataStatus(dStatus); });
         mDropDownTracker->increment(translate_idx(dStatus) + "_DATA");
     }
 }
@@ -232,10 +237,11 @@ void CellularPage::on_cell_dataStatusBox_currentIndexChanged(int index) {
 void CellularPage::on_cell_signalStatusBox_currentIndexChanged(int index) {
     saveSignalStrength(index);
 
-    android::RecursiveScopedVmLock vmlock;
     if (sCellularAgent && sCellularAgent->setSignalStrengthProfile) {
+        const auto* agent = sCellularAgent;
         CellularSignal signal = (CellularSignal)index;
-        sCellularAgent->setSignalStrengthProfile(signal);
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent, signal]() { agent->setSignalStrengthProfile(signal); });
         mDropDownTracker->increment(translate_idx(signal));
     }
 }
