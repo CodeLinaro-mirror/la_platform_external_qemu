@@ -152,6 +152,11 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
 #else
     constexpr const bool isMac = false;
 #endif
+#ifdef __linux__
+    constexpr const bool isLinux = true;
+#else
+    constexpr const bool isLinux = false;
+#endif
 
     const char* androidbootVerityMode;
     const char* checkjniProp;
@@ -532,11 +537,12 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         const bool avdSupportsSkiaVk =
                 ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle)) ||
                  apiLevel >= 36);
-        const bool gpuSupportsSkiaVk =
-                fc::isEnabled(fc::Vulkan) &&
-                (fc::isEnabled(fc::VulkanVirtualQueue) || isVkNVIDIA);
-        // TODO(b/394566319): InternalEmulationFailure errors when skiavk is used without minigbm
-        const bool systemSupportsSkiaVk = fc::isEnabled(fc::Minigbm);
+        const bool gpuSupportsSkiaVk = fc::isEnabled(fc::Vulkan);
+        // TODO(b/394566319): InternalEmulationFailure errors when skiavk is
+        // used without minigbm on Windows
+        const bool systemSupportsSkiaVk =
+                fc::isEnabled(fc::Minigbm) ||
+                (isLinux && fc::isEnabled(fc::GuestAngle));
 
         const bool enableSkiaVk =
                 avdSupportsSkiaVk && gpuSupportsSkiaVk && systemSupportsSkiaVk;
@@ -552,6 +558,16 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
 
     if (qemuUirendererPropValue) {
         params.push_back({qemuUirendererProp, qemuUirendererPropValue});
+
+        // Automatically enable virtual queue feature to satisfy multiple
+        // graphics queue requirement of skiavk hwui
+        if (!strcmp(qemuUirendererPropValue, "skiavk")) {
+            if (!isVkNVIDIA) {
+                VERBOSE("HWUI is set to use SkiaVK, enabling "
+                        "VulkanVirtualQueue for queue requirements.");
+                fc::setEnabledOverride(fc::VulkanVirtualQueue, true);
+            }
+        }
     }
     if (qemuRenderengineProp && qemuRenderenginePropValue) {
         params.push_back({qemuRenderengineProp, qemuRenderenginePropValue});
