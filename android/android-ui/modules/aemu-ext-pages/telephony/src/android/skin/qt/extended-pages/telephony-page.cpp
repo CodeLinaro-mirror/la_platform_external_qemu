@@ -22,19 +22,23 @@
 #include <cassert>             // for assert
 #include <string>              // for basic_string
 
-#include "android/avd/info.h"                           // for avdInfo_getAv...
-#include "android/avd/util.h"                           // for AVD_ANDROID_AUTO
-#include "host-common/VmLock.h"                   // for RecursiveScop...
+#include "aemu/base/async/Looper.h"
+#include "aemu/base/async/ThreadLooper.h"
+
+#include "android/avd/info.h"  // for avdInfo_getAv...
+#include "android/avd/util.h"  // for AVD_ANDROID_AUTO
+#include "android/console.h"   // for getConsoleAgents()->settings->avdInfo()
 #include "android/emulation/control/telephony_agent.h"  // for QAndroidTelep...
-#include "android/console.h"                            // for getConsoleAgents()->settings->avdInfo()
 #include "android/metrics/UiEventTracker.h"
-#include "android/settings-agent.h"                  // for SettingsTheme
-#include "android/skin/qt/error-dialog.h"            // for showErrorDialog
-#include "android/skin/qt/extended-pages/common.h"   // for setButtonEnabled
+#include "android/settings-agent.h"                 // for SettingsTheme
+#include "android/skin/qt/error-dialog.h"           // for showErrorDialog
+#include "android/skin/qt/extended-pages/common.h"  // for setButtonEnabled
+#include "android/skin/qt/function-runner.h"
 #include "android/skin/qt/raised-material-button.h"  // for RaisedMateria...
 #include "android/telephony/modem.h"                 // for amodem_get_ra...
 #include "android/telephony/sms.h"                   // for SmsPDU, is_in...
 #include "android_modem_v2.h"                        // for TelephonyPage
+#include "host-common/VmLock.h"                      // for RecursiveScop...
 #include "ui_telephony-page.h"                       // for TelephonyPage
 
 class QString;
@@ -74,11 +78,13 @@ TelephonyPage::TelephonyPage(QWidget* parent)
     mUi->tel_numberBox->setValidator(new PhoneNumberValidator());
     mCustomEventType = (QEvent::Type)QEvent::registerEventType();
 
-    android::RecursiveScopedVmLock vmlock;
     if (sTelephonyAgent && sTelephonyAgent->setNotifyCallback) {
         // Notify the agent that we want call-backs to tell us when the
         // telephone state changes
-        sTelephonyAgent->setNotifyCallback(telephony_callback, (void*)this);
+        const auto* agent = sTelephonyAgent;
+        android::base::ThreadLooper::runOnMainLooper([agent, this]() {
+            agent->setNotifyCallback(telephony_callback, (void*)this);
+        });
     }
 
     // Disable sms button and box for Automotive, since it's not supported
@@ -102,46 +108,49 @@ void TelephonyPage::on_tel_startEndButton_clicked() {
     SettingsTheme theme = getSelectedTheme();
     if (mCallActivity == CallActivity::Inactive) {
         // Start a call
-        {
-            android::RecursiveScopedVmLock vmlock;
-            if (sTelephonyAgent && sTelephonyAgent->telephonyCmd) {
-                // Command the emulator
-                TelephonyResponse tResp;
+        if (sTelephonyAgent && sTelephonyAgent->telephonyCmd) {
+            // Command the emulator
 
-                // Get rid of spurious characters from the phone number
-                // (Allow only '+' and '0'..'9')
-                // Note: phoneNumberValidator validates the user's input, but
-                // allows some human-readable characters like '.' and ')'.
-                // Here we remove that meaningless punctuation.
-                QString cleanNumber = mUi->tel_numberBox->currentText().remove(
-                        QRegularExpression("[^+0-9]"));
+            // Get rid of spurious characters from the phone number
+            // (Allow only '+' and '0'..'9')
+            // Note: phoneNumberValidator validates the user's input, but
+            // allows some human-readable characters like '.' and ')'.
+            // Here we remove that meaningless punctuation.
+            QString cleanNumber = mUi->tel_numberBox->currentText().remove(
+                    QRegularExpression("[^+0-9]"));
 
-                tResp = sTelephonyAgent->telephonyCmd(
+            const auto* agent = sTelephonyAgent;
+            android::base::ThreadLooper::runOnMainLooper([this, agent,
+                                                          cleanNumber,
+                                                          theme]() {
+                auto tResp = agent->telephonyCmd(
                         Tel_Op_Init_Call, cleanNumber.toStdString().c_str());
-                if (tResp != Tel_Resp_OK) {
-                    const char* errMsg = NULL;
-                    if (tResp == Tel_Resp_Radio_Off) {
-                        errMsg = "The call failed: radio is off.";
-                    } else {
-                        errMsg = "The call failed.";
+                // need to show on ui thread
+                runOnEmuUiThread([this, tResp, theme] {
+                    if (tResp != Tel_Resp_OK) {
+                        const char* errMsg = NULL;
+                        if (tResp == Tel_Resp_Radio_Off) {
+                            errMsg = "The call failed: radio is off.";
+                        } else {
+                            errMsg = "The call failed.";
+                        }
+                        showErrorDialog(tr(errMsg), tr("Telephony"));
+                        return;
                     }
-                    showErrorDialog(tr(errMsg), tr("Telephony"));
-                    return;
-                }
-            }
+                    // Success: Update the state and the UI buttons
+                    mCallActivity = CallActivity::Active;
+                    mPhoneNumber = mUi->tel_numberBox->currentText();
+
+                    mUi->tel_numberBox->setEnabled(false);
+
+                    setButtonEnabled(mUi->tel_holdCallButton, theme, true);
+                    // Change the icon and text to "END CALL"
+                    QIcon theIcon = getIconForCurrentTheme("call_end");
+                    mUi->tel_startEndButton->setIcon(theIcon);
+                    mUi->tel_startEndButton->setText(tr("END CALL"));
+                });
+            });
         }
-
-        // Success: Update the state and the UI buttons
-        mCallActivity = CallActivity::Active;
-        mPhoneNumber = mUi->tel_numberBox->currentText();
-
-        mUi->tel_numberBox->setEnabled(false);
-
-        setButtonEnabled(mUi->tel_holdCallButton, theme, true);
-        // Change the icon and text to "END CALL"
-        QIcon theIcon = getIconForCurrentTheme("call_end");
-        mUi->tel_startEndButton->setIcon(theIcon);
-        mUi->tel_startEndButton->setText(tr("END CALL"));
     } else {
         // End a call
         // Update the state and the UI buttons
@@ -158,24 +167,28 @@ void TelephonyPage::on_tel_startEndButton_clicked() {
         mUi->tel_startEndButton->setText(tr("CALL DEVICE"));
 
         {
-            android::RecursiveScopedVmLock vmlock;
             if (sTelephonyAgent && sTelephonyAgent->telephonyCmd) {
                 // Command the emulator
                 QString cleanNumber = mUi->tel_numberBox->currentText().remove(
                         QRegularExpression("[^+0-9]"));
-                TelephonyResponse tResp;
-                tResp = sTelephonyAgent->telephonyCmd(
-                        Tel_Op_Disconnect_Call,
-                        cleanNumber.toStdString().c_str());
-                if (tResp != Tel_Resp_OK && tResp != Tel_Resp_Invalid_Action) {
-                    // Don't show an error for Invalid Action: that
-                    // just means that the AVD already hanged up.
-                    showErrorDialog(tr("The end-call failed."),
-                                    tr("Telephony"));
-                    return;
-                }
+                const auto* agent = sTelephonyAgent;
+                android::base::ThreadLooper::runOnMainLooper(
+                        [this, agent, cleanNumber]() {
+                            auto tResp = agent->telephonyCmd(
+                                    Tel_Op_Disconnect_Call,
+                                    cleanNumber.toStdString().c_str());
+                            if (tResp != Tel_Resp_OK &&
+                                tResp != Tel_Resp_Invalid_Action) {
+                                // Don't show an error for Invalid Action: that
+                                // just means that the AVD already hanged up.
+                                runOnEmuUiThread([this] {
+                                    showErrorDialog(tr("The end-call failed."),
+                                                    tr("Telephony"));
+                                });
+                            }
+                        });
             }
-        }
+        }  // end of lock
     }
 }
 
@@ -205,7 +218,6 @@ void TelephonyPage::on_tel_holdCallButton_clicked() {
             break;
         default:;
     }
-    android::RecursiveScopedVmLock vmlock;
     if (sTelephonyAgent && sTelephonyAgent->telephonyCmd) {
         // Command the emulator
         QString cleanNumber = mUi->tel_numberBox->currentText().remove(
@@ -215,12 +227,18 @@ void TelephonyPage::on_tel_holdCallButton_clicked() {
                                          ? Tel_Op_Place_Call_On_Hold
                                          : Tel_Op_Take_Call_Off_Hold;
 
-        tResp = sTelephonyAgent->telephonyCmd(
-                tOp, cleanNumber.toStdString().c_str());
-        if (tResp != Tel_Resp_OK) {
-            showErrorDialog(tr("The call hold failed."), tr("Telephony"));
-            return;
-        }
+        const auto* agent = sTelephonyAgent;
+        android::base::ThreadLooper::runOnMainLooper([this, agent, tOp,
+                                                      cleanNumber]() {
+            auto tResp =
+                    agent->telephonyCmd(tOp, cleanNumber.toStdString().c_str());
+            if (tResp != Tel_Resp_OK) {
+                runOnEmuUiThread([this] {
+                    showErrorDialog(tr("The call hold failed."),
+                                    tr("Telephony"));
+                });
+            }
+        });
     }
 }
 
@@ -363,7 +381,6 @@ void TelephonyPage::on_sms_sendButton_clicked() {
     }
 
     {
-        android::RecursiveScopedVmLock vmlock;
         if (sTelephonyAgent && sTelephonyAgent->getModem) {
             AModem modem = sTelephonyAgent->getModem();
             if (modem == NULL) {
@@ -384,7 +401,6 @@ void TelephonyPage::on_sms_sendButton_clicked() {
 
 // static
 void TelephonyPage::setTelephonyAgent(const QAndroidTelephonyAgent* agent) {
-    android::RecursiveScopedVmLock vmlock;
     sTelephonyAgent = agent;
 }
 
