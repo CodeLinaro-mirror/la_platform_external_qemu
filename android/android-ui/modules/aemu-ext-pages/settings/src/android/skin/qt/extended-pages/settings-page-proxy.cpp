@@ -27,23 +27,26 @@
 #include <memory>        // for unique_ptr
 #include <string>        // for string
 
-#include "host-common/VmLock.h"                      // for RecursiveS...
+#include "aemu/base/async/Looper.h"
+#include "aemu/base/async/ThreadLooper.h"
 #include "android/console.h"
 #include "android/emulation/control/http_proxy_agent.h"    // for QAndroidHt...
 #include "android/emulator-window.h"                       // for EmulatorWi...
 #include "android/proxy/proxy_common.h"                    // for proxy_erro...
 #include "android/proxy/proxy_errno.h"                     // for PROXY_ERR_OK
 #include "android/skin/qt/extended-pages/settings-page.h"  // for SettingsPage
-#include "android/skin/qt/qt-settings.h"                   // for HTTP_PROXY...
-#include "android/skin/qt/raised-material-button.h"        // for RaisedMate...
-#include "ui_settings-page.h"                              // for SettingsPage
+#include "android/skin/qt/function-runner.h"
+#include "android/skin/qt/qt-settings.h"             // for HTTP_PROXY...
+#include "android/skin/qt/raised-material-button.h"  // for RaisedMate...
+#include "ui_settings-page.h"                        // for SettingsPage
 
 static QString sHttpProxyResults;
 static QString sStudioProxyString;
 static const QAndroidHttpProxyAgent* sHttpProxyAgent = nullptr;
 
 static void getStudioProxyString();
-static void sendProxySettingsToAgent(QString password);
+static void sendProxySettingsToAgent(QString password,
+                                     Ui::SettingsPage* qtSettingPageUi);
 static QString proxyStringFromParts(QString hostName,
                                     int port,
                                     QString userName,
@@ -101,18 +104,14 @@ void SettingsPage::proxyDtor() {
 
 // static
 void SettingsPage::setHttpProxyAgent(const QAndroidHttpProxyAgent* agent) {
-    {
-        android::RecursiveScopedVmLock vmlock;
-        sHttpProxyAgent = agent;
-    }
+    sHttpProxyAgent = agent;
     getStudioProxyString();
-    sendProxySettingsToAgent("");
+    sendProxySettingsToAgent("", nullptr);
 }
 
 void SettingsPage::on_set_proxyApply_clicked() {
     disableProxyApply();
-    sendProxySettingsToAgent(mUi->set_loginPassword->text());
-    mUi->set_proxyResults->setText(sHttpProxyResults);
+    sendProxySettingsToAgent(mUi->set_loginPassword->text(), mUi.get());
 }
 
 void SettingsPage::on_set_hostName_textChanged(QString /* unused */) {
@@ -208,8 +207,8 @@ void SettingsPage::grayOutProxy() {
 // decide what to tell the agent.
 //
 // But only if there is an agent.
-static void sendProxySettingsToAgent(QString password) {
-    android::RecursiveScopedVmLock vmlock;
+static void sendProxySettingsToAgent(QString password,
+                                     Ui::SettingsPage* qtSettingPageUi) {
     if (sHttpProxyAgent == nullptr ||
         sHttpProxyAgent->httpProxySet == nullptr) {
         return;
@@ -271,16 +270,29 @@ static void sendProxySettingsToAgent(QString password) {
     }
 
     // Send the proxy selection to the agent
-    int proxyResultCode =
-            sHttpProxyAgent->httpProxySet(proxyString.toStdString().c_str());
 
-    // Make the results available to the GUI
-    if (proxyString.isEmpty() && proxyResultCode == PROXY_ERR_OK) {
-        // Don't say "Success" when we're not using a proxy
-        sHttpProxyResults = SettingsPage::tr("No proxy");
-    } else {
-        sHttpProxyResults =
-                SettingsPage::tr(proxy_error_string(proxyResultCode));
+    {
+        const auto* agent = sHttpProxyAgent;
+        android::base::ThreadLooper::runOnMainLooper([agent, proxyString,
+                                                      qtSettingPageUi]() {
+            int proxyResultCode = sHttpProxyAgent->httpProxySet(
+                    proxyString.toStdString().c_str());
+            // Make the results available to the GUI
+
+            runOnEmuUiThread([proxyString, proxyResultCode, qtSettingPageUi]() {
+                if (proxyString.isEmpty() && proxyResultCode == PROXY_ERR_OK) {
+                    // Don't say "Success" when we're not using a proxy
+                    sHttpProxyResults = SettingsPage::tr("No proxy");
+                } else {
+                    sHttpProxyResults = SettingsPage::tr(
+                            proxy_error_string(proxyResultCode));
+                }
+                if (qtSettingPageUi) {
+                    qtSettingPageUi->set_proxyResults->setText(
+                            sHttpProxyResults);
+                }
+            });
+        });
     }
 }
 

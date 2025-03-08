@@ -16,10 +16,11 @@
 #include <QVariant>                                  // for QVariant
 #include <Qt>                                        // for RichText
 
-#include "android/avd/info.h"                        // for avdInfo_getApiDe...
-#include "host-common/VmLock.h"                // for RecursiveScopedV...
+#include "aemu/base/async/Looper.h"
+#include "aemu/base/async/ThreadLooper.h"
+#include "android/avd/info.h"  // for avdInfo_getApiDe...
+#include "android/console.h"   // for getConsoleAgents()->settings->avdInfo()
 #include "android/emulation/control/finger_agent.h"  // for QAndroidFingerAgent
-#include "android/console.h"                         // for getConsoleAgents()->settings->avdInfo()
 #include "android/metrics/UiEventTracker.h"          // for UiEventTracker
 #include "studio_stats.pb.h"                         // for EmulatorUiEvent
 
@@ -79,23 +80,22 @@ void FingerPage::on_finger_touchButton_pressed()
     // Send the ID associated with the selected fingerprint
     int fingerID = mUi->finger_pickBox->currentData().toInt();
 
-    android::RecursiveScopedVmLock vmlock;
     if (sFingerAgent && sFingerAgent->setTouch) {
-        sFingerAgent->setTouch(true, fingerID);
+        const auto* agent = sFingerAgent;
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent, fingerID]() { agent->setTouch(true, fingerID); });
     }
 }
 
-void FingerPage::on_finger_touchButton_released()
-{
-    android::RecursiveScopedVmLock vmlock;
+void FingerPage::on_finger_touchButton_released() {
     if (sFingerAgent && sFingerAgent->setTouch) {
-        sFingerAgent->setTouch(false, 0);
+        const auto* agent = sFingerAgent;
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent]() { agent->setTouch(false, 0); });
     }
 }
 
 // static
-void FingerPage::setFingerAgent(const QAndroidFingerAgent* agent)
-{
-    android::RecursiveScopedVmLock vmlock;
+void FingerPage::setFingerAgent(const QAndroidFingerAgent* agent) {
     sFingerAgent = agent;
 }
