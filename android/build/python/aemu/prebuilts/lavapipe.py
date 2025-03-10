@@ -63,7 +63,7 @@ def configureLavapipeBuild(srcdir, builddir):
     os.umask(old_umask)
 
     config_script = "meson"
-    conf_args = [config_script, "setup", builddir, "-Dvulkan-drivers=swrast", "-Dgallium-drivers=llvmpipe"]
+    conf_args = [config_script, "setup", builddir, "-Dvulkan-drivers=swrast", "-Dgallium-drivers=llvmpipe", "-Dshared-llvm=false"]
     toolchain_dir = Path(builddir) / "toolchain"
     os.makedirs(Path(builddir) / "toolchain")
 
