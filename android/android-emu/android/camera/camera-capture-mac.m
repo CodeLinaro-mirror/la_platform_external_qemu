@@ -714,8 +714,18 @@ int camera_enumerate_devices(CameraInfo* cis, int max) {
     /* Emulates 1280x960 frame. */
     {1280, 960}};
 
-  NSArray *videoDevicesUnsorted =
-      [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
+  NSArray* captureDeviceType = @[
+    AVCaptureDeviceTypeBuiltInWideAngleCamera,
+    AVCaptureDeviceTypeExternalUnknown,  /* deprecated in 14.0+ */
+  ];
+
+  AVCaptureDeviceDiscoverySession* deviceDescoverySession =
+    [AVCaptureDeviceDiscoverySession
+      discoverySessionWithDeviceTypes:captureDeviceType
+      mediaType:AVMediaTypeVideo
+      position:AVCaptureDevicePositionUnspecified];
+
+  NSArray *videoDevicesUnsorted = deviceDescoverySession.devices;
   if (!videoDevicesUnsorted) {
     E("No web cameras are connected to the host.");
     return 0;
