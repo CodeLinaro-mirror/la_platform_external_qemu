@@ -3949,6 +3949,8 @@ static const CommandDefRec screenrecord_commands[] = {
          "  --fps FPS\r\n"
          "    Set the frames per second for the video recording. Default is 24"
          " fps, maximum is 60 fps.\r\n"
+         "  --display DISPLAY\r\n"
+         "    Set the display id for the video recording. Default is 0.\r\n"
          "\r\nThe recording will stop with 'screenrecord stop' or when the "
          "time limit\r\n"
          "is reached\r\n",
