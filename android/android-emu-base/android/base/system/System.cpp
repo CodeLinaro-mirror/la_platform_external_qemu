@@ -1408,7 +1408,7 @@ public:
 
 #if defined(__x86_64__)
     static int getCpuBrandNameCpuid(char *name) {
-        char cpuName[48] = { 0 };
+        char cpuName[49] = { 0 };
         uint32_t eax = 0;
 
         android_get_x86_cpuid(0x80000000, 0, &eax, NULL, NULL, NULL);

@@ -40,9 +40,12 @@ namespace base {
 #if defined(__x86_64__)
 TEST(System, getCpuBrandName) {
     // BrandName returned by CPUID can have 48 bytes at most
-    // including the NULL terminator.
-    char name1[48] = { 0 };
-    char name2[48] = { 0 };
+    // including the NULL terminator. Some CPUs seem not to follow
+    // the specification. So we purposefully enlarge the string
+    // buffer here to check whether the brand name returned by
+    // CPUID can be longer than 47 bytes.
+    char name1[100] = { 0 };
+    char name2[100] = { 0 };
 
 #ifdef _WIN32
     uint32_t core_count = 0;
@@ -62,6 +65,7 @@ TEST(System, getCpuBrandName) {
 
     EXPECT_LT(0, strlen(name1));
     EXPECT_LT(0, strlen(name2));
+    EXPECT_GT(48, strlen(name2));
     EXPECT_EQ(0, strcmp(name1, name2));
 }
 #endif
