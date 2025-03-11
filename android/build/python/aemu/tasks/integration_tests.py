@@ -170,11 +170,8 @@ class ZipIntegrationTestsTask(BuildTask):
     def do_run(self):
         repo = self.aosp / "external" / "adt-infra" / "devpi" / "repo" / "simple"
 
-        if platform.system() == "Windows":
-            # Windows is currently not working, so skip on that platform.
-            return
-
-        repo = f"file://{repo}"
+        if platform.system() != "Windows":
+            repo = f"file://{repo}"
         py_runner = PyRunner(repo, self.aosp)
         py_runner.run(
             [
