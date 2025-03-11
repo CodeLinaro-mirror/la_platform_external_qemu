@@ -46,47 +46,47 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     }
 
     const char* name = avdInfo_getName(avd);
+    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_DEV_2024);
+
+    // TODO(b/373601997): Correctly determine if hardware gpu requested.
+    // emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST won't
+    // work as emuglconfig is not initialized when doing hw gpu checks.
+    const bool hwGpuRequested = isXrAvd;
+    if (!hwGpuRequested) {
+        metrics.set_check(EmulatorCompatibilityInfo::
+                                  AVD_COMPATIBILITY_CHECK_GPU_CHECK_SKIP);
+        metrics.set_details(
+                "Hardware GPU compatibility checks are not required");
+        return {.description =
+                        "Hardware GPU compatibility checks are not required",
+                .status = AvdCompatibility::Ok,
+                .metrics = metrics};
+    }
 
     // Check XR specific compatibility issues
     // TODO(b/373601997): Improve supported platforms and configurations
-    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_DEV_2024);
     if (isXrAvd) {
         // Not supported on Mac Intel due to missing GPU features
 #if defined(__APPLE__) && !defined(__arm64__)
-        return {
-                .description =
+        return {.description =
                         absl::StrFormat("`%s` is not supported to run on "
                                         "Mac with Intel processors",
                                         name),
                 .status = AvdCompatibility::Error,
-        };
-#endif
-
-        // Linux platform is not very well tested on XR scenarios, independently
-        // of the GPU
-// TODO(b/373601997) Change this warning when we will have more tests
-#ifdef __linux__
-        return {
-                .description = absl::StrFormat("`%s` is not yet "
-                                               "fully supported on Linux",
-                                               name),
-                .status = AvdCompatibility::Warning,
-        };
+                .metrics = metrics};
 #endif
     }
 
-#ifdef _WIN32
-    constexpr const bool isWindows = true;
-#else
-    constexpr const bool isWindows = false;
-#endif
-
-    // Only apply these checks on Windows when GuestAngle enabled
+    // Only apply the Vulkan related checks when GuestAngle is enabled
     namespace fc = android::featurecontrol;
     bool requiresHwGpuCheck = true;
-    if (!isWindows || !fc::isEnabled(fc::GuestAngle)) {
+#if defined(__APPLE__)
+    requiresHwGpuCheck = false;
+#else
+    if (!fc::isEnabled(fc::GuestAngle)) {
         requiresHwGpuCheck = false;
     }
+#endif
 
     if (!requiresHwGpuCheck) {
         return {.description = absl::StrFormat(
@@ -166,6 +166,15 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                 // for vulkan, disable it
                 isUnsupportedGpuDriver = true;
             }
+        }
+#endif
+#if defined(__linux__)
+        if (isAMD &&
+            strcmp("AMD Custom GPU 0405 (RADV VANGOGH)", vkVendor) == 0) {
+            // on linux, this specific amd gpu does not work for vulkan
+            // even with VulkanAllocateDeviceMemoryOnly, disable it
+            // (b/225541819)
+            isUnsupportedGpuDriver = true;
         }
 #endif
     }
