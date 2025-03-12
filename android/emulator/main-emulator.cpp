@@ -1386,6 +1386,13 @@ static void updateLibrarySearchPath(bool isHeadless,
         add_library_search_dir(fullPath);
     }
 
+    // Always add vulkan folder for loading ICDs
+    bufprint(fullPath, fullPath + sizeof(fullPath),
+             "%s" PATH_SEP "%s" PATH_SEP "%s", launcherDir, libSubDir,
+             "vulkan");
+    D("Adding library search path: '%s'", fullPath);
+    add_library_search_dir(fullPath);
+
 #ifdef __linux__
     if (!useSystemLibs) {
         // Use bundled libstdc++
