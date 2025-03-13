@@ -201,28 +201,6 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         };
     }
 
-    // Check maxAllocationCount for GPU.
-    // For XR we will request 8192 for AMD GPUs because in testing we've
-    // encountered issues. Otherwise we require 4096 as per spec and Android Baseline.
-    const uint64_t minAllocationCountRequired =
-            isXrAvd ? (isAMD ? 8192 : 4096) : 4096;
-    if (vkDeviceMaxAllocationCount < minAllocationCountRequired) {
-        metrics.set_check(
-                EmulatorCompatibilityInfo::
-                        AVD_COMPATIBILITY_CHECK_GPU_CHECK_INSUFFICIENT_MEMORY);
-        metrics.set_details(absl::StrFormat(
-                "GPU:%s, driver:%s maxMemoryAllocationCount: %llu", vendorName,
-                driverVersionStr, vkDeviceMaxAllocationCount));
-        return {
-                .description = absl::StrFormat(
-                        "GPU `%s` does not support number of memory allocations required "
-                        "to run avd: `%s`. Available: %llu, minimum required: %llu",
-                        vendorName, name, vkDeviceMaxAllocationCount,
-                        minAllocationCountRequired),
-                .status = AvdCompatibility::Error,
-                .metrics = metrics,
-        };
-    }
     // Check available GPU memory
     const uint64_t deviceMemMiB = vkDeviceMemBytes / (1024 * 1024);
     const uint64_t avdMinGpuMemMiB = isXrAvd ? (isAMD ? 8192 : 2048) : 0;
@@ -250,6 +228,29 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                                         "the suggested level (%llu MB)",
                                         deviceMemMiB, name, avdMinGpuMemMiB),
                 .status = AvdCompatibility::Warning,
+        };
+    }
+
+    // Check maxAllocationCount for GPU.
+    // For XR we will request 8192 for AMD GPUs because in testing we've
+    // encountered issues. Otherwise we require 4096 as per spec and Android Baseline.
+    const uint64_t minAllocationCountRequired =
+            isXrAvd ? (isAMD ? 8192 : 4096) : 4096;
+    if (vkDeviceMaxAllocationCount < minAllocationCountRequired) {
+        metrics.set_check(
+                EmulatorCompatibilityInfo::
+                        AVD_COMPATIBILITY_CHECK_GPU_CHECK_INSUFFICIENT_MEMORY);
+        metrics.set_details(absl::StrFormat(
+                "GPU:%s, driver:%s maxMemoryAllocationCount: %llu", vendorName,
+                driverVersionStr, vkDeviceMaxAllocationCount));
+        return {
+                .description = absl::StrFormat(
+                        "GPU `%s` does not support the memory properties required "
+                        "to run avd: `%s`. Available allocations: %llu, suggested: %llu",
+                        vendorName, name, vkDeviceMaxAllocationCount,
+                        minAllocationCountRequired),
+                .status = AvdCompatibility::Warning,
+                .metrics = metrics,
         };
     }
 
