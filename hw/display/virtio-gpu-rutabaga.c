@@ -932,6 +932,7 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     struct rutabaga_channel channel = { 0 };
     struct rutabaga_channels channels = { 0 };
 
+    VirtIOGPUBase *base = VIRTIO_GPU_BASE(g);
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
     vr->rutabaga = NULL;
 
@@ -963,6 +964,8 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     builder.debug_cb = virtio_gpu_rutabaga_debug_cb;
     builder.capset_mask = vr->capset_mask;
     builder.user_data = (uint64_t)g;
+    builder.display_width = base->conf.xres;
+    builder.display_height = base->conf.yres;
 
     /*
      * If the user doesn't specify the wayland socket path, we try to infer
