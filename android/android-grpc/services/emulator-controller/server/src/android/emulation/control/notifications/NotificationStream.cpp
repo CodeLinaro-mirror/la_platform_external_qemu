@@ -137,6 +137,30 @@ std::optional<Notification> NotificationStream::getPostureNotificationEvent() {
     return event;
 }
 
+std::optional<Notification> NotificationStream::getXrOptionsNotificationEvent() {
+    Notification event;
+
+    int environment;
+    float passthroughCoefficient;
+    bool success = android_xr_get_options(&environment, &passthroughCoefficient);
+
+    if (success) {
+        auto eventDetails = event.mutable_xroptions();
+        eventDetails->set_environment(static_cast<XrOptions::Environment>(environment));
+        eventDetails->set_passthrough_coefficient(passthroughCoefficient);
+
+        DD("XR options notification event: Environment=%d, PassthroughCoefficient=%.2f, "
+           "Full proto: %s",
+           environment,
+           passthroughCoefficient,
+           event.ShortDebugString().c_str());
+        return event;
+    } else {
+        DD("Failed to get XR options for notification event");
+        return std::nullopt;
+    }
+}
+
 NotificationStreamWriter* NotificationStream::notificationStream() {
     if (!mRegisteredListeners.test_and_set()) {
         registerListeners();
@@ -146,6 +170,7 @@ NotificationStreamWriter* NotificationStream::notificationStream() {
     stream->eventArrived(getCameraNotificationEvent());
     stream->eventArrived(getPostureNotificationEvent());
     stream->eventArrived(getBootedNotificationEvent());
+    stream->eventArrived(getXrOptionsNotificationEvent());
     return stream;
 }
 
@@ -198,6 +223,14 @@ void NotificationStream::registerListeners() {
     });
     BootCompletionHandler::get()->registerOnce([&](auto completed) {
         mNotificationListeners.fireEvent(getBootedNotificationEvent());
+    });
+
+
+    auto xrOptionsPublisher =
+            static_cast<base::EventNotificationSupport<XrOptions>*>(
+                    android_get_xr_options_publisher());
+    xrOptionsPublisher->registerOnce([&](auto options) {
+        mNotificationListeners.fireEvent(getXrOptionsNotificationEvent());
     });
 }
 }  // namespace control

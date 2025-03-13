@@ -20,7 +20,6 @@
 #include "android/hw-sensors.h"
 #include "android/physics/Physics.h"
 #include "android/utils/compiler.h"
-
 ANDROID_BEGIN_HEADER
 
 /* forward declarations */
@@ -38,6 +37,10 @@ namespace automation {
 class AutomationController;
 }  // namespace automation
 }  // namespace android
+
+namespace xr_emulator_proto {
+class XrOptions;  // Forward declaration for the protobuf message
+}
 
 /*
 * Implements a model of an ambient environment containing a rigid
@@ -177,5 +180,8 @@ bool physicalModel_isLoadingSnapshot(PhysicalModel* model);
 
 android::base::EventNotificationSupport<FoldablePostures>*
 physicalModel_getPostureListener(PhysicalModel* model);
+
+android::base::EventNotificationSupport<xr_emulator_proto::XrOptions>*
+physicalModel_getXrOptionsPublisher(PhysicalModel* model);
 
 ANDROID_END_HEADER

@@ -228,6 +228,10 @@ public:
         return mFoldableModel.getPostureListener();
     }
 
+    android::base::EventNotificationSupport<xr_emulator_proto::XrOptions>* getXrOptionsPublisher() {
+        return mXrDeviceModel.getXrOptionsPublisher();
+    }
+
 private:
     /*
      * Sets the target value for the given physical parameter that the physical
@@ -1938,6 +1942,15 @@ physicalModel_getPostureListener(PhysicalModel* model) {
     PhysicalModelImpl* impl = PhysicalModelImpl::getImpl(model);
     if (impl != nullptr) {
         return impl->getPostureListener();
+    }
+    return nullptr;
+}
+
+android::base::EventNotificationSupport<xr_emulator_proto::XrOptions>*
+physicalModel_getXrOptionsPublisher(PhysicalModel* model) {
+    PhysicalModelImpl* impl = PhysicalModelImpl::getImpl(model);
+    if (impl != nullptr) {
+        return impl->getXrOptionsPublisher();
     }
     return nullptr;
 }

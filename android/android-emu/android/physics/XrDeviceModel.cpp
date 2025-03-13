@@ -189,12 +189,25 @@ void XrDeviceModel::setXrOptions(int environment,
     xr_options_param->set_environment(static_cast<XrOptions_Environment>(environment));
     xr_options_param->set_passthrough_coefficient(passthroughCoefficient);
     qemudClientSend(request);
+
+    vec3 currentOptions = getXrOptions(PARAMETER_VALUE_TYPE_CURRENT);
+    int currentEnvironment = static_cast<int>(currentOptions.x);
+    float currentPassthroughCoefficient = currentOptions.y;
+
+    if (currentEnvironment != environment || 
+        currentPassthroughCoefficient != passthroughCoefficient) {
+        xr_emulator_proto::XrOptions options;
+        options.set_environment(static_cast<xr_emulator_proto::XrOptions_Environment>(environment));
+        options.set_passthrough_coefficient(passthroughCoefficient);
+
+        mXrOptionsPublisher.fireEvent(options);
+    }
 }
 
 vec3 XrDeviceModel::getXrOptions(
         ParameterValueType parameterValueType) const {
-    // TODO(b/396418192): implement toggle environment mode in Android Studio
-    return {0, 0, 0};
+    // TODO(b/396418192): implement get environment mode handling in guest OS
+    return {1, 0.5, 0};
 }
 
 void XrDeviceModel::sendXrInputMode(enum XrInputMode mode) {
