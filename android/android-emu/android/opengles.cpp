@@ -382,6 +382,8 @@ int android_startOpenglesRenderer(
                      &gfxstream::host::FeatureSet::VulkanCommandBufferCheckpoints},
                     {android::featurecontrol::VulkanVirtualQueue,
                      &gfxstream::host::FeatureSet::VulkanVirtualQueue},
+                    {android::featurecontrol::VulkanRobustness,
+                     &gfxstream::host::FeatureSet::VulkanRobustness},
             };
     for (const auto& [aemuFeature, gfxstreamFeaturePtr] :
          kAemuToGfxstreamFeatureMap) {
