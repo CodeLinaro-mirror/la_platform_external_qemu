@@ -68,6 +68,8 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     if (isXrAvd) {
         // Not supported on Mac Intel due to missing GPU features
 #if defined(__APPLE__) && !defined(__arm64__)
+        metrics.set_check(EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_SYSTEM_CORE);
+        metrics.set_details("MacIntel on Xr");
         return {.description =
                         absl::StrFormat("`%s` is not supported to run on "
                                         "Mac with Intel processors",
@@ -221,6 +223,11 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     }
     const uint64_t avdSuggestedGpuMemMiB = isXrAvd ? (isAMD ? 8192 : 4096) : 0;
     if (deviceMemMiB < avdSuggestedGpuMemMiB) {
+        metrics.set_check(
+                EmulatorCompatibilityInfo::
+                        AVD_COMPATIBILITY_CHECK_GPU_CHECK_INSUFFICIENT_MEMORY);
+        metrics.set_details(absl::StrFormat("GPU:%s, deviceMemMiB: %llu",
+                                            vendorName, deviceMemMiB));
         return {
                 .description =
                         absl::StrFormat("GPU memory available (%llu MB) to run "
@@ -228,7 +235,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                                         "the suggested level (%llu MB)",
                                         deviceMemMiB, name, avdMinGpuMemMiB),
                 .status = AvdCompatibility::Warning,
-        };
+                .metrics = metrics};
     }
 
     // Check maxAllocationCount for GPU.
@@ -250,16 +257,14 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                         vendorName, name, vkDeviceMaxAllocationCount,
                         minAllocationCountRequired),
                 .status = AvdCompatibility::Warning,
-                .metrics = metrics,
-        };
+                .metrics = metrics};
     }
 
     return {
             .description = absl::StrFormat(
                     "Hardware GPU requirements to run avd: `%s` are met", name),
             .status = AvdCompatibility::Ok,
-            .metrics = metrics,
-    };
+            .metrics = metrics};
 }
 
 REGISTER_COMPATIBILITY_CHECK(hasSufficientHwGpu);
