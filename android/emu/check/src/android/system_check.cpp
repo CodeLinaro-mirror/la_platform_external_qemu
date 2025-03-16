@@ -121,7 +121,7 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
                         "avd '%s' is %d MiB (available: %d MiB)",
                         avdName, idealMinRamMB, ramMB),
                 .status = AvdCompatibility::Warning,
-        };
+                .metrics = metrics};
     }
 
     return {
