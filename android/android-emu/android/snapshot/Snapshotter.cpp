@@ -17,6 +17,7 @@
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/avd/info.h"
+#include "android/cmdline-option.h"
 #include "android/console.h"
 #include "android/crashreport/CrashReporter.h"
 #include "android/emulation/control/ApkInstaller.h"
@@ -810,9 +811,17 @@ bool Snapshotter::isSavingCanceled(const char* name) const {
 }
 
 bool Snapshotter::stopVulkanAppsIfApplicable() {
-    const bool needToSaveSnapshot =
+    bool needToSaveSnapshot =
             !(getConsoleAgents()->settings->avdParams()->flags &
               AVDINFO_NO_SNAPSHOT_SAVE_ON_EXIT);
+    if(getConsoleAgents()->settings->android_cmdLineOptions()->no_snapshot_save) {
+            needToSaveSnapshot = false;
+    }
+    if(isEnabled(android::featurecontrol::XrModeUI) &&
+        isEnabled(android::featurecontrol::GuestAngle)) {
+        needToSaveSnapshot = false;
+    }
+
     const bool needToSaveVulkanApps = android::featurecontrol::isEnabled(
             android::featurecontrol::VulkanSnapshots);
 
