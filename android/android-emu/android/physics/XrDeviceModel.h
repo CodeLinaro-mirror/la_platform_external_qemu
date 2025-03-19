@@ -30,6 +30,13 @@ namespace physics {
 
 class XrDeviceModel {
 public:
+    // Define a nested publisher class with friend access for XrDeviceModel
+    // XrDeviceModel needs to access the protected method of XrOptionsPublisher
+    class XrOptionsPublisher
+        : public base::EventNotificationSupport<xr_emulator_proto::XrOptions> {
+        friend class XrDeviceModel;
+    };
+
     XrDeviceModel();
 
     // Send and receive Input Mode (Mouse-KB, hand tracking, eye gaze, etc.) to
@@ -84,6 +91,10 @@ public:
     vec3 getXrOptions(
         ParameterValueType parameterValueType) const;
 
+    XrOptionsPublisher* getXrOptionsPublisher() {
+        return &mXrOptionsPublisher;
+    }
+
     QemudClient* initializeQemudClient(int channel, const char* client_param);
     void qemudClientRecv(uint8_t* msg, int msglen);
     void qemudClientClose();
@@ -101,6 +112,8 @@ private:
     void sendXrEnvironmentMode(enum XrEnvironmentMode mode);
     void sendXrScreenRecenter();
     void sendXrViewportControlMode(enum XrViewportControlMode mode);
+
+    XrOptionsPublisher mXrOptionsPublisher;
 
     QemudService* qemud_service = nullptr;
     QemudClient* qemud_client = nullptr;

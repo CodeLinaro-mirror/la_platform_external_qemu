@@ -1736,3 +1736,7 @@ bool android_xr_get_options(int* environment, float* passthroughCoefficient) {
     *passthroughCoefficient = options_vector[1];
     return result;
 }
+
+void* android_get_xr_options_publisher() {
+    return physicalModel_getXrOptionsPublisher(android_physical_model_instance());
+}
