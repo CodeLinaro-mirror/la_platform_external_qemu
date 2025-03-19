@@ -186,6 +186,13 @@ void ClipboardPipe::setGuestClipboardContents(const uint8_t* buf, size_t len) {
         return;  // who cares.
     }
 
+    // 32786 is an arbitrary constant which confirmed working on API36.
+    if (len > 32768) {
+        LOG(WARNING) << "ClipboardPipe: the clipboard is too "
+                        "large (" << len << "), ignoring.";
+        return;
+    }
+
     VERBOSE_INFO(keys, "ClipboardPipe update, host->guest: '%s'",
                  std::string((char*)buf, len).c_str());
 
