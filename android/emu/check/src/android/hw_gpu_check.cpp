@@ -203,9 +203,9 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         };
     }
 
-    // Check available GPU memory
+    // Check available GPU memory, use rounded MiB values to allow some driver margin.
     const uint64_t deviceMemMiB = vkDeviceMemBytes / (1024 * 1024);
-    const uint64_t avdMinGpuMemMiB = isXrAvd ? (isAMD ? 8192 : 2048) : 0;
+    const uint64_t avdMinGpuMemMiB = isXrAvd ? (isAMD ? 4000 : 2000) : 0;
     if (deviceMemMiB < avdMinGpuMemMiB) {
         metrics.set_check(
                 EmulatorCompatibilityInfo::
@@ -221,7 +221,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                 .metrics = metrics,
         };
     }
-    const uint64_t avdSuggestedGpuMemMiB = isXrAvd ? (isAMD ? 8192 : 4096) : 0;
+    const uint64_t avdSuggestedGpuMemMiB = isXrAvd ? (isAMD ? 8000 : 4000) : 0;
     if (deviceMemMiB < avdSuggestedGpuMemMiB) {
         metrics.set_check(
                 EmulatorCompatibilityInfo::
@@ -241,9 +241,9 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     // Check maxAllocationCount for GPU.
     // For XR we will request 8192 for AMD GPUs because in testing we've
     // encountered issues. Otherwise we require 4096 as per spec and Android Baseline.
-    const uint64_t minAllocationCountRequired =
+    const uint64_t suggestedAllocationCountRequired =
             isXrAvd ? (isAMD ? 8192 : 4096) : 4096;
-    if (vkDeviceMaxAllocationCount < minAllocationCountRequired) {
+    if (vkDeviceMaxAllocationCount < suggestedAllocationCountRequired) {
         metrics.set_check(
                 EmulatorCompatibilityInfo::
                         AVD_COMPATIBILITY_CHECK_GPU_CHECK_INSUFFICIENT_MEMORY);
@@ -255,7 +255,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                         "GPU `%s` does not support the memory properties required "
                         "to run avd: `%s`. Available allocations: %llu, suggested: %llu",
                         vendorName, name, vkDeviceMaxAllocationCount,
-                        minAllocationCountRequired),
+                        suggestedAllocationCountRequired),
                 .status = AvdCompatibility::Warning,
                 .metrics = metrics};
     }
