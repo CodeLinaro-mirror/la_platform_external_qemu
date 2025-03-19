@@ -13,7 +13,7 @@
 // limitations under the License.
 #include "qemu/osdep.h"
 
-#include "google//drivers/hw/acpi/goldfish_acpi.h"
+#include "google/drivers/hw/acpi/goldfish_acpi.h"
 #include "google/drivers/hw/acpi/goldfish_defs.h"
 #include "google/drivers/hw/i386/goldfish_board.h"
 #include "hw/acpi/aml-build.h"
