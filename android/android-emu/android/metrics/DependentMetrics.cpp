@@ -723,6 +723,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::VULKAN_COMMAND_BUFFER_CHECKPOINTS;
         case android::featurecontrol::VulkanVirtualQueue:
             return android_studio::EmulatorFeatureFlagState::VULKAN_VIRTUAL_QUEUE;
+        case android::featurecontrol::VulkanRobustness:
+            return android_studio::EmulatorFeatureFlagState::VULKAN_ROBUSTNESS;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;

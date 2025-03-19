@@ -383,6 +383,7 @@ Feature: 'BypassVulkanDeviceFeatureOverrides' (107), value: 0, default: 0, is ov
 Feature: 'VulkanDebugUtils' (108), value: 0, default: 0, is overridden: 0
 Feature: 'VulkanCommandBufferCheckpoints' (109), value: 0, default: 0, is overridden: 0
 Feature: 'VulkanVirtualQueue' (110), value: 0, default: 0, is overridden: 0
+Feature: 'VulkanRobustness' (111), value: 0, default: 0, is overridden: 0
 )#";
     EXPECT_EQ(feature_list, ss.str());
 }
