@@ -1443,6 +1443,7 @@ message EmulatorAvdInfo {
         AUTOMOTIVE_DISTANT_DISPLAY_WITH_PLAY = 50;
         AUTOMOTIVE_ULTRAWIDE_DISPLAY = 51;
         AUTOMOTIVE_LARGE_PORTRAIT = 52;
+        PIXEL_9A = 53;
     }
     // Name of the AVD. Deprecated as it could potentially contain PII.
     optional string name = 1 [deprecated = true];

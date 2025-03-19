@@ -304,6 +304,9 @@ static android_studio::EmulatorAvdInfo::EmulatorDeviceName getDeviceName() {
     if (0 == strcmp(id, "pixel_9")) {
         return android_studio::EmulatorAvdInfo::PIXEL_9;
     }
+    if (0 == strcmp(id, "pixel_9a")) {
+        return android_studio::EmulatorAvdInfo::PIXEL_9A;
+    }
     if (0 == strcmp(id, "pixel_9_pro")) {
         return android_studio::EmulatorAvdInfo::PIXEL_9_PRO;
     }
