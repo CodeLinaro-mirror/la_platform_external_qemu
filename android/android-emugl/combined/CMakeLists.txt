@@ -245,7 +245,8 @@ if(OPTION_GFXSTREAM_BACKEND)
         angle_shader_translator
         renderdoc
         gfxstream_egl_headers
-        gfxstream_glm_headers)
+        gfxstream_glm_headers
+        gfxstream_host_tracing)
    android_license(TARGET "${GFXSTREAM_DEPENDENCIES}"
                    LIBNAME gfxstream
                    URL "https://android.googlesource.com/platform/hardware/google/gfxstream/+/refs/heads/master"
