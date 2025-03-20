@@ -270,7 +270,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
             default_shortcuts += "Ctrl+Shift+I SHOW_PANE_SENSOR_REPLAY\n";
         } else if (avdFlavor == AVD_DEV_2024) {
             default_shortcuts +=
-                "Ctrl+Shift+/   XR_SCREEN_RECENTER\n";
+                "Ctrl+Shift+.   XR_SCREEN_RECENTER\n";
         } else if (android::featurecontrol::isEnabled(
                            android::featurecontrol::MultiDisplay) &&
                    !android_foldable_any_folded_area_configured() &&
