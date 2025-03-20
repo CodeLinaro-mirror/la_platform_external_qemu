@@ -304,6 +304,9 @@ static android_studio::EmulatorAvdInfo::EmulatorDeviceName getDeviceName() {
     if (0 == strcmp(id, "pixel_9")) {
         return android_studio::EmulatorAvdInfo::PIXEL_9;
     }
+    if (0 == strcmp(id, "pixel_9a")) {
+        return android_studio::EmulatorAvdInfo::PIXEL_9A;
+    }
     if (0 == strcmp(id, "pixel_9_pro")) {
         return android_studio::EmulatorAvdInfo::PIXEL_9_PRO;
     }
@@ -720,6 +723,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::VULKAN_COMMAND_BUFFER_CHECKPOINTS;
         case android::featurecontrol::VulkanVirtualQueue:
             return android_studio::EmulatorFeatureFlagState::VULKAN_VIRTUAL_QUEUE;
+        case android::featurecontrol::VulkanRobustness:
+            return android_studio::EmulatorFeatureFlagState::VULKAN_ROBUSTNESS;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;

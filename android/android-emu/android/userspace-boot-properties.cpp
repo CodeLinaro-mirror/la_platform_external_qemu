@@ -540,9 +540,9 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         const bool gpuSupportsSkiaVk = fc::isEnabled(fc::Vulkan);
         // TODO(b/394566319): InternalEmulationFailure errors when skiavk is
         // used without minigbm on Windows
+        // Always enable skiavk when GuestAngle is used.
         const bool systemSupportsSkiaVk =
-                fc::isEnabled(fc::Minigbm) ||
-                (isLinux && fc::isEnabled(fc::GuestAngle));
+                fc::isEnabled(fc::Minigbm) || fc::isEnabled(fc::GuestAngle);
 
         const bool enableSkiaVk =
                 avdSupportsSkiaVk && gpuSupportsSkiaVk && systemSupportsSkiaVk;

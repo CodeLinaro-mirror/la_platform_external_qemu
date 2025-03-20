@@ -82,8 +82,8 @@ private:
     std::optional<Notification> getPostureNotificationEvent();
     std::optional<Notification> getDisplayNotificationEvent();
     std::optional<Notification> getBootedNotificationEvent();
-
-    NotificationEventChangeSupport mNotificationListeners;
+    std::optional<Notification> getXrOptionsNotificationEvent();
+    NotificationEventChangeSupport mNotificationListeners; // publisher holding a list of subscribers/listeners
     VirtualSceneCamera* mCamera;
     const AndroidConsoleAgents* mAgents;
     std::atomic_flag mRegisteredListeners = ATOMIC_FLAG_INIT;
