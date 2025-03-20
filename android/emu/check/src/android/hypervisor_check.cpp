@@ -19,15 +19,19 @@ namespace android {
 namespace emulation {
 
 using android::base::System;
+using android_studio::EmulatorCompatibilityInfo;
 
 // A check to make sure there is a enough disk space available
 // for the given avd.
 AvdCompatibilityCheckResult hasCompatibleHypervisor(AvdInfo* avd) {
+    android_studio::EmulatorCompatibilityInfo metrics;
     if (avd == nullptr) {
+        metrics.set_check(
+                EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_NO_AVD);
         return {
                 .description = "No avd present, cannot check hypervisor compatibility",
                 .status = AvdCompatibility::Warning,
-        };
+                .metrics = metrics};
     }
 
     // Allow users and tests to skip compatibility checks
@@ -44,6 +48,8 @@ AvdCompatibilityCheckResult hasCompatibleHypervisor(AvdInfo* avd) {
 
     if (isXrAvd && (accelerator == ANDROID_CPU_ACCELERATOR_AEHD ||
                     accelerator == ANDROID_CPU_ACCELERATOR_HAX)) {
+        metrics.set_check(EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_GPU_CHECK_NO_VULKAN);
+        metrics.set_details("Accelerator for Xr");
         return {
                 .description = absl::StrFormat(
                         "Your current hypervisor (AEHD or HAXM) is not compatible with Android XR AVD %s. "
@@ -51,7 +57,7 @@ AvdCompatibilityCheckResult hasCompatibleHypervisor(AvdInfo* avd) {
                         "Refer to https://developer.android.com/studio/run/emulator-acceleration#vm-windows-whpx",
                         name),
                 .status = AvdCompatibility::Warning,
-        };
+                .metrics = metrics};
     }
 
     return {
