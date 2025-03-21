@@ -30,6 +30,7 @@ extern "C" {
 #include "aemu/base/files/PathUtils.h"             // for pj, PathUtils
 #include "android/base/system/System.h"               // for System
 #include "android/emulation/CpuAccelerator.h"         // for GetCurrentCpuAc...
+#include "host-common/FeatureControl.h"  // for isEnabled
 #include "host-common/HostmemIdMapping.h"       // for android_emulati...
 #include "host-common/VmLock.h"                 // for RecursiveScoped...
 #include "android/emulation/control/callbacks.h"      // for LineConsumerCal...
@@ -219,7 +220,8 @@ static bool is_snapshot_save_skipped() {
     }
 
     // if vulkan snapshot is enabled
-    if (does_snapshot_use_vulkan) {
+    namespace fc = android::featurecontrol;
+    if (fc::isEnabled(fc::VulkanSnapshots) || does_snapshot_use_vulkan) {
         // for now, it is not really stable
         // assume user is aware of that
         return false;
