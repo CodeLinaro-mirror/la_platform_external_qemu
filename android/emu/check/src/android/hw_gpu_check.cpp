@@ -188,9 +188,10 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         metrics.set_check(
                 EmulatorCompatibilityInfo::
                         AVD_COMPATIBILITY_CHECK_GPU_CHECK_UNSUPPORTED_VULKAN_VERSION);
-        metrics.set_details(absl::StrFormat("GPU:%s, API: %d.%d.%d",
+        metrics.set_details(absl::StrFormat("GPU:%s, API: %d.%d.%d Driver: %s",
                                             vendorName, vkMajor,
-                                            vkMinor, vkPatch));
+                                            vkMinor, vkPatch,
+                                            driverVersionStr));
         return {
                 .description = absl::StrFormat(
                         "GPU driver is not supported to run avd: `%s`. "
