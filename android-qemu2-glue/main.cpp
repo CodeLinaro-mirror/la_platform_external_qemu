@@ -1000,6 +1000,10 @@ static bool createInitalEncryptionKeyPartition(AndroidHwConfig* hw) {
     }
     hw->disk_encryptionKeyPartition_path =
             path_join(userdata_dir.get(), "encryptionkey.img");
+    if (path_exists(hw->disk_encryptionKeyPartition_path)) {
+        return true;  // keep the existing encryptionkey.img file
+    }
+
     if (path_exists(hw->disk_systemPartition_initPath)) {
         ScopedCPtr<char> sysimg_dir(
                 path_dirname(hw->disk_systemPartition_initPath));
