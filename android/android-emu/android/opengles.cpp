@@ -266,9 +266,10 @@ int android_startOpenglesRenderer(
     sRenderLib->setAvdInfo(guestPhoneApi, guestApiLevel);
     sRenderLib->setCrashReporter(&crashhandler_die_format);
 
-    if (android::featurecontrol::isEnabled(android::featurecontrol::Minigbm)) {
+    if (android::featurecontrol::isEnabled(android::featurecontrol::Minigbm)
+        || android::featurecontrol::isEnabled(android::featurecontrol::VulkanSnapshots)) {
         // TODO(b/373686455): Disabling VulkanbatchedDescriptorSetUpdate on minigbm results in
-        // crash.
+        // crash. Also required for VulkanSnapshots at this point.
         android::featurecontrol::setIfNotOverriden(
             android::featurecontrol::VulkanBatchedDescriptorSetUpdate, true);
     }
@@ -366,17 +367,6 @@ int android_startOpenglesRenderer(
          kAemuToGfxstreamFeatureMap) {
         (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled =
                 android::featurecontrol::isEnabled(aemuFeature);
-    }
-
-    gfxstream::host::FeatureDependencyHandler gfxstreamFeaturesDependencyHandler(gfxstreamFeatures);
-    const bool enableFeatureDepsCheck =
-            android::base::getEnvironmentVariable(
-                    "ANDROID_EMU_VK_DISABLE_FEATURE_DEPS_CHECK")
-                    .empty();
-    gfxstream::host::FeatureResult res =  gfxstreamFeaturesDependencyHandler.checkAllDependentFeaturesAreEnabled();
-    if (enableFeatureDepsCheck && !res.first) {
-        ERR(res.second.c_str());
-        return -1;
     }
 #else
     // libOpenglRender uses feature control directly.
