@@ -127,5 +127,8 @@ message EmulatorRequest {
 }
 
 message EmulatorResponse {
-    optional Status status = 1;
+    oneof response {
+        Status status = 1;
+        XrOptions xr_options = 2;
+    }
 }

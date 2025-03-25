@@ -22,6 +22,7 @@
 #include "android/hw-sensors.h"
 #include "android/utils/debug.h"
 #include "host-common/MultiDisplay.h"
+#include "xr_emulator_conn.pb.h"
 
 #define DEBUG 0
 /* set  for very verbose debugging */
@@ -225,12 +226,18 @@ void NotificationStream::registerListeners() {
         mNotificationListeners.fireEvent(getBootedNotificationEvent());
     });
 
-
     auto xrOptionsPublisher =
-            static_cast<base::EventNotificationSupport<XrOptions>*>(
+            static_cast<base::EventNotificationSupport<xr_emulator_proto::XrOptions>*>(
                     android_get_xr_options_publisher());
     xrOptionsPublisher->registerOnce([&](auto options) {
-        mNotificationListeners.fireEvent(getXrOptionsNotificationEvent());
+        DD("Sending XR options notification event - environment: %d, passthrough_coefficient: %f",
+          options.environment(),
+          options.passthrough_coefficient());
+        Notification event;
+        auto eventDetails = event.mutable_xroptions();
+        eventDetails->set_environment(static_cast<XrOptions::Environment>(options.environment()));
+        eventDetails->set_passthrough_coefficient(options.passthrough_coefficient());
+        mNotificationListeners.fireEvent(event);
     });
 }
 }  // namespace control
