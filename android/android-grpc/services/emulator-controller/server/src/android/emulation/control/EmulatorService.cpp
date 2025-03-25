@@ -988,6 +988,7 @@ public:
             return Status::CANCELLED;
         }
 
+        std::shared_ptr<SharedMemory> shm;
         uint8_t* pixels;
         size_t cPixels = 0;
         bool isPNG = request->format() ==
@@ -1029,7 +1030,7 @@ public:
         rotation_reply->set_zaxis(zaxis);
         rotation_reply->set_rotation(rotation);
         if (request->transport().channel() == ImageTransport::MMAP) {
-            auto shm = mSharedMemoryLibrary.borrow(
+            shm = mSharedMemoryLibrary.borrow(
                     request->transport().handle(), cPixels);
             if (shm->isOpen() && shm->isMapped()) {
                 if (cPixels > shm->size()) {
