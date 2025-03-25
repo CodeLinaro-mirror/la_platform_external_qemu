@@ -234,7 +234,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                         absl::StrFormat("GPU memory available (%llu MB) to run "
                                         "avd: `%s` is below "
                                         "the suggested level (%llu MB)",
-                                        deviceMemMiB, name, avdMinGpuMemMiB),
+                                        deviceMemMiB, name, avdSuggestedGpuMemMiB),
                 .status = AvdCompatibility::Warning,
                 .metrics = metrics};
     }
