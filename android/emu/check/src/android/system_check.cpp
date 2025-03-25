@@ -66,16 +66,19 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
         // < 0.1% of our users as of November 2024
         metrics.set_check(
                 EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_SYSTEM_CORE);
+        metrics.set_details(absl::StrFormat("numCores: %d", numCores));
         return {.description =
                         absl::StrFormat("AVD '%s' requires %d CPU cores to "
                                         "run. Only %d cores are available.",
-                                        avdName, numCores, minNumCores),
+                                        avdName, minNumCores, numCores),
                 .status = AvdCompatibility::Error,
                 .metrics = metrics};
     } else if (numCores < idealMinNumCores) {
         // < 2% of our users as of November 2024
         metrics.set_check(
                 EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_SYSTEM_CORE);
+        metrics.set_details(absl::StrFormat("numCores: %d", numCores));
+
         return {.description =
                         absl::StrFormat("AVD '%s' will run more smoothly with "
                                         "%d CPU cores (currently using %d)",
