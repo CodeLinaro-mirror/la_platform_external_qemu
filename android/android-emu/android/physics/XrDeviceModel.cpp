@@ -26,6 +26,7 @@
 #include "xr_emulator_conn.pb.h"
 
 #define D(...) VERBOSE_PRINT(sensors, __VA_ARGS__)
+#define I(...) dinfo(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
 #define E(...) derror(__VA_ARGS__)
 
@@ -303,13 +304,32 @@ QemudClient* XrDeviceModel::initializeQemudClient(int channel,
 void XrDeviceModel::qemudClientRecv(uint8_t* msg, int msglen) {
     D("XrDeviceModel::qemudClientRecv");
     EmulatorResponse response;
-    std::string printMsg;
     if (response.ParseFromString(std::string(msg, msg + msglen))) {
-        printMsg += " Status: " + std::to_string(response.status());
+        switch (response.response_case()) {
+            case EmulatorResponse::kStatus: {
+                D("Status: %d", static_cast<int>(response.status()));
+                break;
+            }
+
+            case EmulatorResponse::kXrOptions: {
+                const auto& xr_options = response.xr_options();
+                I("XrOptions received: %s", xr_options.ShortDebugString().c_str());
+                if (xr_options.has_passthrough_coefficient()) {
+                    I("Received passthrough coefficient: %f",
+                      xr_options.passthrough_coefficient());
+                    mXrOptionsPublisher.fireEvent(xr_options);
+                }
+                break;
+            }
+
+            case EmulatorResponse::RESPONSE_NOT_SET: {
+                E("No response type set");
+                break;
+            }
+        }
     } else {
-        printMsg = "Received raw string: " + std::string(msg, msg + msglen);
+        E("Cannot parse raw string: %s", std::string(msg, msg + msglen));
     }
-    D("%s.\n", static_cast<std::string>(printMsg));
 }
 
 void XrDeviceModel::qemudClientClose() {
