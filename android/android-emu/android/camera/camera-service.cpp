@@ -750,54 +750,54 @@ struct CameraClient
      *  On Linux this is the name of the camera device.
      *  On Windows this is the name of capturing window.
      */
-    char*               device_name;
+    char*               device_name = nullptr;
     /* Input channel to use to connect to the camera. */
-    int                 inp_channel;
+    int                 inp_channel = 0;
     /* Camera information. */
-    const CameraInfo*   camera_info;
+    const CameraInfo*   camera_info = nullptr;
     /* Emulated camera device descriptor. */
-    CameraDevice*       camera;
+    CameraDevice*       camera = nullptr;
 
-    CameraDevice* (*open)(const char* name, int inp_channel);
+    CameraDevice* (*open)(const char* name, int inp_channel) = nullptr;
     int (*start_capturing)(CameraDevice* cd,
                            uint32_t pixel_format,
                            int frame_width,
-                           int frame_height);
-    int (*stop_capturing)(CameraDevice* cd);
+                           int frame_height) = nullptr;
+    int (*stop_capturing)(CameraDevice* cd) = nullptr;
     int (*read_frame)(CameraDevice* cd,
                       ClientFrame* frame,
                       float r_scale,
                       float g_scale,
                       float b_scale,
                       float exp_comp,
-                      const char* direction);
-    void (*close)(CameraDevice* cd);
+                      const char* direction) = nullptr;
+    void (*close)(CameraDevice* cd) = nullptr;
 
     /* Buffer allocated for video frames.
      * Note that memory allocated for this buffer also contains preview
      * framebuffer and i420 staging framebuffer. */
-    uint8_t*            video_frame;
+    uint8_t*            video_frame = nullptr;
     /* Preview frame buffer.
      * This address points inside the 'video_frame' buffer. */
-    uint8_t*            preview_frame;
+    uint8_t*            preview_frame = nullptr;
     /* Byte size of the videoframe buffer. */
-    size_t              video_frame_size;
+    size_t              video_frame_size = 0;
     /* Byte size of the preview frame buffer. */
-    size_t              preview_frame_size;
+    size_t              preview_frame_size = 0;
     /* Staging framebuffer, used as an intermediate buffer for libyuv. */
-    uint8_t*            staging_framebuffer;
+    uint8_t*            staging_framebuffer = nullptr;
     /* Staging framebuffer size. */
-    size_t              staging_framebuffer_size;
+    size_t              staging_framebuffer_size = 0;
     /* Pixel format required by the guest. */
-    uint32_t            pixel_format;
+    uint32_t            pixel_format = 0;
     /* Frame width. */
-    int                 width;
+    int                 width = 0;
     /* Frame height. */
-    int                 height;
+    int                 height = 0;
     /* Number of pixels in a frame buffer. */
-    int                 pixel_num;
+    int                 pixel_num = 0;
     /* Status of preview frame cache. */
-    int                 frames_cached;
+    int                 frames_cached = 0;
     /* Queries being sent from the guest can be interrupted, resulting in the camera receiving
        the partial text of a query.  (This can be detected by the query not ending with a
        terminating 0 character.)  In that case, the partial command is stored in command_buffer,
@@ -805,40 +805,14 @@ struct CameraClient
        the next segment should be written.
        */
     char command_buffer[MAX_QUERY_MESSAGE_SIZE];
-    int  command_buffer_offset;
+    int  command_buffer_offset = 0;
     /* Total number of frames rendered, used for metrics. */
-    uint64_t            frame_count;
-    bool                started;
-    bool                need_frame_cache;
-    size_t              frame_cache_size;
+    uint64_t            frame_count = 0;
+    bool                started = false;
+    bool                need_frame_cache = false;
+    size_t              frame_cache_size = 0;
     std::vector<uint8_t>    frame_cache;
-    CameraClient()
-        : device_name(nullptr),
-          inp_channel(0),
-          camera_info(nullptr),
-          camera(nullptr),
-          open(nullptr),
-          start_capturing(nullptr),
-          stop_capturing(nullptr),
-          read_frame(nullptr),
-          close(nullptr),
-          video_frame(nullptr),
-          preview_frame(nullptr),
-          video_frame_size(0),
-          preview_frame_size(0),
-          staging_framebuffer(nullptr),
-          staging_framebuffer_size(0),
-          pixel_format(0),
-          width(0),
-          height(0),
-          pixel_num(0),
-          frames_cached(0),
-          command_buffer_offset(0),
-          frame_count(0),
-          started(false),
-          need_frame_cache(false),
-          frame_cache_size(0) {};
-
+    CameraClient() = default;
     ~CameraClient() {
         if (camera_info != NULL) {
             ((CameraInfo*)camera_info)->in_use = 0;
