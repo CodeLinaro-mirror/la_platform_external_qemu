@@ -62,14 +62,11 @@
 #define V1 ((avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) > 29) && \
             !feature_is_enabled(kFeature_Minigbm))
 
-/* Defines name of the camera service. */
-#define SERVICE_NAME    "camera"
-
 /* Maximum number of supported emulated cameras. */
-#define MAX_CAMERA      8
+static constexpr size_t MAX_CAMERA = 8;
 
 /* the query from guest should not be too long, so 8092 is more than enough */
-#define MAX_QUERY_MESSAGE_SIZE 8092
+static constexpr size_t MAX_QUERY_MESSAGE_SIZE = 8092;
 
 /* Camera sevice descriptor. */
 typedef struct CameraServiceDesc CameraServiceDesc;
@@ -462,7 +459,7 @@ static void
 _camera_service_init(CameraServiceDesc* csd)
 {
     /* Enumerate camera devices connected to the host. */
-    memset(csd->camera_info, 0, sizeof(CameraInfo) * MAX_CAMERA);
+    memset(csd->camera_info, 0, sizeof(csd->camera_info));
     csd->camera_count = 0;
     set_coarse_orientation_getter(
         (GetCoarseOrientation)android_sensors_get_coarse_orientation);
@@ -2063,18 +2060,20 @@ void register_camera_status_change_callback(camera_callback_t cb, void* ctx, Cam
 }
 
 void android_camera_service_init(void) {
+    static constexpr char kServiceCamera[] = "camera";
+
     static int _inited = 0;
 
     if (!_inited) {
         _camera_service_init(&_camera_service_desc);
-        QemudService*  serv = qemud_service_register( SERVICE_NAME, 0,
+        QemudService*  serv = qemud_service_register(kServiceCamera, 0,
                 &_camera_service_desc,
                 _camera_service_connect,
                 NULL,
                 NULL);
         if (serv == NULL) {
             derror("%s: Could not register '%s' service",
-                    __func__, SERVICE_NAME);
+                    __func__, kServiceCamera);
             return;
         }
 
@@ -2094,6 +2093,6 @@ void android_camera_service_init(void) {
             }
         }
 
-        D("%s: Registered '%s' qemud service", __func__, SERVICE_NAME);
+        D("%s: Registered '%s' qemud service", __func__, kServiceCamera);
     }
 }
