@@ -304,7 +304,7 @@ QemudClient* XrDeviceModel::initializeQemudClient(int channel,
 void XrDeviceModel::qemudClientRecv(uint8_t* msg, int msglen) {
     D("XrDeviceModel::qemudClientRecv");
     EmulatorResponse response;
-    if (response.ParseFromString(std::string(msg, msg + msglen))) {
+    if (response.ParseFromArray(msg, msglen)) {
         switch (response.response_case()) {
             case EmulatorResponse::kStatus: {
                 D("Status: %d", static_cast<int>(response.status()));
@@ -328,7 +328,7 @@ void XrDeviceModel::qemudClientRecv(uint8_t* msg, int msglen) {
             }
         }
     } else {
-        E("Cannot parse raw string: %s", std::string(msg, msg + msglen));
+        E("Cannot parse raw string: %s", std::string_view(reinterpret_cast<const char*>(msg), msglen));
     }
 }
 
