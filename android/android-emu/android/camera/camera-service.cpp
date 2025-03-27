@@ -754,7 +754,7 @@ struct CameraClient
     /* Input channel to use to connect to the camera. */
     int                 inp_channel = 0;
     /* Camera information. */
-    const CameraInfo*   camera_info = nullptr;
+    CameraInfo*         camera_info = nullptr;
     /* Emulated camera device descriptor. */
     CameraDevice*       camera = nullptr;
 
@@ -815,7 +815,7 @@ struct CameraClient
     CameraClient() = default;
     ~CameraClient() {
         if (camera_info != NULL) {
-            ((CameraInfo*)camera_info)->in_use = 0;
+            camera_info->in_use = 0;
         }
         if (camera != NULL) {
             close(camera);
