@@ -19,6 +19,7 @@
  */
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -785,13 +786,6 @@ struct CameraClient
     };
 };
 
-/* Frees emulated camera client descriptor. */
-static void
-_camera_client_free(CameraClient* cc)
-{
-    delete(cc);
-}
-
 /* Creates descriptor for a connecting emulated camera client.
  * Param:
  *  csd - Camera service descriptor.
@@ -806,7 +800,7 @@ _camera_client_free(CameraClient* cc)
 static CameraClient*
 _camera_client_create(CameraServiceDesc* csd, const char* param)
 {
-    CameraClient* cc = new CameraClient();
+    std::unique_ptr<CameraClient> cc = std::make_unique<CameraClient>();
     CameraInfo* ci;
     int res;
 
@@ -818,7 +812,7 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
     if (get_token_value_alloc(param, "name", &cc->device_name)) {
         E("%s: Allocation failure, or required 'name' parameter is missing, or misformed in '%s'",
           __func__, param);
-        return NULL;
+        return nullptr;
     }
 
     /* Pull optional input channel. */
@@ -831,7 +825,7 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
         } else {
             E("%s: 'inp_channel' parameter is misformed in '%s'",
               __func__, param);
-            return NULL;
+            return nullptr;
         }
     }
 
@@ -847,16 +841,14 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
     if (ci == NULL) {
         E("%s: Cannot find camera info for device '%s'",
           __func__, cc->device_name);
-        _camera_client_free(cc);
-        return NULL;
+        return nullptr;
     }
 
     /* We can't allow multiple camera services for a single camera device, Lets
      * make sure that there is no client created for this camera. */
     if (ci->in_use) {
         E("%s: Camera device '%s' is in use", __func__, cc->device_name);
-        _camera_client_free(cc);
-        return NULL;
+        return nullptr;
     }
 
     /* We're done. Set camera in use, and succeed the connection. */
@@ -886,7 +878,7 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
     D("%s: Camera service is created for device '%s' using input channel %d",
       __func__, cc->device_name, cc->inp_channel);
 
-    return cc;
+    return cc.release();
 }
 
 /********************************************************************************
@@ -1857,12 +1849,12 @@ _camera_client_recv(void*         opaque,
 static void
 _camera_client_close(void* opaque)
 {
-    CameraClient* cc = (CameraClient*)opaque;
+    CameraClient* cc = static_cast<CameraClient*>(opaque);
 
     D("%s: Camera client for device '%s' on input channel %d is now closed",
       __func__, cc->device_name, cc->inp_channel);
 
-    _camera_client_free(cc);
+    delete cc;
 }
 
 /* Saves the state of the camera client.
