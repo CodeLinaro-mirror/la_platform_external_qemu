@@ -190,19 +190,6 @@ void XrDeviceModel::setXrOptions(int environment,
     xr_options_param->set_environment(static_cast<XrOptions_Environment>(environment));
     xr_options_param->set_passthrough_coefficient(passthroughCoefficient);
     qemudClientSend(request);
-
-    vec3 currentOptions = getXrOptions(PARAMETER_VALUE_TYPE_CURRENT);
-    int currentEnvironment = static_cast<int>(currentOptions.x);
-    float currentPassthroughCoefficient = currentOptions.y;
-
-    if (currentEnvironment != environment || 
-        currentPassthroughCoefficient != passthroughCoefficient) {
-        xr_emulator_proto::XrOptions options;
-        options.set_environment(static_cast<xr_emulator_proto::XrOptions_Environment>(environment));
-        options.set_passthrough_coefficient(passthroughCoefficient);
-
-        mXrOptionsPublisher.fireEvent(options);
-    }
 }
 
 vec3 XrDeviceModel::getXrOptions(
