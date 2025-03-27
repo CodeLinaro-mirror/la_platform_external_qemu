@@ -257,27 +257,6 @@ static CameraInfo* _camera_info_get_by_display_name(const char* disp_name,
     return NULL;
 }
 
-/* Gets camera information matching a device name.
- * Param:
- *  device_name - Device name to match.
- *  arr - Array of camera informations.
- *  num - Number of elements in the array.
- * Return:
- *  Matching camera information, or NULL if matching camera information for the
- *  given device name has not been found in the array.
- */
-static CameraInfo*
-_camera_info_get_by_device_name(const char* device_name, CameraInfo* arr, int num)
-{
-    int n;
-    for (n = 0; n < num; n++) {
-        if (arr[n].device_name != NULL && !strcmp(arr[n].device_name, device_name)) {
-            return &arr[n];
-        }
-    }
-    return NULL;
-}
-
 static int _camera_client_get_max_resolution(const CameraInfo* info,
                                              int* width, int* height) {
     if (!info || !width || !height) {
@@ -489,22 +468,6 @@ _camera_service_init(CameraServiceDesc* csd)
             camera_info_done(&ci[i]);
         }
     }
-}
-
-/* Gets camera information for the given camera device name.
- * Param:
- *  cs - Initialized camera service descriptor.
- *  device_name - Camera's device name to look up the information for.
- * Return:
- *  Camera information pointer on success, or NULL if no camera information has
- *  been found for the given device name.
- */
-static CameraInfo*
-_camera_service_get_camera_info_by_device_name(CameraServiceDesc* cs,
-                                               const char* device_name)
-{
-    return _camera_info_get_by_device_name(device_name, cs->camera_info,
-                                           cs->camera_count);
 }
 
 /********************************************************************************
@@ -801,7 +764,6 @@ static CameraClient*
 _camera_client_create(CameraServiceDesc* csd, const char* param)
 {
     std::unique_ptr<CameraClient> cc = std::make_unique<CameraClient>();
-    CameraInfo* ci;
     int res;
 
     /*
@@ -829,16 +791,12 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
         }
     }
 
-    /* Get camera info for the emulated camera represented with this service.
-     * Array of camera information records has been created when the camera
-     * service was enumerating camera devices during the service initialization.
-     * By the camera service protocol, camera service clients must first obtain
-     * list of enumerated cameras via the 'list' query to the camera service, and
-     * then use device name reported in the list to connect to an emulated camera
-     * service. So, if camera information for the given device name is not found
-     * in the array, we fail this connection due to protocol violation. */
-    ci = _camera_service_get_camera_info_by_device_name(csd, cc->device_name);
-    if (ci == NULL) {
+    CameraInfo* ci = std::find_if(csd->camera_info, &csd->camera_info[csd->camera_count],
+                                  [&cc](const CameraInfo& ci){
+                                        return ci.device_name &&
+                                               !strcmp(ci.device_name, cc->device_name);
+                                  });
+    if (ci == &csd->camera_info[csd->camera_count]) {
         E("%s: Cannot find camera info for device '%s'",
           __func__, cc->device_name);
         return nullptr;
