@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 
 #include "android/camera/camera-service.h"
 
@@ -190,49 +191,22 @@ static int get_token_value_int(const char* params,
     }
 }
 
-/* Extracts query name, and (optionally) query parameters from the query string.
- * Param:
- *  query - Query string. Query string in the camera service are formatted as such:
- *          "<query name>[ <parameters>]",
- *      where parameters are optional, and if present, must be separated from the
- *      query name with a single ' '. See comments to get_token_value routine
- *      for the format of the parameters string.
- *  query_name - Upon success contains query name extracted from the query
- *      string.
- *  query_name_size - Buffer size for 'query_name' string.
- *  query_param - Upon success contains a pointer to the beginning of the query
- *      parameters. If query has no parameters, NULL will be passed back with
- *      this parameter. This parameter is optional and can be NULL.
- * Return:
- *  0 on success, or number of bytes required for query name if 'query_name'
- *  string buffer was too small to contain it.
- */
-static int
-_parse_query(const char* query,
-             char* query_name,
-             int query_name_size,
-             const char** query_param)
+static std::pair<std::string_view, std::string_view> _parse_query(const std::string_view request)
 {
-    /* Extract query name. */
-    const char* qend = strchr(query, ' ');
-    if (qend == NULL) {
-        qend = query + strlen(query);
+    const size_t separator = request.find(' ');
+    if (separator != request.npos) {
+        return {request.substr(0, separator), request.substr(separator + 1)};
+    } else if (request.empty()) {
+        return {{}, {}};
+    } else if (request.back() == 0) {
+        return {request.substr(0, request.size() - 1), {}};
+    } else {
+        return {request, {}};
     }
-    if ((qend - query) >= query_name_size) {
-        return qend - query + 1;
-    }
-    memcpy(query_name, query, qend - query);
-    query_name[qend - query] = '\0';
+}
 
-    /* Calculate query parameters pointer (if needed) */
-    if (query_param != NULL) {
-        if (*qend == ' ') {
-            qend++;
-        }
-        *query_param = (*qend == '\0') ? NULL : qend;
-    }
-
-    return 0;
+static std::pair<std::string_view, std::string_view> _parse_query(const void* data, size_t size) {
+    return _parse_query(std::string_view(static_cast<const char*>(data), size));
 }
 
 static std::string _camera_info_to_string(const CameraInfo& ci) {
@@ -679,30 +653,25 @@ _factory_client_recv(void*         opaque,
                      int           msglen,
                      QemudClient*  client)
 {
-    /*
-     * Emulated camera factory client queries.
-     */
+    using namespace std::literals;
 
     /* List cameras connected to the host. */
-    static const char _query_list[]     = "list";
+    static constexpr std::string_view _query_list = "list"sv;
 
     CameraServiceDesc* csd = (CameraServiceDesc*)opaque;
-    char query_name[64];
-    const char* query_param = NULL;
 
     /* Parse the query, extracting query name and parameters. */
-    if (_parse_query((const char*)msg, query_name, sizeof(query_name),
-                     &query_param)) {
+    const auto [query_name, query_param] = _parse_query(msg, msglen);
+    if (query_name.empty()) {
         E("%s: Invalid format in query '%s'", __func__, (const char*)msg);
         _qemu_client_reply_ko(client, "Invalid query format");
         return;
     }
 
-    D("%s Camera factory query '%s'", __func__, query_name);
+    D("%s Camera factory query '%*.*s'", __func__,
+      int(query_name.size()), int(query_name.size()), query_name.data());
 
-    /* Dispatch the query to an appropriate handler. */
-    if (!strcmp(query_name, _query_list)) {
-        /* This is a "list" query. */
+    if (query_name == _query_list) {
         _factory_client_list_cameras(csd, client);
     } else {
         E("%s: Unknown camera factory query name in '%s'",
@@ -1778,6 +1747,8 @@ camera_client_handle_event(CameraClient*  cc,
                             uint8_t*       msg,
                             int            msglen,
                             QemudClient*   client) {
+    using namespace std::literals;
+
     /*
      * Emulated camera client queries.
      */
@@ -1802,22 +1773,17 @@ camera_client_handle_event(CameraClient*  cc,
            with the next segment of the command */
         return;
     }
-    msg = (uint8_t*)(cc->command_buffer);
-    cc->command_buffer_offset = 0;
-    /* E("%s: query is '%s'\n", __func__, msg); */
-    /* Connect to the camera. */
-    static const char _query_connect[]    = "connect";
-    /* Disconnect from the camera. */
-    static const char _query_disconnect[] = "disconnect";
-    /* Start video capturing. */
-    static const char _query_start[]      = "start";
-    /* Stop video capturing. */
-    static const char _query_stop[]       = "stop";
-    /* Query frame(s). */
-    static const char _query_frame[]      = "frame";
 
-    char query_name[64];
-    const char* query_param = NULL;
+    /* Connect to the camera. */
+    static constexpr std::string_view _query_connect    = "connect"sv;
+    /* Disconnect from the camera. */
+    static constexpr std::string_view _query_disconnect = "disconnect"sv;
+    /* Start video capturing. */
+    static constexpr std::string_view _query_start      = "start"sv;
+    /* Stop video capturing. */
+    static constexpr std::string_view _query_stop       = "stop"sv;
+    /* Query frame(s). */
+    static constexpr std::string_view _query_frame      = "frame"sv;
 
     /*
      * Emulated camera queries are formatted as such:
@@ -1825,39 +1791,42 @@ camera_client_handle_event(CameraClient*  cc,
      */
 
     T("%s: Camera client query: '%s'", __func__, (char*)msg);
-    if (_parse_query((const char*)msg, query_name, sizeof(query_name),
-        &query_param)) {
-        E("%s: Invalid query '%s'", __func__, (char*)msg);
+    const auto [query_name, query_param] =
+        _parse_query(cc->command_buffer, cc->command_buffer_offset);
+    cc->command_buffer_offset = 0;
+
+    if (query_name.empty()) {
+        E("%s: Invalid query '%s'", __func__, cc->command_buffer);
         _qemu_client_reply_ko(client, "Invalid query");
         return;
     }
 
     /* Dispatch the query to an appropriate handler. */
-    if (!strcmp(query_name, _query_frame)) {
+    if (query_name == _query_frame) {
         /* A frame is queried. */
         if (V1) {
-            _camera_client_query_frame_v1(cc, client, query_param);
+            _camera_client_query_frame_v1(cc, client, query_param.data());
         } else {
-            _camera_client_query_frame(cc, client, query_param);
+            _camera_client_query_frame(cc, client, query_param.data());
         }
-    } else if (!strcmp(query_name, _query_connect)) {
+    } else if (query_name == _query_connect) {
         /* Camera connection is queried. */
-        _camera_client_query_connect(cc, client, query_param);
-    } else if (!strcmp(query_name, _query_disconnect)) {
+        _camera_client_query_connect(cc, client, query_param.data());
+    } else if (query_name == _query_disconnect) {
         /* Camera disnection is queried. */
-        _camera_client_query_disconnect(cc, client, query_param);
-    } else if (!strcmp(query_name, _query_start)) {
+        _camera_client_query_disconnect(cc, client, query_param.data());
+    } else if (query_name == _query_start) {
         /* Start capturing is queried. */
         if (V1) {
-            _camera_client_query_start_v1(cc, client, query_param);
+            _camera_client_query_start_v1(cc, client, query_param.data());
         } else {
-            _camera_client_query_start(cc, client, query_param);
+            _camera_client_query_start(cc, client, query_param.data());
         }
-    } else if (!strcmp(query_name, _query_stop)) {
+    } else if (query_name == _query_stop) {
         /* Stop capturing is queried. */
-        _camera_client_query_stop(cc, client, query_param);
+        _camera_client_query_stop(cc, client, query_param.data());
     } else {
-        E("%s: Unknown query '%s'", __func__, (char*)msg);
+        E("%s: Unknown query '%s'", __func__, cc->command_buffer);
         _qemu_client_reply_ko(client, "Unknown query");
     }
 }
