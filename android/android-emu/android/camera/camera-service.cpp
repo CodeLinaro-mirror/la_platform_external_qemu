@@ -19,6 +19,7 @@
  */
 
 #include <algorithm>
+#include <string>
 
 #include "android/camera/camera-service.h"
 
@@ -234,118 +235,29 @@ _parse_query(const char* query,
     return 0;
 }
 
-/* Appends one string to another, growing the destination string buffer if
- * needed.
- * Param:
- *  str_buffer - Contains pointer to the destination string buffer. Content of
- *      this parameter can be NULL. Note that content of this parameter will
- *      change if string buffer has been reallocated.
- *  str_buf_size - Contains current buffer size of the string, addressed by
- *      'str_buffer' parameter. Note that content of this parameter will change
- *      if string buffer has been reallocated.
- *  str - String to append.
- * Return:
- *  0 on success, or -1 on failure (memory allocation).
- */
-static int
-_append_string(char** str_buf, size_t* str_buf_size, const char* str)
-{
-    const size_t offset = (*str_buf != NULL) ? strlen(*str_buf) : 0;
-    const size_t append_bytes = strlen(str) + 1;
-
-    /* Make sure these two match. */
-    if (*str_buf == NULL) {
-        *str_buf_size = 0;
+static std::string _camera_info_to_string(const CameraInfo& ci) {
+    if (ci.frame_sizes_num == 0) {
+        return {};
     }
 
-    if ((offset + append_bytes) > *str_buf_size) {
-        /* Reallocate string, so it can fit what's being append to it. Note that
-         * we reallocate a bit bigger buffer than is needed in order to minimize
-         * number of memory allocation calls in case there are more "appends"
-         * coming. */
-        const size_t required_mem = offset + append_bytes + 256;
-        char* new_buf = (char*)realloc(*str_buf, required_mem);
-        if (new_buf == NULL) {
-            E("%s: Unable to allocate %d bytes for a string",
-              __func__, required_mem);
-            return -1;
-        }
-        *str_buf = new_buf;
-        *str_buf_size = required_mem;
-    }
-    memcpy(*str_buf + offset, str, append_bytes);
+    char buf[256];
+    int len = ::snprintf(buf, sizeof(buf), "name=%s channel=%u pix=%u "
+                         "dir=%s framedims=%ux%u", ci.device_name,
+                         ci.inp_channel, ci.pixel_format, ci.direction,
+                         ci.frame_sizes[0].width, ci.frame_sizes[0].height);
 
-    return 0;
-}
+    std::string info(buf, len);
 
-/* Represents camera information as a string formatted as follows:
- *  'name=<devname> channel=<num> pix=<format> facing=<direction> framedims=<widh1xheight1,...>\n'
- * Param:
- *  ci - Camera information descriptor to convert into a string.
- *  str - Pointer to the string buffer where to save the converted camera
- *      information descriptor. On entry, content of this parameter can be NULL.
- *      Note that string buffer addressed with this parameter may be reallocated
- *      in this routine, so (if not NULL) it must contain a buffer allocated with
- *      malloc.  The caller is responsible for freeing string buffer returned in
- *      this parameter.
- *  str_size - Contains byte size of the buffer addressed by 'str' parameter.
- * Return:
- *  0 on success, or != 0 on failure.
- */
-static int
-_camera_info_to_string(const CameraInfo* ci, char** str, size_t* str_size) {
-    int res;
-    int n;
-    char tmp[128];
-
-    /* Append device name. */
-    snprintf(tmp, sizeof(tmp), "name=%s ", ci->device_name);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append input channel. */
-    snprintf(tmp, sizeof(tmp), "channel=%d ", ci->inp_channel);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append pixel format. */
-    snprintf(tmp, sizeof(tmp), "pix=%d ", ci->pixel_format);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append direction. */
-    snprintf(tmp, sizeof(tmp), "dir=%s ", ci->direction);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append supported frame sizes. */
-    snprintf(tmp, sizeof(tmp), "framedims=%dx%d",
-             ci->frame_sizes[0].width, ci->frame_sizes[0].height);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    for (n = 1; n < ci->frame_sizes_num; n++) {
-        if (ci->frame_sizes[n].width > 1280 || ci->frame_sizes[n].height > 1280) {
-            /* Guest cannot handle large pictures due to memory allocation problem
-               bug:30835259
-             */
-            continue;
-        }
-        snprintf(tmp, sizeof(tmp), ",%dx%d",
-                 ci->frame_sizes[n].width, ci->frame_sizes[n].height);
-        res = _append_string(str, str_size, tmp);
-        if (res) {
-            return res;
-        }
+    for (int i = 1; i < ci.frame_sizes_num; ++i) {
+        len = ::snprintf(buf, sizeof(buf), ",%ux%u",
+                         ci.frame_sizes[i].width,
+                         ci.frame_sizes[i].height);
+        info.append(buf, len);
     }
 
-    /* Stringified camera properties should end with EOL. */
-    return _append_string(str, str_size, "\n");
+    info.push_back('\n');
+
+    return info;
 }
 
 /* Gets camera information matching a display name.
@@ -738,34 +650,18 @@ _qemu_client_reply_ko(QemudClient* qc, const char* ko_str)
 static int
 _factory_client_list_cameras(CameraServiceDesc* csd, QemudClient* client)
 {
-    int n;
-    size_t reply_size = 0;
-    char* reply = NULL;
-
-    /* Lets see if there was anything found... */
     if (csd->camera_count == 0) {
         /* No cameras connected to the host. Reply with "\n" */
         _qemu_client_reply_ok(client, "\n");
         return 0;
     }
 
-    /* "Stringify" each camera information into the reply string. */
-    for (n = 0; n < csd->camera_count; n++) {
-        const int res =
-            _camera_info_to_string(csd->camera_info + n, &reply, &reply_size);
-        if (res) {
-            if (reply != NULL) {
-                free(reply);
-            }
-            _qemu_client_reply_ko(client, "Memory allocation error");
-            return res;
-        }
+    std::string reply;
+    for (int n = 0; n < csd->camera_count; n++) {
+        reply += _camera_info_to_string(csd->camera_info[n]);
     }
 
-    D("%s Replied: %s", __func__, reply);
-    _qemu_client_reply_ok(client, reply);
-    free(reply);
-
+    _qemu_client_reply_ok(client, reply.c_str());
     return 0;
 }
 
