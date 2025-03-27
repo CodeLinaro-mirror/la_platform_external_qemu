@@ -29,7 +29,6 @@ extern "C" {
 
 #include "aemu/base/files/PathUtils.h"             // for pj, PathUtils
 #include "android/base/system/System.h"               // for System
-#include "aemu/base/async/ThreadLooper.h"
 #include "android/emulation/CpuAccelerator.h"         // for GetCurrentCpuAc...
 #include "host-common/HostmemIdMapping.h"       // for android_emulati...
 #include "host-common/VmLock.h"                 // for RecursiveScoped...
@@ -961,10 +960,11 @@ static void map_user_backed_ram(uint64_t gpa, void* hva, uint64_t size) {
                               USER_BACKED_RAM_FLAGS_READ | USER_BACKED_RAM_FLAGS_WRITE);
 }
 
-static void unmap_user_backed_ram(std::unordered_map<uint64_t, MemoryMapping>& aMemoryMap, uint64_t gpa, uint64_t size) {
+static void unmap_user_backed_ram(uint64_t gpa, uint64_t size) {
+    android::RecursiveScopedVmLock vmlock;
     DMEM("%s: gpa:0x%lx size:0x%lx", __func__, gpa, size);
-    auto res = aMemoryMap.find(gpa);
-    if (res == aMemoryMap.end()) {
+    auto res = sMemoryMap.find(gpa);
+    if (res == sMemoryMap.end()) {
         derror("Tried to unmap non-existant memory region {gpa:0x%lx size:0x%lx}. Ignoring.",
              gpa, size);
         return;
@@ -974,14 +974,8 @@ static void unmap_user_backed_ram(std::unordered_map<uint64_t, MemoryMapping>& a
                "Ignoring.", gpa, size, res->first, res->second.hva, res->second.memory_size);
         return;
     }
-    aMemoryMap.erase(res);
+    sMemoryMap.erase(res);
     qemu_user_backed_ram_unmap(gpa, size);
-}
-
-static void unmap_user_backed_ram_on_mainloop(uint64_t gpa, uint64_t size) {
-    android::base::ThreadLooper::runOnMainLooper(
-                [gpa=gpa, size=size] { unmap_user_backed_ram(sMemoryMap, gpa, size); }
-                );
 }
 
 static void get_vm_config(VmConfiguration* out) {
@@ -1288,7 +1282,7 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
         .setSnapshotCallbacks = set_snapshot_callbacks,
         .setSnapshotProtobuf = set_snapshot_protobuf,
         .mapUserBackedRam = map_user_backed_ram,
-        .unmapUserBackedRam = unmap_user_backed_ram_on_mainloop,
+        .unmapUserBackedRam = unmap_user_backed_ram,
         .getVmConfiguration = get_vm_config,
         .setFailureReason = set_failure_reason,
         .setExiting = set_exiting,
