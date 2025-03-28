@@ -19,6 +19,9 @@
  */
 
 #include <algorithm>
+#include <memory>
+#include <string>
+#include <string_view>
 
 #include "android/camera/camera-service.h"
 
@@ -94,163 +97,142 @@ static CameraCallbackDesc _camera_callback_desc;
  * Helper routines
  *******************************************************************************/
 
-/* Extracts query name, and (optionally) query parameters from the query string.
- * Param:
- *  query - Query string. Query string in the camera service are formatted as such:
- *          "<query name>[ <parameters>]",
- *      where parameters are optional, and if present, must be separated from the
- *      query name with a single ' '. See comments to get_token_value routine
- *      for the format of the parameters string.
- *  query_name - Upon success contains query name extracted from the query
- *      string.
- *  query_name_size - Buffer size for 'query_name' string.
- *  query_param - Upon success contains a pointer to the beginning of the query
- *      parameters. If query has no parameters, NULL will be passed back with
- *      this parameter. This parameter is optional and can be NULL.
- * Return:
- *  0 on success, or number of bytes required for query name if 'query_name'
- *  string buffer was too small to contain it.
- */
-static int
-_parse_query(const char* query,
-             char* query_name,
-             int query_name_size,
-             const char** query_param)
+static int get_token_value(const char* params, const char* name,
+                           char* value, int val_size)
 {
-    /* Extract query name. */
-    const char* qend = strchr(query, ' ');
-    if (qend == NULL) {
-        qend = query + strlen(query);
-    }
-    if ((qend - query) >= query_name_size) {
-        return qend - query + 1;
-    }
-    memcpy(query_name, query, qend - query);
-    query_name[qend - query] = '\0';
+    const char* val_end;
+    int len = strlen(name);
+    const char* par_end = params + strlen(params);
+    const char* par_start = strstr(params, name);
 
-    /* Calculate query parameters pointer (if needed) */
-    if (query_param != NULL) {
-        if (*qend == ' ') {
-            qend++;
+    /* Search for 'name=' */
+    while (par_start != NULL) {
+        /* Make sure that we're within the parameters buffer. */
+        if ((par_end - par_start) < len) {
+            par_start = NULL;
+            break;
         }
-        *query_param = (*qend == '\0') ? NULL : qend;
+        /* Make sure that par_start starts at the beginning of <name>, and only
+         * then check for '=' value separator. */
+        if ((par_start == params || (*(par_start - 1) == ' ')) &&
+                par_start[len] == '=') {
+            break;
+        }
+        /* False positive. Move on... */
+        par_start = strstr(par_start + 1, name);
+    }
+    if (par_start == NULL) {
+        return -1;
     }
 
-    return 0;
+    /* Advance past 'name=', and calculate value's string length. */
+    par_start += len + 1;
+    val_end = strchr(par_start, ' ');
+    if (val_end == NULL) {
+        val_end = par_start + strlen(par_start);
+    }
+    len = val_end - par_start;
+
+    /* Check if fits... */
+    if ((len + 1) <= val_size) {
+        memcpy(value, par_start, len);
+        value[len] = '\0';
+        return 0;
+    } else {
+        return len + 1;
+    }
 }
 
-/* Appends one string to another, growing the destination string buffer if
- * needed.
- * Param:
- *  str_buffer - Contains pointer to the destination string buffer. Content of
- *      this parameter can be NULL. Note that content of this parameter will
- *      change if string buffer has been reallocated.
- *  str_buf_size - Contains current buffer size of the string, addressed by
- *      'str_buffer' parameter. Note that content of this parameter will change
- *      if string buffer has been reallocated.
- *  str - String to append.
- * Return:
- *  0 on success, or -1 on failure (memory allocation).
- */
-static int
-_append_string(char** str_buf, size_t* str_buf_size, const char* str)
+static int get_token_value_alloc(const char* params,
+                                 const char* name, char** value)
 {
-    const size_t offset = (*str_buf != NULL) ? strlen(*str_buf) : 0;
-    const size_t append_bytes = strlen(str) + 1;
-
-    /* Make sure these two match. */
-    if (*str_buf == NULL) {
-        *str_buf_size = 0;
-    }
-
-    if ((offset + append_bytes) > *str_buf_size) {
-        /* Reallocate string, so it can fit what's being append to it. Note that
-         * we reallocate a bit bigger buffer than is needed in order to minimize
-         * number of memory allocation calls in case there are more "appends"
-         * coming. */
-        const size_t required_mem = offset + append_bytes + 256;
-        char* new_buf = (char*)realloc(*str_buf, required_mem);
-        if (new_buf == NULL) {
-            E("%s: Unable to allocate %d bytes for a string",
-              __func__, required_mem);
-            return -1;
-        }
-        *str_buf = new_buf;
-        *str_buf_size = required_mem;
-    }
-    memcpy(*str_buf + offset, str, append_bytes);
-
-    return 0;
-}
-
-/* Represents camera information as a string formatted as follows:
- *  'name=<devname> channel=<num> pix=<format> facing=<direction> framedims=<widh1xheight1,...>\n'
- * Param:
- *  ci - Camera information descriptor to convert into a string.
- *  str - Pointer to the string buffer where to save the converted camera
- *      information descriptor. On entry, content of this parameter can be NULL.
- *      Note that string buffer addressed with this parameter may be reallocated
- *      in this routine, so (if not NULL) it must contain a buffer allocated with
- *      malloc.  The caller is responsible for freeing string buffer returned in
- *      this parameter.
- *  str_size - Contains byte size of the buffer addressed by 'str' parameter.
- * Return:
- *  0 on success, or != 0 on failure.
- */
-static int
-_camera_info_to_string(const CameraInfo* ci, char** str, size_t* str_size) {
+    char tmp;
     int res;
-    int n;
-    char tmp[128];
 
-    /* Append device name. */
-    snprintf(tmp, sizeof(tmp), "name=%s ", ci->device_name);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append input channel. */
-    snprintf(tmp, sizeof(tmp), "channel=%d ", ci->inp_channel);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append pixel format. */
-    snprintf(tmp, sizeof(tmp), "pix=%d ", ci->pixel_format);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append direction. */
-    snprintf(tmp, sizeof(tmp), "dir=%s ", ci->direction);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    /* Append supported frame sizes. */
-    snprintf(tmp, sizeof(tmp), "framedims=%dx%d",
-             ci->frame_sizes[0].width, ci->frame_sizes[0].height);
-    res = _append_string(str, str_size, tmp);
-    if (res) {
-        return res;
-    }
-    for (n = 1; n < ci->frame_sizes_num; n++) {
-        if (ci->frame_sizes[n].width > 1280 || ci->frame_sizes[n].height > 1280) {
-            /* Guest cannot handle large pictures due to memory allocation problem
-               bug:30835259
-             */
-            continue;
-        }
-        snprintf(tmp, sizeof(tmp), ",%dx%d",
-                 ci->frame_sizes[n].width, ci->frame_sizes[n].height);
-        res = _append_string(str, str_size, tmp);
-        if (res) {
-            return res;
-        }
+    /* Calculate size of string buffer required for the value. */
+    const int val_size = get_token_value(params, name, &tmp, 0);
+    if (val_size < 0) {
+        *value = NULL;
+        return val_size;
     }
 
-    /* Stringified camera properties should end with EOL. */
-    return _append_string(str, str_size, "\n");
+    /* Allocate string buffer, and retrieve the value. */
+    *value = (char*)malloc(val_size);
+    if (*value == NULL) {
+        E("%s: Unable to allocated %d bytes for string buffer.",
+          __FUNCTION__, val_size);
+        return -2;
+    }
+    res = get_token_value(params, name, *value, val_size);
+    if (res) {
+        E("%s: Unable to retrieve value into allocated buffer.", __FUNCTION__);
+        free(*value);
+        *value = NULL;
+    }
+
+    return res;
+}
+
+static int get_token_value_int(const char* params,
+                               const char* name, int* value)
+{
+    char val_str[64];   // Should be enough for all numeric values.
+    if (!get_token_value(params, name, val_str, sizeof(val_str))) {
+        errno = 0;
+        *value = strtoi(val_str, (char**)NULL, 10);
+        if (errno) {
+            E("%s: Value '%s' of the parameter '%s' in '%s' is not a decimal number.",
+              __FUNCTION__, val_str, name, params);
+            return -2;
+        } else {
+            return 0;
+        }
+    } else {
+        return -1;
+    }
+}
+
+static std::pair<std::string_view, std::string_view> _parse_query(const std::string_view request)
+{
+    const size_t separator = request.find(' ');
+    if (separator != request.npos) {
+        return {request.substr(0, separator), request.substr(separator + 1)};
+    } else if (request.empty()) {
+        return {{}, {}};
+    } else if (request.back() == 0) {
+        return {request.substr(0, request.size() - 1), {}};
+    } else {
+        return {request, {}};
+    }
+}
+
+static std::pair<std::string_view, std::string_view> _parse_query(const void* data, size_t size) {
+    return _parse_query(std::string_view(static_cast<const char*>(data), size));
+}
+
+static std::string _camera_info_to_string(const CameraInfo& ci) {
+    if (ci.frame_sizes_num == 0) {
+        return {};
+    }
+
+    char buf[256];
+    int len = ::snprintf(buf, sizeof(buf), "name=%s channel=%u pix=%u "
+                         "dir=%s framedims=%ux%u", ci.device_name,
+                         ci.inp_channel, ci.pixel_format, ci.direction,
+                         ci.frame_sizes[0].width, ci.frame_sizes[0].height);
+
+    std::string info(buf, len);
+
+    for (int i = 1; i < ci.frame_sizes_num; ++i) {
+        len = ::snprintf(buf, sizeof(buf), ",%ux%u",
+                         ci.frame_sizes[i].width,
+                         ci.frame_sizes[i].height);
+        info.append(buf, len);
+    }
+
+    info.push_back('\n');
+
+    return info;
 }
 
 /* Gets camera information matching a display name.
@@ -643,34 +625,18 @@ _qemu_client_reply_ko(QemudClient* qc, const char* ko_str)
 static int
 _factory_client_list_cameras(CameraServiceDesc* csd, QemudClient* client)
 {
-    int n;
-    size_t reply_size = 0;
-    char* reply = NULL;
-
-    /* Lets see if there was anything found... */
     if (csd->camera_count == 0) {
         /* No cameras connected to the host. Reply with "\n" */
         _qemu_client_reply_ok(client, "\n");
         return 0;
     }
 
-    /* "Stringify" each camera information into the reply string. */
-    for (n = 0; n < csd->camera_count; n++) {
-        const int res =
-            _camera_info_to_string(csd->camera_info + n, &reply, &reply_size);
-        if (res) {
-            if (reply != NULL) {
-                free(reply);
-            }
-            _qemu_client_reply_ko(client, "Memory allocation error");
-            return res;
-        }
+    std::string reply;
+    for (int n = 0; n < csd->camera_count; n++) {
+        reply += _camera_info_to_string(csd->camera_info[n]);
     }
 
-    D("%s Replied: %s", __func__, reply);
-    _qemu_client_reply_ok(client, reply);
-    free(reply);
-
+    _qemu_client_reply_ok(client, reply.c_str());
     return 0;
 }
 
@@ -688,30 +654,25 @@ _factory_client_recv(void*         opaque,
                      int           msglen,
                      QemudClient*  client)
 {
-    /*
-     * Emulated camera factory client queries.
-     */
+    using namespace std::literals;
 
     /* List cameras connected to the host. */
-    static const char _query_list[]     = "list";
+    static constexpr std::string_view _query_list = "list"sv;
 
     CameraServiceDesc* csd = (CameraServiceDesc*)opaque;
-    char query_name[64];
-    const char* query_param = NULL;
 
     /* Parse the query, extracting query name and parameters. */
-    if (_parse_query((const char*)msg, query_name, sizeof(query_name),
-                     &query_param)) {
+    const auto [query_name, query_param] = _parse_query(msg, msglen);
+    if (query_name.empty()) {
         E("%s: Invalid format in query '%s'", __func__, (const char*)msg);
         _qemu_client_reply_ko(client, "Invalid query format");
         return;
     }
 
-    D("%s Camera factory query '%s'", __func__, query_name);
+    D("%s Camera factory query '%*.*s'", __func__,
+      int(query_name.size()), int(query_name.size()), query_name.data());
 
-    /* Dispatch the query to an appropriate handler. */
-    if (!strcmp(query_name, _query_list)) {
-        /* This is a "list" query. */
+    if (query_name == _query_list) {
         _factory_client_list_cameras(csd, client);
     } else {
         E("%s: Unknown camera factory query name in '%s'",
@@ -825,13 +786,6 @@ struct CameraClient
     };
 };
 
-/* Frees emulated camera client descriptor. */
-static void
-_camera_client_free(CameraClient* cc)
-{
-    delete(cc);
-}
-
 /* Creates descriptor for a connecting emulated camera client.
  * Param:
  *  csd - Camera service descriptor.
@@ -846,7 +800,7 @@ _camera_client_free(CameraClient* cc)
 static CameraClient*
 _camera_client_create(CameraServiceDesc* csd, const char* param)
 {
-    CameraClient* cc = new CameraClient();
+    std::unique_ptr<CameraClient> cc = std::make_unique<CameraClient>();
     CameraInfo* ci;
     int res;
 
@@ -858,7 +812,7 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
     if (get_token_value_alloc(param, "name", &cc->device_name)) {
         E("%s: Allocation failure, or required 'name' parameter is missing, or misformed in '%s'",
           __func__, param);
-        return NULL;
+        return nullptr;
     }
 
     /* Pull optional input channel. */
@@ -871,7 +825,7 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
         } else {
             E("%s: 'inp_channel' parameter is misformed in '%s'",
               __func__, param);
-            return NULL;
+            return nullptr;
         }
     }
 
@@ -887,16 +841,14 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
     if (ci == NULL) {
         E("%s: Cannot find camera info for device '%s'",
           __func__, cc->device_name);
-        _camera_client_free(cc);
-        return NULL;
+        return nullptr;
     }
 
     /* We can't allow multiple camera services for a single camera device, Lets
      * make sure that there is no client created for this camera. */
     if (ci->in_use) {
         E("%s: Camera device '%s' is in use", __func__, cc->device_name);
-        _camera_client_free(cc);
-        return NULL;
+        return nullptr;
     }
 
     /* We're done. Set camera in use, and succeed the connection. */
@@ -926,7 +878,7 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
     D("%s: Camera service is created for device '%s' using input channel %d",
       __func__, cc->device_name, cc->inp_channel);
 
-    return cc;
+    return cc.release();
 }
 
 /********************************************************************************
@@ -1787,6 +1739,8 @@ camera_client_handle_event(CameraClient*  cc,
                             uint8_t*       msg,
                             int            msglen,
                             QemudClient*   client) {
+    using namespace std::literals;
+
     /*
      * Emulated camera client queries.
      */
@@ -1811,22 +1765,17 @@ camera_client_handle_event(CameraClient*  cc,
            with the next segment of the command */
         return;
     }
-    msg = (uint8_t*)(cc->command_buffer);
-    cc->command_buffer_offset = 0;
-    /* E("%s: query is '%s'\n", __func__, msg); */
-    /* Connect to the camera. */
-    static const char _query_connect[]    = "connect";
-    /* Disconnect from the camera. */
-    static const char _query_disconnect[] = "disconnect";
-    /* Start video capturing. */
-    static const char _query_start[]      = "start";
-    /* Stop video capturing. */
-    static const char _query_stop[]       = "stop";
-    /* Query frame(s). */
-    static const char _query_frame[]      = "frame";
 
-    char query_name[64];
-    const char* query_param = NULL;
+    /* Connect to the camera. */
+    static constexpr std::string_view _query_connect    = "connect"sv;
+    /* Disconnect from the camera. */
+    static constexpr std::string_view _query_disconnect = "disconnect"sv;
+    /* Start video capturing. */
+    static constexpr std::string_view _query_start      = "start"sv;
+    /* Stop video capturing. */
+    static constexpr std::string_view _query_stop       = "stop"sv;
+    /* Query frame(s). */
+    static constexpr std::string_view _query_frame      = "frame"sv;
 
     /*
      * Emulated camera queries are formatted as such:
@@ -1834,39 +1783,42 @@ camera_client_handle_event(CameraClient*  cc,
      */
 
     T("%s: Camera client query: '%s'", __func__, (char*)msg);
-    if (_parse_query((const char*)msg, query_name, sizeof(query_name),
-        &query_param)) {
-        E("%s: Invalid query '%s'", __func__, (char*)msg);
+    const auto [query_name, query_param] =
+        _parse_query(cc->command_buffer, cc->command_buffer_offset);
+    cc->command_buffer_offset = 0;
+
+    if (query_name.empty()) {
+        E("%s: Invalid query '%s'", __func__, cc->command_buffer);
         _qemu_client_reply_ko(client, "Invalid query");
         return;
     }
 
     /* Dispatch the query to an appropriate handler. */
-    if (!strcmp(query_name, _query_frame)) {
+    if (query_name == _query_frame) {
         /* A frame is queried. */
         if (V1) {
-            _camera_client_query_frame_v1(cc, client, query_param);
+            _camera_client_query_frame_v1(cc, client, query_param.data());
         } else {
-            _camera_client_query_frame(cc, client, query_param);
+            _camera_client_query_frame(cc, client, query_param.data());
         }
-    } else if (!strcmp(query_name, _query_connect)) {
+    } else if (query_name == _query_connect) {
         /* Camera connection is queried. */
-        _camera_client_query_connect(cc, client, query_param);
-    } else if (!strcmp(query_name, _query_disconnect)) {
+        _camera_client_query_connect(cc, client, query_param.data());
+    } else if (query_name == _query_disconnect) {
         /* Camera disnection is queried. */
-        _camera_client_query_disconnect(cc, client, query_param);
-    } else if (!strcmp(query_name, _query_start)) {
+        _camera_client_query_disconnect(cc, client, query_param.data());
+    } else if (query_name == _query_start) {
         /* Start capturing is queried. */
         if (V1) {
-            _camera_client_query_start_v1(cc, client, query_param);
+            _camera_client_query_start_v1(cc, client, query_param.data());
         } else {
-            _camera_client_query_start(cc, client, query_param);
+            _camera_client_query_start(cc, client, query_param.data());
         }
-    } else if (!strcmp(query_name, _query_stop)) {
+    } else if (query_name == _query_stop) {
         /* Stop capturing is queried. */
-        _camera_client_query_stop(cc, client, query_param);
+        _camera_client_query_stop(cc, client, query_param.data());
     } else {
-        E("%s: Unknown query '%s'", __func__, (char*)msg);
+        E("%s: Unknown query '%s'", __func__, cc->command_buffer);
         _qemu_client_reply_ko(client, "Unknown query");
     }
 }
@@ -1897,12 +1849,12 @@ _camera_client_recv(void*         opaque,
 static void
 _camera_client_close(void* opaque)
 {
-    CameraClient* cc = (CameraClient*)opaque;
+    CameraClient* cc = static_cast<CameraClient*>(opaque);
 
     D("%s: Camera client for device '%s' on input channel %d is now closed",
       __func__, cc->device_name, cc->inp_channel);
 
-    _camera_client_free(cc);
+    delete cc;
 }
 
 /* Saves the state of the camera client.
