@@ -544,19 +544,6 @@ _qemu_client_reply_payload(QemudClient* qc, size_t payload_size)
     qemud_client_send(qc, (const uint8_t*)payload_size_str, 8);
 }
 
-/*
- * Prefixes for replies to camera client queries.
- */
-
-/* Success, no data to send in reply. */
-#define OK_REPLY        "ok"
-/* Failure, no data to send in reply. */
-#define KO_REPLY        "ko"
-/* Success, there are data to send in reply. */
-#define OK_REPLY_DATA   OK_REPLY ":"
-/* Failure, there are data to send in reply. */
-#define KO_REPLY_DATA   KO_REPLY ":"
-
 /* Builds and sends a reply to a query.
  * All replies to a query in camera service have a prefix indicating whether the
  * query has succeeded ("ok"), or failed ("ko"). The prefix can be followed by
@@ -574,6 +561,15 @@ _qemu_client_query_reply(QemudClient* qc,
                          const void* extra,
                          size_t extra_size)
 {
+    /* Success, no data to send in reply. */
+    static constexpr char OK_REPLY[] = "ok";
+    /* Failure, no data to send in reply. */
+    static constexpr char KO_REPLY[] = "ko";
+    /* Success, there are data to send in reply. */
+    static constexpr char OK_REPLY_DATA[] = "ok:";
+    /* Failure, there are data to send in reply. */
+    static constexpr char KO_REPLY_DATA[] = "ko:";
+
     const char* ok_ko_str;
     size_t payload_size;
 
