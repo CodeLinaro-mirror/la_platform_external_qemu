@@ -1602,7 +1602,11 @@ extern "C" int main(int argc, char** argv) {
     }
 
     // Initialize crash handler
-    crashhandler_init(argc, argv);
+#ifdef _WIN32
+    const char*no_crashhandler = getenv("ANDROID_EMU_DISABLE_CRASHHANDLER");
+    if (!no_crashhandler || strcmp("1", no_crashhandler))
+#endif
+        crashhandler_init(argc, argv);
 #ifdef __APPLE__
     {
         int ret;
