@@ -4747,11 +4747,11 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
             }
             goldfish_fb_set_use_host_gpu(
                     rendererConfig.glesMode == kAndroidGlesEmulationHost);
-            is_opengl_alive = rendererConfig.openglAlive;
+            is_opengl_alive = rendererConfig.rendererStarted;
 
             char  tmp[64];
             snprintf(tmp, sizeof(tmp), "%d",
-                     rendererConfig.bootPropOpenglesVersion);
+                     getBootPropOpenglesVersion(&rendererConfig));
             boot_property_add("ro.opengles.version", tmp);
 
 #if defined(CONFIG_VNC)

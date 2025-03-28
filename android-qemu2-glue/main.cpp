@@ -1823,6 +1823,52 @@ extern "C" int main(int argc, char** argv) {
                 &android::metrics::MetricsReporter::get(), looper);
     }
 
+    if (!fc::isOverridden(fc::GuestAngle)) {
+        switch (skin_winsys_get_preferred_gles_driver()) {
+            case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
+                fc::setEnabledOverride(fc::GuestAngle, false);
+                dinfo("Guest GLES Driver: Native (ext controls)");
+                break;
+            case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE:
+                fc::setEnabledOverride(fc::GuestAngle, true);
+                dinfo("Guest GLES Driver: Angle (ext controls)");
+                break;
+            default:
+                dinfo("Guest GLES Driver: Auto (ext controls)");
+        }
+    }
+
+    // Use advancedFeatures to override renderer if the user has
+    // selected in UI that the preferred renderer is "autoselected".
+    WinsysPreferredGlesBackend uiPreferredGlesBackend =
+            skin_winsys_get_preferred_gles_backend();
+#ifndef _WIN32
+    if (uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE ||
+        uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE9) {
+        uiPreferredGlesBackend = WINSYS_GLESBACKEND_PREFERENCE_AUTO;
+        skin_winsys_set_preferred_gles_backend(uiPreferredGlesBackend);
+    }
+#endif
+
+    RendererConfig rendererConfig;
+    if (fc::isEnabled(fc::ForceANGLE)) {
+        uiPreferredGlesBackend =
+                skin_winsys_override_glesbackend_if_auto(
+                        WINSYS_GLESBACKEND_PREFERENCE_ANGLE);
+    }
+
+    if (fc::isEnabled(fc::ForceSwiftshader)) {
+        uiPreferredGlesBackend =
+                skin_winsys_override_glesbackend_if_auto(
+                        WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER);
+    }
+
+    // Needs to be called before compatibility checks to correctly control
+    // if hw gpu is going to be used
+    if (!configureRenderer(uiPreferredGlesBackend, &rendererConfig)) {
+        derror("Error: could not configure renderer!");
+    }
+
     // Check compatibility and exit in case of failure, reporting metrics if
     // needed
     AvdCompatibilityManager::ensureAvdCompatibility(avd, reportMetrics);
@@ -3260,18 +3306,6 @@ extern "C" int main(int argc, char** argv) {
                get_uptime_ms());
 #endif
 
-        // Use advancedFeatures to override renderer if the user has
-        // selected in UI that the preferred renderer is "autoselected".
-        WinsysPreferredGlesBackend uiPreferredGlesBackend =
-                skin_winsys_get_preferred_gles_backend();
-#ifndef _WIN32
-        if (uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE ||
-            uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE9) {
-            uiPreferredGlesBackend = WINSYS_GLESBACKEND_PREFERENCE_AUTO;
-            skin_winsys_set_preferred_gles_backend(uiPreferredGlesBackend);
-        }
-#endif
-
         // Feature flags-related last-microsecond renderer changes
         {
             // b/147241060
@@ -3286,22 +3320,6 @@ extern "C" int main(int argc, char** argv) {
                 fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion,
                                                      true);
             }
-
-            if (!fc::isOverridden(fc::GuestAngle)) {
-                switch (skin_winsys_get_preferred_gles_driver()) {
-                    case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
-                        fc::setEnabledOverride(fc::GuestAngle, false);
-                        dinfo("Guest Driver: Native (ext controls)");
-                        break;
-                    case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE:
-                        fc::setEnabledOverride(fc::GuestAngle, true);
-                        dinfo("Guest Driver: Angle (ext controls)");
-                        break;
-                    default:
-                        dinfo("Guest Driver: Auto (ext controls)");
-                }
-            }
-
 
             if (skin_winsys_get_preferred_gles_apilevel() ==
                         WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT ||
@@ -3336,21 +3354,11 @@ extern "C" int main(int argc, char** argv) {
             fc::setIfNotOverridenOrGuestDisabled(fc::GLAsyncSwap, true);
 #endif
 
-            if (fc::isEnabled(fc::ForceANGLE)) {
-                uiPreferredGlesBackend =
-                        skin_winsys_override_glesbackend_if_auto(
-                                WINSYS_GLESBACKEND_PREFERENCE_ANGLE);
-            }
-
-            if (fc::isEnabled(fc::ForceSwiftshader)) {
-                uiPreferredGlesBackend =
-                        skin_winsys_override_glesbackend_if_auto(
-                                WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER);
-            }
         }
 
-        RendererConfig rendererConfig;
-        configAndStartRenderer(uiPreferredGlesBackend, &rendererConfig);
+        if (!startRenderer(&rendererConfig)) {
+            derror("Could not start renderer");
+        }
 
         // Gpu configuration is set, now initialize the multi display, screen
         // recorder and screenshot callback
@@ -3437,7 +3445,7 @@ extern "C" int main(int argc, char** argv) {
                 getUserspaceBootProperties(
                         opts, kTarget.androidArch, myserialno.c_str(),
                         rendererConfig.glesMode,
-                        rendererConfig.bootPropOpenglesVersion, apiLevel,
+                        getBootPropOpenglesVersion(&rendererConfig), apiLevel,
                         real_console_tty_prefix, &verified_boot_params, hw);
 
         std::vector<std::string> kernelCmdLineUserspaceBootOpts;
