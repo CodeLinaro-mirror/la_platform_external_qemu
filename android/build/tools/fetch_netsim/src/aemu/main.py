@@ -133,7 +133,7 @@ def get_bid(args):
         return args.bid
 
     ab_client = AndroidBuildClient(args.token)
-    return ab_client.get_latest_build_id(args.branch, f"{args.prefix}-linux_x64")
+    return ab_client.get_latest_build_id(args.branch, f"{args.prefix}_linux_x64")
 
 
 def obtain(args, bid: str, target: str, base_dir: Path):
@@ -166,14 +166,14 @@ def obtain(args, bid: str, target: str, base_dir: Path):
     unzip_artifact(
         ab_client,
         dest,
-        f"{args.prefix}-{target}",
+        f"{args.prefix}_{target}",
         artifact,
         bid,
     )
     run(["git", "-C", str(base_dir), "add", TARGET_MAP[target]], dry_run=args.dry_run)
 
 
-def find_aosp_root(start_directory=Path(__file__).resolve()) -> Path:
+def find_repo_root(start_directory=Path(__file__).resolve()) -> Path:
     current_directory = Path(start_directory).resolve()
 
     while True:
@@ -213,12 +213,12 @@ def main():
     parser.add_argument(
         "--dest",
         type=str,
-        default=find_aosp_root()
+        default=find_repo_root()
         / "prebuilts"
         / "android-emulator-build"
         / "common"
         / "netsim",
-        help="Destination directory for the netsim prebuilt, usually this is in AOSP",
+        help="Destination directory for the netsim prebuilt, usually this is in internal Android",
     )
     parser.add_argument(
         "--token",
@@ -227,7 +227,7 @@ def main():
     )
     parser.add_argument(
         "--branch",
-        default="aosp-netsim-dev",
+        default="git_main-netsim-dev",
         type=str,
         help="go/ab branch",
     )
@@ -238,7 +238,7 @@ def main():
     )
     parser.add_argument(
         "--prefix",
-        default="emulator",
+        default="netsim",
         help="Target prefix. This is the bold header you see in go/ab",
     )
 
