@@ -106,10 +106,10 @@ static int get_token_value(const char* params, const char* name,
     const char* par_start = strstr(params, name);
 
     /* Search for 'name=' */
-    while (par_start != NULL) {
+    while (par_start != nullptr) {
         /* Make sure that we're within the parameters buffer. */
         if ((par_end - par_start) < len) {
-            par_start = NULL;
+            par_start = nullptr;
             break;
         }
         /* Make sure that par_start starts at the beginning of <name>, and only
@@ -121,14 +121,14 @@ static int get_token_value(const char* params, const char* name,
         /* False positive. Move on... */
         par_start = strstr(par_start + 1, name);
     }
-    if (par_start == NULL) {
+    if (par_start == nullptr) {
         return -1;
     }
 
     /* Advance past 'name=', and calculate value's string length. */
     par_start += len + 1;
     val_end = strchr(par_start, ' ');
-    if (val_end == NULL) {
+    if (val_end == nullptr) {
         val_end = par_start + strlen(par_start);
     }
     len = val_end - par_start;
@@ -152,13 +152,13 @@ static int get_token_value_alloc(const char* params,
     /* Calculate size of string buffer required for the value. */
     const int val_size = get_token_value(params, name, &tmp, 0);
     if (val_size < 0) {
-        *value = NULL;
+        *value = nullptr;
         return val_size;
     }
 
     /* Allocate string buffer, and retrieve the value. */
     *value = (char*)malloc(val_size);
-    if (*value == NULL) {
+    if (*value == nullptr) {
         E("%s: Unable to allocated %d bytes for string buffer.",
           __FUNCTION__, val_size);
         return -2;
@@ -167,7 +167,7 @@ static int get_token_value_alloc(const char* params,
     if (res) {
         E("%s: Unable to retrieve value into allocated buffer.", __FUNCTION__);
         free(*value);
-        *value = NULL;
+        *value = nullptr;
     }
 
     return res;
@@ -179,7 +179,7 @@ static int get_token_value_int(const char* params,
     char val_str[64];   // Should be enough for all numeric values.
     if (!get_token_value(params, name, val_str, sizeof(val_str))) {
         errno = 0;
-        *value = strtoi(val_str, (char**)NULL, 10);
+        *value = strtoi(val_str, (char**)nullptr, 10);
         if (errno) {
             E("%s: Value '%s' of the parameter '%s' in '%s' is not a decimal number.",
               __FUNCTION__, val_str, name, params);
@@ -241,7 +241,7 @@ static std::string _camera_info_to_string(const CameraInfo& ci) {
  *  arr - Array of camera informations.
  *  num - Number of elements in the array.
  * Return:
- *  Matching camera information, or NULL if matching camera information for the
+ *  Matching camera information, or nullptr if matching camera information for the
  *  given display name has not been found in the array.
  */
 static CameraInfo* _camera_info_get_by_display_name(const char* disp_name,
@@ -249,12 +249,12 @@ static CameraInfo* _camera_info_get_by_display_name(const char* disp_name,
                                                     int num) {
     int n;
     for (n = 0; n < num; n++) {
-        if (!arr[n].in_use && arr[n].display_name != NULL &&
+        if (!arr[n].in_use && arr[n].display_name != nullptr &&
             !strcmp(arr[n].display_name, disp_name)) {
             return &arr[n];
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 static int _camera_client_get_max_resolution(const CameraInfo* info,
@@ -309,7 +309,7 @@ static void _virtualscenecamera_setup(CameraServiceDesc* csd) {
 
     csd->camera_info[csd->camera_count].frame_sizes =
             (CameraFrameDim*)malloc(sizeof(kEmulateDims));
-    if (csd->camera_info[csd->camera_count].frame_sizes != NULL) {
+    if (csd->camera_info[csd->camera_count].frame_sizes != nullptr) {
         csd->camera_info[csd->camera_count].frame_sizes_num =
                 sizeof(kEmulateDims) / sizeof(*kEmulateDims);
         memcpy(csd->camera_info[csd->camera_count].frame_sizes, kEmulateDims,
@@ -351,7 +351,7 @@ static void _videoplaybackcamera_setup(CameraServiceDesc* csd, const char* dir) 
 
     csd->camera_info[csd->camera_count].frame_sizes =
             (CameraFrameDim*)malloc(sizeof(kEmulateDims));
-    if (csd->camera_info[csd->camera_count].frame_sizes != NULL) {
+    if (csd->camera_info[csd->camera_count].frame_sizes != nullptr) {
         csd->camera_info[csd->camera_count].frame_sizes_num =
                 sizeof(kEmulateDims) / sizeof(*kEmulateDims);
         memcpy(csd->camera_info[csd->camera_count].frame_sizes, kEmulateDims,
@@ -388,7 +388,7 @@ static void _webcam_setup(CameraServiceDesc* csd,
                           int ci_cnt) {
     /* Find webcam record in the list of enumerated web cameras. */
     CameraInfo* found = _camera_info_get_by_display_name(disp_name, ci, ci_cnt);
-    if (found == NULL) {
+    if (found == nullptr) {
         W("Camera name '%s' is not found in the list of connected cameras.\n"
           "Use '-webcam-list' emulator option to obtain the list of connected camera names.\n",
           disp_name);
@@ -401,7 +401,7 @@ static void _webcam_setup(CameraServiceDesc* csd,
     /* This camera is taken. */
     found->in_use = 1;
     /* Update direction parameter. */
-    if (csd->camera_info[csd->camera_count].direction != NULL) {
+    if (csd->camera_info[csd->camera_count].direction != nullptr) {
         free(csd->camera_info[csd->camera_count].direction);
     }
     csd->camera_info[csd->camera_count].direction = ASTRDUP(dir);
@@ -497,7 +497,7 @@ _qemu_client_reply_payload(QemudClient* qc, size_t payload_size)
  * Param:
  *  qc - Qemu client to send the reply to.
  *  ok_ko - An "ok", or "ko" selector, where 0 is for "ko", and !0 is for "ok".
- *  extra - Optional extra query data. Can be NULL.
+ *  extra - Optional extra query data. Can be nullptr.
  *  extra_size - Extra data size.
  */
 static void
@@ -518,9 +518,9 @@ _qemu_client_query_reply(QemudClient* qc,
     const char* ok_ko_str;
     size_t payload_size;
 
-    /* Make sure extra_size is 0 if extra is NULL. */
-    if (extra == NULL && extra_size != 0) {
-        W("%s: 'extra' = NULL, while 'extra_size' = %d",
+    /* Make sure extra_size is 0 if extra is nullptr. */
+    if (extra == nullptr && extra_size != 0) {
+        W("%s: 'extra' = nullptr, while 'extra_size' = %d",
           __func__, (int)extra_size);
         extra_size = 0;
     }
@@ -543,7 +543,7 @@ _qemu_client_query_reply(QemudClient* qc,
      * separator. So, one way or another, the prefix is always 3 bytes. */
     qemud_client_send(qc, (const uint8_t*)ok_ko_str, 3);
     /* Send extra data (if present). */
-    if (extra != NULL) {
+    if (extra != nullptr) {
         qemud_client_send(qc, (const uint8_t*)extra, extra_size);
     }
 }
@@ -551,25 +551,25 @@ _qemu_client_query_reply(QemudClient* qc,
 /* Replies query success ("OK") back to the client.
  * Param:
  *  qc - Qemu client to send the reply to.
- *  ok_str - An optional string containing query results. Can be NULL.
+ *  ok_str - An optional string containing query results. Can be nullptr.
  */
 static void
 _qemu_client_reply_ok(QemudClient* qc, const char* ok_str)
 {
     _qemu_client_query_reply(qc, 1, ok_str,
-                             (ok_str != NULL) ? (strlen(ok_str) + 1) : 0);
+                             (ok_str != nullptr) ? (strlen(ok_str) + 1) : 0);
 }
 
 /* Replies query failure ("KO") back to the client.
  * Param:
  *  qc - Qemu client to send the reply to.
- *  ko_str - An optional string containing reason for failure. Can be NULL.
+ *  ko_str - An optional string containing reason for failure. Can be nullptr.
  */
 static void
 _qemu_client_reply_ko(QemudClient* qc, const char* ko_str)
 {
     _qemu_client_query_reply(qc, 0, ko_str,
-                             (ko_str != NULL) ? (strlen(ko_str) + 1) : 0);
+                             (ko_str != nullptr) ? (strlen(ko_str) + 1) : 0);
 }
 
 /********************************************************************************
@@ -734,16 +734,16 @@ struct CameraClient
     std::vector<uint8_t>    frame_cache;
     CameraClient() = default;
     ~CameraClient() {
-        if (camera_info != NULL) {
+        if (camera_info != nullptr) {
             camera_info->in_use = 0;
         }
-        if (camera != NULL) {
+        if (camera != nullptr) {
             close(camera);
         }
-        if (video_frame != NULL) {
+        if (video_frame != nullptr) {
             free(video_frame);
         }
-        if (device_name != NULL) {
+        if (device_name != nullptr) {
             free(device_name);
         }
     };
@@ -758,7 +758,7 @@ struct CameraClient
  *      may contain a decimal 'inp_channel' parameter, selecting the input
  *      channel to use when communicating with the camera device.
  * Return:
- *  Emulated camera client descriptor on success, or NULL on failure.
+ *  Emulated camera client descriptor on success, or nullptr on failure.
  */
 static CameraClient*
 _camera_client_create(CameraServiceDesc* csd, const char* param)
@@ -847,7 +847,7 @@ _camera_client_create(CameraServiceDesc* csd, const char* param)
 static __inline__ uint64_t _get_timestamp(void) {
     struct timeval t;
     t.tv_sec = t.tv_usec = 0;
-    gettimeofday(&t, NULL);
+    gettimeofday(&t, nullptr);
     return (uint64_t)t.tv_sec * 1000000LL + t.tv_usec;
 }
 
@@ -862,7 +862,7 @@ static __inline__ void _camera_sleep(int millisec) {
         }
         t.tv_sec = (wake_at - stamp) / 1000000;
         t.tv_usec = (wake_at - stamp) - (uint64_t)t.tv_sec * 1000000;
-    } while (select(0, NULL, NULL, NULL, &t) < 0 && errno == EINTR);
+    } while (select(0, nullptr, nullptr, nullptr, &t) < 0 && errno == EINTR);
 }
 
 /* Client has queried conection to the camera.
@@ -874,7 +874,7 @@ static __inline__ void _camera_sleep(int millisec) {
 static void
 _camera_client_query_connect(CameraClient* cc, QemudClient* qc, const char* param)
 {
-    if (cc->camera != NULL) {
+    if (cc->camera != nullptr) {
         /* Already connected. */
         W("%s: Camera '%s' is already connected", __func__, cc->device_name);
         _qemu_client_reply_ok(qc, "Camera is already connected");
@@ -884,7 +884,7 @@ _camera_client_query_connect(CameraClient* cc, QemudClient* qc, const char* para
     /* Open camera device. */
     cc->camera = cc->open(cc->device_name, cc->inp_channel);
 
-    if (cc->camera == NULL) {
+    if (cc->camera == nullptr) {
         E("%s: Unable to open camera device '%s'", __func__, cc->device_name);
         _qemu_client_reply_ko(qc, "Unable to open camera device.");
         return;
@@ -895,7 +895,7 @@ _camera_client_query_connect(CameraClient* cc, QemudClient* qc, const char* para
         _camera_callback_desc.callback) {
         _camera_callback_desc.callback(_camera_callback_desc.context, true);
     }
-    _qemu_client_reply_ok(qc, NULL);
+    _qemu_client_reply_ok(qc, nullptr);
 }
 
 /* Client has queried disconection from the camera.
@@ -909,7 +909,7 @@ _camera_client_query_disconnect(CameraClient* cc,
                                 QemudClient* qc,
                                 const char* param)
 {
-    if (cc->camera == NULL) {
+    if (cc->camera == nullptr) {
         /* Already disconnected. */
         W("%s: Camera '%s' is already disconnected", __func__, cc->device_name);
         _qemu_client_reply_ok(qc, "Camera is not connected");
@@ -918,7 +918,7 @@ _camera_client_query_disconnect(CameraClient* cc,
 
     /* Before we can go ahead and disconnect, we must make sure that camera is
      * not capturing frames. */
-    if ((!V1 && cc->video_frame != NULL) || (V1 && cc->started)) {
+    if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
         E("%s: Cannot disconnect camera '%s' while it is not stopped",
           __func__, cc->device_name);
         _qemu_client_reply_ko(qc, "Camera is not stopped");
@@ -927,10 +927,10 @@ _camera_client_query_disconnect(CameraClient* cc,
 
     /* Close camera device. */
     cc->close(cc->camera);
-    cc->camera = NULL;
+    cc->camera = nullptr;
 
     D("Camera device '%s' is now disconnected", cc->device_name);
-    _qemu_client_reply_ok(qc, NULL);
+    _qemu_client_reply_ok(qc, nullptr);
 }
 
 /* Start capturing video with the given frame params
@@ -951,7 +951,7 @@ _camera_client_start(CameraClient* cc, int width, int height, int pix_format) {
 
     /* After collecting capture parameters lets see if camera has already
      * started, and if so, lets see if parameters match. */
-    if ((!V1 && cc->video_frame != NULL) || (V1 && cc->started)) {
+    if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
         /* Already started. Match capture parameters. */
         if (cc->pixel_format == (uint32_t)pix_format && cc->width == width &&
             cc->height == height) {
@@ -978,7 +978,7 @@ _camera_client_start(CameraClient* cc, int width, int height, int pix_format) {
     cc->pixel_num = cc->width * cc->height;
     cc->frames_cached = 0;
     cc->frame_count = 0;
-    cc->staging_framebuffer = NULL;
+    cc->staging_framebuffer = nullptr;
     cc->staging_framebuffer_size = 0;
 
     if (V1) {
@@ -1019,7 +1019,7 @@ _camera_client_start(CameraClient* cc, int width, int height, int pix_format) {
          * framebuffers. */
         cc->video_frame =
                 (uint8_t*)malloc(cc->video_frame_size + cc->preview_frame_size);
-        if (cc->video_frame == NULL) {
+        if (cc->video_frame == nullptr) {
             E("%s: Not enough memory for framebuffers %d + %d", __func__,
               cc->video_frame_size, cc->preview_frame_size);
             return CLIENT_START_RESULT_OUT_OF_MEMORY;
@@ -1037,7 +1037,7 @@ _camera_client_start(CameraClient* cc, int width, int height, int pix_format) {
           cc->width, cc->height, strerror(errno));
         if (cc->video_frame) {
             free(cc->video_frame);
-            cc->video_frame = NULL;
+            cc->video_frame = nullptr;
         }
         return CLIENT_START_RESULT_FAILED;
     }
@@ -1072,7 +1072,7 @@ _camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param)
     int width, height, pix_format;
 
     /* Sanity check. */
-    if (cc->camera == NULL) {
+    if (cc->camera == nullptr) {
         /* Not connected. */
         E("%s: Camera '%s' is not connected", __func__, cc->device_name);
         _qemu_client_reply_ko(qc, "Camera is not connected");
@@ -1083,7 +1083,7 @@ _camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param)
      * Parse parameters.
      */
 
-    if (param == NULL) {
+    if (param == nullptr) {
         E("%s: Missing parameters for the query", __func__);
         _qemu_client_reply_ko(qc, "Missing parameters for the query");
         return;
@@ -1105,15 +1105,15 @@ _camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param)
 
     /* Parse 'dim' parameter, and get requested frame width and height. */
     w = strchr(dim, 'x');
-    if (w == NULL || w[1] == '\0') {
+    if (w == nullptr || w[1] == '\0') {
         E("%s: Invalid 'dim' parameter in '%s'", __func__, param);
         _qemu_client_reply_ko(qc, "Invalid 'dim' parameter");
         return;
     }
     *w = '\0'; w++;
     errno = 0;
-    width = strtoi(dim, NULL, 10);
-    height = strtoi(w, NULL, 10);
+    width = strtoi(dim, nullptr, 10);
+    height = strtoi(w, nullptr, 10);
     if (errno) {
         E("%s: Invalid 'dim' parameter in '%s'", __func__, param);
         _qemu_client_reply_ko(qc, "Invalid 'dim' parameter");
@@ -1130,7 +1130,7 @@ _camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param)
 
     switch (result) {
         case CLIENT_START_RESULT_SUCCESS:
-            _qemu_client_reply_ok(qc, NULL);
+            _qemu_client_reply_ok(qc, nullptr);
             break;
         case CLIENT_START_RESULT_ALREADY_STARTED:
             _qemu_client_reply_ok(qc, "Camera is already started");
@@ -1165,7 +1165,7 @@ _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
     int width, height, pix_format;
 
     /* Sanity check. */
-    if (cc->camera == NULL) {
+    if (cc->camera == nullptr) {
         /* Not connected. */
         E("%s: Camera '%s' is not connected", __func__, cc->device_name);
         _qemu_client_reply_ko(qc, "Camera is not connected");
@@ -1175,7 +1175,7 @@ _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
     /*
      * Parse parameters.
      */
-    if (param == NULL) {
+    if (param == nullptr) {
         if (_camera_client_get_max_resolution(cc->camera_info, &width, &height)) {
             E("%s: Failed to get default resolution", __func__);
             _qemu_client_reply_ko(qc, "Failed to get default resolution");
@@ -1192,15 +1192,15 @@ _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
         } else {
             /* Parse 'dim' parameter, and get requested frame width and height. */
             w = strchr(dim, 'x');
-            if (w == NULL || w[1] == '\0') {
+            if (w == nullptr || w[1] == '\0') {
                 E("%s: Invalid 'dim' parameter in '%s'", __func__, param);
                 _qemu_client_reply_ko(qc, "Invalid 'dim' parameter");
                 return;
             }
             *w = '\0'; w++;
             errno = 0;
-            width = strtoi(dim, NULL, 10);
-            height = strtoi(w, NULL, 10);
+            width = strtoi(dim, nullptr, 10);
+            height = strtoi(w, nullptr, 10);
             if (errno) {
                 E("%s: Invalid 'dim' parameter in '%s'", __func__, param);
                 _qemu_client_reply_ko(qc, "Invalid 'dim' parameter");
@@ -1223,7 +1223,7 @@ _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
 
     switch (result) {
         case CLIENT_START_RESULT_SUCCESS:
-            _qemu_client_reply_ok(qc, NULL);
+            _qemu_client_reply_ok(qc, nullptr);
             break;
         case CLIENT_START_RESULT_ALREADY_STARTED:
             _qemu_client_reply_ok(qc, "Camera is already started");
@@ -1258,7 +1258,7 @@ _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
 static void
 _camera_client_query_stop(CameraClient* cc, QemudClient* qc, const char* param)
 {
-    if ((!V1 && cc->video_frame == NULL) || (V1 && !cc->started)) {
+    if ((!V1 && cc->video_frame == nullptr) || (V1 && !cc->started)) {
         /* Not started. */
         W("%s: Camera '%s' is not started", __func__, cc->device_name);
         _qemu_client_reply_ok(qc, "Camera is not started");
@@ -1275,7 +1275,7 @@ _camera_client_query_stop(CameraClient* cc, QemudClient* qc, const char* param)
 
     if (cc->video_frame) {
         free(cc->video_frame);
-        cc->video_frame = NULL;
+        cc->video_frame = nullptr;
     }
 
     if (V1) {
@@ -1283,7 +1283,7 @@ _camera_client_query_stop(CameraClient* cc, QemudClient* qc, const char* param)
     }
 
     free(cc->staging_framebuffer);
-    cc->staging_framebuffer = NULL;
+    cc->staging_framebuffer = nullptr;
 
     camera_metrics_report_stop_session(cc->frame_count);
 
@@ -1293,7 +1293,7 @@ _camera_client_query_stop(CameraClient* cc, QemudClient* qc, const char* param)
     }
 
     D("%s: Camera device '%s' is now stopped.", __func__, cc->device_name);
-    _qemu_client_reply_ok(qc, NULL);
+    _qemu_client_reply_ok(qc, nullptr);
 }
 
 /* Client has queried next frame.
@@ -1328,7 +1328,7 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
     ClientFrame frame = {};
 
     /* Sanity check. */
-    if (cc->video_frame == NULL) {
+    if (cc->video_frame == nullptr) {
         /* Not started. */
         E("%s: Camera '%s' is not started", __func__, cc->device_name);
         _qemu_client_reply_ko(qc, "Camera is not started");
@@ -1533,15 +1533,15 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
     } else {
         /* Parse 'dim' parameter, and get requested frame width and height. */
         w = strchr(tmp, 'x');
-        if (w == NULL || w[1] == '\0') {
+        if (w == nullptr || w[1] == '\0') {
             E("%s: Invalid 'dim' parameter in '%s'", __func__, param);
             _qemu_client_reply_ko(qc, "Invalid 'dim' parameter");
             return;
         }
         *w = '\0'; w++;
         errno = 0;
-        width = strtoi(tmp, NULL, 10);
-        height = strtoi(w, NULL, 10);
+        width = strtoi(tmp, nullptr, 10);
+        height = strtoi(w, nullptr, 10);
         if (errno) {
             E("%s: Invalid 'dim' parameter in '%s'", __func__, param);
             _qemu_client_reply_ko(qc, "Invalid 'dim' parameter");
@@ -1823,13 +1823,13 @@ _camera_client_close(void* opaque)
 static void _camera_client_save(Stream* f, QemudClient* client, void* opaque) {
     CameraClient* cc = (CameraClient*)opaque;
 
-    stream_put_be32(f, cc->camera != NULL ? 1 : 0);
+    stream_put_be32(f, cc->camera != nullptr ? 1 : 0);
     if (V1) {
         stream_put_be32(f, cc->started ? 1: 0);
     } else {
-        stream_put_be32(f, cc->video_frame != NULL ? 1 : 0);
+        stream_put_be32(f, cc->video_frame != nullptr ? 1 : 0);
     }
-    if ((!V1 && cc->video_frame != NULL) || (V1 && cc->started)) {
+    if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
         stream_put_be32(f, cc->pixel_format);
         stream_put_be32(f, cc->width);
         stream_put_be32(f, cc->height);
@@ -1840,9 +1840,9 @@ static int _camera_client_load(Stream* f, QemudClient* client, void* opaque) {
     CameraClient* cc = (CameraClient*)opaque;
 
     int is_camera_connected = stream_get_be32(f);
-    if (is_camera_connected && cc->camera == NULL) {
+    if (is_camera_connected && cc->camera == nullptr) {
         cc->camera = cc->open(cc->device_name, cc->inp_channel);
-        if (cc->camera == NULL) {
+        if (cc->camera == nullptr) {
             D("%s: failed to start camera service required in snapshot.\n",
               __func__);
             return -EIO;
@@ -1851,11 +1851,11 @@ static int _camera_client_load(Stream* f, QemudClient* client, void* opaque) {
 
     // Try to stop the camera if it is already started in order to avoid a frame
     // size or format mismatch.
-    if ((!V1 &&cc->video_frame != NULL) || (V1 && cc->started)) {
+    if ((!V1 &&cc->video_frame != nullptr) || (V1 && cc->started)) {
         if (cc->stop_capturing(cc->camera) == 0) {
             if (cc->video_frame) {
                 free(cc->video_frame);
-                cc->video_frame = NULL;
+                cc->video_frame = nullptr;
             }
             if (V1) {
                 cc->started = false;
@@ -1900,7 +1900,7 @@ static int _camera_client_load(Stream* f, QemudClient* client, void* opaque) {
  *    to the host.
  *  - Camera device emulators that attach to the actual camera devices.
  * The distinction between these two classes is made by looking at extra
- * parameters passed in client_param variable. If it's NULL, or empty, the
+ * parameters passed in client_param variable. If it's nullptr, or empty, the
  * client connects to a camera factory. Otherwise, parameters describe the
  * camera device the client wants to connect to.
  */
@@ -1910,20 +1910,20 @@ _camera_service_connect(void*          opaque,
                         int            channel,
                         const char*    client_param)
 {
-    QemudClient*  client = NULL;
+    QemudClient*  client = nullptr;
     CameraServiceDesc* csd = (CameraServiceDesc*)opaque;
 
     D("%s: Connecting camera client '%s'", __func__,
       client_param ? client_param : "Factory");
-    if (client_param == NULL || *client_param == '\0') {
+    if (client_param == nullptr || *client_param == '\0') {
         /* This is an emulated camera factory client. */
         client = qemud_client_new(serv, channel, client_param, csd,
                                   _factory_client_recv, _factory_client_close,
-                                  NULL, NULL);
+                                  nullptr, nullptr);
     } else {
         /* This is an emulated camera client. */
         CameraClient* cc = _camera_client_create(csd, client_param);
-        if (cc != NULL) {
+        if (cc != nullptr) {
             client = qemud_client_new(serv, channel, client_param, cc,
                                       _camera_client_recv, _camera_client_close,
                                       _camera_client_save, _camera_client_load);
@@ -1949,9 +1949,9 @@ void android_camera_service_init(void) {
         QemudService*  serv = qemud_service_register(kServiceCamera, 0,
                 &_camera_service_desc,
                 _camera_service_connect,
-                NULL,
-                NULL);
-        if (serv == NULL) {
+                nullptr,
+                nullptr);
+        if (serv == nullptr) {
             derror("%s: Could not register '%s' service",
                     __func__, kServiceCamera);
             return;
