@@ -1149,7 +1149,7 @@ _camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param)
             break;
         default:
             E("%s: Unexpected capture result '%d'", __func__, result);
-            // Intentional fallthrough.
+            [[fallthrough]];
         case CLIENT_START_RESULT_FAILED:
             _qemu_client_reply_ko(qc, "Cannot start the camera");
             break;
@@ -1242,7 +1242,7 @@ _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
             break;
         default:
             E("%s: Unexpected capture result '%d'", __func__, result);
-            // Intentional fallthrough.
+            [[fallthrough]];
         case CLIENT_START_RESULT_FAILED:
             _qemu_client_reply_ko(qc, "Cannot start the camera");
             break;
