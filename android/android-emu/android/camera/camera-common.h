@@ -124,7 +124,7 @@ typedef struct ClientFrame {
     /* Array of framebuffers, the size of this array is defined by
      * framebuffers_count. Note that the caller must make sure that the buffers
      * are large enough to contain the entire frame captured from the device. */
-    ClientFrameBuffer* framebuffers;
+    const ClientFrameBuffer* framebuffers;
 
     /* Pointer to staging buffer, used internally by convert_frame. */
     uint8_t** staging_framebuffer;
