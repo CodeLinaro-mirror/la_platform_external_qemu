@@ -76,6 +76,14 @@
 
 //#define DEBUG_SUBPAGE
 
+#ifdef _DEBUG
+#define DPRINTF(fmt, ...) \
+    do { fprintf(stderr, fmt, ## __VA_ARGS__); } while (0)
+#else
+#define DPRINTF(fmt, ...) \
+    do { } while (0)
+#endif
+
 #define FLATVIEW_UNUSUAL_ITER_COUNT 128
 
 #if !defined(CONFIG_USER_ONLY)
@@ -3553,10 +3561,9 @@ static MemTxResult flatview_write_continue(FlatView *fv, hwaddr addr,
             if (goldfish_as_oob_access &&
                 !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
                 goldfish_address_space_is_oob(addr1,l)) {
-                fprintf(stderr, "Warning: A write to %s is out-of-bound and is"
-                                " ignored. Offset = 0x%llx, size = %llx\n",
-                                GOLDFISH_ADDRESS_SPACE_AREA_NAME,
-                                addr1, l);
+                DPRINTF("A write to %s is out-of-bound and is"
+                        " ignored. Offset = 0x%llx, size = %llx\n",
+                        GOLDFISH_ADDRESS_SPACE_AREA_NAME, addr1, l);
             } else {
                 ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
                 memcpy(ptr, buf, l);
@@ -3660,10 +3667,9 @@ MemTxResult flatview_read_continue(FlatView *fv, hwaddr addr,
             if (goldfish_as_oob_access &&
                 !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
                 goldfish_address_space_is_oob(addr1,l)) {
-                fprintf(stderr, "Warning: A read to %s is out-of-bound and 0xFF"
-                                " is returned. Offset = 0x%llx, size = %llx\n",
-                                GOLDFISH_ADDRESS_SPACE_AREA_NAME,
-                                addr1, l);
+                DPRINTF("A read to %s is out-of-bound and 0xFF"
+                        " is returned. Offset = 0x%llx, size = %llx\n",
+                        GOLDFISH_ADDRESS_SPACE_AREA_NAME, addr1, l);
                 memset(buf, 0xFF, l);
             } else {
                 ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
