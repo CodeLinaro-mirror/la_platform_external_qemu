@@ -36,7 +36,7 @@ using xr_emulator_proto::EnvironmentMode;
 using xr_emulator_proto::InputMode;
 using xr_emulator_proto::MsgType;
 using xr_emulator_proto::ViewportControlMode;
-using xr_emulator_proto::XrOptions_Environment;
+using XrOptions = xr_emulator_proto::XrOptions;
 
 namespace android {
 namespace physics {
@@ -187,15 +187,16 @@ void XrDeviceModel::setXrOptions(int environment,
     EmulatorRequest request;
     request.set_msg_type(MsgType::MSG_TYPE_SET_OPTIONS);
     auto xr_options_param = request.mutable_xr_options();
-    xr_options_param->set_environment(static_cast<XrOptions_Environment>(environment));
+    xr_options_param->set_environment(static_cast<XrOptions::Environment>(environment));
     xr_options_param->set_passthrough_coefficient(passthroughCoefficient);
     qemudClientSend(request);
 }
 
 vec3 XrDeviceModel::getXrOptions(
         ParameterValueType parameterValueType) const {
-    // TODO(b/396418192): implement get environment mode handling in guest OS
-    return {1, 0.5, 0};
+    D("XrDeviceModel::getXrOptions");
+    // TODO(b/407610938): replace the constant with a variable representing the current environment.
+    return {XrOptions::LIVING_ROOM_DAY, mPassthroughCoefficient, /*unused*/ 0};
 }
 
 void XrDeviceModel::sendXrInputMode(enum XrInputMode mode) {
@@ -304,6 +305,7 @@ void XrDeviceModel::qemudClientRecv(uint8_t* msg, int msglen) {
                 if (xr_options.has_passthrough_coefficient()) {
                     I("Received passthrough coefficient: %f",
                       xr_options.passthrough_coefficient());
+                    mPassthroughCoefficient = xr_options.passthrough_coefficient();
                     mXrOptionsPublisher.fireEvent(xr_options);
                 }
                 break;
