@@ -83,6 +83,7 @@ public:
     void resetEnabledToDefault(Feature feature);
     void setIfNotOverriden(Feature feature, bool isEnabled);
     void setIfNotOverridenOrGuestDisabled(Feature feature, bool isEnabled);
+    void makeReadOnly(Feature feature);
 
     static Feature fromString(std::string_view str);
     static std::string_view toString(Feature feature);
@@ -109,6 +110,9 @@ public:
         bool defaultVal = false;
         bool currentVal = false;
         bool isOverridden = false;
+        bool isReadOnly = false;
+
+        void setCurrentVal(bool val);
     };
 private:
     std::unordered_map<Feature, FeatureOption> mFeatures = {};
