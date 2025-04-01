@@ -98,8 +98,7 @@ static CameraCallbackDesc _camera_callback_desc;
  *******************************************************************************/
 
 static int get_token_value(const char* params, const char* name,
-                           char* value, int val_size)
-{
+                           char* value, int val_size) {
     const char* val_end;
     int len = strlen(name);
     const char* par_end = params + strlen(params);
@@ -144,8 +143,7 @@ static int get_token_value(const char* params, const char* name,
 }
 
 static int get_token_value_alloc(const char* params,
-                                 const char* name, char** value)
-{
+                                 const char* name, char** value) {
     char tmp;
     int res;
 
@@ -174,8 +172,7 @@ static int get_token_value_alloc(const char* params,
 }
 
 static int get_token_value_int(const char* params,
-                               const char* name, int* value)
-{
+                               const char* name, int* value) {
     char val_str[64];   // Should be enough for all numeric values.
     if (!get_token_value(params, name, val_str, sizeof(val_str))) {
         errno = 0;
@@ -192,8 +189,7 @@ static int get_token_value_int(const char* params,
     }
 }
 
-static std::pair<std::string_view, std::string_view> _parse_query(const std::string_view request)
-{
+static std::pair<std::string_view, std::string_view> _parse_query(const std::string_view request) {
     const size_t separator = request.find(' ');
     if (separator != request.npos) {
         return {request.substr(0, separator), request.substr(separator + 1)};
@@ -417,8 +413,7 @@ static void _webcam_setup(CameraServiceDesc* csd,
 /* Initializes camera service descriptor.
  */
 static void
-_camera_service_init(CameraServiceDesc* csd)
-{
+_camera_service_init(CameraServiceDesc* csd) {
     /* Enumerate camera devices connected to the host. */
     memset(csd->camera_info, 0, sizeof(csd->camera_info));
     csd->camera_count = 0;
@@ -482,8 +477,7 @@ _camera_service_init(CameraServiceDesc* csd)
  *  payload_size - Payload size to report to the client.
  */
 static void
-_qemu_client_reply_payload(QemudClient* qc, const size_t payload_size)
-{
+_qemu_client_reply_payload(QemudClient* qc, const size_t payload_size) {
     char payload_size_str[9];
     snprintf(payload_size_str, sizeof(payload_size_str), "%08zx", payload_size);
     qemud_client_send(qc, (const uint8_t*)payload_size_str, 8);
@@ -504,8 +498,7 @@ static void
 _qemu_client_query_reply(QemudClient* qc,
                          int ok_ko,
                          const void* extra,
-                         size_t extra_size)
-{
+                         size_t extra_size) {
     /* Success, no data to send in reply. */
     static constexpr char OK_REPLY[] = "ok";
     /* Failure, no data to send in reply. */
@@ -554,8 +547,7 @@ _qemu_client_query_reply(QemudClient* qc,
  *  ok_str - An optional string containing query results. Can be nullptr.
  */
 static void
-_qemu_client_reply_ok(QemudClient* qc, const char* ok_str)
-{
+_qemu_client_reply_ok(QemudClient* qc, const char* ok_str) {
     _qemu_client_query_reply(qc, 1, ok_str,
                              (ok_str != nullptr) ? (strlen(ok_str) + 1) : 0);
 }
@@ -566,8 +558,7 @@ _qemu_client_reply_ok(QemudClient* qc, const char* ok_str)
  *  ko_str - An optional string containing reason for failure. Can be nullptr.
  */
 static void
-_qemu_client_reply_ko(QemudClient* qc, const char* ko_str)
-{
+_qemu_client_reply_ko(QemudClient* qc, const char* ko_str) {
     _qemu_client_query_reply(qc, 0, ko_str,
                              (ko_str != nullptr) ? (strlen(ko_str) + 1) : 0);
 }
@@ -586,8 +577,7 @@ _qemu_client_reply_ko(QemudClient* qc, const char* ko_str)
  *  0 on success, or != 0 on failure.
  */
 static int
-_factory_client_list_cameras(CameraServiceDesc* csd, QemudClient* client)
-{
+_factory_client_list_cameras(CameraServiceDesc* csd, QemudClient* client) {
     if (csd->camera_count == 0) {
         /* No cameras connected to the host. Reply with "\n" */
         _qemu_client_reply_ok(client, "\n");
@@ -615,8 +605,7 @@ static void
 _factory_client_recv(void*         opaque,
                      uint8_t*      msg,
                      int           msglen,
-                     QemudClient*  client)
-{
+                     QemudClient*  client) {
     using namespace std::literals;
 
     /* List cameras connected to the host. */
@@ -646,8 +635,7 @@ _factory_client_recv(void*         opaque,
 
 /* Emulated camera factory client has been disconnected from the service. */
 static void
-_factory_client_close(void*  opaque)
-{
+_factory_client_close(void*  opaque) {
     /* There is nothing to clean up here: factory service is just an alias for
      * the "root" camera service, that doesn't require anything more, than camera
      * dervice descriptor already provides. */
@@ -664,8 +652,7 @@ static void camera_client_handle_event(CameraClient*  cc,
                                        uint8_t*       msg,
                                        int            msglen,
                                        QemudClient*   client);
-struct CameraClient
-{
+struct CameraClient {
     /* Client name.
      *  On Linux this is the name of the camera device.
      *  On Windows this is the name of capturing window.
@@ -759,8 +746,7 @@ struct CameraClient
  *  Emulated camera client descriptor on success, or nullptr on failure.
  */
 static CameraClient*
-_camera_client_create(CameraServiceDesc* csd, const char* param)
-{
+_camera_client_create(CameraServiceDesc* csd, const char* param) {
     std::unique_ptr<CameraClient> cc = std::make_unique<CameraClient>();
     int res;
 
@@ -870,8 +856,7 @@ static __inline__ void _camera_sleep(int millisec) {
  *  param - Query parameters. There are no parameters expected for this query.
  */
 static void
-_camera_client_query_connect(CameraClient* cc, QemudClient* qc, const char* param)
-{
+_camera_client_query_connect(CameraClient* cc, QemudClient* qc, const char* param) {
     if (cc->camera != nullptr) {
         /* Already connected. */
         W("%s: Camera '%s' is already connected", __func__, cc->device_name);
@@ -905,8 +890,7 @@ _camera_client_query_connect(CameraClient* cc, QemudClient* qc, const char* para
 static void
 _camera_client_query_disconnect(CameraClient* cc,
                                 QemudClient* qc,
-                                const char* param)
-{
+                                const char* param) {
     if (cc->camera == nullptr) {
         /* Already disconnected. */
         W("%s: Camera '%s' is already disconnected", __func__, cc->device_name);
@@ -1062,8 +1046,7 @@ _camera_client_start(CameraClient* cc, int width, int height, int pix_format) {
  *      the client. 'format' must be one of the V4L2_PIX_FMT_XXX values.
  */
 static void
-_camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param)
-{
+_camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param) {
     char* w;
     char dim[64];
     int width, height, pix_format;
@@ -1155,8 +1138,7 @@ _camera_client_query_start(CameraClient* cc, QemudClient* qc, const char* param)
 
 static void
 _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
-                              const char* param)
-{
+                              const char* param) {
     char* w;
     char dim[64];
     int width, height, pix_format;
@@ -1253,8 +1235,7 @@ _camera_client_query_start_v1(CameraClient* cc, QemudClient* qc,
  *  param - Query parameters. There are no parameters expected for this query.
  */
 static void
-_camera_client_query_stop(CameraClient* cc, QemudClient* qc, const char* param)
-{
+_camera_client_query_stop(CameraClient* cc, QemudClient* qc, const char* param) {
     if ((!V1 && cc->video_frame == nullptr) || (V1 && !cc->started)) {
         /* Not started. */
         W("%s: Camera '%s' is not started", __func__, cc->device_name);
@@ -1310,8 +1291,7 @@ _camera_client_query_stop(CameraClient* cc, QemudClient* qc, const char* param)
  *         frame time included.
  */
 static void
-_camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
-{
+_camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param) {
     int video_size = 0;
     int preview_size = 0;
     int repeat;
@@ -1496,8 +1476,7 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
 }
 
 static void
-_camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* param)
-{
+_camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* param) {
     int repeat;
     char* w;
     int format, width, height;
@@ -1777,16 +1756,14 @@ static void
 _camera_client_recv(void*         opaque,
                     uint8_t*      msg,
                     int           msglen,
-                    QemudClient*  client)
-{
+                    QemudClient*  client) {
     CameraClient* cc = (CameraClient*)opaque;
     camera_client_handle_event(cc, msg, msglen, client);
 }
 
 /* Emulated camera client has been disconnected from the service. */
 static void
-_camera_client_close(void* opaque)
-{
+_camera_client_close(void* opaque) {
     CameraClient* cc = static_cast<CameraClient*>(opaque);
 
     D("%s: Camera client for device '%s' on input channel %d is now closed",
@@ -1888,8 +1865,7 @@ static QemudClient*
 _camera_service_connect(void*          opaque,
                         QemudService*  serv,
                         int            channel,
-                        const char*    client_param)
-{
+                        const char*    client_param) {
     QemudClient*  client = nullptr;
     CameraServiceDesc* csd = (CameraServiceDesc*)opaque;
 
