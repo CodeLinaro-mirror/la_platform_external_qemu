@@ -729,7 +729,6 @@ struct CameraClient
     /* Total number of frames rendered, used for metrics. */
     uint64_t            frame_count = 0;
     bool                started = false;
-    bool                need_frame_cache = false;
     size_t              frame_cache_size = 0;
     std::vector<uint8_t>    frame_cache;
     CameraClient() = default;
@@ -1383,17 +1382,17 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
 
     if (video_size) {
         fbs[fbs_num].pixel_format = cc->pixel_format;
-        fbs[fbs_num].framebuffer = cc->video_frame;
         fbs[fbs_num].width = cc->width;
         fbs[fbs_num].height = cc->height;
+        fbs[fbs_num].framebuffer = cc->video_frame;
         fbs_num++;
     }
     if (preview_size) {
         /* TODO: Watch out for preview format changes! */
         fbs[fbs_num].pixel_format = V4L2_PIX_FMT_RGB32;
-        fbs[fbs_num].framebuffer = cc->preview_frame;
         fbs[fbs_num].width = cc->width;
         fbs[fbs_num].height = cc->height;
+        fbs[fbs_num].framebuffer = cc->preview_frame;
         fbs_num++;
     }
 
@@ -1509,8 +1508,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
     char* w;
     int format, width, height;
     uint64_t offset;
-    std::vector<ClientFrameBuffer> fbs;
-    int fbs_num = 0;
     uint64_t tick;
     float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
     char tmp[256];
@@ -1588,28 +1585,21 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
         send_frame_time = 0;
     }
 
-    /*
-     * Initialize framebuffer array for frame read.
-     */
-    fbs_num = cc->need_frame_cache ? 2: 1;
-    fbs.resize(fbs_num);
-    fbs[0].pixel_format = format;
-    fbs[0].framebuffer = get_address_space_device_control_ops()->get_host_ptr(
-        get_address_space_device_hw_funcs()->getPhysAddrStart() + offset);
-    fbs[0].width = width;
-    fbs[0].height = height;
-    if (fbs_num == 2) {
-        fbs[1].pixel_format = cc->pixel_format;
-        fbs[1].framebuffer = cc->frame_cache.data();
-        fbs[1].width = cc->width;
-        fbs[1].height = cc->height;
-    }
 
-    /* Capture new frame. */
+    const ClientFrameBuffer fb = {
+        .pixel_format = format,
+        .width = width,
+        .height = height,
+        .framebuffer =
+            get_address_space_device_control_ops()->get_host_ptr(
+                get_address_space_device_hw_funcs()->getPhysAddrStart() +
+                    offset),
+    };
+
     tick = _get_timestamp();
 
-    frame.framebuffers_count = fbs_num;
-    frame.framebuffers = fbs.data();
+    frame.framebuffers_count = 1;
+    frame.framebuffers = &fb;
     frame.staging_framebuffer = &cc->staging_framebuffer;
     frame.staging_framebuffer_size = &cc->staging_framebuffer_size;
     frame.frame_time =
@@ -1634,7 +1624,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
            (_get_timestamp() - tick) < 2000000LL) {
         /* Sleep for 10 millisec before repeating the attempt. */
         _camera_sleep(10);
-        cc->need_frame_cache = true;
         calculate_framebuffer_size(cc->pixel_format, cc->width, cc->height,
                                    &cc->frame_cache_size);
         if (cc->frame_cache.size() < cc->frame_cache_size) {
@@ -1672,9 +1661,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
         D("convert cached frames to requested frame");
     }
 
-    if (fbs_num == 2) {
-        cc->frames_cached = true;
-    }
     ++cc->frame_count;
 
     if (send_frame_time) {
