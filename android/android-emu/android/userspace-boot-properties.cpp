@@ -528,12 +528,24 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         // backend in case of any issues.
         qemuUirendererPropValue = opts->systemui_renderer;
         qemuRenderenginePropValue = opts->systemui_renderer;
+
+        // Check if the skiavk can actually work if requested
+        if (!strcmp(qemuUirendererPropValue, "skiavk")) {
+            const bool supportsMultipleQueues =
+                    fc::isEnabled(fc::VulkanVirtualQueue) || isVkNVIDIA;
+            if (!supportsMultipleQueues) {
+                // Give an error if the user manually enables skiavk without the
+                // necessary feature flags, as it'll cause boot time errors.
+                dfatal("SkiaVK requires VulkanVirtualQueue feature to be "
+                       "enabled!");
+            }
+        }
     } else {
         // SkiaVK requires multiple graphics queues and it works better with
         // GuestAngle. This behavior requires system image to support overriding
-        // hwui and renderengine backends, which is only guaranteed to be supported
-        // on XR and API level 36+ AVD images. Some AVD images with API level 34
-        // will also support it.
+        // hwui and renderengine backends, which is only guaranteed to be
+        // supported on XR and API level 36+ AVD images. Some AVD images with
+        // API level 34 will also support it.
         const bool avdSupportsSkiaVk =
                 ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle)) ||
                  apiLevel >= 36);
@@ -542,7 +554,8 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         // used without minigbm on Windows
         // Always enable skiavk when GuestAngle is used.
         const bool systemSupportsSkiaVk =
-                fc::isEnabled(fc::Minigbm) || fc::isEnabled(fc::GuestAngle);
+                (fc::isEnabled(fc::Minigbm) || fc::isEnabled(fc::GuestAngle)) &&
+                fc::isEnabled(fc::VulkanVirtualQueue);
 
         const bool enableSkiaVk =
                 avdSupportsSkiaVk && gpuSupportsSkiaVk && systemSupportsSkiaVk;
@@ -558,16 +571,6 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
 
     if (qemuUirendererPropValue) {
         params.push_back({qemuUirendererProp, qemuUirendererPropValue});
-
-        // Automatically enable virtual queue feature to satisfy multiple
-        // graphics queue requirement of skiavk hwui
-        if (!strcmp(qemuUirendererPropValue, "skiavk")) {
-            if (!isVkNVIDIA) {
-                VERBOSE("HWUI is set to use SkiaVK, enabling "
-                        "VulkanVirtualQueue for queue requirements.");
-                fc::setEnabledOverride(fc::VulkanVirtualQueue, true);
-            }
-        }
     }
     if (qemuRenderengineProp && qemuRenderenginePropValue) {
         params.push_back({qemuRenderengineProp, qemuRenderenginePropValue});
