@@ -1065,7 +1065,7 @@ vec3 PhysicalModelImpl::getParameterXrHeadVelocity(
 
 vec3 PhysicalModelImpl::getParameterXrOptions(
         ParameterValueType parameterValueType) const {
-    return {0, 0, 0};
+    return mXrDeviceModel.getXrOptions(parameterValueType);
 }
 
 #define GET_FUNCTION_NAME(x) get##x

@@ -117,6 +117,7 @@ private:
 
     QemudService* qemud_service = nullptr;
     QemudClient* qemud_client = nullptr;
+    float mPassthroughCoefficient = 0.0f;
 };
 
 }  // namespace physics
