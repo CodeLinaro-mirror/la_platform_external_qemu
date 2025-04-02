@@ -44,6 +44,10 @@ void resetEnabledToDefault(Feature feature) {
     FeatureControlImpl::get().resetEnabledToDefault(feature);
 }
 
+void makeReadOnly(Feature feature) {
+    FeatureControlImpl::get().makeReadOnly(feature);
+}
+
 bool isOverridden(Feature feature) {
     return FeatureControlImpl::get().isOverridden(feature);
 }

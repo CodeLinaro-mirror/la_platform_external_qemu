@@ -367,9 +367,14 @@ int android_startOpenglesRenderer(
          kAemuToGfxstreamFeatureMap) {
         (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled =
                 android::featurecontrol::isEnabled(aemuFeature);
+
         VERBOSE("gfxstreamFeature:%s = %d",
                 (gfxstreamFeatures.*gfxstreamFeaturePtr).name.c_str(),
                 (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled);
+
+        // These flags should not be changed anymore, as that won't be
+        // reflected on the gfxstream side.
+        android::featurecontrol::makeReadOnly(aemuFeature);
     }
 #else
     // libOpenglRender uses feature control directly.

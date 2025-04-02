@@ -335,7 +335,7 @@ std::ostream& operator<<(std::ostream& os,
     os << absl::StrFormat(
             "Feature: '%s' (%d), value: %d, default: %d, is "
             "overridden: %d",
-            FeatureControlImpl::toString(feature.name),
+            FeatureControlImpl::toString(feature.name).data(),
             static_cast<int>(feature.name), feature.currentVal,
             feature.defaultVal, feature.isOverridden);
     return os;
@@ -363,13 +363,13 @@ bool FeatureControlImpl::isEnabled(Feature feature) const {
 
 void FeatureControlImpl::setEnabledOverride(Feature feature, bool isEnabled) {
     FeatureOption& currFeature = mFeatures[feature];
-    currFeature.currentVal = isEnabled;
+    currFeature.setCurrentVal(isEnabled);
     currFeature.isOverridden = true;
 }
 
 void FeatureControlImpl::resetEnabledToDefault(Feature feature) {
     FeatureOption& currFeature = mFeatures[feature];
-    currFeature.currentVal = currFeature.defaultVal;
+    currFeature.setCurrentVal(currFeature.defaultVal);
     currFeature.isOverridden = false;
 }
 
@@ -405,7 +405,7 @@ void FeatureControlImpl::setIfNotOverriden(Feature feature, bool isEnabled) {
     if (currFeature.isOverridden) {
         return;
     }
-    currFeature.currentVal = isEnabled;
+    currFeature.setCurrentVal(isEnabled);
 }
 
 void FeatureControlImpl::setIfNotOverridenOrGuestDisabled(Feature feature,
@@ -417,8 +417,12 @@ void FeatureControlImpl::setIfNotOverridenOrGuestDisabled(Feature feature,
     if (isGuestFeature(feature) && !isEnabledByGuest(feature)) {
         return;
     }
+    currFeature.setCurrentVal(isEnabled);
+}
 
-    currFeature.currentVal = isEnabled;
+void FeatureControlImpl::makeReadOnly(Feature feature) {
+    FeatureOption& currFeature = mFeatures[feature];
+    currFeature.isReadOnly = true;
 }
 
 Feature FeatureControlImpl::fromString(std::string_view str) {
@@ -443,12 +447,20 @@ std::string_view FeatureControlImpl::toString(Feature feature) {
     return "UnknownFeature";
 }
 
+void FeatureControlImpl::FeatureOption::setCurrentVal(bool val) {
+    if (isReadOnly && currentVal != val) {
+        ERR("Setting read-only feature '%s' to '%d'", toString(name).data(), val);
+    }
+    currentVal = val;
+}
+
 void FeatureControlImpl::initEnabledDefault(Feature feature, bool isEnabled) {
     FeatureOption& currFeature = mFeatures[feature];
     currFeature.name = feature;
     currFeature.defaultVal = isEnabled;
     currFeature.currentVal = isEnabled;
     currFeature.isOverridden = false;
+    currFeature.isReadOnly = false;
 }
 
 void FeatureControlImpl::setGuestTriedEnable(Feature feature) {
@@ -457,6 +469,7 @@ void FeatureControlImpl::setGuestTriedEnable(Feature feature) {
     opt.defaultVal = true;
     opt.currentVal = true;
     opt.isOverridden = false;
+    opt.isReadOnly = false;
 }
 
 void FeatureControlImpl::parseAndApplyOverrides(std::string_view overrides) {
