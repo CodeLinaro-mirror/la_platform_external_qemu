@@ -178,8 +178,16 @@ static void user_event_mouse_wheel(int dx, int dy, int displayId) {
             !feature_is_enabled(kFeature_VirtioTablet)) {
         return;
     }
-    kbd_mouse_wheel_event(
-        scale_with_retaining_sign(dx, 120), scale_with_retaining_sign(dy, 120));
+    if(feature_is_enabled(kFeature_VirtioDualModeMouse)){
+        // One wheel scroll click is scaled to 8 units originally,
+        // Scale it to 1 unit when sent to AndroidXR guest system
+        kbd_mouse_wheel_event(
+            scale_with_retaining_sign(dx, 960), scale_with_retaining_sign(dy, 960));
+    } else {
+        kbd_mouse_wheel_event(
+            scale_with_retaining_sign(dx, 120), scale_with_retaining_sign(dy, 120));
+    }
+
 }
 
 static void user_event_rotary(int delta) {
