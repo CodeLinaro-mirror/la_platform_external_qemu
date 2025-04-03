@@ -144,6 +144,15 @@ typedef struct CameraFrameDim {
     int     height;
 } CameraFrameDim;
 
+/* Describes a connected camera device.
+ * This is a pratform-independent camera device descriptor that is used in
+ * the camera API.
+ */
+typedef struct CameraDevice {
+    /* Opaque pointer used by the camera capturing API. */
+    void*       opaque;
+} CameraDevice;
+
 /* Defines the camera source type, which determines what generates frames on
  * the host. */
 typedef enum CameraSourceType {
@@ -155,6 +164,25 @@ typedef enum CameraSourceType {
     kVideoPlayback
 } CameraSourceType;
 
+typedef struct CameraInfoVtbl {
+    CameraDevice* (*open)(const char* name, int inp_channel);
+    int (*start_capturing)(CameraDevice* cd,
+                           uint32_t pixel_format,
+                           int frame_width,
+                           int frame_height);
+    int (*read_frame)(CameraDevice* cd,
+                      ClientFrame* frame,
+                      float r_scale,
+                      float g_scale,
+                      float b_scale,
+                      float exp_comp,
+                      const char* direction);
+    int (*stop_capturing)(CameraDevice* cd);
+    void (*close)(CameraDevice* cd);
+
+    CameraSourceType camera_source;
+} CameraInfoVtbl;
+
 /* Camera information descriptor, containing properties of a camera connected
  * to the host.
  *
@@ -164,12 +192,12 @@ typedef enum CameraSourceType {
  * representing that camera.
  */
 typedef struct CameraInfo {
+    const CameraInfoVtbl* vtbl;
+
     /* User-friendly camera display name. */
     char*               display_name;
     /* Device name for the camera. */
     char*               device_name;
-    /* The source of the frames for the camera. */
-    CameraSourceType camera_source;
     /* Input channel for the camera. */
     int                 inp_channel;
     /* Pixel format chosen for the camera. */
@@ -194,15 +222,6 @@ void camera_info_done(CameraInfo* ci);
 
 /* Copy a CameraInfo instance |*from| into |*ci|. */
 void camera_info_copy(CameraInfo* ci, const CameraInfo* from);
-
-/* Describes a connected camera device.
- * This is a pratform-independent camera device descriptor that is used in
- * the camera API.
- */
-typedef struct CameraDevice {
-    /* Opaque pointer used by the camera capturing API. */
-    void*       opaque;
-} CameraDevice;
 
 enum ClientStartResult {
     CLIENT_START_RESULT_SUCCESS = 2,
