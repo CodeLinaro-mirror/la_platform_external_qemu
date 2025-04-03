@@ -639,11 +639,6 @@ static void factoryClientClose(void*) {
 /* Describes an emulated camera client.
  */
 struct CameraClient {
-    /* Client name.
-     *  On Linux this is the name of the camera device.
-     *  On Windows this is the name of capturing window.
-     */
-    char*               device_name = nullptr;
     /* Input channel to use to connect to the camera. */
     int                 inp_channel = 0;
     /* Camera information. */
@@ -714,9 +709,6 @@ struct CameraClient {
         if (video_frame != nullptr) {
             free(video_frame);
         }
-        if (device_name != nullptr) {
-            free(device_name);
-        }
     };
 };
 
@@ -739,8 +731,8 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
      * Parse parameter string, containing camera client properties.
      */
 
-    /* Pull required device name. */
-    if (getTokenValueAlloc(param, "name", &cc->device_name)) {
+    char* device_name = nullptr;
+    if (getTokenValueAlloc(param, "name", &device_name)) {
         E("%s: Allocation failure, or required 'name' parameter is missing, or misformed in '%s'",
           __func__, param);
         return nullptr;
@@ -756,25 +748,27 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
         } else {
             E("%s: 'inp_channel' parameter is misformed in '%s'",
               __func__, param);
+            ::free(device_name);
             return nullptr;
         }
     }
 
     CameraInfo* ci = std::find_if(csd->camera_info, &csd->camera_info[csd->camera_count],
-                                  [&cc](const CameraInfo& ci){
+                                  [device_name](const CameraInfo& ci){
                                         return ci.device_name &&
-                                               !strcmp(ci.device_name, cc->device_name);
+                                               !strcmp(ci.device_name, device_name);
                                   });
     if (ci == &csd->camera_info[csd->camera_count]) {
-        E("%s: Cannot find camera info for device '%s'",
-          __func__, cc->device_name);
+        E("%s: Cannot find camera info for device '%s'", __func__, device_name);
+        ::free(device_name);
         return nullptr;
     }
+    ::free(device_name);
 
     /* We can't allow multiple camera services for a single camera device, Lets
      * make sure that there is no client created for this camera. */
     if (ci->in_use) {
-        E("%s: Camera device '%s' is in use", __func__, cc->device_name);
+        E("%s: Camera device '%s' is in use", __func__, ci->device_name);
         return nullptr;
     }
 
@@ -803,7 +797,7 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
     }
 
     D("%s: Camera service is created for device '%s' using input channel %d",
-      __func__, cc->device_name, cc->inp_channel);
+      __func__, ci->device_name, cc->inp_channel);
 
     return cc.release();
 }
@@ -843,21 +837,24 @@ static __inline__ void cameraSleep(uint64_t millisec) {
 static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const char* param) {
     if (cc->camera != nullptr) {
         /* Already connected. */
-        W("%s: Camera '%s' is already connected", __func__, cc->device_name);
+        W("%s: Camera '%s' is already connected",
+          __func__, cc->camera_info->device_name);
         qemuClientReplyOk(qc, "Camera is already connected");
         return;
     }
 
     /* Open camera device. */
-    cc->camera = cc->open(cc->device_name, cc->inp_channel);
+    cc->camera = cc->open(cc->camera_info->device_name, cc->inp_channel);
 
     if (cc->camera == nullptr) {
-        E("%s: Unable to open camera device '%s'", __func__, cc->device_name);
+        E("%s: Unable to open camera device '%s'",
+          __func__, cc->camera_info->device_name);
         qemuClientReplyKo(qc, "Unable to open camera device.");
         return;
     }
 
-    D("%s: Camera device '%s' is now connected", __func__, cc->device_name);
+    D("%s: Camera device '%s' is now connected",
+      __func__, cc->camera_info->device_name);
     if(cc->camera_info->camera_source == _camera_callback_desc.source &&
         _camera_callback_desc.callback) {
         _camera_callback_desc.callback(_camera_callback_desc.context, true);
@@ -874,7 +871,8 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
 static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const char* param) {
     if (cc->camera == nullptr) {
         /* Already disconnected. */
-        W("%s: Camera '%s' is already disconnected", __func__, cc->device_name);
+        W("%s: Camera '%s' is already disconnected",
+          __func__, cc->camera_info->device_name);
         qemuClientReplyOk(qc, "Camera is not connected");
         return;
     }
@@ -883,7 +881,7 @@ static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const
      * not capturing frames. */
     if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
         E("%s: Cannot disconnect camera '%s' while it is not stopped",
-          __func__, cc->device_name);
+          __func__, cc->camera_info->device_name);
         qemuClientReplyKo(qc, "Camera is not stopped");
         return;
     }
@@ -892,7 +890,7 @@ static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const
     cc->close(cc->camera);
     cc->camera = nullptr;
 
-    D("Camera device '%s' is now disconnected", cc->device_name);
+    D("Camera device '%s' is now disconnected", cc->camera_info->device_name);
     qemuClientReplyOk(qc, nullptr);
 }
 
@@ -920,13 +918,13 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
         /* Already started. Match capture parameters. */
         if (cc->pixel_format == (uint32_t)pix_format && cc->width == width &&
             cc->height == height) {
-            W("%s: Camera '%s' is already started", __func__, cc->device_name);
+            W("%s: Camera '%s' is already started", __func__, cc->camera_info->device_name);
             return CLIENT_START_RESULT_ALREADY_STARTED;
         } else {
             /* Parameters don't match. Fail the query. */
             E("%s: Camera '%s' is already started, and parameters don't match:\n"
               "Current %.4s[%dx%d] != requested %.4s[%dx%d]",
-              __func__, cc->device_name, (const char*)&cc->pixel_format,
+              __func__, cc->camera_info->device_name, (const char*)&cc->pixel_format,
               cc->width, cc->height, (const char*)&pix_format, width, height);
             return CLIENT_START_RESULT_PARAMETER_MISMATCH;
         }
@@ -997,7 +995,8 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
     if (cc->start_capturing(cc->camera, cc->camera_info->pixel_format,
                             cc->width, cc->height)) {
         E("%s: Cannot start camera '%s' for %.4s[%dx%d]: %s",
-          __func__, cc->device_name, (const char*)&cc->pixel_format,
+          __func__, cc->camera_info->device_name,
+          (const char*)&cc->pixel_format,
           cc->width, cc->height, strerror(errno));
         if (cc->video_frame) {
             free(cc->video_frame);
@@ -1011,7 +1010,8 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
     }
 
     D("%s: Camera '%s' is now started for %.4s[%dx%d]",
-      __func__, cc->device_name, (char*)&cc->pixel_format, cc->width,
+      __func__, cc->camera_info->device_name,
+      (char*)&cc->pixel_format, cc->width,
       cc->height);
 
     return CLIENT_START_RESULT_SUCCESS;
@@ -1036,7 +1036,7 @@ static void cameraClientQueryStart(CameraClient* cc, QemudClient* qc, const char
     /* Sanity check. */
     if (cc->camera == nullptr) {
         /* Not connected. */
-        E("%s: Camera '%s' is not connected", __func__, cc->device_name);
+        E("%s: Camera '%s' is not connected", __func__, cc->camera_info->device_name);
         qemuClientReplyKo(qc, "Camera is not connected");
         return;
     }
@@ -1127,7 +1127,8 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
     /* Sanity check. */
     if (cc->camera == nullptr) {
         /* Not connected. */
-        E("%s: Camera '%s' is not connected", __func__, cc->device_name);
+        E("%s: Camera '%s' is not connected",
+          __func__, cc->camera_info->device_name);
         qemuClientReplyKo(qc, "Camera is not connected");
         return;
     }
@@ -1218,7 +1219,8 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
 static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char* param) {
     if ((!V1 && cc->video_frame == nullptr) || (V1 && !cc->started)) {
         /* Not started. */
-        W("%s: Camera '%s' is not started", __func__, cc->device_name);
+        W("%s: Camera '%s' is not started",
+          __func__, cc->camera_info->device_name);
         qemuClientReplyOk(qc, "Camera is not started");
         return;
     }
@@ -1226,7 +1228,7 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
     /* Stop the camera. */
     if (cc->stop_capturing(cc->camera)) {
         E("%s: Cannot stop camera device '%s': %s",
-          __func__, cc->device_name, strerror(errno));
+          __func__, cc->camera_info->device_name, strerror(errno));
         qemuClientReplyKo(qc, "Cannot stop camera device");
         return;
     }
@@ -1250,7 +1252,8 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
         _camera_callback_desc.callback(_camera_callback_desc.context, false);
     }
 
-    D("%s: Camera device '%s' is now stopped.", __func__, cc->device_name);
+    D("%s: Camera device '%s' is now stopped.",
+      __func__, cc->camera_info->device_name);
     qemuClientReplyOk(qc, nullptr);
 }
 
@@ -1286,7 +1289,8 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
     /* Sanity check. */
     if (cc->video_frame == nullptr) {
         /* Not started. */
-        E("%s: Camera '%s' is not started", __func__, cc->device_name);
+        E("%s: Camera '%s' is not started",
+          __func__, cc->camera_info->device_name);
         qemuClientReplyKo(qc, "Camera is not started");
         return;
     }
@@ -1327,7 +1331,7 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
         (preview_size != 0 && cc->preview_frame_size != (size_t)preview_size)) {
         E("%s: Frame sizes don't match for camera '%s':\n"
           "Expected %d for video, and %d for preview. Requested %d, and %d",
-          __func__, cc->device_name, cc->video_frame_size,
+          __func__, cc->camera_info->device_name, cc->video_frame_size,
           cc->preview_frame_size, video_size, preview_size);
         qemuClientReplyKo(qc, "Frame size mismatch");
         return;
@@ -1388,14 +1392,14 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
     if (repeat == 1 && !cc->frame_count) {
         /* Waited too long for the first frame. */
         E("%s: Unable to obtain first video frame from the camera '%s' in %d milliseconds: %s.",
-          __func__, cc->device_name,
+          __func__, cc->camera_info->device_name,
           (uint32_t)(getTimestamp() - tick) / 1000, strerror(errno));
         qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
         return;
     } else if (repeat < 0) {
         /* An I/O error. */
         E("%s: Unable to obtain video frame from the camera '%s': %s.",
-          __func__, cc->device_name, strerror(errno));
+          __func__, cc->camera_info->device_name, strerror(errno));
         qemuClientReplyKo(qc, strerror(errno));
         return;
     }
@@ -1407,7 +1411,7 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
                           cc->preview_frame_size, cc->width, cc->height, &frame,
                           1.0f, 1.0f, 1.0f, 1.0f, "front", 1)) {
             E("%s: Unable to obtain first video frame from the camera '%s'",
-                __func__, cc->device_name);
+                __func__, cc->camera_info->device_name);
             qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
             return;
         }
@@ -1469,7 +1473,7 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
     /* Sanity check. */
     if (!cc->started) {
         /* Not started. */
-        E("%s: Camera '%s' is not started", __func__, cc->device_name);
+        E("%s: Camera '%s' is not started", __func__, cc->camera_info->device_name);
         qemuClientReplyKo(qc, "Camera is not started");
         return;
     }
@@ -1587,7 +1591,7 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
     if (repeat == 1 && !cc->frame_count) {
         /* Waited too long for the first frame. */
         E("%s: Unable to obtain first video frame from the camera '%s' in %d milliseconds: %s.",
-          __func__, cc->device_name,
+          __func__, cc->camera_info->device_name,
           (uint32_t)(getTimestamp() - tick) / 1000, strerror(errno));
         qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
         return;
@@ -1595,7 +1599,7 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
     if (repeat < 0 && !cc->frame_count) {
         /* An I/O error. */
         E("%s: Unable to obtain video frame from the camera '%s': %s.",
-          __func__, cc->device_name, strerror(errno));
+          __func__, cc->camera_info->device_name, strerror(errno));
         qemuClientReplyKo(qc, strerror(errno));
         return;
     }
@@ -1606,7 +1610,7 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
                           cc->frame_cache_size, cc->width, cc->height, &frame,
                           1.0f, 1.0f, 1.0f, 1.0f, "front", 1)) {
             E("%s: Unable to obtain first video frame from the camera '%s'",
-                __func__, cc->device_name);
+                __func__, cc->camera_info->device_name);
             qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
             return;
         }
@@ -1742,7 +1746,7 @@ static void cameraClientClose(void* opaque) {
     CameraClient* cc = static_cast<CameraClient*>(opaque);
 
     D("%s: Camera client for device '%s' on input channel %d is now closed",
-      __func__, cc->device_name, cc->inp_channel);
+      __func__, cc->camera_info->device_name, cc->inp_channel);
 
     delete cc;
 }
@@ -1773,7 +1777,7 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
 
     int is_camera_connected = stream_get_be32(f);
     if (is_camera_connected && cc->camera == nullptr) {
-        cc->camera = cc->open(cc->device_name, cc->inp_channel);
+        cc->camera = cc->open(cc->camera_info->device_name, cc->inp_channel);
         if (cc->camera == nullptr) {
             D("%s: failed to start camera service required in snapshot.\n",
               __func__);
