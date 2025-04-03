@@ -72,7 +72,6 @@ static constexpr size_t MAX_CAMERA = 8;
 static constexpr size_t MAX_QUERY_MESSAGE_SIZE = 8092;
 
 /* Camera sevice descriptor. */
-typedef struct CameraServiceDesc CameraServiceDesc;
 struct CameraServiceDesc {
     /* Information about camera devices connected to the host.
      * Note that once initialized, entries in this array are considered to be
@@ -647,11 +646,6 @@ _factory_client_close(void*  opaque) {
 
 /* Describes an emulated camera client.
  */
-typedef struct CameraClient CameraClient;
-static void camera_client_handle_event(CameraClient*  cc,
-                                       uint8_t*       msg,
-                                       int            msglen,
-                                       QemudClient*   client);
 struct CameraClient {
     /* Client name.
      *  On Linux this is the name of the camera device.
