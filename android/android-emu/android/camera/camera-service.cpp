@@ -716,8 +716,7 @@ struct CameraClient
     int                 height = 0;
     /* Number of pixels in a frame buffer. */
     int                 pixel_num = 0;
-    /* Status of preview frame cache. */
-    int                 frames_cached = 0;
+
     /* Queries being sent from the guest can be interrupted, resulting in the camera receiving
        the partial text of a query.  (This can be detected by the query not ending with a
        terminating 0 character.)  In that case, the partial command is stored in command_buffer,
@@ -729,7 +728,6 @@ struct CameraClient
     /* Total number of frames rendered, used for metrics. */
     uint64_t            frame_count = 0;
     bool                started = false;
-    bool                need_frame_cache = false;
     size_t              frame_cache_size = 0;
     std::vector<uint8_t>    frame_cache;
     CameraClient() = default;
@@ -976,7 +974,6 @@ _camera_client_start(CameraClient* cc, int width, int height, int pix_format) {
     cc->width = width;
     cc->height = height;
     cc->pixel_num = cc->width * cc->height;
-    cc->frames_cached = 0;
     cc->frame_count = 0;
     cc->staging_framebuffer = nullptr;
     cc->staging_framebuffer_size = 0;
@@ -1383,17 +1380,17 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
 
     if (video_size) {
         fbs[fbs_num].pixel_format = cc->pixel_format;
-        fbs[fbs_num].framebuffer = cc->video_frame;
         fbs[fbs_num].width = cc->width;
         fbs[fbs_num].height = cc->height;
+        fbs[fbs_num].framebuffer = cc->video_frame;
         fbs_num++;
     }
     if (preview_size) {
         /* TODO: Watch out for preview format changes! */
         fbs[fbs_num].pixel_format = V4L2_PIX_FMT_RGB32;
-        fbs[fbs_num].framebuffer = cc->preview_frame;
         fbs[fbs_num].width = cc->width;
         fbs[fbs_num].height = cc->height;
+        fbs[fbs_num].framebuffer = cc->preview_frame;
         fbs_num++;
     }
 
@@ -1421,7 +1418,7 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
      * stuck on something (observed with some Microsoft devices) we will limit
      * the loop by 2 second time period (which is more than enough to obtain
      * something from the device) */
-    while (repeat == 1 && !cc->frames_cached &&
+    while (repeat == 1 && !cc->frame_count &&
            (_get_timestamp() - tick) < 2000000LL) {
         /* Sleep for 10 millisec before repeating the attempt. */
         _camera_sleep(10);
@@ -1429,7 +1426,7 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
                                 exp_comp, cc->camera_info->direction);
         D("wait 10ms and read again\n");
     }
-    if (repeat == 1 && !cc->frames_cached) {
+    if (repeat == 1 && !cc->frame_count) {
         /* Waited too long for the first frame. */
         E("%s: Unable to obtain first video frame from the camera '%s' in %d milliseconds: %s.",
           __func__, cc->device_name,
@@ -1444,7 +1441,7 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
         return;
     }
 
-    if (video_size && repeat == 1 && cc->frames_cached) {
+    if (video_size && repeat == 1 && cc->frame_count) {
         // Device has no frame update reported. Use cached preview frame.
         // Convert preview frame format to video frame format.
         if (convert_frame(cc->preview_frame, V4L2_PIX_FMT_RGB32,
@@ -1457,10 +1454,6 @@ _camera_client_query_frame(CameraClient* cc, QemudClient* qc, const char* param)
         }
     }
 
-    /* We have cached something... */
-    if (preview_size) {
-        cc->frames_cached = 1;
-    }
     ++cc->frame_count;
 
     /*
@@ -1509,8 +1502,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
     char* w;
     int format, width, height;
     uint64_t offset;
-    std::vector<ClientFrameBuffer> fbs;
-    int fbs_num = 0;
     uint64_t tick;
     float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
     char tmp[256];
@@ -1588,28 +1579,21 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
         send_frame_time = 0;
     }
 
-    /*
-     * Initialize framebuffer array for frame read.
-     */
-    fbs_num = cc->need_frame_cache ? 2: 1;
-    fbs.resize(fbs_num);
-    fbs[0].pixel_format = format;
-    fbs[0].framebuffer = get_address_space_device_control_ops()->get_host_ptr(
-        get_address_space_device_hw_funcs()->getPhysAddrStart() + offset);
-    fbs[0].width = width;
-    fbs[0].height = height;
-    if (fbs_num == 2) {
-        fbs[1].pixel_format = cc->pixel_format;
-        fbs[1].framebuffer = cc->frame_cache.data();
-        fbs[1].width = cc->width;
-        fbs[1].height = cc->height;
-    }
 
-    /* Capture new frame. */
+    const ClientFrameBuffer fb = {
+        .pixel_format = format,
+        .width = width,
+        .height = height,
+        .framebuffer =
+            get_address_space_device_control_ops()->get_host_ptr(
+                get_address_space_device_hw_funcs()->getPhysAddrStart() +
+                    offset),
+    };
+
     tick = _get_timestamp();
 
-    frame.framebuffers_count = fbs_num;
-    frame.framebuffers = fbs.data();
+    frame.framebuffers_count = 1;
+    frame.framebuffers = &fb;
     frame.staging_framebuffer = &cc->staging_framebuffer;
     frame.staging_framebuffer_size = &cc->staging_framebuffer_size;
     frame.frame_time =
@@ -1630,11 +1614,10 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
      * the loop by 2 second time period (which is more than enough to obtain
      * something from the device) */
     while (repeat == 1 &&
-           !cc->frames_cached &&
+           !cc->frame_count &&
            (_get_timestamp() - tick) < 2000000LL) {
         /* Sleep for 10 millisec before repeating the attempt. */
         _camera_sleep(10);
-        cc->need_frame_cache = true;
         calculate_framebuffer_size(cc->pixel_format, cc->width, cc->height,
                                    &cc->frame_cache_size);
         if (cc->frame_cache.size() < cc->frame_cache_size) {
@@ -1643,7 +1626,7 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
         repeat = cc->read_frame(cc->camera, &frame, r_scale, g_scale, b_scale,
                                 exp_comp, cc->camera_info->direction);
     }
-    if (repeat == 1 && !cc->frames_cached) {
+    if (repeat == 1 && !cc->frame_count) {
         /* Waited too long for the first frame. */
         E("%s: Unable to obtain first video frame from the camera '%s' in %d milliseconds: %s.",
           __func__, cc->device_name,
@@ -1651,7 +1634,7 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
         _qemu_client_reply_ko(qc, "Unable to obtain video frame from the camera");
         return;
     }
-    if (repeat < 0 && !cc->frames_cached) {
+    if (repeat < 0 && !cc->frame_count) {
         /* An I/O error. */
         E("%s: Unable to obtain video frame from the camera '%s': %s.",
           __func__, cc->device_name, strerror(errno));
@@ -1659,7 +1642,7 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
         return;
     }
 
-    if (repeat == 1 && cc->frames_cached) {
+    if (repeat == 1 && cc->frame_count) {
         frame.framebuffers_count = 1;
         if (convert_frame(cc->frame_cache.data(), cc->pixel_format,
                           cc->frame_cache_size, cc->width, cc->height, &frame,
@@ -1672,9 +1655,6 @@ _camera_client_query_frame_v1(CameraClient* cc, QemudClient* qc, const char* par
         D("convert cached frames to requested frame");
     }
 
-    if (fbs_num == 2) {
-        cc->frames_cached = true;
-    }
     ++cc->frame_count;
 
     if (send_frame_time) {
