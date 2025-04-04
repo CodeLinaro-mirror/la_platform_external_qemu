@@ -602,14 +602,14 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
     return new CameraClient(ci, inp_channel);
 }
 
-static __inline__ uint64_t getTimestamp(void) {
+static uint64_t getTimestamp(void) {
     struct timeval t;
     t.tv_sec = t.tv_usec = 0;
     gettimeofday(&t, nullptr);
     return (uint64_t)t.tv_sec * 1000000LL + t.tv_usec;
 }
 
-static __inline__ void cameraSleep(uint64_t millisec) {
+static void cameraSleep(uint64_t millisec) {
     struct timeval t;
     const uint64_t wake_at = getTimestamp() + millisec * 1000;
     do {
