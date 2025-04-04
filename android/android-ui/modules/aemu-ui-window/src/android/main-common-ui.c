@@ -237,6 +237,7 @@ void ui_done(void) {
 }
 
 static RendererConfig lastRendererConfig;
+static bool lastRendererConfigSet = false;
 
 static bool isGuestRendererChoice(const char* choice) {
     return choice && (!strcmp(choice, "off") || !strcmp(choice, "guest"));
@@ -244,8 +245,34 @@ static bool isGuestRendererChoice(const char* choice) {
 
 static const char DEFAULT_SOFTWARE_GPU_MODE[] = "swiftshader_indirect";
 
+// Older API, calls configureRenderer and startRenderer
 bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
+    RendererConfig* config_out) {
+
+    // First configure
+    if (!configureRenderer(uiPreferredBackend, config_out)) {
+        derror("Could not configure renderer!");
+        return false;
+    }
+
+    // Then start with the selected renderer
+    if (!startRenderer(config_out)) {
+        derror("Could not start renderer!");
+        return false;
+    }
+    return true;
+}
+
+bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
                             RendererConfig* config_out) {
+    // Set defaults
+    config_out->glesMode = kAndroidGlesEmulationOff;
+    config_out->selectedRenderer = SELECTED_RENDERER_UNKNOWN;
+    config_out->gles_major_version = 2;
+    config_out->gles_minor_version = 0;
+    config_out->glFramebufferSizeBytes = 0;
+    config_out->rendererStarted = 0;
+
     EmuglConfig config;
     AvdInfo* avd = getConsoleAgents()->settings->avdInfo();
     AndroidHwConfig* hw = getConsoleAgents()->settings->hw();
@@ -259,10 +286,11 @@ bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
             getConsoleAgents()->multi_display;
     if (!avd || !hw || !opts || !vm_operations || !window_agent ||
         !multi_display_agent) {
-        derror("configAndStartRenderer: Invalid configuration parameters "
+        derror("%s: Invalid configuration parameters "
                "(%p, %p, %p, %p, %p, %p)",
+               __func__,
                avd, hw, opts, vm_operations, window_agent, multi_display_agent);
-        crashhandler_append_message_format("configAndStartRenderer failed.\n");
+        crashhandler_append_message_format("%s failed.\n", __func__);
         return false;
     }
 
@@ -298,11 +326,9 @@ bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
                 uiPreferredBackend, &hostGpuVulkanBlacklisted,
                 opts->use_host_vulkan)) {
         derror("%s", config.status);
-        config_out->openglAlive = 0;
 
         crashhandler_append_message_format("androidEmuglConfigInit failed.\n");
 
-        lastRendererConfig = *config_out;
         AFREE(api_arch);
 
         return false;
@@ -423,14 +449,12 @@ bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 
     emuglConfig_setupEnv(&config);
 
-    // Now start the renderer, if applicable, and determine various things such
-    // as max supported GLES version and the correct props to write.
     config_out->glesMode = kAndroidGlesEmulationHost;
-    config_out->openglAlive = 1;
-    int gles_major_version = 2;
-    int gles_minor_version = 0;
-    if (strcmp(gpu_mode, "guest") == 0 || strcmp(gpu_mode, "off") == 0 ||
-        !hw->hw_gpu_enabled) {
+    const bool noOpenglesStart = strcmp(gpu_mode, "guest") == 0 ||
+                                 strcmp(gpu_mode, "off") == 0 ||
+                                 !hw->hw_gpu_enabled;
+    if (noOpenglesStart) {
+        // no host emulation needed
         android_gl_object_counter_get();
 
         if (avdInfo_isGoogleApis(avd) && avdInfo_getApiLevel(avd) >= 19) {
@@ -438,63 +462,93 @@ bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         } else {
             config_out->glesMode = kAndroidGlesEmulationOff;
         }
-    } else {
-        int gles_init_res = android_initOpenglesEmulation();
-        if (gles_init_res < 0) {
-            config_out->openglAlive = 0;
-            derror("Could not initialize Opengl ES Emulation! (Error: %d)",
-                   gles_init_res);
-            crashhandler_append_message_format(
-                    "android_initOpenglesEmulation failed. "
-                    "Error: %d\n",
-                    gles_init_res);
-            return false;
-        }
-
-        int renderer_startup_res = android_startOpenglesRenderer(
-                hw->hw_lcd_width, hw->hw_lcd_height,
-                avdInfo_getAvdFlavor(avd) == AVD_PHONE,
-                avdInfo_getApiLevel(avd), vm_operations, window_agent,
-                multi_display_agent, NULL, &gles_major_version,
-                &gles_minor_version);
-        if (renderer_startup_res < 0) {
-            config_out->openglAlive = 0;
-            derror("Could not start Opengl ES Renderer! (Error: %d)",
-                   renderer_startup_res);
-            crashhandler_append_message_format(
-                    "android_startOpenglesRenderer failed. "
-                    "Error: %d\n",
-                    renderer_startup_res);
-            return false;
-        }
-
-        VERBOSE_INFO(init, "Setting vsync to %d hz", hw->hw_lcd_vsync);
-        android_setVsyncHz(hw->hw_lcd_vsync);
     }
+
+    return true;
+}
+
+bool startRenderer(RendererConfig* config_inout) {
+    const bool noOpenglesStart =
+            (config_inout->glesMode != kAndroidGlesEmulationHost);
+
+    if (noOpenglesStart) {
+        // no host emulation needed
+        return true;
+    }
+
+    AvdInfo* avd = getConsoleAgents()->settings->avdInfo();
+    AndroidHwConfig* hw = getConsoleAgents()->settings->hw();
+    AndroidOptions* opts =
+            getConsoleAgents()->settings->android_cmdLineOptions();
+
+    const QAndroidVmOperations* vm_operations = getConsoleAgents()->vm;
+    const struct QAndroidEmulatorWindowAgent* window_agent =
+            getConsoleAgents()->emu;
+    const QAndroidMultiDisplayAgent* multi_display_agent =
+            getConsoleAgents()->multi_display;
+
+    int gles_init_res = android_initOpenglesEmulation();
+    if (gles_init_res < 0) {
+        derror("Could not initialize Opengl ES Emulation! (Error: %d)",
+            gles_init_res);
+        crashhandler_append_message_format(
+                "android_initOpenglesEmulation failed. "
+                "Error: %d\n",
+                gles_init_res);
+        return false;
+    }
+
+    // Now start the renderer, if applicable, and determine various things such
+    // as max supported GLES version and the correct props to write.
+    config_inout->gles_major_version = 2;
+    config_inout->gles_minor_version = 0;
+
+    int renderer_startup_res = android_startOpenglesRenderer(
+            hw->hw_lcd_width, hw->hw_lcd_height,
+            avdInfo_getAvdFlavor(avd) == AVD_PHONE,
+            avdInfo_getApiLevel(avd), vm_operations, window_agent,
+            multi_display_agent, NULL, &config_inout->gles_major_version,
+            &config_inout->gles_minor_version);
+    if (renderer_startup_res < 0) {
+        derror("Could not start Opengl ES Renderer! (Error: %d)",
+            renderer_startup_res);
+        crashhandler_append_message_format(
+                "android_startOpenglesRenderer failed. "
+                "Error: %d\n",
+                renderer_startup_res);
+        return false;
+    }
+
+    VERBOSE_INFO(init, "Setting vsync to %d hz", hw->hw_lcd_vsync);
+    android_setVsyncHz(hw->hw_lcd_vsync);
 
     // We need to know boot property
     // for opengles version in advance.
     const bool guest_es3_is_ok =
             feature_is_enabled(kFeature_GLESDynamicVersion);
-    if (guest_es3_is_ok) {
-        config_out->bootPropOpenglesVersion =
-                gles_major_version << 16 | gles_minor_version;
-    } else {
-        config_out->bootPropOpenglesVersion = (2 << 16) | 0;
+    if (!guest_es3_is_ok) {
+        config_inout->gles_major_version = 2;
+        config_inout->gles_minor_version = 0;
     }
 
     // Now estimate the GL framebuffer size.
     // Use the conservative value for bytes per pixel (RGBA8)
     uint64_t pixelSizeBytes = 4;
-
-    config_out->glFramebufferSizeBytes =
+    config_inout->glFramebufferSizeBytes =
             hw->hw_lcd_width * hw->hw_lcd_height * pixelSizeBytes;
 
-    lastRendererConfig = *config_out;
+    config_inout->rendererStarted = 1;
+
+    lastRendererConfig = *config_inout;
+    lastRendererConfigSet = true;
+
     return true;
 }
 
 RendererConfig getLastRendererConfig(void) {
+    if (!lastRendererConfigSet) {
+        derror("%s called without setting renderer configuration!", __func__);
+    }
     return lastRendererConfig;
 }
 

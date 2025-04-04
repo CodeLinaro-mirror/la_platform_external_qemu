@@ -48,10 +48,10 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     const char* name = avdInfo_getName(avd);
     const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_DEV_2024);
 
-    // TODO(b/373601997): Correctly determine if hardware gpu requested.
-    // emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST won't
-    // work as emuglconfig is not initialized when doing hw gpu checks.
-    const bool hwGpuRequested = isXrAvd;
+    // configureRenderer must have been called before this point
+    const SelectedRenderer renderer = emuglConfig_get_current_renderer();
+    const bool hwGpuRequested = isXrAvd || (renderer == SELECTED_RENDERER_HOST);
+
     if (!hwGpuRequested) {
         metrics.set_check(EmulatorCompatibilityInfo::
                                   AVD_COMPATIBILITY_CHECK_GPU_CHECK_SKIP);
@@ -85,6 +85,8 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
 #if defined(__APPLE__)
     requiresHwGpuCheck = false;
 #else
+    // TODO(b/373601997): this should not check GuestAngle, check
+    // if vulkan is going to be used instead
     if (!fc::isEnabled(fc::GuestAngle)) {
         requiresHwGpuCheck = false;
     }

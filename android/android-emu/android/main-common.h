@@ -66,19 +66,6 @@ bool emulator_parseFeatureCommandLineOptions(AndroidOptions* opts,
                                              AvdInfo* avd,
                                              AndroidHwConfig* hw);
 
-// configAndStartRenderer():
-// Perform renderer configuration based on the host GPU
-// (or guest renderer if applicable), and then start the renderer.
-// The renderer needs to be started in order to query OpenGL
-// capabilities.
-// Outputs:
-// |glesMode|: Resolved rendering mode (on host or guest)
-// |opengl_alive|: Tracks whether or not the renderer startup failed.
-// |bootPropOpenglesVersion|; Constructed ro.opengles.version boot property
-// appropriate to the detected OpenGL ES API level support.
-// |glFramebufferSizeBytes|: Returns size of LCD-bound framebuffer in bytes.
-// |selectedRenderer|: Returns OpenGL ES backend (host/angle/swiftshader etc)
-// Useful for reserving extra memory for in-guest framebuffers.
 
 // Update server-based hw config / feature flags.
 // Must be done after createAVD,  which sets up critical info needed

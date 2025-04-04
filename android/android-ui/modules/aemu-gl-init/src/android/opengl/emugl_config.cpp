@@ -153,8 +153,12 @@ SelectedRenderer emuglConfig_get_renderer(const char* gpu_mode) {
 
 static SelectedRenderer sCurrentRenderer =
     SELECTED_RENDERER_UNKNOWN;
+static bool sCurrentRendererSet = false;
 
 SelectedRenderer emuglConfig_get_current_renderer() {
+    if (!sCurrentRendererSet) {
+        ERR("%s called before selecting the renderer!", __func__);
+    }
     return sCurrentRenderer;
 }
 
@@ -195,15 +199,16 @@ const char* emuglConfig_renderer_to_string(SelectedRenderer renderer) {
 }
 
 bool emuglConfig_current_renderer_supports_snapshot() {
+    const SelectedRenderer renderer = emuglConfig_get_current_renderer();
     if (getConsoleAgents()->settings->hw()->hw_arc) {
-        return sCurrentRenderer == SELECTED_RENDERER_OFF ||
-               sCurrentRenderer == SELECTED_RENDERER_GUEST;
+        return renderer == SELECTED_RENDERER_OFF ||
+               renderer == SELECTED_RENDERER_GUEST;
     }
-    return sCurrentRenderer == SELECTED_RENDERER_HOST ||
-           sCurrentRenderer == SELECTED_RENDERER_OFF ||
-           sCurrentRenderer == SELECTED_RENDERER_GUEST ||
-           sCurrentRenderer == SELECTED_RENDERER_ANGLE_INDIRECT ||
-           sCurrentRenderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
+    return renderer == SELECTED_RENDERER_HOST ||
+           renderer == SELECTED_RENDERER_OFF ||
+           renderer == SELECTED_RENDERER_GUEST ||
+           renderer == SELECTED_RENDERER_ANGLE_INDIRECT ||
+           renderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
 }
 
 void free_emugl_host_gpu_props(emugl_host_gpu_prop_list proplist) {
@@ -220,6 +225,8 @@ void free_emugl_host_gpu_props(emugl_host_gpu_prop_list proplist) {
 
 static void setCurrentRenderer(const char* gpuMode) {
     sCurrentRenderer = emuglConfig_get_renderer(gpuMode);
+    sCurrentRendererSet = true;
+    ERR("ERRRRR SETTING %s %d", gpuMode, sCurrentRenderer);
 }
 
 struct DeviceSupportInfo {
@@ -1058,6 +1065,8 @@ bool emuglConfig_init(EmuglConfig* config,
 void emuglConfig_setupEnv(const EmuglConfig* config) {
     System* system = System::get();
 
+    const SelectedRenderer renderer = emuglConfig_get_current_renderer();
+
     if (config->use_host_vulkan) {
 #ifdef __APPLE__
         system->envSet("ANDROID_EMU_VK_ICD", "moltenvk");
@@ -1069,8 +1078,8 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
     } else
 #ifndef __APPLE__
     // Default to swiftshader vk on mac
-    if  (sCurrentRenderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT
-            || sCurrentRenderer == SELECTED_RENDERER_SWIFTSHADER
+    if  (renderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT
+            || renderer == SELECTED_RENDERER_SWIFTSHADER
             || strstr(config->backend, "swangle"))
 #endif
     {

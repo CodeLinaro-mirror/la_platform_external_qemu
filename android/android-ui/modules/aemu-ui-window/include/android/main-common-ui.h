@@ -46,17 +46,28 @@ void emulator_finiUserInterface(void);
 
 // First, there is a struct to hold outputs.
 typedef struct {
+    // Set with configureRenderer
     AndroidGlesEmulationMode glesMode;
-    int openglAlive;
-    int bootPropOpenglesVersion;
-    int glFramebufferSizeBytes;
     SelectedRenderer selectedRenderer;
-} RendererConfig;
-// Function itself:
-bool configAndStartRenderer(
-        enum WinsysPreferredGlesBackend uiPreferredBackend,
-        RendererConfig* config_out);
 
+    // Following values can be changed during or
+    // after startRenderer
+    int gles_major_version;
+    int gles_minor_version;
+    int glFramebufferSizeBytes;
+    int rendererStarted;
+} RendererConfig;
+
+// Older API, calls configureRenderer and startRenderer consecutively
+bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
+                            RendererConfig* config_out);
+
+// Configures RendererConfig objects to select gpu mode to be used
+bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
+                       RendererConfig* config_out);
+
+// Initializes and starts renderer based on selected config
+bool startRenderer(RendererConfig* config_inout);
 
 // stopRenderer() - stop all the render threads and wait until their exit.
 // NOTE: It is only safe to stop the OpenGL ES renderer after the main loop
@@ -64,9 +75,12 @@ bool configAndStartRenderer(
 //   especially on Windows!
 void stopRenderer(void);
 
-
-// After configAndStartRenderer is called, one can query last output values:
+// After configureRenderer is called, one can query last output values:
 RendererConfig getLastRendererConfig(void);
+
+inline int getBootPropOpenglesVersion(const RendererConfig* config) {
+    return (config->gles_major_version << 16) | config->gles_minor_version;
+}
 
 // TODO(digit): Remove the deprecated declarations below once QEMU2 has been
 //              ported to use emulator_parseUiCommandLineOptions() and
