@@ -557,6 +557,8 @@ struct CameraClient {
         if (video_frame != nullptr) {
             free(video_frame);
         }
+        ::free(staging_framebuffer);
+
         camera_info->in_use = 0;
     };
 };
@@ -688,8 +690,6 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
     cc->width = width;
     cc->height = height;
     cc->frame_count = 0;
-    cc->staging_framebuffer = nullptr;
-    cc->staging_framebuffer_size = 0;
 
     if (V1) {
         if (!has_converter(ci.pixel_format, cc->pixel_format)) {
@@ -924,9 +924,6 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
     if (V1) {
         cc->started = false;
     }
-
-    free(cc->staging_framebuffer);
-    cc->staging_framebuffer = nullptr;
 
     camera_metrics_report_stop_session(cc->frame_count);
 
