@@ -538,8 +538,6 @@ struct CameraClient {
     int                 width = 0;
     /* Frame height. */
     int                 height = 0;
-    /* Number of pixels in a frame buffer. */
-    int                 pixel_num = 0;
 
     /* Queries being sent from the guest can be interrupted, resulting in the camera receiving
        the partial text of a query.  (This can be detected by the query not ending with a
@@ -551,8 +549,6 @@ struct CameraClient {
     int  command_buffer_offset = 0;
     uint64_t            frame_count = 0;
     bool                started = false;
-    size_t              frame_cache_size = 0;
-    std::vector<uint8_t>    frame_cache;
     CameraClient() = default;
     ~CameraClient() {
         if (camera != nullptr) {
@@ -691,7 +687,6 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
     cc->pixel_format = pix_format;
     cc->width = width;
     cc->height = height;
-    cc->pixel_num = cc->width * cc->height;
     cc->frame_count = 0;
     cc->staging_framebuffer = nullptr;
     cc->staging_framebuffer_size = 0;
