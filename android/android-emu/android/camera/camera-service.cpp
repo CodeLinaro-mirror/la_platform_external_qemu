@@ -1354,7 +1354,9 @@ static QemudClient* cameraServiceConnect(void*          opaque,
     return client;
 }
 
-void register_camera_status_change_callback(camera_callback_t cb, void* ctx, CameraSourceType src) {
+void register_camera_status_change_callback(camera_callback_t cb,
+                                            void* ctx,
+                                            CameraSourceType src) {
     g_cameraCallbackDesc.callback = cb;
     g_cameraCallbackDesc.context = ctx;
     g_cameraCallbackDesc.source = src;
@@ -1367,11 +1369,10 @@ void android_camera_service_init(void) {
 
     if (!_inited) {
         cameraServiceInit(&g_cameraServiceDesc);
-        QemudService*  serv = qemud_service_register(kServiceCamera, 0,
-                &g_cameraServiceDesc,
-                cameraServiceConnect,
-                nullptr,
-                nullptr);
+
+        QemudService* serv = qemud_service_register(kServiceCamera, 0,
+                &g_cameraServiceDesc, &cameraServiceConnect,
+                nullptr, nullptr);
         if (serv == nullptr) {
             derror("%s: Could not register '%s' service",
                     __func__, kServiceCamera);
