@@ -290,6 +290,15 @@ static int cameraClientGetMaxResolution(const CameraInfo* info,
  *  csd - Camera service descriptor to initialize a record in.
  */
 static void virtualscenecameraSetup(CameraServiceDesc* csd) {
+    static const CameraInfoVtbl vtbl = {
+        .open = &camera_virtualscene_open,
+        .start_capturing = &camera_virtualscene_start_capturing,
+        .read_frame = &camera_virtualscene_read_frame,
+        .stop_capturing = &camera_virtualscene_stop_capturing,
+        .close = &camera_virtualscene_close,
+        .camera_source = kVirtualScene,
+    };
+
     /* Array containing emulated camera frame dimensions
      * expected by framework. */
     static const CameraFrameDim kEmulateDims[] = {
@@ -308,13 +317,14 @@ static void virtualscenecameraSetup(CameraServiceDesc* csd) {
         return;
     }
 
+    ci.vtbl = &vtbl;
+
     memcpy(ci.frame_sizes, kEmulateDims, sizeof(kEmulateDims));
     ci.frame_sizes_num = sizeof(kEmulateDims) / sizeof(*kEmulateDims);
 
     ci.display_name = ASTRDUP("virtualscene");
     ci.device_name = ASTRDUP("virtualscene");
 
-    ci.camera_source = kVirtualScene;
     ci.inp_channel = 0;
     ci.pixel_format = camera_virtualscene_preferred_format();
     ci.direction = ASTRDUP("back");
@@ -329,6 +339,15 @@ static void virtualscenecameraSetup(CameraServiceDesc* csd) {
  *  dir - Direction ('back', or 'front') that emulated camera is facing.
  */
 static void videoplaybackcameraSetup(CameraServiceDesc* csd, const char* dir) {
+    static const CameraInfoVtbl vtbl = {
+        .open = &camera_videoplayback_open,
+        .start_capturing = &camera_videoplayback_start_capturing,
+        .read_frame = &camera_videoplayback_read_frame,
+        .stop_capturing = &camera_videoplayback_stop_capturing,
+        .close = &camera_videoplayback_close,
+        .camera_source = kVideoPlayback,
+    };
+
     /* Array containing emulated camera frame dimensions
      * expected by framework. */
     static const CameraFrameDim kEmulateDims[] = {
@@ -347,13 +366,14 @@ static void videoplaybackcameraSetup(CameraServiceDesc* csd, const char* dir) {
         return;
     }
 
+    ci.vtbl = &vtbl;
+
     memcpy(ci.frame_sizes, kEmulateDims, sizeof(kEmulateDims));
     ci.frame_sizes_num = sizeof(kEmulateDims) / sizeof(*kEmulateDims);
 
     ci.display_name = ASTRDUP("videoplayback");
     ci.device_name = ASTRDUP("videoplayback");
 
-    ci.camera_source = kVideoPlayback;
     ci.inp_channel = 0;
     ci.pixel_format = camera_videoplayback_preferred_format();
     ci.direction = ASTRDUP(dir);
@@ -375,6 +395,15 @@ static void webcamSetup(CameraServiceDesc* csd,
                         const char* dir,
                         CameraInfo* webcams,
                         int webcams_cnt) {
+    static const CameraInfoVtbl vtbl = {
+        .open = &camera_device_open,
+        .start_capturing = &camera_device_start_capturing,
+        .read_frame = &camera_device_read_frame,
+        .stop_capturing = &camera_device_stop_capturing,
+        .close = &camera_device_close,
+        .camera_source = kWebcam,
+    };
+
     CameraInfo* srcCi =
         cameraInfoGetByDisplayName(disp_name, webcams, webcams_cnt);
     if (srcCi == nullptr) {
@@ -392,7 +421,7 @@ static void webcamSetup(CameraServiceDesc* csd,
 
     srcCi->in_use = 1;
     camera_info_copy(&dstCi, srcCi);
-    dstCi.camera_source = kWebcam;
+    dstCi.vtbl = &vtbl;
 
     if (dstCi.direction != nullptr) {
         free(dstCi.direction);
@@ -633,27 +662,14 @@ static void factoryClientClose(void*) {
 /* Describes an emulated camera client.
  */
 struct CameraClient {
-    /* Input channel to use to connect to the camera. */
-    int                 inp_channel = 0;
-    /* Camera information. */
-    CameraInfo*         camera_info = nullptr;
-    /* Emulated camera device descriptor. */
-    CameraDevice*       camera = nullptr;
+    CameraClient(CameraInfo* ci, uint32_t inp_channel1)
+            : camera_info(ci)
+            , inp_channel(inp_channel1) {
+        ci->in_use = 1;
+    }
 
-    CameraDevice* (*open)(const char* name, int inp_channel) = nullptr;
-    int (*start_capturing)(CameraDevice* cd,
-                           uint32_t pixel_format,
-                           int frame_width,
-                           int frame_height) = nullptr;
-    int (*stop_capturing)(CameraDevice* cd) = nullptr;
-    int (*read_frame)(CameraDevice* cd,
-                      ClientFrame* frame,
-                      float r_scale,
-                      float g_scale,
-                      float b_scale,
-                      float exp_comp,
-                      const char* direction) = nullptr;
-    void (*close)(CameraDevice* cd) = nullptr;
+    CameraInfo* const   camera_info;
+    CameraDevice*       camera = nullptr;
 
     /* Buffer allocated for video frames.
      * Note that memory allocated for this buffer also contains preview
@@ -670,6 +686,8 @@ struct CameraClient {
     uint8_t*            staging_framebuffer = nullptr;
     /* Staging framebuffer size. */
     size_t              staging_framebuffer_size = 0;
+    /* Input channel to use to connect to the camera. */
+    const uint32_t      inp_channel = 0;
     /* Pixel format required by the guest. */
     uint32_t            pixel_format = 0;
     /* Frame width. */
@@ -694,15 +712,13 @@ struct CameraClient {
     std::vector<uint8_t>    frame_cache;
     CameraClient() = default;
     ~CameraClient() {
-        if (camera_info != nullptr) {
-            camera_info->in_use = 0;
-        }
         if (camera != nullptr) {
-            close(camera);
+            (camera_info->vtbl->close)(camera);
         }
         if (video_frame != nullptr) {
             free(video_frame);
         }
+        camera_info->in_use = 0;
     };
 };
 
@@ -718,9 +734,6 @@ struct CameraClient {
  *  Emulated camera client descriptor on success, or nullptr on failure.
  */
 static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* param) {
-    std::unique_ptr<CameraClient> cc = std::make_unique<CameraClient>();
-    int res;
-
     /*
      * Parse parameter string, containing camera client properties.
      */
@@ -733,12 +746,13 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
     }
 
     /* Pull optional input channel. */
-    res = getTokenValueInt(param, "inp_channel", &cc->inp_channel);
+    int inp_channel;
+    int res = getTokenValueInt(param, "inp_channel", &inp_channel);
     if (res != 0) {
         if (res == -1) {
             /* 'inp_channel' parameter has been ommited. Use default input
              * channel, which is zero. */
-            cc->inp_channel = 0;
+            inp_channel = 0;
         } else {
             E("%s: 'inp_channel' parameter is misformed in '%s'",
               __func__, param);
@@ -766,34 +780,7 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
         return nullptr;
     }
 
-    /* We're done. Set camera in use, and succeed the connection. */
-    ci->in_use = 1;
-    cc->camera_info = ci;
-
-    if (ci->camera_source == kVirtualScene) {
-        cc->open = camera_virtualscene_open;
-        cc->start_capturing = camera_virtualscene_start_capturing;
-        cc->stop_capturing = camera_virtualscene_stop_capturing;
-        cc->read_frame = camera_virtualscene_read_frame;
-        cc->close = camera_virtualscene_close;
-    } else if (ci->camera_source == kVideoPlayback) {
-        cc->open = camera_videoplayback_open;
-        cc->start_capturing = camera_videoplayback_start_capturing;
-        cc->stop_capturing = camera_videoplayback_stop_capturing;
-        cc->read_frame = camera_videoplayback_read_frame;
-        cc->close = camera_videoplayback_close;
-    } else {
-        cc->open = camera_device_open;
-        cc->start_capturing = camera_device_start_capturing;
-        cc->stop_capturing = camera_device_stop_capturing;
-        cc->read_frame = camera_device_read_frame;
-        cc->close = camera_device_close;
-    }
-
-    D("%s: Camera service is created for device '%s' using input channel %d",
-      __func__, ci->device_name, cc->inp_channel);
-
-    return cc.release();
+    return new CameraClient(ci, inp_channel);
 }
 
 /********************************************************************************
@@ -840,8 +827,7 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
     }
 
     /* Open camera device. */
-    cc->camera = cc->open(ci.device_name, cc->inp_channel);
-
+    cc->camera = (ci.vtbl->open)(ci.device_name, cc->inp_channel);
     if (cc->camera == nullptr) {
         E("%s: Unable to open camera device '%s'",
           __func__, ci.device_name);
@@ -851,8 +837,8 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
 
     D("%s: Camera device '%s' is now connected",
       __func__, ci.device_name);
-    if(ci.camera_source == _camera_callback_desc.source &&
-        _camera_callback_desc.callback) {
+    if (ci.vtbl->camera_source == _camera_callback_desc.source &&
+            _camera_callback_desc.callback) {
         _camera_callback_desc.callback(_camera_callback_desc.context, true);
     }
     qemuClientReplyOk(qc, nullptr);
@@ -865,10 +851,12 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
  *  param - Query parameters. There are no parameters expected for this query.
  */
 static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const char* param) {
+    const CameraInfo& ci = *cc->camera_info;
+
     if (cc->camera == nullptr) {
         /* Already disconnected. */
         W("%s: Camera '%s' is already disconnected",
-          __func__, cc->camera_info->device_name);
+          __func__, ci.device_name);
         qemuClientReplyOk(qc, "Camera is not connected");
         return;
     }
@@ -877,16 +865,16 @@ static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const
      * not capturing frames. */
     if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
         E("%s: Cannot disconnect camera '%s' while it is not stopped",
-          __func__, cc->camera_info->device_name);
+          __func__, ci.device_name);
         qemuClientReplyKo(qc, "Camera is not stopped");
         return;
     }
 
     /* Close camera device. */
-    cc->close(cc->camera);
+    (ci.vtbl->close)(cc->camera);
     cc->camera = nullptr;
 
-    D("Camera device '%s' is now disconnected", cc->camera_info->device_name);
+    D("Camera device '%s' is now disconnected", ci.device_name);
     qemuClientReplyOk(qc, nullptr);
 }
 
@@ -906,7 +894,7 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
                                            int pix_format) {
     const CameraInfo& ci = *cc->camera_info;
 
-    camera_metrics_report_start_session(ci.camera_source, ci.direction, width,
+    camera_metrics_report_start_session(ci.vtbl->camera_source, ci.direction, width,
                                         height, pix_format);
 
     /* After collecting capture parameters lets see if camera has already
@@ -989,8 +977,8 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
     }
 
     /* Start the camera. */
-    if (cc->start_capturing(cc->camera, ci.pixel_format,
-                            cc->width, cc->height)) {
+    if ((ci.vtbl->start_capturing)(cc->camera, ci.pixel_format,
+                                   cc->width, cc->height)) {
         E("%s: Cannot start camera '%s' for %.4s[%dx%d]: %s",
           __func__, ci.device_name,
           (const char*)&cc->pixel_format,
@@ -1227,7 +1215,7 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
     }
 
     /* Stop the camera. */
-    if (cc->stop_capturing(cc->camera)) {
+    if ((ci.vtbl->stop_capturing)(cc->camera)) {
         E("%s: Cannot stop camera device '%s': %s",
           __func__, ci.device_name, strerror(errno));
         qemuClientReplyKo(qc, "Cannot stop camera device");
@@ -1248,8 +1236,8 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
 
     camera_metrics_report_stop_session(cc->frame_count);
 
-    if (ci.camera_source == _camera_callback_desc.source &&
-        _camera_callback_desc.callback) {
+    if (ci.vtbl->camera_source == _camera_callback_desc.source &&
+            _camera_callback_desc.callback) {
         _camera_callback_desc.callback(_camera_callback_desc.context, false);
     }
 
@@ -1370,8 +1358,8 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
     frame.frame_time =
             looper_nowNsWithClock(looper_getForThread(), LOOPER_CLOCK_VIRTUAL);
 
-    repeat = cc->read_frame(cc->camera, &frame, r_scale, g_scale, b_scale,
-                            exp_comp, ci.direction);
+    repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
+                                   exp_comp, ci.direction);
 
     /* Note that there is no (known) way how to wait on next frame being
      * available, so we could dequeue frame buffer from the device only when we
@@ -1388,8 +1376,8 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
            (getTimestamp() - tick) < 2000000LL) {
         /* Sleep for 10 millisec before repeating the attempt. */
         cameraSleep(10);
-        repeat = cc->read_frame(cc->camera, &frame, r_scale, g_scale, b_scale,
-                                exp_comp, ci.direction);
+        repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
+                                       exp_comp, ci.direction);
         D("wait 10ms and read again\n");
     }
     if (repeat == 1 && !cc->frame_count) {
@@ -1566,8 +1554,8 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
     frame.frame_time =
             looper_nowNsWithClock(looper_getForThread(), LOOPER_CLOCK_VIRTUAL);
 
-    repeat = cc->read_frame(cc->camera, &frame, r_scale, g_scale, b_scale,
-                            exp_comp, ci.direction);
+    repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
+                                   exp_comp, ci.direction);
 
     /* Note that there is no (known) way how to wait on next frame being
      * available, so we could dequeue frame buffer from the device only when we
@@ -1590,8 +1578,8 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
         if (cc->frame_cache.size() < cc->frame_cache_size) {
             cc->frame_cache.resize(cc->frame_cache_size);
         }
-        repeat = cc->read_frame(cc->camera, &frame, r_scale, g_scale, b_scale,
-                                exp_comp, ci.direction);
+        repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
+                                       exp_comp, ci.direction);
     }
     if (repeat == 1 && !cc->frame_count) {
         /* Waited too long for the first frame. */
@@ -1783,7 +1771,7 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
 
     int is_camera_connected = stream_get_be32(f);
     if (is_camera_connected && cc->camera == nullptr) {
-        cc->camera = cc->open(ci.device_name, cc->inp_channel);
+        cc->camera = (ci.vtbl->open)(ci.device_name, cc->inp_channel);
         if (cc->camera == nullptr) {
             D("%s: failed to start camera service required in snapshot.\n",
               __func__);
@@ -1794,7 +1782,7 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
     // Try to stop the camera if it is already started in order to avoid a frame
     // size or format mismatch.
     if ((!V1 &&cc->video_frame != nullptr) || (V1 && cc->started)) {
-        if (cc->stop_capturing(cc->camera) == 0) {
+        if ((ci.vtbl->stop_capturing)(cc->camera) == 0) {
             if (cc->video_frame) {
                 free(cc->video_frame);
                 cc->video_frame = nullptr;
@@ -1825,8 +1813,8 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
             return -EIO;
         }
     }
-    if (ci.camera_source == _camera_callback_desc.source &&
-        _camera_callback_desc.callback)
+    if (ci.vtbl->camera_source == _camera_callback_desc.source &&
+            _camera_callback_desc.callback)
         _camera_callback_desc.callback(_camera_callback_desc.context, is_camera_started);
 
     return 0;
