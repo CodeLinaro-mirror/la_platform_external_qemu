@@ -67,6 +67,8 @@ struct CameraCallbackDesc {
 static CameraServiceDesc  g_cameraServiceDesc;
 static CameraCallbackDesc g_cameraCallbackDesc;
 
+using namespace std::literals;
+
 static int getTokenValue(const char* params, const char* name,
                          char* value, int val_size) {
     const char* val_end;
@@ -401,53 +403,42 @@ static void cameraServiceInit(CameraServiceDesc* csd) {
     }
 }
 
-static void sendPayloadSize(QemudClient* qc, const size_t payload_size) {
-    char payload_size_str[9];
-    snprintf(payload_size_str, sizeof(payload_size_str), "%08zx", payload_size);
-    qemud_client_send(qc, (const uint8_t*)payload_size_str, 8);
+static void sendPayloadSize(QemudClient* qc, const size_t size) {
+    char str[9];
+    ::snprintf(str, sizeof(str), "%08zx", size);
+    qemud_client_send(qc, reinterpret_cast<const uint8_t*>(str), 8);
 }
 
-static void qemuClientQueryReply(QemudClient* qc,
-                                 int ok_ko,
-                                 const void* extra,
-                                 size_t extra_size) {
-    static constexpr char OK_REPLY[] = "ok";
-    static constexpr char KO_REPLY[] = "ko";
-    static constexpr char OK_REPLY_DATA[] = "ok:";
-    static constexpr char KO_REPLY_DATA[] = "ko:";
+static constexpr size_t kReplyPrefixSize = 3;
+static constexpr uint8_t kOkReplyData[kReplyPrefixSize] = {'o', 'k', ':'};
 
-    const char* ok_ko_str;
-    size_t payload_size;
+static void qemuClientReply(QemudClient* qc, const bool okko,
+                            const void* data,
+                            const size_t dataSize) {
+    static constexpr uint8_t kOkReply[kReplyPrefixSize] = {'o', 'k', 0};
+    static constexpr uint8_t kKoReply[kReplyPrefixSize] = {'k', 'o', 0};
+    static constexpr uint8_t kKoReplyData[kReplyPrefixSize] = {'k', 'o', ':'};
 
-    if (extra == nullptr && extra_size != 0) {
-        W("%s: 'extra' = nullptr, while 'extra_size' = %d",
-          __func__, (int)extra_size);
-        extra_size = 0;
-    }
+    const uint8_t* okkoStr = dataSize ?
+        (okko ? kOkReplyData : kKoReplyData) :
+        (okko ? kOkReply : kKoReply);
 
-    if (extra_size) {
-        payload_size = extra_size + 3;
-        ok_ko_str = ok_ko ? OK_REPLY_DATA : KO_REPLY_DATA;
-    } else {
-        payload_size = 3;
-        ok_ko_str = ok_ko ? OK_REPLY : KO_REPLY;
-    }
-
-    sendPayloadSize(qc, payload_size);
-    qemud_client_send(qc, (const uint8_t*)ok_ko_str, 3);
-    if (extra != nullptr) {
-        qemud_client_send(qc, (const uint8_t*)extra, extra_size);
+    sendPayloadSize(qc, kReplyPrefixSize + dataSize);
+    qemud_client_send(qc, okkoStr, kReplyPrefixSize);
+    if (dataSize) {
+        qemud_client_send(qc, static_cast<const uint8_t*>(data),
+                          dataSize);
     }
 }
 
-static void qemuClientReplyOk(QemudClient* qc, const char* ok_str) {
-    qemuClientQueryReply(qc, 1, ok_str,
-                         (ok_str != nullptr) ? (strlen(ok_str) + 1) : 0);
+static void qemuClientReply(QemudClient* qc, const bool okko,
+                            const std::string_view str = {}) {
+    qemuClientReply(qc, okko, str.data(), str.size());
 }
 
-static void qemuClientReplyKo(QemudClient* qc, const char* ko_str) {
-    qemuClientQueryReply(qc, 0, ko_str,
-                         (ko_str != nullptr) ? (strlen(ko_str) + 1) : 0);
+static void qemuClientReplyASCIZ(QemudClient* qc, const bool okko,
+                                 const char* str) {
+    qemuClientReply(qc, okko, str, ::strlen(str));
 }
 
 /********************************************************************************
@@ -466,7 +457,7 @@ static void qemuClientReplyKo(QemudClient* qc, const char* ko_str) {
 static int factoryClientListCameras(CameraServiceDesc* csd, QemudClient* client) {
     if (csd->camera_count == 0) {
         /* No cameras connected to the host. Reply with "\n" */
-        qemuClientReplyOk(client, "\n");
+        qemuClientReply(client, true, "\n"sv);
         return 0;
     }
 
@@ -475,7 +466,7 @@ static int factoryClientListCameras(CameraServiceDesc* csd, QemudClient* client)
         reply += cameraInfoToString(csd->camera_info[n]);
     }
 
-    qemuClientReplyOk(client, reply.c_str());
+    qemuClientReply(client, true, reply);
     return 0;
 }
 
@@ -499,15 +490,14 @@ static void factoryClientRecv(void*         opaque,
 
     const auto [query_name, query_param] = _parse_query(msg, msglen);
     if (query_name.empty()) {
-        qemuClientReplyKo(client, "Invalid query format");
+        qemuClientReply(client, false, "Invalid query format"sv);
         return;
     }
-
 
     if (query_name == _query_list) {
         factoryClientListCameras(csd, client);
     } else {
-        qemuClientReplyKo(client, "Unknown query name");
+        qemuClientReply(client, false, "Unknown query name"sv);
     }
 }
 
@@ -636,13 +626,13 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
     const CameraInfo& ci = *cc->camera_info;
 
     if (cc->camera != nullptr) {
-        qemuClientReplyOk(qc, "Camera is already connected");
+        qemuClientReply(qc, true, "Camera is already connected"sv);
         return;
     }
 
     cc->camera = (ci.vtbl->open)(ci.device_name, cc->inp_channel);
     if (cc->camera == nullptr) {
-        qemuClientReplyKo(qc, "Unable to open camera device.");
+        qemuClientReply(qc, false, "Unable to open camera device."sv);
         return;
     }
 
@@ -650,26 +640,26 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
             g_cameraCallbackDesc.callback) {
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, true);
     }
-    qemuClientReplyOk(qc, nullptr);
+    qemuClientReply(qc, true);
 }
 
 static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const char* param) {
     const CameraInfo& ci = *cc->camera_info;
 
     if (cc->camera == nullptr) {
-        qemuClientReplyOk(qc, "Camera is not connected");
+        qemuClientReply(qc, true, "Camera is not connected"sv);
         return;
     }
 
     if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
-        qemuClientReplyKo(qc, "Camera is not stopped");
+        qemuClientReply(qc, false, "Camera is not stopped"sv);
         return;
     }
 
     (ci.vtbl->close)(cc->camera);
     cc->camera = nullptr;
 
-    qemuClientReplyOk(qc, nullptr);
+    qemuClientReply(qc, true);
 }
 
 static ClientStartResult cameraClientStart(CameraClient* cc,
@@ -758,28 +748,28 @@ static void cameraClientQueryStart(CameraClient* cc, QemudClient* qc, const char
     int width, height, pix_format;
 
     if (cc->camera == nullptr) {
-        qemuClientReplyKo(qc, "Camera is not connected");
+        qemuClientReply(qc, false, "Camera is not connected"sv);
         return;
     }
 
     if (param == nullptr) {
-        qemuClientReplyKo(qc, "Missing parameters for the query");
+        qemuClientReply(qc, false, "Missing parameters for the query"sv);
         return;
     }
 
     if (getTokenValue(param, "dim", dim, sizeof(dim))) {
-        qemuClientReplyKo(qc, "Invalid or missing 'dim' parameter");
+        qemuClientReply(qc, false, "Invalid or missing 'dim' parameter"sv);
         return;
     }
 
     if (getTokenValueInt(param, "pix", &pix_format)) {
-        qemuClientReplyKo(qc, "Invalid or missing 'pix' parameter");
+        qemuClientReply(qc, false, "Invalid or missing 'pix' parameter"sv);
         return;
     }
 
     w = strchr(dim, 'x');
     if (w == nullptr || w[1] == '\0') {
-        qemuClientReplyKo(qc, "Invalid 'dim' parameter");
+        qemuClientReply(qc, false, "Invalid 'dim' parameter");
         return;
     }
     *w = '\0'; w++;
@@ -787,7 +777,7 @@ static void cameraClientQueryStart(CameraClient* cc, QemudClient* qc, const char
     width = strtoi(dim, nullptr, 10);
     height = strtoi(w, nullptr, 10);
     if (errno) {
-        qemuClientReplyKo(qc, "Invalid 'dim' parameter");
+        qemuClientReply(qc, false, "Invalid 'dim' parameter");
         return;
     }
 
@@ -800,30 +790,30 @@ static void cameraClientQueryStart(CameraClient* cc, QemudClient* qc, const char
     }
 
     switch (result) {
-        case CLIENT_START_RESULT_SUCCESS:
-            qemuClientReplyOk(qc, nullptr);
-            break;
-        case CLIENT_START_RESULT_ALREADY_STARTED:
-            qemuClientReplyOk(qc, "Camera is already started");
-            break;
-        case CLIENT_START_RESULT_PARAMETER_MISMATCH:
-            qemuClientReplyKo(qc, "Camera is already started with different capturing parameters");
-            break;
-        case CLIENT_START_RESULT_UNKNOWN_PIXEL_FORMAT:
-            qemuClientReplyKo(qc, "Pixel format is unknown");
-            break;
-        case CLIENT_START_RESULT_NO_PIXEL_CONVERSION:
-            qemuClientReplyKo(qc, "No conversion exist for the requested pixel format");
-            break;
-        case CLIENT_START_RESULT_OUT_OF_MEMORY:
-            qemuClientReplyKo(qc, "Out of memory");
-            break;
-        default:
-            E("%s: Unexpected capture result '%d'", __func__, result);
-            [[fallthrough]];
-        case CLIENT_START_RESULT_FAILED:
-            qemuClientReplyKo(qc, "Cannot start the camera");
-            break;
+    case CLIENT_START_RESULT_SUCCESS:
+        qemuClientReply(qc, true);
+        break;
+    case CLIENT_START_RESULT_ALREADY_STARTED:
+        qemuClientReply(qc, true, "Camera is already started"sv);
+        break;
+    case CLIENT_START_RESULT_PARAMETER_MISMATCH:
+        qemuClientReply(qc, false, "Camera is already started with different capturing parameters"sv);
+        break;
+    case CLIENT_START_RESULT_UNKNOWN_PIXEL_FORMAT:
+        qemuClientReply(qc, false, "Pixel format is unknown"sv);
+        break;
+    case CLIENT_START_RESULT_NO_PIXEL_CONVERSION:
+        qemuClientReply(qc, false, "No conversion exist for the requested pixel format"sv);
+        break;
+    case CLIENT_START_RESULT_OUT_OF_MEMORY:
+        qemuClientReply(qc, false, "Out of memory"sv);
+        break;
+    default:
+        E("%s: Unexpected capture result '%d'", __func__, result);
+        [[fallthrough]];
+    case CLIENT_START_RESULT_FAILED:
+        qemuClientReply(qc, false, "Cannot start the camera"sv);
+        break;
     }
 }
 
@@ -836,26 +826,26 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
     int width, height, pix_format;
 
     if (cc->camera == nullptr) {
-        qemuClientReplyKo(qc, "Camera is not connected");
+        qemuClientReply(qc, false, "Camera is not connected"sv);
         return;
     }
 
     if (param == nullptr) {
         if (cameraClientGetMaxResolution(&ci, &width, &height)) {
-            qemuClientReplyKo(qc, "Failed to get default resolution");
+            qemuClientReply(qc, false, "Failed to get default resolution"sv);
             return;
         }
         pix_format = ci.pixel_format;
     } else {
         if (getTokenValue(param, "dim", dim, sizeof(dim))) {
             if (cameraClientGetMaxResolution(&ci, &width, &height)) {
-                qemuClientReplyKo(qc, "Failed to get default resolution");
-              return;
+                qemuClientReply(qc, false, "Failed to get default resolution"sv);
+                return;
             }
         } else {
             w = strchr(dim, 'x');
             if (w == nullptr || w[1] == '\0') {
-                qemuClientReplyKo(qc, "Invalid 'dim' parameter");
+                qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
                 return;
             }
             *w = '\0'; w++;
@@ -863,7 +853,7 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
             width = strtoi(dim, nullptr, 10);
             height = strtoi(w, nullptr, 10);
             if (errno) {
-                qemuClientReplyKo(qc, "Invalid 'dim' parameter");
+                qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
                 return;
             }
         }
@@ -881,30 +871,32 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
     }
 
     switch (result) {
-        case CLIENT_START_RESULT_SUCCESS:
-            qemuClientReplyOk(qc, nullptr);
-            break;
-        case CLIENT_START_RESULT_ALREADY_STARTED:
-            qemuClientReplyOk(qc, "Camera is already started");
-            break;
-        case CLIENT_START_RESULT_PARAMETER_MISMATCH:
-            qemuClientReplyKo(qc, "Camera is already started with different capturing parameters");
-            break;
-        case CLIENT_START_RESULT_UNKNOWN_PIXEL_FORMAT:
-            qemuClientReplyKo(qc, "Pixel format is unknown");
-            break;
-        case CLIENT_START_RESULT_NO_PIXEL_CONVERSION:
-            qemuClientReplyKo(qc, "No conversion exist for the requested pixel format");
-            break;
-        case CLIENT_START_RESULT_OUT_OF_MEMORY:
-            qemuClientReplyKo(qc, "Out of memory");
-            break;
-        default:
-            E("%s: Unexpected capture result '%d'", __func__, result);
-            [[fallthrough]];
-        case CLIENT_START_RESULT_FAILED:
-            qemuClientReplyKo(qc, "Cannot start the camera");
-            break;
+    case CLIENT_START_RESULT_SUCCESS:
+        qemuClientReply(qc, true);
+        break;
+    case CLIENT_START_RESULT_ALREADY_STARTED:
+        qemuClientReply(qc, true, "Camera is already started"sv);
+        break;
+    case CLIENT_START_RESULT_PARAMETER_MISMATCH:
+        qemuClientReply(qc, false, "Camera is already started with "
+                                   "different capturing parameters"sv);
+        break;
+    case CLIENT_START_RESULT_UNKNOWN_PIXEL_FORMAT:
+        qemuClientReply(qc, false, "Pixel format is unknown"sv);
+        break;
+    case CLIENT_START_RESULT_NO_PIXEL_CONVERSION:
+        qemuClientReply(qc, false, "No conversion exist for the "
+                                   "requested pixel format"sv);
+        break;
+    case CLIENT_START_RESULT_OUT_OF_MEMORY:
+        qemuClientReply(qc, false, "Out of memory"sv);
+        break;
+    default:
+        E("%s: Unexpected capture result '%d'", __func__, result);
+        [[fallthrough]];
+    case CLIENT_START_RESULT_FAILED:
+        qemuClientReply(qc, false, "Cannot start the camera");
+        break;
     }
 }
 
@@ -912,12 +904,12 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
     const CameraInfo& ci = *cc->camera_info;
 
     if ((!V1 && cc->video_frame == nullptr) || (V1 && !cc->started)) {
-        qemuClientReplyOk(qc, "Camera is not started");
+        qemuClientReply(qc, true, "Camera is not started"sv);
         return;
     }
 
     if ((ci.vtbl->stop_capturing)(cc->camera)) {
-        qemuClientReplyKo(qc, "Cannot stop camera device");
+        qemuClientReply(qc, false, "Cannot stop camera device"sv);
         return;
     }
 
@@ -940,7 +932,7 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, false);
     }
 
-    qemuClientReplyOk(qc, nullptr);
+    qemuClientReply(qc, true);
 }
 
 static int readFrameImpl(CameraClient* cc, QemudClient* qc, ClientFrame* frame,
@@ -966,10 +958,10 @@ static int readFrameImpl(CameraClient* cc, QemudClient* qc, ClientFrame* frame,
     } while ((retry > 0) && (getTimestamp() < timeout));
 
     if (retry > 0) {
-        qemuClientReplyKo(qc, "Unable to obtain video frame "
-                              "from the camera");
+        qemuClientReply(qc, false, "Unable to obtain video frame "
+                                   "from the camera"sv);
     } else if (retry < 0) {
-        qemuClientReplyKo(qc, strerror(errno));
+        qemuClientReplyASCIZ(qc, false, strerror(errno));
     }
 
     return retry;
@@ -982,21 +974,19 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
     int preview_size = 0;
     ClientFrameBuffer fbs[2];
     int fbs_num = 0;
-    size_t payload_size;
     float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
     char tmp[256];
     int send_frame_time = 0;
     ClientFrame frame = {};
 
     if (cc->video_frame == nullptr) {
-        qemuClientReplyKo(qc, "Camera is not started");
+        qemuClientReply(qc, false, "Invalid 'video' parameter"sv);
         return;
     }
 
     if (getTokenValueInt(param, "video", &video_size) ||
         getTokenValueInt(param, "preview", &preview_size)) {
-        qemuClientReplyKo(qc,
-            "Invalid or missing 'video', or 'preview' parameter");
+        qemuClientReply(qc, false, "Invalid or missing 'video', or 'preview' parameter"sv);
         return;
     }
 
@@ -1018,7 +1008,7 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
 
     if ((video_size != 0 && cc->video_frame_size != (size_t)video_size) ||
         (preview_size != 0 && cc->preview_frame_size != (size_t)preview_size)) {
-        qemuClientReplyKo(qc, "Frame size mismatch");
+        qemuClientReply(qc, false, "Frame size mismatch"sv);
         return;
     }
 
@@ -1050,33 +1040,31 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
         return;
     }
 
-    ++cc->frame_count;
+    const size_t payload_size = kReplyPrefixSize +
+        (send_frame_time ? sizeof(int64_t) : 0) + video_size + preview_size;
 
+    if (payload_size > kReplyPrefixSize) {
+        sendPayloadSize(qc, payload_size);
+        qemud_client_send(qc, kOkReplyData, kReplyPrefixSize);
 
-    payload_size = 3 + (send_frame_time ? 8 : 0) + video_size + preview_size;
+        if (video_size) {
+            qemud_client_send(qc, cc->video_frame, video_size);
+        }
+        if (preview_size) {
+            qemud_client_send(qc, cc->preview_frame, preview_size);
+        }
+        if (send_frame_time) {
+            const int64_t adjusted_time = frame.frame_time +
+                    android_sensors_get_time_offset();
 
-    sendPayloadSize(qc, payload_size);
-
-    if (video_size || preview_size) {
-        qemud_client_send(qc, (const uint8_t*)"ok:", 3);
+            qemud_client_send(qc, (const uint8_t*) &adjusted_time,
+                              sizeof(adjusted_time));
+        }
     } else {
-        qemud_client_send(qc, (const uint8_t*)"ok", 3);
+        qemuClientReply(qc, true);
     }
 
-    if (video_size) {
-        qemud_client_send(qc, cc->video_frame, video_size);
-    }
-
-    if (preview_size) {
-        qemud_client_send(qc, cc->preview_frame, preview_size);
-    }
-
-    if (send_frame_time) {
-        int64_t adjusted_time = frame.frame_time +
-                android_sensors_get_time_offset();
-
-        qemud_client_send(qc, (const uint8_t*) &adjusted_time, 8);
-    }
+    ++cc->frame_count;
 }
 
 static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
@@ -1092,17 +1080,17 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
     ClientFrame frame = {};
 
     if (!cc->started) {
-        qemuClientReplyKo(qc, "Camera is not started");
+        qemuClientReply(qc, "Camera is not started");
         return;
     }
 
     if (getTokenValue(param, "dim", tmp, sizeof(tmp))) {
-        qemuClientReplyKo(qc, "Invalid or missing 'dim' parameter");
+        qemuClientReply(qc, false, "Invalid or missing 'dim' parameter"sv);
         return;
     } else {
         w = strchr(tmp, 'x');
         if (w == nullptr || w[1] == '\0') {
-            qemuClientReplyKo(qc, "Invalid 'dim' parameter");
+            qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
             return;
         }
         *w = '\0'; w++;
@@ -1110,22 +1098,22 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
         width = strtoi(tmp, nullptr, 10);
         height = strtoi(w, nullptr, 10);
         if (errno) {
-            qemuClientReplyKo(qc, "Invalid 'dim' parameter");
+            qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
             return;
         }
     }
 
     if (getTokenValueInt(param, "pix", &format)) {
-        qemuClientReplyKo(qc, "Invalid or missing 'pix' parameter");
+        qemuClientReply(qc, false, "Invalid or missing 'pix' parameter"sv);
         return;
     }
 
     if (getTokenValue(param, "offset", tmp, sizeof(tmp))) {
-        qemuClientReplyKo(qc, "Invalid or missing 'offset' parameter");
+        qemuClientReply(qc, false, "Invalid or missing 'offset' parameter"sv);
         return;
     } else {
         if (sscanf(tmp, "%" PRIu64, &offset) != 1) {
-            qemuClientReplyKo(qc, "not a decimal number for 'offset'");
+            qemuClientReply(qc, false, "not a decimal number for 'offset'"sv);
             return;
         }
     }
@@ -1175,13 +1163,9 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
         const int64_t adjusted_time = frame.frame_time +
                 android_sensors_get_time_offset();
 
-        sendPayloadSize(qc, sizeof(kOkColon) + sizeof(adjusted_time));
-        qemud_client_send(qc, kOkColon, sizeof(kOkColon));
-        qemud_client_send(qc, (const uint8_t*)&adjusted_time, sizeof(adjusted_time));
+        qemuClientReply(qc, true, &adjusted_time, sizeof(adjusted_time));
     } else {
-        static const uint8_t kOk[] = { 'o', 'k', 0 };
-        sendPayloadSize(qc, sizeof(kOk));
-        qemud_client_send(qc, kOk, sizeof(kOk));
+        qemuClientReply(qc, true);
     }
 }
 
@@ -1197,7 +1181,7 @@ static void cameraClientHandleEvent(CameraClient*  cc,
 
     if (cc->command_buffer_offset + msglen >= MAX_QUERY_MESSAGE_SIZE) {
         cc->command_buffer_offset = 0;
-        qemuClientReplyKo(client, "query too long");
+        qemuClientReply(client, false, "query too long"sv);
         return;
     }
     memcpy(cc->command_buffer + cc->command_buffer_offset, msg, msglen);
@@ -1218,7 +1202,7 @@ static void cameraClientHandleEvent(CameraClient*  cc,
     cc->command_buffer_offset = 0;
 
     if (query_name.empty()) {
-        qemuClientReplyKo(client, "Invalid query");
+        qemuClientReply(client, false, "Invalid query"sv);
         return;
     }
 
@@ -1241,7 +1225,7 @@ static void cameraClientHandleEvent(CameraClient*  cc,
     } else if (query_name == _query_stop) {
         cameraClientQueryStop(cc, client, query_param.data());
     } else {
-        qemuClientReplyKo(client, "Unknown query");
+        qemuClientReply(client, false, "Unknown query"sv);
     }
 }
 
