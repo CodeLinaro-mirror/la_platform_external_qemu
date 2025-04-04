@@ -1246,6 +1246,38 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
     qemuClientReplyOk(qc, nullptr);
 }
 
+static int readFrameImpl(CameraClient* cc, QemudClient* qc, ClientFrame* frame,
+                         const float r_scale, const float g_scale, const float b_scale,
+                         const float expComp) {
+    const CameraInfo& ci = *cc->camera_info;
+    const auto readFrame = ci.vtbl->read_frame;
+
+    int retry = readFrame(cc->camera, frame,
+                          r_scale, g_scale, b_scale,
+                          expComp, ci.direction);
+    if (!retry) {
+        return 0;
+    }
+
+    const uint64_t timeout = getTimestamp() + 2000000U;
+    do {
+        cameraSleep(10);
+
+        retry = readFrame(cc->camera, frame,
+                          r_scale, g_scale, b_scale,
+                          expComp, ci.direction);
+    } while ((retry > 0) && (getTimestamp() < timeout));
+
+    if (retry > 0) {
+        qemuClientReplyKo(qc, "Unable to obtain video frame "
+                              "from the camera");
+    } else if (retry < 0) {
+        qemuClientReplyKo(qc, strerror(errno));
+    }
+
+    return retry;
+}
+
 /* Client has queried next frame.
  * Param:
  *  cc - Queried camera client descriptor.
@@ -1267,11 +1299,9 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
 
     int video_size = 0;
     int preview_size = 0;
-    int repeat;
     ClientFrameBuffer fbs[2];
     int fbs_num = 0;
     size_t payload_size;
-    uint64_t tick;
     float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
     char tmp[256];
     int send_frame_time = 0;
@@ -1348,9 +1378,6 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
         fbs_num++;
     }
 
-    /* Capture new frame. */
-    tick = getTimestamp();
-
     frame.framebuffers_count = fbs_num;
     frame.framebuffers = fbs;
     frame.staging_framebuffer = &cc->staging_framebuffer;
@@ -1358,54 +1385,8 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
     frame.frame_time =
             looper_nowNsWithClock(looper_getForThread(), LOOPER_CLOCK_VIRTUAL);
 
-    repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
-                                   exp_comp, ci.direction);
-
-    /* Note that there is no (known) way how to wait on next frame being
-     * available, so we could dequeue frame buffer from the device only when we
-     * know it's available. Instead we're shooting in the dark, and quite often
-     * device will response with EAGAIN, indicating that it doesn't have frame
-     * ready. In turn, it means that the last frame we have obtained from the
-     * device is still good, and we can reply with the cached frames. The only
-     * case when we need to keep trying to obtain a new frame is when frame cache
-     * is empty. To prevent ourselves from an indefinite loop in case device got
-     * stuck on something (observed with some Microsoft devices) we will limit
-     * the loop by 2 second time period (which is more than enough to obtain
-     * something from the device) */
-    while (repeat == 1 && !cc->frame_count &&
-           (getTimestamp() - tick) < 2000000LL) {
-        /* Sleep for 10 millisec before repeating the attempt. */
-        cameraSleep(10);
-        repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
-                                       exp_comp, ci.direction);
-        D("wait 10ms and read again\n");
-    }
-    if (repeat == 1 && !cc->frame_count) {
-        /* Waited too long for the first frame. */
-        E("%s: Unable to obtain first video frame from the camera '%s' in %d milliseconds: %s.",
-          __func__, ci.device_name,
-          (uint32_t)(getTimestamp() - tick) / 1000, strerror(errno));
-        qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
+    if (readFrameImpl(cc, qc, &frame, r_scale, g_scale, b_scale, exp_comp)) {
         return;
-    } else if (repeat < 0) {
-        /* An I/O error. */
-        E("%s: Unable to obtain video frame from the camera '%s': %s.",
-          __func__, ci.device_name, strerror(errno));
-        qemuClientReplyKo(qc, strerror(errno));
-        return;
-    }
-
-    if (video_size && repeat == 1 && cc->frame_count) {
-        // Device has no frame update reported. Use cached preview frame.
-        // Convert preview frame format to video frame format.
-        if (convert_frame(cc->preview_frame, V4L2_PIX_FMT_RGB32,
-                          cc->preview_frame_size, cc->width, cc->height, &frame,
-                          1.0f, 1.0f, 1.0f, 1.0f, "front", 1)) {
-            E("%s: Unable to obtain first video frame from the camera '%s'",
-                __func__, ci.device_name);
-            qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
-            return;
-        }
     }
 
     ++cc->frame_count;
@@ -1453,11 +1434,9 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
                                      const char* param) {
     const CameraInfo& ci = *cc->camera_info;
 
-    int repeat;
     char* w;
     int format, width, height;
     uint64_t offset;
-    uint64_t tick;
     float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
     char tmp[256];
     int send_frame_time = 0;
@@ -1545,8 +1524,6 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
                     offset),
     };
 
-    tick = getTimestamp();
-
     frame.framebuffers_count = 1;
     frame.framebuffers = &fb;
     frame.staging_framebuffer = &cc->staging_framebuffer;
@@ -1554,60 +1531,8 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
     frame.frame_time =
             looper_nowNsWithClock(looper_getForThread(), LOOPER_CLOCK_VIRTUAL);
 
-    repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
-                                   exp_comp, ci.direction);
-
-    /* Note that there is no (known) way how to wait on next frame being
-     * available, so we could dequeue frame buffer from the device only when we
-     * know it's available. Instead we're shooting in the dark, and quite often
-     * device will response with EAGAIN, indicating that it doesn't have frame
-     * ready. In turn, it means that the last frame we have obtained from the
-     * device is still good, and we can reply with the cached frames. The only
-     * case when we need to keep trying to obtain a new frame is when frame cache
-     * is empty. To prevent ourselves from an indefinite loop in case device got
-     * stuck on something (observed with some Microsoft devices) we will limit
-     * the loop by 2 second time period (which is more than enough to obtain
-     * something from the device) */
-    while (repeat == 1 &&
-           !cc->frame_count &&
-           (getTimestamp() - tick) < 2000000LL) {
-        /* Sleep for 10 millisec before repeating the attempt. */
-        cameraSleep(10);
-        calculate_framebuffer_size(cc->pixel_format, cc->width, cc->height,
-                                   &cc->frame_cache_size);
-        if (cc->frame_cache.size() < cc->frame_cache_size) {
-            cc->frame_cache.resize(cc->frame_cache_size);
-        }
-        repeat = (ci.vtbl->read_frame)(cc->camera, &frame, r_scale, g_scale, b_scale,
-                                       exp_comp, ci.direction);
-    }
-    if (repeat == 1 && !cc->frame_count) {
-        /* Waited too long for the first frame. */
-        E("%s: Unable to obtain first video frame from the camera '%s' in %d milliseconds: %s.",
-          __func__, ci.device_name,
-          (uint32_t)(getTimestamp() - tick) / 1000, strerror(errno));
-        qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
+    if (readFrameImpl(cc, qc, &frame, r_scale, g_scale, b_scale, exp_comp)) {
         return;
-    }
-    if (repeat < 0 && !cc->frame_count) {
-        /* An I/O error. */
-        E("%s: Unable to obtain video frame from the camera '%s': %s.",
-          __func__, ci.device_name, strerror(errno));
-        qemuClientReplyKo(qc, strerror(errno));
-        return;
-    }
-
-    if (repeat == 1 && cc->frame_count) {
-        frame.framebuffers_count = 1;
-        if (convert_frame(cc->frame_cache.data(), cc->pixel_format,
-                          cc->frame_cache_size, cc->width, cc->height, &frame,
-                          1.0f, 1.0f, 1.0f, 1.0f, "front", 1)) {
-            E("%s: Unable to obtain first video frame from the camera '%s'",
-                __func__, ci.device_name);
-            qemuClientReplyKo(qc, "Unable to obtain video frame from the camera");
-            return;
-        }
-        D("convert cached frames to requested frame");
     }
 
     ++cc->frame_count;
