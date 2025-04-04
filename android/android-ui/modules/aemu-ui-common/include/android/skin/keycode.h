@@ -137,6 +137,7 @@ typedef enum {
     kKeyCodeStem2 = ANDROID_KEY_STEM_2,
     kKeyCodeStem3 = ANDROID_KEY_STEM_3,
     kKeyCodeAssist = ANDROID_KEY_ASSIST,
+    kKeyCodeAllApps = ANDROID_KEY_ALL_APPS,
     kKeyCodeAppSwitch = ANDROID_KEY_APPSWITCH,
 } SkinKeyCode;
 

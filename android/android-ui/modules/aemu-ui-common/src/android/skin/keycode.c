@@ -150,6 +150,7 @@ SkinKeyCode skin_keycode_rotate(SkinKeyCode code, int  rotation) {
     _KEYSYM1_ANDROID_(STEM_2)             \
     _KEYSYM1_ANDROID_(STEM_3)             \
     _KEYSYM1_ANDROID_(ASSIST)             \
+    _KEYSYM1_ANDROID_(ALL_APPS)           \
     _KEYSYM1_ANDROID_(APPSWITCH)
 
 #define _KEYSYM_(x, y) {LINUX_KEY_##x, #y},

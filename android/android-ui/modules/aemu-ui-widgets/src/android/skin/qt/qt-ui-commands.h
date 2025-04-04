@@ -50,6 +50,7 @@ enum class QtUICommand {
     POWER,
     MENU,
     HOME,
+    ALL_APPS,
     BACK,
     OVERVIEW,
     ROTATE_RIGHT,

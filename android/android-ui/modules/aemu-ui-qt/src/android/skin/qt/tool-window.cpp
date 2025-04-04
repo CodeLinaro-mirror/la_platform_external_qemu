@@ -290,6 +290,12 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         default_shortcuts += "Ctrl+Shift+D SHOW_PANE_DPAD\n";
     }
 
+    if (fc::isEnabled(fc::AllAppsForHomeTray)) {
+       mToolsUi->home_button->setHidden(true);
+    } else {
+       mToolsUi->all_apps_button->setHidden(true);
+    }
+
     if (avdFlavor != AVD_TV) {
         if (avdFlavor != AVD_DEV_2024) {
             default_shortcuts +=
@@ -901,6 +907,9 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             break;
         case QtUICommand::HOME:
             forwardKeyToEmulator(LINUX_KEY_HOME, down);
+            break;
+        case QtUICommand::ALL_APPS:
+            forwardKeyToEmulator(ANDROID_KEY_ALL_APPS, down);
             break;
         case QtUICommand::BACK:
             forwardKeyToEmulator(LINUX_KEY_BACK, down);
@@ -1604,6 +1613,16 @@ void ToolWindow::on_home_button_pressed() {
 void ToolWindow::on_home_button_released() {
     mEmulatorWindow->activateWindow();
     handleUICommand(QtUICommand::HOME, false);
+}
+
+void ToolWindow::on_all_apps_button_pressed() {
+    mEmulatorWindow->raise();
+    handleUICommand(QtUICommand::ALL_APPS, true);
+}
+
+void ToolWindow::on_all_apps_button_released() {
+    mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::ALL_APPS, false);
 }
 
 void ToolWindow::on_minimize_button_clicked() {

@@ -411,6 +411,17 @@ DOM_KEY_MAP_DECLARATION {
   DOM_KEY_MAP("MannerMode",           MANNER_MODE,              0x100A),
   DOM_KEY_MAP("VoiceDial",            VOICE_DIAL,               0x100B),
 
+
+  // =========================================================
+  // Android XR Keys
+  // =========================================================
+
+  // Note: For AndroidXR emulator, AllApps key is used to replace Home key
+  // to bringup apptray.
+
+  //          Key                     Enum                      Value
+  DOM_KEY_MAP("AllApps",              ALL_APPS,                 0x0D60),
+
   // =========================================================
   // TV Keys
   // http://www.w3.org/TR/uievents-key/#keys-tv

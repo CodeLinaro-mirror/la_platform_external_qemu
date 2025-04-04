@@ -216,6 +216,8 @@ const struct NonPrintableCodeEntry {
         {DomCode::APP_SWITCH, DomKey::APP_SWITCH},  // "Overview"
         // {DomCode::CAMERA, DomKey::CAMERA},          // Camera
         {DomCode::SLEEP, DomKey::STANDBY},  // Sleep
+        // AndroidXR specific events.
+        {DomCode::ALL_APPS, DomKey::ALL_APPS},  // All_Apps
 };
 
 const size_t kDomKeyMapEntries = ARRAY_SIZE(dom_key_map);

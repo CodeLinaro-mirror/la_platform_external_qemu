@@ -1597,7 +1597,8 @@ message EmulatorFeatureFlagState {
         // Intentional gap to avoid merge conflicts.
         VIRTIO_DUAL_MODE_MOUSE = 131;
         DUAL_MODE_MOUSE_DISPLAY_HOST_CURSOR = 132;
-        // Next tag: 133
+        ALL_APPS_FOR_HOME_TRAY = 133;
+        // Next tag: 134
     }
     // Which features were enabled by default or through the server-side config.
     repeated EmulatorFeatureFlag attempted_enabled_feature_flags = 1;

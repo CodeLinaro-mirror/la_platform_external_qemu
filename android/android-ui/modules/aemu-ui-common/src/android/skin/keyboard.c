@@ -385,6 +385,7 @@ void skin_keyboard_process_event(SkinKeyboard* kb, SkinEvent* ev, int down) {
         case ANDROID_KEY_STEM_2:
         case ANDROID_KEY_STEM_3:
         case ANDROID_KEY_ASSIST:
+        case ANDROID_KEY_ALL_APPS:
             skin_keyboard_add_key_event(kb, keycode, down);
             skin_keyboard_flush(kb);
             break;
