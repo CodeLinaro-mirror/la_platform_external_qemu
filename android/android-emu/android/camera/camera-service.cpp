@@ -554,9 +554,8 @@ struct CameraClient {
         if (camera != nullptr) {
             (camera_info->vtbl->close)(camera);
         }
-        if (video_frame != nullptr) {
-            free(video_frame);
-        }
+
+        ::free(video_frame);
         ::free(staging_framebuffer);
 
         camera_info->in_use = 0;
