@@ -19,6 +19,9 @@
 #include <string>
 #include <string_view>
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "android/camera/camera-service.h"
 
 #include "android/boot-properties.h"
@@ -40,8 +43,6 @@
 #include "android/utils/misc.h"
 #include "android/utils/system.h"
 #include "host-common/hw-config.h"
-
-#include <stdio.h>
 
 #define  E(...)    derror(__VA_ARGS__)
 #define  W(...)    dwarning(__VA_ARGS__)
@@ -602,24 +603,31 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
     return new CameraClient(ci, inp_channel);
 }
 
-static uint64_t getTimestamp(void) {
+static int64_t getTimestamp(void) {
     struct timeval t;
-    t.tv_sec = t.tv_usec = 0;
     gettimeofday(&t, nullptr);
-    return (uint64_t)t.tv_sec * 1000000LL + t.tv_usec;
+    return int64_t(t.tv_sec) * 1000000L + t.tv_usec;
 }
 
-static void cameraSleep(uint64_t millisec) {
-    struct timeval t;
-    const uint64_t wake_at = getTimestamp() + millisec * 1000;
-    do {
-        const uint64_t stamp = getTimestamp();
-        if ((stamp / 1000) >= (wake_at / 1000)) {
+static void cameraSleep(const int64_t millisec) {
+    int64_t toSleep = millisec * 1000L;
+    const int64_t wakeAt = getTimestamp() + toSleep;
+
+    while (toSleep > 0) {
+        const lldiv_t parts = ::lldiv(toSleep, 1000000L);
+
+        struct timeval interval = {
+            .tv_sec = parts.quot,
+            .tv_usec = parts.rem,
+        };
+
+        if ((select(0, nullptr, nullptr, nullptr, &interval) < 0)
+                && (errno == EINTR)) {
+            toSleep = wakeAt - getTimestamp();
+        } else {
             break;
         }
-        t.tv_sec = (wake_at - stamp) / 1000000;
-        t.tv_usec = (wake_at - stamp) - (uint64_t)t.tv_sec * 1000000;
-    } while (select(0, nullptr, nullptr, nullptr, &t) < 0 && errno == EINTR);
+    }
 }
 
 static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const char* param) {
@@ -948,7 +956,7 @@ static int readFrameImpl(CameraClient* cc, QemudClient* qc, ClientFrame* frame,
         return 0;
     }
 
-    const uint64_t timeout = getTimestamp() + 2000000U;
+    const int64_t timeout = getTimestamp() + 2000000U;
     do {
         cameraSleep(10);
 
