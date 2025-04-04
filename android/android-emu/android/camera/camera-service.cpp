@@ -636,7 +636,7 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
         return;
     }
 
-    if (ci.vtbl->camera_source == g_cameraCallbackDesc.source &&
+    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
             g_cameraCallbackDesc.callback) {
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, true);
     }
@@ -927,7 +927,7 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
 
     camera_metrics_report_stop_session(cc->frame_count);
 
-    if (ci.vtbl->camera_source == g_cameraCallbackDesc.source &&
+    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
             g_cameraCallbackDesc.callback) {
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, false);
     }
@@ -1308,7 +1308,7 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
             return -EIO;
         }
     }
-    if (ci.vtbl->camera_source == g_cameraCallbackDesc.source &&
+    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
             g_cameraCallbackDesc.callback)
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, is_camera_started);
 
