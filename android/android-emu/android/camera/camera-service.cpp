@@ -549,7 +549,7 @@ struct CameraClient {
     int  command_buffer_offset = 0;
     uint64_t            frame_count = 0;
     bool                started = false;
-    CameraClient() = default;
+
     ~CameraClient() {
         if (camera != nullptr) {
             (camera_info->vtbl->close)(camera);
