@@ -636,7 +636,7 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
         return;
     }
 
-    if (ci.vtbl->camera_source == g_cameraCallbackDesc.source &&
+    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
             g_cameraCallbackDesc.callback) {
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, true);
     }
@@ -927,7 +927,7 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
 
     camera_metrics_report_stop_session(cc->frame_count);
 
-    if (ci.vtbl->camera_source == g_cameraCallbackDesc.source &&
+    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
             g_cameraCallbackDesc.callback) {
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, false);
     }
@@ -1308,7 +1308,7 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
             return -EIO;
         }
     }
-    if (ci.vtbl->camera_source == g_cameraCallbackDesc.source &&
+    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
             g_cameraCallbackDesc.callback)
         g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, is_camera_started);
 
@@ -1354,7 +1354,9 @@ static QemudClient* cameraServiceConnect(void*          opaque,
     return client;
 }
 
-void register_camera_status_change_callback(camera_callback_t cb, void* ctx, CameraSourceType src) {
+void register_camera_status_change_callback(camera_callback_t cb,
+                                            void* ctx,
+                                            CameraSourceType src) {
     g_cameraCallbackDesc.callback = cb;
     g_cameraCallbackDesc.context = ctx;
     g_cameraCallbackDesc.source = src;
@@ -1367,11 +1369,10 @@ void android_camera_service_init(void) {
 
     if (!_inited) {
         cameraServiceInit(&g_cameraServiceDesc);
-        QemudService*  serv = qemud_service_register(kServiceCamera, 0,
-                &g_cameraServiceDesc,
-                cameraServiceConnect,
-                nullptr,
-                nullptr);
+
+        QemudService* serv = qemud_service_register(kServiceCamera, 0,
+                &g_cameraServiceDesc, &cameraServiceConnect,
+                nullptr, nullptr);
         if (serv == nullptr) {
             derror("%s: Could not register '%s' service",
                     __func__, kServiceCamera);
