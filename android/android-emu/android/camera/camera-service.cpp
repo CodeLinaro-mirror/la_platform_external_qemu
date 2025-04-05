@@ -70,6 +70,71 @@ static CameraCallbackDesc g_cameraCallbackDesc;
 
 using namespace std::literals;
 
+static int64_t getTimestamp(void) {
+    struct timeval t;
+    gettimeofday(&t, nullptr);
+    return int64_t(t.tv_sec) * 1000000L + t.tv_usec;
+}
+
+static void cameraSleep(const int64_t millisec) {
+    int64_t toSleep = millisec * 1000L;
+    const int64_t wakeAt = getTimestamp() + toSleep;
+
+    while (toSleep > 0) {
+        const lldiv_t parts = ::lldiv(toSleep, 1000000L);
+
+        struct timeval interval = {
+            .tv_sec = parts.quot,
+            .tv_usec = parts.rem,
+        };
+
+        if ((select(0, nullptr, nullptr, nullptr, &interval) < 0)
+                && (errno == EINTR)) {
+            toSleep = wakeAt - getTimestamp();
+        } else {
+            break;
+        }
+    }
+}
+
+static void sendPayloadSize(QemudClient* qc, const size_t size) {
+    char str[9];
+    ::snprintf(str, sizeof(str), "%08zx", size);
+    qemud_client_send(qc, reinterpret_cast<const uint8_t*>(str), 8);
+}
+
+static constexpr size_t kReplyPrefixSize = 3;
+static constexpr uint8_t kOkReplyData[kReplyPrefixSize] = {'o', 'k', ':'};
+
+static void qemuClientReply(QemudClient* qc, const bool okko,
+                            const void* data,
+                            const size_t dataSize) {
+    static constexpr uint8_t kOkReply[kReplyPrefixSize] = {'o', 'k', 0};
+    static constexpr uint8_t kKoReply[kReplyPrefixSize] = {'k', 'o', 0};
+    static constexpr uint8_t kKoReplyData[kReplyPrefixSize] = {'k', 'o', ':'};
+
+    const uint8_t* okkoStr = dataSize ?
+        (okko ? kOkReplyData : kKoReplyData) :
+        (okko ? kOkReply : kKoReply);
+
+    sendPayloadSize(qc, kReplyPrefixSize + dataSize);
+    qemud_client_send(qc, okkoStr, kReplyPrefixSize);
+    if (dataSize) {
+        qemud_client_send(qc, static_cast<const uint8_t*>(data),
+                          dataSize);
+    }
+}
+
+static void qemuClientReply(QemudClient* qc, const bool okko,
+                            const std::string_view str = {}) {
+    qemuClientReply(qc, okko, str.data(), str.size());
+}
+
+static void qemuClientReplyASCIZ(QemudClient* qc, const bool okko,
+                                 const char* str) {
+    qemuClientReply(qc, okko, str, ::strlen(str));
+}
+
 static int getTokenValue(const char* params, const char* name,
                          char* value, int val_size) {
     const char* val_end;
@@ -404,44 +469,6 @@ static void cameraServiceInit(CameraServiceDesc* csd) {
     }
 }
 
-static void sendPayloadSize(QemudClient* qc, const size_t size) {
-    char str[9];
-    ::snprintf(str, sizeof(str), "%08zx", size);
-    qemud_client_send(qc, reinterpret_cast<const uint8_t*>(str), 8);
-}
-
-static constexpr size_t kReplyPrefixSize = 3;
-static constexpr uint8_t kOkReplyData[kReplyPrefixSize] = {'o', 'k', ':'};
-
-static void qemuClientReply(QemudClient* qc, const bool okko,
-                            const void* data,
-                            const size_t dataSize) {
-    static constexpr uint8_t kOkReply[kReplyPrefixSize] = {'o', 'k', 0};
-    static constexpr uint8_t kKoReply[kReplyPrefixSize] = {'k', 'o', 0};
-    static constexpr uint8_t kKoReplyData[kReplyPrefixSize] = {'k', 'o', ':'};
-
-    const uint8_t* okkoStr = dataSize ?
-        (okko ? kOkReplyData : kKoReplyData) :
-        (okko ? kOkReply : kKoReply);
-
-    sendPayloadSize(qc, kReplyPrefixSize + dataSize);
-    qemud_client_send(qc, okkoStr, kReplyPrefixSize);
-    if (dataSize) {
-        qemud_client_send(qc, static_cast<const uint8_t*>(data),
-                          dataSize);
-    }
-}
-
-static void qemuClientReply(QemudClient* qc, const bool okko,
-                            const std::string_view str = {}) {
-    qemuClientReply(qc, okko, str.data(), str.size());
-}
-
-static void qemuClientReplyASCIZ(QemudClient* qc, const bool okko,
-                                 const char* str) {
-    qemuClientReply(qc, okko, str, ::strlen(str));
-}
-
 /********************************************************************************
  * Camera Factory API
  *******************************************************************************/
@@ -598,33 +625,6 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
     }
 
     return new CameraClient(ci, inp_channel);
-}
-
-static int64_t getTimestamp(void) {
-    struct timeval t;
-    gettimeofday(&t, nullptr);
-    return int64_t(t.tv_sec) * 1000000L + t.tv_usec;
-}
-
-static void cameraSleep(const int64_t millisec) {
-    int64_t toSleep = millisec * 1000L;
-    const int64_t wakeAt = getTimestamp() + toSleep;
-
-    while (toSleep > 0) {
-        const lldiv_t parts = ::lldiv(toSleep, 1000000L);
-
-        struct timeval interval = {
-            .tv_sec = parts.quot,
-            .tv_usec = parts.rem,
-        };
-
-        if ((select(0, nullptr, nullptr, nullptr, &interval) < 0)
-                && (errno == EINTR)) {
-            toSleep = wakeAt - getTimestamp();
-        } else {
-            break;
-        }
-    }
 }
 
 static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const char* param) {
