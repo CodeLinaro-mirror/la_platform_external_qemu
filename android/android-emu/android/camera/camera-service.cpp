@@ -65,7 +65,6 @@ struct CameraCallbackDesc {
     CameraSourceType source;
 };
 
-static CameraServiceDesc  g_cameraServiceDesc;
 static CameraCallbackDesc g_cameraCallbackDesc;
 
 using namespace std::literals;
@@ -1363,14 +1362,15 @@ void register_camera_status_change_callback(camera_callback_t cb,
 
 void android_camera_service_init(void) {
     static constexpr char kServiceCamera[] = "camera";
+    static CameraServiceDesc  s_cameraServiceDesc;
+    static bool s_inited = false;
 
-    static int _inited = 0;
-
-    if (!_inited) {
-        cameraServiceInit(&g_cameraServiceDesc);
+    if (!s_inited) {
+        cameraServiceInit(&s_cameraServiceDesc);
+        s_inited = true;
 
         QemudService* serv = qemud_service_register(kServiceCamera, 0,
-                &g_cameraServiceDesc, &cameraServiceConnect,
+                &s_cameraServiceDesc, &cameraServiceConnect,
                 nullptr, nullptr);
         if (serv == nullptr) {
             derror("%s: Could not register '%s' service",
