@@ -603,9 +603,10 @@ bool Snapshotter::checkSafeToSave(const char* name, bool reportMetrics) {
 
     // Check whether skipping snapshot saves was set.
     if (mVmOperations.isSnapshotSaveSkipped()) {
-        showError(
+        SnapshotSkipReason vmReason = mVmOperations.getSkipSnapshotSaveReason();
+        dwarning(
                 "Snapshot saving is currently unavailable due to the "
-                "emulator's current state.");
+                "emulator's current state. Reason: %s", toString_SnapshotSkipReason(vmReason));
         if (reportMetrics) {
             appendFailedSave(android_studio::EmulatorSnapshotSaveState::
                                  EMULATOR_SNAPSHOT_SAVE_SKIPPED_UNSUPPORTED,
