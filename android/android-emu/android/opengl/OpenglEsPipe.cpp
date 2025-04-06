@@ -265,10 +265,7 @@ public:
             mDataForReadingLeft = loadStream->getBe32();
         }
 
-        uint32_t virtioGpuContextId = std::numeric_limits<uint32_t>::max();
-        if (flags & ANDROID_PIPE_VIRTIO_GPU_BIT) {
-            virtioGpuContextId = (uint32_t)(uintptr_t)hwPipe;
-        }
+        const uint32_t virtioGpuContextId = (uint32_t)(uintptr_t)hwPipe;
 
         mChannel = renderer->createRenderChannel(loadStream, virtioGpuContextId);
         if (!mChannel) {
