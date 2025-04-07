@@ -46,9 +46,6 @@
 #include "android/utils/system.h"
 #include "host-common/hw-config.h"
 
-#define  E(...)    derror(__VA_ARGS__)
-#define  W(...)    dwarning(__VA_ARGS__)
-
 /* Camera service version 1 */
 #define V1 ((avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) > 29) && \
             !feature_is_enabled(kFeature_Minigbm))
@@ -554,9 +551,9 @@ static void webcamSetup(CameraServiceDesc* csd,
     CameraInfo* srcCi =
         cameraInfoGetByDisplayName(disp_name, webcams, webcams_cnt);
     if (!srcCi) {
-        W("Camera name '%s' is not found in the list of connected cameras.\n"
-          "Use '-webcam-list' emulator option to obtain the list of connected camera names.\n",
-          disp_name);
+        dwarning("Camera name '%s' is not found in the list of connected cameras.\n"
+                "Use '-webcam-list' emulator option to obtain the list of connected "
+                "camera names.\n", disp_name);
         return;
     }
 
@@ -753,6 +750,7 @@ static CameraClient* cameraClientCreate(CameraServiceDesc& csd,
     std::optional<std::string_view> maybeDeviceName =
         getTokenValueStr(params, kParamName);
     if (!maybeDeviceName) {
+        dwarning("Missing the '%s' parameter.", kParamName);
         return nullptr;
     }
 
@@ -766,14 +764,22 @@ static CameraClient* cameraClientCreate(CameraServiceDesc& csd,
             });
 
     if (ci == &csd.camera_info[csd.camera_count]) {
+        dwarning("Camera name '%s' is not found in the list of "
+                 "connected cameras.", deviceName);
         return nullptr;
     }
     if (ci->in_use) {
+        dwarning("Can't open the '%s' camera, it is still in use.", deviceName);
+        return nullptr;
+    }
+    if (!ci->frame_sizes_num || !ci->frame_sizes) {
+        dwarning("Camera '%s' has no supported frame dimensions.", deviceName);
         return nullptr;
     }
 
     uint32_t inpChannel;
     if (!getParamValueV(inpChannel, params, kParamInpChannel, parseInpChannel, 0U)) {
+        dwarning("Invalid '%s' parameter.", kParamInpChannel);
         return nullptr;
     }
 
