@@ -60,12 +60,22 @@ struct CameraServiceDesc {
 };
 
 struct CameraCallbackDesc {
-    void* context = nullptr;
-    camera_callback_t callback = nullptr;
-    CameraSourceType source;
-};
+    void set(camera_callback_t cb, void* ctx, CameraSourceType src) {
+        callback = cb;
+        context = ctx;
+        source = src;
+    }
 
-static CameraCallbackDesc g_cameraCallbackDesc;
+    void operator()(CameraSourceType src, bool value) const {
+        if (callback && (source == src)) {
+            callback(context, value);
+        }
+    }
+
+    camera_callback_t callback = nullptr;
+    void* context = nullptr;
+    CameraSourceType source = {};
+};
 
 using namespace std::literals;
 
@@ -584,6 +594,8 @@ struct CameraClient {
     };
 };
 
+CameraCallbackDesc g_cameraCallbackDesc;
+
 static CameraClient* cameraClientCreate(CameraServiceDesc& csd, const char* param) {
 
     char* device_name = nullptr;
@@ -636,10 +648,6 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
         return;
     }
 
-    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
-            g_cameraCallbackDesc.callback) {
-        g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, true);
-    }
     qemuClientReply(qc, true);
 }
 
@@ -736,6 +744,7 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
         cc->started = true;
     }
 
+    g_cameraCallbackDesc(ci.vtbl->camera_source, true);
     return CLIENT_START_RESULT_SUCCESS;
 }
 
@@ -921,11 +930,7 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
 
     camera_metrics_report_stop_session(cc->frame_count);
 
-    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
-            g_cameraCallbackDesc.callback) {
-        g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, false);
-    }
-
+    g_cameraCallbackDesc(ci.vtbl->camera_source, false);
     qemuClientReply(qc, true);
 }
 
@@ -1299,10 +1304,8 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
             return -EIO;
         }
     }
-    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
-            g_cameraCallbackDesc.callback)
-        g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, is_camera_started);
 
+    g_cameraCallbackDesc(ci.vtbl->camera_source, is_camera_started);
     return 0;
 }
 
@@ -1344,12 +1347,12 @@ static QemudClient* cameraServiceConnect(void*          opaque,
     return nullptr;
 }
 
+// TODO: remove this function and g_cameraCallbackDesc and call
+// the callback from camera_XYZ_(start|stop)_capturing.
 void register_camera_status_change_callback(camera_callback_t cb,
                                             void* ctx,
                                             CameraSourceType src) {
-    g_cameraCallbackDesc.callback = cb;
-    g_cameraCallbackDesc.context = ctx;
-    g_cameraCallbackDesc.source = src;
+    g_cameraCallbackDesc.set(cb, ctx, src);
 }
 
 void android_camera_service_init(void) {
