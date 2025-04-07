@@ -469,6 +469,33 @@ int main(int argc, char** argv) {
             }
         }
     }
+
+// lavapipe needs XDG_RUNTIME_DIR, otherwise,
+// it cannot create tmp file that is needed to
+// support memory fd export and import
+
+#if defined(__linux__) || defined(__APPLE__)
+    const char* kXDG_RUNTIME_DIR_NAME = "XDG_RUNTIME_DIR";
+    const char* xdg_runtime_dir_val = getenv(kXDG_RUNTIME_DIR_NAME);
+    if (!xdg_runtime_dir_val) {
+        const char* default_runtime_dir = "/tmp";
+#if defined(__APPLE__)
+        const char* darwin_runtime_dir = getenv("DARWIN_USER_TEMP_DIR");
+        if (darwin_runtime_dir) {
+            default_runtime_dir = darwin_runtime_dir;
+        } else {
+            const char* darwin_temp_dir = getenv("TMPDIR");
+            if (darwin_temp_dir) {
+                default_runtime_dir = darwin_temp_dir;
+            }
+        }
+#endif
+        dwarning("XDG_RUNTIME_DIR is not defined, default to %s",
+                 default_runtime_dir);
+        System::get()->envSet(kXDG_RUNTIME_DIR_NAME, "/tmp");
+    }
+#endif
+
     System::get()->envSet(
             "ANDROID_EMULATOR_WRAPPER_PID",
             std::to_string(System::get()->getCurrentProcessId()).c_str());
