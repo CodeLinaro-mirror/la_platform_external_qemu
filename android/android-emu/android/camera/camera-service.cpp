@@ -261,8 +261,7 @@ static std::string cameraInfoToString(const CameraInfo& ci) {
 static CameraInfo* cameraInfoGetByDisplayName(const char* disp_name,
                                               CameraInfo* arr,
                                               int num) {
-    int n;
-    for (n = 0; n < num; n++) {
+    for (int n = 0; n < num; n++) {
         if (!arr[n].in_use && arr[n].display_name &&
             !strcmp(arr[n].display_name, disp_name)) {
             return &arr[n];
@@ -481,11 +480,10 @@ static void cameraServiceInit(CameraServiceDesc* csd) {
  * Return:
  *  0 on success, or != 0 on failure.
  */
-static int factoryClientListCameras(const CameraServiceDesc& csd, QemudClient* client) {
+static void factoryClientListCameras(const CameraServiceDesc& csd, QemudClient* client) {
     if (!csd.camera_count) {
         /* No cameras connected to the host. Reply with "\n" */
         qemuClientReply(client, true, "\n"sv);
-        return 0;
     }
 
     std::string reply;
@@ -494,7 +492,6 @@ static int factoryClientListCameras(const CameraServiceDesc& csd, QemudClient* c
     }
 
     qemuClientReply(client, true, reply);
-    return 0;
 }
 
 /* Handles a message received from the emulated camera factory client.
@@ -1236,10 +1233,7 @@ static void cameraClientRecv(void*         opaque,
 
 /* Emulated camera client has been disconnected from the service. */
 static void cameraClientClose(void* opaque) {
-    CameraClient* cc = static_cast<CameraClient*>(opaque);
-
-
-    delete cc;
+    delete static_cast<CameraClient*>(opaque);
 }
 
 /* Saves the state of the camera client.
@@ -1328,22 +1322,22 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
  */
 static QemudClient* cameraServiceConnect(void*          opaque,
                                          QemudService*  serv,
-                                         int            channel,
-                                         const char*    client_param) {
+                                         const int      channel,
+                                         const char*    clientParams) {
     CameraServiceDesc* csd = static_cast<CameraServiceDesc*>(opaque);
 
-    if (!client_param || !*client_param) {
+    if (!clientParams || !*clientParams) {
         /* This is an emulated camera factory client. */
-        return qemud_client_new(serv, channel, client_param, csd,
-                                factoryClientRecv, factoryClientClose,
+        return qemud_client_new(serv, channel, clientParams, csd,
+                                &factoryClientRecv, &factoryClientClose,
                                 nullptr, nullptr);
     } else {
         /* This is an emulated camera client. */
-        CameraClient* cc = cameraClientCreate(*csd, client_param);
+        CameraClient* cc = cameraClientCreate(*csd, clientParams);
         if (cc) {
-            return qemud_client_new(serv, channel, client_param, cc,
-                                    cameraClientRecv, cameraClientClose,
-                                    cameraClientSave, cameraClientLoad);
+            return qemud_client_new(serv, channel, clientParams, cc,
+                                    &cameraClientRecv, &cameraClientClose,
+                                    &cameraClientSave, &cameraClientLoad);
         }
     }
 
