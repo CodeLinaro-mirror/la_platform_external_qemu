@@ -20,10 +20,12 @@
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/core/irq.h"
+#include "qobject/qlist.h"
 
 #define AST27XX_I3C_MMIO_SIZE 0x1000
 #define AST27XX_I3C_CTRL_OFFSET 0xd00
 #define AST27XX_I3C_PHY_OFFSET 0xe00
+#define AST27XX_I3C_EXT_CAPS_OFFSET 0xf00
 
 /* Control registers. */
 REG32(I3C_CONTROL_0, 0x00)
@@ -380,8 +382,37 @@ static const MemoryRegionOps ast27xx_i3c_phy_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+
+static void ast27xx_i3c_init_ext_capabilities(AST27xxI3CState *s)
+{
+    const uint32_t ext_caps[] = {
+        0x00000401, /* HW_ID_HEADER */
+        0x000003f6, /* HW_ID_MIPI_VENDOR */
+        0x00000002, /* HW_ID_I3C_VER */
+        0x00000000, /* HW_ID_I3C_PRODUCT*/
+        0x00000202, /* CTL_CFG_HEADER */
+        0x00000030, /* CTL_CFG_OPERATION_MODE */
+        0x000004c0, /* EXTCAPS_HEADER */
+        0x00000d00, /* EXTCAPS_CTRL */
+        0x00000e00, /* EXTCAPS_PHY */
+        0x00000f80, /* EXTCAP_DMAARB */
+    };
+
+    QList *ext_capabilities = qlist_new();
+    for (int i = 0; i < ARRAY_SIZE(ext_caps); i++) {
+        qlist_append_int(ext_capabilities, ext_caps[i]);
+    }
+
+    MIPIHCIState *hci = MIPI_HCI(s);
+    hci->core.cfg.ext_caps_section_offset = AST27XX_I3C_EXT_CAPS_OFFSET;
+    qdev_prop_set_array(DEVICE(hci), "ext-capabilities", ext_capabilities);
+}
+
 static void ast27xx_i3c_instance_init(Object *obj)
 {
+    AST27xxI3CState *s = AST27XX_I3C(obj);
+
+    ast27xx_i3c_init_ext_capabilities(s);
 }
 
 static void ast27xx_i3c_realize(DeviceState *dev, Error **errp)
