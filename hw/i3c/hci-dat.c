@@ -51,3 +51,19 @@ void hci_dat_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
     }
     s->regs[offset] = value;
 }
+
+uint32_t hci_dat_dev_index_from_addr(MIPIHCIState *hci, uint8_t addr)
+{
+    /*
+     * In theory this lookup isn't very efficient, but in practice the DAT
+     * tables are small enough that it's good enough.
+     */
+    for (int i = 0; i < hci->core.cfg.dat_table_size; i += HCI_DAT_ENTRY_SIZE) {
+        if (FIELD_EX32(hci->dat.regs[i + R_TARGET_DAT], TARGET_DAT,
+                       TARGET_DYNAMIC_ADDRESS) == addr) {
+            return i;
+        }
+    }
+
+    return HCI_DAT_DEV_NOT_FOUND;
+}

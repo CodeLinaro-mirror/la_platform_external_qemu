@@ -17,6 +17,7 @@
 #include "migration/vmstate.h"
 #include "hci-cmd.h"
 #include "exec/cpu-common.h"
+#include "hw/i3c/hci-ibi.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/core/irq.h"
@@ -415,4 +416,11 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
         s->regs[offset] = val32;
         break;
     }
+}
+
+int hci_dma_report_ibi(MIPIHCIState *hci)
+{
+    g_assert(hci->ibi_in_progress != NULL);
+    /* TODO: Store the IBI and set IRQs. */
+    return 0;
 }

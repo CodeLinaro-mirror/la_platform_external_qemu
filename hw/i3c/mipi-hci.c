@@ -19,6 +19,7 @@
 #include "hci-ext-internal.h"
 #include "hci-dat-internal.h"
 #include "hci-dct-internal.h"
+#include "hw/i3c/hci-ibi.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/mipi-hci.h"
@@ -217,6 +218,11 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
 
     s->bus = i3c_init_bus(DEVICE(s), NULL);
+
+    I3CBusClass *bc = I3C_BUS_GET_CLASS(s->bus);
+    bc->ibi_handle = hci_ibi_handle;
+    bc->ibi_recv = hci_ibi_recv;
+    bc->ibi_finish = hci_ibi_finish;
 }
 
 static void mipi_hci_enter_reset(Object *obj, ResetType type)

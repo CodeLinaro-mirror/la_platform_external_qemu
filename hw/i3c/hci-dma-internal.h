@@ -34,6 +34,7 @@ void hci_dma_header_write(void *opaque, hwaddr offset, uint64_t value,
 
 uint64_t hci_dma_read(void *opaque, hwaddr offset, unsigned size);
 void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size);
+int hci_dma_report_ibi(MIPIHCIState *hci);
 
 void hci_dma_reset(HCIDMAState *s);
 

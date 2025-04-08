@@ -16,6 +16,7 @@
 #include "hw/i3c/hci-ext.h"
 #include "hw/i3c/hci-dat.h"
 #include "hw/i3c/hci-dct.h"
+#include "hw/i3c/hci-ibi.h"
 #include "hw/i3c/i3c.h"
 
 #define TYPE_MIPI_HCI "mipi.hci"
@@ -58,6 +59,11 @@ typedef struct MIPIHCIState {
     MemoryRegion iomem;
     qemu_irq *irq;
     I3CBus *bus;
+    /*
+     * A pointer to an IBI that's currently in progress.
+     * Freed once the IBI is done.
+     */
+    IbiStatus *ibi_in_progress;
 } MIPIHCIState;
 
 #endif /* MIPI_HCI_H */

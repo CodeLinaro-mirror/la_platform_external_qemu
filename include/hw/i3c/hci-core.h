@@ -15,6 +15,11 @@
 #define HCI_CORE_MMIO_OFFSET 0x0
 #define HCI_CORE_NUM_REGS 27
 
+typedef enum {
+    MODE_SELECTOR_DMA = 0,
+    MODE_SELECTOR_PIO = 1,
+} ModeSelector;
+
 REG32(HCI_VERSION, 0x00)
 REG32(HC_CONTROL, 0x04)
     FIELD(HC_CONTROL, IBA_INCLUDE,             0, 1)
