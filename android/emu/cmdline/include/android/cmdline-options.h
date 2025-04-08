@@ -369,7 +369,7 @@ OPT_PARAM(android_serialno,
           "be encodable as 7-bit ASCII and match the regular expression "
           "“^[a-zA-Z0-9._-,]+$”.")
 
-OPT_FLAG(support_multiple_input_modalites, "deprecated: Support different input modalities")
+OPT_FLAG(support_multiple_input_modalities, "deprecated: Support different input modalities")
 
 OPT_PARAM(systemui_renderer,
           "<option list>",

@@ -1654,7 +1654,7 @@ void ToolWindow::on_dismiss_resizable_dialog() {
 
 void ToolWindow::on_xr_environment_mode_button_clicked() {
     mXrEnvironmentModeDialog->show();
-    // Align pop-up posture selction dialog to the right of posture button
+    // Align pop-up posture selection dialog to the right of posture button
     QRect geoTool = this->geometry();
     mXrEnvironmentModeDialog->move(
             geoTool.right(),
@@ -1665,7 +1665,7 @@ void ToolWindow::on_xr_environment_mode_button_clicked() {
 void ToolWindow::on_xr_input_mode_button_clicked() {
     if (getConsoleAgents()
                 ->settings->android_cmdLineOptions()
-                ->support_multiple_input_modalites) {
+                ->support_multiple_input_modalities) {
         mXrInputModeDialog->show();
         // Align pop-up input selection dialog to the right of input button.
         QRect geoTool = this->geometry();
@@ -1736,7 +1736,7 @@ void ToolWindow::updateXrNavigationButtonsChecked(QtUICommand currentMode) {
                 const QVariant uiCommand = xrButton.property("uiCommand");
                 if (uiCommand.isValid()) {
                     QtUICommand buttonCommand;
-                    // Parse the `uiCommand` string to retrive the QtUICommand
+                    // Parse the `uiCommand` string to retrieve the QtUICommand
                     // object.
                     if (parseQtUICommand(uiCommand.toString(), &buttonCommand)) {
                         if (buttonCommand == currentMode) {
