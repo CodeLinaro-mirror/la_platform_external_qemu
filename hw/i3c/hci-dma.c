@@ -176,6 +176,31 @@ static RespStatus hci_dma_send(MIPIHCIState *hci,
                         desc->data_buffer.block_size);
 }
 
+static void hci_dma_write_memory(const DataBufferDescr *desc,
+                                 const uint8_t *data, size_t len)
+{
+    uint64_t addr = desc->buffer_ptr_hi;
+    addr <<= 32;
+    addr |= desc->buffer_ptr_lo;
+
+    cpu_physical_memory_write(addr, data, len);
+}
+
+static RespStatus hci_dma_i3c_read(MIPIHCIState *hci,
+                                   const TransferDescr *desc,
+                                   RespDescr *resp)
+{
+    g_autofree uint8_t *data = g_new0(uint8_t, desc->data_buffer.block_size);
+    uint32_t num_read = 0;
+
+    RespStatus status = hci_cmd_read(hci, &desc->cmd.regular_xfer, resp, data,
+                                     desc->data_buffer.block_size, &num_read);
+    if (status == RESP_STATUS_SUCCESS) {
+        hci_dma_write_memory(&desc->data_buffer, data, num_read);
+    }
+    return status;
+}
+
 static RespStatus hci_dma_regular_xfer(MIPIHCIState *hci,
                                         const TransferDescr *desc,
                                         RespDescr *resp)
@@ -188,7 +213,7 @@ static RespStatus hci_dma_regular_xfer(MIPIHCIState *hci,
     }
 
     if (desc->cmd.regular_xfer.rnw) {
-        /* TODO: Support reads. */
+        return hci_dma_i3c_read(hci, desc, resp);
     }
     return hci_dma_send(hci, desc, resp);
 }

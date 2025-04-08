@@ -213,30 +213,23 @@ done:
     return status;
 }
 
-static RespStatus hci_cmd_send_ccc(MIPIHCIState *hci, const RegularXfer *desc,
-                                   RespDescr *resp, const uint8_t *data,
-                                   size_t len)
+static RespStatus hci_cmd_start_ccc(MIPIHCIState *hci, const RegularXfer *desc)
 {
     MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
-    RespStatus status = RESP_STATUS_SUCCESS;
     uint8_t ccc = desc->cmd;
-    uint32_t num_sent = 0;
     uint8_t addr = 0;
     uint16_t dat_offset = 0;
 
     /* Start the CCC, both direct and broadcast start with a broadcast. */
     if (i3c_start_send(hci->bus, I3C_BROADCAST)) {
-        status = RESP_STATUS_ERROR_ADDR_HEADER;
-        goto done;
+        return RESP_STATUS_ERROR_ADDR_HEADER;
     }
     if (i3c_send_byte(hci->bus, ccc)) {
-        status = RESP_STATUS_ERROR_XFER_ABORTED;
-        goto done;
+        return RESP_STATUS_ERROR_XFER_ABORTED;
     }
     if (desc->dbp) {
         if (i3c_send_byte(hci->bus, desc->def_byte)) {
-            status = RESP_STATUS_ERROR_XFER_ABORTED;
-            goto done;
+            return RESP_STATUS_ERROR_XFER_ABORTED;
         }
     }
 
@@ -245,9 +238,22 @@ static RespStatus hci_cmd_send_ccc(MIPIHCIState *hci, const RegularXfer *desc,
         dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
         addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
         if (i3c_start_send(hci->bus, addr)) {
-            status = RESP_STATUS_ERROR_XFER_ABORTED;
-            goto done;
+            return RESP_STATUS_ERROR_XFER_ABORTED;
         }
+    }
+
+    return RESP_STATUS_SUCCESS;
+}
+
+static RespStatus hci_cmd_send_ccc(MIPIHCIState *hci, const RegularXfer *desc,
+                                   RespDescr *resp, const uint8_t *data,
+                                   size_t len)
+{
+    uint32_t num_sent = 0;
+
+    RespStatus status = hci_cmd_start_ccc(hci, desc);
+    if (status != RESP_STATUS_SUCCESS) {
+        goto done;
     }
 
     /* Now send the CCC data, if any. */
@@ -260,6 +266,29 @@ done:
         i3c_end_transfer(hci->bus);
     }
     resp->resp.length = len - num_sent;
+    return status;
+}
+
+static RespStatus hci_cmd_read_ccc(MIPIHCIState *hci, const RegularXfer *desc,
+                                   RespDescr *resp, uint8_t *data, size_t len,
+                                   uint32_t *num_read)
+{
+    *num_read = 0;
+
+    RespStatus status = hci_cmd_start_ccc(hci, desc);
+    if (status != RESP_STATUS_SUCCESS) {
+        goto done;
+    }
+
+    if (i3c_recv(hci->bus, data, len, num_read)) {
+        status = RESP_STATUS_ERROR_XFER_ABORTED;
+    }
+
+done:
+    if (desc->toc) {
+        i3c_end_transfer(hci->bus);
+    }
+    resp->resp.length = len - *num_read;
     return status;
 }
 
@@ -364,6 +393,36 @@ RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
         status = hci_cmd_send_ccc(hci, desc, resp, data, len);
     } else {
         status = hci_cmd_send_data(hci, desc, resp, data, len);
+    }
+
+done:
+    resp->resp.tid = desc->tid;
+    resp->resp.err = status;
+
+    return status;
+}
+
+RespStatus hci_cmd_read(MIPIHCIState *hci, const RegularXfer *desc,
+                        RespDescr *resp, uint8_t *data, uint32_t len,
+                        uint32_t *num_read) {
+    RespStatus status = RESP_STATUS_SUCCESS;
+    /* This is an internal error, the caller passed in bad arguments. */
+    if (desc->cmd_attr != CMD_ATTR_REGULAR_XFER || !desc->rnw) {
+        status = RESP_STATUS_ERROR_HC_ABORTED;
+        resp->resp.length = len;
+        goto done;
+    }
+    /* We only support SDR. */
+    if (desc->mode > TRANSFER_MODE_SDR4) {
+        status = RESP_STATUS_ERROR_NOT_SUPPORTED;
+        resp->resp.length = len;
+        goto done;
+    }
+
+    if (desc->cp) {
+        status = hci_cmd_read_ccc(hci, desc, resp, data, len, num_read);
+    } else {
+        /* TODO: Implement private reads. */
     }
 
 done:

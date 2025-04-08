@@ -152,4 +152,8 @@ RespStatus hci_cmd_addr_assign(MIPIHCIState *hci, const AddrCmd *desc,
 RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
                         RespDescr *resp, const uint8_t *data, size_t len);
 
+RespStatus hci_cmd_read(MIPIHCIState *hci, const RegularXfer *desc,
+                        RespDescr *resp, uint8_t *data, uint32_t len,
+                        uint32_t *num_read);
+
 #endif  /* HCI_CMD_H */
