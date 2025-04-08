@@ -10,6 +10,10 @@
 #define HCI_DAT_H
 
 #include "hw/core/registerfields.h"
+#include "system/memory.h"
+
+#define HCI_DAT_ENTRY_SIZE 2
+#define HCI_DAT_MAX_REGS (0x7f * HCI_DAT_ENTRY_SIZE)
 
 REG32(TARGET_DAT, 0x00)
     FIELD(TARGET_DAT, TARGET_STATIC_ADDRESS,      0, 7)
@@ -27,5 +31,11 @@ REG32(TARGET_DAT2, 0x04)
     FIELD(TARGET_DAT2, AUTOCMD_VALUE,     9, 8)
     FIELD(TARGET_DAT2, AUTOCMD_MODE,     17, 3)
     FIELD(TARGET_DAT2, AUTOCMD_HDR_MODE, 20, 8)
+
+typedef struct HCIDATState {
+    uint32_t regs[HCI_DAT_MAX_REGS];
+
+    MemoryRegion mmio;
+} HCIDATState;
 
 #endif  /* HCI_DAT_H */
