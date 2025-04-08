@@ -14,4 +14,6 @@
 uint64_t hci_dct_read(void *opaque, hwaddr offset, unsigned size);
 void hci_dct_write(void *opaque, hwaddr offset, uint64_t value, unsigned size);
 
+void hci_dct_reset(HCIDCTState *s, uint32_t num_regs);
+
 #endif  /* HCI_DCT_INTERNAL_H_ */

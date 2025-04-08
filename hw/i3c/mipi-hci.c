@@ -169,6 +169,7 @@ static void mipi_hci_enter_reset(Object *obj, ResetType type)
     hci_core_reset(&s->core);
     hci_dma_reset(&s->dma);
     hci_dat_reset(&s->dat, s->core.cfg.dat_table_size);
+    hci_dct_reset(&s->dct, s->core.cfg.dct_table_size);
 }
 
 static void mipi_hci_class_init(ObjectClass *klass, const void *data)

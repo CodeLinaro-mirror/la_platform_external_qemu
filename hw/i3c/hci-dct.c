@@ -19,6 +19,11 @@
 #include "hw/i3c/hci-dct.h"
 #include "hci-dct-internal.h"
 
+void hci_dct_reset(HCIDCTState *s, uint32_t num_regs)
+{
+    memset(&s->regs, 0, num_regs * sizeof(s->regs[0] * HCI_DCT_ENTRY_SIZE));
+}
+
 uint64_t hci_dct_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIDCTState *s = &(MIPI_HCI(opaque)->dct);
