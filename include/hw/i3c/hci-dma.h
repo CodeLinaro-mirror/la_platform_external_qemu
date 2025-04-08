@@ -90,6 +90,9 @@ typedef struct HCIDMAState {
     uint32_t header_regs[HCI_DMA_HEADER_NUM_REGS];
     uint32_t regs[HCI_DMA_NUM_REGS];
 
+    /* The number of IBI chunks we've written that the guest has not freed. */
+    uint32_t ibi_chunks_stored;
+
     struct {
         uint32_t num_ring_offsets;
         uint32_t *ring_offsets;

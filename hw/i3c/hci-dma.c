@@ -31,6 +31,8 @@
         }                        \
     } while (0)
 
+#define IBI_CHUNK_SIZE(x) (4 << (x))
+
 static const uint32_t hci_dma_header_ro_mask[] = {
     [R_RHS_CONTROL] = 0xfffffff0,
     [R_RH0_OFFSET]  = 0xffffffff,
@@ -66,6 +68,9 @@ void hci_dma_reset(HCIDMAState *s)
                      s->cfg.resp_struct_size);
     ARRAY_FIELD_DP32(s->regs, IBI_SETUP, IBI_STATUS_STRUCT_SIZE,
                      s->cfg.ibi_status_struct_size);
+
+    /* State. */
+    s->ibi_chunks_stored = 0;
 }
 
 uint64_t hci_dma_header_read(void *opaque, hwaddr offset, unsigned size)
@@ -367,6 +372,40 @@ static void hci_dma_ibi_setup_w(MIPIHCIState *hci, uint32_t val)
     s->regs[R_IBI_SETUP] = val;
 }
 
+static void hci_dma_chunk_control_w(MIPIHCIState *hci, uint32_t val)
+{
+    HCIDMAState *s = &hci->dma;
+    /*
+     * The spec says CHUNK_CONTROL must be monotonically increasing. If the
+     * guest decremented it, let them do so, but warn them. From the
+     * controller's PoV, this will look like the guest decided to un-free IBI
+     * data chunks.
+     */
+    if (val < s->regs[R_CHUNK_CONTROL]) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Chunk control was decremented\n",
+                      path);
+        s->ibi_chunks_stored += (s->regs[R_CHUNK_CONTROL] - val);
+        return;
+    }
+
+    uint32_t chunks_to_free = val - s->regs[R_CHUNK_CONTROL];
+    /*
+     * If they decided to tell us that they freed more chunks than were actually
+     * being used, warn them about that too, but don't underflow.
+     */
+    if (chunks_to_free > s->ibi_chunks_stored) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Attempted to free more IBI data "
+                      "chunks %d, than the amount that was actually being "
+                      "used, %d\n", path, chunks_to_free, s->ibi_chunks_stored);
+       chunks_to_free = s->ibi_chunks_stored;
+    }
+
+    s->ibi_chunks_stored -= chunks_to_free;
+    s->regs[R_CHUNK_CONTROL] = val;
+}
+
 static void hci_dma_rh_operation1_w(MIPIHCIState *hci, uint32_t val)
 {
     HCIDMAState *s = &hci->dma;
@@ -374,8 +413,14 @@ static void hci_dma_rh_operation1_w(MIPIHCIState *hci, uint32_t val)
 
     s->regs[R_RH_OPERATION1] = val;
 
-    /* Attempt to transfer if the enqueue pointer was updated. */
-    if (FIELD_EX32(prev_val, RH_OPERATION1, CR_ENQ_PTR) <
+    /*
+     * Attempt to transfer if the enqueue pointer was updated. A simple
+     * inequality check is the most robust way to handle this, as it correctly
+     * covers linear advancement and all rollover scenarios. Although this
+     * would also trigger on a decrement of the pointer (a driver bug), the
+     * hci_dma_xfer() function is safe and will correctly handle the ring state.
+     */
+    if (FIELD_EX32(prev_val, RH_OPERATION1, CR_ENQ_PTR) !=
         FIELD_EX32(val, RH_OPERATION1, CR_ENQ_PTR)) {
         hci_dma_xfer(hci);
     }
@@ -420,6 +465,9 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
     case R_IBI_SETUP:
         hci_dma_ibi_setup_w(hci, val32);
         break;
+    case R_CHUNK_CONTROL:
+        hci_dma_chunk_control_w(hci, val32);
+        break;
     case R_RH_OPERATION1:
         hci_dma_rh_operation1_w(hci, val32);
         break;
@@ -435,9 +483,144 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
     }
 }
 
+static bool hci_dma_ibi_status_ring_full(HCIDMAState *s)
+{
+    uint8_t num_entries = ARRAY_FIELD_EX32(s->regs, RH_OPERATION2,
+                                           IBI_ENQ_PTR) -
+                          ARRAY_FIELD_EX32(s->regs, RH_OPERATION1, IBI_DEQ_PTR);
+    return num_entries >= ARRAY_FIELD_EX32(s->regs, IBI_SETUP,
+                                          IBI_STATUS_RING_SIZE);
+}
+
+static bool hci_dma_ibi_data_ring_full(HCIDMAState *s, IbiStatus *ibi)
+{
+    if (ibi->num_bytes == 0) {
+        return false;
+    }
+
+    uint32_t max_chunks_available = IBI_CHUNK_SIZE(
+        ARRAY_FIELD_EX32(s->regs, IBI_SETUP, CHUNK_SIZE));
+    return s->ibi_chunks_stored >= max_chunks_available;
+}
+
+static bool hci_dma_ibi_ring_ok(MIPIHCIState *hci, IbiStatus *ibi)
+{
+    HCIDMAState *s = &hci->dma;
+
+    if (ARRAY_FIELD_EX32(s->regs, IBI_SETUP, IBI_STATUS_RING_SIZE) < 2) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Received an IBI when the IBI ring "
+                      "was disabled.\n", path);
+        return false;
+    }
+    if (ARRAY_FIELD_EX32(s->regs, IBI_SETUP, IBI_STATUS_RING_SIZE) < 2) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Received an IBI when the IBI ring "
+                      "was disabled.\n", path);
+        return false;
+    }
+    if (hci_dma_ibi_status_ring_full(s)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Received an IBI when the IBI "
+                      "status ring was full.\n", path);
+        ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, IBI_RING_FULL_STAT, 1);
+        return false;
+    }
+    if (hci_dma_ibi_data_ring_full(s, ibi)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Received an IBI when the IBI data "
+                 "ring was full.\n", path);
+        ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, IBI_RING_FULL_STAT, 1);
+        return false;
+    }
+
+    return true;
+}
+
+static uint32_t hci_dma_ibi_num_chunks(HCIDMAState *s, const IbiStatus *ibi)
+{
+    if (ibi->num_bytes == 0) {
+        return 0;
+    }
+
+    uint32_t num_chunks = (ibi->num_bytes /
+        IBI_CHUNK_SIZE(ARRAY_FIELD_EX32(s->regs, IBI_SETUP, CHUNK_SIZE)));
+    /* We need to allocate 1 more chunk for partial data, if present. */
+    if ((ibi->num_bytes % IBI_CHUNK_SIZE(
+        ARRAY_FIELD_EX32(s->regs, IBI_SETUP, CHUNK_SIZE))) == 0) {
+        num_chunks++;
+    }
+
+    return num_chunks;
+}
+
+static void hci_dma_ibi_status_write(HCIDMAState *s, IbiStatus *ibi)
+{
+    uint64_t addr = s->regs[R_RH_IBI_STATUS_RING_BASE_HI];
+    addr <<= 32;
+    addr |= s->regs[R_RH_IBI_STATUS_RING_BASE_LO];
+    addr += (ARRAY_FIELD_EX32(s->regs, RH_OPERATION2, IBI_ENQ_PTR) *
+             s->cfg.ibi_status_struct_size);
+
+    ibi->ibi.chunks = hci_dma_ibi_num_chunks(s, ibi);
+    /* Number of bytes in the last chunk. */
+    if (ibi->ibi.chunks) {
+        ibi->ibi.data_length = ibi->num_bytes %
+            IBI_CHUNK_SIZE(ARRAY_FIELD_EX32(s->regs, IBI_SETUP, CHUNK_SIZE));
+    }
+
+    /* Write out the data and move the queue pointer. */
+    cpu_physical_memory_write(addr, &ibi->ibi, sizeof(ibi->ibi));
+    uint8_t enqueue_ptr = ARRAY_FIELD_EX32(s->regs, RH_OPERATION2, IBI_ENQ_PTR);
+    INC_AND_ROLLOVER(enqueue_ptr, ARRAY_FIELD_EX32(s->regs, IBI_SETUP,
+                                                   IBI_STATUS_RING_SIZE));
+    ARRAY_FIELD_DP32(s->regs, RH_OPERATION2, IBI_ENQ_PTR, enqueue_ptr);
+
+    ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, IBI_READY_STAT, 1);
+}
+
+static void hci_dma_ibi_data_write(HCIDMAState *s, IbiStatus *ibi)
+{
+    if (ibi->num_bytes == 0) {
+        return;
+    }
+
+    uint64_t addr = s->regs[R_RH_IBI_DATA_RING_BASE_HI];
+    addr <<= 32;
+    addr |= s->regs[R_RH_IBI_DATA_RING_BASE_LO];
+
+    /*
+     * CHUNK_CONTROL is an incrementing number that the driver sets to tell us
+     * where it stopped reading data. Since it won't roll over, it's up to us
+     * to do the rollover.
+     */
+    uint32_t chunk_offset = s->regs[R_CHUNK_CONTROL] %
+            ARRAY_FIELD_EX32(s->regs, IBI_SETUP, CHUNK_COUNT);
+    chunk_offset *= IBI_CHUNK_SIZE(ARRAY_FIELD_EX32(s->regs, IBI_SETUP,
+                                                     CHUNK_SIZE));
+    addr += chunk_offset;
+
+    /*
+     * Write out the IBI data. No need to update the IRQ since it was already
+     * updated when writing the status.
+     */
+    cpu_physical_memory_write(addr, ibi->data, ibi->num_bytes);
+}
+
 int hci_dma_report_ibi(MIPIHCIState *hci)
 {
+    int ret = 0;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
     g_assert(hci->ibi_in_progress != NULL);
-    /* TODO: Store the IBI and set IRQs. */
-    return 0;
+
+    if (!hci_dma_ibi_ring_ok(hci, hci->ibi_in_progress)) {
+        ret = -1;
+    } else {
+        hci_dma_ibi_status_write(&hci->dma, hci->ibi_in_progress);
+        hci_dma_ibi_data_write(&hci->dma, hci->ibi_in_progress);
+    }
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
+
+    return ret;
 }
