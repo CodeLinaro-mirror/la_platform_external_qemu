@@ -36,6 +36,8 @@ typedef struct MIPIHCIClass {
 
     /* Overridable in case other implementations have multiple IRQ lines. */
     void (*update_irq)(MIPIHCIState *s, MIPIHCIIRQContext ctx);
+    /* Overridable, since halt state could be presented in extended caps. */
+    void (*enter_halt)(MIPIHCIState *s);
     /* Aspeed-specific. */
     uint8_t (*get_next_dynamic_addr)(MIPIHCIState *s, uint8_t dat_index);
     uint8_t (*get_dev_dynamic_addr)(MIPIHCIState *s, uint8_t dat_index);

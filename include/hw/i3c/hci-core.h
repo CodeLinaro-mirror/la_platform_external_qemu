@@ -116,6 +116,7 @@ typedef struct HCICoreState {
     } cfg;
 
     MemoryRegion iomem;
+    bool halted;
 } HCICoreState;
 
 #endif /* HCI_CORE_H */

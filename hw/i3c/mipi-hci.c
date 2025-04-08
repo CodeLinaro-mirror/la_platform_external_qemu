@@ -57,6 +57,12 @@ static void mipi_hci_update_irq(MIPIHCIState *s, MIPIHCIIRQContext ctx)
     qemu_set_irq(s->irq[0], level);
 }
 
+/* Default halt function. */
+static void mipi_hci_enter_halt(MIPIHCIState *s)
+{
+    s->core.halted = true;
+}
+
 static const MemoryRegionOps hci_core_ops = {
     .read = hci_core_read,
     .write = hci_core_write,
@@ -249,6 +255,7 @@ static void mipi_hci_class_init(ObjectClass *klass, const void *data)
     mhc->update_irq = mipi_hci_update_irq;
     mhc->get_next_dynamic_addr = mipi_hci_get_next_dynamic_addr;
     mhc->get_dev_dynamic_addr = mipi_hci_get_dev_dynamic_addr;
+    mhc->enter_halt = mipi_hci_enter_halt;
 }
 
 static const TypeInfo mipi_hci_info = {

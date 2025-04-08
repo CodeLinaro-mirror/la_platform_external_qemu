@@ -15,5 +15,6 @@
 uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size);
 void hci_core_write(void *opaque, hwaddr offset, uint64_t value, unsigned size);
 void hci_core_reset(HCICoreState *s);
+bool hci_core_can_xfer(HCICoreState *s);
 
 #endif  /* HCI_CORE_INTERNAL_H_ */

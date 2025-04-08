@@ -22,6 +22,7 @@
 #include "hw/i3c/i3c.h"
 #include "hw/core/irq.h"
 #include "hci-dma-internal.h"
+#include "hci-core-internal.h"
 
 #define INC_AND_ROLLOVER(x, max) \
     do {                         \
@@ -240,12 +241,13 @@ static RespStatus hci_dma_internal_control_xfer(MIPIHCIState *hci,
     return RESP_STATUS_SUCCESS;
 }
 
-static void hci_dma_xfer(MIPIHCIState *hci)
+void hci_dma_xfer(MIPIHCIState *hci)
 {
     HCIDMAState *s = &(hci->dma);
     MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
 
-    if (!hci_dma_can_xfer(s) || !hci_dma_ring_ok(s)) {
+    if (!hci_dma_can_xfer(s) || !hci_dma_ring_ok(s) ||
+        !hci_core_can_xfer(&hci->core)) {
         return;
     }
 
@@ -304,6 +306,9 @@ static void hci_dma_xfer(MIPIHCIState *hci)
                              1);
         } else {
             ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, TRANSFER_ERR_STAT, 1);
+        }
+        if (status != RESP_STATUS_SUCCESS) {
+            c->enter_halt(hci);
         }
         if (desc.data_buffer.ioc || status != RESP_STATUS_SUCCESS) {
             c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);

@@ -44,6 +44,11 @@ static const uint32_t hci_core_ro_mask[HCI_CORE_NUM_REGS] = {
     [R_DEV_CTX_SG]                  = 0x7fff0000,
 };
 
+bool hci_core_can_xfer(HCICoreState *s)
+{
+    return !s->halted;
+}
+
 void hci_core_reset(HCICoreState *s)
 {
     memset(&s->regs, 0, sizeof(s->regs));
@@ -63,6 +68,8 @@ void hci_core_reset(HCICoreState *s)
     s->regs[R_HCI_VERSION] = s->cfg.hci_version;
     s->regs[R_HC_CAPABILITIES] = s->cfg.hc_capabilities;
     s->regs[R_INT_CTRL_CMDS_EN] = s->cfg.int_ctrl_cmds_en;
+
+    s->halted = false;
 }
 
 uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)
@@ -74,6 +81,40 @@ uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)
     g_assert(offset < ARRAY_SIZE(s->regs));
 
     return s->regs[offset];
+}
+
+static void hci_core_xfer(MIPIHCIState *hci)
+{
+    if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, MODE_SELECTOR) ==
+        MODE_SELECTOR_PIO) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_UNIMP, "%s: PIO mode is not supported\n", path);
+    } else {
+        hci_dma_xfer(hci);
+    }
+}
+
+static void hci_core_hc_control_w(MIPIHCIState *hci, uint32_t val)
+{
+    HCICoreState *s = &hci->core;
+    uint32_t new_mode_selector = FIELD_EX32(val, HC_CONTROL, MODE_SELECTOR);
+    uint32_t old_mode_selector = ARRAY_FIELD_EX32(s->regs,
+                                                  HC_CONTROL, MODE_SELECTOR);
+
+    if (new_mode_selector != old_mode_selector &&
+        ARRAY_FIELD_EX32(s->regs, HC_CONTROL, ENABLE)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Cannot change between PIO and DMA "
+                     "modes when controller is enabled.\n", path);
+        val = FIELD_DP32(val, HC_CONTROL, MODE_SELECTOR, 0);
+    }
+
+    if (FIELD_EX32(val, HC_CONTROL, RESUME)) {
+        s->halted = false;
+        val = FIELD_DP32(val, HC_CONTROL, RESUME, 0); /* W1C */
+        hci_core_xfer(hci);
+    }
+    s->regs[R_HC_CONTROL] = val;
 }
 
 static void hci_core_reset_control_w(MIPIHCIState *hci, uint32_t val)
@@ -98,6 +139,9 @@ void hci_core_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 
     val32 &= ~hci_core_ro_mask[offset];
     switch (offset) {
+    case R_HC_CONTROL:
+        hci_core_hc_control_w(hci, val32);
+        break;
     case R_RESET_CONTROL:
         hci_core_reset_control_w(hci, val32);
         break;

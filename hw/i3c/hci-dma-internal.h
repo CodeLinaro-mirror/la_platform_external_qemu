@@ -10,6 +10,7 @@
 #define HCI_DMA_INTERNAL_H_
 
 #include "hw/i3c/hci-dma.h"
+#include "hw/i3c/mipi-hci.h"
 #include "hci-cmd.h"
 
 typedef struct DataBufferDescr {
@@ -37,5 +38,7 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size);
 int hci_dma_report_ibi(MIPIHCIState *hci);
 
 void hci_dma_reset(HCIDMAState *s);
+
+void hci_dma_xfer(MIPIHCIState *hci);
 
 #endif  /* HCI_DMA_INTERNAL_H_ */
