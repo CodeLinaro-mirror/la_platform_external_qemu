@@ -98,6 +98,10 @@ REG32(DEV_CTX_SG, 0x68)
 typedef struct HCICoreState {
     uint32_t regs[HCI_CORE_NUM_REGS];
 
+    struct {
+        uint32_t ring_header_section_offset;
+    } cfg;
+
     MemoryRegion iomem;
 } HCICoreState;
 

@@ -12,6 +12,9 @@
 #include "hw/core/registerfields.h"
 #include "system/memory.h"
 
+#define HCI_DMA_NUM_REGS 32
+#define HCI_DMA_HEADER_NUM_REGS 2
+
 /* Header */
 REG32(RHS_CONTROL, 0x00)
     FIELD(RHS_CONTROL, MAX_HEADER_COUNT,            0, 4)
@@ -82,5 +85,18 @@ REG32(RH_IBI_STATUS_RING_BASE_LO, 0x40)
 REG32(RH_IBI_STATUS_RING_BASE_HI, 0x44)
 REG32(RH_IBI_DATA_RING_BASE_LO, 0x48)
 REG32(RH_IBI_DATA_RING_BASE_HI, 0x4c)
+
+typedef struct HCIDMAState {
+    uint32_t header_regs[HCI_DMA_HEADER_NUM_REGS];
+    uint32_t regs[HCI_DMA_NUM_REGS];
+
+    struct {
+        uint32_t num_ring_offsets;
+        uint32_t *ring_offsets;
+    } cfg;
+
+    MemoryRegion header_mmio;
+    MemoryRegion *rh_mmio;
+} HCIDMAState;
 
 #endif

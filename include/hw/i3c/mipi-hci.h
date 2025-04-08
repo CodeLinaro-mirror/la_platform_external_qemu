@@ -12,6 +12,7 @@
 #include "hw/core/sysbus.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/hci-core.h"
+#include "hw/i3c/hci-dma.h"
 
 #define TYPE_MIPI_HCI "mipi.hci"
 OBJECT_DECLARE_TYPE(MIPIHCIState, MIPIHCIClass, MIPI_HCI)
@@ -26,6 +27,7 @@ typedef struct MIPIHCIState {
     SysBusDevice parent;
 
     HCICoreState core;
+    HCIDMAState dma;
 
     MemoryRegion iomem;
     I3CBus *bus;

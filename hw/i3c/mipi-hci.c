@@ -14,6 +14,7 @@
 #include "hw/i3c/hci-core.h"
 #include "hci-core-internal.h"
 #include "hw/i3c/hci-dma.h"
+#include "hci-dma-internal.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/mipi-hci.h"
@@ -29,14 +30,43 @@ static const MemoryRegionOps hci_core_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+static const MemoryRegionOps hci_dma_ops = {
+    .read = hci_dma_read,
+    .write = hci_dma_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_dma_header_ops = {
+    .read = hci_dma_header_read,
+    .write = hci_dma_header_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
 static void mipi_hci_instance_init(Object *obj)
 {
 }
+
+static const Property mipi_hci_properties[] = {
+    DEFINE_PROP_UINT32("ring-header-section-offset", MIPIHCIState,
+                       core.cfg.ring_header_section_offset, 0),
+    DEFINE_PROP_ARRAY("ring-offsets", MIPIHCIState,
+                      dma.cfg.num_ring_offsets, dma.cfg.ring_offsets,
+                      qdev_prop_uint32, uint32_t),
+};
 
 static void mipi_hci_realize(DeviceState *dev, Error **errp)
 {
     MIPIHCIState *s = MIPI_HCI(dev);
     HCICoreState *core = &s->core;
+    HCIDMAState *dma = &s->dma;
 
     memory_region_init(&s->iomem, OBJECT(s), TYPE_MIPI_HCI"-mmio",
                        MIPI_HCI_MMIO_SIZE);
@@ -45,6 +75,21 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
                           HCI_CORE_NUM_REGS * sizeof(uint32_t));
     memory_region_add_subregion(&s->iomem, HCI_CORE_MMIO_OFFSET,
                                 &core->iomem);
+    dma->rh_mmio = g_new0(MemoryRegion, dma->cfg.num_ring_offsets);
+    memory_region_init_io(&dma->header_mmio, OBJECT(s), &hci_dma_header_ops, s,
+                           TYPE_MIPI_HCI"-dma-header-mmio",
+                           HCI_DMA_HEADER_NUM_REGS * sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem,
+                                core->cfg.ring_header_section_offset,
+                                &dma->header_mmio);
+    for (int i = 0; i < dma->cfg.num_ring_offsets; ++i) {
+        g_autofree char *mr_name = g_strdup_printf("%s-dma-%d-mmio",
+                                                   TYPE_MIPI_HCI, i);
+        memory_region_init_io(&dma->rh_mmio[i], OBJECT(s), &hci_dma_ops, s,
+                              mr_name, HCI_DMA_NUM_REGS * sizeof(uint32_t));
+        memory_region_add_subregion(&s->iomem, dma->cfg.ring_offsets[i],
+                                    &dma->rh_mmio[i]);
+    }
 
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
     s->bus = i3c_init_bus(DEVICE(s), NULL);
@@ -65,6 +110,7 @@ static void mipi_hci_class_init(ObjectClass *klass, const void *data)
     rc->phases.enter = mipi_hci_enter_reset;
     dc->realize = mipi_hci_realize;
     dc->desc = "MIPI HCI I3C Controller";
+    device_class_set_props(dc, mipi_hci_properties);
 }
 
 static const TypeInfo mipi_hci_info = {
