@@ -170,9 +170,30 @@ static void hci_dma_rh_operation1_w(HCIDMAState *s, uint32_t val)
     }
 }
 
+static void hci_dma_rh_intr_status_w(MIPIHCIState *hci, uint32_t val)
+{
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    hci->dma.regs[R_RH_INTR_STATUS] &= ~val; /* W1C */
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
+}
+
+static void hci_dma_rh_intr_force_w(MIPIHCIState *hci, uint32_t val)
+{
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    /*
+     * Set the interrupt status. If it's not masked, it will be cleared during
+     * IRQ updating.
+     */
+    hci->dma.regs[R_RH_INTR_STATUS] = val;
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
+}
+
 void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
-    HCIDMAState *s = &(MIPI_HCI(opaque)->dma);
+    MIPIHCIState *hci = MIPI_HCI(opaque);
+    HCIDMAState *s = &hci->dma;
     offset /= sizeof(*s->regs);
 
     /* MMIO region size should prevent this from happening. */
@@ -187,6 +208,12 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
         break;
     case R_RH_OPERATION1:
         hci_dma_rh_operation1_w(s, val32);
+        break;
+    case R_RH_INTR_STATUS:
+        hci_dma_rh_intr_status_w(hci, val32);
+        break;
+    case R_RH_INTR_FORCE:
+        hci_dma_rh_intr_force_w(hci, val32);
         break;
     default:
         s->regs[offset] = val32;
