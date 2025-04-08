@@ -13,5 +13,6 @@
 
 uint64_t hci_dat_read(void *opaque, hwaddr offset, unsigned size);
 void hci_dat_write(void *opaque, hwaddr offset, uint64_t value, unsigned size);
+void hci_dat_reset(HCIDATState *s, uint32_t num_regs);
 
 #endif  /* HCI_DAT_INTERNAL_H_ */

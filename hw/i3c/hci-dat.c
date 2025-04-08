@@ -21,6 +21,11 @@
 
 #define TARGET_DAT_RO_MASK 0x1ff80f80
 
+void hci_dat_reset(HCIDATState *s, uint32_t num_regs)
+{
+    memset(&s->regs, 0, num_regs * sizeof(s->regs[0]) * HCI_DAT_ENTRY_SIZE);
+}
+
 uint64_t hci_dat_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIDATState *s = &(MIPI_HCI(opaque)->dat);

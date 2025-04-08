@@ -49,6 +49,10 @@ void hci_core_reset(HCICoreState *s)
                      s->cfg.ring_header_section_offset);
     ARRAY_FIELD_DP32(s->regs, EXT_CAPS_SECTION_OFFSET,
                      EXT_CAPS_SECTION_OFFSET, s->cfg.ext_caps_section_offset);
+    ARRAY_FIELD_DP32(s->regs, DAT_SECTION_OFFSET, DAT_TABLE_OFFSET,
+                     s->cfg.dat_table_offset);
+    ARRAY_FIELD_DP32(s->regs, DAT_SECTION_OFFSET, DAT_TABLE_SIZE,
+                     s->cfg.dat_table_size);
 }
 
 uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)
