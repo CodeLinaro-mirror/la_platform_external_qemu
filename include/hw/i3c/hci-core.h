@@ -10,6 +10,10 @@
 #define HCI_CORE_H
 
 #include "hw/core/registerfields.h"
+#include "system/memory.h"
+
+#define HCI_CORE_MMIO_OFFSET 0x0
+#define HCI_CORE_NUM_REGS 27
 
 REG32(HCI_VERSION, 0x00)
 REG32(HC_CONTROL, 0x04)
@@ -90,5 +94,11 @@ REG32(IBI_NOTIFY_CTRL, 0x58)
 REG32(DEV_CTX_BASE_LO, 0x60)
 REG32(DEV_CTX_BASE_HI, 0x64)
 REG32(DEV_CTX_SG, 0x68)
+
+typedef struct HCICoreState {
+    uint32_t regs[HCI_CORE_NUM_REGS];
+
+    MemoryRegion iomem;
+} HCICoreState;
 
 #endif /* HCI_CORE_H */
