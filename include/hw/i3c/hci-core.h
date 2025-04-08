@@ -105,6 +105,9 @@ typedef struct HCICoreState {
         uint32_t dat_table_offset;
         uint32_t dct_table_size;
         uint32_t dct_table_offset;
+        uint32_t hci_version;
+        uint32_t hc_capabilities;
+        uint32_t int_ctrl_cmds_en;
     } cfg;
 
     MemoryRegion iomem;

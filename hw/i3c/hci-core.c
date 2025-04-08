@@ -57,6 +57,9 @@ void hci_core_reset(HCICoreState *s)
                      s->cfg.dct_table_offset);
     ARRAY_FIELD_DP32(s->regs, DCT_SECTION_OFFSET, DCT_TABLE_SIZE,
                      s->cfg.dct_table_size);
+    s->regs[R_HCI_VERSION] = s->cfg.hci_version;
+    s->regs[R_HC_CAPABILITIES] = s->cfg.hc_capabilities;
+    s->regs[R_INT_CTRL_CMDS_EN] = s->cfg.int_ctrl_cmds_en;
 }
 
 uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)

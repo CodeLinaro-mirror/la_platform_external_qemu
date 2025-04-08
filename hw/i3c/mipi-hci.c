@@ -107,6 +107,12 @@ static const Property mipi_hci_properties[] = {
                         0),
     DEFINE_PROP_UINT32("dct-table-offset", MIPIHCIState,
                         core.cfg.dct_table_offset, 0),
+    DEFINE_PROP_UINT32("hci-version", MIPIHCIState,
+                       core.cfg.hci_version, 0),
+    DEFINE_PROP_UINT32("hc-capabilities", MIPIHCIState,
+                       core.cfg.hc_capabilities, 0),
+    DEFINE_PROP_UINT32("int-ctrl-cmds-en", MIPIHCIState,
+                        core.cfg.int_ctrl_cmds_en, 0),
 };
 
 static void mipi_hci_realize(DeviceState *dev, Error **errp)
