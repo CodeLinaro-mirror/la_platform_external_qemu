@@ -68,6 +68,8 @@ void hci_core_reset(HCICoreState *s)
     s->regs[R_HCI_VERSION] = s->cfg.hci_version;
     s->regs[R_HC_CAPABILITIES] = s->cfg.hc_capabilities;
     s->regs[R_INT_CTRL_CMDS_EN] = s->cfg.int_ctrl_cmds_en;
+    /* We only support 1 controller per bus, so this is always true. */
+    ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CURRENT_CONTROLLER, 1);
 
     s->halted = false;
 }
