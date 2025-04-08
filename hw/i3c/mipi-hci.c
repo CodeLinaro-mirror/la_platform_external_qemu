@@ -15,6 +15,8 @@
 #include "hci-core-internal.h"
 #include "hw/i3c/hci-dma.h"
 #include "hci-dma-internal.h"
+#include "hw/i3c/hci-ext.h"
+#include "hci-ext-internal.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/mipi-hci.h"
@@ -50,6 +52,16 @@ static const MemoryRegionOps hci_dma_header_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+static const MemoryRegionOps hci_ext_caps_ops = {
+    .read = hci_ext_read,
+    .write = hci_ext_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
 static void mipi_hci_instance_init(Object *obj)
 {
 }
@@ -60,6 +72,11 @@ static const Property mipi_hci_properties[] = {
     DEFINE_PROP_ARRAY("ring-offsets", MIPIHCIState,
                       dma.cfg.num_ring_offsets, dma.cfg.ring_offsets,
                       qdev_prop_uint32, uint32_t),
+    DEFINE_PROP_ARRAY("ext-capabilities", MIPIHCIState,
+                      ext_cap.num_ext_capabilities, ext_cap.ext_capabilities,
+                      qdev_prop_uint32, uint32_t),
+    DEFINE_PROP_UINT32("ext-caps-section-offset", MIPIHCIState,
+                       core.cfg.ext_caps_section_offset, 0),
 };
 
 static void mipi_hci_realize(DeviceState *dev, Error **errp)
@@ -67,6 +84,7 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
     MIPIHCIState *s = MIPI_HCI(dev);
     HCICoreState *core = &s->core;
     HCIDMAState *dma = &s->dma;
+    HCIExtCapState *ext_caps = &s->ext_cap;
 
     memory_region_init(&s->iomem, OBJECT(s), TYPE_MIPI_HCI"-mmio",
                        MIPI_HCI_MMIO_SIZE);
@@ -90,6 +108,12 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
         memory_region_add_subregion(&s->iomem, dma->cfg.ring_offsets[i],
                                     &dma->rh_mmio[i]);
     }
+    memory_region_init_io(&ext_caps->mmio, OBJECT(s), &hci_ext_caps_ops, s,
+                                 TYPE_MIPI_HCI"-ext-caps-mmio",
+                                 ext_caps->num_ext_capabilities *
+                                 sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem, core->cfg.ext_caps_section_offset,
+                                        &ext_caps->mmio);
 
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
     s->bus = i3c_init_bus(DEVICE(s), NULL);

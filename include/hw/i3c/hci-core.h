@@ -100,6 +100,7 @@ typedef struct HCICoreState {
 
     struct {
         uint32_t ring_header_section_offset;
+        uint32_t ext_caps_section_offset;
     } cfg;
 
     MemoryRegion iomem;

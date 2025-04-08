@@ -13,6 +13,7 @@
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/hci-core.h"
 #include "hw/i3c/hci-dma.h"
+#include "hw/i3c/hci-ext.h"
 
 #define TYPE_MIPI_HCI "mipi.hci"
 OBJECT_DECLARE_TYPE(MIPIHCIState, MIPIHCIClass, MIPI_HCI)
@@ -28,6 +29,7 @@ typedef struct MIPIHCIState {
 
     HCICoreState core;
     HCIDMAState dma;
+    HCIExtCapState ext_cap;
 
     MemoryRegion iomem;
     I3CBus *bus;
