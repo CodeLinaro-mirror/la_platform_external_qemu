@@ -18,4 +18,6 @@ void hci_dma_header_write(void *opaque, hwaddr offset, uint64_t value,
 uint64_t hci_dma_read(void *opaque, hwaddr offset, unsigned size);
 void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size);
 
+void hci_dma_reset(HCIDMAState *s);
+
 #endif  /* HCI_DMA_INTERNAL_H_ */

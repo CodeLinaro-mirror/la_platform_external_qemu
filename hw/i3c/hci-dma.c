@@ -37,6 +37,17 @@ static const uint32_t hci_dma_ro_mask[HCI_DMA_NUM_REGS] = {
     [R_RH_OPERATION2]         = 0xffffffff,
 };
 
+void hci_dma_reset(HCIDMAState *s)
+{
+    /* Header */
+    s->header_regs[R_RHS_CONTROL] = 0x02050010;
+    for (int i = 0; i < s->cfg.num_ring_offsets; ++i) {
+        s->header_regs[R_RH0_OFFSET + i] = s->cfg.ring_offsets[i];
+    }
+    /* Ring status */
+    memset(s->regs, 0, sizeof(s->regs));
+}
+
 uint64_t hci_dma_header_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIDMAState *s = &(MIPI_HCI(opaque)->dma);

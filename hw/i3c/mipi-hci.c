@@ -100,6 +100,7 @@ static void mipi_hci_enter_reset(Object *obj, ResetType type)
     MIPIHCIState *s = MIPI_HCI(obj);
 
     hci_core_reset(&s->core);
+    hci_dma_reset(&s->dma);
 }
 
 static void mipi_hci_class_init(ObjectClass *klass, const void *data)

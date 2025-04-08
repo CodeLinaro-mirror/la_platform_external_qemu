@@ -44,6 +44,9 @@ static const uint32_t hci_core_ro_mask[HCI_CORE_NUM_REGS] = {
 void hci_core_reset(HCICoreState *s)
 {
     memset(&s->regs, 0, sizeof(s->regs));
+    ARRAY_FIELD_DP32(s->regs, RING_HEADERS_SECTION_OFFSET,
+                     RING_HEADER_SECTION_OFFSET,
+                     s->cfg.ring_header_section_offset);
 }
 
 uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)
