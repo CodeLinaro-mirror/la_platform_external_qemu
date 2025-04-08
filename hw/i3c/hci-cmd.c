@@ -316,50 +316,57 @@ done:
     return status;
 }
 
-static RespStatus hci_cmd_i3c_start_xfer(MIPIHCIState *hci,
-                                         const RegularXfer *desc)
+static RespStatus hci_cmd_i3c_start_xfer(MIPIHCIState *hci, uint8_t addr,
+                                         bool rnw)
+{
+    /* Start with a broadcast if they configured it. */
+    if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, IBA_INCLUDE)) {
+        if (i3c_start_transfer(hci->bus, I3C_BROADCAST, rnw)) {
+            return RESP_STATUS_ERROR_ADDR_HEADER;
+        }
+    }
+
+    if (i3c_start_transfer(hci->bus, addr, rnw)) {
+        return RESP_STATUS_ERROR_NACK;
+    }
+    return RESP_STATUS_SUCCESS;
+}
+
+static RespStatus hci_cmd_regular_i3c_start_xfer(MIPIHCIState *hci,
+                                                 const RegularXfer *desc)
 {
     MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
     uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
     uint8_t addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
 
-    /* Start with a broadcast if they configured it. */
-    if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, IBA_INCLUDE)) {
-        if (i3c_start_transfer(hci->bus, I3C_BROADCAST, desc->rnw)) {
-            return RESP_STATUS_ERROR_ADDR_HEADER;
-        }
-    }
+    return hci_cmd_i3c_start_xfer(hci, addr, desc->rnw);
+}
 
-    if (i3c_start_transfer(hci->bus, addr, desc->rnw)) {
+static RespStatus hci_cmd_i2c_start_xfer(MIPIHCIState *hci, uint8_t addr,
+                                         bool rnw)
+{
+    if (legacy_i2c_start_transfer(hci->bus, addr, rnw)) {
         return RESP_STATUS_ERROR_NACK;
     }
     return RESP_STATUS_SUCCESS;
 }
 
-static int hci_cmd_i2c_start_xfer(MIPIHCIState *hci, const RegularXfer *desc)
+static RespStatus hci_cmd_regular_i2c_start_xfer(MIPIHCIState *hci,
+                                          const RegularXfer *desc)
 {
     uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
     uint8_t addr = FIELD_EX32(hci->dat.regs[dat_offset + R_TARGET_DAT],
                               TARGET_DAT, TARGET_STATIC_ADDRESS);
 
-    if (legacy_i2c_start_transfer(hci->bus, addr, desc->rnw)) {
-        return RESP_STATUS_ERROR_NACK;
-    }
-    return RESP_STATUS_SUCCESS;
+    return hci_cmd_i2c_start_xfer(hci, addr, desc->rnw);
 }
 
-static RespStatus hci_cmd_i2c_send_data(MIPIHCIState *hci,
-                                        const RegularXfer *desc,
-                                        RespDescr *resp, const uint8_t *data,
-                                        size_t len)
+static RespStatus hci_cmd_i2c_send_data(MIPIHCIState *hci, RespDescr *resp,
+                                        const uint8_t *data, size_t len,
+                                        bool toc)
 {
+    RespStatus status = RESP_STATUS_SUCCESS;
     uint32_t num_sent = 0;
-
-    /* Address the target and send the data. */
-    RespStatus status = hci_cmd_i2c_start_xfer(hci, desc);
-    if (status != RESP_STATUS_SUCCESS) {
-        goto done;
-    }
 
     for (num_sent = 0; num_sent < len; ++num_sent) {
         if (legacy_i2c_send(hci->bus, data[num_sent])) {
@@ -368,50 +375,68 @@ static RespStatus hci_cmd_i2c_send_data(MIPIHCIState *hci,
         }
     }
 
-done:
-    if (desc->toc) {
+    if (toc) {
         legacy_i2c_end_transfer(hci->bus);
     }
     resp->resp.length = len - num_sent;
     return status;
 }
 
-static RespStatus hci_cmd_i3c_send_data(MIPIHCIState *hci,
-                                        const RegularXfer *desc,
-                                        RespDescr *resp, const uint8_t *data,
-                                        size_t len)
+static RespStatus hci_cmd_regular_i2c_send_data(MIPIHCIState *hci,
+                                                const RegularXfer *desc,
+                                                RespDescr *resp,
+                                                const uint8_t *data,
+                                                size_t len)
 {
-    uint32_t num_sent = 0;
-
-    /* Address the target and send the data. */
-    RespStatus status = hci_cmd_i3c_start_xfer(hci, desc);
+    RespStatus status = hci_cmd_regular_i2c_start_xfer(hci, desc);
     if (status != RESP_STATUS_SUCCESS) {
-        goto done;
+        return status;
     }
+    return hci_cmd_i2c_send_data(hci, resp, data, len, desc->toc);
+}
+
+static RespStatus hci_cmd_i3c_send_data(MIPIHCIState *hci,
+                                        RespDescr *resp, const uint8_t *data,
+                                        size_t len, bool toc)
+{
+    RespStatus status = RESP_STATUS_SUCCESS;
+    uint32_t num_sent = 0;
 
     if (i3c_send(hci->bus, data, len, &num_sent)) {
         status = RESP_STATUS_ERROR_XFER_ABORTED;
     }
 
-done:
-    if (desc->toc) {
+    if (toc) {
         i3c_end_transfer(hci->bus);
     }
     resp->resp.length = len - num_sent;
     return status;
 }
 
-static RespStatus hci_cmd_send_data(MIPIHCIState *hci, const RegularXfer *desc,
-                                     RespDescr *resp, const uint8_t *data,
-                                     size_t len)
+static RespStatus hci_cmd_regular_i3c_send_data(MIPIHCIState *hci,
+                                        const RegularXfer *desc,
+                                        RespDescr *resp, const uint8_t *data,
+                                        size_t len)
+{
+    RespStatus status = hci_cmd_regular_i3c_start_xfer(hci, desc);
+    if (status != RESP_STATUS_SUCCESS) {
+        return status;
+    }
+    return hci_cmd_i3c_send_data(hci, resp, data, len, desc->toc);
+}
+
+static RespStatus hci_cmd_regular_send_data(MIPIHCIState *hci,
+                                            const RegularXfer *desc,
+                                            RespDescr *resp,
+                                            const uint8_t *data, size_t len)
 {
     uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
 
     if (FIELD_EX32(hci->dat.regs[dat_offset + R_TARGET_DAT], TARGET_DAT,
                    TARGET_DEVICE)) {
-        return hci_cmd_i2c_send_data(hci, desc, resp, data, len);
+        return hci_cmd_regular_i2c_send_data(hci, desc, resp, data, len);
     }
-    return hci_cmd_i3c_send_data(hci, desc, resp, data, len);
+    return hci_cmd_regular_i3c_send_data(hci, desc, resp, data, len);
 }
 
 RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
@@ -434,7 +459,7 @@ RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
     if (desc->cp) {
         status = hci_cmd_regular_send_ccc(hci, desc, resp, data, len);
     } else {
-        status = hci_cmd_send_data(hci, desc, resp, data, len);
+        status = hci_cmd_regular_send_data(hci, desc, resp, data, len);
     }
 
 done:
@@ -451,7 +476,7 @@ static RespStatus hci_cmd_i2c_read_data(MIPIHCIState *hci,
 {
     *num_read = 0;
 
-    RespStatus status = hci_cmd_i2c_start_xfer(hci, desc);
+    RespStatus status = hci_cmd_regular_i2c_start_xfer(hci, desc);
     if (status != RESP_STATUS_SUCCESS) {
         goto done;
     }
@@ -475,7 +500,7 @@ static RespStatus hci_cmd_i3c_read_data(MIPIHCIState *hci,
 {
     *num_read = 0;
 
-    RespStatus status = hci_cmd_i3c_start_xfer(hci, desc);
+    RespStatus status = hci_cmd_regular_i3c_start_xfer(hci, desc);
     if (status != RESP_STATUS_SUCCESS) {
         goto done;
     }
@@ -577,6 +602,67 @@ static RespStatus hci_cmd_immediate_send_ccc(MIPIHCIState *hci,
     return status;
 }
 
+static RespStatus hci_cmd_i2c_immediate_start_xfer(MIPIHCIState *hci,
+                                             const ImmediateXfer *desc)
+{
+    uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
+    uint8_t addr = FIELD_EX32(hci->dat.regs[dat_offset + R_TARGET_DAT],
+                              TARGET_DAT, TARGET_STATIC_ADDRESS);
+
+    return hci_cmd_i2c_start_xfer(hci, addr, desc->rnw);
+}
+
+static RespStatus hci_cmd_immediate_i2c_send_data(MIPIHCIState *hci,
+                                                  const ImmediateXfer *desc,
+                                                  RespDescr *resp,
+                                                  const uint8_t *data,
+                                                  size_t len)
+{
+    RespStatus status = hci_cmd_i2c_immediate_start_xfer(hci, desc);
+    if (status != RESP_STATUS_SUCCESS) {
+        return status;
+    }
+    return hci_cmd_i2c_send_data(hci, resp, data, len, desc->toc);
+}
+
+static RespStatus hci_cmd_i3c_immediate_start_xfer(MIPIHCIState *hci,
+                                             const ImmediateXfer *desc)
+{
+    MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
+    uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
+    uint8_t addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
+
+    return hci_cmd_i3c_start_xfer(hci, addr, desc->rnw);
+}
+
+static RespStatus hci_cmd_immediate_i3c_send_data(MIPIHCIState *hci,
+                                                  const ImmediateXfer *desc,
+                                                  RespDescr *resp,
+                                                  const uint8_t *data,
+                                                  size_t len)
+{
+    RespStatus status = hci_cmd_i3c_immediate_start_xfer(hci, desc);
+    if (status != RESP_STATUS_SUCCESS) {
+        return status;
+    }
+    return hci_cmd_i3c_send_data(hci, resp, data, len, desc->toc);
+}
+
+static RespStatus hci_cmd_immediate_send_data(MIPIHCIState *hci,
+                                              const ImmediateXfer *desc,
+                                              RespDescr *resp,
+                                              const uint8_t *data,
+                                              size_t len)
+{
+    uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
+
+    if (FIELD_EX32(hci->dat.regs[dat_offset + R_TARGET_DAT], TARGET_DAT,
+                   TARGET_DEVICE)) {
+        return hci_cmd_immediate_i2c_send_data(hci, desc, resp, data, len);
+    }
+    return hci_cmd_immediate_i3c_send_data(hci, desc, resp, data, len);
+}
+
 RespStatus hci_cmd_immediate_xfer(MIPIHCIState *hci, const ImmediateXfer *desc,
                                   RespDescr *resp)
 {
@@ -599,7 +685,8 @@ RespStatus hci_cmd_immediate_xfer(MIPIHCIState *hci, const ImmediateXfer *desc,
         status = hci_cmd_immediate_send_ccc(hci, desc, resp, desc->data,
                                             DTT_TO_LEN(desc->dtt));
     } else {
-        /* TODO: Implement immediate transfers. */
+        status = hci_cmd_immediate_send_data(hci, desc, resp, desc->data,
+                                             DTT_TO_LEN(desc->dtt));
     }
 
 done:
