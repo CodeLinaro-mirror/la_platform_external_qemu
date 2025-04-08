@@ -460,11 +460,38 @@ static void ast27xx_i3c_init_ext_capabilities(AST27xxI3CState *s)
     qdev_prop_set_array(DEVICE(hci), "ext-capabilities", ext_capabilities);
 }
 
+static void ast27xx_i3c_init_ring_headers(AST27xxI3CState *s)
+{
+    QList *ring_offsets = qlist_new();
+    qlist_append_int(ring_offsets, 0x830);
+
+    MIPIHCIState *hci = MIPI_HCI(s);
+    qdev_prop_set_array(DEVICE(hci), "ring-offsets", ring_offsets);
+}
+
 static void ast27xx_i3c_instance_init(Object *obj)
 {
     AST27xxI3CState *s = AST27XX_I3C(obj);
+    DeviceState *dev = DEVICE(obj);
 
     ast27xx_i3c_init_ext_capabilities(s);
+    ast27xx_i3c_init_ring_headers(s);
+
+    /* Values  from AST2750-A1 datasheet. */
+    qdev_prop_set_uint32(dev, "hc-capabilities", 0x0468);
+    qdev_prop_set_uint32(dev, "dat-table-offset", 0x0100);
+    qdev_prop_set_uint32(dev, "dat-table-size", 0x7f);
+    qdev_prop_set_uint32(dev, "dct-table-offset", 0x0500);
+    qdev_prop_set_uint32(dev, "dct-table-size", 0x01);
+    qdev_prop_set_uint32(dev, "ext-caps-section-offset", 0x0f00);
+    qdev_prop_set_uint32(dev, "hci-version", 0x0110);
+    qdev_prop_set_uint32(dev, "int-ctrl-cmds-en", 0x3f);
+    qdev_prop_set_uint32(dev, "ring-header-section-offset", 0x0800);
+    qdev_prop_set_uint32(dev, "preamble-size", 0x02);
+    qdev_prop_set_uint32(dev, "header-size", 0x05);
+    qdev_prop_set_uint32(dev, "xfer-struct-size", 0x14);
+    qdev_prop_set_uint32(dev, "resp-struct-size", 0x04);
+    qdev_prop_set_uint32(dev, "ibi-stat", 0x04);
 }
 
 static void ast27xx_i3c_realize(DeviceState *dev, Error **errp)
