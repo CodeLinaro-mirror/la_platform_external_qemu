@@ -1,4 +1,4 @@
-/*
+      /*
  * MIPI HCI I3C controller commands
  *
  * Copyright (C) 2025 Google, LLC
@@ -213,13 +213,13 @@ done:
     return status;
 }
 
-static RespStatus hci_cmd_start_ccc(MIPIHCIState *hci, const RegularXfer *desc)
+/*
+ * addr is optional in a broadcast CCC, and def_byte is optional if there's no
+ * defining byte present (dbp == false).
+ */
+static RespStatus hci_cmd_start_ccc(MIPIHCIState *hci, uint8_t addr,
+                                    uint8_t ccc, bool dbp, uint8_t def_byte)
 {
-    MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
-    uint8_t ccc = desc->cmd;
-    uint8_t addr = 0;
-    uint16_t dat_offset = 0;
-
     /* Start the CCC, both direct and broadcast start with a broadcast. */
     if (i3c_start_send(hci->bus, I3C_BROADCAST)) {
         return RESP_STATUS_ERROR_ADDR_HEADER;
@@ -227,16 +227,14 @@ static RespStatus hci_cmd_start_ccc(MIPIHCIState *hci, const RegularXfer *desc)
     if (i3c_send_byte(hci->bus, ccc)) {
         return RESP_STATUS_ERROR_XFER_ABORTED;
     }
-    if (desc->dbp) {
-        if (i3c_send_byte(hci->bus, desc->def_byte)) {
+    if (dbp) {
+        if (i3c_send_byte(hci->bus, def_byte)) {
             return RESP_STATUS_ERROR_XFER_ABORTED;
         }
     }
 
     /* If we're doing a direct CCC, reSTART and address the target. */
     if (CCC_IS_DIRECT(ccc)) {
-        dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
-        addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
         if (i3c_start_send(hci->bus, addr)) {
             return RESP_STATUS_ERROR_XFER_ABORTED;
         }
@@ -245,27 +243,53 @@ static RespStatus hci_cmd_start_ccc(MIPIHCIState *hci, const RegularXfer *desc)
     return RESP_STATUS_SUCCESS;
 }
 
-static RespStatus hci_cmd_send_ccc(MIPIHCIState *hci, const RegularXfer *desc,
+static RespStatus hci_cmd_send_ccc(MIPIHCIState *hci,
                                    RespDescr *resp, const uint8_t *data,
-                                   size_t len)
+                                   size_t len, bool toc)
 {
+    RespStatus status = RESP_STATUS_SUCCESS;
     uint32_t num_sent = 0;
-
-    RespStatus status = hci_cmd_start_ccc(hci, desc);
-    if (status != RESP_STATUS_SUCCESS) {
-        goto done;
-    }
 
     /* Now send the CCC data, if any. */
     if (i3c_send(hci->bus, data, len, &num_sent)) {
         status = RESP_STATUS_ERROR_XFER_ABORTED;
     }
 
-done:
-    if (desc->toc) {
+    if (toc) {
         i3c_end_transfer(hci->bus);
     }
     resp->resp.length = len - num_sent;
+    return status;
+}
+
+static RespStatus hci_cmd_regular_start_ccc(MIPIHCIState *hci,
+                                            const RegularXfer *desc)
+{
+    MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
+    uint8_t ccc = desc->cmd;
+    uint8_t addr = 0;
+
+    if (CCC_IS_DIRECT(ccc)) {
+        uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
+        addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
+    }
+
+    return hci_cmd_start_ccc(hci, addr, ccc, desc->dbp, desc->def_byte);
+}
+
+
+static RespStatus hci_cmd_regular_send_ccc(MIPIHCIState *hci,
+                                        const RegularXfer *desc,
+                                        RespDescr *resp, const uint8_t *data,
+                                        size_t len)
+{
+    RespStatus status = hci_cmd_regular_start_ccc(hci, desc);
+
+    if (status == RESP_STATUS_SUCCESS) {
+        status = hci_cmd_send_ccc(hci, resp, data, len, desc->toc);
+    } else {
+        resp->resp.length = len;
+    }
     return status;
 }
 
@@ -275,7 +299,7 @@ static RespStatus hci_cmd_read_ccc(MIPIHCIState *hci, const RegularXfer *desc,
 {
     *num_read = 0;
 
-    RespStatus status = hci_cmd_start_ccc(hci, desc);
+    RespStatus status = hci_cmd_regular_start_ccc(hci, desc);
     if (status != RESP_STATUS_SUCCESS) {
         goto done;
     }
@@ -288,7 +312,7 @@ done:
     if (desc->toc) {
         i3c_end_transfer(hci->bus);
     }
-    resp->resp.length = len - *num_read;
+    resp->resp.length = *num_read;
     return status;
 }
 
@@ -297,7 +321,7 @@ static RespStatus hci_cmd_i3c_start_xfer(MIPIHCIState *hci,
 {
     MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
     uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
-    uint8_t addr = mhc->get_next_dynamic_addr(hci, dat_offset);
+    uint8_t addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
 
     /* Start with a broadcast if they configured it. */
     if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, IBA_INCLUDE)) {
@@ -408,7 +432,7 @@ RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
     }
 
     if (desc->cp) {
-        status = hci_cmd_send_ccc(hci, desc, resp, data, len);
+        status = hci_cmd_regular_send_ccc(hci, desc, resp, data, len);
     } else {
         status = hci_cmd_send_data(hci, desc, resp, data, len);
     }
@@ -440,7 +464,7 @@ done:
     if (desc->toc) {
         legacy_i2c_end_transfer(hci->bus);
     }
-    resp->resp.length = len - *num_read;
+    resp->resp.length = *num_read;
     return status;
 }
 
@@ -471,7 +495,7 @@ done:
     if (desc->toc) {
         i3c_end_transfer(hci->bus);
     }
-    resp->resp.length = len - *num_read;
+    resp->resp.length = *num_read;
     return status;
 }
 
@@ -509,6 +533,73 @@ RespStatus hci_cmd_read(MIPIHCIState *hci, const RegularXfer *desc,
         status = hci_cmd_read_ccc(hci, desc, resp, data, len, num_read);
     } else {
         status = hci_cmd_read_data(hci, desc, resp, data, len, num_read);
+    }
+
+done:
+    resp->resp.tid = desc->tid;
+    resp->resp.err = status;
+
+    return status;
+}
+
+static RespStatus hci_cmd_immediate_start_ccc(MIPIHCIState *hci,
+                                              const ImmediateXfer *desc)
+{
+    MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
+    uint8_t ccc = desc->cmd;
+    uint8_t addr = 0;
+
+    if (CCC_IS_DIRECT(ccc)) {
+        uint16_t dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
+        addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
+    }
+
+    return hci_cmd_start_ccc(hci, addr, ccc, DTT_HAS_DBP(desc->dtt),
+                             desc->data[0]);
+}
+
+static RespStatus hci_cmd_immediate_send_ccc(MIPIHCIState *hci,
+                                             const ImmediateXfer *desc,
+                                             RespDescr *resp,
+                                             const uint8_t *data,
+                                             size_t len)
+{
+    RespStatus status = hci_cmd_immediate_start_ccc(hci, desc);
+    if (status != RESP_STATUS_SUCCESS) {
+        return status;
+    }
+
+    if (status == RESP_STATUS_SUCCESS) {
+        status = hci_cmd_send_ccc(hci, resp, data, len, desc->toc);
+    } else {
+        resp->resp.length = len;
+    }
+    return status;
+}
+
+RespStatus hci_cmd_immediate_xfer(MIPIHCIState *hci, const ImmediateXfer *desc,
+                                  RespDescr *resp)
+{
+    RespStatus status = RESP_STATUS_SUCCESS;
+
+    /* This is an internal error, the caller passed in bad arguments. */
+    if (desc->cmd_attr != CMD_ATTR_IMMEDIATE_XFER) {
+        status = RESP_STATUS_ERROR_HC_ABORTED;
+        resp->resp.length = DTT_TO_LEN(desc->dtt);
+        goto done;
+    }
+    /* We only support SDR, also immediate transfers cannot be reads. */
+    if (desc->mode > TRANSFER_MODE_SDR4 || desc->rnw) {
+        status = RESP_STATUS_ERROR_NOT_SUPPORTED;
+        resp->resp.length = DTT_TO_LEN(desc->dtt);
+        goto done;
+    }
+
+    if (desc->cp) {
+        status = hci_cmd_immediate_send_ccc(hci, desc, resp, desc->data,
+                                            DTT_TO_LEN(desc->dtt));
+    } else {
+        /* TODO: Implement immediate transfers. */
     }
 
 done:

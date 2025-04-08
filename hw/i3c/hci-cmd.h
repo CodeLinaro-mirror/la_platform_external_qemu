@@ -11,6 +11,14 @@
 
 #include "hw/i3c/mipi-hci.h"
 
+/*
+ * Immediate transfer length is equal to DTT, unless DTT > 4.
+ * If DTT > 4, the length becomes (1 + (dtt & 3)), since DTT > 4 means that the
+ * first byte in the immediate transfer is the defining byte.
+ */
+#define DTT_TO_LEN(dtt) ((dtt) > 4 ? ((dtt) - 4) : (dtt))
+#define DTT_HAS_DBP(dtt) ((dtt) > 4)
+
 typedef enum {
   CMD_ATTR_REGULAR_XFER = 0x00,
   CMD_ATTR_IMMEDIATE_XFER = 0x01,
@@ -155,5 +163,8 @@ RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
 RespStatus hci_cmd_read(MIPIHCIState *hci, const RegularXfer *desc,
                         RespDescr *resp, uint8_t *data, uint32_t len,
                         uint32_t *num_read);
+
+RespStatus hci_cmd_immediate_xfer(MIPIHCIState *hci, const ImmediateXfer *desc,
+                                  RespDescr *resp);
 
 #endif  /* HCI_CMD_H */

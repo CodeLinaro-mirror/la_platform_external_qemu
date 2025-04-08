@@ -243,9 +243,13 @@ static void hci_dma_xfer(MIPIHCIState *hci)
             status = hci_dma_regular_xfer(hci, &desc, &resp);
             roc = desc.cmd.regular_xfer.roc;
             break;
+        case CMD_ATTR_IMMEDIATE_XFER:
+            status = hci_cmd_immediate_xfer(hci, &desc.cmd.immediate_xfer,
+                                            &resp);
+            roc = desc.cmd.immediate_xfer.roc;
+            break;
         case CMD_ATTR_INTERNAL_CONTROL:
         case CMD_ATTR_COMBO_XFER:
-        case CMD_ATTR_IMMEDIATE_XFER:
             {
                 g_autofree char *path = object_get_canonical_path(OBJECT(hci));
                 qemu_log_mask(LOG_UNIMP, "%s: Unimplemented command 0x%x\n",
