@@ -239,6 +239,78 @@ static const uint32_t ast27xx_i3c_ctrl_ro_mask[AST27XX_I3C_CTRL_NUM_REGS] = {
     [R_I3C_IBI_TIMEOUT_F8]     = 0xfffe0000,
 };
 
+static const uint32_t ast27xx_i3c_ctrl_reset[AST27XX_I3C_CTRL_NUM_REGS] = {
+    [R_I3C_CONTROL_0]      = 0x00002400,
+    [R_I3C_AUTOCMD_0]      = 0x00008000,
+    [R_I3C_AUTOCMD_1]      = 0x00008000,
+    [R_I3C_AUTOCMD_2]      = 0x00008000,
+    [R_I3C_AUTOCMD_3]      = 0x00008000,
+    [R_I3C_AUTOCMD_4]      = 0x00008000,
+    [R_I3C_AUTOCMD_5]      = 0x00008000,
+    [R_I3C_AUTOCMD_6]      = 0x00008000,
+    [R_I3C_AUTOCMD_7]      = 0x00008000,
+    [R_I3C_WDMA_CTL_080]   = 0x03800000,
+    [R_I3C_RDMA_CTL_090]   = 0x03800000,
+    [R_I3C_SLV_CTL_0B0]    = 0x00010000,
+    [R_I3C_SLV_CTL_0B4]    = 0x00010070,
+    [R_I3C_SLV_CTL_0B8]    = 0x00800080,
+    [R_I3C_IBI_TIMEOUT_F8] = 0x00000160,
+};
+
+static const uint32_t ast27xx_i3c_phy_reset[AST27XX_I3C_PHY_NUM_REGS] = {
+    [R_I3C_PHY_EXT_CAP_OFFSET]                 = 0x00000100,
+    [R_I3C_PHY_SW_CTRL]                        = 0x00003737,
+    [R_I3C_PHY_CR_I2C_OD_FM_STA_STO_CNT]       = 0x00770103,
+    [R_I3C_PHY_CR_I2C_OD_FM_SCL_CNT]           = 0x00770103,
+    [R_I3C_PHY_CR_I2C_OD_FM_ACK_CNT]           = 0x00770103,
+    [R_I3C_PHY_CR_I2C_OD_FM_SDA_TRAN_CNT]      = 0x00010001,
+    [R_I3C_PHY_CR_I2C_OD_FMP_STA_STO_CNT]      = 0x00330063,
+    [R_I3C_PHY_CR_I2C_OD_FMP_SCL_CNT]          = 0x00330063,
+    [R_I3C_PHY_CR_I2C_OD_FMP_ACK_CNT]          = 0x00330063,
+    [R_I3C_PHY_CR_I2C_OD_FMP_SDA_TRAN_CNT]     = 0x00010001,
+    [R_I3C_PHY_CR_I3C_OD_STA_STO_CNT]          = 0x00070007,
+    [R_I3C_PHY_CR_I3C_OD_SCL_CNT]              = 0x00130027,
+    [R_I3C_PHY_CR_I3C_OD_ACK_CNT]              = 0x00130027,
+    [R_I3C_PHY_CR_I3C_OD_SDA_TRAN_CNT]         = 0x00010001,
+    [R_I3C_PHY_CR_I3C_SDR0_PP_SCL_CNT]         = 0x00070007,
+    [R_I3C_PHY_CR_I3C_SDR0_PP_TBIT_CNT]        = 0x00070007,
+    [R_I3C_PHY_CR_I3C_SDR0_PP_SDA_TRAN_CNT]    = 0x00010001,
+    [R_I3C_PHY_CR_I3C_SDR1_PP_SCL_CNT]         = 0x003b0040,
+    [R_I3C_PHY_CR_I3C_SDR1_PP_TBIT_CNT]        = 0x003b0040,
+    [R_I3C_PHY_CR_I3C_SDR1_PP_SDA_TRAN_CNT]    = 0x00010001,
+    [R_I3C_PHY_CR_I3C_SDR2_PP_SCL_CNT]         = 0x00500055,
+    [R_I3C_PHY_CR_I3C_SDR2_PP_TBIT_CNT]        = 0x00500055,
+    [R_I3C_PHY_CR_I3C_SDR2_PP_SDA_TRAN_CNT]    = 0x00010001,
+    [R_I3C_PHY_CR_I3C_SDR3_PP_SCL_CNT]         = 0x00f900f9,
+    [R_I3C_PHY_CR_I3C_SDR3_PP_TBIT_CNT]        = 0x007c007c,
+    [R_I3C_PHY_CR_I3C_SDR3_PP_SDA_TRAN_CNT]    = 0x00010001,
+    [R_I3C_PHY_CR_I3C_SDR4_PP_SCL_CNT]         = 0x00f900f9,
+    [R_I3C_PHY_CR_I3C_SDR4_PP_TBIT_CNT]        = 0x00f900f9,
+    [R_I3C_PHY_CR_I3C_SDR4_PP_SDA_TRAN_CNT]    = 0x00010001,
+    [R_I3C_PHY_CR_I3C_DDR_PP_SCL_CNT]          = 0x00070007,
+    [R_I3C_PHY_CR_I3C_DDR_PP_TBIT_CNT]         = 0x00070007,
+    [R_I3C_PHY_CR_I3C_DDR_PP_SDA_TRAN_CNT]     = 0x00010001,
+    [R_I3C_PHY_SR_P_PREPARE_SCL_SDA_CNT]       = 0x0004000b,
+    [R_I3C_PHY_CCR_TO_NCR_OVERLAP_CNT]         = 0x00000027,
+    [R_I3C_PHY_CR_IBI_ADDR_ACK_PROLONG_CNT]    = 0x00000004,
+    [R_I3C_PHY_TG_WR_ADDR_ACK_PROLONG]         = 0x00000011,
+    [R_I3C_PHY_DDR_CMD_HANDOFF_EARLY_TM_CNT]   = 0x00000407,
+    [R_I3C_PHY_CR_SCL_SDA_PULLUP_EN]           = 0x00770077,
+    [R_I3C_PHY_SPECIAL_PATTERN_SET]            = 0x08090909,
+    [R_I3C_PHY_SPECIAL_PATTERN_SW_OPT]         = 0x00000020,
+    [R_I3C_PHY_SPECIAL_PATTERN_SCL_TOGGLE_SET] = 0x00000003,
+    [R_I3C_PHY_SPECIAL_PATTERN_SCL_TOGGLE_PAT] = 0xffffffff,
+    [R_I3C_PHY_SPECIAL_PATTERN_SCL_TIEL_SET]   = 0x001e8480,
+    [R_I3C_PHY_SDA_DETECTOR_CNT0]              = 0x00130704,
+    [R_I3C_PHY_SDA_DETECTOR_CNT1]              = 0x090c00c7,
+    [R_I3C_PHY_SDA_DETECTOR_CNT2]              = 0x00630063,
+    [R_I3C_PHY_SDA_STUCK_SET1]                 = 0x75300708,
+    [R_I3C_PHY_PHY_OPTION]                     = 0x00000190,
+    [R_I3C_PHY_BUS_FREE_TIME_CNT]              = 0x00000006,
+    [R_I3C_PHY_SPECIAL_PATTERN_SET_ADDITIONAL] = 0x00c80109,
+    [R_I3C_PHY_BUS_CONTENTION_CHK0]            = 0x00000f90,
+};
+
 static uint64_t ast27xx_i3c_ctrl_read(void *opaque, hwaddr offset,
                                       unsigned size)
 {
@@ -334,10 +406,18 @@ static void ast27xx_i3c_realize(DeviceState *dev, Error **errp)
 
 static void ast27xx_i3c_enter_reset(Object *obj, ResetType type)
 {
+    AST27xxI3CState *s = AST27XX_I3C(obj);
     AST27xxI3CClass *aic = AST27XX_I3C_GET_CLASS(obj);
 
     if (aic->parent_phases.enter) {
         aic->parent_phases.enter(obj, type);
+    }
+
+    for (int i = 0; i < ARRAY_SIZE(s->ctrl_regs); i++) {
+        s->ctrl_regs[i] = ast27xx_i3c_ctrl_reset[i];
+    }
+    for (int i = 0; i < ARRAY_SIZE(s->phy_regs); i++) {
+        s->phy_regs[i] = ast27xx_i3c_phy_reset[i];
     }
 }
 
