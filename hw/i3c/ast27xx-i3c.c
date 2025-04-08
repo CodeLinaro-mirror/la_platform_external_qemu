@@ -17,6 +17,7 @@
 #include "qapi/error.h"
 #include "migration/vmstate.h"
 #include "hw/core/qdev.h"
+#include "hw/core/sysbus.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/core/irq.h"
@@ -497,26 +498,39 @@ static void ast27xx_i3c_instance_init(Object *obj)
 static void ast27xx_i3c_realize(DeviceState *dev, Error **errp)
 {
     AST27xxI3CState *s = AST27XX_I3C(dev);
+    AST27xxI3CClass *aic = AST27XX_I3C_GET_CLASS(dev);
+    SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
 
-    memory_region_init(&s->iomem, OBJECT(s), TYPE_AST27XX_I3C"-mmio",
-                       AST27XX_I3C_MMIO_SIZE);
+    Error *local_err = NULL;
+
+    aic->parent_realize(dev, &local_err);
+    if (local_err) {
+        error_propagate(errp, local_err);
+        return;
+    }
+
+
     memory_region_init_io(&s->ctrl_iomem, OBJECT(s), &ast27xx_i3c_ops, s,
                           TYPE_AST27XX_I3C"-ctrl-mmio",
                           AST27XX_I3C_CTRL_NUM_REGS * sizeof(uint32_t));
-    memory_region_add_subregion(&s->iomem, AST27XX_I3C_CTRL_OFFSET,
-                                &s->ctrl_iomem);
+    sysbus_init_mmio(sbd, &s->ctrl_iomem);
     memory_region_init_io(&s->phy_iomem, OBJECT(s), &ast27xx_i3c_phy_ops, s,
                           TYPE_AST27XX_I3C"-phy-mmio",
                           AST27XX_I3C_PHY_NUM_REGS * sizeof(uint32_t));
-    memory_region_add_subregion(&s->iomem, AST27XX_I3C_PHY_OFFSET,
-                                &s->phy_iomem);
-    memory_region_init_io(&s->ctrl_iomem, OBJECT(s), &ast27xx_i3c_dmaarb_ops, s,
-                          TYPE_AST27XX_I3C"-dmaarb-[*]",
+    sysbus_init_mmio(sbd, &s->phy_iomem);
+    memory_region_init_io(&s->dmaarb_iomem, OBJECT(s), &ast27xx_i3c_dmaarb_ops,
+                          s, TYPE_AST27XX_I3C"-dmaarb-mmio",
                           AST27XX_I3C_DMAARB_NUM_REGS * sizeof(uint32_t));
-    memory_region_add_subregion(&s->iomem, AST27XX_I3C_DMAARB_OFFSET,
-                                &s->dmaarb_iomem);
+    sysbus_init_mmio(sbd, &s->dmaarb_iomem);
 
-    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+    MemoryRegion *hci_mmio = sysbus_mmio_get_region(SYS_BUS_DEVICE(&s->parent),
+                                                    0);
+    memory_region_add_subregion(hci_mmio, AST27XX_I3C_CTRL_OFFSET,
+                                &s->ctrl_iomem);
+    memory_region_add_subregion(hci_mmio, AST27XX_I3C_PHY_OFFSET,
+                                &s->phy_iomem);
+    memory_region_add_subregion(hci_mmio, AST27XX_I3C_DMAARB_OFFSET,
+                                &s->dmaarb_iomem);
 }
 
 static void ast27xx_i3c_enter_reset(Object *obj, ResetType type)

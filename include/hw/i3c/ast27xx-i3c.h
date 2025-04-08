@@ -33,7 +33,6 @@ typedef struct AST27xxI3CState {
     uint32_t phy_regs[AST27XX_I3C_PHY_NUM_REGS];
     uint32_t dmaarb_regs[AST27XX_I3C_DMAARB_NUM_REGS];
 
-    MemoryRegion iomem;
     MemoryRegion phy_iomem;
     MemoryRegion ctrl_iomem;
     MemoryRegion dmaarb_iomem;
