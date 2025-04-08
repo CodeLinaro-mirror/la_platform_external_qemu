@@ -13,6 +13,7 @@
 #include "migration/vmstate.h"
 #include "hw/i3c/hci-core.h"
 #include "hci-core-internal.h"
+#include "hw/i3c/hci-dma.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/mipi-hci.h"
