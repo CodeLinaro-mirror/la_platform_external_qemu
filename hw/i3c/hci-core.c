@@ -46,7 +46,7 @@ static const uint32_t hci_core_ro_mask[HCI_CORE_NUM_REGS] = {
 
 bool hci_core_can_xfer(HCICoreState *s)
 {
-    return !s->halted;
+    return !s->halted && ARRAY_FIELD_EX32(s->regs, HC_CONTROL, ENABLE);
 }
 
 void hci_core_reset(HCICoreState *s)
