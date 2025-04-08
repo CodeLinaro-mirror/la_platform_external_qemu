@@ -91,6 +91,85 @@ uint64_t hci_dma_read(void *opaque, hwaddr offset, unsigned size)
     return s->regs[offset];
 }
 
+static bool hci_dma_ring_empty(HCIDMAState *s)
+{
+    return ARRAY_FIELD_EX32(s->regs, RH_OPERATION1, CR_ENQ_PTR) ==
+           ARRAY_FIELD_EX32(s->regs, RH_OPERATION2, CR_DEQ_PTR);
+}
+
+static bool hci_dma_can_xfer(HCIDMAState *s)
+{
+    return ARRAY_FIELD_EX32(s->regs, RH_STATUS, RING_ENABLED) &&
+           ARRAY_FIELD_EX32(s->regs, RH_STATUS, RING_RUNNING) &&
+           !ARRAY_FIELD_EX32(s->regs, RH_STATUS, RING_ABORTED);
+}
+
+static bool hci_dma_ring_ok(HCIDMAState *s)
+{
+    bool ok = !hci_dma_ring_empty(s) &&
+            (ARRAY_FIELD_EX32(s->regs, CR_SETUP, RING_SIZE) >= 2);
+
+    if (!ok) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: Attempted to start DMA transfer "
+                      "when the ring wasn't set up correctly.", __func__);
+    }
+    return ok;
+}
+
+static void hci_dma_xfer(HCIDMAState *s)
+{
+    if (!hci_dma_can_xfer(s) || !hci_dma_ring_ok(s)) {
+        return;
+    }
+
+    /* TODO: Read from the ring and execute transfers. */
+}
+
+static void hci_dma_rh_control_w(HCIDMAState *s, uint32_t val)
+{
+    uint32_t prev_val = s->regs[R_RH_CONTROL];
+    s->regs[R_RH_CONTROL] = val;
+
+    /* RH_CONTROL.ENABLED transitioning from 0 to 1 clears pointer states. */
+    if (FIELD_EX32(prev_val, RH_CONTROL, RING_ENABLED) == 0 &&
+        FIELD_EX32(val, RH_CONTROL, RING_ENABLED)) {
+        s->regs[R_RH_OPERATION1] = 0;
+        s->regs[R_RH_OPERATION2] = 0;
+        s->regs[R_CHUNK_CONTROL] = 0;
+    }
+
+    /* Update RING_OP_STAT since we start running or got aborted. */
+    if (FIELD_EX32(prev_val, RH_CONTROL, RING_RS) == 0 &&
+        FIELD_EX32(val, RH_CONTROL, RING_RS)) {
+        ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, RING_OP_STAT, 1);
+    }
+    if (FIELD_EX32(prev_val, RH_CONTROL, RING_ABORT) == 0 &&
+        FIELD_EX32(val, RH_CONTROL, RING_ABORT)) {
+        ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, RING_OP_STAT, 1);
+    }
+
+    ARRAY_FIELD_DP32(s->regs, RH_STATUS, RING_ENABLED,
+                     FIELD_EX32(val, RH_CONTROL, RING_ENABLED));
+    ARRAY_FIELD_DP32(s->regs, RH_STATUS, RING_RUNNING,
+                     FIELD_EX32(val, RH_CONTROL, RING_RS));
+    ARRAY_FIELD_DP32(s->regs, RH_STATUS, RING_ABORTED,
+                     FIELD_EX32(val, RH_CONTROL, RING_ABORT));
+
+    hci_dma_xfer(s);
+}
+
+static void hci_dma_rh_operation1_w(HCIDMAState *s, uint32_t val)
+{
+    uint32_t prev_val = s->regs[R_RH_OPERATION1];
+    s->regs[R_RH_OPERATION1] = val;
+
+    /* Attempt to transfer if the enqueue pointer was updated. */
+    if (FIELD_EX32(prev_val, RH_OPERATION1, CR_ENQ_PTR) <
+        FIELD_EX32(val, RH_OPERATION1, CR_ENQ_PTR)) {
+        hci_dma_xfer(s);
+    }
+}
+
 void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
     HCIDMAState *s = &(MIPI_HCI(opaque)->dma);
@@ -100,5 +179,17 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
     g_assert(offset < ARRAY_SIZE(s->regs));
 
     value &= ~hci_dma_ro_mask[offset];
-    s->regs[offset] = value;
+    uint32_t val32 = (uint32_t)value;
+
+    switch (offset) {
+    case R_RH_CONTROL:
+        hci_dma_rh_control_w(s, val32);
+        break;
+    case R_RH_OPERATION1:
+        hci_dma_rh_operation1_w(s, val32);
+        break;
+    default:
+        s->regs[offset] = val32;
+        break;
+    }
 }
