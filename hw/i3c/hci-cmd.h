@@ -48,6 +48,16 @@ typedef struct ImmediateXfer {
 } __attribute__((packed)) ImmediateXfer;
 QEMU_BUILD_BUG_ON(sizeof(ImmediateXfer) != sizeof(uint64_t));
 
+typedef enum {
+    TRANSFER_MODE_SDR0    = 0,
+    TRANSFER_MODE_SDR1    = 1,
+    TRANSFER_MODE_SDR2    = 2,
+    TRANSFER_MODE_SDR3    = 3,
+    TRANSFER_MODE_SDR4    = 4,
+    TRANSFER_MODE_HDR_TS  = 5,
+    TRANSFER_MODE_HDR_DDR = 6,
+} TransferMode;
+
 typedef struct RegularXfer {
   uint8_t cmd_attr:3;
   uint8_t tid:4; /* Transaction ID. */
@@ -138,5 +148,8 @@ QEMU_BUILD_BUG_ON(sizeof(RespDescr) != sizeof(uint32_t));
 
 RespStatus hci_cmd_addr_assign(MIPIHCIState *hci, const AddrCmd *desc,
                                RespDescr *resp);
+
+RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
+                        RespDescr *resp, const uint8_t *data, size_t len);
 
 #endif  /* HCI_CMD_H */

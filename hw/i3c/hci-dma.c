@@ -16,6 +16,7 @@
 #include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "hci-cmd.h"
+#include "exec/cpu-common.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/core/irq.h"
@@ -153,6 +154,45 @@ static void hci_dma_push_resp(HCIDMAState *s, RespDescr *resp)
     cpu_physical_memory_write(addr, resp, sizeof(*resp));
 }
 
+/* Data read from this must be freed by the caller. */
+static uint8_t *hci_dma_read_memory(const DataBufferDescr *desc)
+{
+    uint64_t addr = desc->buffer_ptr_hi;
+    addr <<= 32;
+    addr |= desc->buffer_ptr_lo;
+
+    uint8_t *data = g_new0(uint8_t, desc->block_size);
+    cpu_physical_memory_read(addr, data, desc->block_size);
+    return data;
+}
+
+static RespStatus hci_dma_send(MIPIHCIState *hci,
+                               const TransferDescr *desc,
+                               RespDescr *resp)
+{
+    g_autofree uint8_t *data = hci_dma_read_memory(&desc->data_buffer);
+
+    return hci_cmd_send(hci, &desc->cmd.regular_xfer, resp, data,
+                        desc->data_buffer.block_size);
+}
+
+static RespStatus hci_dma_regular_xfer(MIPIHCIState *hci,
+                                        const TransferDescr *desc,
+                                        RespDescr *resp)
+{
+    if (desc->data_buffer.blp) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_UNIMP, "%s: Scatter gather DMA is not implemented.\n",
+                      path);
+        return RESP_STATUS_ERROR_NOT_SUPPORTED;
+    }
+
+    if (desc->cmd.regular_xfer.rnw) {
+        /* TODO: Support reads. */
+    }
+    return hci_dma_send(hci, desc, resp);
+}
+
 static void hci_dma_xfer(MIPIHCIState *hci)
 {
     HCIDMAState *s = &(hci->dma);
@@ -174,8 +214,11 @@ static void hci_dma_xfer(MIPIHCIState *hci)
             status = hci_cmd_addr_assign(hci, &desc.cmd.addr_cmd, &resp);
             roc = desc.cmd.addr_cmd.roc;
             break;
-        case CMD_ATTR_INTERNAL_CONTROL:
         case CMD_ATTR_REGULAR_XFER:
+            status = hci_dma_regular_xfer(hci, &desc, &resp);
+            roc = desc.cmd.regular_xfer.roc;
+            break;
+        case CMD_ATTR_INTERNAL_CONTROL:
         case CMD_ATTR_COMBO_XFER:
         case CMD_ATTR_IMMEDIATE_XFER:
             {

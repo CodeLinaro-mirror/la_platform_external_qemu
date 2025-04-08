@@ -11,6 +11,7 @@
 #include "hw/i3c/i3c.h"
 #include "qemu/log.h"
 #include "hw/core/registerfields.h"
+#include "hw/i3c/mipi-hci.h"
 
 #define INC_AND_ROLLOVER(x, amount, max) \
     do {                                 \
@@ -206,6 +207,86 @@ done:
     if (desc->toc) {
         i3c_end_transfer(hci->bus);
     }
+    resp->resp.tid = desc->tid;
+    resp->resp.err = status;
+
+    return status;
+}
+
+static RespStatus hci_cmd_send_ccc(MIPIHCIState *hci, const RegularXfer *desc,
+                                   RespDescr *resp, const uint8_t *data,
+                                   size_t len)
+{
+    MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(hci);
+    RespStatus status = RESP_STATUS_SUCCESS;
+    uint8_t ccc = desc->cmd;
+    uint32_t num_sent = 0;
+    uint8_t addr = 0;
+    uint16_t dat_offset = 0;
+
+    /* Start the CCC, both direct and broadcast start with a broadcast. */
+    if (i3c_start_send(hci->bus, I3C_BROADCAST)) {
+        status = RESP_STATUS_ERROR_ADDR_HEADER;
+        goto done;
+    }
+    if (i3c_send_byte(hci->bus, ccc)) {
+        status = RESP_STATUS_ERROR_XFER_ABORTED;
+        goto done;
+    }
+    if (desc->dbp) {
+        if (i3c_send_byte(hci->bus, desc->def_byte)) {
+            status = RESP_STATUS_ERROR_XFER_ABORTED;
+            goto done;
+        }
+    }
+
+    /* If we're doing a direct CCC, reSTART and address the target. */
+    if (CCC_IS_DIRECT(ccc)) {
+        dat_offset = DAT_ENTRY_FROM_DEV_INDEX(desc->dev_index);
+        addr = mhc->get_dev_dynamic_addr(hci, dat_offset);
+        if (i3c_start_send(hci->bus, addr)) {
+            status = RESP_STATUS_ERROR_XFER_ABORTED;
+            goto done;
+        }
+    }
+
+    /* Now send the CCC data, if any. */
+    if (i3c_send(hci->bus, data, len, &num_sent)) {
+        status = RESP_STATUS_ERROR_XFER_ABORTED;
+    }
+
+done:
+    if (desc->toc) {
+        i3c_end_transfer(hci->bus);
+    }
+    resp->resp.length = len - num_sent;
+    return status;
+}
+
+RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
+                        RespDescr *resp, const uint8_t *data, size_t len) {
+    RespStatus status = RESP_STATUS_SUCCESS;
+
+    /* This is an internal error, the caller passed in bad arguments. */
+    if (desc->cmd_attr != CMD_ATTR_REGULAR_XFER || desc->rnw) {
+        status = RESP_STATUS_ERROR_HC_ABORTED;
+        resp->resp.length = len;
+        goto done;
+    }
+    /* We only support SDR. */
+    if (desc->mode > TRANSFER_MODE_SDR4) {
+        status = RESP_STATUS_ERROR_NOT_SUPPORTED;
+        resp->resp.length = len;
+        goto done;
+    }
+
+    if (desc->cp) {
+        status = hci_cmd_send_ccc(hci, desc, resp, data, len);
+    } else {
+        /* TODO: Support private writes. */
+    }
+
+done:
     resp->resp.tid = desc->tid;
     resp->resp.err = status;
 
