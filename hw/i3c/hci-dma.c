@@ -353,6 +353,20 @@ static void hci_dma_rh_control_w(MIPIHCIState *hci, uint32_t val)
     c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
 }
 
+static void hci_dma_ibi_setup_w(MIPIHCIState *hci, uint32_t val)
+{
+    HCIDMAState *s = &hci->dma;
+
+    /* 0 means disabled, 1 is "illegal, do not use", 2-255 is fine. */
+    if (FIELD_EX32(val, IBI_SETUP, IBI_STATUS_RING_SIZE) == 1) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: IBI status ring size cannot be 1.",
+                      path);
+    }
+
+    s->regs[R_IBI_SETUP] = val;
+}
+
 static void hci_dma_rh_operation1_w(MIPIHCIState *hci, uint32_t val)
 {
     HCIDMAState *s = &hci->dma;
@@ -402,6 +416,9 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
     switch (offset) {
     case R_RH_CONTROL:
         hci_dma_rh_control_w(hci, val32);
+        break;
+    case R_IBI_SETUP:
+        hci_dma_ibi_setup_w(hci, val32);
         break;
     case R_RH_OPERATION1:
         hci_dma_rh_operation1_w(hci, val32);
