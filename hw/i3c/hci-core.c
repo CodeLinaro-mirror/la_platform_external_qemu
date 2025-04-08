@@ -41,6 +41,11 @@ static const uint32_t hci_core_ro_mask[HCI_CORE_NUM_REGS] = {
     [R_DEV_CTX_SG]                  = 0x7fff0000,
 };
 
+void hci_core_reset(HCICoreState *s)
+{
+    memset(&s->regs, 0, sizeof(s->regs));
+}
+
 uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCICoreState *s = &(MIPI_HCI(opaque)->core);
