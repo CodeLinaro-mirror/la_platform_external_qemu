@@ -15,7 +15,9 @@
  */
 
 #include <algorithm>
+#include <charconv>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -44,15 +46,11 @@
 #include "android/utils/system.h"
 #include "host-common/hw-config.h"
 
-#define  E(...)    derror(__VA_ARGS__)
-#define  W(...)    dwarning(__VA_ARGS__)
-
 /* Camera service version 1 */
 #define V1 ((avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) > 29) && \
             !feature_is_enabled(kFeature_Minigbm))
 
 static constexpr size_t MAX_CAMERA = 8;
-static constexpr size_t MAX_QUERY_MESSAGE_SIZE = 8092;
 
 struct CameraServiceDesc {
     CameraInfo  camera_info[MAX_CAMERA];
@@ -75,6 +73,10 @@ struct CameraCallbackDesc {
     camera_callback_t callback = nullptr;
     void* context = nullptr;
     CameraSourceType source = {};
+};
+
+struct WhiteBalance {
+    float red, green, blue;
 };
 
 using namespace std::literals;
@@ -144,103 +146,252 @@ static void qemuClientReplyASCIZ(QemudClient* qc, const bool okko,
     qemuClientReply(qc, okko, str, ::strlen(str));
 }
 
-static int getTokenValue(const char* params, const char* name,
-                         char* value, int val_size) {
-    const char* val_end;
-    int len = strlen(name);
-    const char* par_end = params + strlen(params);
-    const char* par_start = strstr(params, name);
+static std::optional<std::string_view> getTokenValueStr(const std::string_view params,
+                                                        const std::string_view name) {
+    const size_t paramsSize = params.size();
+    const size_t nameSize = name.size();
 
-    /* Search for 'name=' */
-    while (par_start != nullptr) {
-        /* Make sure that we're within the parameters buffer. */
-        if ((par_end - par_start) < len) {
-            par_start = nullptr;
-            break;
-        }
-        /* Make sure that par_start starts at the beginning of <name>, and only
-         * then check for '=' value separator. */
-        if ((par_start == params || (*(par_start - 1) == ' ')) &&
-                par_start[len] == '=') {
-            break;
-        }
-        par_start = strstr(par_start + 1, name);
-    }
-    if (par_start == nullptr) {
-        return -1;
-    }
+    size_t i = 0;
+    while ((i = params.find(name, i)) != params.npos) {
+        const size_t nameEnd = i + nameSize;
+        if (nameEnd >= paramsSize) {
+            return std::nullopt;
+        } else if (params[nameEnd] == '=') {
+            const size_t valueBegin = nameEnd + 1;
+            const size_t valueEnd = params.find(' ', valueBegin);
 
-    par_start += len + 1;
-    val_end = strchr(par_start, ' ');
-    if (val_end == nullptr) {
-        val_end = par_start + strlen(par_start);
-    }
-    len = val_end - par_start;
-
-    if ((len + 1) <= val_size) {
-        memcpy(value, par_start, len);
-        value[len] = '\0';
-        return 0;
-    } else {
-        return len + 1;
-    }
-}
-
-static int getTokenValueAlloc(const char* params,
-                              const char* name, char** value) {
-    char tmp;
-    int res;
-
-    const int val_size = getTokenValue(params, name, &tmp, 0);
-    if (val_size < 0) {
-        *value = nullptr;
-        return val_size;
-    }
-
-    *value = (char*)malloc(val_size);
-    if (*value == nullptr) {
-        return -2;
-    }
-    res = getTokenValue(params, name, *value, val_size);
-    if (res) {
-        free(*value);
-        *value = nullptr;
-    }
-
-    return res;
-}
-
-static int getTokenValueInt(const char* params,
-                            const char* name, int* value) {
-    char val_str[64];   // Should be enough for all numeric values.
-    if (!getTokenValue(params, name, val_str, sizeof(val_str))) {
-        errno = 0;
-        *value = strtoi(val_str, (char**)nullptr, 10);
-        if (errno) {
-            return -2;
+            return (valueEnd == params.npos) ?
+                params.substr(valueBegin) :
+                params.substr(valueBegin, valueEnd - valueBegin);
         } else {
-            return 0;
+            ++i;
         }
+    }
+
+    return std::nullopt;
+}
+
+template <class T, class P> bool getParamValue(T& destination,
+                                               const std::string_view params,
+                                               const std::string_view name,
+                                               const P valueParser) {
+    const std::optional<std::string_view> maybeValueStr =
+        getTokenValueStr(params, name);
+    if (!maybeValueStr) {
+        return false;
+    }
+
+    auto maybeValue = valueParser(maybeValueStr.value());
+    if (!maybeValue) {
+        return false;
+    }
+
+    destination = std::move(maybeValue.value());
+    return true;
+}
+
+template <class T, class P> bool getParamValueV(T& destination,
+                                                const std::string_view params,
+                                                const std::string_view name,
+                                                const P valueParser,
+                                                const T& defValue) {
+    const std::optional<std::string_view> maybeValueStr =
+        getTokenValueStr(params, name);
+    if (!maybeValueStr) {
+        destination = defValue;
+        return true;
+    }
+
+    auto maybeValue = valueParser(maybeValueStr.value());
+    if (!maybeValue) {
+        return false;
+    }
+
+    destination = std::move(maybeValue.value());
+    return true;
+}
+
+template <class T, class P, class F> bool getParamValueF(T& destination,
+                                                         const std::string_view params,
+                                                         const std::string_view name,
+                                                         const P valueParser,
+                                                         const F& getDefValue) {
+    const std::optional<std::string_view> maybeValueStr =
+        getTokenValueStr(params, name);
+    if (!maybeValueStr) {
+        destination = getDefValue();
+        return true;
+    }
+
+    auto maybeValue = valueParser(maybeValueStr.value());
+    if (!maybeValue) {
+        return false;
+    }
+
+    destination = std::move(maybeValue.value());
+    return true;
+}
+
+static std::optional<bool> parseBool(const std::string_view str) {
+    if (str == "0"sv) {
+        return false;
+    } else if (str == "1"sv) {
+        return true;
     } else {
-        return -1;
+        return std::nullopt;
     }
 }
 
-static std::pair<std::string_view, std::string_view> _parse_query(const std::string_view request) {
-    const size_t separator = request.find(' ');
-    if (separator != request.npos) {
-        return {request.substr(0, separator), request.substr(separator + 1)};
-    } else if (request.empty()) {
-        return {{}, {}};
-    } else if (request.back() == 0) {
-        return {request.substr(0, request.size() - 1), {}};
+template <class T> static std::optional<T> parseInt(const std::string_view str,
+                                                    const unsigned base = 10) {
+    if (str.empty()) {
+        return std::nullopt;
+    }
+
+    T value;
+    const auto [ptr, ec] =
+        std::from_chars(&*str.begin(), &*str.end(), value, base);
+    if ((ec != std::errc()) || (ptr != &*str.end())) {
+        return std::nullopt;
+    }
+
+    return value;
+}
+
+template <class T, class F>
+static std::optional<T> parseIntValidated(const std::string_view str,
+                                          const F& isValid,
+                                          const unsigned base = 10) {
+    const auto maybeValue = parseInt<T>(str, base);
+    if (maybeValue && isValid(maybeValue.value())) {
+        return maybeValue;
     } else {
-        return {request, {}};
+        return std::nullopt;
     }
 }
 
-static std::pair<std::string_view, std::string_view> _parse_query(const void* data, size_t size) {
-    return _parse_query(std::string_view(static_cast<const char*>(data), size));
+template <class F> static std::optional<float>parseFloatValidated(const std::string_view str,
+                                                                  const F& isValid) {
+    if (str.empty()) {
+        return std::nullopt;
+    }
+
+    char* end = const_cast<char*>(&*str.end());
+    const float value = std::strtof(&*str.begin(), &end);
+    if (end != &*str.end()) {
+        return std::nullopt;
+    }
+
+    if (isValid(value)) {
+        return value;
+    } else {
+        return std::nullopt;
+    }
+}
+
+static std::optional<size_t> parseSize(const std::string_view str) {
+    return parseInt<size_t>(str);
+}
+
+static std::optional<uint64_t> parseOffset(const std::string_view str) {
+    return parseInt<uint64_t>(str);
+}
+
+static std::optional<uint32_t> parsePix(const std::string_view str) {
+    return parseInt<uint32_t>(str);
+}
+
+static std::optional<uint32_t> parseInpChannel(const std::string_view str) {
+    return parseInt<uint32_t>(str);
+}
+
+static std::optional<std::pair<uint32_t, uint32_t>>
+parseDim(const std::string_view str) {
+    static constexpr auto parseDim1 =
+        [](const std::string_view str){
+            static constexpr auto isValidDimValue =
+                [](const uint32_t value){ return value > 0; };
+
+            return parseIntValidated<uint32_t>(str, isValidDimValue);
+        };
+
+    const size_t xpos = str.find('x');
+    if (xpos == str.npos) {
+        return std::nullopt;
+    }
+
+    std::optional<uint32_t> maybeWidth = parseDim1(str.substr(0, xpos));
+    if (!maybeWidth) {
+        return std::nullopt;
+    }
+
+    std::optional<uint32_t> maybeHeight = parseDim1(str.substr(xpos + 1));
+    if (!maybeHeight) {
+        return std::nullopt;
+    }
+
+    return std::make_pair(maybeWidth.value(), maybeHeight.value());
+}
+
+static std::optional<WhiteBalance> parseWhiteBalance(const std::string_view str) {
+    static constexpr auto parseWhiteBalance1 =
+        [](const std::string_view str){
+            static constexpr auto isValidWhiteBalanceValue =
+                [](const float value){
+                    return value > 0.0f;
+                };
+
+            return parseFloatValidated(str, isValidWhiteBalanceValue);
+        };
+
+    WhiteBalance whiteBalance;
+    std::optional<float> maybeValue;
+
+    const size_t comma1 = str.find(',');
+    if (comma1 == str.npos) {
+        return std::nullopt;
+    }
+
+    maybeValue = parseWhiteBalance1(str.substr(0, comma1));
+    if (!maybeValue) {
+        return std::nullopt;
+    }
+
+    whiteBalance.red = maybeValue.value();
+
+    const size_t comma2 = str.find(',', comma1 + 1);
+    if (comma2 == str.npos) {
+        return std::nullopt;
+    }
+
+    maybeValue = parseWhiteBalance1(str.substr(comma1 + 1, comma2 - comma1 - 1));
+    if (!maybeValue) {
+        return std::nullopt;
+    }
+
+    whiteBalance.green = maybeValue.value();
+
+    maybeValue = parseWhiteBalance1(str.substr(comma2 + 1));
+    if (!maybeValue) {
+        return std::nullopt;
+    }
+
+    whiteBalance.blue = maybeValue.value();
+    return whiteBalance;
+}
+
+static std::optional<float> parseExpComp(const std::string_view str) {
+    return parseFloatValidated(str, [](const float value){ return value > 0.0f; });
+}
+
+static std::pair<std::string_view, std::string_view>
+parseQuery(const std::string_view query) {
+    const size_t separator = query.find(' ');
+    if (separator != query.npos) {
+        return {query.substr(0, separator), query.substr(separator + 1)};
+    } else {
+        return {query, {}};
+    }
 }
 
 static std::string cameraInfoToString(const CameraInfo& ci) {
@@ -280,19 +431,15 @@ static CameraInfo* cameraInfoGetByDisplayName(const char* disp_name,
     return nullptr;
 }
 
-static int cameraClientGetMaxResolution(const CameraInfo* info,
-                                        int* width, int* height) {
-    if (!info || !width || !height) {
-        return -1;
-    }
-
-    const CameraFrameDim *maxDim = info->frame_sizes;
+static std::pair<uint32_t, uint32_t>
+cameraClientGetMaxResolution(const CameraInfo& info) {
+    const CameraFrameDim *maxDim = info.frame_sizes;
     if (!maxDim) {
-        return -1;
+        return {0, 0};
     }
-    const int frameSizesNum = info->frame_sizes_num;
+    const int frameSizesNum = info.frame_sizes_num;
     if (frameSizesNum <= 0) {
-        return -1;
+        return {0, 0};
     }
 
     using MaxSoFar = std::pair<const CameraFrameDim *, int>;
@@ -304,9 +451,7 @@ static int cameraClientGetMaxResolution(const CameraInfo* info,
             return (area > maxSoFar.second) ? std::make_pair(&dim, area) : maxSoFar;
         }).first;
 
-    *width = maxDim->width;
-    *height = maxDim->height;
-    return 0;
+    return {maxDim->width, maxDim->height};
 }
 
 static void virtualscenecameraSetup(CameraServiceDesc* csd) {
@@ -406,9 +551,9 @@ static void webcamSetup(CameraServiceDesc* csd,
     CameraInfo* srcCi =
         cameraInfoGetByDisplayName(disp_name, webcams, webcams_cnt);
     if (!srcCi) {
-        W("Camera name '%s' is not found in the list of connected cameras.\n"
-          "Use '-webcam-list' emulator option to obtain the list of connected camera names.\n",
-          disp_name);
+        dwarning("Camera name '%s' is not found in the list of connected cameras.\n"
+                "Use '-webcam-list' emulator option to obtain the list of connected "
+                "camera names.\n", disp_name);
         return;
     }
 
@@ -514,21 +659,23 @@ static void factoryClientListCameras(const CameraServiceDesc& csd, QemudClient* 
  */
 static void factoryClientRecv(void*         opaque,
                               uint8_t*      msg,
-                              int           msglen,
+                              const int     msglen,
                               QemudClient*  client) {
-    using namespace std::literals;
+    static constexpr std::string_view kQueryList = "list"sv;
 
-    static constexpr std::string_view _query_list = "list"sv;
-
-    const auto [query_name, query_param] = _parse_query(msg, msglen);
-    if (query_name.empty()) {
-        qemuClientReply(client, false, "Invalid query format"sv);
+    if (msglen <= 1) {
         return;
     }
 
-    if (query_name == _query_list) {
+    const auto [queryName, queryParams] =
+        parseQuery(std::string_view(reinterpret_cast<const char*>(msg),
+                                    msglen - 1));
+
+    if (queryName == kQueryList) {
         factoryClientListCameras(*static_cast<CameraServiceDesc*>(opaque),
                                  client);
+    } else if (queryName.empty()) {
+        qemuClientReply(client, false, "Empty query"sv);
     } else {
         qemuClientReply(client, false, "Unknown query name"sv);
     }
@@ -547,6 +694,9 @@ struct CameraClient {
     CameraInfo* const   camera_info;
     CameraDevice*       camera = nullptr;
 
+    /* to parse quesries that arrive in parts */
+    std::vector<char>   queryBuffer;
+
     /* Buffer allocated for video frames.
      * Note that memory allocated for this buffer also contains preview
      * framebuffer and i420 staging framebuffer. */
@@ -554,32 +704,28 @@ struct CameraClient {
     /* Preview frame buffer.
      * This address points inside the 'video_frame' buffer. */
     uint8_t*            preview_frame = nullptr;
+    /* Staging framebuffer, used as an intermediate buffer for libyuv. */
+    uint8_t*            staging_framebuffer = nullptr;
+
     /* Byte size of the videoframe buffer. */
     size_t              video_frame_size = 0;
     /* Byte size of the preview frame buffer. */
     size_t              preview_frame_size = 0;
-    /* Staging framebuffer, used as an intermediate buffer for libyuv. */
-    uint8_t*            staging_framebuffer = nullptr;
     /* Staging framebuffer size. */
     size_t              staging_framebuffer_size = 0;
+
+    /* Total number of frames rendered, used for metrics. */
+    uint64_t            frame_count = 0;
+
     /* Input channel to use to connect to the camera. */
     const uint32_t      inp_channel = 0;
     /* Pixel format required by the guest. */
     uint32_t            pixel_format = 0;
     /* Frame width. */
-    int                 width = 0;
+    uint32_t            width = 0;
     /* Frame height. */
-    int                 height = 0;
+    uint32_t            height = 0;
 
-    /* Queries being sent from the guest can be interrupted, resulting in the camera receiving
-       the partial text of a query.  (This can be detected by the query not ending with a
-       terminating 0 character.)  In that case, the partial command is stored in command_buffer,
-       and command_buffer_offset records the length of the messages received so far, and thus where
-       the next segment should be written.
-       */
-    char command_buffer[MAX_QUERY_MESSAGE_SIZE];
-    int  command_buffer_offset = 0;
-    uint64_t            frame_count = 0;
     bool                started = false;
 
     ~CameraClient() {
@@ -596,52 +742,57 @@ struct CameraClient {
 
 CameraCallbackDesc g_cameraCallbackDesc;
 
-static CameraClient* cameraClientCreate(CameraServiceDesc& csd, const char* param) {
+static CameraClient* cameraClientCreate(CameraServiceDesc& csd,
+                                        const std::string_view params) {
+    static constexpr std::string_view kParamName       = "name"sv;
+    static constexpr std::string_view kParamInpChannel = "inp_channel"sv;
 
-    char* device_name = nullptr;
-    if (getTokenValueAlloc(param, "name", &device_name)) {
+    std::optional<std::string_view> maybeDeviceName =
+        getTokenValueStr(params, kParamName);
+    if (!maybeDeviceName) {
+        dwarning("Missing the '%s' parameter.", kParamName);
         return nullptr;
     }
 
-    int inp_channel;
-    int res = getTokenValueInt(param, "inp_channel", &inp_channel);
-    if (res != 0) {
-        if (res == -1) {
-            /* 'inp_channel' parameter has been ommited. Use default input
-             * channel, which is zero. */
-            inp_channel = 0;
-        } else {
-            ::free(device_name);
-            return nullptr;
-        }
-    }
+    const std::string_view deviceName = std::move(maybeDeviceName.value());
+    CameraInfo* ci = std::find_if(
+            csd.camera_info, &csd.camera_info[csd.camera_count],
+            [&deviceName](const CameraInfo& ci){
+                return ci.device_name &&
+                       !strncmp(ci.device_name, deviceName.data(), deviceName.size()) &&
+                       !ci.device_name[deviceName.size()];
+            });
 
-    CameraInfo* ci = std::find_if(csd.camera_info, &csd.camera_info[csd.camera_count],
-                                  [device_name](const CameraInfo& ci){
-                                        return ci.device_name &&
-                                               !strcmp(ci.device_name, device_name);
-                                  });
     if (ci == &csd.camera_info[csd.camera_count]) {
-        ::free(device_name);
+        dwarning("Camera name '%s' is not found in the list of "
+                 "connected cameras.", deviceName);
         return nullptr;
     }
-    ::free(device_name);
-
     if (ci->in_use) {
+        dwarning("Can't open the '%s' camera, it is still in use.", deviceName);
+        return nullptr;
+    }
+    if (!ci->frame_sizes_num || !ci->frame_sizes) {
+        dwarning("Camera '%s' has no supported frame dimensions.", deviceName);
         return nullptr;
     }
 
-    return new CameraClient(ci, inp_channel);
+    uint32_t inpChannel;
+    if (!getParamValueV(inpChannel, params, kParamInpChannel, parseInpChannel, 0U)) {
+        dwarning("Invalid '%s' parameter.", kParamInpChannel);
+        return nullptr;
+    }
+
+    return new CameraClient(ci, inpChannel);
 }
 
-static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const char* param) {
-    const CameraInfo& ci = *cc->camera_info;
-
+static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc) {
     if (cc->camera) {
         qemuClientReply(qc, true, "Camera is already connected"sv);
         return;
     }
 
+    const CameraInfo& ci = *cc->camera_info;
     cc->camera = (ci.vtbl->open)(ci.device_name, cc->inp_channel);
     if (!cc->camera) {
         qemuClientReply(qc, false, "Unable to open camera device."sv);
@@ -651,9 +802,7 @@ static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const ch
     qemuClientReply(qc, true);
 }
 
-static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const char* param) {
-    const CameraInfo& ci = *cc->camera_info;
-
+static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc) {
     if (!cc->camera) {
         qemuClientReply(qc, true, "Camera is not connected"sv);
         return;
@@ -664,23 +813,19 @@ static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const
         return;
     }
 
-    (ci.vtbl->close)(cc->camera);
+    (cc->camera_info->vtbl->close)(cc->camera);
     cc->camera = nullptr;
 
     qemuClientReply(qc, true);
 }
 
 static ClientStartResult cameraClientStart(CameraClient* cc,
-                                           int width,
-                                           int height,
-                                           int pix_format) {
+                                           const uint32_t width, const uint32_t height,
+                                           const uint32_t pixFormat) {
     const CameraInfo& ci = *cc->camera_info;
 
-    camera_metrics_report_start_session(ci.vtbl->camera_source, ci.direction, width,
-                                        height, pix_format);
-
     if ((!V1 && cc->video_frame) || (V1 && cc->started)) {
-        if (cc->pixel_format == (uint32_t)pix_format && cc->width == width &&
+        if (cc->pixel_format == pixFormat && cc->width == width &&
             cc->height == height) {
             return CLIENT_START_RESULT_ALREADY_STARTED;
         } else {
@@ -688,7 +833,7 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
         }
     }
 
-    cc->pixel_format = pix_format;
+    cc->pixel_format = pixFormat;
     cc->width = width;
     cc->height = height;
     cc->frame_count = 0;
@@ -731,8 +876,7 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
         cc->preview_frame = cc->video_frame + cc->video_frame_size;
     }
 
-    if ((ci.vtbl->start_capturing)(cc->camera, ci.pixel_format,
-                                   cc->width, cc->height)) {
+    if ((ci.vtbl->start_capturing)(cc->camera, ci.pixel_format, cc->width, cc->height)) {
         if (cc->video_frame) {
             free(cc->video_frame);
             cc->video_frame = nullptr;
@@ -744,134 +888,75 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
         cc->started = true;
     }
 
+    camera_metrics_report_start_session(ci.vtbl->camera_source,
+                                        ci.direction, width,
+                                        height, pixFormat);
+
     g_cameraCallbackDesc(ci.vtbl->camera_source, true);
+
     return CLIENT_START_RESULT_SUCCESS;
 }
 
-static void cameraClientQueryStart(CameraClient* cc, QemudClient* qc, const char* param) {
-    char* w;
-    char dim[64];
-    int width, height, pix_format;
+static constexpr std::string_view kParamDim             = "dim"sv;
+static constexpr std::string_view kParamPix             = "pix"sv;
+static constexpr std::string_view kParamOffset          = "offset"sv;
+static constexpr std::string_view kParamPreviewSize     = "preview"sv;
+static constexpr std::string_view kParamVideoSize       = "video"sv;
+static constexpr std::string_view kParamSendFrameTime   = "time"sv;
+static constexpr std::string_view kParamWhiteBalance    = "whiteb"sv;
+static constexpr std::string_view kParamExpComp         = "expcomp"sv;
 
+static constexpr WhiteBalance kDefaultWhiteBalance = { 1.0f, 1.0f, 1.0f };
+
+static void cameraClientQueryStart(CameraClient* cc, QemudClient* qc,
+                                   const std::string_view params,
+                                   const bool allowDefaults) {
     if (!cc->camera) {
         qemuClientReply(qc, false, "Camera is not connected"sv);
         return;
     }
 
-    if (param == nullptr) {
-        qemuClientReply(qc, false, "Missing parameters for the query"sv);
-        return;
-    }
-
-    if (getTokenValue(param, "dim", dim, sizeof(dim))) {
-        qemuClientReply(qc, false, "Invalid or missing 'dim' parameter"sv);
-        return;
-    }
-
-    if (getTokenValueInt(param, "pix", &pix_format)) {
-        qemuClientReply(qc, false, "Invalid or missing 'pix' parameter"sv);
-        return;
-    }
-
-    w = strchr(dim, 'x');
-    if (w == nullptr || w[1] == '\0') {
-        qemuClientReply(qc, false, "Invalid 'dim' parameter");
-        return;
-    }
-    *w = '\0'; w++;
-    errno = 0;
-    width = strtoi(dim, nullptr, 10);
-    height = strtoi(w, nullptr, 10);
-    if (errno) {
-        qemuClientReply(qc, false, "Invalid 'dim' parameter");
-        return;
-    }
-
-    ClientStartResult result =
-            cameraClientStart(cc, width, height, pix_format);
-    camera_metrics_report_start_result(result);
-
-    if (result < 0) {
-        camera_metrics_report_stop_session(0);
-    }
-
-    switch (result) {
-    case CLIENT_START_RESULT_SUCCESS:
-        qemuClientReply(qc, true);
-        break;
-    case CLIENT_START_RESULT_ALREADY_STARTED:
-        qemuClientReply(qc, true, "Camera is already started"sv);
-        break;
-    case CLIENT_START_RESULT_PARAMETER_MISMATCH:
-        qemuClientReply(qc, false, "Camera is already started with different capturing parameters"sv);
-        break;
-    case CLIENT_START_RESULT_UNKNOWN_PIXEL_FORMAT:
-        qemuClientReply(qc, false, "Pixel format is unknown"sv);
-        break;
-    case CLIENT_START_RESULT_NO_PIXEL_CONVERSION:
-        qemuClientReply(qc, false, "No conversion exist for the requested pixel format"sv);
-        break;
-    case CLIENT_START_RESULT_OUT_OF_MEMORY:
-        qemuClientReply(qc, false, "Out of memory"sv);
-        break;
-    default:
-        E("%s: Unexpected capture result '%d'", __func__, result);
-        [[fallthrough]];
-    case CLIENT_START_RESULT_FAILED:
-        qemuClientReply(qc, false, "Cannot start the camera"sv);
-        break;
-    }
-}
-
-static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
-                                     const char* param) {
     const CameraInfo& ci = *cc->camera_info;
 
-    char* w;
-    char dim[64];
-    int width, height, pix_format;
-
-    if (cc->camera == nullptr) {
-        qemuClientReply(qc, false, "Camera is not connected"sv);
-        return;
-    }
-
-    if (param == nullptr) {
-        if (cameraClientGetMaxResolution(&ci, &width, &height)) {
-            qemuClientReply(qc, false, "Failed to get default resolution"sv);
+    uint32_t pixFormat;
+    if (allowDefaults) {
+        if (!getParamValueF(pixFormat, params, kParamPix, parsePix,
+                            [&ci](){
+                                return ci.pixel_format;
+                            })) {
+badPix:     qemuClientReply(qc, false, "Invalid or missing 'pix' parameter"sv);
             return;
         }
-        pix_format = ci.pixel_format;
+
     } else {
-        if (getTokenValue(param, "dim", dim, sizeof(dim))) {
-            if (cameraClientGetMaxResolution(&ci, &width, &height)) {
-                qemuClientReply(qc, false, "Failed to get default resolution"sv);
-                return;
-            }
-        } else {
-            w = strchr(dim, 'x');
-            if (w == nullptr || w[1] == '\0') {
-                qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
-                return;
-            }
-            *w = '\0'; w++;
-            errno = 0;
-            width = strtoi(dim, nullptr, 10);
-            height = strtoi(w, nullptr, 10);
-            if (errno) {
-                qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
-                return;
-            }
-        }
-        if (getTokenValueInt(param, "pix", &pix_format)) {
-            pix_format = ci.pixel_format;
+        if (!getParamValue(pixFormat, params, kParamPix, parsePix)) {
+            goto badPix;
         }
     }
 
-    ClientStartResult result =
-            cameraClientStart(cc, width, height, pix_format);
-    camera_metrics_report_start_result(result);
+    uint32_t width;
+    uint32_t height;
+    auto rect = std::tie(width, height);
+    if (allowDefaults) {
+        if (!getParamValueF(rect, params, kParamDim, parseDim,
+                            [&ci](){
+                                return cameraClientGetMaxResolution(ci);
+                            })) {
+badDim:     qemuClientReply(qc, false, "Invalid or missing 'dim' parameter"sv);
+            return;
+        } else if (!width || !height) {
+            goto badDim;
+        }
+    } else {
+        if (!getParamValue(rect, params, kParamDim, parseDim)) {
+            goto badDim;
+        }
+    }
 
+    const ClientStartResult result =
+            cameraClientStart(cc, width, height, pixFormat);
+
+    camera_metrics_report_start_result(result);
     if (result < 0) {
         camera_metrics_report_stop_session(0);
     }
@@ -898,7 +983,7 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
         qemuClientReply(qc, false, "Out of memory"sv);
         break;
     default:
-        E("%s: Unexpected capture result '%d'", __func__, result);
+        derror("%s: Unexpected capture result '%d'", __func__, result);
         [[fallthrough]];
     case CLIENT_START_RESULT_FAILED:
         qemuClientReply(qc, false, "Cannot start the camera");
@@ -906,13 +991,13 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
     }
 }
 
-static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char* param) {
-    const CameraInfo& ci = *cc->camera_info;
-
+static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc) {
     if ((!V1 && !cc->video_frame) || (V1 && !cc->started)) {
         qemuClientReply(qc, true, "Camera is not started"sv);
         return;
     }
+
+    const CameraInfo& ci = *cc->camera_info;
 
     if ((ci.vtbl->stop_capturing)(cc->camera)) {
         qemuClientReply(qc, false, "Cannot stop camera device"sv);
@@ -935,13 +1020,12 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
 }
 
 static int readFrameImpl(CameraClient* cc, QemudClient* qc, ClientFrame* frame,
-                         const float r_scale, const float g_scale, const float b_scale,
-                         const float expComp) {
+                         const WhiteBalance& whiteBalance, const float expComp) {
     const CameraInfo& ci = *cc->camera_info;
     const auto readFrame = ci.vtbl->read_frame;
 
     int retry = readFrame(cc->camera, frame,
-                          r_scale, g_scale, b_scale,
+                          whiteBalance.red, whiteBalance.green, whiteBalance.blue,
                           expComp, ci.direction);
     if (!retry) {
         return 0;
@@ -952,7 +1036,7 @@ static int readFrameImpl(CameraClient* cc, QemudClient* qc, ClientFrame* frame,
         cameraSleep(10);
 
         retry = readFrame(cc->camera, frame,
-                          r_scale, g_scale, b_scale,
+                          whiteBalance.red, whiteBalance.green, whiteBalance.blue,
                           expComp, ci.direction);
     } while ((retry > 0) && (getTimestamp() < timeout));
 
@@ -966,60 +1050,70 @@ static int readFrameImpl(CameraClient* cc, QemudClient* qc, ClientFrame* frame,
     return retry;
 }
 
-static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char* param) {
-    const CameraInfo& ci = *cc->camera_info;
+static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc,
+                                   const std::string_view params) {
+    constexpr size_t kZero = 0;
 
-    int video_size = 0;
-    int preview_size = 0;
-    ClientFrameBuffer fbs[2];
-    int fbs_num = 0;
-    float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
-    char tmp[256];
-    int send_frame_time = 0;
-    ClientFrame frame = {};
+    if (!cc->camera) {
+        return;
+    }
 
-    if (cc->video_frame == nullptr) {
+    size_t videoSize;
+    if (!getParamValueV(videoSize, params, kParamVideoSize,
+                        parseSize, kZero)) {
         qemuClientReply(qc, false, "Invalid 'video' parameter"sv);
         return;
     }
 
-    if (getTokenValueInt(param, "video", &video_size) ||
-        getTokenValueInt(param, "preview", &preview_size)) {
-        qemuClientReply(qc, false, "Invalid or missing 'video', or 'preview' parameter"sv);
+    size_t previewSize;
+    if (!getParamValueV(previewSize, params, kParamPreviewSize,
+                        parseSize, kZero)) {
+        qemuClientReply(qc, false, "Invalid 'preview' parameter"sv);
         return;
     }
 
-    if (!getTokenValue(param, "whiteb", tmp, sizeof(tmp))) {
-        if (sscanf(tmp, "%g,%g,%g", &r_scale, &g_scale, &b_scale) != 3) {
-            r_scale = g_scale = b_scale = 1.0f;
-        }
+    if (!videoSize && !previewSize) {
+        qemuClientReply(qc, false, "Nothing requested"sv);
+        return;
     }
 
-    if (!getTokenValue(param, "expcomp", tmp, sizeof(tmp))) {
-        if (sscanf(tmp, "%g", &exp_comp) != 1) {
-            exp_comp = 1.0f;
-        }
-    }
-
-    if (getTokenValueInt(param, "time", &send_frame_time) < 0) {
-        send_frame_time = 0;
-    }
-
-    if ((video_size != 0 && cc->video_frame_size != (size_t)video_size) ||
-        (preview_size != 0 && cc->preview_frame_size != (size_t)preview_size)) {
+    if ((videoSize && (cc->video_frame_size != videoSize)) ||
+            (previewSize && (cc->preview_frame_size != previewSize))) {
         qemuClientReply(qc, false, "Frame size mismatch"sv);
         return;
     }
 
+    bool sendFrameTime;
+    if (!getParamValueV(sendFrameTime, params, kParamSendFrameTime,
+                        parseBool, false)) {
+        qemuClientReply(qc, false, "Invalid 'time' parameter"sv);
+        return;
+    }
 
-    if (video_size) {
+    WhiteBalance whiteBalance;
+    if (!getParamValueV(whiteBalance, params, kParamWhiteBalance,
+                        parseWhiteBalance, kDefaultWhiteBalance)) {
+        qemuClientReply(qc, false, "Invalid 'whiteb' parameter"sv);
+        return;
+    }
+
+    float expComp;
+    if (!getParamValueV(expComp, params, kParamExpComp,
+                        parseExpComp, 1.0f)) {
+        qemuClientReply(qc, false, "Invalid 'expcomp' parameter"sv);
+        return;
+    }
+
+    ClientFrameBuffer fbs[2];
+    int fbs_num = 0;
+    if (videoSize) {
         fbs[fbs_num].pixel_format = cc->pixel_format;
         fbs[fbs_num].width = cc->width;
         fbs[fbs_num].height = cc->height;
         fbs[fbs_num].framebuffer = cc->video_frame;
         fbs_num++;
     }
-    if (preview_size) {
+    if (previewSize) {
         /* TODO: Watch out for preview format changes! */
         fbs[fbs_num].pixel_format = V4L2_PIX_FMT_RGB32;
         fbs[fbs_num].width = cc->width;
@@ -1028,31 +1122,34 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
         fbs_num++;
     }
 
-    frame.framebuffers_count = fbs_num;
-    frame.framebuffers = fbs;
-    frame.staging_framebuffer = &cc->staging_framebuffer;
-    frame.staging_framebuffer_size = &cc->staging_framebuffer_size;
-    frame.frame_time =
-            looper_nowNsWithClock(looper_getForThread(), LOOPER_CLOCK_VIRTUAL);
+    ClientFrame frame = {
+        .framebuffers_count = fbs_num,
+        .framebuffers = fbs,
+        .staging_framebuffer = &cc->staging_framebuffer,
+        .staging_framebuffer_size = &cc->staging_framebuffer_size,
+        .frame_time =
+                looper_nowNsWithClock(looper_getForThread(),
+                                      LOOPER_CLOCK_VIRTUAL),
+    };
 
-    if (readFrameImpl(cc, qc, &frame, r_scale, g_scale, b_scale, exp_comp)) {
+    if (readFrameImpl(cc, qc, &frame, whiteBalance, expComp)) {
         return;
     }
 
-    const size_t payload_size = kReplyPrefixSize +
-        (send_frame_time ? sizeof(int64_t) : 0) + video_size + preview_size;
+    const size_t payloadSize = kReplyPrefixSize +
+        (sendFrameTime ? sizeof(int64_t) : 0) + videoSize + previewSize;
 
-    if (payload_size > kReplyPrefixSize) {
-        sendPayloadSize(qc, payload_size);
+    if (payloadSize > kReplyPrefixSize) {
+        sendPayloadSize(qc, payloadSize);
         qemud_client_send(qc, kOkReplyData, kReplyPrefixSize);
 
-        if (video_size) {
-            qemud_client_send(qc, cc->video_frame, video_size);
+        if (videoSize) {
+            qemud_client_send(qc, cc->video_frame, videoSize);
         }
-        if (preview_size) {
-            qemud_client_send(qc, cc->preview_frame, preview_size);
+        if (previewSize) {
+            qemud_client_send(qc, cc->preview_frame, previewSize);
         }
-        if (send_frame_time) {
+        if (sendFrameTime) {
             const int64_t adjusted_time = frame.frame_time +
                     android_sensors_get_time_offset();
 
@@ -1067,75 +1164,55 @@ static void cameraClientQueryFrame(CameraClient* cc, QemudClient* qc, const char
 }
 
 static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
-                                     const char* param) {
-    const CameraInfo& ci = *cc->camera_info;
-
-    char* w;
-    int format, width, height;
-    uint64_t offset;
-    float r_scale = 1.0f, g_scale = 1.0f, b_scale = 1.0f, exp_comp = 1.0f;
-    char tmp[256];
-    int send_frame_time = 0;
-    ClientFrame frame = {};
-
+                                     const std::string_view params) {
     if (!cc->started) {
         qemuClientReply(qc, "Camera is not started");
         return;
     }
 
-    if (getTokenValue(param, "dim", tmp, sizeof(tmp))) {
+    uint32_t width;
+    uint32_t height;
+    auto rect = std::tie(width, height);
+    if (!getParamValue(rect, params, kParamDim, parseDim)) {
         qemuClientReply(qc, false, "Invalid or missing 'dim' parameter"sv);
         return;
-    } else {
-        w = strchr(tmp, 'x');
-        if (w == nullptr || w[1] == '\0') {
-            qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
-            return;
-        }
-        *w = '\0'; w++;
-        errno = 0;
-        width = strtoi(tmp, nullptr, 10);
-        height = strtoi(w, nullptr, 10);
-        if (errno) {
-            qemuClientReply(qc, false, "Invalid 'dim' parameter"sv);
-            return;
-        }
     }
 
-    if (getTokenValueInt(param, "pix", &format)) {
+    uint32_t pixFormat;
+    if (!getParamValue(pixFormat, params, kParamPix, parsePix)) {
         qemuClientReply(qc, false, "Invalid or missing 'pix' parameter"sv);
         return;
     }
 
-    if (getTokenValue(param, "offset", tmp, sizeof(tmp))) {
+    uint64_t offset;
+    if (!getParamValue(offset, params, kParamOffset, parseOffset)) {
         qemuClientReply(qc, false, "Invalid or missing 'offset' parameter"sv);
         return;
-    } else {
-        if (sscanf(tmp, "%" PRIu64, &offset) != 1) {
-            qemuClientReply(qc, false, "not a decimal number for 'offset'"sv);
-            return;
-        }
     }
 
-    if (!getTokenValue(param, "whiteb", tmp, sizeof(tmp))) {
-        if (sscanf(tmp, "%g,%g,%g", &r_scale, &g_scale, &b_scale) != 3) {
-            r_scale = g_scale = b_scale = 1.0f;
-        }
+    bool sendFrameTime;
+    if (!getParamValueV(sendFrameTime, params, kParamSendFrameTime,
+                        parseBool, false)) {
+        qemuClientReply(qc, false, "Invalid 'time' parameter"sv);
+        return;
     }
 
-    if (!getTokenValue(param, "expcomp", tmp, sizeof(tmp))) {
-        if (sscanf(tmp, "%g", &exp_comp) != 1) {
-            exp_comp = 1.0f;
-        }
+    WhiteBalance whiteBalance;
+    if (!getParamValueV(whiteBalance, params, kParamWhiteBalance,
+                        parseWhiteBalance, kDefaultWhiteBalance)) {
+        qemuClientReply(qc, false, "Invalid or missing 'whiteb' parameter"sv);
+        return;
     }
 
-    if (getTokenValueInt(param, "time", &send_frame_time) < 0) {
-        send_frame_time = 0;
+    float expComp;
+    if (!getParamValueV(expComp, params, kParamExpComp,
+                        parseExpComp, 1.0f)) {
+        qemuClientReply(qc, false, "Invalid or missing 'expcomp' parameter"sv);
+        return;
     }
-
 
     const ClientFrameBuffer fb = {
-        .pixel_format = format,
+        .pixel_format = pixFormat,
         .width = width,
         .height = height,
         .framebuffer =
@@ -1144,96 +1221,108 @@ static void cameraClientQueryFrameV1(CameraClient* cc, QemudClient* qc,
                     offset),
     };
 
-    frame.framebuffers_count = 1;
-    frame.framebuffers = &fb;
-    frame.staging_framebuffer = &cc->staging_framebuffer;
-    frame.staging_framebuffer_size = &cc->staging_framebuffer_size;
-    frame.frame_time =
-            looper_nowNsWithClock(looper_getForThread(), LOOPER_CLOCK_VIRTUAL);
+    ClientFrame frame = {
+        .framebuffers_count = 1,
+        .framebuffers = &fb,
+        .staging_framebuffer = &cc->staging_framebuffer,
+        .staging_framebuffer_size = &cc->staging_framebuffer_size,
+        .frame_time =
+                looper_nowNsWithClock(looper_getForThread(),
+                                      LOOPER_CLOCK_VIRTUAL),
+    };
 
-    if (readFrameImpl(cc, qc, &frame, r_scale, g_scale, b_scale, exp_comp)) {
+    if (readFrameImpl(cc, qc, &frame, whiteBalance, expComp)) {
         return;
     }
 
-    ++cc->frame_count;
-
-    if (send_frame_time) {
-        static const uint8_t kOkColon[] = { 'o', 'k', ':' };
+    if (sendFrameTime) {
         const int64_t adjusted_time = frame.frame_time +
                 android_sensors_get_time_offset();
-
         qemuClientReply(qc, true, &adjusted_time, sizeof(adjusted_time));
     } else {
         qemuClientReply(qc, true);
     }
+
+    ++cc->frame_count;
 }
 
-static void cameraClientHandleEvent(CameraClient*  cc,
-                                    uint8_t*       msg,
-                                    int            msglen,
-                                    QemudClient*   client) {
-    using namespace std::literals;
+static void cameraClientHandleQuery(CameraClient*  cc,
+                                    QemudClient*   client,
+                                    const std::string_view query) {
+    static constexpr std::string_view kQueryConnect         = "connect"sv;
+    static constexpr std::string_view kQueryStart           = "start"sv;
+    static constexpr std::string_view kQueryFrame           = "frame"sv;
+    static constexpr std::string_view kQueryStop            = "stop"sv;
+    static constexpr std::string_view kQueryDisconnect      = "disconnect"sv;
 
-    if (msglen <= 0) {
-        return;
-    }
+    const auto [queryName, queryParams] = parseQuery(query);
 
-    if (cc->command_buffer_offset + msglen >= MAX_QUERY_MESSAGE_SIZE) {
-        cc->command_buffer_offset = 0;
-        qemuClientReply(client, false, "query too long"sv);
-        return;
-    }
-    memcpy(cc->command_buffer + cc->command_buffer_offset, msg, msglen);
-    cc->command_buffer_offset += msglen;
-
-    if (cc->command_buffer[cc->command_buffer_offset - 1] != '\0') {
-        return;
-    }
-
-    static constexpr std::string_view _query_connect    = "connect"sv;
-    static constexpr std::string_view _query_disconnect = "disconnect"sv;
-    static constexpr std::string_view _query_start      = "start"sv;
-    static constexpr std::string_view _query_stop       = "stop"sv;
-    static constexpr std::string_view _query_frame      = "frame"sv;
-
-    const auto [query_name, query_param] =
-        _parse_query(cc->command_buffer, cc->command_buffer_offset);
-    cc->command_buffer_offset = 0;
-
-    if (query_name.empty()) {
-        qemuClientReply(client, false, "Invalid query"sv);
-        return;
-    }
-
-    if (query_name == _query_frame) {
+    if (queryName == kQueryFrame) {
         if (V1) {
-            cameraClientQueryFrameV1(cc, client, query_param.data());
+            cameraClientQueryFrameV1(cc, client, queryParams);
         } else {
-            cameraClientQueryFrame(cc, client, query_param.data());
+            cameraClientQueryFrame(cc, client, queryParams);
         }
-    } else if (query_name == _query_connect) {
-        cameraClientQueryConnect(cc, client, query_param.data());
-    } else if (query_name == _query_disconnect) {
-        cameraClientQueryDisconnect(cc, client, query_param.data());
-    } else if (query_name == _query_start) {
+    } else if (queryName == kQueryConnect) {
+        cameraClientQueryConnect(cc, client);
+    } else if (queryName == kQueryStart) {
         if (V1) {
-            cameraClientQueryStartV1(cc, client, query_param.data());
+            cameraClientQueryStart(cc, client, queryParams, true);
         } else {
-            cameraClientQueryStart(cc, client, query_param.data());
+            cameraClientQueryStart(cc, client, queryParams, false);
         }
-    } else if (query_name == _query_stop) {
-        cameraClientQueryStop(cc, client, query_param.data());
+    } else if (queryName == kQueryStop) {
+        cameraClientQueryStop(cc, client);
+    } else if (queryName == kQueryDisconnect) {
+        cameraClientQueryDisconnect(cc, client);
+    } else if (queryName.empty()) {
+        qemuClientReply(client, false, "Empty query"sv);
     } else {
         qemuClientReply(client, false, "Unknown query"sv);
     }
 }
 
+static void cameraClientHandleEvent(CameraClient*  cc,
+                                    QemudClient*   client,
+                                    const std::string_view msg) {
+    constexpr char kQuerySeparator = 0;
+
+    auto& queryBuffer = cc->queryBuffer;
+
+    const size_t separator = msg.find(kQuerySeparator);
+    if (separator == msg.npos) {
+        queryBuffer.insert(cc->queryBuffer.end(),
+                           msg.begin(), msg.end());
+        return;
+    }
+
+    if (queryBuffer.empty()) {
+        cameraClientHandleQuery(cc, client, msg.substr(0, separator));
+    } else {
+        const size_t querySize = queryBuffer.size() + separator;
+
+        queryBuffer.insert(queryBuffer.end(),
+                           msg.begin(), msg.begin() + separator);
+
+        cameraClientHandleQuery(cc, client,
+                                std::string_view(queryBuffer.data(),
+                                                 querySize));
+    }
+
+    queryBuffer.assign(msg.begin() + separator + 1, msg.end());
+}
+
 static void cameraClientRecv(void*         opaque,
                              uint8_t*      msg,
-                             int           msglen,
+                             const int     msglen,
                              QemudClient*  client) {
-    cameraClientHandleEvent(static_cast<CameraClient*>(opaque),
-                            msg, msglen, client);
+    if (msglen <= 0) {
+        return;
+    }
+
+    cameraClientHandleEvent(static_cast<CameraClient*>(opaque), client,
+                            std::string_view(reinterpret_cast<const char*>(msg),
+                                             msglen));
 }
 
 /* Emulated camera client has been disconnected from the service. */
