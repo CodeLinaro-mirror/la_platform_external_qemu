@@ -15,6 +15,7 @@
 #include "hw/i3c/hci-dma.h"
 #include "hw/i3c/hci-ext.h"
 #include "hw/i3c/hci-dat.h"
+#include "hw/i3c/hci-dct.h"
 
 #define TYPE_MIPI_HCI "mipi.hci"
 OBJECT_DECLARE_TYPE(MIPIHCIState, MIPIHCIClass, MIPI_HCI)
@@ -32,6 +33,12 @@ typedef struct MIPIHCIState {
     HCIDMAState dma;
     HCIExtCapState ext_cap;
     HCIDATState dat;
+    HCIDCTState dct;
+
+    struct {
+        uint32_t ring_header_section_offset;
+        uint32_t ext_caps_section_offset;
+    } cfg;
 
     MemoryRegion iomem;
     I3CBus *bus;

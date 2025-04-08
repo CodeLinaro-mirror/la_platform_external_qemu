@@ -18,6 +18,7 @@
 #include "hw/i3c/hci-ext.h"
 #include "hci-ext-internal.h"
 #include "hci-dat-internal.h"
+#include "hci-dct-internal.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/mipi-hci.h"
@@ -73,6 +74,16 @@ static const MemoryRegionOps hci_dat_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+static const MemoryRegionOps hci_dct_ops = {
+    .read = hci_dct_read,
+    .write = hci_dct_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
 static void mipi_hci_instance_init(Object *obj)
 {
 }
@@ -92,6 +103,10 @@ static const Property mipi_hci_properties[] = {
                        0),
     DEFINE_PROP_UINT32("dat-table-offset", MIPIHCIState,
                        core.cfg.dat_table_offset, 0),
+    DEFINE_PROP_UINT32("dct-table-size", MIPIHCIState, core.cfg.dct_table_size,
+                        0),
+    DEFINE_PROP_UINT32("dct-table-offset", MIPIHCIState,
+                        core.cfg.dct_table_offset, 0),
 };
 
 static void mipi_hci_realize(DeviceState *dev, Error **errp)
@@ -101,6 +116,7 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
     HCIDMAState *dma = &s->dma;
     HCIExtCapState *ext_caps = &s->ext_cap;
     HCIDATState *dat = &s->dat;
+    HCIDCTState *dct = &s->dct;
 
     memory_region_init(&s->iomem, OBJECT(s), TYPE_MIPI_HCI"-mmio",
                        MIPI_HCI_MMIO_SIZE);
@@ -136,6 +152,11 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
                           HCI_DAT_ENTRY_SIZE);
     memory_region_add_subregion(&s->iomem, core->cfg.dat_table_offset,
                                 &dat->mmio);
+    memory_region_init_io(&dct->mmio, OBJECT(s), &hci_dct_ops, s,
+                          TYPE_MIPI_HCI"-dct-mmio",
+                          core->cfg.dct_table_size * sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem, core->cfg.dct_table_offset,
+                                &dct->mmio);
 
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
     s->bus = i3c_init_bus(DEVICE(s), NULL);
