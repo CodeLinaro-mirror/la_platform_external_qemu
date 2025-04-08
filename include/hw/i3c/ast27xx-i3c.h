@@ -15,6 +15,9 @@
 #define TYPE_AST27XX_I3C "ast27xx-i3c"
 OBJECT_DECLARE_TYPE(AST27xxI3CState, AST27xxI3CClass, AST27XX_I3C)
 
+#define AST27XX_I3C_CTRL_NUM_REGS 63
+#define AST27XX_I3C_PHY_NUM_REGS 61
+
 typedef struct AST27xxI3CClass {
     MIPIHCIClass parent_class;
 
@@ -25,7 +28,12 @@ typedef struct AST27xxI3CClass {
 typedef struct AST27xxI3CState {
     MIPIHCIState parent;
 
+    uint32_t ctrl_regs[AST27XX_I3C_CTRL_NUM_REGS];
+    uint32_t phy_regs[AST27XX_I3C_PHY_NUM_REGS];
+
     MemoryRegion iomem;
+    MemoryRegion phy_iomem;
+    MemoryRegion ctrl_iomem;
 } AST27xxI3CState;
 
 #endif /* AST27XX_I3C_H */
