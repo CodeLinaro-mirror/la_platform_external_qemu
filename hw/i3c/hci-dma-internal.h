@@ -10,6 +10,23 @@
 #define HCI_DMA_INTERNAL_H_
 
 #include "hw/i3c/hci-dma.h"
+#include "hci-cmd.h"
+
+typedef struct DataBufferDescr {
+    uint16_t block_size;
+    uint16_t res0:14;
+    bool ioc:1; /* Interrupt on completion. */
+    bool blp:1; /* Buffer vs list pointer (for scatter gather). */
+    uint32_t buffer_ptr_lo;
+    uint32_t buffer_ptr_hi;
+} __attribute__((packed)) DataBufferDescr;
+QEMU_BUILD_BUG_ON(sizeof(DataBufferDescr) != 12);
+
+typedef struct TransferDescr {
+    CmdDescr cmd;
+    DataBufferDescr data_buffer;
+} __attribute__((packed)) TransferDescr;
+QEMU_BUILD_BUG_ON(sizeof(TransferDescr) != 20);
 
 uint64_t hci_dma_header_read(void *opaque, hwaddr offset, unsigned size);
 void hci_dma_header_write(void *opaque, hwaddr offset, uint64_t value,
