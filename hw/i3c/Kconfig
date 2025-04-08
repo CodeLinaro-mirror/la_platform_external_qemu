@@ -22,3 +22,7 @@ config REMOTE_I3C
 config SVC_I3C
     select I3C
     bool
+
+config MIPI_HCI
+    bool
+    select I3C
