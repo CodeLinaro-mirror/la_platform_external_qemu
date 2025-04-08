@@ -48,6 +48,7 @@
 #include "hw/misc/aspeed_ltpi.h"
 #include "hw/arm/aspeed_ast1700.h"
 #include "hw/misc/pci_mbox.h"
+#include "hw/i3c/ast27xx-i3c.h"
 
 #define VBOOTROM_FILE_NAME  "ast27x0_bootrom.bin"
 
@@ -154,6 +155,7 @@ struct Aspeed27x0SoCState {
     AspeedINTCState intc[ASPEED_INTC_NUM];
     AspeedINTCState intcioexp[ASPEED_IOEXP_NUM];
     GICv3State gic;
+    AST27xxI3CState i3c[16];
     MemoryRegion dram_empty;
 };
 
@@ -276,7 +278,22 @@ enum {
     ASPEED_DEV_HACE,
     ASPEED_DEV_DPMCU,
     ASPEED_DEV_DP,
-    ASPEED_DEV_I3C,
+    ASPEED_DEV_I3C0,
+    ASPEED_DEV_I3C1,
+    ASPEED_DEV_I3C2,
+    ASPEED_DEV_I3C3,
+    ASPEED_DEV_I3C4,
+    ASPEED_DEV_I3C5,
+    ASPEED_DEV_I3C6,
+    ASPEED_DEV_I3C7,
+    ASPEED_DEV_I3C8,
+    ASPEED_DEV_I3C9,
+    ASPEED_DEV_I3C10,
+    ASPEED_DEV_I3C11,
+    ASPEED_DEV_I3C12,
+    ASPEED_DEV_I3C13,
+    ASPEED_DEV_I3C14,
+    ASPEED_DEV_I3C15,
     ASPEED_DEV_ESPI,
     ASPEED_DEV_UDC,
     ASPEED_DEV_JTAG0,

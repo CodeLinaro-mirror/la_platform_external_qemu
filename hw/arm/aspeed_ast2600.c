@@ -80,7 +80,7 @@ static const hwaddr aspeed_soc_ast2600_memmap[] = {
     [ASPEED_DEV_VUART]     = 0x1E787000,
     [ASPEED_DEV_FSI1]      = 0x1E79B000,
     [ASPEED_DEV_FSI2]      = 0x1E79B100,
-    [ASPEED_DEV_I3C]       = 0x1E7A0000,
+    [ASPEED_DEV_I3C0]       = 0x1E7A0000,
     [ASPEED_DEV_PCIE_MMIO1] = 0x60000000,
     [ASPEED_DEV_SDRAM]     = 0x80000000,
 };
@@ -141,7 +141,7 @@ static const int aspeed_soc_ast2600_irqmap[] = {
     [ASPEED_DEV_DP]        = 62,
     [ASPEED_DEV_FSI1]      = 100,
     [ASPEED_DEV_FSI2]      = 101,
-    [ASPEED_DEV_I3C]       = 102,   /* 102 -> 107 */
+    [ASPEED_DEV_I3C0]      = 102,   /* 102 -> 107 */
 };
 
 #define AST_BMC_DEV_MEM_SIZE    0x100000
@@ -724,10 +724,10 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
         return;
     }
     aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->i3c), 0,
-                    sc->memmap[ASPEED_DEV_I3C]);
+                    sc->memmap[ASPEED_DEV_I3C0]);
     for (i = 0; i < ASPEED_I3C_NR_DEVICES; i++) {
         irq = qdev_get_gpio_in(DEVICE(&a->a7mpcore),
-                               sc->irqmap[ASPEED_DEV_I3C] + i);
+                               sc->irqmap[ASPEED_DEV_I3C0] + i);
         /* The AST2600 I3C controller has one IRQ per bus. */
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->i3c.devices[i]), 0, irq);
     }

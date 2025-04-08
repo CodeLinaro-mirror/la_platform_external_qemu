@@ -54,7 +54,7 @@ static const hwaddr aspeed_soc_ast1030_memmap[] = {
     [ASPEED_DEV_WDT]       = 0x7E785000,
     [ASPEED_DEV_LPC]       = 0x7E789000,
     [ASPEED_DEV_PECI]      = 0x7E78B000,
-    [ASPEED_DEV_I3C]       = 0x7E7A0000,
+    [ASPEED_DEV_I3C0]      = 0x7E7A0000,
     [ASPEED_DEV_I2C]       = 0x7E7B0000,
 };
 
@@ -90,7 +90,7 @@ static const int aspeed_soc_ast1030_irqmap[] = {
     [ASPEED_DEV_ADC]       = 46,
     [ASPEED_DEV_SPI1]      = 65,
     [ASPEED_DEV_SPI2]      = 66,
-    [ASPEED_DEV_I3C]       = 102, /* 102 -> 105 */
+    [ASPEED_DEV_I3C0]      = 102, /* 102 -> 105 */
     [ASPEED_DEV_I2C]       = 110, /* 110 ~ 123 */
     [ASPEED_DEV_KCS]       = 138, /* 138 -> 142 */
     [ASPEED_DEV_UDC]       = 9,
@@ -285,10 +285,10 @@ static bool aspeed_soc_ast10x0_realize(Aspeed10x0SoCState *a, Error **errp)
         return false;
     }
     aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->i3c), 0,
-                    sc->memmap[ASPEED_DEV_I3C]);
+                    sc->memmap[ASPEED_DEV_I3C0]);
     for (i = 0; i < ASPEED_I3C_NR_DEVICES; i++) {
         qemu_irq irq = qdev_get_gpio_in(DEVICE(&a->armv7m),
-                                        sc->irqmap[ASPEED_DEV_I3C] + i);
+                                        sc->irqmap[ASPEED_DEV_I3C0] + i);
         /* The AST1030 I3C controller has one IRQ per bus. */
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->i3c.devices[i]), 0, irq);
     }

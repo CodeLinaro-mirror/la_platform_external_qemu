@@ -74,6 +74,22 @@ static const hwaddr aspeed_soc_ast2700_memmap[] = {
     [ASPEED_DEV_INTCIO]    =  0x14C18000,
     [ASPEED_DEV_PCIE_PHY2] =  0x14C1C000,
     [ASPEED_DEV_SLIIO]     =  0x14C1E000,
+    [ASPEED_DEV_I3C0]      =  0x14C20000,
+    [ASPEED_DEV_I3C1]      =  0x14C21000,
+    [ASPEED_DEV_I3C2]      =  0x14C22000,
+    [ASPEED_DEV_I3C3]      =  0x14C23000,
+    [ASPEED_DEV_I3C4]      =  0x14C24000,
+    [ASPEED_DEV_I3C5]      =  0x14C25000,
+    [ASPEED_DEV_I3C6]      =  0x14C26000,
+    [ASPEED_DEV_I3C7]      =  0x14C27000,
+    [ASPEED_DEV_I3C8]      =  0x14C28000,
+    [ASPEED_DEV_I3C9]      =  0x14C29000,
+    [ASPEED_DEV_I3C10]     =  0x14C2A000,
+    [ASPEED_DEV_I3C11]     =  0x14C2B000,
+    [ASPEED_DEV_I3C12]     =  0x14C2C000,
+    [ASPEED_DEV_I3C13]     =  0x14C2D000,
+    [ASPEED_DEV_I3C14]     =  0x14C2E000,
+    [ASPEED_DEV_I3C15]     =  0x14C2F000,
     [ASPEED_DEV_VUART]     =  0x14C30000,
     [ASPEED_DEV_UART0]     =  0x14C33000,
     [ASPEED_DEV_UART1]     =  0x14C33100,
@@ -136,7 +152,23 @@ static const int aspeed_soc_ast2700a1_irqmap[] = {
     [ASPEED_DEV_FMC]       = 195,
     [ASPEED_DEV_WDT]       = 195,
     [ASPEED_DEV_PWM]       = 195,
-    [ASPEED_DEV_I3C]       = 195,
+    [ASPEED_DEV_I3C0]      = 195,
+    [ASPEED_DEV_I3C1]      = 195,
+    [ASPEED_DEV_I3C2]      = 195,
+    [ASPEED_DEV_I3C3]      = 195,
+    [ASPEED_DEV_I3C4]      = 195,
+    [ASPEED_DEV_I3C5]      = 195,
+    [ASPEED_DEV_I3C6]      = 195,
+    [ASPEED_DEV_I3C7]      = 195,
+    [ASPEED_DEV_I3C8]      = 195,
+    [ASPEED_DEV_I3C8]      = 195,
+    [ASPEED_DEV_I3C9]      = 195,
+    [ASPEED_DEV_I3C10]     = 195,
+    [ASPEED_DEV_I3C11]     = 195,
+    [ASPEED_DEV_I3C12]     = 195,
+    [ASPEED_DEV_I3C13]     = 195,
+    [ASPEED_DEV_I3C14]     = 195,
+    [ASPEED_DEV_I3C15]     = 195,
     [ASPEED_DEV_PCIE2]     = 196,
     [ASPEED_DEV_UART0]     = 196,
     [ASPEED_DEV_UART1]     = 196,
@@ -183,7 +215,22 @@ static const int ast2700_gic194_intcmap[] = {
 
 /* GICINT 195 */
 static const int ast2700_gic195_intcmap[] = {
-    [ASPEED_DEV_I3C]       = 0,
+    [ASPEED_DEV_I3C0]      = 0,
+    [ASPEED_DEV_I3C1]      = 1,
+    [ASPEED_DEV_I3C2]      = 2,
+    [ASPEED_DEV_I3C3]      = 3,
+    [ASPEED_DEV_I3C4]      = 4,
+    [ASPEED_DEV_I3C5]      = 5,
+    [ASPEED_DEV_I3C6]      = 6,
+    [ASPEED_DEV_I3C7]      = 7,
+    [ASPEED_DEV_I3C8]      = 8,
+    [ASPEED_DEV_I3C9]      = 9,
+    [ASPEED_DEV_I3C10]     = 10,
+    [ASPEED_DEV_I3C11]     = 11,
+    [ASPEED_DEV_I3C12]     = 12,
+    [ASPEED_DEV_I3C13]     = 13,
+    [ASPEED_DEV_I3C14]     = 14,
+    [ASPEED_DEV_I3C15]     = 15,
     [ASPEED_DEV_WDT]       = 16,
     [ASPEED_DEV_FMC]       = 25,
     [ASPEED_DEV_PWM]       = 29,
@@ -547,6 +594,10 @@ static void aspeed_soc_ast2700_init(Object *obj)
                                 TYPE_ASPEED_AST1700);
         qdev_prop_set_uint32(DEVICE(&s->ioexp[i]), "silicon-rev",
                              sc->silicon_rev);
+    }
+
+    for (i = 0; i < ARRAY_SIZE(a->i3c); i++) {
+        object_initialize_child(obj, "i3c[*]", &a->i3c[i], TYPE_AST27XX_I3C);
     }
 
     object_initialize_child(obj, "dpmcu", &s->dpmcu,
@@ -1116,6 +1167,13 @@ static void aspeed_soc_ast2700_realize(DeviceState *dev, Error **errp)
             sysbus_connect_irq(SYS_BUS_DEVICE(&s->ioexp[i].i2c.busses[j]),
                                0, irq);
         }
+    }
+
+    /* I3C */
+    for (i = 0; i < ARRAY_SIZE(a->i3c); i++) {
+        sysbus_realize(SYS_BUS_DEVICE(&a->i3c[i]), errp);
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&a->i3c[i]), 0,
+                        sc->memmap[ASPEED_DEV_I3C0 + i]);
     }
 
     aspeed_mmio_map_unimplemented(s->memory, SYS_BUS_DEVICE(&s->dpmcu),
