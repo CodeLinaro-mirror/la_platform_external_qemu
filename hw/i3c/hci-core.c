@@ -19,6 +19,9 @@
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/core/irq.h"
+#include "hci-dat-internal.h"
+#include "hci-dct-internal.h"
+#include "hci-dma-internal.h"
 
 static const uint32_t hci_core_ro_mask[HCI_CORE_NUM_REGS] = {
     [R_HCI_VERSION]                 = 0xffffffff,
@@ -73,14 +76,33 @@ uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)
     return s->regs[offset];
 }
 
+static void hci_core_reset_control_w(MIPIHCIState *hci, uint32_t val)
+{
+    if (FIELD_EX32(val, RESET_CONTROL, SOFT_RST)) {
+        hci_core_reset(&hci->core);
+        hci_dma_reset(&hci->dma);
+        hci_dat_reset(&hci->dat, hci->core.cfg.dat_table_size);
+        hci_dct_reset(&hci->dct, hci->core.cfg.dct_table_size);
+    }
+}
+
 void hci_core_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
-    HCICoreState *s = &(MIPI_HCI(opaque)->core);
+    MIPIHCIState *hci = MIPI_HCI(opaque);
+    HCICoreState *s = &hci->core;
     offset /= sizeof(*s->regs);
+    uint32_t val32 = (uint32_t)value;
 
     /* MMIO region size should prevent this from happening. */
     g_assert(offset < ARRAY_SIZE(s->regs));
 
-    value &= ~hci_core_ro_mask[offset];
-    s->regs[offset] = value;
+    val32 &= ~hci_core_ro_mask[offset];
+    switch (offset) {
+    case R_RESET_CONTROL:
+        hci_core_reset_control_w(hci, val32);
+        break;
+    default:
+        s->regs[offset] = val32;
+        break;
+    }
 }
