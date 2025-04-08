@@ -60,12 +60,22 @@ struct CameraServiceDesc {
 };
 
 struct CameraCallbackDesc {
-    void* context = nullptr;
-    camera_callback_t callback = nullptr;
-    CameraSourceType source;
-};
+    void set(camera_callback_t cb, void* ctx, CameraSourceType src) {
+        callback = cb;
+        context = ctx;
+        source = src;
+    }
 
-static CameraCallbackDesc g_cameraCallbackDesc;
+    void operator()(CameraSourceType src, bool value) const {
+        if (callback && (source == src)) {
+            callback(context, value);
+        }
+    }
+
+    camera_callback_t callback = nullptr;
+    void* context = nullptr;
+    CameraSourceType source = {};
+};
 
 using namespace std::literals;
 
@@ -261,9 +271,8 @@ static std::string cameraInfoToString(const CameraInfo& ci) {
 static CameraInfo* cameraInfoGetByDisplayName(const char* disp_name,
                                               CameraInfo* arr,
                                               int num) {
-    int n;
-    for (n = 0; n < num; n++) {
-        if (!arr[n].in_use && arr[n].display_name != nullptr &&
+    for (int n = 0; n < num; n++) {
+        if (!arr[n].in_use && arr[n].display_name &&
             !strcmp(arr[n].display_name, disp_name)) {
             return &arr[n];
         }
@@ -396,7 +405,7 @@ static void webcamSetup(CameraServiceDesc* csd,
 
     CameraInfo* srcCi =
         cameraInfoGetByDisplayName(disp_name, webcams, webcams_cnt);
-    if (srcCi == nullptr) {
+    if (!srcCi) {
         W("Camera name '%s' is not found in the list of connected cameras.\n"
           "Use '-webcam-list' emulator option to obtain the list of connected camera names.\n",
           disp_name);
@@ -409,7 +418,7 @@ static void webcamSetup(CameraServiceDesc* csd,
     camera_info_copy(&dstCi, srcCi);
     dstCi.vtbl = &vtbl;
 
-    if (dstCi.direction != nullptr) {
+    if (dstCi.direction) {
         free(dstCi.direction);
     }
 
@@ -481,20 +490,18 @@ static void cameraServiceInit(CameraServiceDesc* csd) {
  * Return:
  *  0 on success, or != 0 on failure.
  */
-static int factoryClientListCameras(CameraServiceDesc* csd, QemudClient* client) {
-    if (csd->camera_count == 0) {
+static void factoryClientListCameras(const CameraServiceDesc& csd, QemudClient* client) {
+    if (!csd.camera_count) {
         /* No cameras connected to the host. Reply with "\n" */
         qemuClientReply(client, true, "\n"sv);
-        return 0;
     }
 
     std::string reply;
-    for (int n = 0; n < csd->camera_count; n++) {
-        reply += cameraInfoToString(csd->camera_info[n]);
+    for (int i = 0; i < csd.camera_count; i++) {
+        reply += cameraInfoToString(csd.camera_info[i]);
     }
 
     qemuClientReply(client, true, reply);
-    return 0;
 }
 
 /* Handles a message received from the emulated camera factory client.
@@ -513,8 +520,6 @@ static void factoryClientRecv(void*         opaque,
 
     static constexpr std::string_view _query_list = "list"sv;
 
-    CameraServiceDesc* csd = (CameraServiceDesc*)opaque;
-
     const auto [query_name, query_param] = _parse_query(msg, msglen);
     if (query_name.empty()) {
         qemuClientReply(client, false, "Invalid query format"sv);
@@ -522,7 +527,8 @@ static void factoryClientRecv(void*         opaque,
     }
 
     if (query_name == _query_list) {
-        factoryClientListCameras(csd, client);
+        factoryClientListCameras(*static_cast<CameraServiceDesc*>(opaque),
+                                 client);
     } else {
         qemuClientReply(client, false, "Unknown query name"sv);
     }
@@ -577,7 +583,7 @@ struct CameraClient {
     bool                started = false;
 
     ~CameraClient() {
-        if (camera != nullptr) {
+        if (camera) {
             (camera_info->vtbl->close)(camera);
         }
 
@@ -588,7 +594,9 @@ struct CameraClient {
     };
 };
 
-static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* param) {
+CameraCallbackDesc g_cameraCallbackDesc;
+
+static CameraClient* cameraClientCreate(CameraServiceDesc& csd, const char* param) {
 
     char* device_name = nullptr;
     if (getTokenValueAlloc(param, "name", &device_name)) {
@@ -608,12 +616,12 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
         }
     }
 
-    CameraInfo* ci = std::find_if(csd->camera_info, &csd->camera_info[csd->camera_count],
+    CameraInfo* ci = std::find_if(csd.camera_info, &csd.camera_info[csd.camera_count],
                                   [device_name](const CameraInfo& ci){
                                         return ci.device_name &&
                                                !strcmp(ci.device_name, device_name);
                                   });
-    if (ci == &csd->camera_info[csd->camera_count]) {
+    if (ci == &csd.camera_info[csd.camera_count]) {
         ::free(device_name);
         return nullptr;
     }
@@ -629,33 +637,29 @@ static CameraClient* cameraClientCreate(CameraServiceDesc* csd, const char* para
 static void cameraClientQueryConnect(CameraClient* cc, QemudClient* qc, const char* param) {
     const CameraInfo& ci = *cc->camera_info;
 
-    if (cc->camera != nullptr) {
+    if (cc->camera) {
         qemuClientReply(qc, true, "Camera is already connected"sv);
         return;
     }
 
     cc->camera = (ci.vtbl->open)(ci.device_name, cc->inp_channel);
-    if (cc->camera == nullptr) {
+    if (!cc->camera) {
         qemuClientReply(qc, false, "Unable to open camera device."sv);
         return;
     }
 
-    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
-            g_cameraCallbackDesc.callback) {
-        g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, true);
-    }
     qemuClientReply(qc, true);
 }
 
 static void cameraClientQueryDisconnect(CameraClient* cc, QemudClient* qc, const char* param) {
     const CameraInfo& ci = *cc->camera_info;
 
-    if (cc->camera == nullptr) {
+    if (!cc->camera) {
         qemuClientReply(qc, true, "Camera is not connected"sv);
         return;
     }
 
-    if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
+    if ((!V1 && cc->video_frame) || (V1 && cc->started)) {
         qemuClientReply(qc, false, "Camera is not stopped"sv);
         return;
     }
@@ -675,7 +679,7 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
     camera_metrics_report_start_session(ci.vtbl->camera_source, ci.direction, width,
                                         height, pix_format);
 
-    if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
+    if ((!V1 && cc->video_frame) || (V1 && cc->started)) {
         if (cc->pixel_format == (uint32_t)pix_format && cc->width == width &&
             cc->height == height) {
             return CLIENT_START_RESULT_ALREADY_STARTED;
@@ -719,7 +723,7 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
          * framebuffers. */
         cc->video_frame =
                 (uint8_t*)malloc(cc->video_frame_size + cc->preview_frame_size);
-        if (cc->video_frame == nullptr) {
+        if (!cc->video_frame) {
             return CLIENT_START_RESULT_OUT_OF_MEMORY;
         }
 
@@ -740,6 +744,7 @@ static ClientStartResult cameraClientStart(CameraClient* cc,
         cc->started = true;
     }
 
+    g_cameraCallbackDesc(ci.vtbl->camera_source, true);
     return CLIENT_START_RESULT_SUCCESS;
 }
 
@@ -748,7 +753,7 @@ static void cameraClientQueryStart(CameraClient* cc, QemudClient* qc, const char
     char dim[64];
     int width, height, pix_format;
 
-    if (cc->camera == nullptr) {
+    if (!cc->camera) {
         qemuClientReply(qc, false, "Camera is not connected"sv);
         return;
     }
@@ -904,7 +909,7 @@ static void cameraClientQueryStartV1(CameraClient* cc, QemudClient* qc,
 static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char* param) {
     const CameraInfo& ci = *cc->camera_info;
 
-    if ((!V1 && cc->video_frame == nullptr) || (V1 && !cc->started)) {
+    if ((!V1 && !cc->video_frame) || (V1 && !cc->started)) {
         qemuClientReply(qc, true, "Camera is not started"sv);
         return;
     }
@@ -925,11 +930,7 @@ static void cameraClientQueryStop(CameraClient* cc, QemudClient* qc, const char*
 
     camera_metrics_report_stop_session(cc->frame_count);
 
-    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
-            g_cameraCallbackDesc.callback) {
-        g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, false);
-    }
-
+    g_cameraCallbackDesc(ci.vtbl->camera_source, false);
     qemuClientReply(qc, true);
 }
 
@@ -1231,16 +1232,13 @@ static void cameraClientRecv(void*         opaque,
                              uint8_t*      msg,
                              int           msglen,
                              QemudClient*  client) {
-    CameraClient* cc = (CameraClient*)opaque;
-    cameraClientHandleEvent(cc, msg, msglen, client);
+    cameraClientHandleEvent(static_cast<CameraClient*>(opaque),
+                            msg, msglen, client);
 }
 
 /* Emulated camera client has been disconnected from the service. */
 static void cameraClientClose(void* opaque) {
-    CameraClient* cc = static_cast<CameraClient*>(opaque);
-
-
-    delete cc;
+    delete static_cast<CameraClient*>(opaque);
 }
 
 /* Saves the state of the camera client.
@@ -1249,15 +1247,15 @@ static void cameraClientClose(void* opaque) {
  * reconnect on load.
  */
 static void cameraClientSave(Stream* f, QemudClient* client, void* opaque) {
-    CameraClient* cc = (CameraClient*)opaque;
+    CameraClient* cc = static_cast<CameraClient*>(opaque);
 
-    stream_put_be32(f, cc->camera != nullptr ? 1 : 0);
+    stream_put_be32(f, cc->camera ? 1 : 0);
     if (V1) {
         stream_put_be32(f, cc->started ? 1: 0);
     } else {
-        stream_put_be32(f, cc->video_frame != nullptr ? 1 : 0);
+        stream_put_be32(f, cc->video_frame ? 1 : 0);
     }
-    if ((!V1 && cc->video_frame != nullptr) || (V1 && cc->started)) {
+    if ((!V1 && cc->video_frame) || (V1 && cc->started)) {
         stream_put_be32(f, cc->pixel_format);
         stream_put_be32(f, cc->width);
         stream_put_be32(f, cc->height);
@@ -1265,20 +1263,20 @@ static void cameraClientSave(Stream* f, QemudClient* client, void* opaque) {
 }
 
 static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
-    CameraClient* cc = (CameraClient*)opaque;
+    CameraClient* cc = static_cast<CameraClient*>(opaque);
     const CameraInfo& ci = *cc->camera_info;
 
     int is_camera_connected = stream_get_be32(f);
-    if (is_camera_connected && cc->camera == nullptr) {
+    if (is_camera_connected && !cc->camera) {
         cc->camera = (ci.vtbl->open)(ci.device_name, cc->inp_channel);
-        if (cc->camera == nullptr) {
+        if (!cc->camera) {
             return -EIO;
         }
     }
 
     // Try to stop the camera if it is already started in order to avoid a frame
     // size or format mismatch.
-    if ((!V1 &&cc->video_frame != nullptr) || (V1 && cc->started)) {
+    if ((!V1 && cc->video_frame) || (V1 && cc->started)) {
         if ((ci.vtbl->stop_capturing)(cc->camera) == 0) {
             if (cc->video_frame) {
                 free(cc->video_frame);
@@ -1306,10 +1304,8 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
             return -EIO;
         }
     }
-    if ((ci.vtbl->camera_source == g_cameraCallbackDesc.source) &&
-            g_cameraCallbackDesc.callback)
-        g_cameraCallbackDesc.callback(g_cameraCallbackDesc.context, is_camera_started);
 
+    g_cameraCallbackDesc(ci.vtbl->camera_source, is_camera_started);
     return 0;
 }
 
@@ -1329,35 +1325,34 @@ static int cameraClientLoad(Stream* f, QemudClient* client, void* opaque) {
  */
 static QemudClient* cameraServiceConnect(void*          opaque,
                                          QemudService*  serv,
-                                         int            channel,
-                                         const char*    client_param) {
-    QemudClient*  client = nullptr;
-    CameraServiceDesc* csd = (CameraServiceDesc*)opaque;
+                                         const int      channel,
+                                         const char*    clientParams) {
+    CameraServiceDesc* csd = static_cast<CameraServiceDesc*>(opaque);
 
-    if (client_param == nullptr || *client_param == '\0') {
+    if (!clientParams || !*clientParams) {
         /* This is an emulated camera factory client. */
-        client = qemud_client_new(serv, channel, client_param, csd,
-                                  factoryClientRecv, factoryClientClose,
-                                  nullptr, nullptr);
+        return qemud_client_new(serv, channel, clientParams, csd,
+                                &factoryClientRecv, &factoryClientClose,
+                                nullptr, nullptr);
     } else {
         /* This is an emulated camera client. */
-        CameraClient* cc = cameraClientCreate(csd, client_param);
-        if (cc != nullptr) {
-            client = qemud_client_new(serv, channel, client_param, cc,
-                                      cameraClientRecv, cameraClientClose,
-                                      cameraClientSave, cameraClientLoad);
+        CameraClient* cc = cameraClientCreate(*csd, clientParams);
+        if (cc) {
+            return qemud_client_new(serv, channel, clientParams, cc,
+                                    &cameraClientRecv, &cameraClientClose,
+                                    &cameraClientSave, &cameraClientLoad);
         }
     }
 
-    return client;
+    return nullptr;
 }
 
+// TODO: remove this function and g_cameraCallbackDesc and call
+// the callback from camera_XYZ_(start|stop)_capturing.
 void register_camera_status_change_callback(camera_callback_t cb,
                                             void* ctx,
                                             CameraSourceType src) {
-    g_cameraCallbackDesc.callback = cb;
-    g_cameraCallbackDesc.context = ctx;
-    g_cameraCallbackDesc.source = src;
+    g_cameraCallbackDesc.set(cb, ctx, src);
 }
 
 void android_camera_service_init(void) {
@@ -1372,7 +1367,7 @@ void android_camera_service_init(void) {
         QemudService* serv = qemud_service_register(kServiceCamera, 0,
                 &s_cameraServiceDesc, &cameraServiceConnect,
                 nullptr, nullptr);
-        if (serv == nullptr) {
+        if (!serv) {
             derror("%s: Could not register '%s' service",
                     __func__, kServiceCamera);
             return;
