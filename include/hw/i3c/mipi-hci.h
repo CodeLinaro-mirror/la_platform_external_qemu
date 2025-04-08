@@ -16,6 +16,7 @@
 #include "hw/i3c/hci-ext.h"
 #include "hw/i3c/hci-dat.h"
 #include "hw/i3c/hci-dct.h"
+#include "hw/i3c/i3c.h"
 
 #define TYPE_MIPI_HCI "mipi.hci"
 OBJECT_DECLARE_TYPE(MIPIHCIState, MIPIHCIClass, MIPI_HCI)

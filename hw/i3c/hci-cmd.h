@@ -11,6 +11,14 @@
 
 #include "hw/i3c/mipi-hci.h"
 
+typedef enum {
+  CMD_ATTR_REGULAR_XFER = 0x00,
+  CMD_ATTR_IMMEDIATE_XFER = 0x01,
+  CMD_ATTR_ADDR_ASSIGN = 0x02,
+  CMD_ATTR_COMBO_XFER = 0x03,
+  CMD_ATTR_INTERNAL_CONTROL = 0x07,
+} CmdAttr;
+
 typedef struct AddrCmd {
   uint8_t cmd_attr:3;
   uint8_t tid:4; /* Transaction ID. */
@@ -100,6 +108,22 @@ typedef union CmdDescr {
 } __attribute__((packed)) CmdDescr;
 QEMU_BUILD_BUG_ON(sizeof(CmdDescr) != sizeof(uint64_t));
 
+typedef enum {
+  RESP_STATUS_SUCCESS = 0,
+  RESP_STATUS_ERROR_CRC = 0x01,
+  RESP_STATUS_ERROR_PARITY = 0x02,
+  RESP_STATUS_ERROR_FRAME = 0x03,
+  RESP_STATUS_ERROR_ADDR_HEADER = 0x04,
+  RESP_STATUS_ERROR_NACK = 0x05,
+  RESP_STATUS_ERROR_OVL = 0x06,
+  RESP_STATUS_ERROR_SHORT_READ_ERR = 0x07,
+  /* Aborted due to internal error. */
+  RESP_STATUS_ERROR_HC_ABORTED = 0x08,
+  /* I2C NACK or I3C early termination. */
+  RESP_STATUS_ERROR_XFER_ABORTED = 0x09,
+  RESP_STATUS_ERROR_NOT_SUPPORTED = 0x0a,
+} RespStatus;
+
 typedef union RespDescr {
     struct {
         uint16_t length;
@@ -111,5 +135,8 @@ typedef union RespDescr {
     uint32_t val32;
 } __attribute__((packed)) RespDescr;
 QEMU_BUILD_BUG_ON(sizeof(RespDescr) != sizeof(uint32_t));
+
+RespStatus hci_cmd_addr_assign(MIPIHCIState *hci, const AddrCmd *desc,
+                               RespDescr *resp);
 
 #endif  /* HCI_CMD_H */

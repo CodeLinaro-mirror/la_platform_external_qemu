@@ -215,6 +215,7 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
                                 &dct->mmio);
 
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+
     s->bus = i3c_init_bus(DEVICE(s), NULL);
 }
 

@@ -15,9 +15,19 @@
 #include "hw/core/registerfields.h"
 #include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
+#include "hci-cmd.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/core/irq.h"
+#include "hci-dma-internal.h"
+
+#define INC_AND_ROLLOVER(x, max) \
+    do {                         \
+        x++;                     \
+        if (x >= max) {          \
+            x = 0;               \
+        }                        \
+    } while (0)
 
 static const uint32_t hci_dma_header_ro_mask[] = {
     [R_RHS_CONTROL] = 0xfffffff0,
@@ -116,18 +126,103 @@ static bool hci_dma_ring_ok(HCIDMAState *s)
     return ok;
 }
 
-static void hci_dma_xfer(HCIDMAState *s)
+static void hci_dma_read_descr(HCIDMAState *s, TransferDescr *desc)
 {
+    uint64_t addr = s->regs[R_RH_CMD_RING_BASE_HI];
+    uint8_t dequeue_ptr = ARRAY_FIELD_EX32(s->regs, RH_OPERATION2, CR_DEQ_PTR);
+    addr <<= 32;
+    addr |= s->regs[R_RH_CMD_RING_BASE_LO];
+    addr += (dequeue_ptr * s->cfg.xfer_struct_size);
+
+    cpu_physical_memory_read(addr, desc, sizeof(*desc));
+}
+
+static void hci_dma_push_resp(HCIDMAState *s, RespDescr *resp)
+{
+    uint64_t addr = s->regs[R_RH_RESP_RING_BASE_HI];
+    /*
+     * The DMA response is a pair with the command that was just handled.
+     * Therefore, we use the offset of where the command was, which is the
+     * dequeue pointer.
+     */
+    uint8_t dequeue_ptr = ARRAY_FIELD_EX32(s->regs, RH_OPERATION2, CR_DEQ_PTR);
+    addr <<= 32;
+    addr |= s->regs[R_RH_RESP_RING_BASE_LO];
+    addr += (dequeue_ptr * s->cfg.resp_struct_size);
+
+    cpu_physical_memory_write(addr, resp, sizeof(*resp));
+}
+
+static void hci_dma_xfer(MIPIHCIState *hci)
+{
+    HCIDMAState *s = &(hci->dma);
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
     if (!hci_dma_can_xfer(s) || !hci_dma_ring_ok(s)) {
         return;
     }
 
-    /* TODO: Read from the ring and execute transfers. */
+    while (!hci_dma_ring_empty(s)) {
+        TransferDescr desc;
+        RespDescr resp;
+        RespStatus status;
+        bool roc = true;
+        hci_dma_read_descr(s, &desc);
+
+        switch (desc.cmd.cmd_attr) {
+        case CMD_ATTR_ADDR_ASSIGN:
+            status = hci_cmd_addr_assign(hci, &desc.cmd.addr_cmd, &resp);
+            roc = desc.cmd.addr_cmd.roc;
+            break;
+        case CMD_ATTR_INTERNAL_CONTROL:
+        case CMD_ATTR_REGULAR_XFER:
+        case CMD_ATTR_COMBO_XFER:
+        case CMD_ATTR_IMMEDIATE_XFER:
+            {
+                g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+                qemu_log_mask(LOG_UNIMP, "%s: Unimplemented command 0x%x\n",
+                              path, desc.cmd.cmd_attr);
+            }
+            status = RESP_STATUS_ERROR_NOT_SUPPORTED;
+            break;
+        default:
+            {
+                g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+                qemu_log_mask(LOG_UNIMP, "%s: Unknown command 0x%x\n",
+                              path, desc.cmd.cmd_attr);
+            }
+            status = RESP_STATUS_ERROR_NOT_SUPPORTED;
+            break;
+        }
+
+        if (status == RESP_STATUS_SUCCESS) {
+            ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, TRANSFER_COMPLETION_STAT,
+                             1);
+        } else {
+            ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, TRANSFER_ERR_STAT, 1);
+        }
+        if (desc.data_buffer.ioc || status != RESP_STATUS_SUCCESS) {
+            c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
+        }
+        if (roc || status != RESP_STATUS_SUCCESS) {
+            hci_dma_push_resp(s, &resp);
+        }
+
+        /* Increment the ring dequeue pointer. */
+        uint8_t dequeue_ptr = ARRAY_FIELD_EX32(s->regs, RH_OPERATION2,
+                                               CR_DEQ_PTR);
+        INC_AND_ROLLOVER(dequeue_ptr,
+                         ARRAY_FIELD_EX32(s->regs, CR_SETUP, RING_SIZE));
+        ARRAY_FIELD_DP32(s->regs, RH_OPERATION2, CR_DEQ_PTR, dequeue_ptr);
+    }
 }
 
-static void hci_dma_rh_control_w(HCIDMAState *s, uint32_t val)
+static void hci_dma_rh_control_w(MIPIHCIState *hci, uint32_t val)
 {
+    HCIDMAState *s = &hci->dma;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
     uint32_t prev_val = s->regs[R_RH_CONTROL];
+
     s->regs[R_RH_CONTROL] = val;
 
     /* RH_CONTROL.ENABLED transitioning from 0 to 1 clears pointer states. */
@@ -155,18 +250,21 @@ static void hci_dma_rh_control_w(HCIDMAState *s, uint32_t val)
     ARRAY_FIELD_DP32(s->regs, RH_STATUS, RING_ABORTED,
                      FIELD_EX32(val, RH_CONTROL, RING_ABORT));
 
-    hci_dma_xfer(s);
+    hci_dma_xfer(hci);
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
 }
 
-static void hci_dma_rh_operation1_w(HCIDMAState *s, uint32_t val)
+static void hci_dma_rh_operation1_w(MIPIHCIState *hci, uint32_t val)
 {
+    HCIDMAState *s = &hci->dma;
     uint32_t prev_val = s->regs[R_RH_OPERATION1];
+
     s->regs[R_RH_OPERATION1] = val;
 
     /* Attempt to transfer if the enqueue pointer was updated. */
     if (FIELD_EX32(prev_val, RH_OPERATION1, CR_ENQ_PTR) <
         FIELD_EX32(val, RH_OPERATION1, CR_ENQ_PTR)) {
-        hci_dma_xfer(s);
+        hci_dma_xfer(hci);
     }
 }
 
@@ -204,10 +302,10 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 
     switch (offset) {
     case R_RH_CONTROL:
-        hci_dma_rh_control_w(s, val32);
+        hci_dma_rh_control_w(hci, val32);
         break;
     case R_RH_OPERATION1:
-        hci_dma_rh_operation1_w(s, val32);
+        hci_dma_rh_operation1_w(hci, val32);
         break;
     case R_RH_INTR_STATUS:
         hci_dma_rh_intr_status_w(hci, val32);
