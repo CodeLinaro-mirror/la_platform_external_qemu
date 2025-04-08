@@ -93,6 +93,11 @@ typedef struct HCIDMAState {
     struct {
         uint32_t num_ring_offsets;
         uint32_t *ring_offsets;
+        uint32_t preamble_size;
+        uint32_t header_size;
+        uint32_t xfer_struct_size;
+        uint32_t resp_struct_size;
+        uint32_t ibi_status_struct_size;
     } cfg;
 
     MemoryRegion header_mmio;

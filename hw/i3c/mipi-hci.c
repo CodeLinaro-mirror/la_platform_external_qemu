@@ -113,6 +113,16 @@ static const Property mipi_hci_properties[] = {
                        core.cfg.hc_capabilities, 0),
     DEFINE_PROP_UINT32("int-ctrl-cmds-en", MIPIHCIState,
                         core.cfg.int_ctrl_cmds_en, 0),
+    DEFINE_PROP_UINT32("preamble-size", MIPIHCIState,
+                       dma.cfg.preamble_size, 0),
+    DEFINE_PROP_UINT32("header-size", MIPIHCIState,
+                       dma.cfg.header_size, 0),
+    DEFINE_PROP_UINT32("xfer-struct-size", MIPIHCIState,
+                       dma.cfg.xfer_struct_size, 0),
+    DEFINE_PROP_UINT32("resp-struct-size", MIPIHCIState,
+                       dma.cfg.resp_struct_size, 0),
+    DEFINE_PROP_UINT32("ibi-stat", MIPIHCIState,
+                       dma.cfg.ibi_status_struct_size, 0),
 };
 
 static void mipi_hci_realize(DeviceState *dev, Error **errp)

@@ -46,6 +46,14 @@ void hci_dma_reset(HCIDMAState *s)
     }
     /* Ring status */
     memset(s->regs, 0, sizeof(s->regs));
+    ARRAY_FIELD_DP32(s->regs, RHS_CONTROL, PREAMBLE_SIZE, s->cfg.preamble_size);
+    ARRAY_FIELD_DP32(s->regs, RHS_CONTROL, HEADER_SIZE, s->cfg.header_size);
+    ARRAY_FIELD_DP32(s->regs, CR_SETUP, XFER_STRUCT_SIZE,
+                     s->cfg.xfer_struct_size);
+    ARRAY_FIELD_DP32(s->regs, CR_SETUP, RESP_STRUCT_SIZE,
+                     s->cfg.resp_struct_size);
+    ARRAY_FIELD_DP32(s->regs, IBI_SETUP, IBI_STATUS_STRUCT_SIZE,
+                     s->cfg.ibi_status_struct_size);
 }
 
 uint64_t hci_dma_header_read(void *opaque, hwaddr offset, unsigned size)
