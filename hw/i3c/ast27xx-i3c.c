@@ -26,6 +26,7 @@
 #define AST27XX_I3C_CTRL_OFFSET 0xd00
 #define AST27XX_I3C_PHY_OFFSET 0xe00
 #define AST27XX_I3C_EXT_CAPS_OFFSET 0xf00
+#define AST27XX_I3C_DMAARB_OFFSET 0xf80
 
 /* Control registers. */
 REG32(I3C_CONTROL_0, 0x00)
@@ -142,6 +143,14 @@ REG32(I3C_PHY_BUS_CONTENTION_CNT0, 0xe8)
 REG32(I3C_PHY_BUS_CONTENTION_CNT1, 0xec)
 REG32(I3C_PHY_BUS_CONTENTION_CNT2, 0xf0)
 
+/* DMA MBUS ARBiter registers. */
+REG32(DMA_MBUS_ARB_CTRL0, 0x0)
+REG32(DMA_MBUS_ARB_CLR0, 0x4)
+REG32(DMA_MBUS_ARB_DBG0, 0x10)
+REG32(DMA_MBUS_ARB_DBG1, 0x14)
+REG32(DMA_MBUS_ARB_DBG2, 0x18)
+REG32(DMA_MBUS_ARB_DBG3, 0x1c)
+
 static const uint32_t ast27xx_i3c_phy_ro_mask[AST27XX_I3C_PHY_NUM_REGS] = {
     [R_I3C_PHY_EXT_CAP_OFFSET]                  = 0xffffffff,
     [R_I3C_PHY_SW_CTRL]                         = 0x00ffc0c0,
@@ -239,6 +248,15 @@ static const uint32_t ast27xx_i3c_ctrl_ro_mask[AST27XX_I3C_CTRL_NUM_REGS] = {
     [R_I3C_INTR_STATUS_F0]     = 0xffffffff,
     [R_I3C_INTR_PROCESS]       = 0xfffffffe,
     [R_I3C_IBI_TIMEOUT_F8]     = 0xfffe0000,
+};
+
+static const uint32_t
+    ast27xx_i3c_dmaarb_ro_mask[AST27XX_I3C_DMAARB_NUM_REGS] = {
+    [R_DMA_MBUS_ARB_CLR0] = 0xfffffffe,
+    [R_DMA_MBUS_ARB_DBG0] = 0xffffffff,
+    [R_DMA_MBUS_ARB_DBG1] = 0xffffffff,
+    [R_DMA_MBUS_ARB_DBG2] = 0xffffffff,
+    [R_DMA_MBUS_ARB_DBG3] = 0xffffffff,
 };
 
 static const uint32_t ast27xx_i3c_ctrl_reset[AST27XX_I3C_CTRL_NUM_REGS] = {
@@ -362,6 +380,31 @@ static void ast27xx_i3c_phy_write(void *opaque, hwaddr offset, uint64_t value,
     s->phy_regs[offset] = value;
 }
 
+static uint64_t ast27xx_i3c_dmaarb_read(void *opaque, hwaddr offset,
+                                        unsigned size)
+{
+    AST27xxI3CState *s = AST27XX_I3C(opaque);
+    offset /= sizeof(uint32_t);
+
+    /* MMIO region size should prevent this from happening. */
+    g_assert(offset < ARRAY_SIZE(s->phy_regs));
+
+    return s->dmaarb_regs[offset];
+}
+
+static void ast27xx_i3c_dmaarb_write(void *opaque, hwaddr offset,
+                                     uint64_t value, unsigned size)
+{
+    AST27xxI3CState *s = AST27XX_I3C(opaque);
+    offset /= sizeof(uint32_t);
+
+    /* MMIO region size should prevent this from happening. */
+    g_assert(offset < ARRAY_SIZE(s->phy_regs));
+
+    value &= ~ast27xx_i3c_dmaarb_ro_mask[offset];
+    s->dmaarb_regs[offset] = value;
+}
+
 static const MemoryRegionOps ast27xx_i3c_ops = {
     .read = ast27xx_i3c_ctrl_read,
     .write = ast27xx_i3c_ctrl_write,
@@ -382,6 +425,15 @@ static const MemoryRegionOps ast27xx_i3c_phy_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+static const MemoryRegionOps ast27xx_i3c_dmaarb_ops = {
+    .read = ast27xx_i3c_dmaarb_read,
+    .write = ast27xx_i3c_dmaarb_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
 
 static void ast27xx_i3c_init_ext_capabilities(AST27xxI3CState *s)
 {
@@ -431,6 +483,11 @@ static void ast27xx_i3c_realize(DeviceState *dev, Error **errp)
                           AST27XX_I3C_PHY_NUM_REGS * sizeof(uint32_t));
     memory_region_add_subregion(&s->iomem, AST27XX_I3C_PHY_OFFSET,
                                 &s->phy_iomem);
+    memory_region_init_io(&s->ctrl_iomem, OBJECT(s), &ast27xx_i3c_dmaarb_ops, s,
+                          TYPE_AST27XX_I3C"-dmaarb-[*]",
+                          AST27XX_I3C_DMAARB_NUM_REGS * sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem, AST27XX_I3C_DMAARB_OFFSET,
+                                &s->dmaarb_iomem);
 
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
 }
@@ -450,6 +507,7 @@ static void ast27xx_i3c_enter_reset(Object *obj, ResetType type)
     for (int i = 0; i < ARRAY_SIZE(s->phy_regs); i++) {
         s->phy_regs[i] = ast27xx_i3c_phy_reset[i];
     }
+    memset(s->dmaarb_regs, 0, sizeof(s->dmaarb_regs));
 }
 
 static void ast27xx_i3c_class_init(ObjectClass *klass, const void *data)
