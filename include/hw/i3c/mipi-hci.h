@@ -20,11 +20,21 @@
 #define TYPE_MIPI_HCI "mipi.hci"
 OBJECT_DECLARE_TYPE(MIPIHCIState, MIPIHCIClass, MIPI_HCI)
 
+#define MIPI_HCI_MMIO_SIZE 0x1000
+
+/* The context in which an IRQ is happening. */
+typedef enum MIPIHCIIRQContext {
+    MIPI_HCI_IRQ_CONTEXT_CORE = 0,
+    MIPI_HCI_IRQ_CONTEXT_DMA = 1,
+    MIPI_HCI_IRQ_CONTEXT_PIO = 2,
+} MIPIHCIIRQContext;
+
 typedef struct MIPIHCIClass {
     SysBusDeviceClass parent_class;
-} MIPIHCIClass;
 
-#define MIPI_HCI_MMIO_SIZE 0x1000
+    /* Overridable in case other implementations have multiple IRQ lines. */
+    void (*update_irq)(MIPIHCIState *s, MIPIHCIIRQContext ctx);
+} MIPIHCIClass;
 
 typedef struct MIPIHCIState {
     SysBusDevice parent;
@@ -38,9 +48,11 @@ typedef struct MIPIHCIState {
     struct {
         uint32_t ring_header_section_offset;
         uint32_t ext_caps_section_offset;
+        uint32_t num_irqs;
     } cfg;
 
     MemoryRegion iomem;
+    qemu_irq *irq;
     I3CBus *bus;
 } MIPIHCIState;
 

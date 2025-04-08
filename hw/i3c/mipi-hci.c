@@ -24,6 +24,24 @@
 #include "hw/i3c/mipi-hci.h"
 #include "hw/core/irq.h"
 
+ /* Default IRQ update function. This assumes 1 IRQ line. */
+static void mipi_hci_update_irq(MIPIHCIState *s, MIPIHCIIRQContext ctx)
+{
+    HCICoreState *core = &s->core;
+    HCIDMAState *dma = &s->dma;
+    g_assert(s->cfg.num_irqs == 1);
+
+    /* INTR_STATUS is masked before setting the IRQ line. */
+    core->regs[R_INTR_STATUS] &= core->regs[R_INTR_SIGNAL_ENABLE];
+    dma->regs[R_RH_INTR_STATUS] &= dma->regs[R_RH_INTR_SIGNAL_ENABLE];
+
+    bool level = !!(core->regs[R_INTR_STATUS] &
+                    core->regs[R_INTR_SIGNAL_ENABLE]);
+    level |= !!(dma->regs[R_RH_INTR_STATUS] &
+                dma->regs[R_RH_INTR_SIGNAL_ENABLE]);
+    qemu_set_irq(s->irq[0], level);
+}
+
 static const MemoryRegionOps hci_core_ops = {
     .read = hci_core_read,
     .write = hci_core_write,
@@ -123,6 +141,7 @@ static const Property mipi_hci_properties[] = {
                        dma.cfg.resp_struct_size, 0),
     DEFINE_PROP_UINT32("ibi-stat", MIPIHCIState,
                        dma.cfg.ibi_status_struct_size, 0),
+    DEFINE_PROP_UINT32("num-irqs", MIPIHCIState, cfg.num_irqs, 1),
 };
 
 static void mipi_hci_realize(DeviceState *dev, Error **errp)
@@ -133,6 +152,13 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
     HCIExtCapState *ext_caps = &s->ext_cap;
     HCIDATState *dat = &s->dat;
     HCIDCTState *dct = &s->dct;
+
+    g_assert(s->cfg.num_irqs > 0);
+
+    s->irq = g_new0(qemu_irq, s->cfg.num_irqs);
+    for (int i = 0; i < s->cfg.num_irqs; i++) {
+        sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq[i]);
+    }
 
     memory_region_init(&s->iomem, OBJECT(s), TYPE_MIPI_HCI"-mmio",
                        MIPI_HCI_MMIO_SIZE);
@@ -192,11 +218,14 @@ static void mipi_hci_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);
+    MIPIHCIClass *mhc = MIPI_HCI_CLASS(klass);
 
     rc->phases.enter = mipi_hci_enter_reset;
     dc->realize = mipi_hci_realize;
     dc->desc = "MIPI HCI I3C Controller";
     device_class_set_props(dc, mipi_hci_properties);
+
+    mhc->update_irq = mipi_hci_update_irq;
 }
 
 static const TypeInfo mipi_hci_info = {
