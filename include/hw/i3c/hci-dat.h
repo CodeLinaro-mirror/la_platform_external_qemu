@@ -1,0 +1,31 @@
+/*
+ * MIPI HCI I3C DAT state
+ *
+ * Copyright (C) 2025 Google, LLC
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#ifndef HCI_DAT_H
+#define HCI_DAT_H
+
+#include "hw/core/registerfields.h"
+
+REG32(TARGET_DAT, 0x00)
+    FIELD(TARGET_DAT, TARGET_STATIC_ADDRESS,      0, 7)
+    FIELD(TARGET_DAT, TARGET_IBI_PAYLOAD,        12, 1)
+    FIELD(TARGET_DAT, TARGET_IBI_REJECT,         13, 1)
+    FIELD(TARGET_DAT, TARGET_CRR_REJECT,         14, 1)
+    FIELD(TARGET_DAT, TARGET_IBI_TS,             15, 1)
+    FIELD(TARGET_DAT, TARGET_DYNAMIC_ADDRESS,    16, 8)
+    FIELD(TARGET_DAT, TARGET_RING_ID,            26, 3)
+    FIELD(TARGET_DAT, TARGET_DEV_NACK_RETRY_CNT, 29, 2)
+    FIELD(TARGET_DAT, TARGET_DEVICE,             31, 1)
+REG32(TARGET_DAT2, 0x04)
+    FIELD(TARGET_DAT2, DEVICE,            0, 1)
+    FIELD(TARGET_DAT2, AUTOCMD_MASK,      1, 8)
+    FIELD(TARGET_DAT2, AUTOCMD_VALUE,     9, 8)
+    FIELD(TARGET_DAT2, AUTOCMD_MODE,     17, 3)
+    FIELD(TARGET_DAT2, AUTOCMD_HDR_MODE, 20, 8)
+
+#endif  /* HCI_DAT_H */
