@@ -226,7 +226,8 @@ void free_emugl_host_gpu_props(emugl_host_gpu_prop_list proplist) {
 static void setCurrentRenderer(const char* gpuMode) {
     sCurrentRenderer = emuglConfig_get_renderer(gpuMode);
     sCurrentRendererSet = true;
-    ERR("ERRRRR SETTING %s %d", gpuMode, sCurrentRenderer);
+    VERBOSE("%s: %s %s", __func__, gpuMode,
+            emuglConfig_renderer_to_string(sCurrentRenderer));
 }
 
 struct DeviceSupportInfo {
