@@ -559,8 +559,8 @@ static void webcamSetup(CameraServiceDesc* csd,
 
     CameraInfo& dstCi = csd->camera_info[csd->camera_count];
 
-    srcCi->in_use = 1;
     camera_info_copy(&dstCi, srcCi);
+    srcCi->in_use = 1;
     dstCi.vtbl = &vtbl;
 
     if (dstCi.direction) {
