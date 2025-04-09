@@ -697,7 +697,10 @@ static void virgl_cmd_resource_map(VirtIOGPU *g,
 
     memset(&resp, 0, sizeof(resp));
     resp.hdr.type = VIRTIO_GPU_RESP_OK_MAP_INFO;
-    resp.map_flags = 0x3;
+    // 1 = Write Back, 2 = Uncached, 3 = Write Combining
+    // Let's set the memory type to WB, otherwise, on Apple silicon
+    // LSE atomic instruction targetting UC/WC memory will fail.
+    resp.map_flags = 0x1;
     resp.padding = 0;
     virtio_gpu_ctrl_response(g, cmd, &resp.hdr, sizeof(resp));
 }
