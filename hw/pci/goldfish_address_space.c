@@ -787,6 +787,8 @@ static void address_space_control_write_locked(void *opaque,
     case ADDRESS_SPACE_REGISTER_GUEST_PAGE_SIZE:
 #if defined(__APPLE__) && defined(__arm64__)
         state->registers.guest_page_size = (val < 16384) ? 16384 : 16384;
+#elif defined(__aarch64__) && defined(__linux__)
+        state->registers.guest_page_size = MAX(val, getpagesize());
 #else
         state->registers.guest_page_size = val;
 #endif
@@ -908,6 +910,8 @@ static void address_space_pci_set_config(PCIDevice *dev)
 
 #if defined(__APPLE__) && defined(__arm64__)
 #define DEFAULT_GUEST_PAGE_SIZE 16384
+#elif defined(__aarch64__) && defined(__linux__)
+#define DEFAULT_GUEST_PAGE_SIZE getpagesize()
 #else
 #define DEFAULT_GUEST_PAGE_SIZE 4096
 #endif

@@ -24,6 +24,10 @@
 #include <unordered_map>
 #include <utility>
 
+#if defined(__aarch64__) && defined(__linux__)
+#include <unistd.h>
+#endif
+
 namespace android {
 namespace emulation {
 namespace {
@@ -34,10 +38,19 @@ typedef MemBlock::FreeSubblocks_t FreeSubblocks_t;
 using base::AutoLock;
 using base::Lock;
 
-#if defined(__APPLE__) && defined(__arm64__)
-constexpr uint32_t kAllocAlignment = 16384;
+#if defined(__aarch64__) && defined(__linux__)
+uint64_t GetPageSize() {
+    static int page_size = getpagesize();
+    return page_size;
+}
 #else
-constexpr uint32_t kAllocAlignment = 4096;
+constexpr uint64_t GetPageSize() {
+#if defined(__APPLE__) && defined(__arm64__)
+    return 16384;
+#else
+    return 4096;
+#endif
+}
 #endif
 
 uint64_t allocateAddressSpaceBlock(const AddressSpaceHwFuncs* hw, uint32_t size) {
@@ -89,7 +102,7 @@ std::pair<uint64_t, MemBlock*> translatePhysAddr(uint64_t p) {
 
 MemBlock::MemBlock(const address_space_device_control_ops* o, const AddressSpaceHwFuncs* h, uint32_t sz)
         : ops(o), hw(h) {
-    bits = android::aligned_buf_alloc(kAllocAlignment, sz);
+    bits = android::aligned_buf_alloc(GetPageSize(), sz);
     bitsSize = sz;
     physBase = allocateAddressSpaceBlock(hw, sz);
     if (!physBase) {
@@ -247,7 +260,7 @@ bool MemBlock::load(base::Stream* stream,
                     MemBlock* block) {
     const uint64_t physBaseLoaded = stream->getBe64();
     const uint32_t bitsSize = stream->getBe32();
-    void* const bits = android::aligned_buf_alloc(kAllocAlignment, bitsSize);
+    void* const bits = android::aligned_buf_alloc(GetPageSize(), bitsSize);
     if (!bits) {
         return false;
     }

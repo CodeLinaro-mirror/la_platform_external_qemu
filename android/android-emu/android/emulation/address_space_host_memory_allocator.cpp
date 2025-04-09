@@ -19,6 +19,10 @@
 #include "android/utils/misc.h"
 #include "host-common/crash-handler.h"
 
+#if defined(__aarch64__) && defined(__linux__)
+#include <unistd.h>
+#endif
+
 namespace android {
 namespace emulation {
 
@@ -55,6 +59,8 @@ void *AddressSpaceHostMemoryAllocatorContext::allocate_impl(const uint64_t phys_
                                                             const uint64_t size) {
 #if defined(__APPLE__) && defined(__arm64__)
     constexpr uint64_t k_alloc_alignment = 16384;
+#elif defined(__aarch64__) && defined(__linux__)
+    static uint64_t k_alloc_alignment = getpagesize();
 #else
     constexpr uint64_t k_alloc_alignment = 4096;
 #endif

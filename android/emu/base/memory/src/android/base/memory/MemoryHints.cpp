@@ -28,6 +28,10 @@
 #include <windows.h>
 #endif
 
+#if defined(__aarch64__) && defined(__linux__)
+#include <unistd.h>
+#endif
+
 #if defined(__APPLE__) && defined(__arm64__)
 // Seeing segfaults with madvise dontneed on macos aarch64
 #define DISABLE_DONTNEED 1
@@ -46,6 +50,12 @@ static constexpr size_t kPageSize = 16384;
 #else
 static constexpr size_t kPageSize = 4096;
 #endif
+#elif defined(__aarch64__) && defined(__linux__)
+static uint64_t GetPageSize() {
+    static int page_size = getpagesize();
+    return page_size;
+}
+#define kPageSize GetPageSize()
 #else
 static constexpr size_t kPageSize = 4096;
 #endif
