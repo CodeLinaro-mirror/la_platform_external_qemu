@@ -419,6 +419,7 @@ public slots:
     void show();
     void showMinimized();
     void wheelScrollTimeout();
+    void trackpadAggregateTimeout();
 
     void onScreenConfigChanged();
     void onScreenChanged(QScreen* newScreen);
@@ -547,6 +548,9 @@ private:
     int mSkinGapBottom;
     int mSkinGapLeft;
 
+    int mScrollOverflowXInDegrees = 0;
+    int mScrollOverflowYInDegrees = 0;
+
     MainLoopThread* mMainLoopThread;
 
     using OnDemandMessageBox =
@@ -605,6 +609,7 @@ private:
     bool mDisablePinchToZoom = false;
     bool mPauseAvdWhenMinimized = false;
     QTimer mWheelScrollTimer;
+    QTimer mTrackpadAggregateTimer;
     std::unique_ptr<SwipeGesture> mSwipeGesture;
     bool mStartedAdbStopProcess;
 
