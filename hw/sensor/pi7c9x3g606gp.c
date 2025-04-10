@@ -179,10 +179,11 @@ static int pi7c9x3g606gp_write_buf(SMBusDevice *d, uint8_t *buf, uint8_t len)
 static void pi7c9x3g606gp_get_temperature(Object *obj, Visitor *v,
     const char *name, void *opaque, Error **errp) {
     uint32_t n = *(uint32_t *)opaque;
+    int32_t temp;
 
     n = extract32(n, 8, 12);
-    uint32_t temp = (uint32_t)((((double)n / 4094) * 237.7 - 79.925) * 1000);
-    visit_type_uint32(v, name, &temp, errp);
+    temp = (int32_t)((((double)n / 4094) * 237.7 - 79.925) * 1000);
+    visit_type_int32(v, name, &temp, errp);
 }
 
 /*
@@ -191,13 +192,22 @@ static void pi7c9x3g606gp_get_temperature(Object *obj, Visitor *v,
  */
 static void pi7c9x3g606gp_set_temperature(Object *obj, Visitor *v,
     const char *name, void *opaque, Error **errp) {
-    uint32_t temp;
+    int32_t temp;
     uint32_t *n = (uint32_t *)opaque;
 
-    if (!visit_type_uint32(v, name, &temp, errp)) {
+    if (!visit_type_int32(v, name, &temp, errp)) {
         return;
     }
     temp = ((double)temp / 1000 + 79.925) / 237.7 * 4094;
+    /*
+     * The converted temperature is stored as unsigned in the register.
+     * Avoid overflow if the temperature value is too low.
+     */
+    if (temp < 0) {
+        qemu_log_mask(LOG_GUEST_ERROR, "Temperature %" PRIx32
+             "out of range.", temp);
+        temp = 0;
+    }
     *n = PI7C_TEMP_DATA_READY | (temp << 8);
 }
 
@@ -232,7 +242,7 @@ static void pi7c9x3g606gp_init(Object *obj)
 
     /* Current temperature in millidegrees. */
     for (int i = 0; i < PI7C_TEMP_COUNT; ++i) {
-        object_property_add(obj, "temp[*]", "uint32",
+        object_property_add(obj, "temp[*]", "int32",
                             pi7c9x3g606gp_get_temperature,
                             pi7c9x3g606gp_set_temperature, NULL,
                             &s->data[PI7C_TEMP_ADDR(i)]);
