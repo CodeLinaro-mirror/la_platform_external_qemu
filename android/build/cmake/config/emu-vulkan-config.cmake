@@ -76,6 +76,9 @@ elseif(WINDOWS)
     ABSOLUTE)
   set(VULKAN_DEPENDENCIES
       "${PREBUILT_ROOT}/icds/vk_swiftshader.dll>lib64/vulkan/vulkan-1.dll"
+      # Lavapipe
+      "${PREBUILT_ROOT}/icds/vulkan_lvp.dll>lib64/vulkan/vulkan_lvp.dll"
+      "${PREBUILT_ROOT}/icds/lvp_icd.x86_64.json>lib64/vulkan/lvp_icd.x86_64.json"
       # Swiftshader
       "${PREBUILT_ROOT}/icds/vk_swiftshader.dll>lib64/vulkan/vk_swiftshader.dll"
       "${PREBUILT_ROOT}/icds/vk_swiftshader_icd.json>lib64/vulkan/vk_swiftshader_icd.json"
