@@ -231,6 +231,7 @@ enum ClientStartResult {
     CLIENT_START_RESULT_NO_PIXEL_CONVERSION = -3,
     CLIENT_START_RESULT_OUT_OF_MEMORY = -4,
     CLIENT_START_RESULT_FAILED = -5,
+    CLIENT_START_RESULT_INCORRECT_PARAMS = -6,
 };
 
 typedef enum ClientStartResult ClientStartResult;
