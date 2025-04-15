@@ -831,7 +831,11 @@ protected:
     }
 
     bool startCapturingImpl(const uint32_t width, uint32_t height,
-                            const uint32_t pixelFormat) const {
+                            const uint32_t pixelFormat) {
+        camera_metrics_report_start_session(
+                mCameraInfo.vtbl->camera_source, mCameraInfo.direction,
+                width, height, pixelFormat);
+
         const int res =
             (mCameraInfo.vtbl->start_capturing)(
                 &mCameraDevice, pixelFormat, width, height);
@@ -839,10 +843,12 @@ protected:
             dwarning("Can't start the '%s' camera: %d.",
                      mCameraInfo.display_name, res);
             return false;
-        } else {
-            g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, true);
-            return true;
         }
+
+        camera_metrics_report_start_result(CLIENT_START_RESULT_SUCCESS);
+        g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, true);
+        mFrameCounter = 0;
+        return true;
     }
 
     int readFrameImpl(const WhiteBalance& wb, const float expComp,
@@ -875,27 +881,19 @@ protected:
         return retry;
     }
 
-    bool stopCapturingImpl() const {
+    void stopCapturingImpl() const {
+        g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, false);
+        camera_metrics_report_stop_session(mFrameCounter);
+
         const int res = (mCameraInfo.vtbl->stop_capturing)(&mCameraDevice);
         if (res) {
             derror("Can't stop the '%s' camera: %d.", mCameraInfo.display_name, res);
-            return false;
-        } else {
-            g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, false);
-            return true;
         }
     }
 
-    void reportStart(const ClientStartResult result) {
+    void reportStartError(const ClientStartResult result) {
         camera_metrics_report_start_result(result);
-        if (result < 0) {
-            camera_metrics_report_stop_session(0);
-        }
-        mFrameCounter = 0;
-    }
-
-    void reportStop() const {
-        camera_metrics_report_stop_session(mFrameCounter);
+        camera_metrics_report_stop_session(0);
     }
 
     void incrementFrameCounter() {
@@ -923,11 +921,14 @@ struct OldCamerasClient : public BaseCameraClient {
 
     virtual ClientStartResult start(std::string_view params) = 0;
     virtual void capture(std::string_view params, QemudClient* qc) = 0;
-    virtual bool stop() = 0;
+    virtual void stop() = 0;
 
     void processQueryStart(const std::string_view params, QemudClient* qc) {
         const ClientStartResult startResult = start(params);
-        reportStart(startResult);
+        if (startResult < 0) {
+            reportStartError(startResult);
+            return;
+        }
 
         switch (startResult) {
         case CLIENT_START_RESULT_SUCCESS:
@@ -971,11 +972,8 @@ struct OldCamerasClient : public BaseCameraClient {
             processQueryStart(params, qc);
         } else if ((query == kQueryStop) ||
                    (query == kQueryDisconnect)){
-            if (stop()) {
-                qemuClientReply(qc, true);
-            } else {
-                qemuClientReply(qc, false, "Can't stop the camera"sv);
-            }
+            stop();
+            qemuClientReply(qc, true);
         } else if (query.empty()) {
             qemuClientReply(qc, false, "Empty query"sv);
         } else {
@@ -1137,16 +1135,12 @@ struct SerialCameraClient : public OldCamerasClient {
         incrementFrameCounter();
     }
 
-    bool stop() override {
+    void stop() override {
         if (!mStarted) {
-            return true;
+            return;
         }
 
-        if (!stopCapturingImpl()) {
-            return false;
-        }
-
-        reportStop();
+        stopCapturingImpl();
 
         mVideoFrameBuffer.clear();
         mPreviewFrameBuffer.clear();
@@ -1157,7 +1151,6 @@ struct SerialCameraClient : public OldCamerasClient {
         mHeight = 0;
         mPixelFormat = 0;
         mStarted = false;
-        return true;
     }
 
     void save(Stream* f) const override {
@@ -1329,22 +1322,17 @@ struct GasCameraClient : public OldCamerasClient {
         incrementFrameCounter();
     }
 
-    bool stop() override {
+    void stop() override {
         if (!mStarted) {
-            return true;
+            return;
         }
 
-        if (!stopCapturingImpl()) {
-            return false;
-        }
-
-        reportStop();
+        stopCapturingImpl();
 
         ::free(mStagingFramebuffer);
         mStagingFramebuffer = nullptr;
         mStagingFramebufferSize = 0;
         mStarted = false;
-        return true;
     }
 
     void save(Stream* f) const override {
