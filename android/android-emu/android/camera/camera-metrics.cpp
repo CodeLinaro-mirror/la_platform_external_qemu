@@ -136,7 +136,6 @@ void CameraMetrics::stopSession(uint64_t frameCount) {
 void CameraMetrics::setVirtualSceneName(const char* name) {
     AutoLock lock(mLock);
     if (!mSessionActive) {
-        W("%s: Session not active, call ignored.", __FUNCTION__);
         return;
     }
 
