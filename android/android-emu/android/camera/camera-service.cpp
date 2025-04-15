@@ -962,7 +962,7 @@ struct OldCamerasClient : public BaseCameraClient {
 
     void processQuery(const std::string_view query,
                       const std::string_view params,
-                      QemudClient* qc) {
+                      QemudClient* qc) override {
         if (query == kQueryFrame) {
             capture(params, qc);
         } else if (query == kQueryConnect) {
