@@ -46,8 +46,13 @@
 #include "android/utils/system.h"
 #include "host-common/hw-config.h"
 
+#include <gfxstream/virtio-gpu-gfxstream-renderer.h>
+
 namespace {
 using namespace std::literals;
+
+constexpr uint32_t kPixelFormat_RGBA_8888 = 0x1;
+constexpr uint32_t kPixelFormat_YCBCR_420_888 = 0x23;
 
 // TODO(b/173651912): remove this thing and call the callback from
 // camera_XYZ_(start|stop)_capturing instead.
@@ -71,6 +76,10 @@ struct CameraCallbackDesc {
 
 struct WhiteBalance {
     float red, green, blue;
+};
+
+size_t align16(const size_t x) {
+    return (x + 15U) / 16U * 16U;
 };
 
 int64_t getTimestamp(void) {
@@ -372,6 +381,23 @@ std::optional<WhiteBalance> parseWhiteBalance(const std::string_view str) {
 
 std::optional<float> parseExpComp(const std::string_view str) {
     return parseFloatValidated(str, [](const float value){ return value > 0.0f; });
+}
+
+template <class Sink > bool tokenize(const std::string_view str,
+                                     const char separator,
+                                     const bool allowEmpty,
+                                     const Sink sink) {
+    size_t i = 0;
+    size_t sepPos;
+    while ((sepPos = str.find(separator, i)) != str.npos) {
+        if (((sepPos == i) && !allowEmpty) ||
+                !sink(str.substr(i, sepPos - i))) {
+            return false;
+        }
+        i = sepPos + 1;
+    }
+
+    return ((i < str.size()) || allowEmpty) && sink(str.substr(i));
 }
 
 std::string cameraInfoToString(const CameraInfo& ci) {
@@ -1373,6 +1399,276 @@ private:
     bool            mStarted = false;
 };
 
+constexpr std::string_view kQueryConfigure = "configure"sv;
+constexpr std::string_view kQueryCapture   = "capture"sv;
+constexpr std::string_view kParamStreams   = "streams"sv;
+constexpr std::string_view kParamBufs      = "bufs"sv;
+
+struct MinigbmCameraClient : public BaseCameraClient {
+    MinigbmCameraClient(CameraInfo& ci, CameraDevice& cd)
+            : BaseCameraClient(ci, cd)
+    {}
+
+    ~MinigbmCameraClient() {
+        ::free(mStagingFramebuffer);
+    }
+
+    static MinigbmCameraClient* create(CameraInfo& ci, CameraDevice& cd) {
+        return new MinigbmCameraClient(ci, cd);
+    }
+
+    void processQuery(const std::string_view query,
+                      const std::string_view params,
+                      QemudClient* qc) override {
+        if (query == kQueryCapture) {
+            capture(params, qc);
+        } else if (query == kQueryConfigure) {
+            configure(params, qc);
+        } else if (query.empty()) {
+            qemuClientReply(qc, false, "Empty query"sv);
+        } else {
+            qemuClientReply(qc, false, "Unknown query"sv);
+        }
+    }
+
+private:
+    struct StreamState {
+        std::vector<uint8_t> frameBuffer;
+        int32_t id;
+        uint32_t width;
+        uint32_t height;
+        uint32_t format;
+    };
+
+    using Streams = std::vector<StreamState>;
+
+    // "configure streams=id:WxH@F,..."
+    void configure(const std::string_view params, QemudClient* qc) {
+        Streams streams;
+        const bool parsed = getParamValue(streams, params, kParamStreams,
+                [](const std::string_view str) -> std::optional<Streams> {
+                    Streams streams;
+                    if (tokenize(str, ',', false,
+                                 [&streams](const std::string_view str){
+                                     char strz[64];
+                                     if (str.size() >= sizeof(strz)) {
+                                         return false;
+                                     }
+                                     memcpy(strz, str.data(), str.size());
+                                     strz[str.size()] = 0;
+
+                                     StreamState ss;
+                                     uint32_t androidFormat;
+                                     if (4 != ::sscanf(strz, "%d:%ux%u@%X",
+                                                       &ss.id, &ss.width, &ss.height, &androidFormat)) {
+                                         return false;
+                                     }
+
+                                     switch (androidFormat) {
+                                     case kPixelFormat_RGBA_8888:
+                                         ss.format = V4L2_PIX_FMT_RGB32;
+                                         ss.frameBuffer.resize(ss.width * ss.height * sizeof(uint32_t));
+                                         break;
+
+                                     case kPixelFormat_YCBCR_420_888:
+                                         ss.format = V4L2_PIX_FMT_NV12;
+                                         ss.frameBuffer.resize(align16(ss.width * ss.height) +
+                                                               align16(ss.width * ss.height / 2));
+                                         break;
+
+                                     default:
+                                         return false;
+                                     }
+
+                                     streams.push_back(std::move(ss));
+                                     return true;
+                    })) {
+                        return streams;
+                    } else {
+                        return std::nullopt;
+                    }});
+        if (!parsed) {
+            camera_metrics_report_start_session(
+                    mCameraInfo.vtbl->camera_source, mCameraInfo.direction,
+                    0, 0, 0);
+            reportStartError(CLIENT_START_RESULT_FAILED);
+            qemuClientReply(qc, false, "Can't parse"sv);
+            return;
+        }
+        if (streams.empty()) {
+            camera_metrics_report_start_session(
+                    mCameraInfo.vtbl->camera_source, mCameraInfo.direction,
+                    0, 0, 0);
+            reportStartError(CLIENT_START_RESULT_FAILED);
+            qemuClientReply(qc, false, "No streams provided"sv);
+            return;
+        }
+
+        if (!mStreams.empty()) {
+            stopCapturingImpl();
+        }
+
+        const auto [width, height] = getMaxResolution(
+                &*streams.begin(), &*streams.end());
+        if (!startCapturingImpl(width, height, mCameraInfo.pixel_format)) {
+            reportStartError(CLIENT_START_RESULT_FAILED);
+            qemuClientReply(qc, false, "Can't start the camera"sv);
+            return;
+        }
+
+        mStreams = std::move(streams);
+        qemuClientReply(qc, true);
+    }
+
+    // "capture bufs=id:handle,..."
+    void capture(const std::string_view params, QemudClient* qc) {
+        using BufInfo = std::pair<StreamState*, uint32_t>;
+        using Bufs = std::vector<BufInfo>;
+        Bufs bufs;
+
+        Streams& streamsRef = mStreams;
+        const bool parsed = getParamValue(bufs, params, kParamBufs,
+                [&streamsRef](const std::string_view str) -> std::optional<Bufs> {
+                    Bufs bufs;
+                    if (tokenize(str, ',', false,
+                                 [&streamsRef, &bufs](const std::string_view str) -> bool {
+                                     char strz[32];
+                                     if (str.size() >= sizeof(strz)) {
+                                         return false;
+                                     }
+                                     memcpy(strz, str.data(), str.size());
+                                     strz[str.size()] = 0;
+
+                                     int32_t id;
+                                     uint32_t hostHandle;
+                                     if (2 != ::sscanf(strz, "%d:%u", &id, &hostHandle)) {
+                                         return false;
+                                     }
+
+                                     const auto si = std::find_if(streamsRef.begin(),
+                                                                  streamsRef.end(),
+                                                                  [id](const StreamState& ss) {
+                                                                      return id == ss.id;
+                                                                  });
+                                     if (si == streamsRef.end()) {
+                                         return false;
+                                     }
+
+                                     bufs.push_back({&*si, hostHandle});
+                                     return true;
+                    })) {
+                        return bufs;
+                    } else {
+                        return std::nullopt;
+                    }});
+        if (!parsed) {
+            qemuClientReply(qc, false, "Can't parse"sv);
+            return;
+        }
+        const size_t bufsSize = bufs.size();
+        if (!bufsSize) {
+            qemuClientReply(qc, false, "No bufs provided"sv);
+            return;
+        }
+
+        WhiteBalance whiteBalance;
+        if (!getParamValueV(whiteBalance, params, kParamWhiteBalance,
+                            parseWhiteBalance, kDefaultWhiteBalance)) {
+            qemuClientReply(qc, false, "Invalid or missing 'whiteb' parameter"sv);
+            return;
+        }
+
+        float expComp;
+        if (!getParamValueV(expComp, params, kParamExpComp,
+                            parseExpComp, 1.0f)) {
+            qemuClientReply(qc, false, "Invalid or missing 'expcomp' parameter"sv);
+            return;
+        }
+
+        std::vector<ClientFrameBuffer> fbs(bufsSize);
+        for (size_t i = 0; i < bufsSize; ++i) {
+            StreamState& ss = *bufs[i].first;
+            ClientFrameBuffer& fb = fbs[i];
+            fb.pixel_format = ss.format;
+            fb.width = ss.width;
+            fb.height = ss.height;
+            fb.framebuffer = ss.frameBuffer.data();
+        }
+
+        ClientFrame frame = {
+            .framebuffers_count = bufsSize,
+            .framebuffers = fbs.data(),
+            .staging_framebuffer = &mStagingFramebuffer,
+            .staging_framebuffer_size = &mStagingFramebufferSize,
+            .frame_time =
+                    looper_nowNsWithClock(looper_getForThread(),
+                                          LOOPER_CLOCK_VIRTUAL),
+        };
+
+        if (readFrameImpl(whiteBalance, expComp, frame, qc)) {
+            return;
+        }
+
+        for (const BufInfo& bi : bufs) {
+            const StreamState& ss = *bi.first;
+
+            stream_renderer_box box = {
+                .x = 0, .y = 0, .z = 0,
+                .w = ss.width, .h = ss.height, .d = 1,
+            };
+
+            struct iovec framebuffer = {
+                .iov_base = const_cast<uint8_t*>(ss.frameBuffer.data()),
+                .iov_len = ss.frameBuffer.size(),
+            };
+
+            stream_renderer_transfer_write_iov(bi.second, 0, 0, 0, 0,
+                                               &box, 0, &framebuffer, 1);
+        }
+
+        qemuClientReply(qc, true);
+        incrementFrameCounter();
+    }
+
+    void save(Stream* f) const override {
+        BaseCameraClient::save(f);
+        stream_put_be32(f, mStreams.size());
+        stream_write(f, mStreams.data(),
+                     mStreams.size() * sizeof(Streams::value_type));
+    }
+
+    int load(Stream* f) override {
+        if (int r = BaseCameraClient::load(f)) {
+            return r;
+        }
+
+        const uint32_t nStreams = stream_get_be32(f);
+        Streams streams(nStreams);
+
+        if (nStreams) {
+            const ssize_t readSize =
+                nStreams * sizeof(Streams::value_type);
+            if (stream_read(f, streams.data(), readSize) != readSize) {
+                return -EIO;
+            }
+
+            const auto [width, height] = getMaxResolution(
+                    &*streams.begin(), &*streams.end());
+            if (!startCapturingImpl(width, height,
+                                    mCameraInfo.pixel_format)) {
+                return -EIO;
+            }
+        }
+
+        mStreams = std::move(streams);
+        return 0;
+    }
+
+    Streams     mStreams;
+    uint8_t*    mStagingFramebuffer = nullptr;
+    size_t      mStagingFramebufferSize = 0;
+};
+
 enum class CameraClientProtocol : int {
     // Pixels are sent over the channel.
     SERIAL,
@@ -1451,8 +1747,7 @@ ICppQemudClient* CameraService::cameraClientCreate(const std::string_view params
         client = GasCameraClient::create(*ci, *cameraDevice);
         break;
     case CameraClientProtocol::MINIGBM:
-        dwarning("CameraClientProtocol::MINIGBM is not supported yet.");
-        client = nullptr;
+        client = MinigbmCameraClient::create(*ci, *cameraDevice);
         break;
     default:
         derror("Unexpected protocol: %d.", protocol);
