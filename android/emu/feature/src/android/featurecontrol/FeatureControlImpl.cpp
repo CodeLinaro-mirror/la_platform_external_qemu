@@ -161,6 +161,7 @@ void FeatureControlImpl::init(const std::string& defaultIniHostPath,
     mFeatures.clear();
     mGuestTriedEnabledFeatures.clear();
     if (defaultIniHost.read()) {
+        VERBOSE("%s, loading %s", __func__, defaultIniHostPath.c_str());
         // Initialize host only features
 #define FEATURE_CONTROL_ITEM(item, idx) \
     initHostFeatureAndParseDefault(defaultIniHost, item, #item);
@@ -209,6 +210,7 @@ void FeatureControlImpl::init(const std::string& defaultIniHostPath,
     if (base::System::get()->pathCanRead(userIniHostPath)) {
         base::IniFile userIni(userIniHostPath);
         if (userIni.read()) {
+            VERBOSE("%s, loading %s", __func__, userIniHostPath.c_str());
 #define FEATURE_CONTROL_ITEM(item, idx) \
     loadUserOverrideFeature(userIni, item, #item);
 #include "host-common/FeatureControlDefGuest.h"
@@ -219,6 +221,7 @@ void FeatureControlImpl::init(const std::string& defaultIniHostPath,
     if (base::System::get()->pathCanRead(userIniGuestPath)) {
         base::IniFile userIni(userIniGuestPath);
         if (userIni.read()) {
+            VERBOSE("%s, loading %s", __func__, userIniGuestPath.c_str());
 #define FEATURE_CONTROL_ITEM(item, idx) \
     loadUserOverrideFeature(userIni, item, #item);
 #include "host-common/FeatureControlDefGuest.h"
@@ -236,6 +239,7 @@ void FeatureControlImpl::init(const std::string& defaultIniHostPath,
     const auto envVar =
             android::base::System::get()->envGet("ANDROID_EMULATOR_FEATURES");
     if (!envVar.empty()) {
+        VERBOSE("%s, ANDROID_EMULATOR_FEATURES is set to %s", __func__, envVar.c_str());
         parseAndApplyOverrides(envVar);
     }
     if (getConsoleAgents()->settings->has_cmdLineOptions()) {
@@ -365,12 +369,19 @@ void FeatureControlImpl::setEnabledOverride(Feature feature, bool isEnabled) {
     FeatureOption& currFeature = mFeatures[feature];
     currFeature.setCurrentVal(isEnabled);
     currFeature.isOverridden = true;
+    INFO("Feature '%s' (%d) is overridden to '%s'",
+         toString(currFeature.name).data(), (int)feature,
+         (isEnabled ? "enabled" : "disabled"));
 }
 
 void FeatureControlImpl::resetEnabledToDefault(Feature feature) {
     FeatureOption& currFeature = mFeatures[feature];
     currFeature.setCurrentVal(currFeature.defaultVal);
-    currFeature.isOverridden = false;
+    if (currFeature.isOverridden) {
+        currFeature.isOverridden = false;
+        VERBOSE("Feature '%s' override is reset",
+                toString(currFeature.name).data());
+    }
 }
 
 bool FeatureControlImpl::isOverridden(Feature feature) const {
@@ -487,11 +498,6 @@ void FeatureControlImpl::parseAndApplyOverrides(std::string_view overrides) {
                          std::string(it, itEnd).c_str());
             } else {
                 setEnabledOverride(feature, enable);
-                VERBOSE_PRINT(
-                        init,
-                        "[FeatureControl] Feature '%s' (%d) state set to %s",
-                        std::string(it, itEnd).c_str(), (int)feature,
-                        (enable ? "enabled" : "disabled"));
             }
         }
         it = itEnd + 1;
