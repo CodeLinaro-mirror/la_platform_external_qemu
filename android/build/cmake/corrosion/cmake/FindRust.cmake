@@ -94,18 +94,18 @@ if (_RESOLVE_RUSTUP_TOOLCHAINS)
     string(REPLACE "\n" ";" _TOOLCHAINS_RAW "${_TOOLCHAINS_RAW}")
 
     foreach(_TOOLCHAIN_RAW ${_TOOLCHAINS_RAW})
-        if (_TOOLCHAIN_RAW MATCHES "([a-zA-Z0-9\\._\\-]+)[ \t\r\n]?(\\(default\\) \\(override\\)|\\(default\\)|\\(override\\))?[ \t\r\n]+(.+)")
+        if (_TOOLCHAIN_RAW MATCHES "([a-zA-Z0-9\\._\\-]+)[ \t\r\n]*(\\(active, default\\)|\\(default\\) \\(override\\)|\\(active\\)|\\(default\\)|\\(override\\))?[ \t\r\n]+(.+)")
             set(_TOOLCHAIN "${CMAKE_MATCH_1}")
             set(_TOOLCHAIN_TYPE ${CMAKE_MATCH_2})
             list(APPEND _DISCOVERED_TOOLCHAINS ${_TOOLCHAIN})
 
             set(${_TOOLCHAIN}_PATH "${CMAKE_MATCH_3}")
 
-            if (_TOOLCHAIN_TYPE MATCHES ".*\\(default\\).*")
+            if (_TOOLCHAIN_TYPE MATCHES ".*default.*")
                 set(_TOOLCHAIN_DEFAULT ${_TOOLCHAIN})
             endif()
 
-            if (_TOOLCHAIN_TYPE MATCHES ".*\\(override\\).*")
+            if ((_TOOLCHAIN_TYPE MATCHES ".*override.*") OR (_TOOLCHAIN_TYPE MATCHES ".*active.*"))
                 set(_TOOLCHAIN_OVERRIDE ${_TOOLCHAIN})
             endif()
         else()
