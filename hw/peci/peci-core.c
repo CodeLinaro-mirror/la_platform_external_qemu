@@ -89,7 +89,7 @@ static void peci_rd_pkg_cfg(PECIClientDevice *client, PECICmd *pcmd)
 {
     PECIPkgCfg *resp = (PECIPkgCfg *)pcmd->tx;
     uint8_t index = pcmd->rx[1];
-    uint16_t param = pcmd->rx[3] | pcmd->rx[2];
+    uint16_t param = (pcmd->rx[3] << 8) | pcmd->rx[2];
 
     switch (index) {
     case PECI_MBX_CPU_ID: /* CPU Family ID*/
