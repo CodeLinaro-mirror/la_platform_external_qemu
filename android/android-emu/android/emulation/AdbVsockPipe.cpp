@@ -153,8 +153,8 @@ struct VsockAdbProxy : public AdbVsockPipe::Proxy {
     }
 
     SocketBuffer mGuestToHost;
-    std::unique_ptr<AdbMessageSniffer> mReceivedMesg;
-    std::unique_ptr<AdbMessageSniffer> mSendingMesg;
+    const std::unique_ptr<AdbMessageSniffer> mReceivedMesg;
+    const std::unique_ptr<AdbMessageSniffer> mSendingMesg;
     mutable std::mutex mGuestToHostMutex;
 };
 
