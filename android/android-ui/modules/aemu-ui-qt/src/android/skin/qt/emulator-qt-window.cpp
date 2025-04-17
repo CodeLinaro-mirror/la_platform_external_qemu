@@ -831,6 +831,10 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
     connect(&mWheelScrollTimer, SIGNAL(timeout()), this,
             SLOT(wheelScrollTimeout()));
 
+    mTrackpadAggregateTimer.setInterval(15);
+    connect(&mTrackpadAggregateTimer, SIGNAL(timeout()), this,
+            SLOT(trackpadAggregateTimeout()));
+
     mIgnoreWheelEvent =
             settings.value(Ui::Settings::DISABLE_MOUSE_WHEEL, false).toBool();
 
@@ -3522,11 +3526,31 @@ void EmulatorQtWindow::wheelEvent(QWheelEvent* event) {
         if (!inputDeviceActive) {
             return;
         }
-        // For most mice, 1 wheel click = 15 degrees
-        handleMouseWheelEvent(event->angleDelta().y() * 120 / 15,
-                              Qt::Orientation::Vertical);
-        handleMouseWheelEvent(event->angleDelta().x() * 120 / 15,
-                              Qt::Orientation::Horizontal);
+        const int kScrollAggregationAmount = (abs(event->angleDelta().x()) >= 120 ||
+                                              abs(event->angleDelta().y()) >= 120) ? 120 : 15;
+        if (android::featurecontrol::isEnabled(
+                        android::featurecontrol::VirtioDualModeMouse)) {
+            mScrollOverflowXInDegrees += event->angleDelta().x();
+            if (abs(mScrollOverflowXInDegrees) >= kScrollAggregationAmount) {
+                int scrollDelta = mScrollOverflowXInDegrees / kScrollAggregationAmount;
+                handleMouseWheelEvent(scrollDelta, Qt::Orientation::Horizontal);
+                mScrollOverflowXInDegrees = mScrollOverflowXInDegrees % kScrollAggregationAmount;
+            }
+
+            mScrollOverflowYInDegrees += event->angleDelta().y();
+            if (abs(mScrollOverflowYInDegrees) >= kScrollAggregationAmount) {
+                int scrollDelta = mScrollOverflowYInDegrees / kScrollAggregationAmount;
+                handleMouseWheelEvent(scrollDelta, Qt::Orientation::Vertical);
+                mScrollOverflowYInDegrees = mScrollOverflowYInDegrees % kScrollAggregationAmount;
+            }
+            mTrackpadAggregateTimer.start();
+        } else {
+            // For most mice, 1 wheel click = 15 degrees
+            handleMouseWheelEvent(event->angleDelta().y() * 120 / 15,
+                                  Qt::Orientation::Vertical);
+            handleMouseWheelEvent(event->angleDelta().x() * 120 / 15,
+                                  Qt::Orientation::Horizontal);
+        }
     } else if (inputDeviceHasRotary) {
         SkinEvent skin_event = createSkinEvent(kEventRotaryInput);
         skin_event.u.rotary_input.delta = event->angleDelta().y() / 8;
@@ -3572,6 +3596,28 @@ void EmulatorQtWindow::wheelScrollTimeout() {
     std::unique_ptr<SwipeGesture> gesture(std::move(mSwipeGesture));
     handleMouseEvent(kEventMouseButtonUp, kMouseButtonLeft, gesture->point(),
                      {0, 0});
+}
+
+void EmulatorQtWindow::trackpadAggregateTimeout() {
+    if (android::featurecontrol::isEnabled(
+        android::featurecontrol::VirtioDualModeMouse)) {
+        // Sending out a scrolling of 960 so it will be scaled to 1 scroll click unit
+        // in android-qemu2-glue/qemu-user-event-agent-impl.c
+        if(mScrollOverflowXInDegrees > 0){
+            handleMouseWheelEvent(960, Qt::Orientation::Horizontal);
+        } else if (mScrollOverflowXInDegrees < 0){
+            handleMouseWheelEvent(-960, Qt::Orientation::Horizontal);
+        }
+        if(mScrollOverflowYInDegrees > 0){
+            handleMouseWheelEvent(960, Qt::Orientation::Vertical);
+        } else if (mScrollOverflowYInDegrees < 0){
+            handleMouseWheelEvent(-960, Qt::Orientation::Vertical);
+        }
+        mTrackpadAggregateTimer.stop();
+        mScrollOverflowXInDegrees = 0;
+        mScrollOverflowYInDegrees = 0;
+    }
+    return;
 }
 
 void EmulatorQtWindow::checkAdbVersionAndWarn() {
