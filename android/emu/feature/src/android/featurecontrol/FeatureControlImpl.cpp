@@ -484,6 +484,11 @@ void FeatureControlImpl::setGuestTriedEnable(Feature feature) {
 }
 
 void FeatureControlImpl::parseAndApplyOverrides(std::string_view overrides) {
+    if (overrides.length() == 0)
+        return;
+
+    VERBOSE("%s, overrides='%.*s'", __func__,
+            static_cast<int>(overrides.length()), overrides.data());
     for (auto it = overrides.begin(); it < overrides.end();) {
         bool enable = true;
         if (*it == '-') {
