@@ -386,9 +386,15 @@ SettingsPage::SettingsPage(QWidget* parent)
                     (WinsysGuestGlesDriverPreference)(mUi->set_guestGlesDriverPrefComboBox
                                                               ->itemData(i)
                                                               .toInt());
-            if (driverPreferenceOption == WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE && !supportsGuestAngle) {
-                mUi->set_guestGlesDriverPrefComboBox->removeItem(i);
-                dinfo("Platform does not support Guest Angle");
+            if (driverPreferenceOption == WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE) {
+                if (!supportsGuestAngle) {
+                    mUi->set_guestGlesDriverPrefComboBox->removeItem(i);
+                    dinfo("Platform does not support Guest Angle");
+                } else if (apiLevel > 35) {
+                    // TODO(b/394755733): Remove this once API 36 is stable.
+                    mUi->set_guestGlesDriverPrefComboBox->removeItem(i);
+                    dinfo("Guest Angle is still unstable for API > 35.");
+                }
             } else if (driverPreferenceOption == WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE && !supportsNativeGles) {
                 mUi->set_guestGlesDriverPrefComboBox->removeItem(i);
                 dinfo("Platform does not support Native GLES");
