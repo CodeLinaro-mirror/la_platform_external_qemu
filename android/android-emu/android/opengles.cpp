@@ -370,16 +370,6 @@ int android_startOpenglesRenderer(
     // libOpenglRender uses feature control directly.
 #endif
 
-#if defined(AEMU_GFXSTREAM_BACKEND)
-    // Don't override the feature controller when running under
-    // gfxstream_backend_unittests
-    if (!sRunningInGfxstreamBackend) {
-        sRenderLib->setFeatureController(
-                &android::featurecontrol::isEnabledLocal);
-    }
-#else
-    sRenderLib->setFeatureController(&android::featurecontrol::isEnabledLocal);
-#endif
     sRenderLib->setSyncDevice(
             goldfish_sync_create_timeline, goldfish_sync_create_fence,
             goldfish_sync_timeline_inc, goldfish_sync_destroy_timeline,
