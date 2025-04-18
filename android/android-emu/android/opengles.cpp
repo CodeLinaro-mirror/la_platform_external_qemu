@@ -263,8 +263,6 @@ int android_startOpenglesRenderer(
 
     sRenderLib->setRenderer(emuglConfig_get_current_renderer());
     sRenderLib->setAvdInfo(guestPhoneApi, guestApiLevel);
-    sRenderLib->setCrashReporter(&crashhandler_die_format);
-
 
     gfxstream::host::FeatureSet gfxstreamFeatures;
 #if defined(AEMU_GFXSTREAM_BACKEND)
