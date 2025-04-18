@@ -5,6 +5,7 @@ target_link_libraries(
     qemu-host-common-headers
     INTERFACE
     aemu-host-common.headers
+    gfxstream_openglesdispatch.headers
     gfxstream-gl-host-common.headers)
 if(OPTION_GFXSTREAM_BACKEND)
     target_link_libraries(
