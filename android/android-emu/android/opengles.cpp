@@ -390,8 +390,6 @@ int android_startOpenglesRenderer(
     sRenderLib->setAddressSpaceDeviceControlOps(
             get_address_space_device_control_ops());
     sRenderLib->setWindowOps(*window_agent, *multi_display_agent);
-    sRenderLib->setUsageTracker(android::base::CpuUsage::get(),
-                                android::base::MemoryTracker::get());
 
     sRenderer = sRenderLib->initRenderer(width, height, gfxstreamFeatures,
                                          sRendererUsesSubWindow, sEgl2egl);
