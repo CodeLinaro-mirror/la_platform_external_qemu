@@ -9,7 +9,6 @@ android_add_library(
       misc.cpp
       shared_library.cpp
       stringparsing.cpp
-      sync_device.cpp
       vm_operations.cpp
       window_operations.cpp)
 
