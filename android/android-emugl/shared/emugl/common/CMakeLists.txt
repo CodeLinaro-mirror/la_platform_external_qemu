@@ -4,7 +4,6 @@ android_add_library(
   LICENSE Apache-2.0
   SRC address_space_device_control_ops.cpp
       crash_reporter.cpp
-      dma_device.cpp
       logging.cpp
       misc.cpp
       shared_library.cpp
