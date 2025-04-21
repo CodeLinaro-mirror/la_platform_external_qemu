@@ -237,8 +237,8 @@ static bool is_snapshot_save_skipped() {
     return false;
 }
 
-static void set_skip_snapshot_save_reason(SnapshotSkipReason reason) {
-    skip_snapshot_save_reason = reason;
+static void set_skip_snapshot_save_reason(uint32_t reason) {
+    skip_snapshot_save_reason = (SnapshotSkipReason)reason;
 }
 
 static void android_vulkan_instance_register(uint64_t id, const char* name) {

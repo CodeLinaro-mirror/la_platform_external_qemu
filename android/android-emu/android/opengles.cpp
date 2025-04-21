@@ -386,7 +386,16 @@ int android_startOpenglesRenderer(
     dma_ops.get_host_addr = android_goldfish_dma_ops.get_host_addr;
     dma_ops.unlock = android_goldfish_dma_ops.unlock;
     sRenderLib->setDmaOps(dma_ops);
-    sRenderLib->setVmOps(*vm_operations);
+    sRenderLib->setVmOps(gfxstream_vm_ops{
+            .map_user_memory = vm_operations->mapUserBackedRam,
+            .unmap_user_memory = vm_operations->unmapUserBackedRam,
+            .lookup_user_memory = vm_operations->physicalMemoryGetAddr,
+            .register_vulkan_instance = vm_operations->vulkanInstanceRegister,
+            .unregister_vulkan_instance = vm_operations->vulkanInstanceUnregister,
+            .set_skip_snapshot_save = vm_operations->setSkipSnapshotSave,
+            .set_skip_snapshot_save_reason = vm_operations->setSkipSnapshotSaveReason,
+            .set_snapshot_uses_vulkan = vm_operations->setStatSnapshotUseVulkan,
+    });
     sRenderLib->setAddressSpaceDeviceControlOps(
             get_address_space_device_control_ops());
     sRenderLib->setWindowOps(*window_agent, *multi_display_agent);
