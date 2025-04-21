@@ -5,7 +5,6 @@ android_add_library(
   SRC address_space_device_control_ops.cpp
       crash_reporter.cpp
       dma_device.cpp
-      feature_control.cpp
       logging.cpp
       misc.cpp
       shared_library.cpp

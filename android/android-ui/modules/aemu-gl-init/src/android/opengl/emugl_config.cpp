@@ -30,6 +30,7 @@
 #include "android/opengl/gpuinfo.h"
 #include "android/skin/backend-defs.h"
 #include "android/cpu_accelerator.h"
+#include "host-common/FeatureControl.h"
 #include "host-common/crash-handler.h"
 #include "host-common/feature_control.h"
 #include "host-common/opengles.h"

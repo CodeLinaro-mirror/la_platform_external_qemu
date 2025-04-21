@@ -263,8 +263,6 @@ int android_startOpenglesRenderer(
 
     sRenderLib->setRenderer(emuglConfig_get_current_renderer());
     sRenderLib->setAvdInfo(guestPhoneApi, guestApiLevel);
-    sRenderLib->setCrashReporter(&crashhandler_die_format);
-
 
     gfxstream::host::FeatureSet gfxstreamFeatures;
 #if defined(AEMU_GFXSTREAM_BACKEND)
@@ -372,16 +370,6 @@ int android_startOpenglesRenderer(
     // libOpenglRender uses feature control directly.
 #endif
 
-#if defined(AEMU_GFXSTREAM_BACKEND)
-    // Don't override the feature controller when running under
-    // gfxstream_backend_unittests
-    if (!sRunningInGfxstreamBackend) {
-        sRenderLib->setFeatureController(
-                &android::featurecontrol::isEnabledLocal);
-    }
-#else
-    sRenderLib->setFeatureController(&android::featurecontrol::isEnabledLocal);
-#endif
     sRenderLib->setSyncDevice(
             goldfish_sync_create_timeline, goldfish_sync_create_fence,
             goldfish_sync_timeline_inc, goldfish_sync_destroy_timeline,
@@ -402,8 +390,6 @@ int android_startOpenglesRenderer(
     sRenderLib->setAddressSpaceDeviceControlOps(
             get_address_space_device_control_ops());
     sRenderLib->setWindowOps(*window_agent, *multi_display_agent);
-    sRenderLib->setUsageTracker(android::base::CpuUsage::get(),
-                                android::base::MemoryTracker::get());
 
     sRenderer = sRenderLib->initRenderer(width, height, gfxstreamFeatures,
                                          sRendererUsesSubWindow, sEgl2egl);

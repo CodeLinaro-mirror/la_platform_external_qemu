@@ -14,8 +14,6 @@
 
 #include "host-common/misc.h"
 
-#include "aemu/base/CpuUsage.h"
-#include "aemu/base/memory/MemoryTracker.h"
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/opengl/misc.h"
 
@@ -28,8 +26,6 @@ static bool s_shouldSkipDrawing = false;
 static int s_glesMajorVersion = 2;
 static int s_glesMinorVersion = 0;
 
-android::base::CpuUsage* s_cpu_usage = nullptr;
-android::base::MemoryTracker* s_mem_usage = nullptr;
 static GrallocImplementation s_gralloc_implementation = MINIGBM;
 
 static SelectedRenderer s_renderer =
@@ -83,22 +79,6 @@ bool emugl::hasExtension(const char* extensionsStr,
         return true;
     }
     return false;
-}
-
-void emugl::setCpuUsage(android::base::CpuUsage* usage) {
-    s_cpu_usage = usage;
-}
-
-android::base::CpuUsage* emugl::getCpuUsage() {
-    return s_cpu_usage;
-}
-
-void emugl::setMemoryTracker(android::base::MemoryTracker* usage) {
-    s_mem_usage = usage;
-}
-
-android::base::MemoryTracker* emugl::getMemoryTracker() {
-    return s_mem_usage;
 }
 
 void emugl::setGrallocImplementation(GrallocImplementation gralloc) {

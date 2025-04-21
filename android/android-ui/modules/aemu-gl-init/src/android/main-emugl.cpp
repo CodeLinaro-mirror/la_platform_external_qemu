@@ -17,6 +17,7 @@
 #include "android/opengl/gpuinfo.h"
 #include "android/utils/debug.h"
 #include "android/utils/string.h"
+#include "host-common/FeatureControl.h"
 #include "host-common/feature_control.h"
 #include "host-common/opengles.h"
 
