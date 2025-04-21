@@ -405,7 +405,21 @@ int android_startOpenglesRenderer(
         .is_folded = window_agent->isFolded,
         .get_folded_area = window_agent->getFoldedArea,
     });
-    sRenderLib->setMultiDisplayOps(*multi_display_agent);
+    sRenderLib->setDisplayOps(gfxstream_multi_display_ops{
+        .is_multi_display_enabled = multi_display_agent->isMultiDisplayEnabled,
+        .is_multi_window = multi_display_agent->isMultiDisplayWindow,
+        .is_pixel_fold = multi_display_agent->isPixelFold,
+        .get_combined_size = multi_display_agent->getCombinedDisplaySize,
+        .get_display_info = multi_display_agent->getMultiDisplay,
+        .get_next_display_info = multi_display_agent->getNextMultiDisplay,
+        .create_display = multi_display_agent->createDisplay,
+        .destroy_display = multi_display_agent->destroyDisplay,
+        .get_display_color_buffer = multi_display_agent->getDisplayColorBuffer,
+        .set_display_color_buffer = multi_display_agent->setDisplayColorBuffer,
+        .get_color_buffer_display = multi_display_agent->getColorBufferDisplay,
+        .get_display_pose = multi_display_agent->getDisplayPose,
+        .set_display_pose = multi_display_agent->setDisplayPose,
+    });
 
     sRenderer = sRenderLib->initRenderer(width, height, gfxstreamFeatures,
                                          sRendererUsesSubWindow, sEgl2egl);
