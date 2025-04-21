@@ -13,7 +13,6 @@
 #include "host-common/opengles.h"
 
 #include "aemu/base/CpuUsage.h"
-#include "aemu/base/GLObjectCounter.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/Stream.h"
 #include "aemu/base/memory/MemoryTracker.h"
@@ -395,7 +394,6 @@ int android_startOpenglesRenderer(
                     : GOLDFISH_GRALLOC);
 
     sRenderLib->setLogger(android_opengl_logger_write);
-    sRenderLib->setGLObjectCounter(android::base::GLObjectCounter::get());
     emugl_dma_ops dma_ops;
     dma_ops.get_host_addr = android_goldfish_dma_ops.get_host_addr;
     dma_ops.unlock = android_goldfish_dma_ops.unlock;

@@ -14,7 +14,6 @@
 
 #include "host-common/misc.h"
 
-#include "aemu/base/GLObjectCounter.h"
 #include "aemu/base/CpuUsage.h"
 #include "aemu/base/memory/MemoryTracker.h"
 #include "host-common/opengl/emugl_config.h"
@@ -29,9 +28,6 @@ static bool s_shouldSkipDrawing = false;
 static int s_glesMajorVersion = 2;
 static int s_glesMinorVersion = 0;
 
-android::base::GLObjectCounter* s_default_gl_object_counter = nullptr;
-
-android::base::GLObjectCounter* s_gl_object_counter = nullptr;
 android::base::CpuUsage* s_cpu_usage = nullptr;
 android::base::MemoryTracker* s_mem_usage = nullptr;
 static GrallocImplementation s_gralloc_implementation = MINIGBM;
@@ -87,20 +83,6 @@ bool emugl::hasExtension(const char* extensionsStr,
         return true;
     }
     return false;
-}
-
-void emugl::setGLObjectCounter(android::base::GLObjectCounter* counter) {
-    s_gl_object_counter = counter;
-}
-
-android::base::GLObjectCounter* emugl::getGLObjectCounter() {
-    if (!s_gl_object_counter) {
-        if (!s_default_gl_object_counter) {
-            s_default_gl_object_counter = new android::base::GLObjectCounter;
-        }
-        return s_default_gl_object_counter;
-    }
-    return s_gl_object_counter;
 }
 
 void emugl::setCpuUsage(android::base::CpuUsage* usage) {
