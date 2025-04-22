@@ -36,12 +36,12 @@
 #include "host-common/address_space_graphics.h"
 #include "host-common/address_space_graphics_types.h"
 #include "host-common/crash-handler.h"
-#include "host-common/dma_device.h"
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/opengl/gpuinfo.h"
 
 #include "OpenGLESDispatch/EGLDispatch.h"
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
+#include "render-utils/dma_device.h"
 #include "render-utils/render_api_functions.h"
 
 #include <assert.h>
@@ -382,7 +382,7 @@ int android_startOpenglesRenderer(
                     : GOLDFISH_GRALLOC);
 
     sRenderLib->setLogger(android_opengl_logger_write);
-    emugl_dma_ops dma_ops;
+    gfxstream_dma_ops dma_ops;
     dma_ops.get_host_addr = android_goldfish_dma_ops.get_host_addr;
     dma_ops.unlock = android_goldfish_dma_ops.unlock;
     sRenderLib->setDmaOps(dma_ops);
