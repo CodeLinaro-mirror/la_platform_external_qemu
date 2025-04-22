@@ -22,15 +22,11 @@ namespace control {
 // Class that sends Mouse events on the current looper.
 class MouseEventSender : public EventSender<MouseEvent> {
 public:
-    MouseEventSender(const AndroidConsoleAgents* const consoleAgents);
+    MouseEventSender(const AndroidConsoleAgents* const consoleAgents) : EventSender<MouseEvent>(consoleAgents) {};
     ~MouseEventSender() = default;
 
 protected:
     void doSend(const MouseEvent event) override;
-
-private:
-    const bool mShouldTranslateMouseClickToTouch{false};
-    bool mRightMouseButtonDown{false};
 };
 
 }  // namespace control
