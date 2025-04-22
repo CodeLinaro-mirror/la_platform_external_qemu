@@ -381,7 +381,7 @@ SettingsPage::SettingsPage(QWidget* parent)
             mUi->set_guestGlesDriverPrefComboBox->setItemData(i, QVariant(i));
         }
         //Remove unsupported guest drivers
-        for (int i = 0; i < mUi->set_guestGlesDriverPrefComboBox->count();) {
+        for (int i = mUi->set_guestGlesDriverPrefComboBox->count() - 1; i >= 0; --i) {
             WinsysGuestGlesDriverPreference driverPreferenceOption =
                     (WinsysGuestGlesDriverPreference)(mUi->set_guestGlesDriverPrefComboBox
                                                               ->itemData(i)
@@ -398,8 +398,6 @@ SettingsPage::SettingsPage(QWidget* parent)
             } else if (driverPreferenceOption == WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE && !supportsNativeGles) {
                 mUi->set_guestGlesDriverPrefComboBox->removeItem(i);
                 dinfo("Platform does not support Native GLES");
-            } else {
-                i++;
             }
         }
         std::unique_ptr<QSettings> settings;
