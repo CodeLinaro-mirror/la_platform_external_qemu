@@ -23,6 +23,7 @@
 #include "hw/gpio/npcm7xx_gpio.h"
 #include "hw/i2c/npcm7xx_smbus.h"
 #include "hw/i3c/svc-i3c.h"
+#include "hw/ipmi/npcm7xx_kcs.h"
 #include "hw/intc/arm_gic_common.h"
 #include "hw/mem/npcm7xx_mc.h"
 #include "hw/misc/npcm_clk.h"
@@ -105,6 +106,7 @@ struct NPCM8xxState {
     NPCM7xxRNGState     rng;
     NPCM7xxGPIOState    gpio[8];
     NPCM7xxSMBusState   smbus[27];
+    NPCM7xxKCSState     kcs;
     EHCISysBusState     ehci[2];
     OHCISysBusState     ohci[2];
     USBRedirectHost     usbredir_host;
