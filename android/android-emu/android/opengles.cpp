@@ -294,7 +294,7 @@ int android_startOpenglesRenderer(
     INFO("%s", gpuInfoAsString.c_str());
 
     sRenderLib->setRenderer(emuglConfig_get_current_renderer());
-    sRenderLib->setAvdInfo(guestPhoneApi, guestApiLevel);
+    sRenderLib->setGuestAndroidApiLevel(guestApiLevel);
 
     gfxstream::host::FeatureSet gfxstreamFeatures;
 #if defined(AEMU_GFXSTREAM_BACKEND)
