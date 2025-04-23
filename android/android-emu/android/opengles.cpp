@@ -42,6 +42,7 @@
 #include "OpenGLESDispatch/EGLDispatch.h"
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "render-utils/dma_device.h"
+#include "render-utils/logging_operations.h"
 #include "render-utils/render_api_functions.h"
 
 #include <assert.h>
@@ -236,6 +237,36 @@ extern bool isEnabledLocal(Feature feature);
 }
 }  // namespace android
 
+void gfxstreamLoggingCallback(
+        gfxstream_logging_level level,
+        const char* file,
+        int line,
+        const char* function,
+        const char* message) {
+    char severity;
+    switch (level) {
+        case GFXSTREAM_LOGGING_LEVEL_FATAL:
+            severity = 'F';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_ERROR:
+            severity = 'E';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_WARNING:
+            severity = 'W';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_INFO:
+            severity = 'I';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_DEBUG:
+            severity = 'D';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_VERBOSE:
+            severity = 'V';
+            break;
+    }
+    OutputLog(stderr, severity, file, line, /*timestamp_us=*/0, "%s", message);
+}
+
 int android_startOpenglesRenderer(
         int width,
         int height,
@@ -381,7 +412,7 @@ int android_startOpenglesRenderer(
                     ? MINIGBM
                     : GOLDFISH_GRALLOC);
 
-    sRenderLib->setLogger(android_opengl_logger_write);
+    sRenderLib->setLogger(gfxstreamLoggingCallback);
     gfxstream_dma_ops dma_ops;
     dma_ops.get_host_addr = android_goldfish_dma_ops.get_host_addr;
     dma_ops.unlock = android_goldfish_dma_ops.unlock;
