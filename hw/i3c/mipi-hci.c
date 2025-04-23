@@ -32,6 +32,12 @@ static uint8_t mipi_hci_get_next_dynamic_addr(MIPIHCIState *s,
                       TARGET_DYNAMIC_ADDRESS);
 }
 
+static uint8_t mipi_hci_get_dev_dynamic_addr(MIPIHCIState *s,
+                                             uint8_t dat_index)
+{
+    return mipi_hci_get_next_dynamic_addr(s, dat_index);
+}
+
  /* Default IRQ update function. This assumes 1 IRQ line. */
 static void mipi_hci_update_irq(MIPIHCIState *s, MIPIHCIIRQContext ctx)
 {
@@ -235,6 +241,7 @@ static void mipi_hci_class_init(ObjectClass *klass, const void *data)
 
     mhc->update_irq = mipi_hci_update_irq;
     mhc->get_next_dynamic_addr = mipi_hci_get_next_dynamic_addr;
+    mhc->get_dev_dynamic_addr = mipi_hci_get_dev_dynamic_addr;
 }
 
 static const TypeInfo mipi_hci_info = {
