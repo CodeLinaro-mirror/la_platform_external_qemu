@@ -28,6 +28,7 @@
 #include "hw/misc/npcm_clk.h"
 #include "hw/misc/npcm_gcr.h"
 #include "hw/misc/npcm7xx_mft.h"
+#include "hw/misc/npcm7xx_pci_mbox.h"
 #include "hw/misc/npcm7xx_pwm.h"
 #include "hw/misc/npcm7xx_rng.h"
 #include "hw/net/npcm_gmac.h"
@@ -111,6 +112,7 @@ struct NPCM8xxState {
     NPCM7xxFIUState     fiu[3];
     NPCMGMACState       gmac[4];
     NPCMPCSState        pcs;
+    NPCM7xxPCIMBoxState pci_mbox[2];
     NPCM7xxSDHCIState   mmc;
     NPCMPCIERCState     pcierc;
     SVCI3C              i3c[6];
