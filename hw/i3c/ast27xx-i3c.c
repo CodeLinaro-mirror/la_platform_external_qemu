@@ -20,6 +20,7 @@
 #include "hw/core/sysbus.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
+#include "hw/i3c/hci-dat.h"
 #include "hw/core/irq.h"
 #include "qobject/qlist.h"
 
@@ -335,6 +336,12 @@ static const uint32_t ast27xx_i3c_phy_reset[AST27XX_I3C_PHY_NUM_REGS] = {
     [R_I3C_PHY_BUS_CONTENTION_CHK0]            = 0x00000f90,
 };
 
+static uint8_t ast27xx_i3c_get_dev_dynamic_addr(MIPIHCIState *hci,
+                                                uint8_t dat_index)
+{
+    return dat_index / HCI_DAT_ENTRY_SIZE;
+}
+
 static uint8_t ast27xx_i3c_get_next_dynamic_addr(MIPIHCIState *hci,
                                                  uint8_t dat_index)
 {
@@ -630,6 +637,7 @@ static void ast27xx_i3c_class_init(ObjectClass *klass, const void *data)
                                        &aic->parent_phases);
     mhc->update_irq = ast27xx_i3c_update_irq;
     mhc->get_next_dynamic_addr = ast27xx_i3c_get_next_dynamic_addr;
+    mhc->get_dev_dynamic_addr = ast27xx_i3c_get_dev_dynamic_addr;
 }
 
 static const TypeInfo ast27xx_i3c_info = {
