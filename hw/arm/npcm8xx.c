@@ -56,6 +56,7 @@
 #define NPCM8XX_MC_BA           0xf0824000
 #define NPCM8XX_RNG_BA          0xf000b000
 #define NPCM8XX_KCS_BA          0xf0007000
+#define NPCM8XX_PECI_BA         0xf0100000
 #define NPCM8XX_PCIERC_BA       0xe1000000
 #define NPCM8XX_PCIE_ROOT_BA    0xe8000000
 #define NPCM8XX_ESPI_BA         0xf009f000
@@ -543,6 +544,7 @@ static void npcm8xx_init(Object *obj)
     }
 
     object_initialize_child(obj, "mmc", &s->mmc, TYPE_NPCM7XX_SDHCI);
+    object_initialize_child(obj, "peci", &s->peci, TYPE_NPCM7XX_PECI);
     object_initialize_child(obj, "pcierc", &s->pcierc, TYPE_NPCM_PCIERC);
     object_initialize_child(obj, "pspi", &s->pspi, TYPE_NPCM_PSPI);
 
@@ -883,6 +885,11 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->mmc), 0,
             npcm8xx_irq(s, NPCM8XX_MMC_IRQ));
 
+    /* PECI */
+    sysbus_realize(SYS_BUS_DEVICE(&s->peci), &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->peci), 0, NPCM8XX_PECI_BA);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->peci), 0,
+                        npcm8xx_irq(s, NPCM8XX_PECI_IRQ));
     /* PCIe RC */
     sysbus_realize(SYS_BUS_DEVICE(&s->pcierc), &error_abort);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->pcierc), 0, NPCM8XX_PCIERC_BA);
@@ -925,7 +932,6 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("npcm8xx.gfxi",         0xf000e000,   4 * KiB);
     create_unimplemented_device("npcm8xx.fsw",          0xf000f000,   4 * KiB);
     create_unimplemented_device("npcm8xx.bt",           0xf0030000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.peci",         0xf0100000,   4 * KiB);
     create_unimplemented_device("npcm8xx.siox[1]",      0xf0101000,   4 * KiB);
     create_unimplemented_device("npcm8xx.siox[2]",      0xf0102000,   4 * KiB);
     create_unimplemented_device("npcm8xx.tmps",         0xf0188000,   4 * KiB);
