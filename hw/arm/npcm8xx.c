@@ -55,6 +55,7 @@
 #define NPCM8XX_CLK_BA          0xf0801000
 #define NPCM8XX_MC_BA           0xf0824000
 #define NPCM8XX_RNG_BA          0xf000b000
+#define NPCM8XX_KCS_BA          0xf0007000
 #define NPCM8XX_PCIERC_BA       0xe1000000
 #define NPCM8XX_PCIE_ROOT_BA    0xe8000000
 #define NPCM8XX_ESPI_BA         0xf009f000
@@ -501,6 +502,8 @@ static void npcm8xx_init(Object *obj)
         DEVICE(&s->smbus[i])->id = g_strdup_printf("smbus[%d]", i);
     }
 
+    object_initialize_child(obj, "kcs", &s->kcs, TYPE_NPCM7XX_KCS);
+
     for (i = 0; i < ARRAY_SIZE(s->ehci); i++) {
         object_initialize_child(obj, "ehci[*]", &s->ehci[i], TYPE_NPCM7XX_EHCI);
     }
@@ -728,6 +731,12 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
                            npcm8xx_irq(s, NPCM8XX_SMBUS0_IRQ + i));
     }
 
+    /* KCS modules*/
+    sysbus_realize(SYS_BUS_DEVICE(&s->kcs), &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->kcs), 0, NPCM8XX_KCS_BA);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->kcs), 0,
+                       npcm8xx_irq(s, NPCM8XX_KCS_HIB_IRQ));
+
     /* USB Host */
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(s->ohci) != ARRAY_SIZE(s->ehci));
     for (i = 0; i < ARRAY_SIZE(s->ehci); i++) {
@@ -913,7 +922,6 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("npcm8xx.shm",          0xc0001000,   4 * KiB);
     create_unimplemented_device("npcm8xx.gicextra",     0xdfffa000,  24 * KiB);
     create_unimplemented_device("npcm8xx.vdmx",         0xe0800000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.kcs",          0xf0007000,   4 * KiB);
     create_unimplemented_device("npcm8xx.gfxi",         0xf000e000,   4 * KiB);
     create_unimplemented_device("npcm8xx.fsw",          0xf000f000,   4 * KiB);
     create_unimplemented_device("npcm8xx.bt",           0xf0030000,   4 * KiB);
