@@ -335,6 +335,31 @@ static const uint32_t ast27xx_i3c_phy_reset[AST27XX_I3C_PHY_NUM_REGS] = {
     [R_I3C_PHY_BUS_CONTENTION_CHK0]            = 0x00000f90,
 };
 
+static uint8_t ast27xx_i3c_get_next_dynamic_addr(MIPIHCIState *hci,
+                                                 uint8_t dat_index)
+{
+    AST27xxI3CState *s = container_of(hci, AST27xxI3CState, parent);
+    /*
+     * These registers aren't documented, but they're bitfields, and the offset
+     * of the set bit is the address to use.
+     * We're going to assume that it will use use the first set bit, so iterate
+     * through each one until we find one that's set.
+     */
+    uint32_t reg = R_I3C_DAA_INDEX_0;
+    for (reg = R_I3C_DAA_INDEX_0; reg <= R_I3C_DAA_INDEX_3; reg++) {
+        for (uint32_t i = 0; i < sizeof(uint32_t) * 8; i++) {
+            if (s->ctrl_regs[reg] & (1UL << i)) {
+                return i;
+            }
+        }
+    }
+
+    g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+    qemu_log_mask(LOG_GUEST_ERROR, "%s: could not find a dynamic address to "
+                  "use", path);
+    return 0;
+}
+
 static void ast27xx_i3c_update_irq(MIPIHCIState *hci, MIPIHCIIRQContext ctx)
 {
     AST27xxI3CState *s = container_of(hci, AST27xxI3CState, parent);
@@ -604,6 +629,7 @@ static void ast27xx_i3c_class_init(ObjectClass *klass, const void *data)
     resettable_class_set_parent_phases(rc, ast27xx_i3c_enter_reset, NULL, NULL,
                                        &aic->parent_phases);
     mhc->update_irq = ast27xx_i3c_update_irq;
+    mhc->get_next_dynamic_addr = ast27xx_i3c_get_next_dynamic_addr;
 }
 
 static const TypeInfo ast27xx_i3c_info = {
