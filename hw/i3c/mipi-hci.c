@@ -22,7 +22,15 @@
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/mipi-hci.h"
+#include "hw/i3c/hci-dat.h"
 #include "hw/core/irq.h"
+
+static uint8_t mipi_hci_get_next_dynamic_addr(MIPIHCIState *s,
+                                              uint8_t dat_index)
+{
+    return FIELD_EX32(s->dat.regs[dat_index + R_TARGET_DAT], TARGET_DAT,
+                      TARGET_DYNAMIC_ADDRESS);
+}
 
  /* Default IRQ update function. This assumes 1 IRQ line. */
 static void mipi_hci_update_irq(MIPIHCIState *s, MIPIHCIIRQContext ctx)
@@ -226,6 +234,7 @@ static void mipi_hci_class_init(ObjectClass *klass, const void *data)
     device_class_set_props(dc, mipi_hci_properties);
 
     mhc->update_irq = mipi_hci_update_irq;
+    mhc->get_next_dynamic_addr = mipi_hci_get_next_dynamic_addr;
 }
 
 static const TypeInfo mipi_hci_info = {
