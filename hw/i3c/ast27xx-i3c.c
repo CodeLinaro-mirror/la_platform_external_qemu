@@ -79,6 +79,9 @@ REG32(I3C_INTR_STATUS_ENABLE, 0xe4)
 REG32(I3C_INTR_SIGNAL_ENABLE, 0xe8)
 REG32(I3C_INTR_FORCE, 0xec)
 REG32(I3C_INTR_STATUS_F0, 0xf0)
+    FIELD(I3C_INTR_STATUS_F0, CAP_STATUS, 0, 1)
+    FIELD(I3C_INTR_STATUS_F0, PIO_STATUS, 1, 1)
+    FIELD(I3C_INTR_STATUS_F0, RHS_STATUS, 2, 1)
 REG32(I3C_INTR_PROCESS, 0xf4)
 REG32(I3C_IBI_TIMEOUT_F8, 0xf8)
 
@@ -332,6 +335,42 @@ static const uint32_t ast27xx_i3c_phy_reset[AST27XX_I3C_PHY_NUM_REGS] = {
     [R_I3C_PHY_BUS_CONTENTION_CHK0]            = 0x00000f90,
 };
 
+static void ast27xx_i3c_update_irq(MIPIHCIState *hci, MIPIHCIIRQContext ctx)
+{
+    AST27xxI3CState *s = container_of(hci, AST27xxI3CState, parent);
+    HCICoreState *core = &hci->core;
+    HCIDMAState *dma = &hci->dma;
+
+    s->ctrl_regs[R_I3C_INTR_STATUS_F0] = 0;
+
+    /* INTR_STATUS is masked before setting the IRQ line. */
+    core->regs[R_INTR_STATUS] &= core->regs[R_INTR_SIGNAL_ENABLE];
+    dma->regs[R_RH_INTR_STATUS] &= dma->regs[R_RH_INTR_SIGNAL_ENABLE];
+
+    bool level = !!(core->regs[R_INTR_STATUS] &
+                    core->regs[R_INTR_SIGNAL_ENABLE]);
+    level |= !!(dma->regs[R_RH_INTR_STATUS] &
+                dma->regs[R_RH_INTR_SIGNAL_ENABLE]);
+
+    if (level) {
+        switch (ctx) {
+        case MIPI_HCI_IRQ_CONTEXT_CORE:
+            ARRAY_FIELD_DP32(s->ctrl_regs, I3C_INTR_STATUS_F0, CAP_STATUS, 1);
+            break;
+        case MIPI_HCI_IRQ_CONTEXT_DMA:
+            ARRAY_FIELD_DP32(s->ctrl_regs, I3C_INTR_STATUS_F0, RHS_STATUS, 1);
+            break;
+        case MIPI_HCI_IRQ_CONTEXT_PIO:
+            ARRAY_FIELD_DP32(s->ctrl_regs, I3C_INTR_STATUS_F0, PIO_STATUS, 1);
+            break;
+        default:
+            g_assert_not_reached();
+        }
+    }
+
+    qemu_set_irq(hci->irq[0], level);
+}
+
 static uint64_t ast27xx_i3c_ctrl_read(void *opaque, hwaddr offset,
                                       unsigned size)
 {
@@ -556,6 +595,7 @@ static void ast27xx_i3c_class_init(ObjectClass *klass, const void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     AST27xxI3CClass *aic = AST27XX_I3C_CLASS(klass);
+    MIPIHCIClass *mhc = MIPI_HCI_CLASS(aic);
 
     dc->desc = "AST27xx I3C Controller";
 
@@ -563,6 +603,7 @@ static void ast27xx_i3c_class_init(ObjectClass *klass, const void *data)
                                     &aic->parent_realize);
     resettable_class_set_parent_phases(rc, ast27xx_i3c_enter_reset, NULL, NULL,
                                        &aic->parent_phases);
+    mhc->update_irq = ast27xx_i3c_update_irq;
 }
 
 static const TypeInfo ast27xx_i3c_info = {
