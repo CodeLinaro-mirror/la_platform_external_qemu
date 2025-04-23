@@ -81,8 +81,7 @@ if(OPTION_GFXSTREAM_BACKEND)
         android-emu-base-headers
         android-emu-crashreport
         android-emu-crashreport-consent-no-ui
-        android-emu-tracing
-        gfxstream-gl-host-common.headers)
+        android-emu-tracing)
     # Allows us a way to include headers from both aemu's base and hardware/google/aemu base.
     target_include_directories(
         aemu-vkcereal-base
@@ -113,7 +112,7 @@ if(OPTION_GFXSTREAM_BACKEND)
     add_library(gfxstream-gl-host-common INTERFACE)
     target_link_libraries(
         gfxstream-gl-host-common
-        INTERFACE gfxstream-gl-host-common.headers aemu-vkcereal-host-common)
+        INTERFACE aemu-vkcereal-host-common)
 
     if (WIN32)
         target_compile_definitions(aemu-vkcereal-base PUBLIC "-DUNICODE -D_UNICODE -DNOMINMAX -DEMUGL_BUILD -DVK_USE_PLATFORM_WIN32_KHR -DSTATIC_EMUGL")

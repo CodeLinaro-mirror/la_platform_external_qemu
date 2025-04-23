@@ -716,6 +716,19 @@ void android_redrawOpenglesWindow(void) {
     }
 }
 
+void android_setShouldSkipDraw(bool skip) {
+    if (sRenderer) {
+        sRenderer->setShouldSkipDraw(skip);
+    }
+}
+
+bool android_getShouldSkipDraw(void) {
+    if (sRenderer) {
+        return sRenderer->getShouldSkipDraw();
+    }
+    return false;
+}
+
 bool android_hasGuestPostedAFrame(void) {
     if (sRenderer) {
         return sRenderer->hasGuestPostedAFrame();
