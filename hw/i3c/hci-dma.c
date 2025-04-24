@@ -218,6 +218,22 @@ static RespStatus hci_dma_regular_xfer(MIPIHCIState *hci,
     return hci_dma_send(hci, desc, resp);
 }
 
+static RespStatus hci_dma_internal_control_xfer(MIPIHCIState *hci,
+                                        const InternalControl *desc,
+                                        RespDescr *resp)
+{
+    /*
+     * We don't implement this, but if we tell the guest that it succeeded,
+     * everything will be fine.
+     */
+    g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+    qemu_log_mask(LOG_UNIMP, "%s: Internal control transfers are not "
+                  "implemented\n", path);
+
+    resp->resp.err = RESP_STATUS_SUCCESS;
+    return RESP_STATUS_SUCCESS;
+}
+
 static void hci_dma_xfer(MIPIHCIState *hci)
 {
     HCIDMAState *s = &(hci->dma);
@@ -249,6 +265,16 @@ static void hci_dma_xfer(MIPIHCIState *hci)
             roc = desc.cmd.immediate_xfer.roc;
             break;
         case CMD_ATTR_INTERNAL_CONTROL:
+            status = hci_dma_internal_control_xfer(hci,
+                                                   &desc.cmd.internal_control,
+                                                   &resp);
+            /*
+             * Not documented, nor is it a part of the internal control data
+             * structure, but the driver always expects a response to internal
+             * control commands.
+             */
+            roc = true;
+            break;
         case CMD_ATTR_COMBO_XFER:
             {
                 g_autofree char *path = object_get_canonical_path(OBJECT(hci));
