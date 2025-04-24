@@ -36,7 +36,6 @@ using android::base::AutoLock;
 using android::base::LazyInstance;
 using android::base::Lock;
 using android::base::SubAllocator;
-using android::emulation::AddressSpaceDevicePingInfo;
 
 namespace android {
 

@@ -48,7 +48,7 @@ public:
     void* getHostAddr(uint64_t physAddr);
     uint64_t offsetToPhysAddr(uint64_t offset) const;
 
-    void ping(uint32_t handle, emulation::AddressSpaceDevicePingInfo* pingInfo);
+    void ping(uint32_t handle, AddressSpaceDevicePingInfo* pingInfo);
 
     int claimShared(uint32_t handle, uint64_t off, uint64_t size);
     int unclaimShared(uint32_t handle, uint64_t off);
