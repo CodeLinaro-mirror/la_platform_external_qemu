@@ -651,7 +651,10 @@ private:
                 {640, 480},
                 {352, 288},
                 {320, 240},
-                {176, 144},
+                // Our RGB to YUV converter produces a broken image
+                // for 176x144 and even writes outside of the image
+                // memory range.
+                //{176, 144},
                 {1280, 720},
                 {1280, 960}};
 
