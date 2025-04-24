@@ -2761,7 +2761,7 @@ extern "C" int main(int argc, char** argv) {
 
     if (hw->hw_cpu_ncore > 6) {
         dwarning(
-                "Emualtor does not support more than 6 cores. Number of cores "
+                "Emulator does not support more than 6 cores. Number of cores "
                 "set to 6");
         hw->hw_cpu_ncore = 6;
     }
