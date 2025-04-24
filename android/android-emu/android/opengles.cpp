@@ -36,6 +36,7 @@
 #include "host-common/address_space_graphics.h"
 #include "host-common/address_space_graphics_types.h"
 #include "host-common/crash-handler.h"
+#include "host-common/goldfish_sync.h"
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/opengl/gpuinfo.h"
 
