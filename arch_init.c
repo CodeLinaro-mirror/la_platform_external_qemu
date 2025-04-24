@@ -98,15 +98,6 @@ int kvm_available(void)
 #endif
 }
 
-int hax_available(void)
-{
-#ifdef CONFIG_HAX
-    return 1;
-#else
-    return 0;
-#endif
-}
-
 int xen_available(void)
 {
 #ifdef CONFIG_XEN

@@ -288,7 +288,7 @@ void qemu_iovec_init_external(QEMUIOVector *qiov, struct iovec *iov, int niov)
 
     for (i = 0; i < niov; i++) {
         // We need to load iovec's eagerly under lazy snapshot RAM loading
-        // with at least Hypervisor.Framework (likely with HAXM as well).
+        // with at least Hypervisor.Framework.
         // Touch them here.
         qemu_ram_load(qiov->iov[i].iov_base, iov[i].iov_len);
         qiov->size += iov[i].iov_len;

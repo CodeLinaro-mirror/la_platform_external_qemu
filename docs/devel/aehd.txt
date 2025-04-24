@@ -36,7 +36,7 @@ Dedicated files are:
   additional in-kernel PIT, which isn't important nowadays. So AEHD removes that.
 
   The last two are user space code for the AEHD hypervisor. This looks pretty
-  similar with HVF, WHPX, HAX. The reason for two separate files is that they
+  similar with HVF, WHPX. The reason for two separate files is that they
   are inheritted from KVM. KVM has its kvm-all.c placed accel\kvm, which is
   shared among i386, arm, ..., etc. AEHD only supports i386 so aehd-all.c is
   placed here. The only reason for not merging then together is for possible

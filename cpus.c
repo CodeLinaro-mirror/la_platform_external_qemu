@@ -37,7 +37,6 @@
 #include "sysemu/dma.h"
 #include "sysemu/hw_accel.h"
 #include "sysemu/kvm.h"
-#include "sysemu/hax.h"
 #ifdef CONFIG_HVF
 #include "sysemu/hvf.h"
 #endif
@@ -1566,38 +1565,6 @@ static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
     return NULL;
 }
 
-static void *qemu_hax_cpu_thread_fn(void *arg)
-{
-    CPUState *cpu = arg;
-    int r;
-
-    assert(hax_enabled() && hax_ug_platform());
-
-    rcu_register_thread();
-    qemu_mutex_lock_iothread();
-    qemu_thread_get_self(cpu->thread);
-
-    cpu->thread_id = qemu_get_thread_id();
-    cpu->created = true;
-    current_cpu = cpu;
-
-    hax_init_vcpu(cpu);
-    qemu_cond_signal(&qemu_cpu_cond);
-
-    do {
-        if (cpu_can_run(cpu)) {
-            r = hax_smp_cpu_exec(cpu);
-            if (r == EXCP_DEBUG) {
-                cpu_handle_guest_debug(cpu);
-            }
-        }
-
-        qemu_wait_io_event(cpu);
-    } while (!cpu->unplug || cpu_can_run(cpu));
-    rcu_unregister_thread();
-    return NULL;
-}
-
 #ifdef CONFIG_HVF
 static void dummy_signal(int signal)
 {
@@ -1799,11 +1766,6 @@ static void qemu_cpu_kick_thread(CPUState *cpu)
         atomic_mb_set(&cpu->exit_request, 1);
     }
 #endif /* __APPLE__ */
-#ifdef CONFIG_HAX
-    if (hax_enabled() && hax_ug_platform()) {
-        cpu_exit(cpu);
-    }
-#endif /* CONFIG_HAX */
 #ifdef CONFIG_HVF
     if (hvf_enabled()) {
         cpu_exit(cpu);
@@ -1843,22 +1805,11 @@ static void qemu_cpu_kick_thread(CPUState *cpu)
 void qemu_cpu_kick(CPUState *cpu)
 {
     qemu_cond_broadcast(cpu->halt_cond);
-#ifdef CONFIG_HAX
-    if (tcg_enabled() && !(hax_enabled() && hax_ug_platform())) {
-#else
     if (tcg_enabled()) {
-#endif
         cpu_exit(cpu);
         /* NOP unless doing single-thread RR */
         qemu_cpu_kick_rr_cpu();
     } else {
-        if (hax_enabled()) {
-            /*
-             * FIXME: race condition with the exit_request check in
-             * hax_vcpu_hax_exec
-             */
-            cpu->exit_request = 1;
-        }
         qemu_cpu_kick_thread(cpu);
     }
 }
@@ -1992,20 +1943,6 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
         tcg_region_init();
     }
 
-#ifdef CONFIG_HAX
-    if (hax_enabled()) {
-        /* HAX is not tested agaist mttcg, so force it off now. */
-        if (qemu_tcg_mttcg_enabled())
-            mttcg_enabled = false;
-        /* This code path should only be taken when HAX is enabled but the
-         * CPU doesn't support "unrestricted guest" mode. */
-        assert(!hax_ug_platform());
-        /* Initialize HAX-related state for the TCG thread. This is required for
-         * cpu_exec() to work correctly when HAX is enabled. */
-        hax_init_vcpu(cpu);
-    }
-#endif /* CONFIG_HAX */
-
     if (qemu_tcg_mttcg_enabled() || !single_tcg_cpu_thread) {
         cpu->thread = g_malloc0(sizeof(QemuThread));
         cpu->halt_cond = g_malloc0(sizeof(QemuCond));
@@ -2041,30 +1978,6 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
         cpu->can_do_io = 1;
         cpu->created = true;
     }
-}
-
-static void qemu_hax_start_vcpu(CPUState *cpu)
-{
-    char thread_name[VCPU_THREAD_NAME_SIZE];
-
-    /* This function shall only be called when HAX is enabled, and the host CPU
-     * supports "unrestricted guest" mode. This allows emulation of "real mode"
-     * and completely avoids the use of TCG. It's only the only way to get
-     * multi-core accelerated emulation with HAX. */
-    assert(hax_enabled());
-    assert(hax_ug_platform());
-
-    cpu->thread = g_malloc0(sizeof(QemuThread));
-    cpu->halt_cond = g_malloc0(sizeof(QemuCond));
-    qemu_cond_init(cpu->halt_cond);
-
-    snprintf(thread_name, VCPU_THREAD_NAME_SIZE, "CPU %d/HAX",
-             cpu->cpu_index);
-    qemu_thread_create(cpu->thread, thread_name, qemu_hax_cpu_thread_fn,
-                       cpu, QEMU_THREAD_JOINABLE);
-#ifdef _WIN32
-    cpu->hThread = qemu_thread_get_handle(cpu->thread);
-#endif
 }
 
 #ifdef CONFIG_HVF
@@ -2164,8 +2077,6 @@ void qemu_init_vcpu(CPUState *cpu)
 
     if (kvm_enabled()) {
         qemu_kvm_start_vcpu(cpu);
-    } else if (hax_enabled() && hax_ug_platform()) {
-        qemu_hax_start_vcpu(cpu);
 #ifdef CONFIG_HVF
     } else if (hvf_enabled()) {
         qemu_hvf_start_vcpu(cpu);

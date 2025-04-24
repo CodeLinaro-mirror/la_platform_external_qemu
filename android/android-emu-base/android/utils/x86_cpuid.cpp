@@ -83,7 +83,6 @@ bool android_get_x86_cpuid_vendor_id_is_vmhost(const char* vendor_id) {
 
     const int VMHostCPUIDCount = sizeof(VMHostCPUID)/sizeof(VMHostCPUID[0]);
     for (int i = 0; i < VMHostCPUIDCount; i++) {
-        /* I don't think HAXM supports nesting */
         if (strcmp(vendor_id, VMHostCPUID[i]) == 0)
             return true;
     }

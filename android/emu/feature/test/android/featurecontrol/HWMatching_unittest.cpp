@@ -51,19 +51,12 @@ pattern { # 2
 pattern { # 3
   hwconfig {
     hostinfo { cpu_manufacturer: "KVMKVMKVM" }
-  }
-  featureaction { feature: HAXM enable: false }
-}
-
-pattern { # 4
-  hwconfig {
-    hostinfo { cpu_manufacturer: "KVMKVMKVM" }
     hostgpuinfo { make: "10de" }
   }
   featureaction { feature: MesaDRI enable: false }
 }
 
-pattern { # 5
+pattern { # 4
   hwconfig {
     hostinfo { cpu_manufacturer: "KVMKVMKVM" }
     hostgpuinfo { make: "1002" }
@@ -71,7 +64,7 @@ pattern { # 5
   featureaction { feature: AMDOpenGLDriver enable: true }
 }
 
-pattern { # 6
+pattern { # 5
   hwconfig {
     hostinfo { os_platform: "Linux" }
   }
@@ -79,21 +72,21 @@ pattern { # 6
   featureaction { feature: GLDMA } # test incomplete feature action
 }
 
-pattern { # 7
+pattern { # 6
   hwconfig { hostinfo { os_platform: "Windows" } }
   hwconfig { hostinfo { os_platform: "Linux" } }
 }
 
-pattern { # 8
+pattern { # 7
   hwconfig {}
 }
 
-pattern { # 9
+pattern { # 8
 }
 
 )";
 
-static const int kTestFeaturePatternsCount = 10;
+static const int kTestFeaturePatternsCount = 9;
 
 TEST(HWMatching, parseFeaturePattern) {
     emulator_features::EmulatorFeaturePatterns patterns;
@@ -119,10 +112,9 @@ TEST(HWMatching, basicCpuMatch) {
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(0)));
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(1)));
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(2)));
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(3)));
+    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(3)));
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(4)));
-    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(5)));
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(6)));
+    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(5)));
 }
 
 static GpuInfo makeTestGpuInfo(
@@ -176,9 +168,8 @@ TEST(HWMatching, basicGpuMatch) {
     EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(1)));
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(2)));
     EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(3)));
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(4)));
-    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(5)));
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(6)));
+    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(4)));
+    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(5)));
 }
 
 static bool actionsIdentical(
@@ -212,18 +203,16 @@ TEST(HWMatching, basicFeatureActions) {
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(0)));
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(1)));
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(2)));
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(3)));
+    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(3)));
     EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(4)));
-    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(5)));
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(6)));
+    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(5)));
 
     std::vector<FeatureAction> actions =
         matchFeaturePatterns(testinfo, &patterns);
 
-    EXPECT_TRUE(actions.size() == 2);
+    EXPECT_TRUE(actions.size() == 1);
 
     std::vector<FeatureAction> expectedActions = {
-        { "HAXM", false },
         { "MesaDRI", true },
     };
 
@@ -244,7 +233,7 @@ TEST(HWMatching, basicDisjunction) {
         nullptr
     };
 
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(7)));
+    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(6)));
 }
 
 TEST(HWMatching, trivialMatch) {
@@ -261,7 +250,7 @@ TEST(HWMatching, trivialMatch) {
         nullptr
     };
 
-    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(8)));
+    EXPECT_TRUE(matchFeaturePattern(testinfo, &patterns.pattern(7)));
 }
 
 TEST(HWMatching, trivialMismatch) {
@@ -278,7 +267,7 @@ TEST(HWMatching, trivialMismatch) {
         nullptr
     };
 
-    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(9)));
+    EXPECT_FALSE(matchFeaturePattern(testinfo, &patterns.pattern(8)));
 }
 
 } // featurecontrol

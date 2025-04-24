@@ -730,8 +730,8 @@ help_accel(stralloc_t *out)
         "  Use '-accel <mode>' to control how CPU emulation can be accelerated\n"
         "  when launching the Android emulator. Accelerated emulation only works\n"
         "  for x86 and x86_64 system images. On Linux, it relies on KVM being\n"
-        "  installed. On Windows and OS X, it relies on an Intel CPU and the\n"
-        "  Intel HAXM driver being installed on your development machine.\n"
+        "  installed. On Windows, it relies on WHPX or AEHD. On MacOS, it relies\n"
+        "  on HVF.\n"
         "  Valid values for <mode> are:\n\n"
 
         "     auto   The default, determines automatically if acceleration\n"
@@ -739,7 +739,7 @@ help_accel(stralloc_t *out)
 
         "     off    Disables acceleration entirely. Mostly useful for debugging.\n\n"
 
-        "     on     Force acceleration. If KVM/HAXM/WHPX is not installed or usable,\n"
+        "     on     Force acceleration. If KVM/WHPX/AEHD is not installed or usable,\n"
         "            the emulator will refuse to start and print an error message.\n\n"
 
         "  Note that this flag is ignored if you're not emulating an x86 or x86_64\n"
@@ -2032,7 +2032,7 @@ help_feature(stralloc_t* out)
     PRINTF(
     "  Force-enable or disable an emulator feature by name. Also use the\n"
     "  ANDROID_EMULATOR_FEATURES environment variable for the same purpose.\n\n"
-    "  E.g. \"-feature HAXM,-HVF -feature Wifi\""
+    "  E.g. \"-feature -HVF -feature Wifi\""
     );
 }
 

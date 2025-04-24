@@ -233,7 +233,7 @@ registers:
 
     Recent Goldfish kernels implement a faster way to perform reads and writes
     that perform a single I/O write per operation (which is useful when
-    emulating x86 system through KVM or HAX).
+    emulating x86 system through KVM).
 
     This uses the following structure known to both the virtual device and
     the kernel, defined in $QEMU/hw/android/goldfish/pipe.h:

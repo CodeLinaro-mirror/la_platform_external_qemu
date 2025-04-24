@@ -1368,8 +1368,6 @@ const char* getAcceleratorEnableParam(AndroidCpuAccelerator accel_type) {
     switch (accel_type) {
         case ANDROID_CPU_ACCELERATOR_KVM:
             return "-enable-kvm";
-        case ANDROID_CPU_ACCELERATOR_HAX:
-            return "-enable-hax";
         case ANDROID_CPU_ACCELERATOR_HVF:
             return "-enable-hvf";
         case ANDROID_CPU_ACCELERATOR_WHPX:

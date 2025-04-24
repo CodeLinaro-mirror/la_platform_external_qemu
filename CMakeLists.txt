@@ -760,10 +760,10 @@ set(ANDROID_QEMU_COMMON_DEVICES "${ANDROID_QEMU_ARM_DEVICES};hw/i386/pc_piix.c")
 set(ANDROID_QEMU_i386_DEVICES_darwin-x86_64
     "hw/i386/acpi-build.c;${ANDROID_QEMU_COMMON_DEVICES}")
 set(ANDROID_QEMU_arm_DEVICES_darwin-x86_64
-    "accel/stubs/hax-stub.c;${ANDROID_QEMU_ARM_DEVICES}")
+    "${ANDROID_QEMU_ARM_DEVICES}")
 # TODO: unstub the hvf for darwin on arm
 set(ANDROID_QEMU_arm_DEVICES_darwin-aarch64
-    "accel/stubs/hax-stub.c;${ANDROID_QEMU_ARM_DEVICES}")
+    "${ANDROID_QEMU_ARM_DEVICES}")
 target_compile_definitions(android-qemu-deps INTERFACE "-DANDROID_IO")
 android_target_compile_options(
   android-qemu-deps
@@ -800,7 +800,7 @@ android_target_link_libraries(android-qemu-deps darwin-aarch64 INTERFACE
 
 # Windows x86 definitions
 set(ANDROID_QEMU_arm_DEVICES_windows_msvc-x86_64
-    "accel/stubs/hax-stub.c;${ANDROID_QEMU_ARM_DEVICES}")
+    "${ANDROID_QEMU_ARM_DEVICES}")
 set(ANDROID_QEMU_i386_DEVICES_windows_msvc-x86_64
     "hw/i386/acpi-build.c;${ANDROID_QEMU_COMMON_DEVICES}")
 android_target_compile_options(
@@ -833,16 +833,16 @@ android_target_compile_definitions(
 
 # Linux settings
 set(ANDROID_QEMU_i386_DEVICES_linux-x86_64
-    "accel/stubs/hax-stub.c;hw/i386/acpi-build.c;${ANDROID_QEMU_COMMON_DEVICES}"
+    "hw/i386/acpi-build.c;${ANDROID_QEMU_COMMON_DEVICES}"
 )
 set(ANDROID_QEMU_arm_DEVICES_linux-x86_64
-    "accel/stubs/hax-stub.c;${ANDROID_QEMU_ARM_DEVICES}")
+    "${ANDROID_QEMU_ARM_DEVICES}")
 
 set(ANDROID_QEMU_i386_DEVICES_linux-aarch64
-    "accel/stubs/hax-stub.c;hw/i386/acpi-build.c;${ANDROID_QEMU_COMMON_DEVICES}"
+    "hw/i386/acpi-build.c;${ANDROID_QEMU_COMMON_DEVICES}"
 )
 set(ANDROID_QEMU_arm_DEVICES_linux-aarch64
-    "accel/stubs/hax-stub.c;${ANDROID_QEMU_ARM_DEVICES}")
+    "${ANDROID_QEMU_ARM_DEVICES}")
 
 android_target_include_directories(android-qemu-deps linux-x86_64 INTERFACE
                                    linux-headers)

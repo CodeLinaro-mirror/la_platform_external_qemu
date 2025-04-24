@@ -12,7 +12,7 @@ contiguous blocks in a specific abstract "RAM address space".
 
 A single block of contiguous RAM is allocated with 'qemu_ram_alloc()', which
 takes a size in bytes, and allocates the pages through mmap() in the QEMU
-host process. It also sets up the corresponding KVM / Xen / HAX mappings,
+host process. It also sets up the corresponding KVM / Xen mappings,
 depending on each accelerator's specific needs.
 
 Each block has a name, which is used for snapshot support.

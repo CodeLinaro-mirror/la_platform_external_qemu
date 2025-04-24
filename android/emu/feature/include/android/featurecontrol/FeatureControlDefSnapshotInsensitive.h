@@ -21,7 +21,6 @@ FEATURE_CONTROL_ITEM(ForceSwiftshader)
 FEATURE_CONTROL_ITEM(HYPERV)
 FEATURE_CONTROL_ITEM(HVF)
 FEATURE_CONTROL_ITEM(KVM)
-FEATURE_CONTROL_ITEM(HAXM)
 FEATURE_CONTROL_ITEM(WindowsHypervisorPlatform)
 // Snapshot feature controls enablement of snapshots, not snapshot data
 FEATURE_CONTROL_ITEM(FastSnapshotV1)

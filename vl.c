@@ -106,7 +106,6 @@ int main(int argc, char **argv)
 #include "migration/colo.h"
 #include "migration/postcopy-ram.h"
 #include "sysemu/kvm.h"
-#include "sysemu/hax.h"
 #include "sysemu/hvf.h"
 #include "qapi/qobject-input-visitor.h"
 #include "qemu/option.h"
@@ -3208,12 +3207,6 @@ static bool set_memory_options(uint64_t *ram_slots, ram_addr_t *maxram_size,
     }
 #endif // defined(CONFIG_ANDROID) && defined(_WIN32) && !defined(_WIN64)
 
-#ifdef _WIN32
-    if (hax_enabled()) {
-        ram_size = MIN(ram_size, hax_mem_limit());
-    }
-#endif
-
     int ram_size_meg = ram_size / (1024 * 1024);
     if (ram_size_meg < requested_meg) {
         fprintf(stderr, "Warning: requested RAM %dM too high for your system. "
@@ -4169,14 +4162,10 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
 #ifdef CONFIG_HVF
             case QEMU_OPTION_enable_hvf:
                 olist = qemu_find_opts("machine");
-                qemu_opts_parse_noisily(olist, "accel=hvf:hax", false);
+                qemu_opts_parse_noisily(olist, "accel=hvf", false);
                 hvf_disable(0);
                 break;
 #endif /* CONFIG_HVF */
-            case QEMU_OPTION_enable_hax:
-                olist = qemu_find_opts("machine");
-                qemu_opts_parse_noisily(olist, "accel=hax", false);
-                break;
             case QEMU_OPTION_enable_whpx:
                 olist = qemu_find_opts("machine");
                 qemu_opts_parse_noisily(olist, "accel=whpx", false);
@@ -4216,7 +4205,7 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
                                                      optarg, true);
                 optarg = qemu_opt_get(accel_opts, "accel");
                 if (!optarg || is_help_option(optarg)) {
-                    error_printf("Possible accelerators: kvm, xen, hax, tcg\n");
+                    error_printf("Possible accelerators: kvm, xen, tcg\n");
                     exit(0);
                 }
                 opts = qemu_opts_create(qemu_find_opts("machine"), NULL,
@@ -5563,10 +5552,6 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
 
     if (!soundhw_init(soundhw_arg)) {
         return 1;
-    }
-
-    if (hax_enabled()) {
-        hax_sync_vcpus();
     }
 
     if (qemu_opts_foreach(qemu_find_opts("fw_cfg"),

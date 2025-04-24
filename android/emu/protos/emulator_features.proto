@@ -22,7 +22,7 @@ enum Feature {
     // Speculative / for testing robustness of
     // mapping feature names between emulator
     // and protobuf.
-    HAXM = 9;
+    HAXM = 9 [deprecated = true];
     AMDOpenGLDriver = 10;
     MesaDRI = 11;
     HVF = 12;

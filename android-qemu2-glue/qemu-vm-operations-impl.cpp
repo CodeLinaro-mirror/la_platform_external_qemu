@@ -65,7 +65,6 @@ extern "C" {
 #include "sysemu/block-backend.h"                     // for blk_flush, blk_...
 #include "sysemu/cpus.h"                              // for smp_cores, smp_...
 #include "sysemu/aehd.h"                               // for aehd_gpa2hva
-#include "sysemu/hax.h"                               // for hax_gpa2hva
 #include "sysemu/hvf.h"                               // for hvf_enabled
 #include "sysemu/kvm.h"                               // for kvm_enabled
 #include "sysemu/sysemu.h"                            // for vm_start, vm_stop
@@ -916,11 +915,6 @@ static void set_snapshot_callbacks(void* opaque,
                                          hvf_protect_safe, hvf_remap_safe,
                                          NULL);
                 break;
-            case android::CPU_ACCELERATOR_HAX:
-                set_address_translation_funcs(hax_hva2gpa, hax_gpa2hva);
-                set_memory_mapping_funcs(NULL, NULL, hax_gpa_protect, NULL,
-                                         hax_gpa_protection_supported);
-                break;
             case android::CPU_ACCELERATOR_WHPX:
                 set_address_translation_funcs(0, whpx_gpa2hva);
                 break;
@@ -985,8 +979,6 @@ static void get_vm_config(VmConfiguration* out) {
     out->ramSizeBytes = int64_t(ram_size);
     if (whpx_enabled()) {
         out->hypervisorType = HV_WHPX;
-    } else if (hax_enabled()) {
-        out->hypervisorType = HV_HAXM;
     } else if (hvf_enabled()) {
         out->hypervisorType = HV_HVF;
     } else if (kvm_enabled()) {

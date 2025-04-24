@@ -96,7 +96,6 @@ typedef enum {
     ACCEL_ON = 1,
     ACCEL_AUTO = 2,
     ACCEL_KVM = 3,
-    ACCEL_HAX = 4,
     ACCEL_HVF = 5,
     ACCEL_WHPX = 6,
 } CpuAccelMode;

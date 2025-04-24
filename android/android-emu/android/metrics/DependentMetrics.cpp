@@ -499,8 +499,6 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::HVF;
         case android::featurecontrol::KVM:
             return android_studio::EmulatorFeatureFlagState::KVM;
-        case android::featurecontrol::HAXM:
-            return android_studio::EmulatorFeatureFlagState::HAXM;
         case android::featurecontrol::FastSnapshotV1:
             return android_studio::EmulatorFeatureFlagState::FAST_SNAPSHOT_V1;
         case android::featurecontrol::ScreenRecording:

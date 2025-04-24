@@ -10,7 +10,6 @@
 // GNU General Public License for more details.
 
 #include "android/emulation/CpuAccelerator.h"
-#include "android/emulation/internal/CpuAccelerator.h"
 
 #include "android/base/system/System.h"
 
@@ -59,10 +58,6 @@ TEST_F(CpuAcceleratorTest, Default) {
 
     case CPU_ACCELERATOR_KVM:
         printf("KVM acceleration usable on this machine!\n");
-        break;
-
-    case CPU_ACCELERATOR_HAX:
-        printf("HAX acceleration usable on this machine!\n");
         break;
 
     case CPU_ACCELERATOR_HVF:
