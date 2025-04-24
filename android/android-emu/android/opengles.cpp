@@ -43,6 +43,7 @@
 #include "OpenGLESDispatch/EGLDispatch.h"
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "render-utils/dma_device.h"
+#include "render-utils/logging_operations.h"
 #include "render-utils/render_api_functions.h"
 
 #include <assert.h>
@@ -237,6 +238,36 @@ extern bool isEnabledLocal(Feature feature);
 }
 }  // namespace android
 
+void gfxstreamLoggingCallback(
+        gfxstream_logging_level level,
+        const char* file,
+        int line,
+        const char* function,
+        const char* message) {
+    char severity;
+    switch (level) {
+        case GFXSTREAM_LOGGING_LEVEL_FATAL:
+            severity = 'F';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_ERROR:
+            severity = 'E';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_WARNING:
+            severity = 'W';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_INFO:
+            severity = 'I';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_DEBUG:
+            severity = 'D';
+            break;
+        case GFXSTREAM_LOGGING_LEVEL_VERBOSE:
+            severity = 'V';
+            break;
+    }
+    OutputLog(stderr, severity, file, line, /*timestamp_us=*/0, "%s", message);
+}
+
 int android_startOpenglesRenderer(
         int width,
         int height,
@@ -382,7 +413,7 @@ int android_startOpenglesRenderer(
                     ? MINIGBM
                     : GOLDFISH_GRALLOC);
 
-    sRenderLib->setLogger(android_opengl_logger_write);
+    sRenderLib->setLogger(gfxstreamLoggingCallback);
     gfxstream_dma_ops dma_ops;
     dma_ops.get_host_addr = android_goldfish_dma_ops.get_host_addr;
     dma_ops.unlock = android_goldfish_dma_ops.unlock;
@@ -406,7 +437,21 @@ int android_startOpenglesRenderer(
         .is_folded = window_agent->isFolded,
         .get_folded_area = window_agent->getFoldedArea,
     });
-    sRenderLib->setMultiDisplayOps(*multi_display_agent);
+    sRenderLib->setDisplayOps(gfxstream_multi_display_ops{
+        .is_multi_display_enabled = multi_display_agent->isMultiDisplayEnabled,
+        .is_multi_window = multi_display_agent->isMultiDisplayWindow,
+        .is_pixel_fold = multi_display_agent->isPixelFold,
+        .get_combined_size = multi_display_agent->getCombinedDisplaySize,
+        .get_display_info = multi_display_agent->getMultiDisplay,
+        .get_next_display_info = multi_display_agent->getNextMultiDisplay,
+        .create_display = multi_display_agent->createDisplay,
+        .destroy_display = multi_display_agent->destroyDisplay,
+        .get_display_color_buffer = multi_display_agent->getDisplayColorBuffer,
+        .set_display_color_buffer = multi_display_agent->setDisplayColorBuffer,
+        .get_color_buffer_display = multi_display_agent->getColorBufferDisplay,
+        .get_display_pose = multi_display_agent->getDisplayPose,
+        .set_display_pose = multi_display_agent->setDisplayPose,
+    });
 
     sRenderer = sRenderLib->initRenderer(width, height, gfxstreamFeatures,
                                          sRendererUsesSubWindow, sEgl2egl);
