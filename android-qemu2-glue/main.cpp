@@ -2790,7 +2790,7 @@ extern "C" int main(int argc, char** argv) {
     }
 
     // XR specific feature overrides
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_DEV_2024) {
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_XR) {
         // XR image needs this feature to pass modifier keys to the guest.
         fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
 

@@ -32,7 +32,7 @@ RecordAndPlaybackPage::RecordAndPlaybackPage(QWidget* parent)
         // Android Auto doesn't support the macro playback and settings tab.
         mUi->tabWidget->removeTab(2);
         mUi->tabWidget->removeTab(1);
-    } else if (flavor == AVD_DEV_2024) {
+    } else if (flavor == AVD_XR) {
         // Android XR doesn't support the macro playback and does not display
         // setting page since it has only macro specific settings.
         mUi->tabWidget->removeTab(2);

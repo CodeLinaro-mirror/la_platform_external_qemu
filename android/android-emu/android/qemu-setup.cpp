@@ -526,8 +526,8 @@ bool android_emulation_setup(const AndroidConsoleAgents* agents, bool isQemu2) {
             case AVD_DESKTOP:
                 crashhandler_add_string("AVD_FLAVOR", "AVD_DESKTOP");
                 break;
-            case AVD_DEV_2024:
-                crashhandler_add_string("AVD_FLAVOR", "AVD_DEV_2024");
+            case AVD_XR:
+                crashhandler_add_string("AVD_FLAVOR", "AVD_XR");
                 break;
             case AVD_OTHER:
                 crashhandler_add_string("AVD_FLAVOR", "AVD_OTHER");

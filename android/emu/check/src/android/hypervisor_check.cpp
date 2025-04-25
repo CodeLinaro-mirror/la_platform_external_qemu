@@ -43,7 +43,7 @@ AvdCompatibilityCheckResult hasCompatibleHypervisor(AvdInfo* avd) {
     }
 
     const char* name = avdInfo_getName(avd);
-    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_DEV_2024);
+    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_XR);
     AndroidCpuAccelerator accelerator = androidCpuAcceleration_getAccelerator();
 
     if (isXrAvd && (accelerator == ANDROID_CPU_ACCELERATOR_AEHD ||

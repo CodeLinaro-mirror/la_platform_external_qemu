@@ -241,7 +241,7 @@ AvdFlavor propertyFile_getAvdFlavor(const FileData* data) {
     const char* wear_names[] = {"aw", "wear"};
     const char* car_names[] = {"car"};
     const char* desktop_names[] = {"pc"};
-    const char* dev_2024_names[] = {"xr"};
+    const char* xr_names[] = {"xr"};
 
     if (IN_PRODUCT_NAME(data, phone_names)) {
         res = AVD_PHONE;
@@ -253,8 +253,8 @@ AvdFlavor propertyFile_getAvdFlavor(const FileData* data) {
         res = AVD_ANDROID_AUTO;
     } else if (IN_PRODUCT_NAME(data, desktop_names)) {
         res = AVD_DESKTOP;
-    } else if (IN_PRODUCT_NAME(data, dev_2024_names)) {
-        res = AVD_DEV_2024;
+    } else if (IN_PRODUCT_NAME(data, xr_names)) {
+        res = AVD_XR;
     }
 
     return res;

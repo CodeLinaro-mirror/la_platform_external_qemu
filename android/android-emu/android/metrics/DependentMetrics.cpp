@@ -210,8 +210,8 @@ toClearcutLogAvdProperty(AvdFlavor flavor) {
             return android_studio::EmulatorAvdInfo::WEAR_AVD;
         case AVD_ANDROID_AUTO:
             return android_studio::EmulatorAvdInfo::ANDROIDAUTO_AVD;
-        case AVD_DEV_2024:
-            return android_studio::EmulatorAvdInfo::DEV_2024_AVD;
+        case AVD_XR:
+            return android_studio::EmulatorAvdInfo::XR_AVD;
         case AVD_OTHER:
             return android_studio::EmulatorAvdInfo::UNKNOWN_EMULATOR_AVD_FLAG;
     }
@@ -708,7 +708,7 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
         case android::featurecontrol::GuestAngle:
             return android_studio::EmulatorFeatureFlagState::GUEST_ANGLE;
         case android::featurecontrol::XrModeUI:
-            return android_studio::EmulatorFeatureFlagState::UX_TEST_2024;
+            return android_studio::EmulatorFeatureFlagState::XR_MODE_UI;
         case android::featurecontrol::VirtioDualModeMouse:
             return android_studio::EmulatorFeatureFlagState::VIRTIO_DUAL_MODE_MOUSE;
         case android::featurecontrol::AllAppsForHomeTray:

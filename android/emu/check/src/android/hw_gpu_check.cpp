@@ -46,7 +46,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     }
 
     const char* name = avdInfo_getName(avd);
-    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_DEV_2024);
+    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_XR);
 
     // configureRenderer must have been called before this point
     const SelectedRenderer renderer = emuglConfig_get_current_renderer();

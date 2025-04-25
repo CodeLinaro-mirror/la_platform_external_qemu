@@ -1386,7 +1386,7 @@ message EmulatorAvdInfo {
         LAPTOP_AVD = 8;
         DESKTOP_AVD = 9;
         CHROMEOS = 10;
-        DEV_2024_AVD = 11;
+        XR_AVD = 11;
         // Next tag: 12
     }
     enum EmulatorDeviceName {
@@ -1586,7 +1586,7 @@ message EmulatorFeatureFlagState {
         VULKAN_ALLOCATE_HOST_MEMORY = 107;
         DEVICE_KEYBOARD_QT_RAW_INPUT = 108;
         UWB = 109;
-        UX_TEST_2024 = 110;
+        XR_MODE_UI = 110;
         GUEST_ANGLE = 111;
         ANDROID_VIRTUALIZATION_FRAMEWORK = 112;
         BYPASS_VULKAN_DEVICE_FEATURE_OVERRIDES = 113;

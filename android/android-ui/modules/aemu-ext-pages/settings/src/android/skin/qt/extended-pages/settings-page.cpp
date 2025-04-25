@@ -358,7 +358,7 @@ SettingsPage::SettingsPage(QWidget* parent)
 
         // ANGLE is only supported on new API levels (unless XR)
         bool supportsGuestAngle = apiLevel >= 35;
-        const bool isXR = (avdInfo_getAvdFlavor(avdInfo) == AVD_DEV_2024);
+        const bool isXR = (avdInfo_getAvdFlavor(avdInfo) == AVD_XR);
 
         // We support NativeGles everywhere (unless XR)
         bool supportsNativeGles = true;

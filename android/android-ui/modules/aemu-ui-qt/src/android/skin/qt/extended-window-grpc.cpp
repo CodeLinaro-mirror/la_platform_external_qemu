@@ -218,7 +218,7 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
         avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
                 AVD_WEAR &&
         avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
-                AVD_DEV_2024 &&
+                AVD_XR &&
         (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
                  AVD_ANDROID_AUTO ||
          android::automotive::isMultiDisplaySupported(
@@ -230,7 +230,7 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
     }
 
     if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
-                AVD_DEV_2024) {
+                AVD_XR) {
         mSidebarButtons.addButton(mExtendedUi->cellularButton);
         mSidebarButtons.addButton(mExtendedUi->telephoneButton);
         mSidebarButtons.addButton(mExtendedUi->dpadButton);
@@ -257,7 +257,7 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
          (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
                 AVD_ANDROID_AUTO &&
           avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
-                AVD_DEV_2024))) {
+                AVD_XR))) {
         mSidebarButtons.addButton(mExtendedUi->cameraButton);
         mExtendedUi->cameraButton->setVisible(true);
     } else {
@@ -265,7 +265,7 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
     }
 
     if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
-                AVD_DEV_2024) {
+                AVD_XR) {
         mSidebarButtons.addButton(mExtendedUi->virtSensorsButton);
     }
 
@@ -349,7 +349,7 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
     }
 
     if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-                AVD_DEV_2024) {
+                AVD_XR) {
         mExtendedUi->locationButton->setVisible(false);
         mExtendedUi->cellularButton->setVisible(false);
         mExtendedUi->dpadButton->setVisible(false);

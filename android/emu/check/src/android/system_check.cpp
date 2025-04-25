@@ -56,7 +56,7 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
     }
 
     const char* avdName = avdInfo_getName(avd);
-    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_DEV_2024);
+    const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_XR);
 
     // Check number of cores
     const int numCores = System::get()->getCpuCoreCount();

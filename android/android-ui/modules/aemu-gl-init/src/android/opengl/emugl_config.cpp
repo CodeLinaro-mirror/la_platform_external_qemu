@@ -931,7 +931,7 @@ bool emuglConfig_init(EmuglConfig* config,
             getConsoleAgents()->settings &&
             getConsoleAgents()->settings->avdInfo() &&
             (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-             AVD_DEV_2024);
+             AVD_XR);
     if (is_xr_mode && !strcmp("host", gpu_mode)) {
         use_host_vulkan = true;
     }
