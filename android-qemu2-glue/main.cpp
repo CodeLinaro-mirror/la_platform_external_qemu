@@ -2789,9 +2789,16 @@ extern "C" int main(int argc, char** argv) {
         fc::setIfNotOverriden(fc::VsockSnapshotLoadFixed_b231345789, true);
     }
 
-    // XR image needs this feature to pass modifier keys to the guest.
+    // XR specific feature overrides
     if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_DEV_2024) {
+        // XR image needs this feature to pass modifier keys to the guest.
         fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
+
+#if defined(__APPLE__) && defined(__aarch64__)
+        // TODO(b/404619245): XR emulator restarts at login screen when
+        // VulkanVirtualQueue is enabled on Mac.
+        fc::setIfNotOverriden(fc::VulkanVirtualQueue, false);
+#endif
     }
 
     // Support for changing default lcd-density
