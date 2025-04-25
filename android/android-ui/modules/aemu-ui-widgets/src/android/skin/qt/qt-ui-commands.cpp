@@ -70,6 +70,7 @@ constexpr CommandInfo kCommands[] = {
         INIT_COMMAND(POWER, "Power"),
         INIT_COMMAND(TABLET_MODE, "Tablet mode"),
         INIT_COMMAND(HOME, "Home"),
+        INIT_COMMAND(ALL_APPS, "All Apps"),
         INIT_COMMAND(BACK, "Back"),
         INIT_COMMAND(MENU, "Menu"),
         INIT_COMMAND(OVERVIEW, "Overview"),

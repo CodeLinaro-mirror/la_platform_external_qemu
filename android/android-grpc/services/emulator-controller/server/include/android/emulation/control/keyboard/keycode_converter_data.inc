@@ -595,6 +595,12 @@ USB_KEYMAP_DECLARATION {
   USB_KEYMAP(0x0c01aa, 0x0066, 0x006e, 0xe047, 0x0073, "GoHome", GO_HOME), // Same as AL Desktop ("Home" in android)
   USB_KEYMAP(0x0c01a2, 0x0244, 0x024c, 0x0000, 0xffff, "AppSwitch", APP_SWITCH), // Same as AL Select Task/Application ("Overview" in android)
 
+  // EVDEV Codes for Android XR
+  //            USB     evdev    XKB     Win     Mac   Code
+  // Note: For AndroidXR emulator, AllApps key is used to replace Home key
+  // to bringup apptray.
+  USB_KEYMAP(0x0c01a3, 0x024a, 0x0000, 0x0000, 0xffff, "AllApps", ALL_APPS), // ALL_APPS to bring up app tray in AndroidXR
+
   // TODO(jansene): Kernel excavation needed for others.
   // USB_KEYMAP(0x0c0193, 0x00d4, 0x00d4, 0x0000, 0xffff, "Camera", CAMERA), // AL A/V Capture
 };

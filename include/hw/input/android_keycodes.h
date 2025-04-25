@@ -29,6 +29,7 @@
 #define ANDROID_KEY_STEM_2 583
 #define ANDROID_KEY_STEM_3 584
 #define ANDROID_KEY_ASSIST 585  // KEYCODE_ASSIST in goldfish/input/qwerty.kl
+#define ANDROID_KEY_ALL_APPS 586 // KEYCODE_ALL_APPS in goldfish/input/qwerty.kl
 
 // Defines Android specific key codes for moving the text cursor to the head
 // or to the end. In a general Linux system, The keycodes LINUX_KEY_HOME and

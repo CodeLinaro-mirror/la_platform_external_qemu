@@ -271,6 +271,8 @@ private slots:
     void on_back_button_released();
     void on_home_button_pressed();
     void on_home_button_released();
+    void on_all_apps_button_pressed();
+    void on_all_apps_button_released();
     void on_minimize_button_clicked();
     void on_more_button_clicked();
     void on_power_button_pressed();
