@@ -245,6 +245,8 @@ if(OPTION_GFXSTREAM_BACKEND)
         renderdoc
         gfxstream_egl_headers
         gfxstream_glm_headers
+        gfxstream_host_address_space
+        gfxstream_host_address_space.headers
         gfxstream_host_tracing)
    android_license(TARGET "${GFXSTREAM_DEPENDENCIES}"
                    LIBNAME gfxstream
