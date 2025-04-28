@@ -610,7 +610,7 @@ static void nuvoton_pci_ipmi_mbx_handle_data(NuvotonPCIIPMIState *s,
 }
 
 static void nuvoton_pci_ipmi_mbx_handle_offset(NuvotonPCIIPMIState *s,
-                                               uint8_t offset)
+                                               uint64_t offset)
 {
     s->pci_mbx.offset += offset <<
                          (s->pci_mbx.rx_cnt * (sizeof(uint8_t) * 8));
