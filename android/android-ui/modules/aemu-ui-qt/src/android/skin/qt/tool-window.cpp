@@ -512,8 +512,8 @@ void ToolWindow::startUnfoldTimer(PresetEmulatorSizeType newSize) {
 }
 
 void ToolWindow::on_sleep_timer_done() {
-    if (emugl::shouldSkipDraw()) {
-        emugl::setShouldSkipDraw(false);
+    if (android_getShouldSkipDraw()) {
+        android_setShouldSkipDraw(false);
         android_redrawOpenglesWindow();
     }
     if (isResizableTransitionInProgress()) {
@@ -1180,7 +1180,7 @@ void ToolWindow::presetSizeAdvance(PresetEmulatorSizeType newSize) {
     }
 
     setResizableTransitionInProgress(true);
-    emugl::setShouldSkipDraw(true);
+    android_setShouldSkipDraw(true);
     startSleepTimer();
     std::string updateMsg = "Updating device size\n";
     switch (info.type) {
