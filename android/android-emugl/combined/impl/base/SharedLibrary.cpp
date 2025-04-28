@@ -18,8 +18,6 @@
 #include "aemu/base/FunctionView.h"
 #include "aemu/base/memory/LazyInstance.h"
 
-#include "emugl/common/logging.h"
-
 #include <functional>
 #include <vector>
 
