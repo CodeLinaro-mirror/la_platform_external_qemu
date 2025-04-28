@@ -1174,6 +1174,8 @@ static void aspeed_soc_ast2700_realize(DeviceState *dev, Error **errp)
         sysbus_realize(SYS_BUS_DEVICE(&a->i3c[i]), errp);
         aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&a->i3c[i]), 0,
                         sc->memmap[ASPEED_DEV_I3C0 + i]);
+        sysbus_connect_irq(SYS_BUS_DEVICE(&a->i3c[i]), 0,
+            aspeed_soc_ast2700_get_irq(s, ASPEED_DEV_I3C0 + i));
     }
 
     aspeed_mmio_map_unimplemented(s->memory, SYS_BUS_DEVICE(&s->dpmcu),
