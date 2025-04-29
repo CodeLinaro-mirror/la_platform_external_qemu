@@ -185,7 +185,7 @@ int main(int argc, char **argv)
 #include "android/skin/winsys.h"
 #include "android/snaphost-android.h"
 #include "android/snapshot.h"
-#include "snapshot/interface.h"
+#include "host-common/snapshot_interface.h"
 #include "android/telephony/modem_driver.h"
 #include "android_modem_v2.h"
 #include "android/ui-emu-agent.h"

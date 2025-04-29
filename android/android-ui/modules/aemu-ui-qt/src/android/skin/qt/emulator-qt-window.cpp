@@ -74,7 +74,7 @@
 #include "host-common/multi_display_agent.h"
 #include "host-common/MultiDisplay.h"
 #include "host-common/opengl/emugl_config.h"
-#include "snapshot/common.h"
+#include "host-common/snapshot_common.h"
 #include "studio_stats.pb.h"
 
 #define DEBUG 1

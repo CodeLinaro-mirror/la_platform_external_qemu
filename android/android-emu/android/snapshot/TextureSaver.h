@@ -20,7 +20,8 @@
 #include "aemu/base/export.h"
 #include "aemu/base/files/StdioStream.h"
 #include "android/base/system/System.h"
-#include "snapshot/common.h"
+#include "host-common/snapshot_common.h"
+#include "render-utils/snapshot_operations.h"
 
 #include <functional>
 #include <vector>
@@ -28,27 +29,7 @@
 namespace android {
 namespace snapshot {
 
-class ITextureSaver {
-    DISALLOW_COPY_AND_ASSIGN(ITextureSaver);
-
-protected:
-    ~ITextureSaver() = default;
-
-public:
-    ITextureSaver() = default;
-
-    using Buffer = android::base::SmallVector<unsigned char>;
-    using saver_t = std::function<void(android::base::Stream*, Buffer*)>;
-
-    // Save texture to a stream as well as update the index
-    virtual void saveTexture(uint32_t texId, const saver_t& saver) = 0;
-    virtual bool hasError() const = 0;
-    virtual uint64_t diskSize() const = 0;
-    virtual bool compressed() const = 0;
-    virtual bool getDuration(base::System::Duration* duration) = 0;
-};
-
-class TextureSaver final : public ITextureSaver {
+class TextureSaver final : public gfxstream::ITextureSaver {
     DISALLOW_COPY_AND_ASSIGN(TextureSaver);
 
 public:
@@ -65,7 +46,7 @@ public:
     // Returns true if there was save with measurable time
     // (and writes it to |duration| if |duration| is not null),
     // otherwise returns false.
-    AEMU_EXPORT bool getDuration(base::System::Duration* duration) override {
+    AEMU_EXPORT bool getDuration(uint64_t* duration) override {
         if (mEndTime < mStartTime) {
             return false;
         }

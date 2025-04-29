@@ -92,8 +92,8 @@
 #include "host-common/opengles.h"
 #include "host-common/screen-recorder.h"
 #include "host-common/window_agent.h"
-#include "snapshot/common.h"
-#include "snapshot/interface.h"
+#include "host-common/snapshot_common.h"
+#include "host-common/snapshot_interface.h"
 #include "studio_stats.pb.h"
 #include "ui_tools.h"
 

@@ -35,7 +35,7 @@
 #include "android/crashreport/CrashReporter.h"
 #include "android/snapshot/PathUtils.h"
 #include "android/snapshot/Snapshot.h"
-#include "snapshot/interface.h"
+#include "host-common/snapshot_interface.h"
 #include "android/utils/file_io.h"
 #include "android/utils/path.h"
 
