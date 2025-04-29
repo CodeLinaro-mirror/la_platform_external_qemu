@@ -582,7 +582,9 @@ static void virgl_cmd_resource_create_blob(VirtIOGPU *g,
 #endif  // CONFIG_STREAM_RENDERER
 }
 
-#define VIRTIO_GPU_MAX_RAM_SLOTS 2048
+// #define VIRTIO_GPU_MAX_RAM_SLOTS 2048
+// Increased the slot size as some dEQP tests + GuestAngle triggered around 3330 slot mappings.
+#define VIRTIO_GPU_MAX_RAM_SLOTS 8192
 
 struct VirtioGpuRamSlotInfo {
     int used;
