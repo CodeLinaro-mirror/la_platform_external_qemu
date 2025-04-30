@@ -1386,8 +1386,10 @@ message EmulatorAvdInfo {
         LAPTOP_AVD = 8;
         DESKTOP_AVD = 9;
         CHROMEOS = 10;
-        XR_AVD = 11;
-        // Next tag: 12
+        // Do not use this -- use XR_AVD below.
+        DEV_2024_AVD = 11 [deprecated = true];
+        XR_AVD = 12;
+        // Next tag: 13
     }
     enum EmulatorDeviceName {
         UNKNOWN_EMULATOR_DEVICE_NAME = 0;
@@ -1586,7 +1588,8 @@ message EmulatorFeatureFlagState {
         VULKAN_ALLOCATE_HOST_MEMORY = 107;
         DEVICE_KEYBOARD_QT_RAW_INPUT = 108;
         UWB = 109;
-        XR_MODE_UI = 110;
+        // Do not use this -- use XR_MODE_UI below.
+        UX_TEST_2024 = 110 [deprecated = true];
         GUEST_ANGLE = 111;
         ANDROID_VIRTUALIZATION_FRAMEWORK = 112;
         BYPASS_VULKAN_DEVICE_FEATURE_OVERRIDES = 113;
@@ -1594,6 +1597,7 @@ message EmulatorFeatureFlagState {
         VULKAN_COMMAND_BUFFER_CHECKPOINTS = 115;
         VULKAN_VIRTUAL_QUEUE = 116;
         VULKAN_ROBUSTNESS = 117;
+        XR_MODE_UI = 118;
         // Intentional gap to avoid merge conflicts.
         VIRTIO_DUAL_MODE_MOUSE = 131;
         DUAL_MODE_MOUSE_DISPLAY_HOST_CURSOR = 132;
