@@ -855,10 +855,12 @@ static X86CPUDefinition builtin_x86_defs[] = {
         .features[FEAT_1_EDX] =
             PPRO_FEATURES |
             CPUID_MTRR | CPUID_CLFLUSH | CPUID_MCA |
-            CPUID_PSE36,
+            CPUID_PSE36 | CPUID_FXSR,
         .features[FEAT_1_ECX] =
             CPUID_EXT_POPCNT | CPUID_EXT_SSE42 | CPUID_EXT_SSE41 |
-            CPUID_EXT_CX16 | CPUID_EXT_SSSE3 | CPUID_EXT_SSE3,
+            CPUID_EXT_CX16 | CPUID_EXT_SSSE3 | CPUID_EXT_SSE3 |
+            CPUID_EXT_AES | CPUID_EXT_PCLMULQDQ | CPUID_EXT_XSAVE |
+            CPUID_EXT_AVX | CPUID_EXT_F16C,
         .features[FEAT_8000_0001_EDX] =
             (PPRO_FEATURES & CPUID_EXT2_AMD_ALIASES) |
             CPUID_EXT2_LM | CPUID_EXT2_SYSCALL | CPUID_EXT2_NX,
@@ -868,11 +870,9 @@ static X86CPUDefinition builtin_x86_defs[] = {
         .model_id = "Android virtual processor"
     },
     {
-        /* A variant of android64 for Android xTS specifically.
-         * Android xTS needs certain advanced CPU features to complete.
-         * Support for those features varies among different CPUs and
-         * different hypervisors. "android64" will keep the most common
-         * features, benefiting snapshot migrations.
+        /* The same as "android64" above. Keeping "android64-xts" is for
+         * backward compatibility where certain users run the emulator with
+         * "-qemu -cpu android-xts".
          */
         .name = "android64-xts",
         .level = 4,

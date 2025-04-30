@@ -2642,7 +2642,6 @@ extern "C" int main(int argc, char** argv) {
                                                        : kTarget.qemuCpu);
 #elif defined(CONFIG_LINUX) && defined(TARGET_X86_64)
     // Add "-xts" to turn on tweaks only made for xts
-    // Right now, only a few CPU features are turned on
     if (opts->xts) {
         if (feature_is_enabled(kFeature_AndroidVirtualizationFramework)) {
             // bug: 349365118, to enable kvm in the guest, we have to pass host
@@ -2652,7 +2651,7 @@ extern "C" int main(int argc, char** argv) {
             dinfo("Enabled cpu host to support AndroidVirtualizationFramework");
             args.add("host");
         } else {
-            args.add("android64-xts");
+            args.add(kTarget.qemuCpu);
         }
     } else {
         args.add(kTarget.qemuCpu);
