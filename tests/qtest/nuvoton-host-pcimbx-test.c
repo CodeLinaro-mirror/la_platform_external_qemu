@@ -210,13 +210,13 @@ static void pcimbx_bar_write(const char *data, uint64_t addr, size_t len)
 
     while (len > 0) {
         if (len >= 8) {
-            qpci_io_writeq(s.dev, s.io_bar, addr, *(const uint64_t *)data);
+            qpci_io_writeq(s.dev, s.io_bar, addr, ldq_le_p(data));
             write_size = 8;
         } else if (len >= 4) {
-            qpci_io_writel(s.dev, s.io_bar, addr, *(const uint32_t *)data);
+            qpci_io_writel(s.dev, s.io_bar, addr, ldl_le_p(data));
             write_size = 4;
         } else if (len >= 2) {
-            qpci_io_writew(s.dev, s.io_bar, addr, *(const uint16_t *)data);
+            qpci_io_writew(s.dev, s.io_bar, addr, lduw_le_p(data));
             write_size = 2;
         } else {
             qpci_io_writeb(s.dev, s.io_bar, addr, *data);
