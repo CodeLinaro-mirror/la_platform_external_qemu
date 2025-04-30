@@ -700,6 +700,8 @@ static void virtio_gpu_unmap_slot(
                 (unsigned long long)table->slots[i].gpa + table->slots[i].size);
         return;
     }
+
+    fprintf(stderr, "UNMAP> no slot for resource_id:%u\n", resource_id);
 }
 
 static void virgl_cmd_resource_map(VirtIOGPU *g,
