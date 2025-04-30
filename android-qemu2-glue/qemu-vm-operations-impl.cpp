@@ -38,8 +38,8 @@ extern "C" {
 #include "android/snapshot/MemoryWatch.h"             // for set_address_tra...
 #include "android/snapshot/PathUtils.h"               // for getSnapshotBaseDir
 #include "android/snapshot/Snapshotter.h"             // for Snapshotter
-#include "snapshot/common.h"                  // for SnapshotRamBlock
-#include "snapshot/interface.h"               // for androidSnapshot...
+#include "host-common/snapshot_common.h"                  // for SnapshotRamBlock
+#include "host-common/snapshot_interface.h"               // for androidSnapshot...
 #include "android/utils/path.h"                       // for path_copy_file
 #include "android/utils/debug.h"
 

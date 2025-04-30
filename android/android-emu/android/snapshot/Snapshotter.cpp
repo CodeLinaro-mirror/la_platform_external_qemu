@@ -45,7 +45,7 @@
 #include "android/snapshot/Saver.h"
 #include "android/snapshot/TextureLoader.h"
 #include "android/snapshot/TextureSaver.h"
-#include "snapshot/interface.h"
+#include "host-common/snapshot_interface.h"
 #include "android/utils/debug.h"
 #include "android/utils/path.h"
 #include "android/utils/system.h"
@@ -454,9 +454,12 @@ Snapshotter::SnapshotOperationStats Snapshotter::getSaveStats(const char* name,
     const auto texturesSize = save.textureSaver()->diskSize();
 
     System::Duration ramDurationMs = 0;
-    System::Duration texturesDurationMs = 0;
     save.ramSaver().getDuration(&ramDurationMs); ramDurationMs /= 1000;
-    save.textureSaver()->getDuration(&texturesDurationMs); texturesDurationMs /= 1000;
+
+    System::Duration texturesDurationMs = 0;
+    uint64_t textureDurationUs = 0;
+    save.textureSaver()->getDuration(&textureDurationUs);
+    texturesDurationMs = static_cast<System::Duration>(textureDurationUs / 1000);
 
     return {
         true /* for save */,

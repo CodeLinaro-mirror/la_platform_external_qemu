@@ -16,7 +16,7 @@
 #include "aemu/base/files/StdioStream.h"
 #include "android/snapshot/RamLoader.h"
 #include "android/snapshot/TextureSaver.h"
-#include "snapshot/common.h"
+#include "host-common/snapshot_common.h"
 #include "android/utils/debug.h"
 #include "android/utils/path.h"
 
@@ -166,9 +166,11 @@ void Saver::complete(bool succeeded) {
     base::System::Duration ramDuration = 0;
     base::System::Duration texturesDuration = 0;
 
+    uint64_t texturesDurationUs = 0;
     if (mRamSaver->getDuration(&ramDuration) &&
-        mTextureSaver->getDuration(&texturesDuration)) {
+        mTextureSaver->getDuration(&texturesDurationUs)) {
 
+        texturesDuration = static_cast<base::System::Duration>(texturesDurationUs / 1000);
         mSnapshot.addSaveStats(
                 mIncrementallySaved,
                 ramDuration + texturesDuration,

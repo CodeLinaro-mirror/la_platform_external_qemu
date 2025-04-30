@@ -21,7 +21,7 @@
 #include "aemu/base/threads/ThreadPool.h"
 #include "android/snapshot/GapTracker.h"
 #include "android/snapshot/MemoryWatch.h"
-#include "snapshot/common.h"
+#include "host-common/snapshot_common.h"
 
 #include <array>
 #include <atomic>

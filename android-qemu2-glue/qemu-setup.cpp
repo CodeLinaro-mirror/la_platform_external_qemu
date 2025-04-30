@@ -118,7 +118,7 @@ extern "C" {
 #include "host-common/crash-handler.h"
 #include "host-common/feature_control.h"
 #include "host-common/record_screen_agent.h"
-#include "snapshot/interface.h"
+#include "host-common/snapshot_interface.h"
 #include "snapshot_service.grpc.pb.h"
 #include "util/log.h"
 

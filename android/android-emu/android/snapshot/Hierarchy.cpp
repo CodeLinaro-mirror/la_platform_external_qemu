@@ -16,7 +16,7 @@
 #include "aemu/base/memory/ScopedPtr.h"
 #include "android/console.h"
 #include "android/protobuf/LoadSave.h"
-#include "snapshot/common.h"
+#include "host-common/snapshot_common.h"
 #include "snapshot.pb.h"
 #include "snapshot_deps.pb.h"
 #include "android/snapshot/PathUtils.h"

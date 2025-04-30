@@ -38,7 +38,7 @@
 #include "android/snapshot/TextureSaver.h"
 #include "android/utils/debug.h"
 #include "host-common/opengl/emugl_config.h"
-#include "snapshot/interface.h"
+#include "host-common/snapshot_interface.h"
 
 #include <cassert>
 #include <fstream>

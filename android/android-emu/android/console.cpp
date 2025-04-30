@@ -63,7 +63,7 @@
 #include "android_modem_v2.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/crash-handler.h"
-#include "snapshot/interface.h"
+#include "host-common/snapshot_interface.h"
 
 #include "config-host.h"
 

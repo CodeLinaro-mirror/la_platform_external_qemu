@@ -43,7 +43,7 @@
 #include "android/metrics/MetricsReporter.h"
 #include "android/snapshot/Snapshotter.h"
 #include "android/utils/file_io.h"
-#include "snapshot/interface.h"  // for androidS...
+#include "host-common/snapshot_interface.h"  // for androidS...
 #include "openssl/base.h"                // for RSA
 #include "openssl/nid.h"                 // for NID_sha1
 #include "studio_stats.pb.h"

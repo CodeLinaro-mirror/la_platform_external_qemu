@@ -472,8 +472,18 @@ int android_startOpenglesRenderer(
     android::snapshot::Snapshotter::get().addOperationCallback(
             [](android::snapshot::Snapshotter::Operation op,
                android::snapshot::Snapshotter::Stage stage) {
-                sRenderer->snapshotOperationCallback(static_cast<int>(op),
-                                                     static_cast<int>(stage));
+                switch (op) {
+                    case android::snapshot::Snapshotter::Operation::Load:
+                        if (stage == android::snapshot::Snapshotter::Stage::Start) {
+                            sRenderer->preLoad();
+                        }
+                        if (stage == android::snapshot::Snapshotter::Stage::End) {
+                            sRenderer->postLoad();
+                        }
+                        break;
+                    default:
+                        break;
+                }
             });
 
     android::emulation::registerOnLastRefCallback(

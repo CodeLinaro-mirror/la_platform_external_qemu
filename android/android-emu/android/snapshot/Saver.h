@@ -13,11 +13,11 @@
 
 #include "aemu/base/Compiler.h"
 #include "aemu/base/Optional.h"
-
 #include "android/base/system/System.h"
-#include "snapshot/common.h"
 #include "android/snapshot/RamSaver.h"
 #include "android/snapshot/Snapshot.h"
+#include "android/snapshot/TextureSaver.h"
+#include "host-common/snapshot_common.h"
 
 #include <string_view>
 

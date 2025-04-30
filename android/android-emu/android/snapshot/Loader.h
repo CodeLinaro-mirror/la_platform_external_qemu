@@ -14,9 +14,10 @@
 #include "aemu/base/Compiler.h"
 #include "aemu/base/Optional.h"
 #include "android/base/system/System.h"
-#include "snapshot/common.h"
 #include "android/snapshot/RamLoader.h"
 #include "android/snapshot/Snapshot.h"
+#include "android/snapshot/TextureLoader.h"
+#include "host-common/snapshot_common.h"
 
 namespace android {
 namespace snapshot {

@@ -22,7 +22,8 @@
 #include "aemu/base/synchronization/Lock.h"
 #include "android/base/system/System.h"
 #include "aemu/base/threads/Thread.h"
-#include "snapshot/common.h"
+#include "host-common/snapshot_common.h"
+#include "render-utils/snapshot_operations.h"
 
 #include <functional>
 #include <memory>
@@ -31,30 +32,7 @@
 namespace android {
 namespace snapshot {
 
-class ITextureLoader {
-    DISALLOW_COPY_AND_ASSIGN(ITextureLoader);
-
-protected:
-    ~ITextureLoader() = default;
-
-public:
-    ITextureLoader() = default;
-
-    using LoaderThreadPtr = std::shared_ptr<android::base::InterruptibleThread>;
-    using loader_t = std::function<void(android::base::Stream*)>;
-
-    virtual bool start() = 0;
-    // Move file position to texId and trigger loader
-    virtual void loadTexture(uint32_t texId, const loader_t& loader) = 0;
-    virtual void acquireLoaderThread(LoaderThreadPtr thread) = 0;
-    virtual bool hasError() const = 0;
-    virtual uint64_t diskSize() const = 0;
-    virtual bool compressed() const = 0;
-    virtual void join() = 0;
-    virtual void interrupt() = 0;
-};
-
-class TextureLoader final : public ITextureLoader {
+class TextureLoader final : public gfxstream::ITextureLoader {
 public:
     AEMU_EXPORT TextureLoader(android::base::StdioStream&& stream);
 
@@ -91,7 +69,7 @@ public:
     // Returns true if there was save with measurable time
     // (and writes it to |duration| if |duration| is not null),
     // otherwise returns false.
-    AEMU_EXPORT bool getDuration(base::System::Duration* duration) {
+    AEMU_EXPORT bool getDuration(uint64_t* duration) {
         if (mEndTime < mStartTime) {
             return false;
         }
