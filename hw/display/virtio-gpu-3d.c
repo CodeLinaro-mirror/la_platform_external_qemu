@@ -604,11 +604,11 @@ static void virgl_cmd_resource_create_blob(VirtIOGPU *g,
 #define VIRTIO_GPU_MAX_RAM_SLOTS 8192
 
 struct VirtioGpuRamSlotInfo {
-    int used;
+    uint32_t used;
+    uint32_t resource_id;
     uint64_t gpa;
     uint64_t offset;
     uint64_t size;
-    uint32_t resource_id;
 };
 
 struct VirtioGpuRamSlotTable {
@@ -1124,10 +1124,10 @@ void virtio_gpu_save_ram_slots(void* qemufile, VirtIOGPU* g) {
     qemu_put_be32(file, VIRTIO_GPU_MAX_RAM_SLOTS);
     for (int i = 0 ; i < VIRTIO_GPU_MAX_RAM_SLOTS; ++i) {
         qemu_put_be32(file, table->slots[i].used);
+        qemu_put_be32(file, table->slots[i].resource_id);
         qemu_put_be64(file, table->slots[i].gpa);
         qemu_put_be64(file, table->slots[i].offset);
         qemu_put_be64(file, table->slots[i].size);
-        qemu_put_be32(file, table->slots[i].resource_id);
     }
 }
 
@@ -1151,10 +1151,10 @@ void virtio_gpu_load_ram_slots(void* qemufile, VirtIOGPU* g) {
 
     for (uint32_t i = 0; i < count; ++i) {
         table->slots[i].used = qemu_get_be32(file);
+        table->slots[i].resource_id = qemu_get_be32(file);
         table->slots[i].gpa = qemu_get_be64(file);
         table->slots[i].offset = qemu_get_be64(file);
         table->slots[i].size = qemu_get_be64(file);
-        table->slots[i].resource_id = qemu_get_be32(file);
 
         if (!table->slots[i].used) continue;
 
