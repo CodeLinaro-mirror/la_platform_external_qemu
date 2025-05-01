@@ -315,7 +315,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
             // This might happen because of unsupported API level or GPU
             dfatal("Vulkan is not supported: GuestAngle feature won't work!");
         }
-        // There's an emulator-specific hack in API 35 to disable specific GL
+        // There's an emulator-specific hack in API > 35 to disable specific GL
         // extensions. You can provide your own colon-delimited list or set to 0
         // to not disable any extensions, as we disable a large set of GL
         // extensions by default. See below.
@@ -373,7 +373,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
             }
         }
 
-        if (apiLevel == 35) {
+        if (apiLevel >= 35) {
             // TODO(b/376893591): The feature set below is only tested on
             // API 35. Adjust accordingly for other APIs.
             if (aemu_angle_overrides_disabled.empty()) {
