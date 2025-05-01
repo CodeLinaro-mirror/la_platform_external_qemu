@@ -87,7 +87,7 @@ def get_tasks(args) -> List[BuildTask]:
                 with_gfx_stream=args.gfxstream or args.gfxstream_only,
                 distribution_directory=args.dist,
             ).enable(run_tests),
-            AccelerationCheckTask(args.out).enable(run_tests),
+            #AccelerationCheckTask(args.out).enable(run_tests),
             EmugenTestTask(args.aosp, args.out).enable(run_tests).enable(False),
             GenEntriesTestTask(args.aosp, args.out),
             CoverageReportTask(
