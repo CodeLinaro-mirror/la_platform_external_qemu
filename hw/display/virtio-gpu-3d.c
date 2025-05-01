@@ -604,10 +604,9 @@ static void virgl_cmd_resource_create_blob(VirtIOGPU *g,
 #define VIRTIO_GPU_MAX_RAM_SLOTS 8192U
 
 struct VirtioGpuRamSlotInfo {
-    uint32_t used;
     uint32_t resource_id;
+    uint32_t size;
     uint64_t gpa;
-    uint64_t size;
 };
 
 struct VirtioGpuRamSlotTable {
@@ -621,7 +620,14 @@ static struct VirtioGpuRamSlotTable* virtio_gpu_ram_slot_table_get(void) {
     if (!s_table) {
         struct VirtioGpuRamSlotTable* table =
             (struct VirtioGpuRamSlotTable*)malloc(sizeof(*table));
-        memset(table, 0, sizeof(*table));
+
+        for (uint_fast32_t i = 0; i < VIRTIO_GPU_MAX_RAM_SLOTS; ++i) {
+            struct VirtioGpuRamSlotInfo* slot = &table->slots[i];
+            slot->resource_id = -1;
+            slot->size = 0;
+            slot->gpa = 0;
+        }
+
         s_table = table;
     }
     return s_table;
@@ -632,10 +638,10 @@ static int virtio_gpu_ram_slot_infos_first_free_slot(uint32_t resource_id) {
     struct VirtioGpuRamSlotTable* table = virtio_gpu_ram_slot_table_get();
 
     for (uint_fast32_t i = pivot; i < VIRTIO_GPU_MAX_RAM_SLOTS; ++i) {
-        if (!table->slots[i].used) return i;
+        if (!table->slots[i].size) return i;
     }
     for (uint_fast32_t i = 0; i < pivot; ++i) {
-        if (!table->slots[i].used) return i;
+        if (!table->slots[i].size) return i;
     }
 
     return -1;
@@ -648,8 +654,8 @@ static void virtio_gpu_ram_slot_dump_used_slots() {
     fprintf(stderr, "VIRTIO_GPU_SLOTS {\n");
     for (int i = 0; i < VIRTIO_GPU_MAX_RAM_SLOTS; ++i) {
         const struct VirtioGpuRamSlotInfo* slot = &table->slots[i];
-        if (slot->used) {
-            fprintf(stderr, "\t[%d]: {res_id:%u gpa:0x%x sz:%lu}\n",
+        if (slot->size) {
+            fprintf(stderr, "\t[%d]: {res_id:%u gpa:0x%x sz:%u}\n",
                     i, slot->resource_id, slot->gpa, slot->size);
         }
     }
@@ -674,10 +680,9 @@ static void virtio_gpu_map_slot(
 
     struct VirtioGpuRamSlotTable* table = virtio_gpu_ram_slot_table_get();
     struct VirtioGpuRamSlotInfo* slot = &table->slots[slotIndex];
-    slot->gpa = gpa;
-    slot->size = size;
     slot->resource_id = resource_id;
-    slot->used = 1;
+    slot->size = size;
+    slot->gpa = gpa;
 
     D("MAP> resource_id:%u slot:%d map hva %p -> gpa [0x%llx 0x%llx)", resource_id,
       slot, hva, (unsigned long long)gpa, (unsigned long long)gpa + size);
@@ -689,7 +694,9 @@ static void virtio_gpu_unmap_slot_impl(int i, struct VirtioGpuRamSlotInfo* slot)
             (unsigned long long)slot->gpa + slot->size);
 
     qemu_user_backed_ram_unmap(slot->gpa, slot->size);
-    slot->used = 0;
+    slot->resource_id = -1;
+    slot->size = 0;
+    slot->gpa = 0;
 }
 
 static void virtio_gpu_unmap_slot(MemoryRegion* parent, uint32_t resource_id) {
@@ -699,13 +706,13 @@ static void virtio_gpu_unmap_slot(MemoryRegion* parent, uint32_t resource_id) {
 
     for (uint_fast32_t i = pivot; i < VIRTIO_GPU_MAX_RAM_SLOTS; ++i) {
         struct VirtioGpuRamSlotInfo* slot = &table->slots[i];
-        if ((resource_id != slot->resource_id) || !slot->used) continue;
+        if ((resource_id != slot->resource_id) || !slot->size) continue;
         virtio_gpu_unmap_slot_impl(i, slot);
         return;
     }
     for (uint_fast32_t i = 0; i < pivot; ++i) {
         struct VirtioGpuRamSlotInfo* slot = &table->slots[i];
-        if ((resource_id != slot->resource_id) || !slot->used) continue;
+        if ((resource_id != slot->resource_id) || !slot->size) continue;
         virtio_gpu_unmap_slot_impl(i, slot);
         return;
     }
@@ -1134,10 +1141,9 @@ void virtio_gpu_save_ram_slots(void* qemufile, VirtIOGPU* g) {
 
     qemu_put_be32(file, VIRTIO_GPU_MAX_RAM_SLOTS);
     for (int i = 0 ; i < VIRTIO_GPU_MAX_RAM_SLOTS; ++i) {
-        qemu_put_be32(file, table->slots[i].used);
         qemu_put_be32(file, table->slots[i].resource_id);
+        qemu_put_be32(file, table->slots[i].size);
         qemu_put_be64(file, table->slots[i].gpa);
-        qemu_put_be64(file, table->slots[i].size);
     }
 }
 
@@ -1145,9 +1151,9 @@ static void virtio_gpu_clear_slots() {
     struct VirtioGpuRamSlotTable* table = virtio_gpu_ram_slot_table_get();
 
     for (int i = 0; i < VIRTIO_GPU_MAX_RAM_SLOTS; ++i) {
-        if (0 == table->slots[i].used) continue;
+        if (0 == table->slots[i].size) continue;
         qemu_user_backed_ram_unmap(table->slots[i].gpa, table->slots[i].size);
-        table->slots[i].used = 0;
+        table->slots[i].size = 0;
     }
 }
 
@@ -1160,12 +1166,11 @@ void virtio_gpu_load_ram_slots(void* qemufile, VirtIOGPU* g) {
     uint32_t count = qemu_get_be32(file);
 
     for (uint32_t i = 0; i < count; ++i) {
-        table->slots[i].used = qemu_get_be32(file);
         table->slots[i].resource_id = qemu_get_be32(file);
+        table->slots[i].size = qemu_get_be32(file);
         table->slots[i].gpa = qemu_get_be64(file);
-        table->slots[i].size = qemu_get_be64(file);
 
-        if (!table->slots[i].used) continue;
+        if (!table->slots[i].size) continue;
 
         void* hva;
         uint64_t size;
