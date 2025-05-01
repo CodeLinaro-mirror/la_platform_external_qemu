@@ -65,6 +65,7 @@ class Licensing(object):
         "pthread",
         "c",
         "iconv",
+        "Shlwapi",
         "Threads::Threads",
         "rt",
         "X11",

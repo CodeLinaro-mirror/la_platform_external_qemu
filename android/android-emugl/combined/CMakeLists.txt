@@ -243,6 +243,8 @@ if(OPTION_GFXSTREAM_BACKEND)
         angle_common
         angle_shader_translator
         renderdoc
+        gfxstream_common_base
+        gfxstream_common_base_windows_compat
         gfxstream_egl_headers
         gfxstream_glm_headers
         gfxstream_host_address_space
