@@ -130,7 +130,7 @@ function(enable_vendorized_crates VENDOR_CRATES)
     STATUS
       "Writing ${CARGO_CONFIG}, cargo should now use vendor crates from ${VENDOR_CRATES}"
   )
-  configure_file("${ANDROID_QEMU2_TOP_DIR}/android/build/cmake/config.toml.in"
+  configure_file("${ANDROID_QEMU2_TOP_DIR}/../../tools/netsim/cmake/config.toml.in"
                  ${CARGO_CONFIG})
   set(Rust_CARGO_HOME ${CARGO_HOME} PARENT_SCOPE)
   set(ENV{CARGO_HOME} ${CARGO_HOME})
