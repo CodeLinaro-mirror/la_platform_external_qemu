@@ -24,6 +24,8 @@
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/mipi-hci.h"
 #include "hw/i3c/hci-dat.h"
+#include "hw/i3c/hci-pio.h"
+#include "hci-pio-internal.h"
 #include "hw/core/irq.h"
 
 static uint8_t mipi_hci_get_next_dynamic_addr(MIPIHCIState *s,
@@ -66,6 +68,16 @@ static void mipi_hci_enter_halt(MIPIHCIState *s)
 static const MemoryRegionOps hci_core_ops = {
     .read = hci_core_read,
     .write = hci_core_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_pio_ops = {
+    .read = hci_pio_read,
+    .write = hci_pio_write,
     .valid.min_access_size = 1,
     .valid.max_access_size = 4,
     .impl.min_access_size = 1,
@@ -133,6 +145,7 @@ static const Property mipi_hci_properties[] = {
     DEFINE_PROP_ARRAY("ring-offsets", MIPIHCIState,
                       dma.cfg.num_ring_offsets, dma.cfg.ring_offsets,
                       qdev_prop_uint32, uint32_t),
+    DEFINE_PROP_UINT32("pio-offset", MIPIHCIState, core.cfg.pio_offset, 0),
     DEFINE_PROP_ARRAY("ext-capabilities", MIPIHCIState,
                       ext_cap.num_ext_capabilities, ext_cap.ext_capabilities,
                       qdev_prop_uint32, uint32_t),
@@ -170,6 +183,7 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
     MIPIHCIState *s = MIPI_HCI(dev);
     HCICoreState *core = &s->core;
     HCIDMAState *dma = &s->dma;
+    HCIPIOState *pio = &s->pio;
     HCIExtCapState *ext_caps = &s->ext_cap;
     HCIDATState *dat = &s->dat;
     HCIDCTState *dct = &s->dct;
@@ -202,6 +216,13 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
                               mr_name, HCI_DMA_NUM_REGS * sizeof(uint32_t));
         memory_region_add_subregion(&s->iomem, dma->cfg.ring_offsets[i],
                                     &dma->rh_mmio[i]);
+    }
+    if (core->cfg.pio_offset) {
+        memory_region_init_io(&pio->mmio, OBJECT(s), &hci_pio_ops, s,
+                              TYPE_MIPI_HCI"-pio-mmio",
+                              HCI_PIO_NUM_REGS * sizeof(uint32_t));
+        memory_region_add_subregion(&s->iomem, core->cfg.pio_offset,
+                                    &pio->mmio);
     }
     memory_region_init_io(&ext_caps->mmio, OBJECT(s), &hci_ext_caps_ops, s,
                                  TYPE_MIPI_HCI"-ext-caps-mmio",

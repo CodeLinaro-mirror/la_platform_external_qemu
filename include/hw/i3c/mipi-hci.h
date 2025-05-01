@@ -17,6 +17,7 @@
 #include "hw/i3c/hci-dat.h"
 #include "hw/i3c/hci-dct.h"
 #include "hw/i3c/hci-ibi.h"
+#include "hw/i3c/hci-pio.h"
 #include "hw/i3c/i3c.h"
 
 #define TYPE_MIPI_HCI "mipi.hci"
@@ -51,6 +52,7 @@ typedef struct MIPIHCIState {
     HCIExtCapState ext_cap;
     HCIDATState dat;
     HCIDCTState dct;
+    HCIPIOState pio;
 
     struct {
         uint32_t ring_header_section_offset;
