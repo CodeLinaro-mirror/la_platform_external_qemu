@@ -38,29 +38,21 @@ public:
 
     AEMU_EXPORT bool start() override;
     AEMU_EXPORT void loadTexture(uint32_t texId, const loader_t& loader) override;
-    AEMU_EXPORT bool hasError() const override { return mHasError; }
-    AEMU_EXPORT uint64_t diskSize() const override { return mDiskSize; }
-    AEMU_EXPORT bool compressed() const override { return mVersion > 1; }
 
-    AEMU_EXPORT void acquireLoaderThread(LoaderThreadPtr thread) override {
-        mLoaderThread = std::move(thread);
-    }
+    AEMU_EXPORT bool hasError() const { return mHasError; }
+    AEMU_EXPORT uint64_t diskSize() const { return mDiskSize; }
+    AEMU_EXPORT bool compressed() const { return mVersion > 1; }
 
     AEMU_EXPORT void join() override {
-        if (mLoaderThread) {
-            mLoaderThread->wait();
-            mLoaderThread.reset();
-        }
+        gfxstream::ITextureLoader::join();
+
         mStream.close();
         mEndTime = base::System::get()->getHighResTimeUs();
     }
 
     AEMU_EXPORT void interrupt() override {
-        if (mLoaderThread) {
-            mLoaderThread->interrupt();
-            mLoaderThread->wait();
-            mLoaderThread.reset();
-        }
+        gfxstream::ITextureLoader::interrupt();
+
         mStream.close();
         mEndTime = base::System::get()->getHighResTimeUs();
     }
@@ -90,8 +82,6 @@ private:
     bool mHasError = false;
     int mVersion = 0;
     uint64_t mDiskSize = 0;
-    LoaderThreadPtr mLoaderThread;
-
     base::System::Duration mStartTime = 0;
     base::System::Duration mEndTime = 0;
 };

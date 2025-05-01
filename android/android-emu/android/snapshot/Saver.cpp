@@ -140,7 +140,7 @@ Saver::~Saver() {
     }
 }
 
-ITextureSaverPtr Saver::textureSaver() const {
+std::shared_ptr<TextureSaver> Saver::textureSaver() const {
     return mTextureSaver;
 }
 

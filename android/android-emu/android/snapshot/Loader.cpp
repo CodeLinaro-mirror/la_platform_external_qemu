@@ -117,7 +117,7 @@ void Loader::interrupt() {
     }
 }
 
-ITextureLoaderPtr Loader::textureLoader() const {
+std::shared_ptr<TextureLoader> Loader::textureLoader() const {
     return mTextureLoader;
 }
 

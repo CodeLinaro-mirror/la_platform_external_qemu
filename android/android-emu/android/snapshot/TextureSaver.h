@@ -38,15 +38,15 @@ class TextureSaver final : public gfxstream::ITextureSaver {
     AEMU_EXPORT void saveTexture(uint32_t texId, const saver_t& saver) override;
     AEMU_EXPORT void done();
 
-    AEMU_EXPORT bool hasError() const override { return mHasError; }
-    AEMU_EXPORT uint64_t diskSize() const override { return mDiskSize; }
-    AEMU_EXPORT bool compressed() const override { return mIndex.version > 1; }
+    AEMU_EXPORT bool hasError() const { return mHasError; }
+    AEMU_EXPORT uint64_t diskSize() const { return mDiskSize; }
+    AEMU_EXPORT bool compressed() const { return mIndex.version > 1; }
 
     // getDuration():
     // Returns true if there was save with measurable time
     // (and writes it to |duration| if |duration| is not null),
     // otherwise returns false.
-    AEMU_EXPORT bool getDuration(uint64_t* duration) override {
+    AEMU_EXPORT bool getDuration(uint64_t* duration) {
         if (mEndTime < mStartTime) {
             return false;
         }

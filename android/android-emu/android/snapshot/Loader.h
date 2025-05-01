@@ -33,7 +33,7 @@ public:
 
     bool hasRamLoader() const { return mRamLoader; }
     RamLoader& ramLoader() { return *mRamLoader; }
-    ITextureLoaderPtr textureLoader() const;
+    std::shared_ptr<TextureLoader> textureLoader() const;
 
     OperationStatus status() const { return mStatus; }
     const Snapshot& snapshot() const { return mSnapshot; }

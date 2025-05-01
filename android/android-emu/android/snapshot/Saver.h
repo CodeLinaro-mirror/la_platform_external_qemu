@@ -39,7 +39,7 @@ public:
     ~Saver();
 
     RamSaver& ramSaver() { return *mRamSaver; }
-    ITextureSaverPtr textureSaver() const;
+    std::shared_ptr<TextureSaver> textureSaver() const;
 
     OperationStatus status() const { return mStatus; }
     const Snapshot& snapshot() const { return mSnapshot; }
