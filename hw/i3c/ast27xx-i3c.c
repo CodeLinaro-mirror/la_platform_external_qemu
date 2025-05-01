@@ -559,6 +559,7 @@ static void ast27xx_i3c_instance_init(Object *obj)
     qdev_prop_set_uint32(dev, "hci-version", 0x0110);
     qdev_prop_set_uint32(dev, "int-ctrl-cmds-en", 0x3f);
     qdev_prop_set_uint32(dev, "ring-header-section-offset", 0x0800);
+    qdev_prop_set_uint32(dev, "pio-offset", 0x00d0);
     qdev_prop_set_uint32(dev, "preamble-size", 0x02);
     qdev_prop_set_uint32(dev, "header-size", 0x05);
     qdev_prop_set_uint32(dev, "xfer-struct-size", 0x14);
