@@ -564,7 +564,7 @@ protected:
         ConsumerInterface interface = {
             // create
             [this](struct asg_context context,
-               base::Stream* loadStream,
+               gfxstream::Stream* loadStream,
                ConsumerCallbacks callbacks,
                uint32_t virtioGpuContextId, uint32_t virtioGpuCapsetId,
                std::optional<std::string> nameOpt) {
@@ -583,7 +583,7 @@ protected:
             // global presave
             []() { },
             // save
-            [](void* consumer, base::Stream* stream) { },
+            [](void* consumer, gfxstream::Stream* stream) { },
             // global postsave
             []() { },
             // postsave

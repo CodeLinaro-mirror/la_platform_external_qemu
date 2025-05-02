@@ -18,6 +18,7 @@
 
 #include "aemu/base/EintrWrapper.h"
 #include "aemu/base/files/DecompressingStream.h"
+#include "android/snapshot/GfxstreamStreamAdapter.h"
 
 #include <assert.h>
 
@@ -47,13 +48,17 @@ void TextureLoader::loadTexture(uint32_t texId, const loader_t& loader) {
     android::base::AutoLock scopedLock(mLock);
     assert(mIndex.count(texId));
     HANDLE_EINTR(fseeko(mStream.get(), mIndex[texId], SEEK_SET));
+
     switch (mVersion) {
-        case 1:
-            loader(&mStream);
+        case 1: {
+            android::snapshot::GfxstreamStreamAdapter gfxstreamStream(&mStream);
+            loader(&gfxstreamStream);
             break;
+        }
         case 2: {
             DecompressingStream stream(mStream);
-            loader(&stream);
+            android::snapshot::GfxstreamStreamAdapter gfxstreamStream(&stream);
+            loader(&gfxstreamStream);
         }
     }
     if (ferror(mStream.get())) {

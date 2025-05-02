@@ -22,6 +22,7 @@
 #include "aemu/base/memory/LazyInstance.h"
 #include "aemu/base/synchronization/Lock.h"
 #include "android/console.h"
+#include "android/snapshot/GfxstreamStreamAdapter.h"
 #include "host-common/address_space_device.h"
 #include "host-common/address_space_device.hpp"
 #include "host-common/crash-handler.h"
@@ -790,7 +791,9 @@ void AddressSpaceGraphicsContext::save(base::Stream* stream) const {
 
     if (mCurrentConsumer) {
         stream->putBe32(1);
-        mConsumerInterface.save(mCurrentConsumer, stream);
+
+        android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
+        mConsumerInterface.save(mCurrentConsumer, &gfxstreamStream);
     } else {
         stream->putBe32(0);
     }
@@ -852,8 +855,10 @@ bool AddressSpaceGraphicsContext::load(base::Stream* stream) {
 
     const bool hasConsumer = stream->getBe32() == 1;
     if (hasConsumer) {
+        android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
+
         mCurrentConsumer =
-            mConsumerInterface.create(mHostContext, stream, mConsumerCallbacks,
+            mConsumerInterface.create(mHostContext, &gfxstreamStream, mConsumerCallbacks,
                                       mVirtioGpuInfo ? mVirtioGpuInfo->contextId : 0,
                                       mVirtioGpuInfo ? mVirtioGpuInfo->capsetId : 0,
                                       mVirtioGpuInfo ? mVirtioGpuInfo->name : std::nullopt);

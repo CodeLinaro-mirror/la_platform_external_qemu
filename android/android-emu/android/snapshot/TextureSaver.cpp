@@ -18,6 +18,7 @@
 
 #include "aemu/base/files/CompressingStream.h"
 #include "android/base/system/System.h"
+#include "android/snapshot/GfxstreamStreamAdapter.h"
 
 #include <algorithm>
 #include <cassert>
@@ -54,7 +55,9 @@ void TextureSaver::saveTexture(uint32_t texId, const saver_t& saver) {
     mIndex.textures.push_back({texId, ftello(mStream.get())});
 
     CompressingStream stream(mStream);
-    saver(&stream, &mBuffer);
+
+    android::snapshot::GfxstreamStreamAdapter gfxstreamStream(&stream);
+    saver(&gfxstreamStream, &mBuffer);
 }
 
 void TextureSaver::done() {

@@ -25,6 +25,7 @@
 #include "android/snapshot/Loader.h"
 #include "android/snapshot/Saver.h"
 #include "android/snapshot/Snapshotter.h"
+#include "android/snapshot/GfxstreamStreamAdapter.h"
 
 #include <atomic>
 
@@ -103,7 +104,8 @@ public:
             }
             int version = stream->getBe32();
             (void)version;
-            renderer->load(stream, Snapshotter::get().loader().textureLoader());
+            android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
+            renderer->load(&gfxstreamStream, Snapshotter::get().loader().textureLoader());
 #ifdef SNAPSHOT_PROFILE
             printf("OpenglEs preload time: %lld ms\n",
                    (long long)(mLoadMeter.elapsedUs() / 1000));
@@ -128,7 +130,9 @@ public:
                 renderer->pauseAllPreSave();
                 stream->putByte(1);
                 stream->putBe32(OPENGL_SAVE_VERSION);
-                renderer->save(stream,
+
+                android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
+                renderer->save(&gfxstreamStream,
                                Snapshotter::get().saver().textureSaver());
 
                 writeScreenshot(*renderer);
@@ -270,7 +274,14 @@ public:
             virtioGpuContextId = (uint32_t)(uintptr_t)hwPipe;
         }
 
-        mChannel = renderer->createRenderChannel(loadStream, virtioGpuContextId);
+        gfxstream::Stream* gfxstreamStream = nullptr;
+        std::optional<android::snapshot::GfxstreamStreamAdapter> gfxstreamStreamAdapter;
+        if (loadStream) {
+            gfxstreamStreamAdapter.emplace(loadStream);
+            gfxstreamStream = &*gfxstreamStreamAdapter;
+        }
+
+        mChannel = renderer->createRenderChannel(gfxstreamStream, virtioGpuContextId);
         if (!mChannel) {
             D("Failed to create an OpenGLES pipe channel!");
             return;
@@ -291,7 +302,8 @@ public:
         android::base::saveBuffer(stream, mDataForReading);
         stream->putBe32(mDataForReadingLeft);
 
-        mChannel->onSave(stream);
+        android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
+        mChannel->onSave(&gfxstreamStream);
     }
 
     virtual void onGuestClose(PipeCloseReason reason) override {

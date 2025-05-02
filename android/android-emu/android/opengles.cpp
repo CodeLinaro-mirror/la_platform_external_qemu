@@ -509,7 +509,7 @@ int android_startOpenglesRenderer(
 
     ConsumerInterface interface = {
             // create
-            [](struct asg_context context, android::base::Stream* loadStream,
+            [](struct asg_context context, gfxstream::Stream* loadStream,
                ConsumerCallbacks callbacks, uint32_t virtioGpuContextId,
                uint32_t virtioGpuCapsetId, std::optional<std::string> nameOpt) {
                 return sRenderer->addressSpaceGraphicsConsumerCreate(
@@ -527,7 +527,7 @@ int android_startOpenglesRenderer(
             // global presave
             []() { sRenderer->pauseAllPreSave(); },
             // save
-            [](void* consumer, android::base::Stream* stream) {
+            [](void* consumer, gfxstream::Stream* stream) {
                 sRenderer->addressSpaceGraphicsConsumerSave(consumer, stream);
             },
             // global postsave
@@ -794,7 +794,7 @@ void android_setOpenglesRenderer(gfxstream::RendererPtr* ptr) {
     // We inject our own opengles.cpp into gfxstream.
     ConsumerInterface interface = {
             // create
-            [](struct asg_context context, android::base::Stream* loadStream,
+            [](struct asg_context context, gfxstream::Stream* loadStream,
                ConsumerCallbacks callbacks, uint32_t virtioGpuContextId,
                uint32_t virtioGpuCapsetId, std::optional<std::string> nameOpt) {
                 return sRenderer->addressSpaceGraphicsConsumerCreate(
@@ -812,7 +812,7 @@ void android_setOpenglesRenderer(gfxstream::RendererPtr* ptr) {
             // global presave
             []() { sRenderer->pauseAllPreSave(); },
             // save
-            [](void* consumer, android::base::Stream* stream) {
+            [](void* consumer, gfxstream::Stream* stream) {
                 sRenderer->addressSpaceGraphicsConsumerSave(consumer, stream);
             },
             // global postsave
