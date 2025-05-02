@@ -13,6 +13,7 @@
 #include "host-common/opengles.h"
 
 #include "aemu/base/CpuUsage.h"
+#include "aemu/base/async/ThreadLooper.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/Stream.h"
 #include "aemu/base/memory/MemoryTracker.h"
@@ -268,6 +269,19 @@ void gfxstreamLoggingCallback(
     OutputLog(stderr, severity, file, line, /*timestamp_us=*/0, "%s", message);
 }
 
+static const QAndroidVmOperations* sVmOperations = nullptr;
+
+void RendererUnmapMemoryAsyncCallback(uint64_t gpa, uint64_t size) {
+    if (sVmOperations != nullptr) {
+        // See b/405345461.
+        android::base::ThreadLooper::runOnMainLooper(
+                [gpa, size, ops = sVmOperations] {
+                    ops->unmapUserBackedRam(gpa, size);
+                });
+    }
+}
+
+
 int android_startOpenglesRenderer(
         int width,
         int height,
@@ -418,9 +432,13 @@ int android_startOpenglesRenderer(
     dma_ops.get_host_addr = android_goldfish_dma_ops.get_host_addr;
     dma_ops.unlock = android_goldfish_dma_ops.unlock;
     sRenderLib->setDmaOps(dma_ops);
+
+    sVmOperations = vm_operations;
+
     sRenderLib->setVmOps(gfxstream_vm_ops{
             .map_user_memory = vm_operations->mapUserBackedRam,
             .unmap_user_memory = vm_operations->unmapUserBackedRam,
+            .unmap_user_memory_async = RendererUnmapMemoryAsyncCallback,
             .lookup_user_memory = vm_operations->physicalMemoryGetAddr,
             .register_vulkan_instance = vm_operations->vulkanInstanceRegister,
             .unregister_vulkan_instance = vm_operations->vulkanInstanceUnregister,
