@@ -490,7 +490,7 @@ int main(int argc, char** argv) {
             }
         }
 #endif
-        dwarning("XDG_RUNTIME_DIR is not defined, default to %s",
+        dprint("XDG_RUNTIME_DIR is not defined, default to %s",
                  default_runtime_dir);
         System::get()->envSet(kXDG_RUNTIME_DIR_NAME, "/tmp");
     }
