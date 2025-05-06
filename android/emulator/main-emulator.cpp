@@ -496,6 +496,10 @@ int main(int argc, char** argv) {
     }
 #endif
 
+#if defined(__APPLE__)
+        System::get()->envSet("SWIFT_BACKTRACE", "enable=no");
+#endif
+
     System::get()->envSet(
             "ANDROID_EMULATOR_WRAPPER_PID",
             std::to_string(System::get()->getCurrentProcessId()).c_str());
