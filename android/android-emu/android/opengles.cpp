@@ -57,8 +57,9 @@ using namespace gfxstream::gl;
 using android::base::pj;
 using android::base::System;
 using android::emulation::asg::AddressSpaceGraphicsContext;
-using android::emulation::asg::ConsumerCallbacks;
-using android::emulation::asg::ConsumerInterface;
+using gfxstream::AsgConsumerCreateInfo;
+using gfxstream::ConsumerCallbacks;
+using gfxstream::ConsumerInterface;
 
 /* Name of the GLES rendering library we're going to use */
 #ifdef AEMU_GFXSTREAM_BACKEND
@@ -509,12 +510,9 @@ int android_startOpenglesRenderer(
 
     ConsumerInterface interface = {
             // create
-            [](struct asg_context context, gfxstream::Stream* loadStream,
-               ConsumerCallbacks callbacks, uint32_t virtioGpuContextId,
-               uint32_t virtioGpuCapsetId, std::optional<std::string> nameOpt) {
-                return sRenderer->addressSpaceGraphicsConsumerCreate(
-                        context, loadStream, callbacks, virtioGpuContextId,
-                        virtioGpuCapsetId, std::move(nameOpt));
+            [](const AsgConsumerCreateInfo& info, gfxstream::Stream* loadStream) {
+                return sRenderer->addressSpaceGraphicsConsumerCreate(info, loadStream);
+
             },
             // destroy
             [](void* consumer) {
@@ -552,6 +550,10 @@ int android_startOpenglesRenderer(
                 android::opengl::forEachProcessPipeIdRunAndErase(
                         [](uint64_t id) { android_cleanupProcGLObjects(id); });
                 android_waitForOpenglesProcessCleanup();
+            },
+            // reloadRingConfig
+            [](void* consumer) {
+                sRenderer->addressSpaceGraphicsConsumerReloadRingConfig(consumer);
             },
     };
     AddressSpaceGraphicsContext::setConsumer(interface);
@@ -794,12 +796,8 @@ void android_setOpenglesRenderer(gfxstream::RendererPtr* ptr) {
     // We inject our own opengles.cpp into gfxstream.
     ConsumerInterface interface = {
             // create
-            [](struct asg_context context, gfxstream::Stream* loadStream,
-               ConsumerCallbacks callbacks, uint32_t virtioGpuContextId,
-               uint32_t virtioGpuCapsetId, std::optional<std::string> nameOpt) {
-                return sRenderer->addressSpaceGraphicsConsumerCreate(
-                        context, loadStream, callbacks, virtioGpuContextId,
-                        virtioGpuCapsetId, std::move(nameOpt));
+            [](const AsgConsumerCreateInfo& info, gfxstream::Stream* loadStream) {
+                return sRenderer->addressSpaceGraphicsConsumerCreate(info, loadStream);
             },
             // destroy
             [](void* consumer) {
@@ -837,6 +835,10 @@ void android_setOpenglesRenderer(gfxstream::RendererPtr* ptr) {
                 android::opengl::forEachProcessPipeIdRunAndErase(
                         [](uint64_t id) { android_cleanupProcGLObjects(id); });
                 android_waitForOpenglesProcessCleanup();
+            },
+            // reloadRingConfig
+            [](void* consumer) {
+                sRenderer->addressSpaceGraphicsConsumerReloadRingConfig(consumer);
             },
     };
     AddressSpaceGraphicsContext::setConsumer(interface);

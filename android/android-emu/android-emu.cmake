@@ -612,7 +612,6 @@ if(NOT LINUX_AARCH64)
       android/emulation/AdbHostServer_unittest.cpp
       android/emulation/AdbHub_unittest.cpp
       android/emulation/AdbMessageSniffer_unittest.cpp
-      android/emulation/address_space_graphics_unittests.cpp
       android/emulation/address_space_host_memory_allocator_unittests.cpp
       android/emulation/address_space_shared_slots_host_memory_allocator_unittests.cpp
       android/emulation/ComponentVersion_unittest.cpp
