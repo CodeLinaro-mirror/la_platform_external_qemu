@@ -19,6 +19,7 @@
 
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/Stream.h"
+#include "aemu/base/system/System.h"
 #include "android/utils/path.h"
 
 #include "aemu/base/StringFormat.h"

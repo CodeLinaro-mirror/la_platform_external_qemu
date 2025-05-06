@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include "aemu/base/containers/SmallVector.h"
 #include "aemu/base/export.h"
 #include "aemu/base/files/StdioStream.h"
 #include "android/base/system/System.h"
 #include "host-common/snapshot_common.h"
 #include "render-utils/snapshot_operations.h"
+#include "render-utils/small_vector.h"
 
 #include <functional>
 #include <vector>
@@ -32,7 +32,7 @@ namespace snapshot {
 class TextureSaver final : public gfxstream::ITextureSaver {
     DISALLOW_COPY_AND_ASSIGN(TextureSaver);
 
-public:
+  public:
     AEMU_EXPORT TextureSaver(android::base::StdioStream&& stream);
     AEMU_EXPORT ~TextureSaver();
     AEMU_EXPORT void saveTexture(uint32_t texId, const saver_t& saver) override;
@@ -73,7 +73,7 @@ private:
 
     android::base::StdioStream mStream;
     // A buffer for fetching data from GPU memory to RAM.
-    android::base::SmallFixedVector<unsigned char, 128> mBuffer;
+    gfxstream::SmallFixedVector<unsigned char, 128> mBuffer;
 
     FileIndex mIndex;
     uint64_t mDiskSize = 0;
