@@ -321,7 +321,7 @@ function(discover_gfxstream_internal_targets result subdir)
   message("gfxstream_internal_targets result=${result} subdir=${subdir}")
   get_filename_component(abs_subdir ${subdir} ABSOLUTE)
   set(GFXSTREAM_THIRD_PARTY_ROOT ${GFXSTREAM_REPO_ROOT})
-  cmake_path(APPEND GFXSTREAM_THIRD_PARTY_ROOT "third-party")
+  cmake_path(APPEND GFXSTREAM_THIRD_PARTY_ROOT "third_party")
   cmake_path(IS_PREFIX GFXSTREAM_THIRD_PARTY_ROOT ${abs_subdir} NORMALIZE
              IS_THIRD_PARTY)
   if(IS_THIRD_PARTY)
@@ -354,7 +354,7 @@ target_include_directories(gfxstream_egl_headers
                            INTERFACE ${ANGLE_REPO_ROOT}/include)
 add_library(gfxstream_glm_headers INTERFACE)
 target_include_directories(gfxstream_glm_headers
-                           INTERFACE ${GFXSTREAM_REPO_ROOT}/third-party/glm/include)
+                           INTERFACE ${GFXSTREAM_REPO_ROOT}/third_party/glm/include)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/host/backend
                  ${GFXSTREAM_PREFIX}-host-backend)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/host/tracing
@@ -363,7 +363,7 @@ add_subdirectory(${GFXSTREAM_REPO_ROOT}/host/features
                  ${GFXSTREAM_PREFIX}-host-features)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/common
                  ${GFXSTREAM_PREFIX}-common)
-add_subdirectory(${GFXSTREAM_REPO_ROOT}/third-party/stb
+add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/stb
                  ${GFXSTREAM_PREFIX}-third-party-stb)
 # Include hardware/google/aemu project
 set(AEMU_COMMON_BUILD_CONFIG "qemu-android" CACHE STRING "")
@@ -384,7 +384,7 @@ if(NOT LINUX_AARCH64)
     set(ISA_AVX2 ON)
     set(ASTCDEC_LIB_NAME astcdec-avx2-static)
   endif()
-  add_subdirectory(${GFXSTREAM_REPO_ROOT}/third-party/astc-encoder
+  add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/astc-encoder
                    ${ASTCDEC_LIB_NAME})
 endif()
 

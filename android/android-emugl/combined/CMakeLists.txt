@@ -45,7 +45,7 @@ if(OPTION_GFXSTREAM_BACKEND)
         message("gfxstream_internal_targets result=${result} subdir=${subdir}")
         get_filename_component(abs_subdir ${subdir} ABSOLUTE)
         set(GFXSTREAM_THIRD_PARTY_ROOT ${GFXSTREAM_REPO_ROOT})
-        cmake_path(APPEND GFXSTREAM_THIRD_PARTY_ROOT "third-party")
+        cmake_path(APPEND GFXSTREAM_THIRD_PARTY_ROOT "third_party")
         cmake_path(IS_PREFIX GFXSTREAM_THIRD_PARTY_ROOT ${abs_subdir} NORMALIZE IS_THIRD_PARTY)
         if(IS_THIRD_PARTY)
             return()
@@ -201,14 +201,17 @@ if(OPTION_GFXSTREAM_BACKEND)
 
     set(EXTRA_SUBDIR_TEST_INCLUDE_FILES)
     # Third party dependencies
-    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third-party/stb ${GFXSTREAM_PREFIX}-third-party-stb)
+    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/stb ${GFXSTREAM_PREFIX}-third-party-stb)
     # TODO(http://b/257068626): bring back ANGLE shader translator
     # add_library(angle_shader_translator SHARED IMPORTED)
     # set_target_properties(angle_shader_translator PROPERTIES IMPORTED_LOCATION "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/ANGLE/${ANDROID_TARGET_OS_FLAVOR}-${ANDROID_TARGET_ARCH}/lib/libshadertranslator${CMAKE_SHARED_LIBRARY_SUFFIX}")
 
     # Backends######################################################################
-
-    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third-party/renderdoc ${GFXSTREAM_PREFIX}-third-party-renderdoc)
+    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/drm ${GFXSTREAM_PREFIX}-third-party-drm)
+    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/opengl ${GFXSTREAM_PREFIX}-third-party-opengl)
+    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/renderdoc ${GFXSTREAM_PREFIX}-third-party-renderdoc)
+    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/x11 ${GFXSTREAM_PREFIX}-third-party-x11)
+    add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/vulkan ${GFXSTREAM_PREFIX}-third-party-vulkan)
     add_subdirectory(${GFXSTREAM_REPO_ROOT}/utils ${GFXSTREAM_PREFIX}-utils)
     add_subdirectory(${GFXSTREAM_REPO_ROOT}/host ${GFXSTREAM_PREFIX}-stream-servers)
     target_link_libraries(
@@ -245,11 +248,15 @@ if(OPTION_GFXSTREAM_BACKEND)
         renderdoc
         gfxstream_common_base
         gfxstream_common_base_windows_compat
+        gfxstream_drm_headers
         gfxstream_egl_headers
         gfxstream_glm_headers
         gfxstream_host_address_space
         gfxstream_host_address_space.headers
-        gfxstream_host_tracing)
+        gfxstream_host_tracing
+        gfxstream_opengl_headers
+        gfxstream_vulkan_headers
+        gfxstream_x11_headers)
    android_license(TARGET "${GFXSTREAM_DEPENDENCIES}"
                    LIBNAME gfxstream
                    URL "https://android.googlesource.com/platform/hardware/google/gfxstream/+/refs/heads/master"
