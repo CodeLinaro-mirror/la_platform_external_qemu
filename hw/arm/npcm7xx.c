@@ -123,6 +123,14 @@ enum NPCM7xxInterrupt {
     NPCM7XX_WDG0_IRQ            = 47,   /* Timer Module 0 Watchdog */
     NPCM7XX_WDG1_IRQ,                   /* Timer Module 1 Watchdog */
     NPCM7XX_WDG2_IRQ,                   /* Timer Module 2 Watchdog */
+    NPCM7XX_UDC0_IRQ            = 51,   /* USB Device Controller */
+    NPCM7XX_UDC1_IRQ,
+    NPCM7XX_UDC2_IRQ,
+    NPCM7XX_UDC3_IRQ,
+    NPCM7XX_UDC4_IRQ,
+    NPCM7XX_UDC5_IRQ,
+    NPCM7XX_UDC6_IRQ,
+    NPCM7XX_UDC7_IRQ,
     NPCM7XX_EHCI_IRQ            = 61,
     NPCM7XX_OHCI_IRQ            = 62,
     NPCM7XX_SMBUS0_IRQ          = 64,
@@ -250,6 +258,18 @@ static const hwaddr npcm7xx_pspi_addr[] = {
 static const hwaddr npcm7xx_gmac_addr[] = {
     0xf0802000,
     0xf0804000,
+};
+
+/* Register base address for 0-7 USB device controller registers */
+static const hwaddr npcm7xx_udc_addr[] = {
+    0xf0830000,
+    0xf0831000,
+    0xf0832000,
+    0xf0833000,
+    0xf0834000,
+    0xf0835000,
+    0xf0836000,
+    0xf0837000,
 };
 
 static const struct {
@@ -464,6 +484,10 @@ static void npcm7xx_init(Object *obj)
     object_initialize_child(obj, "ehci", &s->ehci, TYPE_NPCM7XX_EHCI);
     object_initialize_child(obj, "ohci", &s->ohci, TYPE_SYSBUS_OHCI);
 
+    for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
+        object_initialize_child(obj, "udc[*]", &s->udc[i], TYPE_NPCM_UDC);
+    }
+
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm7xx_fiu) != ARRAY_SIZE(s->fiu));
     for (i = 0; i < ARRAY_SIZE(s->fiu); i++) {
         object_initialize_child(obj, npcm7xx_fiu[i].name, &s->fiu[i],
@@ -671,6 +695,16 @@ static void npcm7xx_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->ohci), 0,
                        npcm7xx_irq(s, NPCM7XX_OHCI_IRQ));
 
+    /* USB Device Controller */
+    QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm7xx_udc_addr) != ARRAY_SIZE(s->udc));
+    for (i = 0; i < ARRAY_SIZE(s->udc); i++) {
+        qdev_prop_set_uint8(DEVICE(&s->udc[i]), "device-index", i);
+        sysbus_realize(SYS_BUS_DEVICE(&s->udc[i]), &error_abort);
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->udc[i]), 0, npcm7xx_udc_addr[i]);
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->udc[i]), 0,
+                           npcm7xx_irq(s, NPCM7XX_UDC0_IRQ + i));
+    }
+
     /* PWM Modules. Cannot fail. */
     QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm7xx_pwm_addr) != ARRAY_SIZE(s->pwm));
     for (i = 0; i < ARRAY_SIZE(s->pwm); i++) {
@@ -845,14 +879,6 @@ static void npcm7xx_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("npcm7xx.vcd",          0xf0810000,  64 * KiB);
     create_unimplemented_device("npcm7xx.ece",          0xf0820000,   8 * KiB);
     create_unimplemented_device("npcm7xx.vdma",         0xf0822000,   8 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[0]",      0xf0830000,   4 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[1]",      0xf0831000,   4 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[2]",      0xf0832000,   4 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[3]",      0xf0833000,   4 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[4]",      0xf0834000,   4 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[5]",      0xf0835000,   4 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[6]",      0xf0836000,   4 * KiB);
-    create_unimplemented_device("npcm7xx.usbd[7]",      0xf0837000,   4 * KiB);
     create_unimplemented_device("npcm7xx.usbd[8]",      0xf0838000,   4 * KiB);
     create_unimplemented_device("npcm7xx.usbd[9]",      0xf0839000,   4 * KiB);
     create_unimplemented_device("npcm7xx.sd",           0xf0840000,   8 * KiB);

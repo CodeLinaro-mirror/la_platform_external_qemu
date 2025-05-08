@@ -486,6 +486,7 @@ config NPCM7XX
     select MAX20730
     select PECI
     select NPCM_PCIERC
+    select USB_NPCM
 
 config NPCM8XX
     bool

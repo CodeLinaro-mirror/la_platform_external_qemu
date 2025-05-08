@@ -40,6 +40,7 @@
 #include "hw/ssi/npcm_pspi.h"
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
+#include "hw/usb/npcm-udc.h"
 #include "target/arm/cpu.h"
 #include "hw/sd/npcm7xx_sdhci.h"
 
@@ -108,6 +109,7 @@ typedef struct NPCM7xxState {
     NPCM7xxKCSState     kcs;
     EHCISysBusState     ehci;
     OHCISysBusState     ohci;
+    NPCMUDC             udc[8];
     NPCM7xxFIUState     fiu[2];
     NPCM7xxEMCState     emc[2];
     NPCMGMACState       gmac[2];
