@@ -225,10 +225,10 @@ if(OPTION_GFXSTREAM_BACKEND)
     # Fake Android guest#########################3##################################
 
     if (ENABLE_VKCEREAL_TESTS)
-        list(APPEND EXTRA_SUBDIR_TEST_INCLUDE_FILES ${GFXSTREAM_REPO_ROOT}/cmake/test_properties.cmake)
+        list(APPEND EXTRA_SUBDIR_TEST_INCLUDE_FILES ${GFXSTREAM_REPO_ROOT}/toolchain/cmake/test_properties.cmake)
     endif()
 
-    include(${GFXSTREAM_REPO_ROOT}/cmake/SetSubdirectorProperties.cmake)
+    include(${GFXSTREAM_REPO_ROOT}/toolchain/cmake/SetSubdirectorProperties.cmake)
 
     if(NOT LINUX_AARCH64)
         add_opengl_dependencies(gfxstream_backend_unittests)
