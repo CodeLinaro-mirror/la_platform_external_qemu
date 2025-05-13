@@ -30,6 +30,7 @@
 #include "android/camera/camera-capture.h"
 #include "android/camera/camera-format-converters.h"
 #include "android/camera/camera-metrics.h"
+#include "android/camera/camera-videofile.h"
 #include "android/camera/camera-videoplayback.h"
 #include "android/camera/camera-virtualscene.h"
 #include "host-common/address_space_device.h"
@@ -460,6 +461,18 @@ struct CameraService {
 
         // TODO: `hwCfg` should be `const AndroidHwConfig*`
         AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
+        const char* const cameraBack = hwCfg->hw_camera_back;
+        const char* const cameraFront = hwCfg->hw_camera_front;
+
+        static const auto isWebcam = [](const char* name){
+            return !strncmp(name, "webcam", 6);
+        };
+
+        constexpr size_t kVideofileCamPrefixSize = 10;
+
+        static const auto isVideofileCam = [](const char* name){
+            return !strncmp(name, "videofile:", kVideofileCamPrefixSize);
+        };
 
         if (androidHwConfig_hasVirtualSceneCamera(hwCfg)) {
             virtualscenecameraSetup();
@@ -467,28 +480,28 @@ struct CameraService {
 
         if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
             videoplaybackcameraSetup("back");
+        } else if (isVideofileCam(cameraBack)) {
+            videofilecameraSetup("back", cameraBack + kVideofileCamPrefixSize);
         }
 
         if (androidHwConfig_hasVideoPlaybackFrontCamera(hwCfg)) {
             videoplaybackcameraSetup("front");
+        } else if (isVideofileCam(cameraFront)) {
+            videofilecameraSetup("front", cameraFront + kVideofileCamPrefixSize);
         }
 
-        static const auto isWebcam = [](const char* name){
-            return !strncmp(name, "webcam", 6);
-        };
-
         /* Lets see if HW config uses emulated cameras. */
-        if (isWebcam(hwCfg->hw_camera_back) || isWebcam(hwCfg->hw_camera_front)) {
+        if (isWebcam(cameraBack) || isWebcam(cameraFront)) {
             CameraInfo ci[MAX_CAMERA] = {};
 
             /* Enumerate web cameras connected to the host. */
             const int connectedCnt = camera_enumerate_devices(ci, MAX_CAMERA);
             if (connectedCnt > 0) {
                 /* Set up back camera emulation. */
-                if (isWebcam(hwCfg->hw_camera_back)) {
-                    webcamSetup(hwCfg->hw_camera_back, "back", ci, connectedCnt);
-                } else if (isWebcam(hwCfg->hw_camera_front)) {
-                    webcamSetup(hwCfg->hw_camera_front, "front", ci, connectedCnt);
+                if (isWebcam(cameraBack)) {
+                    webcamSetup(cameraBack, "back", ci, connectedCnt);
+                } else if (isWebcam(cameraFront)) {
+                    webcamSetup(cameraFront, "front", ci, connectedCnt);
                 }
 
                 for (int i = 0; i < connectedCnt; ++i) {
@@ -509,8 +522,8 @@ struct CameraService {
             return !strncmp(name, "emulated", 6);
         };
 
-        const bool isEmulatedBack = isEmulated(hwCfg->hw_camera_back);
-        const bool isEmulatedFront = isEmulated(hwCfg->hw_camera_front);
+        const bool isEmulatedBack = isEmulated(cameraBack);
+        const bool isEmulatedFront = isEmulated(cameraFront);
 
         if (isEmulatedBack) {
             if (isEmulatedFront) {
@@ -711,6 +724,14 @@ private:
         ci.direction = ASTRDUP(dir);
         ci.in_use = 0;
 
+        addCameraInfo(std::move(ci));
+    }
+
+    void videofilecameraSetup(const char* dir, const char* args) {
+        CameraInfo ci;
+        if (camera_videofile_init_CameraInfo(&ci, dir, args)) {
+            return;
+        }
         addCameraInfo(std::move(ci));
     }
 

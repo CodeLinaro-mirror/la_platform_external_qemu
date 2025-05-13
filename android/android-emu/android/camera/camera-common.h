@@ -160,8 +160,10 @@ typedef enum CameraSourceType {
     kWebcam,
     /* A virtual scene camera, renders a virtual environment on the host. */
     kVirtualScene,
+    /* This is something else, not a videofile. */
+    kVideoPlayback,
     /* A video playback camera, feeds in frames from a video file. */
-    kVideoPlayback
+    kVideofile,
 } CameraSourceType;
 
 typedef struct CameraInfoVtbl {

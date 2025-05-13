@@ -168,6 +168,7 @@ set(android_emu_dependent_src
     android/camera/camera-list.cpp
     android/camera/camera-metrics.cpp
     android/camera/camera-service.cpp
+    android/camera/camera-videofile.cpp
     android/camera/camera-videoplayback-default-renderer.cpp
     android/camera/camera-videoplayback-render-multiplexer.cpp
     android/camera/camera-videoplayback-video-renderer.cpp
@@ -285,6 +286,7 @@ target_link_libraries(
          android-emu-agents
          android-emu-utils
          absl::strings
+         FFMPEG::FFMPEG
          ui::common
          ui::window
          aemu-gl-init
