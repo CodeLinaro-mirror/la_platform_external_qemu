@@ -396,7 +396,7 @@ if(ENABLE_VKCEREAL_TESTS)
 endif()
 
 # Figure out all gfxstream dependencies
-include(${GFXSTREAM_REPO_ROOT}/cmake/SetSubdirectorProperties.cmake)
+include(${GFXSTREAM_REPO_ROOT}/toolchain/cmake/SetSubdirectorProperties.cmake)
 get_directory_property(GFXSTREAM_SUBDIRS SUBDIRECTORIES)
 foreach(GFXSTREAM_SUBDIR IN LISTS GFXSTREAM_SUBDIRS)
   discover_gfxstream_internal_targets(GFXSTREAM_INTERNAL_TARGETS
