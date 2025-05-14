@@ -517,8 +517,14 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     // OpenGL ES related setup
     // 1. Set opengles.version and set Skia as UI renderer if
     // GLESDynamicVersion = on (i.e., is a reasonably good driver)
-    params.push_back({qemuOpenglesVersionProp,
-                      StringFormat("%d", bootPropOpenglesVersion)});
+    if (apiLevel >= 35 && fc::isEnabled(fc::GuestAngle)) {
+        // Hardcode GLES 3.1 support when using GuestAngle, as GLES version support depends on
+        // the host vulkan features/extensions.
+        params.push_back({qemuOpenglesVersionProp, "196609"});
+    } else {
+        params.push_back({qemuOpenglesVersionProp,
+                        StringFormat("%d", bootPropOpenglesVersion)});
+    }
 
     const char* qemuUirendererPropValue = nullptr;
     const char* qemuRenderenginePropValue = nullptr;
