@@ -54,6 +54,7 @@
 #include <fstream>
 #include <string_view>
 #include <utility>
+#include <thread>
 
 #ifdef __x86_64__
 #define FAST_ZERO_CHECK 1
