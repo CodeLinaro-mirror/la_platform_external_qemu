@@ -38,4 +38,6 @@ typedef struct AST27xxI3CState {
     MemoryRegion dmaarb_iomem;
 } AST27xxI3CState;
 
+I3CBus *ast27xx_i3c_get_bus(AST27xxI3CState *s);
+
 #endif /* AST27XX_I3C_H */

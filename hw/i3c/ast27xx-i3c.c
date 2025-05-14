@@ -655,4 +655,13 @@ static void ast27xx_i3c_register_types(void)
     type_register_static(&ast27xx_i3c_info);
 }
 
+I3CBus *ast27xx_i3c_get_bus(AST27xxI3CState *s)
+{
+    if (s) {
+        return s->parent.bus;
+    }
+
+    g_assert_not_reached();
+}
+
 type_init(ast27xx_i3c_register_types);
