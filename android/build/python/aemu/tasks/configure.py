@@ -81,6 +81,10 @@ class ConfigureTask(BuildTask):
             f"-B{destination}",
             "-G Ninja",
         ]
+        ninja = shutil.which(
+            "ninja", path=str(aosp / "prebuilts" / "ninja" / f"{platform.system().lower()}-x86")
+        )
+        self.add_option("CMAKE_MAKE_PROGRAM", str(ninja))
         self.cmake_cmd += self.CRASH[crash]
         self.cmake_cmd += self.BUILDCONFIG[configuration]
 
