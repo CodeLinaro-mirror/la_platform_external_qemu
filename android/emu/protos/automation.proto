@@ -97,6 +97,7 @@ message SensorOverrideEvent {
         RGBC_LIGHT = 15;
         WRIST_TILT = 16;
         ACCELERATION_UNCALIBRATED = 17;
+        HEADING = 18;
     }
 
     optional Sensor sensor = 1;

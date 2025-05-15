@@ -1046,6 +1046,11 @@ static void _hwSensors_init(HwSensors* h) {
         h->sensors[ANDROID_SENSOR_WRIST_TILT].enabled = true;
     }
 
+    const bool auto36plus = (avdFlavor == AVD_ANDROID_AUTO) && (avdApiLevel >= 36);
+    if (auto36plus || hwCfg.hw_sensors_heading) {
+        h->sensors[ANDROID_SENSOR_HEADING].enabled = true;
+    }
+
     /* XXX: TODO: Add other tests when we add the corresponding
      * properties to hardware-properties.ini et al. */
 

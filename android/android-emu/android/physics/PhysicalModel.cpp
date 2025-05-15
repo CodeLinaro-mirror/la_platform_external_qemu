@@ -1214,6 +1214,10 @@ float PhysicalModelImpl::getPhysicalWristTilt() const {
     return mInertialModel.getWristTilt();
 }
 
+float PhysicalModelImpl::getPhysicalHeading() const {
+    return getParameterRotation(PARAMETER_VALUE_TYPE_CURRENT).y;
+}
+
 void PhysicalModelImpl::setPhysicalStateAgent(
         const QAndroidPhysicalStateAgent* agent) {
     bool stateChanging = false;

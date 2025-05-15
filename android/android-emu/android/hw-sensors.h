@@ -124,6 +124,7 @@ typedef enum{
     SENSOR_(RGBC_LIGHT, "rgbc-light", RgbcLight, vec4, "rgbc-light:%g:%g:%g:%g") \
     SENSOR_(WRIST_TILT, "wrist-tilt", WristTilt, float, "wrist-tilt:%g") \
     SENSOR_(ACCELERATION_UNCALIBRATED,"acceleration-uncalibrated",AccelerometerUncalibrated,vec3,"acceleration-uncalibrated:%g:%g:%g") \
+    SENSOR_(HEADING,"heading",Heading,float,"heading:%g") \
 // clang-format on
 typedef enum {
 #define  SENSOR_(x,y,z,v,w)  ANDROID_SENSOR_##x,
