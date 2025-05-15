@@ -959,6 +959,11 @@ static void _hwSensors_setCoarseOrientation(HwSensors* h,
 
 /* initialize the sensors state */
 static void _hwSensors_init(HwSensors* h) {
+    const AvdInfo* advInfo = getConsoleAgents()->settings->avdInfo();
+    const AvdFlavor avdFlavor = avdInfo_getAvdFlavor(advInfo);
+    const int avdApiLevel = avdInfo_getApiLevel(advInfo);
+    const AndroidHwConfig& hwCfg = *getConsoleAgents()->settings->hw();
+
     h->sensors_port = NULL;
 
     h->service = qemud_service_register("sensors", 0, h, _hwSensors_connect,
@@ -970,63 +975,61 @@ static void _hwSensors_init(HwSensors* h) {
     }
     h->physical_model = physicalModel_new();
 
-    if (getConsoleAgents()->settings->hw()->hw_accelerometer) {
+    if (hwCfg.hw_accelerometer) {
         h->sensors[ANDROID_SENSOR_ACCELERATION].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_accelerometer_uncalibrated) {
+    if (hwCfg.hw_accelerometer_uncalibrated) {
         h->sensors[ANDROID_SENSOR_ACCELERATION_UNCALIBRATED].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_gyroscope) {
+    if (hwCfg.hw_gyroscope) {
         h->sensors[ANDROID_SENSOR_GYROSCOPE].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_proximity) {
+    if (hwCfg.hw_sensors_proximity) {
         h->sensors[ANDROID_SENSOR_PROXIMITY].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_magnetic_field) {
+    if (hwCfg.hw_sensors_magnetic_field) {
         h->sensors[ANDROID_SENSOR_MAGNETIC_FIELD].enabled = true;
     }
 
-    if (getConsoleAgents()
-                ->settings->hw()
-                ->hw_sensors_magnetic_field_uncalibrated) {
+    if (hwCfg.hw_sensors_magnetic_field_uncalibrated) {
         h->sensors[ANDROID_SENSOR_MAGNETIC_FIELD_UNCALIBRATED].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_gyroscope_uncalibrated) {
+    if (hwCfg.hw_sensors_gyroscope_uncalibrated) {
         h->sensors[ANDROID_SENSOR_GYROSCOPE_UNCALIBRATED].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_orientation) {
+    if (hwCfg.hw_sensors_orientation) {
         h->sensors[ANDROID_SENSOR_ORIENTATION].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_temperature) {
+    if (hwCfg.hw_sensors_temperature) {
         h->sensors[ANDROID_SENSOR_TEMPERATURE].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_light) {
+    if (hwCfg.hw_sensors_light) {
         h->sensors[ANDROID_SENSOR_LIGHT].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_pressure) {
+    if (hwCfg.hw_sensors_pressure) {
         h->sensors[ANDROID_SENSOR_PRESSURE].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_humidity) {
+    if (hwCfg.hw_sensors_humidity) {
         h->sensors[ANDROID_SENSOR_HUMIDITY].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_rgbclight) {
+    if (hwCfg.hw_sensors_rgbclight) {
         h->sensors[ANDROID_SENSOR_RGBC_LIGHT].enabled = true;
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensor_hinge) {
+    if (hwCfg.hw_sensor_hinge) {
         h->sensors[ANDROID_SENSOR_HINGE_ANGLE0].enabled = true;
-        switch (getConsoleAgents()->settings->hw()->hw_sensor_hinge_count) {
+        switch (hwCfg.hw_sensor_hinge_count) {
             case 3:
                 h->sensors[ANDROID_SENSOR_HINGE_ANGLE2].enabled = true;
             case 2:
@@ -1035,17 +1038,11 @@ static void _hwSensors_init(HwSensors* h) {
         }
     }
 
-    if (getConsoleAgents()->settings->hw()->hw_sensors_heart_rate ||
-        (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-                 AVD_WEAR &&
-         avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) >= 28)) {
+    const bool wear28plus = (avdFlavor == AVD_WEAR) && (avdApiLevel >= 28);
+    if (wear28plus || hwCfg.hw_sensors_heart_rate) {
         h->sensors[ANDROID_SENSOR_HEART_RATE].enabled = true;
     }
-
-    if (getConsoleAgents()->settings->hw()->hw_sensors_wrist_tilt ||
-        (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-                 AVD_WEAR &&
-         avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) >= 28)) {
+    if (wear28plus || hwCfg.hw_sensors_wrist_tilt) {
         h->sensors[ANDROID_SENSOR_WRIST_TILT].enabled = true;
     }
 
