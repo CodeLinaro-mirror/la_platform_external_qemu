@@ -21,6 +21,10 @@ target_include_directories(android-emu-crash-initializer PRIVATE src
 target_compile_options(android-emu-crash-initializer
                        PRIVATE -Wno-extern-c-compat PUBLIC -Wno-macro-redefined)
 
+if(NOT TARGET crashpad_client)
+  message(FATAL_ERROR "Crashpad client not defined!")
+endif()
+
 android_add_library(
   TARGET android-emu-crashreport
   # SHARED # Used to test if you can compile this stand alone.
@@ -125,7 +129,7 @@ android_add_library(
   SOURCE_DIR
   src
   SRC android/crashreport/CrashUploader.cpp
-  DEPS android-emu-crashreport crashpad_handler_handler crashpad_snapshot)
+  DEPS android-emu-crashreport crashpad_handler_lib crashpad_snapshot)
 
 android_add_executable(
   TARGET crashreport INSTALL .
@@ -139,7 +143,7 @@ android_add_executable(
        android-emu-crashreport-uploader
        breakpad_common
        breakpad_processor
-       crashpad_handler_handler
+       crashpad_handler_lib
        nlohmann_json::nlohmann_json)
 add_dependencies(crashreport crashpad_handler)
 
