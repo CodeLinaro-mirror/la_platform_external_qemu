@@ -151,6 +151,10 @@ int write_png_user_function(png_structp p,
         LOG("Failed to set IHDR header\n");
         return 0;
     }
+
+    const int Z_BEST_SPEED = 1;
+    png_set_compression_level(p, Z_BEST_SPEED);
+
     png_set_IHDR(p, pi, cols, rows, 8,
                  nChannels == 3 ? PNG_COLOR_TYPE_RGB : PNG_COLOR_TYPE_RGB_ALPHA,
                  PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
