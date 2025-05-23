@@ -12,7 +12,7 @@
 #pragma once
 
 #include <functional>
-#include <iosfwd>  // for string
+#include <iosfwd>
 #include <string>
 #include <string_view>
 
