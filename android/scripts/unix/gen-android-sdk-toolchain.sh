@@ -494,78 +494,13 @@ gen_wrapper_toolchain () {
     EXTRA_ENV_SETUP=
 }
 
-please_install_proper_sdk_error() {
-    log "No supported OSX SDKs/Xcode version found on the machine at $OSX_SDK_ROOT (Need any of: [$OSX_SDK_SUPPORTED])"
-    log "You will need at least XCode version 10 to build!"
-    log "Please obtain MacOSX$OSX_REQUIRED.sdk.tar.gz and make it available as an sdk."
-    log "You can obtain this by tarring up the SDK directory from an XCode version that supports the SDK"
-    log "See https://developer.apple.com/documentation/macos-release-notes for wich XCode release ships with the sdk you need."
-    log "For example:"
-    log "tar chvf MacOSX$OSX_REQUIRED.sdk.tar.gz /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/ MacOSX$OSX_REQUIRED.sdk"
-    log "And making it available in your XCode (assuming it is in /Applications/Xcode.app):"
-    log "tar xzvf ~/Downloads/MacOSX$OSX_REQUIRED.sdk.tar.gz -C /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX$OSX_REQUIRED.sdk/"
-    panic "Required sdk not available.."
-}
-
 # Configure the darwin toolchain.
 prepare_build_for_darwin() {
-    OSX_VERSION=$(sw_vers -productVersion)
-    OSX_DEPLOYMENT_TARGET=10.14
-    OSX_REQUIRED=10.14
-    MIN_XCODE=10
-    OSX_DESIRED=12.2
+    get_osx_sysroot
 
-    # This is the list of supported SDKs,
-    OSX_SDK_SUPPORTED="${OSX_REQUIRED} 10.15 10.16 11.0 11.1 11.2 11.3 11.4 11.5 11.6 12.0 12.1 12.3 13.0 13.1 13.3 14.0 14.2 14.3 14.4 14.5 15.0 15.1 15.2 15.4 15.5"
-    OSX_XCODE=$(xcodebuild -version | tr '\n' ' ')
-    OSX_SDK_INSTALLED_LIST=$(xcodebuild -showsdks 2>/dev/null | \
-            egrep --color=never -o " macosx\d+.\d+$" | sed -e "s/.*macosx//g" | sort -n | \
-            tr '\n' ' ')
-    if [ -z "$OSX_SDK_INSTALLED_LIST" ]; then
-        panic "Please install XCode for compatible with os version: $OSX_VERSION on this machine!"
-    fi
-    log "OSX ($OSX_VERSION): Installed SDKs: $OSX_SDK_INSTALLED_LIST"
-    for supported_sdk in $(echo "$OSX_SDK_SUPPORTED" | tr ' ' '\n' | sort -r)
-    do
-        POSSIBLE_OSX_SDK_VERSION=$(echo "$OSX_SDK_INSTALLED_LIST" | tr ' ' '\n' | grep $supported_sdk | head -1)
-        if [ -n "$POSSIBLE_OSX_SDK_VERSION" ]; then
-            OSX_SDK_VERSION=$POSSIBLE_OSX_SDK_VERSION
-        fi
-    done
-
-    # Extract the Xcode version, and use version sort to stack the installed version
-    # on top of what you have. If your version is to low it ends up on top.
-    OSX_XCODE_VERSION=$(xcodebuild -version | egrep 'Xcode (\d+.\d+)' | sed 's/Xcode //g')
-    VERSION_SORT=$(printf "$MIN_XCODE\n$OSX_XCODE_VERSION" | sort --version-sort | head -n 1)
-
-    if test "$VERSION_SORT" != "$MIN_XCODE"; then
-        log "You need to have at least XCode 10 installed, not ${OSX_XCODE}"
-        please_install_proper_sdk_error
-    fi
-
-    XCODE_PATH=$(xcode-select -print-path 2>/dev/null)
-
-    log "OSX: Using ${OSX_XCODE} with SDK version $OSX_SDK_VERSION"
-    log "OSX: XCode path: $XCODE_PATH"
-
-    if [ -z "$OSX_SDK_VERSION" ]; then
-        please_install_proper_sdk_error
-    fi
-
-    OSX_SDK_ROOT=$XCODE_PATH/Platforms/MacOSX.platform/Developer/SDKs/MacOSX${OSX_SDK_VERSION}.sdk
-    log2 "OSX: Looking for $OSX_SDK_ROOT"
-    if [ ! -d "$OSX_SDK_ROOT" ]; then
-        OSX_SDK_ROOT=/Developer/SDKs/MacOSX${OSX_SDK_VERSION}.sdk
-        log2 "OSX: Looking for $OSX_SDK_ROOT"
-        if [ ! -d "$OSX_SDK_ROOT" ]; then
-            please_install_proper_sdk_error
-        fi
-    fi
-    log "OSX: Using SDK at $OSX_SDK_ROOT"
     EXTRA_ENV_SETUP="export SDKROOT=$OSX_SDK_ROOT"
     CLANG_BINDIR=$PREBUILT_TOOLCHAIN_DIR/bin
     PREBUILT_TOOLCHAIN_DIR=
-
     GNU_CONFIG_HOST=
 
     common_FLAGS="-arch x86_64"
@@ -783,43 +718,95 @@ fetch_dependencies_msvc() {
     run ${DEPOT_TOOLS}/win_toolchain/get_toolchain_if_necessary.py --force --toolchain-dir=$MOUNT_POINT $MSVC_HASH
 }
 
-prepare_build_for_darwin_aarch64() {
-    CLANG_BINDIR=$PREBUILT_TOOLCHAIN_DIR/bin
+# Derives and returns the OSX SDK Root path.
+get_osx_sysroot() {
+    local OSX_VERSION
+    local OSX_REQUIRED
+    local MIN_XCODE
+    local OSX_SDK_SUPPORTED
+    local OSX_XCODE
+    local OSX_SDK_INSTALLED_LIST
+    # OSX_SDK_VERSION # This will be determined
+    local POSSIBLE_OSX_SDK_VERSION
+    local OSX_XCODE_VERSION
+    local VERSION_SORT
+    local XCODE_PATH
+    # local OSX_SDK_ROOT # Internal variable for the path
+    OSX_DEPLOYMENT_TARGET=10.14
+
+    # Inner function for error reporting, specific to GET_OSX_SYSROOT logic
+    _GET_OSX_SYSROOT_please_install_proper_sdk_error() {
+        log "No supported OSX SDKs/Xcode version found on the machine. Last path checked: '$OSX_SDK_ROOT'. Supported SDKs: [$OSX_SDK_SUPPORTED]"
+        log "You will need at least XCode version $MIN_XCODE to build!"
+        log "Please obtain MacOSX$OSX_REQUIRED.sdk.tar.gz and make it available as an sdk."
+        log "You can obtain this by tarring up the SDK directory from an XCode version that supports the SDK."
+        log "See https://developer.apple.com/documentation/macos-release-notes for which XCode release ships with the sdk you need."
+        log "For example:"
+        log "tar chvf MacOSX$OSX_REQUIRED.sdk.tar.gz /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX$OSX_REQUIRED.sdk"
+        log "And making it available in your XCode (assuming it is in /Applications/Xcode.app):"
+        log "tar xzvf ~/Downloads/MacOSX$OSX_REQUIRED.sdk.tar.gz -C /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/"
+        log "--- For Googlers ---"
+        log "Run the setup script:"
+        log "./android/scripts/unix/get-osx-sdk.sh --sdk-version $OSX_REQUIRED"
+        panic "Required sdk ($OSX_REQUIRED) not available.."
+    }
+
     OSX_VERSION=$(sw_vers -productVersion)
-    OSX_DEPLOYMENT_TARGET=10.16
-    OSX_SDK_SUPPORTED="10.11 10.12 10.13 10.14 10.15 10.16 11.0 11.1 11.2 11.3 11.4 11.5 11.6 12.0 12.1 12.3 13.0 13.1 13.3 14.0 14.2 14.3 14.4 14.5 15.0 15.1 15.2"
+    OSX_REQUIRED=13.3
+    MIN_XCODE=10
+    OSX_SDK_SUPPORTED="13.3"
+    OSX_XCODE=$(xcodebuild -version | tr '\n' ' ')
     OSX_SDK_INSTALLED_LIST=$(xcodebuild -showsdks 2>/dev/null | \
-            grep --color=never macosx | sed -e "s/.*macosx10\.//g" | sort -n | \
-            sed -e 's/^/10./g' | tr '\n' ' ')
+            egrep --color=never -o " macosx\d+.\d+$" | sed -e "s/.*macosx//g" | sort -n | \
+            tr '\n' ' ')
+
     if [ -z "$OSX_SDK_INSTALLED_LIST" ]; then
-        panic "Please install XCode on this machine!"
+        panic "Please install XCode for compatible with os version: $OSX_VERSION on this machine!"
     fi
-    log "OSX: Installed SDKs: $OSX_SDK_INSTALLED_LIST"
-    for supported_sdk in $(echo "$OSX_SDK_SUPPORTED" | tr ' ' '\n' | sort -r)
-    do
-        POSSIBLE_OSX_SDK_VERSION=$(echo "$OSX_SDK_INSTALLED_LIST" | tr ' ' '\n' | grep $supported_sdk | head -1)
+    log "OSX ($OSX_VERSION): Installed SDKs: $OSX_SDK_INSTALLED_LIST"
+
+    OSX_SDK_VERSION=""
+    for supported_sdk_val in $(echo "$OSX_SDK_SUPPORTED" | tr ' ' '\n' | sort -r); do
+        POSSIBLE_OSX_SDK_VERSION=$(echo "$OSX_SDK_INSTALLED_LIST" | tr ' ' '\n' | grep -w "$supported_sdk_val" | head -1)
         if [ -n "$POSSIBLE_OSX_SDK_VERSION" ]; then
             OSX_SDK_VERSION=$POSSIBLE_OSX_SDK_VERSION
+            break
         fi
     done
-    log "OSX: Using SDK version $OSX_SDK_VERSION"
-    if [ -z "$OSX_SDK_VERSION" ]; then
-        panic "No supported OSX SDKs found on the machine (Need any of: [$OSX_SDK_SUPPORTED], have: [$OSX_SDK_INSTALLED_LIST])"
+
+    OSX_XCODE_VERSION=$(xcodebuild -version | egrep 'Xcode (\d+.\d+)' | sed 's/Xcode //g')
+    VERSION_SORT=$(printf "$MIN_XCODE\n$OSX_XCODE_VERSION" | sort --version-sort | head -n 1)
+
+    if test "$VERSION_SORT" != "$MIN_XCODE"; then
+        log "You need to have at least XCode $MIN_XCODE installed, not ${OSX_XCODE}"
+        _GET_OSX_SYSROOT_please_install_proper_sdk_error
     fi
 
     XCODE_PATH=$(xcode-select -print-path 2>/dev/null)
+    log "OSX: Using ${OSX_XCODE} with SDK version $OSX_SDK_VERSION"
     log "OSX: XCode path: $XCODE_PATH"
 
-    OSX_SDK_ROOT=$XCODE_PATH/Platforms/MacOSX.platform/Developer/SDKs/MacOSX${OSX_SDK_VERSION}.sdk
-    log "OSX: Looking for $OSX_SDK_ROOT"
+    if [ -z "$OSX_SDK_VERSION" ]; then
+        _GET_OSX_SYSROOT_please_install_proper_sdk_error
+    fi
+
+    OSX_SDK_ROOT="$XCODE_PATH/Platforms/MacOSX.platform/Developer/SDKs/MacOSX${OSX_SDK_VERSION}.sdk"
+    log2 "OSX: Looking for $OSX_SDK_ROOT"
     if [ ! -d "$OSX_SDK_ROOT" ]; then
-        OSX_SDK_ROOT=/Developer/SDKs/MacOSX${OSX_SDK_VERSION}.sdk
-        log "OSX: Looking for $OSX_SDK_ROOT"
+        OSX_SDK_ROOT="/Developer/SDKs/MacOSX${OSX_SDK_VERSION}.sdk"
+        log2 "OSX: Looking for $OSX_SDK_ROOT"
         if [ ! -d "$OSX_SDK_ROOT" ]; then
-            panic "Could not find SDK $OSX_SDK_VERSION at $OSX_SDK_ROOT"
+            _GET_OSX_SYSROOT_please_install_proper_sdk_error
         fi
     fi
     log "OSX: Using SDK at $OSX_SDK_ROOT"
+}
+
+prepare_build_for_darwin_aarch64() {
+    CLANG_BINDIR=$PREBUILT_TOOLCHAIN_DIR/bin
+
+    get_osx_sysroot
+
     EXTRA_ENV_SETUP="export SDKROOT=$OSX_SDK_ROOT"
     PREBUILT_TOOLCHAIN_DIR=
 
@@ -1001,11 +988,22 @@ print_info () {
             printf "%s\n" "$BINPREFIX"
             ;;
         sysroot)
-            local SUBDIR
-            SUBDIR="$(aosp_prebuilt_toolchain_sysroot_subdir_for "${CURRENT_HOST}")"
-            if [ -n "${SUBDIR}" ]; then
-                printf "${AOSP_DIR}/${SUBDIR}"
-            fi
+            case $CURRENT_HOST in
+                linux-*)
+                    local SUBDIR
+                    SUBDIR="$(aosp_prebuilt_toolchain_sysroot_subdir_for "${CURRENT_HOST}")"
+                    if [ -n "${SUBDIR}" ]; then
+                        printf "${AOSP_DIR}/${SUBDIR}"
+                    fi
+                    ;;
+                darwin-*)
+                    get_osx_sysroot
+                    printf "$OSX_SDK_ROOT"
+                    ;;
+                *)
+                    printf "${AOSP_DIR}"
+                    ;;
+            esac
             ;;
         cflags)
           echo $EXTRA_CFLAGS

@@ -50,9 +50,10 @@ if(NOT APPLE)
   set(CMAKE_INSTALL_DO_STRIP TRUE)
 else()
   toolchain_generate("darwin-aarch64")
-  # Configure how we strip executables.
+  # Configure how we strip executables, and set the sysroot
   set(CMAKE_STRIP_CMD "${CMAKE_STRIP} -S")
   set(CMAKE_HOST_SYSTEM_PROCESSOR "arm64")
+  set(CMAKE_OSX_SYSROOT "${ANDROID_SYSROOT}")
 
 endif()
 

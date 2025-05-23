@@ -55,9 +55,9 @@ if(NOT APPLE)
 else()
 
   toolchain_generate("darwin-x86_64")
-  # Configure how we strip executables.
+  # Configure how we strip executables, and set the osx sysroot.
   set(CMAKE_STRIP_CMD "${CMAKE_STRIP} -S")
-
+  set(CMAKE_OSX_SYSROOT "${ANDROID_SYSROOT}")
 endif()
 
 # Always consider the source to be darwin.
@@ -71,4 +71,3 @@ set(CMAKE_OSX_ARCHITECTURES "x86_64")
 # And the asm type if we are compiling with ASM
 set(ANDROID_ASM_TYPE macho64)
 # No magical includes or dependencies for darwin..
-
