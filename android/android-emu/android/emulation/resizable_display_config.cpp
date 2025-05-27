@@ -147,7 +147,9 @@ public:
         std::string cmd = "su 0 service call SurfaceFlinger 1035 i32 " +
                           std::to_string(sfConfigId);
         // Tell SurfaceFlinger to change display mode to sfConfigId.
-        if (feature_is_enabled(kFeature_PlayStoreImage)) {
+        auto avd = getConsoleAgents()->settings->avdInfo();
+        if ((avd && avdInfo_getApiLevel(avd) >= 36) ||
+            feature_is_enabled(kFeature_PlayStoreImage)) {
             // on user build, su 0 won't work, try multidisplay
             setDisplay(sfConfigId);
         } else {
