@@ -15,6 +15,7 @@
 #include "hci-dat-internal.h"
 #include "hci-dma-internal.h"
 #include "hw/i3c/hci-dat.h"
+#include "trace.h"
 
 static void hci_ibi_report_ibi(MIPIHCIState *hci)
 {
@@ -42,6 +43,8 @@ int hci_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
     /* Mask off parity bit, if present. */
     addr &= 0x7f;
     uint32_t dev_index = hci_dat_dev_index_from_addr(hci, addr);
+
+    trace_hci_ibi_handle(DEVICE(hci)->canonical_path, addr, is_recv);
 
     if (hci->ibi_in_progress) {
         g_autofree char *path = object_get_canonical_path(OBJECT(hci));
@@ -114,6 +117,8 @@ int hci_ibi_recv(I3CBus *bus, uint8_t data)
         return -1;
     }
 
+    trace_hci_ibi_recv(DEVICE(hci)->canonical_path, data);
+
     uint8_t addr = hci->ibi_in_progress->ibi.ibi_id >> 1;
     uint32_t dev_index = hci_dat_dev_index_from_addr(hci, addr);
 
@@ -162,6 +167,7 @@ int hci_ibi_finish(I3CBus *bus)
         return -1;
     }
 
+    trace_hci_ibi_finish(DEVICE(hci)->canonical_path);
     hci_ibi_report_ibi(hci);
     return 0;
 }
