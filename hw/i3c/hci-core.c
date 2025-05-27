@@ -79,6 +79,10 @@ void hci_core_reset(HCICoreState *s)
 uint64_t hci_core_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCICoreState *s = &(MIPI_HCI(opaque)->core);
+
+    trace_hci_core_read(DEVICE(opaque)->canonical_path, offset,
+                        s->regs[offset / 4]);
+
     offset /= sizeof(*s->regs);
 
     /* MMIO region size should prevent this from happening. */
@@ -124,6 +128,8 @@ static void hci_core_hc_control_w(MIPIHCIState *hci, uint32_t val)
 static void hci_core_reset_control_w(MIPIHCIState *hci, uint32_t val)
 {
     if (FIELD_EX32(val, RESET_CONTROL, SOFT_RST)) {
+        trace_hci_core_reset(DEVICE(hci)->canonical_path);
+
         hci_core_reset(&hci->core);
         hci_dma_reset(&hci->dma);
         hci_dat_reset(&hci->dat, hci->core.cfg.dat_table_size);
@@ -135,6 +141,9 @@ void hci_core_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
     MIPIHCIState *hci = MIPI_HCI(opaque);
     HCICoreState *s = &hci->core;
+
+    trace_hci_core_write(DEVICE(hci)->canonical_path, offset, value);
+
     offset /= sizeof(*s->regs);
     uint32_t val32 = (uint32_t)value;
 
