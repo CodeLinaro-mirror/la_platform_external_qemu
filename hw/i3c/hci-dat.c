@@ -29,6 +29,10 @@ void hci_dat_reset(HCIDATState *s, uint32_t num_regs)
 uint64_t hci_dat_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIDATState *s = &(MIPI_HCI(opaque)->dat);
+
+    trace_hci_dat_read(DEVICE(opaque)->canonical_path, offset,
+                       s->regs[offset / 4]);
+
     offset /= sizeof(*s->regs);
 
     /* MMIO region size should prevent this from happening. */
@@ -40,6 +44,9 @@ uint64_t hci_dat_read(void *opaque, hwaddr offset, unsigned size)
 void hci_dat_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
     HCIDATState *s = &(MIPI_HCI(opaque)->dat);
+
+    trace_hci_dat_write(DEVICE(opaque)->canonical_path, offset, value);
+
     offset /= sizeof(*s->regs);
 
     /* MMIO region size should prevent this from happening. */

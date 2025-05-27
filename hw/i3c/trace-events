@@ -94,3 +94,7 @@ hci_ibi_finish(const char *name) "%s: IBI finish"
 
 # hci-dct.c
 hci_dct_read(const char *name, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
+
+# hci-dat.c
+hci_dat_read(const char *name, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
+hci_dat_write(const char *name, uint64_t offset, uint32_t data) "%s: write: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
