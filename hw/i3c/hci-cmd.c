@@ -12,6 +12,7 @@
 #include "qemu/log.h"
 #include "hw/core/registerfields.h"
 #include "hw/i3c/mipi-hci.h"
+#include "trace.h"
 
 #define INC_AND_ROLLOVER(x, amount, max) \
     do {                                 \
@@ -98,6 +99,7 @@ static RespStatus hci_cmd_do_entdaa(MIPIHCIState *hci, const AddrCmd *desc,
             status = RESP_STATUS_ERROR_XFER_ABORTED;
             break;
         }
+        trace_hci_cmd_addr_assign(DEVICE(hci)->canonical_path, addr);
 
         /* Update the DCT and increment our DAT and DCT pointers. */
         hci->dct.regs[dct_offset + R_TARGET_DCT_0] =
@@ -172,6 +174,7 @@ static RespStatus hci_cmd_do_setdasa(MIPIHCIState *hci, const AddrCmd *desc,
             status = RESP_STATUS_ERROR_XFER_ABORTED;
             break;
         }
+        trace_hci_cmd_addr_assign(DEVICE(hci)->canonical_path, dynamic_addr);
 
         dat_offset += HCI_DAT_ENTRY_SIZE;
     }
@@ -220,6 +223,9 @@ done:
 static RespStatus hci_cmd_start_ccc(MIPIHCIState *hci, uint8_t addr,
                                     uint8_t ccc, bool dbp, uint8_t def_byte)
 {
+    trace_hci_cmd_start_ccc(DEVICE(hci)->canonical_path, addr, ccc, dbp,
+                            def_byte);
+
     /* Start the CCC, both direct and broadcast start with a broadcast. */
     if (i3c_start_send(hci->bus, I3C_BROADCAST)) {
         return RESP_STATUS_ERROR_ADDR_HEADER;
@@ -250,10 +256,13 @@ static RespStatus hci_cmd_send_ccc(MIPIHCIState *hci,
     RespStatus status = RESP_STATUS_SUCCESS;
     uint32_t num_sent = 0;
 
+
     /* Now send the CCC data, if any. */
     if (i3c_send(hci->bus, data, len, &num_sent)) {
         status = RESP_STATUS_ERROR_XFER_ABORTED;
     }
+
+    trace_hci_cmd_send_ccc(DEVICE(hci)->canonical_path, num_sent, len);
 
     if (toc) {
         i3c_end_transfer(hci->bus);
@@ -308,6 +317,8 @@ static RespStatus hci_cmd_read_ccc(MIPIHCIState *hci, const RegularXfer *desc,
         status = RESP_STATUS_ERROR_XFER_ABORTED;
     }
 
+    trace_hci_cmd_read_ccc(DEVICE(hci)->canonical_path, *num_read, len);
+
 done:
     if (desc->toc) {
         i3c_end_transfer(hci->bus);
@@ -319,6 +330,8 @@ done:
 static RespStatus hci_cmd_i3c_start_xfer(MIPIHCIState *hci, uint8_t addr,
                                          bool rnw)
 {
+    trace_hci_cmd_i3c_start_xfer(DEVICE(hci)->canonical_path, addr, rnw);
+
     /* Start with a broadcast if they configured it. */
     if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, IBA_INCLUDE)) {
         if (i3c_start_transfer(hci->bus, I3C_BROADCAST, rnw)) {
@@ -345,6 +358,8 @@ static RespStatus hci_cmd_regular_i3c_start_xfer(MIPIHCIState *hci,
 static RespStatus hci_cmd_i2c_start_xfer(MIPIHCIState *hci, uint8_t addr,
                                          bool rnw)
 {
+    trace_hci_cmd_i2c_start_xfer(DEVICE(hci)->canonical_path, addr, rnw);
+
     if (legacy_i2c_start_transfer(hci->bus, addr, rnw)) {
         return RESP_STATUS_ERROR_NACK;
     }
@@ -369,6 +384,8 @@ static RespStatus hci_cmd_i2c_send_data(MIPIHCIState *hci, RespDescr *resp,
     uint32_t num_sent = 0;
 
     for (num_sent = 0; num_sent < len; ++num_sent) {
+        trace_hci_cmd_i2c_send_data(DEVICE(hci)->canonical_path,
+                                    data[num_sent]);
         if (legacy_i2c_send(hci->bus, data[num_sent])) {
             status = RESP_STATUS_ERROR_XFER_ABORTED;
             break;
@@ -406,6 +423,8 @@ static RespStatus hci_cmd_i3c_send_data(MIPIHCIState *hci,
         status = RESP_STATUS_ERROR_XFER_ABORTED;
     }
 
+    trace_hci_cmd_i3c_send_data(DEVICE(hci)->canonical_path, num_sent, len);
+
     if (toc) {
         i3c_end_transfer(hci->bus);
     }
@@ -442,6 +461,10 @@ static RespStatus hci_cmd_regular_send_data(MIPIHCIState *hci,
 RespStatus hci_cmd_send(MIPIHCIState *hci, const RegularXfer *desc,
                         RespDescr *resp, const uint8_t *data, size_t len) {
     RespStatus status = RESP_STATUS_SUCCESS;
+
+    trace_hci_cmd_send(DEVICE(hci)->canonical_path, desc->tid, desc->cmd,
+                       desc->cp, desc->dev_index, desc->roc, desc->toc,
+                       desc->dbp, desc->def_byte, len);
 
     /* This is an internal error, the caller passed in bad arguments. */
     if (desc->cmd_attr != CMD_ATTR_REGULAR_XFER || desc->rnw) {
@@ -541,6 +564,11 @@ RespStatus hci_cmd_read(MIPIHCIState *hci, const RegularXfer *desc,
                         RespDescr *resp, uint8_t *data, uint32_t len,
                         uint32_t *num_read) {
     RespStatus status = RESP_STATUS_SUCCESS;
+
+    trace_hci_cmd_read(DEVICE(hci)->canonical_path, desc->tid, desc->cmd,
+                       desc->cp, desc->dev_index, desc->roc, desc->toc,
+                       desc->dbp, desc->def_byte, len);
+
     /* This is an internal error, the caller passed in bad arguments. */
     if (desc->cmd_attr != CMD_ATTR_REGULAR_XFER || !desc->rnw) {
         status = RESP_STATUS_ERROR_HC_ABORTED;
@@ -667,6 +695,11 @@ RespStatus hci_cmd_immediate_xfer(MIPIHCIState *hci, const ImmediateXfer *desc,
                                   RespDescr *resp)
 {
     RespStatus status = RESP_STATUS_SUCCESS;
+
+    trace_hci_cmd_immediate_xfer(DEVICE(hci)->canonical_path, desc->tid,
+                                 desc->cmd, desc->cp, desc->dev_index,
+                                 desc->dtt, desc->mode, desc->rnw, desc->roc,
+                                 desc->toc);
 
     /* This is an internal error, the caller passed in bad arguments. */
     if (desc->cmd_attr != CMD_ATTR_IMMEDIATE_XFER) {

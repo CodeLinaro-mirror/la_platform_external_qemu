@@ -106,3 +106,17 @@ hci_core_reset(const char *name) "%s: reset"
 
 # hci-ext.c
 hci_ext_read(const char *name, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
+
+# hci-cmd.c
+hci_cmd_addr_assign(const char *name, uint8_t addr) "%s: assigned address 0x%.2" PRIx8 " to target"
+hci_cmd_start_ccc(const char *name, uint8_t addr, uint8_t ccc, uint8_t dbp, uint8_t db) "%s: start CCC to 0x%.2" PRIx8 ", CCC 0x%.2" PRIx8 ", DBP %" PRId8 ", DB 0x%.2" PRIx8
+hci_cmd_send_ccc(const char *name, size_t num_sent, size_t num_to_send) "%s: CCC sent %zu/%zu bytes"
+hci_cmd_read_ccc(const char *name, size_t num_read, size_t num_to_read) "%s: CCC read %zu/%zu bytes"
+hci_cmd_i3c_start_xfer(const char *name, uint8_t addr, bool rnw) "%s: I3C START with address 0x%.2" PRIx8 ", RnW=%d"
+hci_cmd_i2c_start_xfer(const char *name, uint8_t adr, bool rnw) "%s: I2C START with address 0x%.2" PRIx8 ", RnW=%d"
+hci_cmd_i2c_send_data(const char *name, uint8_t byte) "%s: I2C send 0x%.2" PRIx8
+hci_cmd_i3c_send_data(const char *name, size_t num_sent, size_t num_to_send) "%s: I3C sent %zu/%zu bytes"
+hci_cmd_immediate_xfer(const char *name, uint8_t tid, uint8_t cmd, uint8_t cp, uint8_t dev_index, uint8_t dtt, uint8_t mode, uint8_t rnw, uint8_t roc, uint8_t toc) "%s: immediate xfer with tid: 0x%.2" PRIx8 ", cmd: 0x%.2" PRIx8 ", cp: %" PRId8 ", dev_index: %" PRId8 ", dtt: %" PRId8 ", mode: 0x%.2" PRIx8 ", rnw: %" PRId8 ", roc: %" PRId8 ", toc: %" PRId8
+hci_cmd_read(const char *name, uint8_t tid, uint8_t cmd, uint8_t cp, uint8_t dev_index, uint8_t roc, uint8_t toc, uint8_t dbp, uint8_t def_byte, uint16_t len) "%s: regular transfer read with tid: 0x%.2" PRIx8 ", cmd: 0x%.2" PRIx8 ", cp: %" PRId8 ", dev_index: %" PRId8 ", roc: %" PRId8 ", toc: %" PRId8 ", dbp: %" PRId8 ", def_byte: %" PRId8 ", len: %" PRId16
+hci_cmd_send(const char *name, uint8_t tid, uint8_t cmd, uint8_t cp, uint8_t dev_index, uint8_t roc, uint8_t toc, uint8_t dbp, uint8_t def_byte, uint16_t len) "%s: regular transfer write with tid: 0x%.2" PRIx8 ", cmd: 0x%.2" PRIx8 ", cp: %" PRId8 ", dev_index: %" PRId8 ", roc: %" PRId8 ", toc: %" PRId8 ", dbp: %" PRId8 ", def_byte: %" PRId8 ", len: %" PRId16
+
