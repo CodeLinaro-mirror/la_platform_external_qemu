@@ -77,6 +77,10 @@ void hci_dma_reset(HCIDMAState *s)
 uint64_t hci_dma_header_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIDMAState *s = &(MIPI_HCI(opaque)->dma);
+
+    trace_hci_dma_header_read(DEVICE(opaque)->canonical_path, offset,
+                              s->header_regs[offset / 4]);
+
     offset /= sizeof(*s->header_regs);
 
     /* MMIO region size should prevent this from happening. */
@@ -89,6 +93,9 @@ void hci_dma_header_write(void *opaque, hwaddr offset, uint64_t value,
                           unsigned size)
 {
     HCIDMAState *s = &(MIPI_HCI(opaque)->dma);
+
+    trace_hci_dma_header_write(DEVICE(opaque)->canonical_path, offset, value);
+
     offset /= sizeof(*s->header_regs);
 
     /* MMIO region size should prevent this from happening. */
@@ -101,6 +108,10 @@ void hci_dma_header_write(void *opaque, hwaddr offset, uint64_t value,
 uint64_t hci_dma_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIDMAState *s = &(MIPI_HCI(opaque)->dma);
+
+    trace_hci_dma_read(DEVICE(opaque)->canonical_path, offset,
+                       s->regs[offset / 4]);
+
     offset /= sizeof(*s->regs);
 
     /* MMIO region size should prevent this from happening. */
@@ -134,8 +145,10 @@ static bool hci_dma_ring_ok(HCIDMAState *s)
     return ok;
 }
 
-static void hci_dma_read_descr(HCIDMAState *s, TransferDescr *desc)
+static void hci_dma_read_descr(MIPIHCIState *hci, TransferDescr *desc)
 {
+    HCIDMAState *s = &hci->dma;
+
     uint64_t addr = s->regs[R_RH_CMD_RING_BASE_HI];
     uint8_t dequeue_ptr = ARRAY_FIELD_EX32(s->regs, RH_OPERATION2, CR_DEQ_PTR);
     addr <<= 32;
@@ -143,10 +156,14 @@ static void hci_dma_read_descr(HCIDMAState *s, TransferDescr *desc)
     addr += (dequeue_ptr * s->cfg.xfer_struct_size);
 
     cpu_physical_memory_read(addr, desc, sizeof(*desc));
+    trace_hci_dma_read_descr(DEVICE(hci)->canonical_path, addr,
+                             desc->cmd.val64);
 }
 
-static void hci_dma_push_resp(HCIDMAState *s, RespDescr *resp)
+static void hci_dma_push_resp(MIPIHCIState *hci, RespDescr *resp)
 {
+    HCIDMAState *s = &hci->dma;
+
     uint64_t addr = s->regs[R_RH_RESP_RING_BASE_HI];
     /*
      * The DMA response is a pair with the command that was just handled.
@@ -159,6 +176,7 @@ static void hci_dma_push_resp(HCIDMAState *s, RespDescr *resp)
     addr += (dequeue_ptr * s->cfg.resp_struct_size);
 
     cpu_physical_memory_write(addr, resp, sizeof(*resp));
+    trace_hci_dma_push_resp(DEVICE(hci)->canonical_path, addr, resp->val32);
 }
 
 /* Data read from this must be freed by the caller. */
@@ -251,12 +269,13 @@ void hci_dma_xfer(MIPIHCIState *hci)
         return;
     }
 
+    trace_hci_dma_xfer(DEVICE(hci)->canonical_path);
     while (!hci_dma_ring_empty(s)) {
         TransferDescr desc;
         RespDescr resp;
         RespStatus status;
         bool roc = true;
-        hci_dma_read_descr(s, &desc);
+        hci_dma_read_descr(hci, &desc);
 
         switch (desc.cmd.cmd_attr) {
         case CMD_ATTR_ADDR_ASSIGN:
@@ -314,7 +333,7 @@ void hci_dma_xfer(MIPIHCIState *hci)
             c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
         }
         if (roc || status != RESP_STATUS_SUCCESS) {
-            hci_dma_push_resp(s, &resp);
+            hci_dma_push_resp(hci, &resp);
         }
 
         /* Increment the ring dequeue pointer. */
@@ -323,6 +342,7 @@ void hci_dma_xfer(MIPIHCIState *hci)
         INC_AND_ROLLOVER(dequeue_ptr,
                          ARRAY_FIELD_EX32(s->regs, CR_SETUP, RING_SIZE));
         ARRAY_FIELD_DP32(s->regs, RH_OPERATION2, CR_DEQ_PTR, dequeue_ptr);
+        trace_hci_dma_dequeue_ptr(DEVICE(hci)->canonical_path, dequeue_ptr);
     }
 }
 
@@ -455,6 +475,9 @@ void hci_dma_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
     MIPIHCIState *hci = MIPI_HCI(opaque);
     HCIDMAState *s = &hci->dma;
+
+    trace_hci_dma_write(DEVICE(hci)->canonical_path, offset, value);
+
     offset /= sizeof(*s->regs);
 
     /* MMIO region size should prevent this from happening. */
@@ -559,8 +582,10 @@ static uint32_t hci_dma_ibi_num_chunks(HCIDMAState *s, const IbiStatus *ibi)
     return num_chunks;
 }
 
-static void hci_dma_ibi_status_write(HCIDMAState *s, IbiStatus *ibi)
+static void hci_dma_ibi_status_write(MIPIHCIState *hci, IbiStatus *ibi)
 {
+    HCIDMAState *s = &hci->dma;
+
     uint64_t addr = s->regs[R_RH_IBI_STATUS_RING_BASE_HI];
     addr <<= 32;
     addr |= s->regs[R_RH_IBI_STATUS_RING_BASE_LO];
@@ -582,10 +607,14 @@ static void hci_dma_ibi_status_write(HCIDMAState *s, IbiStatus *ibi)
     ARRAY_FIELD_DP32(s->regs, RH_OPERATION2, IBI_ENQ_PTR, enqueue_ptr);
 
     ARRAY_FIELD_DP32(s->regs, RH_INTR_STATUS, IBI_READY_STAT, 1);
+
+    trace_hci_dma_ibi_status_write(DEVICE(hci)->canonical_path, addr,
+                                   *(uint32_t *)&ibi->ibi);
 }
 
-static void hci_dma_ibi_data_write(HCIDMAState *s, IbiStatus *ibi)
+static void hci_dma_ibi_data_write(MIPIHCIState *hci, IbiStatus *ibi)
 {
+    HCIDMAState *s = &hci->dma;
     if (ibi->num_bytes == 0) {
         return;
     }
@@ -610,6 +639,8 @@ static void hci_dma_ibi_data_write(HCIDMAState *s, IbiStatus *ibi)
      * updated when writing the status.
      */
     cpu_physical_memory_write(addr, ibi->data, ibi->num_bytes);
+    trace_hci_dma_ibi_data_write(DEVICE(hci)->canonical_path, addr,
+                                 ibi->num_bytes);
 }
 
 int hci_dma_report_ibi(MIPIHCIState *hci)
@@ -622,8 +653,8 @@ int hci_dma_report_ibi(MIPIHCIState *hci)
     if (!hci_dma_ibi_ring_ok(hci, hci->ibi_in_progress)) {
         ret = -1;
     } else {
-        hci_dma_ibi_status_write(&hci->dma, hci->ibi_in_progress);
-        hci_dma_ibi_data_write(&hci->dma, hci->ibi_in_progress);
+        hci_dma_ibi_status_write(hci, hci->ibi_in_progress);
+        hci_dma_ibi_data_write(hci, hci->ibi_in_progress);
     }
     c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_DMA);
 
