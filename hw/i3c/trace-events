@@ -91,3 +91,6 @@ mipi_hci_update_irq(const char *name, uint32_t core_irq, uint32_t dma_irq, uint8
 hci_ibi_handle(const char *name, uint8_t addr, bool is_recv) "%s: IBI from address 0x%.2" PRIx8 ", RnW=%d"
 hci_ibi_recv(const char *name, uint8_t data) "%s: IBI recv 0x%.2" PRIx8
 hci_ibi_finish(const char *name) "%s: IBI finish"
+
+# hci-dct.c
+hci_dct_read(const char *name, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32

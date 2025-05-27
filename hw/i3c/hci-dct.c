@@ -27,6 +27,10 @@ void hci_dct_reset(HCIDCTState *s, uint32_t num_regs)
 uint64_t hci_dct_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIDCTState *s = &(MIPI_HCI(opaque)->dct);
+
+    trace_hci_dct_read(DEVICE(opaque)->canonical_path, offset,
+                       s->regs[offset / 4]);
+
     offset /= sizeof(*s->regs);
 
     /* MMIO region size should prevent this from happening. */
