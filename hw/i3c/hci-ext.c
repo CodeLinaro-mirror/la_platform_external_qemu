@@ -22,6 +22,10 @@
 uint64_t hci_ext_read(void *opaque, hwaddr offset, unsigned size)
 {
     HCIExtCapState *s = &(MIPI_HCI(opaque)->ext_cap);
+
+    trace_hci_ext_read(DEVICE(opaque)->canonical_path, offset,
+                       s->ext_capabilities[offset / 4]);
+
     offset /= sizeof(uint32_t);
 
     /* MMIO region size should prevent this from happening. */
