@@ -82,3 +82,7 @@ hci_dma_push_resp(const char *name, uint64_t addr, uint32_t resp) "%s: responsed
 hci_dma_dequeue_ptr(const char *name, uint8_t ptr) "%s: dequeued pointer moved to 0x%" PRIx8
 hci_dma_ibi_status_write(const char *name, uint64_t addr, uint32_t status) "%s: IBI status wrote to offset 0x%" PRIx64 ", status 0x%.8" PRIx32
 hci_dma_ibi_data_write(const char *name, uint64_t addr, size_t num_bytes)  "%s: IBI data wrote to offset 0x%" PRIx64 ", num_bytes %zu"
+
+# mipi-hci.c
+mipi_hci_enter_halt(const char *name) "%s: enter halt"
+mipi_hci_update_irq(const char *name, uint32_t core_irq, uint32_t dma_irq, uint8_t level) "%s: update irq core: 0x%.8" PRIx32 ", dma: 0x%.8" PRIx32 ", level %" PRId8

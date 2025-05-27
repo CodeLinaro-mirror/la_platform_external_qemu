@@ -56,12 +56,17 @@ static void mipi_hci_update_irq(MIPIHCIState *s, MIPIHCIIRQContext ctx)
                     core->regs[R_INTR_SIGNAL_ENABLE]);
     level |= !!(dma->regs[R_RH_INTR_STATUS] &
                 dma->regs[R_RH_INTR_SIGNAL_ENABLE]);
+
+    trace_mipi_hci_update_irq(DEVICE(s)->canonical_path,
+                              core->regs[R_INTR_STATUS],
+                              dma->regs[R_RH_INTR_STATUS], level);
     qemu_set_irq(s->irq[0], level);
 }
 
 /* Default halt function. */
 static void mipi_hci_enter_halt(MIPIHCIState *s)
 {
+    trace_mipi_hci_enter_halt(DEVICE(s)->canonical_path);
     s->core.halted = true;
 }
 
