@@ -22,9 +22,11 @@
 #include "aemu/base/memory/OnDemand.h"
 #include "aemu/base/misc/FileUtils.h"
 #include "android/base/system/System.h"
+#include "android/console.h"
 #include "android/snapshot/MemoryWatch.h"
 #include "android/snapshot/RamLoader.h"
 #include "android/utils/debug.h"
+#include "host-common/hw-config.h"
 
 #include "MurmurHash3.h"
 
@@ -139,8 +141,10 @@ RamSaver::RamSaver(const std::string& fileName,
 
     mWriteCombineBuffer.resize(kCompressBufferBatchSize * kDefaultPageSize);
 
+    auto* myHw = getConsoleAgents()->settings->hw();
+    const int num_cores = myHw? myHw->hw_cpu_ncore : 2;
     mWorkers.emplace(
-            std::min(System::get()->getCpuCoreCount() - 1, 2),
+            std::min(System::get()->getCpuCoreCount() - 1, num_cores),
             [this](QueuedPageInfo&& pi) {
                 mIncStats.measure(StatTime::TotalHandlingPageSave, [&] {
                     handlePageSave(std::move(pi));

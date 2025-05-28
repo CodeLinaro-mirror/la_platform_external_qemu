@@ -408,7 +408,8 @@ bool Quickboot::load(const char* name) {
         LOG(INFO) << "Loading snapshot '" << namestr << "'...";
         auto res = snapshotter.load(true /* isQuickboot */, namestr.data());
         if (res == OperationStatus::Ok) {
-            LOG(INFO) << "Successfully loaded snapshot '" << namestr << "'";
+            const auto nowMs = System::get()->getHighResTimeUs() / 1000;
+            LOG(INFO) << "Successfully loaded snapshot '" << namestr << "' using " << int64_t(nowMs - startTimeMs) << " ms";
             const char* contentPath =
                     getConsoleAgents()->settings->avdInfo()
                             ? avdInfo_getContentPath(
@@ -788,6 +789,7 @@ bool androidSnapshot_quickbootLoad(const char* name) {
 }
 
 bool androidSnapshot_quickbootSave(const char* _name) {
+    const auto startTimeMs = System::get()->getHighResTimeUs() / 1000;
     const char* name = _name ? _name : android::snapshot::kDefaultBootSnapshot;
 
     const bool saveResult = android::snapshot::Quickboot::get().save(name);
@@ -819,6 +821,8 @@ bool androidSnapshot_quickbootSave(const char* _name) {
         androidSnapshot_writeQuickbootChoice(wantedSaveOnExit);
     }
 
+    const auto nowTimeMs = System::get()->getHighResTimeUs() / 1000;
+    LOG(INFO) << "Saving snapshot '" << name << "' using " << int64_t(nowTimeMs - startTimeMs) << " ms";
     return saveResult;
 }
 
