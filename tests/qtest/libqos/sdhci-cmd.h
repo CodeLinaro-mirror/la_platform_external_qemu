@@ -17,6 +17,7 @@
 #include "../libqtest.h"
 
 /* more details at hw/sd/sdhci-internal.h */
+#define SDHC_REGISTERS_MAP_SIZE 0x100
 #define SDHC_BLKSIZE 0x04
 #define SDHC_BLKCNT 0x06
 #define SDHC_ARGUMENT 0x08

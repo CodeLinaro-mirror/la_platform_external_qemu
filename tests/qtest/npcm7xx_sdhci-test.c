@@ -21,7 +21,6 @@
 #include "libqtest-single.h"
 #include "libqos/sdhci-cmd.h"
 
-#define NPCM7XX_REG_SIZE 0x100
 #define NPCM7XX_MMC_BA 0xF0842000
 #define NPCM7XX_BLK_SIZE 512
 #define NPCM7XX_TEST_IMAGE_SIZE (1 << 20)
@@ -123,7 +122,7 @@ static void test_reset(void)
 {
     QTestState *qts = qtest_init("-machine kudo-bmc");
     uint64_t addr = NPCM7XX_MMC_BA;
-    uint64_t end_addr = addr + NPCM7XX_REG_SIZE;
+    uint64_t end_addr = addr + SDHC_REGISTERS_MAP_SIZE;
     uint16_t prstvals_resets[] = {NPCM7XX_PRSTVALS_0_RESET,
                                   NPCM7XX_PRSTVALS_1_RESET,
                                   0,
@@ -166,6 +165,14 @@ static void test_reset(void)
                                 prstvals_resets[i]);
             }
             addr += NPCM7XX_PRSTVALS_SIZE * 2;
+            break;
+        /*
+         * NPCM7XX_BOOTTOCTRL is defined as an offset from the overlay at
+         * NPCM7XX_PRSTVALS, so we add the values here.
+         */
+        case NPCM7XX_PRSTVALS + NPCM7XX_BOOTTOCTRL:
+            g_assert_cmphex(qtest_readl(qts, addr), ==, 0);
+            addr += 4;
             break;
         default:
             g_assert_cmphex(qtest_readb(qts, addr), ==, 0);
