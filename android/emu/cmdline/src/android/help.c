@@ -2331,6 +2331,10 @@ static void help_support_multiple_input_modalities(stralloc_t* out) {
     PRINTF("  Support different kind of input modalities.\n");
 }
 
+static void help_hands_in_space(stralloc_t* out) {
+    PRINTF("  Enable hands input for XR spatial application.\n");
+}
+
 static void help_systemui_renderer(stralloc_t* out) {
     PRINTF("  Set guest side renderer backend. Available options: skiagl, skiavk\n");
 }
