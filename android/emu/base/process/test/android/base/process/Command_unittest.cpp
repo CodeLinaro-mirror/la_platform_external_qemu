@@ -135,14 +135,15 @@ TEST(Process, can_read_process_name) {
 
 TEST(Process, can_get_exitcode_from_discovered_process) {
     auto proc =
-            Command::create({sleep_exe(), "--sleep", "100ms", "--exit", "2"})
+            Command::create({sleep_exe(), "--sleep", "200ms", "--exit", "2"})
+                    .asDeamon()
                     .execute();
     auto sleep = Process::fromPid(proc->pid());
     EXPECT_EQ(sleep->exitCode(), 2);
 }
 
 TEST(Process, terminate_someone_else) {
-    auto proc = Command::create({sleep_exe(), "--sleep", "100ms"}).execute();
+    auto proc = Command::create({sleep_exe(), "--sleep", "200ms"}).asDeamon().execute();
     auto sleep = Process::fromPid(proc->pid());
     sleep->terminate();
     EXPECT_FALSE(sleep->isAlive());
