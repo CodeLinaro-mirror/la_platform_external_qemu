@@ -646,6 +646,9 @@ protected:
             std::this_thread::sleep_for(1ms);
             GetExitCodeProcess(mProcess, &exit);
         }
+        if (exit == STILL_ACTIVE) {
+            return std::nullopt;
+        }
 
         DD("Looped %d times", n);
         return exit;
