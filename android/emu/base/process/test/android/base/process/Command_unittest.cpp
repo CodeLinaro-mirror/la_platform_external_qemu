@@ -21,9 +21,13 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include "absl/log/globals.h"
+#include "absl/log/initialize.h"
+#include "absl/log/log.h"
 #include "aemu/base/Log.h"
 #include "aemu/base/files/FileShareOpen.h"
 #include "aemu/base/files/FileShareOpenImpl.h"
+#include "gtest/gtest.h"
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -37,6 +41,16 @@ namespace base {
 
 using namespace std::chrono_literals;
 const std::string HELLO = "hello";
+
+static void initialize_absl() {
+    static bool configured = false;
+    if (!configured) {
+        absl::InitializeLog();
+        absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+        absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
+        configured = true;
+    }
+}
 
 class FakeOverseer : public NullOverseer {
 public:
@@ -82,20 +96,63 @@ public:
     };
 };
 
-TEST(Process, find_me) {
+static void terminateSleepExec() {
+    int attempts = 10;
+    auto procs = Process::fromName("sleep_emu");
+    while (!procs.empty() && attempts-- > 0) {
+        for (auto& proc : procs) {
+            bool terminated = proc->terminate();
+            LOG(INFO) << proc->exe() << " (" << proc->pid() << ") was "
+                      << (terminated ? "successfully" : "unsuccessfully")
+                      << " terminated.";
+            std::this_thread::sleep_for(100ms);
+        }
+        procs = Process::fromName("sleep_emu");
+    }
+
+    if (!procs.empty()) {
+        for (auto& proc : procs) {
+            LOG(ERROR) << "Lingering sleep process: " << proc->exe() << " : "
+                       << proc->pid();
+        }
+        LOG(FATAL) << "There are lingering sleep processes!";
+    }
+};
+
+class ProcessTest : public ::testing::Test {
+public:
+    ProcessTest() { initialize_absl(); }
+
+protected:
+    void SetUp() override { terminateSleepExec(); }
+
+    void TearDown() override { terminateSleepExec(); }
+};
+
+class CommandTest : public ::testing::Test {
+public:
+    CommandTest() { initialize_absl(); }
+
+protected:
+    void SetUp() override { terminateSleepExec(); }
+
+    void TearDown() override { terminateSleepExec(); }
+};
+
+TEST_F(ProcessTest, find_me) {
     auto me = Process::me();
     EXPECT_NE(me, nullptr);
     EXPECT_GT(me->pid(), 0);
 }
 
-TEST(Process, discovered_proc_same_as_launched) {
+TEST_F(ProcessTest, discovered_proc_same_as_launched) {
     auto proc = Command::create({sleep_exe(), "--sleep", "1s"}).execute();
     auto sleep = Process::fromPid(proc->pid());
     EXPECT_EQ(proc->pid(), sleep->pid());
     EXPECT_EQ(*proc, *sleep);
 }
 
-TEST(Process, can_discover_launched_proc) {
+TEST_F(ProcessTest, can_discover_launched_proc) {
     using namespace std::chrono_literals;
     auto proc = Command::create({sleep_exe(), "--sleep", "1s"}).execute();
     auto pids = Process::fromName("sleep_emu");
@@ -122,7 +179,7 @@ TEST(Process, can_discover_launched_proc) {
     EXPECT_TRUE(found) << sleep_exe() << "was not found.";
 }
 
-TEST(Process, can_read_process_name) {
+TEST_F(ProcessTest, can_read_process_name) {
     auto proc = Command::create({sleep_exe(), "--sleep", "1s"}).execute();
     std::this_thread::sleep_for(10ms);
     auto sleep = Process::fromPid(proc->pid());
@@ -133,23 +190,56 @@ TEST(Process, can_read_process_name) {
                "is?";
 }
 
-TEST(Process, can_get_exitcode_from_discovered_process) {
-    auto proc =
-            Command::create({sleep_exe(), "--sleep", "200ms", "--exit", "2"})
-                    .asDeamon()
+TEST_F(ProcessTest, exit_code_waits_until_process_completes) {
+    auto sleep =
+            Command::create({sleep_exe(), "--sleep", "100ms", "--exit", "2"})
                     .execute();
-    auto sleep = Process::fromPid(proc->pid());
-    EXPECT_EQ(sleep->exitCode(), 2);
+    auto now = std::chrono::system_clock::now();
+
+    // This should be a blocking call
+    sleep->exitCode();
+    EXPECT_FALSE(sleep->isAlive());
 }
 
-TEST(Process, terminate_someone_else) {
-    auto proc = Command::create({sleep_exe(), "--sleep", "200ms"}).asDeamon().execute();
+TEST_F(ProcessTest, exit_code_waits_for_process_termination) {
+    auto sleep =
+            Command::create({sleep_exe(), "--sleep", "100ms", "--exit", "2"})
+                    .execute();
+    auto now = std::chrono::system_clock::now();
+
+    // This should be a blocking call, so we do not expect to proceed
+    // immediately..
+    auto exitCode = sleep->exitCode();
+    auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          std::chrono::system_clock::now() - now)
+                          .count();
+    EXPECT_GT(waited, 10);
+    EXPECT_EQ(exitCode, 2);
+}
+
+TEST_F(ProcessTest, can_get_exitcode_from_discovered_process) {
+    auto proc =
+            Command::create({sleep_exe(), "--sleep", "100ms", "--exit", "2"})
+                    .execute();
+    auto sleep = Process::fromPid(proc->pid());
+
+    EXPECT_EQ(proc->pid(), sleep->pid())
+            << "The pid of the launched sleep: " << proc->pid()
+            << " is not the same as the discovered one: " << sleep->pid();
+    auto exitCode = sleep->exitCode();
+    EXPECT_EQ(exitCode, 2);
+}
+
+TEST_F(ProcessTest, terminate_someone_else) {
+    auto proc = Command::create({sleep_exe(), "--sleep", "200ms"})
+                        .asDeamon()
+                        .execute();
     auto sleep = Process::fromPid(proc->pid());
     sleep->terminate();
     EXPECT_FALSE(sleep->isAlive());
 }
 
-TEST(Command, can_use_test_factory) {
+TEST_F(CommandTest, can_use_test_factory) {
     int create_called = 0;
     Command::setTestProcessFactory(
             [&](CommandArguments args, bool deamon, bool inherit) {
@@ -165,13 +255,13 @@ TEST(Command, can_use_test_factory) {
     Command::setTestProcessFactory(nullptr);
 }
 
-TEST(Command, can_read_the_exit_code) {
+TEST_F(CommandTest, can_read_the_exit_code) {
     auto proc = Command::create({sleep_exe(), "--sleep", "10ms", "--exit", "2"})
                         .execute();
     EXPECT_EQ(proc->exitCode(), 2U);
 }
 
-TEST(Command, properly_escape_params) {
+TEST_F(CommandTest, properly_escape_params) {
     auto proc = Command::create({sleep_exe()})
                         .arg("--msg_std_out")
                         .arg("Hello there")
@@ -181,7 +271,7 @@ TEST(Command, properly_escape_params) {
     EXPECT_EQ(proc->out()->asString(), "Hello there");
 }
 
-TEST(Command, a_terminated_process_is_dead) {
+TEST_F(CommandTest, a_terminated_process_is_dead) {
     using namespace std::chrono_literals;
     auto proc = Command::create({sleep_exe(), "--sleep", "5s"}).execute();
     EXPECT_TRUE(proc->isAlive());
@@ -189,7 +279,7 @@ TEST(Command, a_terminated_process_is_dead) {
     EXPECT_FALSE(proc->isAlive());
 }
 
-TEST(Command, out_of_scope_process_gets_terminated) {
+TEST_F(CommandTest, out_of_scope_process_gets_terminated) {
     int pid = 0;
     {
         auto proc = Command::create({sleep_exe(), "--sleep", "5s"}).execute();
@@ -201,7 +291,7 @@ TEST(Command, out_of_scope_process_gets_terminated) {
     EXPECT_FALSE(Process::fromPid(pid)->isAlive());
 }
 
-TEST(Command, wait_for_completion_times_out) {
+TEST_F(CommandTest, wait_for_completion_times_out) {
     auto proc = Command::create({sleep_exe(), "--sleep", "5s"}).execute();
 
     // Well, we sleep for a few seconds.. so we should timeout.
@@ -209,7 +299,7 @@ TEST(Command, wait_for_completion_times_out) {
     EXPECT_TRUE(proc->isAlive());
 }
 
-TEST(Command, we_can_capture_std_out) {
+TEST_F(CommandTest, we_can_capture_std_out) {
     // Let's capture std out
     auto proc = Command::create({sleep_exe(), "--msg_std_out", "stdout"})
                         .withStdoutBuffer(4096)
@@ -222,7 +312,7 @@ TEST(Command, we_can_capture_std_out) {
     EXPECT_EQ(proc->err()->asString(), "");
 }
 
-TEST(Command, we_can_capture_std_err) {
+TEST_F(CommandTest, we_can_capture_std_err) {
     // Let's capture std err
     auto proc = Command::create({sleep_exe(), "--msg_std_err", "error"})
                         .withStderrBuffer(4096)
@@ -243,7 +333,7 @@ void clearCloseOnExec(FILE* sharedFile) {
 #endif  // !_WIN32
 }
 
-TEST(Command, we_do_not_inherit_handles) {
+TEST_F(CommandTest, we_do_not_inherit_handles) {
     // Let's capture std err
     std::string tmp_file = std::tmpnam(nullptr);
 
@@ -278,7 +368,7 @@ TEST(Command, we_do_not_inherit_handles) {
 #endif
 }
 
-TEST(Command, we_do_inherit_handles_if_we_explicity_say_so) {
+TEST_F(CommandTest, we_do_inherit_handles_if_we_explicity_say_so) {
     // Let's capture std err
     std::string tmp_file = std::tmpnam(nullptr);
 
@@ -307,7 +397,7 @@ TEST(Command, we_do_inherit_handles_if_we_explicity_say_so) {
     proc->terminate();
 }
 
-TEST(Command, we_can_capture_both) {
+TEST_F(CommandTest, we_can_capture_both) {
     // Let's capture std err
     auto proc = Command::create({sleep_exe(), "--msg_std_out", "stdout",
                                  "--msg_std_err", "error"})
@@ -322,7 +412,7 @@ TEST(Command, we_can_capture_both) {
     EXPECT_EQ(proc->err()->asString(), "error");
 }
 
-TEST(Command, double_capture_should_not_lock) {
+TEST_F(CommandTest, double_capture_should_not_lock) {
     // Let's capture std err
     auto proc = Command::create({sleep_exe(), "--msg_std_out", "stdout",
                                  "--msg_std_err", "error"})
@@ -335,7 +425,7 @@ TEST(Command, double_capture_should_not_lock) {
     EXPECT_EQ(proc->err()->asString(), "error");
 }
 
-TEST(Command, can_terminate_daemon) {
+TEST_F(CommandTest, can_terminate_daemon) {
     auto proc = Command::create({sleep_exe()}).asDeamon().execute();
 
     // Well, we sleep for a few seconds.. so we should timeout.
@@ -345,7 +435,7 @@ TEST(Command, can_terminate_daemon) {
 }
 
 // Note this a bit slow
-TEST(Command, DISABLED_we_can_stream_data) {
+TEST_F(CommandTest, DISABLED_we_can_stream_data) {
 #ifndef _WIN32
     auto cmd = Command::create({"sh", "-c"});
 #else

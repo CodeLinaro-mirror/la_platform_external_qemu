@@ -18,6 +18,7 @@
 #include <cassert>
 #include <string_view>
 #include "aemu/base/files/ScopedFileHandle.h"
+#include "aemu/base/logging/Log.h"
 #include "aemu/base/streams/RingStreambuf.h"
 #include "android/utils/exec.h"
 
@@ -468,7 +469,10 @@ public:
     bool terminate() override {
         if (mProcess == INVALID_HANDLE_VALUE)
             return false;
-        TerminateProcess(mProcess, 1);
+        if (TerminateProcess(mProcess, 1) == 0) {
+            LOG(ERROR) << "Failed to terminate process due to: "
+                       << formatLastErr() << " (" << GetLastError() << ")";
+        };
         // 100ms to shut down.
         return WaitForSingleObject(mProcess, 100) != WAIT_TIMEOUT;
     }
@@ -508,7 +512,6 @@ public:
     std::optional<Pid> createProcess(const CommandArguments& args,
                                      bool captureOutput,
                                      bool replace) override {
-
         if (replace) {
             // Setup the arguments..
             std::vector<char*> cmd = toCharArray(args);
@@ -574,7 +577,8 @@ public:
 
         BOOL bSuccess;
         if (mInherit || mPipes.empty()) {
-            DD("CreateProcessW(%s)", mInherit ? "Inherit handles" : "Do not inherit");
+            DD("CreateProcessW(%s)",
+               mInherit ? "Inherit handles" : "Do not inherit");
             bSuccess =
                     CreateProcessW(NULL,
                                    szCmdline,  // command line
@@ -634,6 +638,8 @@ public:
 protected:
     std::optional<ProcessExitCode> getExitCode() const override {
         if (mProcess == INVALID_HANDLE_VALUE || isAlive()) {
+            LOG(ERROR) << "Unable to retrieve exitcode from " << mProcess
+                       << " the process is: " << (isAlive() ? "alive" : "dead");
             return std::nullopt;
         }
         DWORD exit = STILL_ACTIVE, n;
@@ -641,10 +647,16 @@ protected:
         // When we are poking another process than our own that just
         // terminated (i.e. not alive), it might not have yet updated
         // its exit status.
-        GetExitCodeProcess(mProcess, &exit);
+        if (GetExitCodeProcess(mProcess, &exit) == 0) {
+            LOG(ERROR) << "Failed to retrieve exit code due to: "
+                       << formatLastErr() << " (" << GetLastError() << ")";
+        };
         for (n = 0; n < 20 && exit == STILL_ACTIVE; n++) {
             std::this_thread::sleep_for(1ms);
-            GetExitCodeProcess(mProcess, &exit);
+            if (GetExitCodeProcess(mProcess, &exit) == 0) {
+                LOG(ERROR) << "Failed to retrieve exit code due to: "
+                           << formatLastErr() << " (" << GetLastError() << ")";
+            };
         }
         if (exit == STILL_ACTIVE) {
             return std::nullopt;
