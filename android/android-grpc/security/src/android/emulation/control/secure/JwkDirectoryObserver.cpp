@@ -54,7 +54,7 @@ JwkDirectoryObserver::JwkDirectoryObserver(Path jwksDir,
 
     if (startImmediately) {
         if (!start()) {
-            dfatal("Unable to start observing %s, jwks will not be updated. "
+            derror("Unable to start observing %s, jwks will not be updated. "
                    "%d were keysets loaded.",
                    jwksDir.c_str(), mLoadedKeys.size());
         }
