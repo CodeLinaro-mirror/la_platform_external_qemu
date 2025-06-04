@@ -436,8 +436,9 @@ private:
 class WinProcess : public ObservableProcess {
 public:
     ~WinProcess() {
-        if (!mDeamon)
+        if (!mDeamon) {
             WinProcess::terminate();
+        }
 
         if (mProcess != 0 && mProcess != INVALID_HANDLE_VALUE) {
             CloseHandle(mProcInfo.hProcess);
@@ -449,7 +450,10 @@ public:
         mDeamon = deamon;
         mInherit = inherit;
     }
-    WinProcess(HANDLE hProcess) { setHandle(hProcess); }
+    WinProcess(HANDLE hProcess) {
+        setHandle(hProcess);
+        mDeamon = true;
+    }
 
     void setHandle(HANDLE hProcess) {
         mPid = GetProcessId(hProcess);
@@ -467,7 +471,7 @@ public:
     }
 
     bool terminate() override {
-        if (mProcess == INVALID_HANDLE_VALUE)
+        if (mProcess == INVALID_HANDLE_VALUE || !isAlive())
             return false;
         if (TerminateProcess(mProcess, 1) == 0) {
             LOG(ERROR) << "Failed to terminate process due to: "
@@ -492,11 +496,38 @@ public:
         return name;
     }
 
-    bool isAlive() const override {
-        if (mProcess == INVALID_HANDLE_VALUE)
+    inline bool isAlive() const override {
+        if (mProcess == INVALID_HANDLE_VALUE) {
+            // Handle is invalid, so the process cannot be considered alive
             return false;
+        }
 
-        return WaitForSingleObject(mProcess, 0) == WAIT_TIMEOUT;
+        // Check the process state without waiting
+        DWORD result = WaitForSingleObject(mProcess, 0);
+
+        switch (result) {
+            case WAIT_TIMEOUT:
+                // The object's state is nonsignaled after 0ms, meaning the
+                // process is still running.
+                return true;
+
+            case WAIT_OBJECT_0:
+                // The object's state is signaled, meaning the process has
+                // terminated.
+                return false;
+
+            case WAIT_FAILED:
+                // An error occurred.
+                LOG(ERROR) << "Failed to retrieve exit code due to: "
+                           << formatLastErr() << " (" << GetLastError() << ")";
+                return false;
+            default:
+                // Shouldn't happen.
+                LOG(ERROR)
+                        << "WaitForSingleObject returned an unexpected result: "
+                        << result;
+                return false;
+        }
     }
 
     std::future_status wait_for(
@@ -644,25 +675,11 @@ protected:
         }
         DWORD exit = STILL_ACTIVE, n;
 
-        // When we are poking another process than our own that just
-        // terminated (i.e. not alive), it might not have yet updated
-        // its exit status.
         if (GetExitCodeProcess(mProcess, &exit) == 0) {
             LOG(ERROR) << "Failed to retrieve exit code due to: "
                        << formatLastErr() << " (" << GetLastError() << ")";
         };
-        for (n = 0; n < 20 && exit == STILL_ACTIVE; n++) {
-            std::this_thread::sleep_for(1ms);
-            if (GetExitCodeProcess(mProcess, &exit) == 0) {
-                LOG(ERROR) << "Failed to retrieve exit code due to: "
-                           << formatLastErr() << " (" << GetLastError() << ")";
-            };
-        }
-        if (exit == STILL_ACTIVE) {
-            return std::nullopt;
-        }
 
-        DD("Looped %d times", n);
         return exit;
     }
 
@@ -678,8 +695,9 @@ Command::ProcessFactory Command::sProcessFactory =
         };
 
 std::unique_ptr<Process> Process::fromPid(Pid pid) {
-    ScopedFileHandle hProc(
-            OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid));
+    ScopedFileHandle hProc(OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE | PROCESS_TERMINATE,
+            false, pid));
     if (hProc.valid()) {
         return std::make_unique<WinProcess>(hProc.release());
     }
