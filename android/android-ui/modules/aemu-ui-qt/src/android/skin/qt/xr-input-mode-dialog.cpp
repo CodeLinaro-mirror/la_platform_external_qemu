@@ -12,11 +12,28 @@
 #include "ui_xr-input-mode-dialog.h"
 
 #include "android/hw-sensors.h"
+#include "android/console.h"
+#include "android/cmdline-definitions.h"
 
 XrInputModeDialog::XrInputModeDialog(QWidget* parent)
     : QDialog(parent), ui(new Ui::XrInputModeDialog) {
     ui->setupUi(this);
     setWindowFlags(Qt::Popup);
+
+    const AndroidOptions* opts = getConsoleAgents()->settings->android_cmdLineOptions();
+    bool support_multi = opts->support_multiple_input_modalities;
+    bool hands_in_space_enabled = opts->hands_in_space;
+
+    if (hands_in_space_enabled) {
+        // Hide eye, show only Mouse and Hand-raycast
+        ui->btn_xr_input_eye_tacking->hide();
+    } else if (support_multi) {
+        // Show Mouse, Hand-raycast, and Eye
+    } else {
+        // Show only Mouse
+        ui->btn_xr_input_hand_raycast->hide();
+        ui->btn_xr_input_eye_tacking->hide();
+    }
 }
 
 void XrInputModeDialog::on_btn_xr_input_keyboard_mouse_clicked() {

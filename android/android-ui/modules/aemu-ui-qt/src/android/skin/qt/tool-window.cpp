@@ -1682,9 +1682,11 @@ void ToolWindow::on_xr_environment_mode_button_clicked() {
 }
 
 void ToolWindow::on_xr_input_mode_button_clicked() {
-    if (getConsoleAgents()
-                ->settings->android_cmdLineOptions()
-                ->support_multiple_input_modalities) {
+    const auto* opts = getConsoleAgents()->settings->android_cmdLineOptions();
+    bool support_multi = opts->support_multiple_input_modalities;
+    bool hands_in_space_enabled = opts->hands_in_space;
+
+    if (support_multi || hands_in_space_enabled) {
         mXrInputModeDialog->show();
         // Align pop-up input selection dialog to the right of input button.
         QRect geoTool = this->geometry();
@@ -1692,9 +1694,10 @@ void ToolWindow::on_xr_input_mode_button_clicked() {
                 geoTool.right(),
                 geoTool.top() + mToolsUi->xr_input_mode_button->geometry().top());
     } else {
+        // Neither flag is set, so only "Mouse" mode is available.
+        // Don't show the dialog, just set the mode.
         mEmulatorWindow->activateWindow();
-        mLastInputModeRequested = XR_INPUT_MODE_MOUSE_KEYBOARD;
-        handleUICommand(QtUICommand::CHANGE_XR_INPUT_MODE, true);
+        on_xr_input_mode_changed(XR_INPUT_MODE_MOUSE_KEYBOARD);
     }
 }
 
