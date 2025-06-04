@@ -1696,7 +1696,6 @@ void ToolWindow::on_xr_input_mode_button_clicked() {
     } else {
         // Neither flag is set, so only "Mouse" mode is available.
         // Don't show the dialog, just set the mode.
-        mEmulatorWindow->activateWindow();
         on_xr_input_mode_changed(XR_INPUT_MODE_MOUSE_KEYBOARD);
     }
 }
