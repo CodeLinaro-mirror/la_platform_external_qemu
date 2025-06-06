@@ -384,3 +384,8 @@ option('rust', type: 'feature', value: 'disabled',
        description: 'Rust support')
 option('strict_rust_lints', type: 'boolean', value: false,
        description: 'Enable stricter set of Rust warnings')
+
+# These are google Android specific. This will include goldfish hardware.
+# These are marked as skipped, we do not want these in the configure script.
+option('android', type: 'feature', value : 'disabled',
+       description: 'android emulation support')
