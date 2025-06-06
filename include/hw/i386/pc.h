@@ -16,6 +16,10 @@
 
 #define MAX_IDE_BUS 2
 
+#ifdef CONFIG_ANDROID
+#include "hw/acpi/aml-build.h"
+#endif
+
 /**
  * PCMachineState:
  * @acpi_dev: link to ACPI PM device that performs ACPI hotplug handling
@@ -58,6 +62,10 @@ typedef struct PCMachineState {
 
     SGXEPCState sgx_epc;
     CXLState cxl_devices_state;
+
+#ifdef CONFIG_ANDROID
+    void (*add_goldfish_dsdt)(MachineState *state, Aml* dsdt);
+#endif
 } PCMachineState;
 
 #define PC_MACHINE_ACPI_DEVICE_PROP "acpi-device"

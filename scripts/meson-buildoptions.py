@@ -30,6 +30,7 @@ import sys
 SKIP_OPTIONS = {
     "default_devices",
     "fuzzing_engine",
+    "android",  # This requires google extensions, let's not upstream.
 }
 
 # Options whose name doesn't match the option for backwards compatibility

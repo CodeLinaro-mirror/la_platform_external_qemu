@@ -395,3 +395,7 @@ option('strict_rust_lints', type: 'boolean', value: false,
 
 option('mcux-soc-svd', type : 'boolean', value : false,
        description: 'enable targets to generate C headers from mcux-soc-svd')
+# These are google Android specific. This will include goldfish hardware.
+# These are marked as skipped, we do not want these in the configure script.
+option('android', type: 'feature', value : 'disabled',
+       description: 'android emulation support')
