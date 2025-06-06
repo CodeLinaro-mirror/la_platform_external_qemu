@@ -39,6 +39,8 @@ int hci_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 {
     MIPIHCIState *hci = MIPI_HCI(bus->parent_obj.parent);
     bool has_error = false;
+    /* Mask off parity bit, if present. */
+    addr &= 0x7f;
     uint32_t dev_index = hci_dat_dev_index_from_addr(hci, addr);
 
     if (hci->ibi_in_progress) {
