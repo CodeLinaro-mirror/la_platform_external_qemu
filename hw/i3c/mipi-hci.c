@@ -282,6 +282,7 @@ static void mipi_hci_class_init(ObjectClass *klass, const void *data)
     mhc->get_next_dynamic_addr = mipi_hci_get_next_dynamic_addr;
     mhc->get_dev_dynamic_addr = mipi_hci_get_dev_dynamic_addr;
     mhc->enter_halt = mipi_hci_enter_halt;
+    mhc->dat_dev_index_from_addr = hci_dat_dev_index_from_addr;
 }
 
 static const TypeInfo mipi_hci_info = {

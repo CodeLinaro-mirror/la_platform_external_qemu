@@ -42,6 +42,7 @@ typedef struct MIPIHCIClass {
     /* Aspeed-specific. */
     uint8_t (*get_next_dynamic_addr)(MIPIHCIState *s, uint8_t dat_index);
     uint8_t (*get_dev_dynamic_addr)(MIPIHCIState *s, uint8_t dat_index);
+    uint32_t (*dat_dev_index_from_addr)(MIPIHCIState *s, uint8_t addr);
 } MIPIHCIClass;
 
 typedef struct MIPIHCIState {

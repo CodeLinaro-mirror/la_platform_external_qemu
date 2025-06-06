@@ -39,10 +39,11 @@ static void hci_ibi_report_ibi(MIPIHCIState *hci)
 int hci_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 {
     MIPIHCIState *hci = MIPI_HCI(bus->parent_obj.parent);
+    MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(OBJECT(hci));
     bool has_error = false;
     /* Mask off parity bit, if present. */
     addr &= 0x7f;
-    uint32_t dev_index = hci_dat_dev_index_from_addr(hci, addr);
+    uint32_t dev_index = mhc->dat_dev_index_from_addr(hci, addr);
 
     trace_hci_ibi_handle(DEVICE(hci)->canonical_path, addr, is_recv);
 
@@ -108,6 +109,7 @@ int hci_ibi_recv(I3CBus *bus, uint8_t data)
 {
     MIPIHCIState *hci = MIPI_HCI(bus->parent_obj.parent);
     bool has_error = false;
+    MIPIHCIClass *mhc = MIPI_HCI_GET_CLASS(OBJECT(hci));
 
     /*
      * The IBI has already ended (and NACKed), but the target tried to send data
@@ -120,7 +122,7 @@ int hci_ibi_recv(I3CBus *bus, uint8_t data)
     trace_hci_ibi_recv(DEVICE(hci)->canonical_path, data);
 
     uint8_t addr = hci->ibi_in_progress->ibi.ibi_id >> 1;
-    uint32_t dev_index = hci_dat_dev_index_from_addr(hci, addr);
+    uint32_t dev_index = mhc->dat_dev_index_from_addr(hci, addr);
 
     /* We don't support PIO, just NACK and tell the user. */
     if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, MODE_SELECTOR) ==
