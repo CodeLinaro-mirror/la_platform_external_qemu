@@ -129,6 +129,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     bool isIntel = (strncmp("Intel", vkVendor, 5) == 0);
     bool isNvidia = (strncmp("NVIDIA", vkVendor, 6) == 0);
     bool isUnsupportedGpuDriver = false;
+    const bool isUnsupportedVendor = isXrAvd && !(isAMD || isNvidia);
     std::string driverVersionStr;
     if (isNvidia) {
         // Decode Nvidia driver version to make it meaningful to the users
@@ -197,7 +198,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         return {
                 .description = absl::StrFormat(
                         "GPU driver is not supported to run avd: `%s`. "
-                        "Your '%s' GPU has Vulkan API version `%d.%d.%d`, "
+                        "Your `%s` GPU has Vulkan API version `%d.%d.%d`, "
                         "driver version `%s` and is not supported for Vulkan",
                         name, vendorName, vkMajor, vkMinor, vkPatch,
                         driverVersionStr),
@@ -239,6 +240,26 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
                                         deviceMemMiB, name, avdSuggestedGpuMemMiB),
                 .status = AvdCompatibility::Warning,
                 .metrics = metrics};
+    }
+
+    // Check unsupported GPU vendors, this is a warning and should be done after
+    // handling all other 'Error' cases
+    if (isUnsupportedVendor) {
+        metrics.set_check(
+                EmulatorCompatibilityInfo::
+                        AVD_COMPATIBILITY_CHECK_GPU_CHECK_UNSUPPORTED_VULKAN_VERSION);
+        metrics.set_details(absl::StrFormat("GPU:%s, API: %d.%d.%d Driver: %s",
+                                            vendorName, vkMajor, vkMinor,
+                                            vkPatch, driverVersionStr));
+        return {
+                .description = absl::StrFormat(
+                        "GPU vendor `%s` is not fully supported yet to run "
+                        "avd: `%s`. You may experience crashes or poor "
+                        "performance.",
+                        vendorName, name),
+                .status = AvdCompatibility::Warning,
+                .metrics = metrics,
+        };
     }
 
     // Check maxAllocationCount for GPU.
