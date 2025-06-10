@@ -591,6 +591,30 @@ static const struct hw_impl hw_implementer[] = {
 };
 #endif
 
+static std::vector<std::string> getAllExt4MountDirs() {
+    std::vector<std::string> allExt4dirs;
+
+#if defined(__linux__)
+    using namespace std::literals;
+    std::ifstream testFile("/proc/self/mounts");
+    std::string line;
+    while (getline(testFile, line)) {
+        std::string device, dir, parttype;
+
+        std::stringstream ss(line);
+
+        ss >> device;
+        ss >> dir;
+        ss >> parttype;
+        if (parttype == "ext4"sv) {
+            allExt4dirs.push_back(dir);
+        }
+    }
+#endif
+
+    return allExt4dirs;
+}
+
 class HostSystem : public System {
 public:
     HostSystem() : mProgramDir(), mHomeDir(), mAppDataDir() {
@@ -1748,7 +1772,7 @@ public:
     }
 
     bool pathFileSystemIsExt4(const std::string& path) const override {
-        return pathFileSystemIsExt4Internal(path);
+        return pathFileSystemIsExt4Internal(path, getAllExt4MountDirs());
     }
 
     bool pathIsExt4(std::string_view path) const override {
@@ -2782,55 +2806,31 @@ bool System::readSomeBytes(std::string_view path,
 }
 
 #if defined(__linux__)
-static void get_all_ext4_mount_dirs(std::vector<std::string>& alldirs) {
-    static const char* proc_mounts = "/proc/self/mounts";
-    std::ifstream testFile(proc_mounts);
-    std::string line;
-
-    while (getline(testFile, line)) {
-        std::string device, dir, parttype;
-
-        std::stringstream ss(line);
-
-        ss >> device;
-        ss >> dir;
-        ss >> parttype;
-        if (parttype == std::string("ext4")) {
-            alldirs.push_back(dir);
-        }
-    }
-}
-
-static bool dir_contains_path(const std::string& dir, const std::string& path) {
-    std::string dir1 = android::base::PathUtils::canonicalPath(dir);
-    std::string path1 = android::base::PathUtils::canonicalPath(path);
-    // on linux, use realpath to make sure the symbolic link is removed
-    //
-    char* dir2 = realpath(dir1.c_str(), NULL);
-    char* path2 = realpath(path1.c_str(), NULL);
-
-    std::string dir3(dir2);
-    std::string path3(path2);
-    free(dir2);
-    free(path2);
-    if (path3.find(dir3) == 0) {
-        return true;
-    }
-    return false;
+static std::string getRealPath(const std::string path) {
+    const std::string canonicalPath = android::base::PathUtils::canonicalPath(path);
+    char* realpathAsciz = ::realpath(canonicalPath.c_str(), NULL);
+    std::string result(realpathAsciz ? realpathAsciz : "");
+    ::free(realpathAsciz);
+    return result;
 }
 #endif
 
-bool System::pathFileSystemIsExt4Internal(const std::string& path) {
+bool System::pathFileSystemIsExt4Internal(const std::string& path,
+                                          const std::vector<std::string>& mountDirs) {
 #if defined(__linux__)
-    std::vector<std::string> mount_dirs;
-    get_all_ext4_mount_dirs(mount_dirs);
+    const std::string realPath = getRealPath(path);
+    if (realPath.empty()) {
+        return false;
+    }
 
-    for (const std::string& dir : mount_dirs) {
-        if (dir_contains_path(dir, path)) {
+    for (const std::string& dir : mountDirs) {
+        const std::string realDirPath = getRealPath(dir);
+        if (!realDirPath.empty() && realPath.find(realDirPath) == 0) {
             return true;
         }
     }
 #endif
+
     return false;
 }
 

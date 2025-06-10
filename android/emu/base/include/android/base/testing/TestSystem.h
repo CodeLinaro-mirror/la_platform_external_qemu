@@ -250,7 +250,7 @@ public:
     }
 
     virtual bool pathFileSystemIsExt4(const std::string& path) const override {
-        return pathFileSystemIsExt4Internal(toTempRoot(path));
+        return false;
     }
 
     virtual bool pathIsExt4(std::string_view path) const override {

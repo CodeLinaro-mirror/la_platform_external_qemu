@@ -614,5 +614,40 @@ TEST(System, DISABLED_runCommandWithOutput) {
     EXPECT_EQ(0, std::remove(outputFile.c_str()));
 }
 
+#ifdef __linux__
+TEST(System, pathFileSystemIsExt4Internal) {
+    fprintf(stderr, "%s:%d\n", __func__, __LINE__);
+
+    TestSystem testSys("/foo/bar", 32);
+    TestTempDir* const myTempDir = testSys.getTempRoot();
+
+    ASSERT_TRUE(myTempDir->makeSubDir("ext4"));
+    ASSERT_TRUE(myTempDir->makeSubDir("ext4/точка_монтирования"));
+    const std::string ext4root = myTempDir->makeSubPath("ext4/точка_монтирования");
+
+    ASSERT_TRUE(myTempDir->makeSubDir("ext4/точка_монтирования/ντοσιέ"));
+    const std::string ext4dir = myTempDir->makeSubPath("ext4/точка_монтирования/ντοσιέ");
+    const std::string ext4file = ext4dir + "/ファイル";
+
+    {
+        std::ofstream createFile(ext4file);
+    }
+
+    ASSERT_TRUE(myTempDir->makeSubDir("otherfs"));
+    ASSERT_TRUE(myTempDir->makeSubDir("otherfs/точка_монтирования"));
+    ASSERT_TRUE(myTempDir->makeSubDir("otherfs/точка_монтирования/საქაღალდე"));
+    const std::string otherfsDir = myTempDir->makeSubPath("otherfs/точка_монтирования/საქაღალდე");
+
+    EXPECT_TRUE(System::pathFileSystemIsExt4Internal(ext4dir, { ext4root }));
+    EXPECT_TRUE(System::pathFileSystemIsExt4Internal(ext4file, { ext4root }));
+
+    EXPECT_FALSE(System::pathFileSystemIsExt4Internal(ext4dir + "/incorrect", { ext4root }));
+
+    EXPECT_FALSE(System::pathFileSystemIsExt4Internal(otherfsDir, { ext4root }));
+    EXPECT_FALSE(System::pathFileSystemIsExt4Internal(otherfsDir, { }));
+    EXPECT_FALSE(System::pathFileSystemIsExt4Internal(otherfsDir, { "" }));
+}
+#endif  // __linux__
+
 }  // namespace base
 }  // namespace android

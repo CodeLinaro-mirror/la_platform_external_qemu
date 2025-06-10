@@ -530,6 +530,10 @@ public:
                                      int* build_1,
                                      int* build_2);
 
+    // for testing
+    static bool pathFileSystemIsExt4Internal(const std::string& path,
+                                             const std::vector<std::string>& mountDirs);
+
 protected:
     size_t mMemorySize = 0;
 
@@ -554,7 +558,6 @@ protected:
     static bool pathCanWriteInternal(std::string_view path);
     static bool pathCanExecInternal(std::string_view path);
     static bool pathIsQcow2Internal(std::string_view path);
-    static bool pathFileSystemIsExt4Internal(const std::string& path);
     static bool pathIsExt4Internal(std::string_view path);
     static int pathOpenInternal(const char *filename, int oflag, int pmode);
     static bool deleteFileInternal(std::string_view path);
