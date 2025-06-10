@@ -146,8 +146,8 @@ class Toolchain:
         return self.versions["rust"]
 
     def visual_studio_version(self) -> str:
-        """Returns the visual studio version range, or [16, 17) if not present in the toolchain.json file"""
-        return self.versions.get("visual_studio_version", "[16, 17)")
+        """Returns the visual studio version range, or [16, ) if not present in the toolchain.json file"""
+        return self.versions.get("visual_studio_version", "[16, )")
 
     def is_crosscompile(self) -> bool:
         """True if the given target needs to be cross compiled.
