@@ -1747,7 +1747,7 @@ public:
         return pathIsQcow2Internal(path);
     }
 
-    bool pathFileSystemIsExt4(std::string_view path) const override {
+    bool pathFileSystemIsExt4(const std::string& path) const override {
         return pathFileSystemIsExt4Internal(path);
     }
 
@@ -2801,7 +2801,7 @@ static void get_all_ext4_mount_dirs(std::vector<std::string>& alldirs) {
     }
 }
 
-static bool dir_contains_path(const std::string& dir, const char* path) {
+static bool dir_contains_path(const std::string& dir, const std::string& path) {
     std::string dir1 = android::base::PathUtils::canonicalPath(dir);
     std::string path1 = android::base::PathUtils::canonicalPath(path);
     // on linux, use realpath to make sure the symbolic link is removed
@@ -2820,13 +2820,13 @@ static bool dir_contains_path(const std::string& dir, const char* path) {
 }
 #endif
 
-bool System::pathFileSystemIsExt4Internal(std::string_view path) {
+bool System::pathFileSystemIsExt4Internal(const std::string& path) {
 #if defined(__linux__)
     std::vector<std::string> mount_dirs;
     get_all_ext4_mount_dirs(mount_dirs);
 
-    for (std::string dir : mount_dirs) {
-        if (dir_contains_path(dir, path.data())) {
+    for (const std::string& dir : mount_dirs) {
+        if (dir_contains_path(dir, path)) {
             return true;
         }
     }
