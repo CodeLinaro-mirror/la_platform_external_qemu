@@ -1269,6 +1269,12 @@ static int startEmulatorWithMinConfig(int argc,
             fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion, true);
         }
 
+        if (apiLevel > 36) {
+            // API > 36 no longer works with our outdated GLES implementation.
+            dinfo("API > 36 detected. Enabling GuestAngle.");
+            fc::setIfNotOverriden(fc::GuestAngle, true);
+        }
+
         if (!fc::isOverridden(fc::GuestAngle)) {
             switch (skin_winsys_get_preferred_gles_driver()) {
                 case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
@@ -1821,6 +1827,13 @@ extern "C" int main(int argc, char** argv) {
                 EMULATOR_FULL_VERSION_STRING, QEMU_VERSION, looper);
         android::metrics::PeriodicReporter::start(
                 &android::metrics::MetricsReporter::get(), looper);
+    }
+
+    const int myApiLevel = avd ? avdInfo_getApiLevel(avd) : 1000;
+    if (myApiLevel > 36) {
+        // API > 36 no longer works with our outdated GLES implementation.
+        dinfo("API > 36 detected. Enabling GuestAngle.");
+        fc::setIfNotOverriden(fc::GuestAngle, true);
     }
 
     if (!fc::isOverridden(fc::GuestAngle)) {
@@ -2474,7 +2487,6 @@ extern "C" int main(int argc, char** argv) {
     // studio avd manager does not allow user to change partition size, set a
     // lower limit to 6GB.
     constexpr auto kMinPlaystoreImageSize = 6LL * 1024 * 1024 * 1024;
-    const int myApiLevel = avd ? avdInfo_getApiLevel(avd) : 1000;
     if (myApiLevel >= 24 || fc::isEnabled(fc::PlayStoreImage)) {
         if (firstTimeSetup &&
             getConsoleAgents()->settings->hw()->disk_dataPartition_size <
