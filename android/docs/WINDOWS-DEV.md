@@ -47,9 +47,11 @@ git config --global user.email wrong-do-it-again@badrobot.com
 2. **Initialize Repo:**
 
     ```bat
-    cd \ && mkdir emu-master-dev && cd emu-master-dev
-    repo init -u https://android.googlesource.com/platform/manifest -b emu-master-dev
+    cd \ && mkdir e && cd e
+    repo init -u https://android.googlesource.com/platform/manifest -b emu-main-dev
     ```
+
+    The folder is named `e` to avoid running into the Windows max path length. If that folder name has more than 5 characters, the build will fail.
 
 3. **Download Code:**
 
