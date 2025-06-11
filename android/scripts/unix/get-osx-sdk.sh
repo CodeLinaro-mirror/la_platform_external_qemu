@@ -10,12 +10,42 @@ log_info() {
   echo "INFO: $1"
 }
 
+# Note: This script is primarily for internal Google use to fetch
+# specific SDK versions from Google Storage.
+# For official Apple SDKs, you should install the appropriate Xcode
+# version.
+display_sdk_info() {
+  log_warn "########################################################################################"
+  log_warn "# Note: This script is primarily for internal Google use to fetch                      #"
+  log_warn "# specific SDK versions from Google Storage.                                           #"
+  log_warn "#                                                                                      #"
+  log_warn "# For official Apple SDKs, you should install the appropriate Xcode                    #"
+  log_warn "# version. Apple provides SDKs bundled with Xcode. To get a specific                   #"
+  log_warn "# SDK version (e.g., ${SDK_VERSION}), you typically need to install the                          #"
+  log_warn "# version of Xcode that shipped with it.                                               #"
+  log_warn "#                                                                                      #"
+  log_warn "# You can find older Xcode releases on the Apple Developer Downloads                   #"
+  log_warn "# page: https://developer.apple.com/download/more/                                     #"
+  log_warn "#                                                                                      #"
+  log_warn "# Alternatively, some SDKs might be available on GitHub, e.g.,                         #"
+  log_warn "# https://github.com/phracker/MacOSX-SDKs                                              #"
+  log_warn "#                                                                                      #"
+  log_warn "# After installing Xcode, the SDKs are located within the Xcode.app                    #"
+  log_warn "# bundle, usually at:                                                                  #"
+  log_warn "# /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/ #"
+  log_warn "#                                                                                      #"
+  log_warn "# Manually adding SDKs is not officially supported by Apple and may                    #"
+  log_warn "# cause issues. This script attempts to automate the manual                            #"
+  log_warn "# installation process for specific internal needs.                                    #"
+  log_warn "########################################################################################"
+}
+
 log_warn() {
-  echo "WARN: $1"
+  echo -e "\033[0;33mWARN: $1\033[0m"
 }
 
 log_error_and_exit() {
-  echo "ERROR: $1"
+  echo -e "\033[0;31mERROR: $1\033[0m"
   exit 1
 }
 
@@ -55,6 +85,8 @@ SDK_URL="${GS_BUCKET_BASE_URL}/${SDK_ZIP_NAME}"
 
 # --- Pre-flight Checks ---
 log_info "--- Starting SDK Installation Script for macOS SDK ${SDK_VERSION} ---"
+display_sdk_info
+log_info "--- Proceeding with download from Google Storage... ---"
 
 # 1. Check for gcloud and attempt login
 log_info "1. Checking for gcloud CLI and ensuring authentication..."
@@ -66,6 +98,17 @@ if ! gcloud auth login; then
 fi
 # Optional: Add 'gcloud config set project YOUR_PROJECT_ID' if needed for gsutil permissions,
 # but gsutil cp often works with bucket-level permissions without a project explicitly set after login.
+
+#
+# # Check if authenticated user is a google account (optional, but good practice for internal tools)
+log_info "   Verifying Google Cloud account type..."
+ACCOUNT_TYPE=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" | cut -d'@' -f2)
+if [ "$ACCOUNT_TYPE" != "google.com" ]; then
+    log_warn "Authenticated account '${ACCOUNT_TYPE}' is not a google.com account."
+    log_warn "This script is primarily intended for internal Google use to access specific buckets."
+    log_warn "You may not have permissions to download the SDK from the specified bucket."
+fi
+
 log_info "   Successfully authenticated with Google Cloud or already authenticated."
 
 
@@ -106,7 +149,8 @@ log_info "6. Downloading SDK from ${SDK_URL} to ${TEMP_FILE_PATH}..."
 if gsutil cp "${SDK_URL}" "${TEMP_FILE_PATH}"; then
   log_info "   Download successful."
 else
-  log_error_and_exit "Failed to download SDK from ${SDK_URL}. Check the URL, SDK version, your gsutil access, and ensure you are authenticated to the correct Google Cloud account with permissions for this bucket."
+  display_sdk_info
+  log_error_and_exit "Failed to download SDK from ${SDK_URL}. Check the URL, SDK version, your gsutil access, reach out to the emulator team (go/android-emulator-dev-android-emulator) if you have access issues or any questions."
 fi
 
 # 7. Unzip the SDK to the Xcode directory
