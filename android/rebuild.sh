@@ -46,7 +46,12 @@ get_build_os () {
 aosp_find_python() {
     local AOSP_PREBUILTS_DIR=$AOSP_DIR/prebuilts
     local OS_NAME=$(get_build_os)
-    local PYTHON=$AOSP_PREBUILTS_DIR/python/$OS_NAME-x86/bin/python3
+    local PYTHON
+    if [ "$OS_NAME" = "windows" ]; then
+        PYTHON=$AOSP_PREBUILTS_DIR/python/$OS_NAME-x86/python
+    else
+        PYTHON=$AOSP_PREBUILTS_DIR/python/$OS_NAME-x86/bin/python3
+    fi
     $PYTHON --version >/dev/null || panic "Unable to get python version from $PYTHON"
     printf "$PYTHON"
 }
