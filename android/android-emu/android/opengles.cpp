@@ -413,6 +413,7 @@ int android_startOpenglesRenderer(
         // reflected on the gfxstream side.
         android::featurecontrol::makeReadOnly(aemuFeature);
     }
+    gfxstreamFeatures.EglOnEgl.enabled = sEgl2egl;
 #else
     // libOpenglRender uses feature control directly.
 #endif
@@ -473,12 +474,12 @@ int android_startOpenglesRenderer(
     });
 
     sRenderer = sRenderLib->initRenderer(width, height, gfxstreamFeatures,
-                                         sRendererUsesSubWindow, sEgl2egl);
+                                         sRendererUsesSubWindow);
 
     if (sRenderer == nullptr) {
         ERR("Can't initialize RenderLib with parameters: width=%d, height=%d "
-        "sRendererUsesSubWindow=%d sEgl2egl=%d",
-        width, height, sRendererUsesSubWindow, sEgl2egl);
+        "sRendererUsesSubWindow=%d",
+        width, height, sRendererUsesSubWindow);
         return -1;
     }
 #ifdef AEMU_GFXSTREAM_BACKEND
