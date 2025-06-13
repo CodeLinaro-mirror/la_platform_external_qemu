@@ -2003,9 +2003,11 @@ static void skin_window_resize(SkinWindow* window, int resize_container) {
     getConsoleAgents()->surface->skin_surface_fill(window->surface, &layout->rect, layout->color);
 
     Background* back = layout->backgrounds;
-    Background* end = back + layout->num_backgrounds;
-    for (; back < end; back++)
-        background_redraw(back, &layout->rect, window->surface);
+    if (back) {
+        const Background* end = back + layout->num_backgrounds;
+        for (; back < end; back++)
+            background_redraw(back, &layout->rect, window->surface);
+    }
 
     getConsoleAgents()->surface->skin_surface_create_window(window->surface, window_x, window_y, window_w,
                                window_h);
@@ -2279,9 +2281,11 @@ void skin_window_redraw(SkinWindow* window, SkinRect* rect) {
 
         {
             Background* back = layout->backgrounds;
-            Background* end = back + layout->num_backgrounds;
-            for (; back < end; back++)
-                background_redraw(back, rect, window->surface);
+            if (back) {
+                const Background* end = back + layout->num_backgrounds;
+                for (; back < end; back++)
+                    background_redraw(back, rect, window->surface);
+            }
         }
 
         {
@@ -2505,13 +2509,22 @@ void skin_window_process_touch_event(SkinWindow* window, SkinEvent* ev) {
 
 void skin_window_process_event(SkinWindow* window, SkinEvent* ev) {
     const uint32_t displayId = get_skin_event_display_id(ev);
-    Button* button;
+    Button* button = NULL;
     int mx, my;
     // This button state set will still be interpreted correctly for
     // single-touch, which only uses the first bit.
+    const bool isMouseEvent = (ev->type == kEventMouseButtonDown) ||
+                              (ev->type == kEventMouseButtonUp) ||
+                              (ev->type == kEventMouseMotion) ||
+                              (ev->type == kEventMouseWheel) ||
+                              (ev->type == kEventMouseStartTracking) ||
+                              (ev->type == kEventMouseStopTracking);
+
     int button_state = multitouch_create_buttons_state(
-            ev->type != kEventMouseButtonUp, ev->u.mouse.skip_sync,
-            ev->u.mouse.button == kMouseButtonSecondaryTouch);
+            ev->type != kEventMouseButtonUp,
+            isMouseEvent ? ev->u.mouse.skip_sync : false,
+            isMouseEvent ? (ev->u.mouse.button == kMouseButtonSecondaryTouch)
+                         : false);
 
     FingerState* finger = NULL;
     if (displayId == 0) {
