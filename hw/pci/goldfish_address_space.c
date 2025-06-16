@@ -960,7 +960,7 @@ static void address_space_pci_realize(PCIDevice *dev, Error **errp) {
 
     s_current_state = state;
 
-    const char* verbose_env = getenv("ANDROID_EMUGL_VERBOSE");
+    const char* verbose_env = getenv("GOLDFISH_ADDRESS_SPACE_LOG_VERBOSE");
 
     if (verbose_env && !strcmp("1", verbose_env)) {
         s_verbose_logging = 1;
