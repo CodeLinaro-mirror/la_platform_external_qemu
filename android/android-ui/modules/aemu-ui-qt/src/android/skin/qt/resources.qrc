@@ -84,6 +84,14 @@
         <file alias="xr_viewport_pan">images/light/ic_xr_viewport_pan.svg</file>
         <file alias="xr_viewport_rotate">images/light/ic_xr_viewport_rotate.svg</file>
         <file alias="xr_viewport_zoom">images/light/ic_xr_viewport_zoom.svg</file>
+        <file alias="xr_left_hand_grab">images/light/ic_xr_left_hand_grab.svg</file>
+        <file alias="xr_left_hand_pinch">images/light/ic_xr_left_hand_pinch.svg</file>
+        <file alias="xr_left_hand_reset">images/light/ic_xr_left_hand_reset.svg</file>
+        <file alias="xr_left_hand_poke">images/light/ic_xr_left_hand_poke.svg</file>
+        <file alias="xr_right_hand_grab">images/light/ic_xr_right_hand_grab.svg</file>
+        <file alias="xr_right_hand_pinch">images/light/ic_xr_right_hand_pinch.svg</file>
+        <file alias="xr_right_hand_reset">images/light/ic_xr_right_hand_reset.svg</file>
+        <file alias="xr_right_hand_poke">images/light/ic_xr_right_hand_poke.svg</file>
         <file alias="zoom">images/light/ic_zoom_in_678_48dp.svg</file>
 
         <!-- Used in the "extended" window -->
@@ -283,6 +291,14 @@
         <file alias="xr_viewport_pan">images/dark/ic_xr_viewport_pan.svg</file>
         <file alias="xr_viewport_rotate">images/dark/ic_xr_viewport_rotate.svg</file>
         <file alias="xr_viewport_zoom">images/dark/ic_xr_viewport_zoom.svg</file>
+        <file alias="xr_left_hand_grab">images/dark/ic_xr_left_hand_grab.svg</file>
+        <file alias="xr_left_hand_pinch">images/dark/ic_xr_left_hand_pinch.svg</file>
+        <file alias="xr_left_hand_reset">images/dark/ic_xr_left_hand_reset.svg</file>
+        <file alias="xr_left_hand_poke">images/dark/ic_xr_left_hand_poke.svg</file>
+        <file alias="xr_right_hand_grab">images/dark/ic_xr_right_hand_grab.svg</file>
+        <file alias="xr_right_hand_pinch">images/dark/ic_xr_right_hand_pinch.svg</file>
+        <file alias="xr_right_hand_reset">images/dark/ic_xr_right_hand_reset.svg</file>
+        <file alias="xr_right_hand_poke">images/dark/ic_xr_right_hand_poke.svg</file>
         <file alias="zoom">images/dark/ic_zoom_in_white_48dp.svg</file>
 
         <!-- Used in the "extended" window -->
