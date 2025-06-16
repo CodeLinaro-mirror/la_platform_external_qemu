@@ -751,7 +751,7 @@ bool emuglConfig_init(EmuglConfig* config,
         } else {
             gpu_enabled = true;
             if (!strcmp(gpu_option, "lavapipe")) {
-                gpu_mode = "swiftshader_indirect";
+                gpu_mode = "swangle_indirect";
             } else {
                 gpu_mode = gpu_option;
             }
