@@ -17,10 +17,10 @@
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/Stream.h"
 #include "aemu/base/memory/MemoryTracker.h"
+#include "aemu/base/logging/LogSeverity.h"
 #include "android/base/system/System.h"
 #include "android/console.h"
 #include "android/opengl/GLProcessPipe.h"
-#include "android/opengl/logger.h"
 #include "android/snapshot/PathUtils.h"
 #include "android/snapshot/Snapshotter.h"
 #include "android/utils/bufprint.h"
@@ -123,7 +123,6 @@ static int initOpenglesEmulationFuncs(ADynamicLibrary* rendererLib) {
     return 0;
 }
 
-static bool sOpenglLoggerInitialized = false;
 static bool sRendererUsesSubWindow = false;
 static bool sEgl2egl = false;
 static gfxstream::RenderLibPtr sRenderLib = nullptr;
@@ -150,23 +149,6 @@ int android_setOpenglesEmulation(void* renderLib,
 #endif  // AEMU_GFXSTREAM_BACKEND
 
 int android_initOpenglesEmulation() {
-    android_init_opengl_logger();
-
-    bool glFineLogging =
-            (System::get()->envGet("ANDROID_EMUGL_FINE_LOG") == "1") ||
-            (System::get()->envGet("ANDROID_EMUGL_VERBOSE") == "1");
-    bool glLogPrinting =
-            System::get()->envGet("ANDROID_EMUGL_LOG_PRINT") == "1";
-
-    AndroidOpenglLoggerFlags loggerFlags =
-            static_cast<AndroidOpenglLoggerFlags>(
-                    (glFineLogging ? OPENGL_LOGGER_DO_FINE_LOGGING : 0) |
-                    OPENGL_LOGGER_PRINT_TO_STDOUT);
-
-    android_opengl_logger_set_flags(loggerFlags);
-
-    sOpenglLoggerInitialized = true;
-
     char* error = NULL;
 
     if (sRenderLib != NULL)
@@ -246,28 +228,29 @@ void gfxstreamLoggingCallback(
         int line,
         const char* function,
         const char* message) {
-    char severity;
+    LogSeverity priority = EMULATOR_LOG_INFO;
     switch (level) {
         case GFXSTREAM_LOGGING_LEVEL_FATAL:
-            severity = 'F';
+            priority = EMULATOR_LOG_FATAL;
             break;
         case GFXSTREAM_LOGGING_LEVEL_ERROR:
-            severity = 'E';
+            priority = EMULATOR_LOG_ERROR;
             break;
         case GFXSTREAM_LOGGING_LEVEL_WARNING:
-            severity = 'W';
+            priority = EMULATOR_LOG_WARNING;
             break;
         case GFXSTREAM_LOGGING_LEVEL_INFO:
-            severity = 'I';
+            priority = EMULATOR_LOG_INFO;
             break;
         case GFXSTREAM_LOGGING_LEVEL_DEBUG:
-            severity = 'D';
+            priority = EMULATOR_LOG_DEBUG;
             break;
         case GFXSTREAM_LOGGING_LEVEL_VERBOSE:
-            severity = 'V';
+            priority = EMULATOR_LOG_VERBOSE;
             break;
     }
-    OutputLog(stderr, severity, file, line, /*timestamp_us=*/0, "%s", message);
+
+    __emu_log_print_str(priority, file, line, message);
 }
 
 static const QAndroidVmOperations* sVmOperations = nullptr;
@@ -307,6 +290,12 @@ int android_startOpenglesRenderer(
     std::string gpuInfoAsString = gpuList.dump();
     INFO("%s: gpu info", __func__);
     INFO("%s", gpuInfoAsString.c_str());
+
+    sRenderLib->setLogger(gfxstreamLoggingCallback);
+    if (getMinLogLevel() <= EMULATOR_LOG_DEBUG) {
+        // Set verbose logging on gfxstream with -verbose option
+        sRenderLib->setLogLevel(GFXSTREAM_LOGGING_LEVEL_VERBOSE);
+    }
 
     sRenderLib->setRenderer(emuglConfig_get_current_renderer());
     sRenderLib->setGuestAndroidApiLevel(guestApiLevel);
@@ -428,7 +417,6 @@ int android_startOpenglesRenderer(
                     ? MINIGBM
                     : GOLDFISH_GRALLOC);
 
-    sRenderLib->setLogger(gfxstreamLoggingCallback);
     gfxstream_dma_ops dma_ops;
     dma_ops.get_host_addr = android_goldfish_dma_ops.get_host_addr;
     dma_ops.unlock = android_goldfish_dma_ops.unlock;
@@ -679,8 +667,6 @@ void android_stopOpenglesRenderer(bool wait) {
                 gfxstream_android_stopOpenglesRenderer(wait);
             }
 #endif  // AEMU_GFXSTREAM_BACKEND
-
-            android_stop_opengl_logger();
         }
     }
 }

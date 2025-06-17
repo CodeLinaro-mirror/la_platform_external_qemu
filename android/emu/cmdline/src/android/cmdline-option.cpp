@@ -100,7 +100,6 @@ android_parse_options( int  *pargc, char**  *pargv, AndroidOptions*  opt )
         /* for backwards compatibility with previous versions */
         if (!strcmp(arg, "verbose")) {
             base_enable_verbose_logs();
-            set_gfxstream_enable_verbose_logs();
             arg = "debug-init";
         }
 

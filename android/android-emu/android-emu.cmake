@@ -126,7 +126,6 @@ set(android-emu-common
     android/network/wifi.cpp
     android/opengl/GLProcessPipe.cpp
     android/opengl/GpuFrameBridge.cpp
-    android/opengl/logger.cpp
     android/opengl/OpenglEsPipe.cpp
     android/opengles.cpp
     android/process_setup.cpp
@@ -407,7 +406,6 @@ android_add_library(
       android/loadpng.c
       android/opengl/GLProcessPipe.cpp
       android/opengl/GpuFrameBridge.cpp
-      android/opengl/logger.cpp
       android/opengl/OpenglEsPipe.cpp
       android/opengles.cpp
       android/snaphost-android.c
