@@ -102,3 +102,8 @@ config AD5321
     bool
     depends on I2C
     default y if I2C_DEVICES
+
+config LTC2991
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
