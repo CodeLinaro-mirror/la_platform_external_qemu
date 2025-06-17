@@ -42,7 +42,6 @@ void* QemuFileStream::getProtobuf() {
 
 ssize_t QemuFileStream::read(void* buffer, size_t len) {
     DCHECK(static_cast<ssize_t>(len) >= 0);
-    DCHECK(static_cast<ssize_t>(len) == static_cast<int>(len));
     return static_cast<ssize_t>(
             qemu_get_buffer(mFile,
                             static_cast<uint8_t*>(buffer),
@@ -51,10 +50,7 @@ ssize_t QemuFileStream::read(void* buffer, size_t len) {
 
 ssize_t QemuFileStream::write(const void* buffer, size_t len) {
     DCHECK(static_cast<ssize_t>(len) >= 0);
-    DCHECK(static_cast<ssize_t>(len) == static_cast<int>(len));
-    qemu_put_buffer(mFile,
-                    static_cast<const uint8_t*>(buffer),
-                    static_cast<int>(len));
+    qemu_put_buffer(mFile, static_cast<const uint8_t*>(buffer), len);
     // There is no way to know if all could be written, so always
     // return success here.
     return static_cast<ssize_t>(len);
