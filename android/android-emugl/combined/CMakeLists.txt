@@ -217,10 +217,6 @@ if(OPTION_GFXSTREAM_BACKEND)
         GLES_V2_translator_static PRIVATE ANGLE::ANGLE
     )
 
-    # Protocols and associated code generators######################################
-
-    add_subdirectory(${GFXSTREAM_REPO_ROOT}/codegen ${GFXSTREAM_PREFIX}-codegen)
-
     # Fake Android guest#########################3##################################
 
     if (ENABLE_VKCEREAL_TESTS)
