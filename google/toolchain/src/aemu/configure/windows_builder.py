@@ -20,6 +20,20 @@ class WindowsBuilder(QemuBuilder):
     def meson_config(self):
         prefix = (self.dest / "release").as_posix()
         return [
+            "-Ddefault_devices=true",
+            "-Dplugins=false",
+            "-Daf_xdp=disabled",
+            "-Dhv_balloon=disabled",
+            "-Dlibkeyutils=disabled",
+            "-Dpvg=disabled",
+            "-Dqatzip=disabled",
+            "-Dqpl=disabled",
+            "-Drust=disabled",
+            "-Dtcg=enabled",
+            "-Ddebug_tcg=false",
+            "-Duadk=disabled",
+            "-Dlibcbor=disabled",
+
             "-Dandroid=enabled",
             "-Db_pie=false",
             "-Daudio_drv_list=default",
@@ -30,7 +44,6 @@ class WindowsBuilder(QemuBuilder):
             # TODO(jansene): Figure out how we get these turned on in the build bots!
             "-Davx2=auto",
             "-Davx512bw=auto",
-            "-Davx512f=auto",
             "-Dblkio=disabled",
             "-Dbochs=disabled",
             "-Dbpf=disabled",
@@ -77,7 +90,6 @@ class WindowsBuilder(QemuBuilder):
             "-Dlibvduse=disabled",
             "-Dlinux_aio=disabled",
             "-Dlinux_io_uring=disabled",
-            "-Dlive_block_migration=enabled",
             "-Dlzfse=disabled",
             "-Dlzo=disabled",
             "-Dmalloc_trim=disabled",
@@ -96,7 +108,6 @@ class WindowsBuilder(QemuBuilder):
             "-Dpipewire=disabled",
             "-Dpixman=enabled",
             "-Dpng=disabled",
-            "-Dpvrdma=disabled",
             "-Dqcow1=disabled",
             "-Dqed=disabled",
             "-Dqga_vss=disabled",
@@ -134,7 +145,6 @@ class WindowsBuilder(QemuBuilder):
             "-Dvhost_vdpa=disabled",
             "-Dvirglrenderer=disabled",
             "-Dvirtfs=disabled",
-            "-Dvirtfs_proxy_helper=disabled",
             "-Dvmdk=disabled",
             "-Dvmnet=disabled",
             "-Dvnc=enabled",
@@ -204,7 +214,6 @@ class WindowsBuilder(QemuBuilder):
     def config_mak(self):
         return [
             "TARGET_DIRS=aarch64-softmmu riscv64-softmmu x86_64-softmmu",
-            "CONFIG_WIN32=y",
             "GENISOIMAGE=False",
             "TCG_TESTS_TARGETS=x86_64-softmmu",
             "EXESUF=.exe",

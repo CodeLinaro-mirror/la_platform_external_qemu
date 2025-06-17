@@ -5,7 +5,6 @@ load("@rules_cc//cc:cc_import.bzl", "cc_import")
 
 def cc_interface_binary(
         name,
-        win_def_file,
         data = None,
         tags = None,
         visibility = None,
@@ -58,7 +57,6 @@ def cc_interface_binary(
     local_linkopts = linkopts or []
     local_linkopts = local_linkopts + select({
         "@platforms//os:windows": [
-            "/DEF:$(location %s)" % win_def_file,
         ],
         "@platforms//os:macos": [
             "-framework Cocoa",
@@ -70,12 +68,10 @@ def cc_interface_binary(
     })
 
     local_data = data or []
-    local_data.append(win_def_file)
     cc_binary(
         name = name + "_std",
         tags = tags,
         visibility = visibility,
-        win_def_file = win_def_file,
         linkopts = local_linkopts,
         data = local_data,
         **kwargs
@@ -89,7 +85,6 @@ def cc_interface_binary(
         linkshared = True,
         tags = ["manual"],
         visibility = ["//visibility:private"],
-        win_def_file = win_def_file,
         linkopts = linkopts,
         **kwargs
     )

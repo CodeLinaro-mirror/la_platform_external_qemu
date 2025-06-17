@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import shutil
+import sys
 
 from aemu.configure.base_builder import QemuBuilder
 from aemu.configure.libraries import BazelLib, CMakeLib
@@ -21,6 +22,20 @@ from aemu.configure.libraries import BazelLib, CMakeLib
 class LinuxBuilder(QemuBuilder):
     def meson_config(self):
         return [
+            "-Ddefault_devices=true",
+            "-Dplugins=true",
+            "-Daf_xdp=disabled",
+            "-Dhv_balloon=disabled",
+            "-Dlibkeyutils=disabled",
+            "-Dpvg=disabled",
+            "-Dqatzip=disabled",
+            "-Dqpl=disabled",
+            "-Drust=disabled",
+            "-Dtcg=enabled",
+            "-Ddebug_tcg=false",
+            "-Duadk=disabled",
+            "-Dlibcbor=disabled",
+
             "-Dandroid=enabled",
             "-Daudio_drv_list=default",
             "-Dfdt=auto",
@@ -29,7 +44,6 @@ class LinuxBuilder(QemuBuilder):
             "-Dauth_pam=disabled",
             "-Davx2=enabled",
             "-Davx512bw=enabled",
-            "-Davx512f=enabled",
             "-Dblkio=disabled",
             "-Dbochs=disabled",
             "-Dbpf=disabled",
@@ -76,7 +90,6 @@ class LinuxBuilder(QemuBuilder):
             "-Dlibvduse=disabled",
             "-Dlinux_aio=disabled",
             "-Dlinux_io_uring=disabled",
-            "-Dlive_block_migration=enabled",
             "-Dlzfse=disabled",
             "-Dlzo=disabled",
             "-Dmalloc_trim=enabled",
@@ -95,7 +108,6 @@ class LinuxBuilder(QemuBuilder):
             "-Dpipewire=disabled",
             "-Dpixman=enabled",
             "-Dpng=disabled",
-            "-Dpvrdma=disabled",
             "-Dqcow1=disabled",
             "-Dqed=disabled",
             "-Dqga_vss=disabled",
@@ -133,7 +145,6 @@ class LinuxBuilder(QemuBuilder):
             "-Dvhost_vdpa=disabled",
             "-Dvirglrenderer=disabled",
             "-Dvirtfs=disabled",
-            "-Dvirtfs_proxy_helper=disabled",
             "-Dvmdk=disabled",
             "-Dvmnet=disabled",
             "-Dvnc=enabled",
@@ -202,11 +213,16 @@ class LinuxBuilder(QemuBuilder):
 
     def config_mak(self):
         return [
+            f"SRC_PATH={self.aosp / 'third_party' / 'qemu'}",
             "TARGET_DIRS=aarch64-softmmu riscv64-softmmu x86_64-softmmu",
-            "TCG_TESTS_TARGETS= x86_64-softmmu",
-            "CONFIG_POSIX=y",
-            "CONFIG_LINUX=y",
+            "GDB=",
+            "SUBDIRS=",
+            f"PYTHON={sys.executable} -B",
+            f"MKVENV_ENSUREGROUP={sys.executable} -B {self.aosp}/third_party/qemu/python/scripts/mkvenv.py ensuregroup  --online",
             "GENISOIMAGE=",
-            "TCG_TESTS_TARGETS=",
-            f"CC={self.dest / 'toolchain' / 'gcc'}",
+            f"MESON={self.toolchain_generator.dest / 'meson'}",
+            f"NINJA={self.toolchain_generator.dest / 'ninja'}",
+            "EXESUF=",
+            "CONFIG_DEFAULT_TARGETS=y",
+            "TCG_TESTS_TARGETS= x86_64-softmmu",
         ]

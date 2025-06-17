@@ -113,7 +113,7 @@ class OrderedSet(T.MutableSet[_T]):
 class BazelValue:
     """Class representing a Bazel value that can be merged across different configurations."""
 
-    def __init__(self, configuration: str, value: T.Union[str | T.Set[str]]):
+    def __init__(self, configuration: str, value):
         """Initialize a BazelValue instance.
 
         Note that a BazelValue is always part of a BazelRule. If a BazelRule is unique to
@@ -358,7 +358,7 @@ class BazelRuleLibrary:
         self.configurations: T.Dict[str, T.Set[str]] = {}
         self.unique_keys = unique
 
-    def register(self, rule: T.Union[BazelRule | LoadCmd]):
+    def register(self, rule):
         if isinstance(rule, LoadCmd):
             self.load_cmds.add(rule)
             return
@@ -451,6 +451,14 @@ class BuildFileFunctions:
 
     def windows_resources(self, **kwargs):
         rule = BazelRule(self.configuration, "windows_resources", kwargs)
+        self.library.register(rule)
+
+    def filegroup(self, **kwargs):
+        rule = BazelRule(self.configuration, "filegroup", kwargs)
+        self.library.register(rule)
+
+    def cc_import(self, **kwargs):
+        rule = BazelRule(self.configuration, "cc_import", kwargs)
         self.library.register(rule)
 
     def load(self, bzl, *files):

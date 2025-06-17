@@ -61,8 +61,23 @@ class DarwinBuilder(QemuBuilder):
     # --disable-vhost-user-blk-server --disable-vhost-user --disable-vhost-vdpa
     # --cc=/tmp/out/toolchain/gcc --cxx=/tmp/out/toolchain/g++
     # --objcc=/tmp/out/toolchain/g++
+
     def meson_config(self):
         return [
+            "-Ddefault_devices=true",
+            "-Dplugins=true",
+            "-Daf_xdp=disabled",
+            "-Dhv_balloon=disabled",
+            "-Dlibkeyutils=disabled",
+            "-Dpvg=disabled",
+            "-Dqatzip=disabled",
+            "-Dqpl=disabled",
+            "-Drust=disabled",
+            "-Dtcg=enabled",
+            "-Ddebug_tcg=false",
+            "-Duadk=disabled",
+            "-Dlibcbor=disabled",
+
             "-Dandroid=enabled",
             "-Daudio_drv_list=coreaudio",
             "-Dfdt=auto",
@@ -127,7 +142,6 @@ class DarwinBuilder(QemuBuilder):
             "-Dparallels=disabled",
             "-Dpipewire=disabled",
             "-Dpng=disabled",
-            "-Dpvrdma=disabled",
             "-Dqcow1=disabled",
             "-Dqed=disabled",
             "-Dqga_vss=disabled",
@@ -157,7 +171,6 @@ class DarwinBuilder(QemuBuilder):
             "-Dvfio_user_server=disabled",
             "-Dvhdx=disabled",
             "-Dvirglrenderer=disabled",
-            "-Dvirtfs_proxy_helper=disabled",
             "-Dvirtfs=disabled",
             "-Dvmdk=disabled",
             "-Dvmnet=enabled",
@@ -174,10 +187,8 @@ class DarwinBuilder(QemuBuilder):
             "-Dzstd=disabled",
             "-Davx2=disabled",
             "-Davx512bw=disabled",
-            "-Davx512f=disabled",
             "-Dcrypto_afalg=disabled",
             "-Dkvm=disabled",
-            "-Dlive_block_migration=enabled",
             "-Dmalloc_trim=disabled",
             "-Dmultiprocess=disabled",
             "-Dpa=disabled",
@@ -244,18 +255,16 @@ class DarwinBuilder(QemuBuilder):
 
     def config_mak(self):
         return [
-            "CONFIG_POSIX=y",
-            "CONFIG_DARWIN=y",
             f"SRC_PATH={self.aosp / 'third_party' / 'qemu'}",
             "TARGET_DIRS=aarch64-softmmu riscv64-softmmu x86_64-softmmu",
-            "CONFIG_BSD=y",
-            "ROMS=",
+            "GDB=",
+            "SUBDIRS=",
             f"PYTHON={sys.executable} -B",
+            f"MKVENV_ENSUREGROUP={sys.executable} -B {self.aosp}/third_party/qemu/python/scripts/mkvenv.py ensuregroup  --online",
             "GENISOIMAGE=",
             f"MESON={self.toolchain_generator.dest / 'meson'}",
             f"NINJA={self.toolchain_generator.dest / 'ninja'}",
-            f"PKG_CONFIG={self.toolchain_generator.dest / 'pkg-config'}",
-            f"CC={self.toolchain_generator.dest / 'cc'}",
             "EXESUF=",
+            "CONFIG_DEFAULT_TARGETS=y",
             "TCG_TESTS_TARGETS=",
         ]

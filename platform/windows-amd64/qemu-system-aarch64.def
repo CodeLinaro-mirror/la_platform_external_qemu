@@ -34,11 +34,15 @@ EXPORTS
     _TRACE_VIRTIO_GPU_CMD_RES_XFER_TOH_2D_DSTATE
     _TRACE_VIRTIO_GPU_CMD_SET_SCANOUT_BLOB_DSTATE
     _TRACE_VIRTIO_GPU_CMD_SET_SCANOUT_DSTATE
+    _TRACE_VIRTIO_GPU_CMD_SUSPENDED_DSTATE
+    _TRACE_VIRTIO_GPU_DEC_INFLIGHT_FENCES_DSTATE
     _TRACE_VIRTIO_GPU_FEATURES_DSTATE
     _TRACE_VIRTIO_GPU_FENCE_RESP_DSTATE
+    _TRACE_VIRTIO_GPU_INC_INFLIGHT_FENCES_DSTATE
     _TRACE_VIRTIO_GPU_UPDATE_CURSOR_DSTATE
     address_space_map
     address_space_unmap
+    aio_bh_call
     all_cpu_threads_idle
     aml_append
     aml_int
@@ -46,10 +50,12 @@ EXPORTS
     aml_return
     async_run_on_cpu
     blk_commit_all
+    bql_locked
+    bql_lock_impl
+    bql_unlock
     call_rcu1
     ChardevBackendKind_lookup
     console_has_gl
-    container_get
     cpu_abort
     cpu_breakpoint_insert
     cpu_breakpoint_remove
@@ -72,7 +78,7 @@ EXPORTS
     current_cpu
     current_machine
     cursor_alloc
-    device_class_set_props
+    device_class_set_props_n
     dpy_cursor_define
     dpy_gfx_replace_surface
     dpy_gfx_update
@@ -80,6 +86,7 @@ EXPORTS
     dpy_gl_update
     dpy_mouse_set
     error_abort
+    error_append_hint
     error_copy
     error_fatal
     error_free
@@ -178,6 +185,7 @@ EXPORTS
     qdev_find_recursive
     qdev_prop_bit
     qdev_prop_size
+    qdev_prop_uint8
     qdev_prop_uint32
     qdev_prop_uint64
     qdev_realize
@@ -197,15 +205,16 @@ EXPORTS
     qemu_cond_destroy
     qemu_cond_init
     qemu_cond_signal
-    qemu_cond_wait_iothread
+    qemu_cond_wait_bql
+    qemu_console_get_name
     qemu_cpu_is_self
     qemu_cpu_kick
     qemu_cpu_list_lock
     qemu_create
     qemu_create_displaysurface_pixman
+    qemu_displaysurface_set_share_handle
     qemu_del_polling_cb
     qemu_del_wait_object
-    qemu_displaysurface_win32_set_handle
     qemu_edid_generate
     qemu_event_set
     qemu_find_opts
@@ -222,12 +231,9 @@ EXPORTS
     qemu_loglevel
     qemu_mutex_destroy
     qemu_mutex_init
-    qemu_mutex_iothread_locked
     qemu_mutex_lock_func
-    qemu_mutex_lock_iothread_impl
     qemu_mutex_unlock_impl
     qemu_mutex_unlock_impl
-    qemu_mutex_unlock_iothread
     qemu_notify_event
     qemu_opt_find
     qemu_opt_get
@@ -240,6 +246,7 @@ EXPORTS
     qemu_opts_do_parse
     qemu_opts_id
     qemu_pixman_image_unref
+    qemu_pixman_image_new_shareable
     qemu_printf
     qemu_put_be32
     qemu_put_be64
@@ -336,6 +343,7 @@ EXPORTS
     vga_dirty_log_start
     vga_init
     virtio_add_queue
+    virtio_bh_new_guarded_full
     virtio_cleanup
     virtio_del_queue
     virtio_get_queue
