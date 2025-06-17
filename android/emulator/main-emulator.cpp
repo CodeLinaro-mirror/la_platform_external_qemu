@@ -1439,7 +1439,14 @@ static void updateLibrarySearchPath(bool isHeadless,
         D("Adding library search path: '%s'", fullPath);
         add_library_search_dir(fullPath);
     }
-
+    // (TODO b/417138854): workaround to get away from bad fde: FDE is really a CIE errors
+    if (gpu && strstr(gpu, "lavapipe") != nullptr) {
+        const char* libgcc_path = "/lib/x86_64-linux-gnu/libgcc_s.so.1";
+        if (path_exists(libgcc_path)) {
+            D("Preload libgcc with path %s", libgcc_path);
+            appendPreloadLib(libgcc_path);
+        }
+    }
 #if defined(__aarch64__)
     if (isHeadless) {
         // for headless mode on linux, uses stub xlib
