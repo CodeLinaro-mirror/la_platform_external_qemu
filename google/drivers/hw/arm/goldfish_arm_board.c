@@ -19,14 +19,14 @@
 #include "hw/arm/virt.h"
 #include "hw/pci/pci.h"
 #include "qemu/error-report.h"
-#include "sysemu/device_tree.h"
+#include "system/device_tree.h"
 
 static const int a15irqmap[] = {
-    [VIRT_UART] = 1,
+    [VIRT_UART0] = 1,
     [VIRT_RTC] = 2,
     [VIRT_PCIE] = 3, /* ... to 6 */
     [VIRT_GPIO] = 7,
-    [VIRT_SECURE_UART] = 8,
+    [VIRT_UART1] = 8,
     [VIRT_ACPI_GED] = 9,
     //[RANCHU_GOLDFISH_FB] = 16,
     [RANCHU_GOLDFISH_BATTERY] = 17,
@@ -199,6 +199,6 @@ static const TypeInfo goldfish_machine_type_std = {
 };
 
 static void goldfish_machine_init_std(void) {
-  type_register(&goldfish_machine_type_std);
+  type_register_static(&goldfish_machine_type_std);
 }
 type_init(goldfish_machine_init_std)

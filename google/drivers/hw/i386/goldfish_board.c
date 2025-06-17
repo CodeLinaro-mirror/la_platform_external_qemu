@@ -39,8 +39,6 @@ static void android_machine_options(MachineClass *m) {
 
   PCMachineClass *pcmc = PC_MACHINE_CLASS(m);
   pcmc->default_south_bridge = TYPE_PIIX3_DEVICE;
-  pcmc->rsdp_in_ram = false;
-  pcmc->resizable_acpi_blob = false;
   pcmc->broken_32bit_mem_addr_check = true;
   pcmc->pci_root_uid = 0;
   pcmc->default_cpu_version = 1;
@@ -95,6 +93,12 @@ goldfish_set_str(acpi_ini);
 goldfish_set_str(system_device_in_guest);
 goldfish_set_str(vendor_device_in_guest);
 
+static int x86_kvm_type(MachineState *ms, const char *vm_type)
+{
+    // Should this use kvm_get_vm_type?
+    return 0;
+}
+
 static void goldfish_machine_std_class_init(ObjectClass *oc, void *data) {
   MachineClass *mc = MACHINE_CLASS(oc);
 
@@ -107,7 +111,7 @@ static void goldfish_machine_std_class_init(ObjectClass *oc, void *data) {
 
   android_machine_options(mc);
   mc->init = pc_init_goldfish;
-  mc->kvm_type = pc_machine_kvm_type;
+  mc->kvm_type = x86_kvm_type;
 }
 
 static const TypeInfo goldfish_machine_type_std = {
@@ -119,6 +123,6 @@ static const TypeInfo goldfish_machine_type_std = {
 };
 
 static void goldfish_machine_init_std(void) {
-  type_register(&goldfish_machine_type_std);
+  type_register_static(&goldfish_machine_type_std);
 }
 type_init(goldfish_machine_init_std)
