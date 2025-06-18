@@ -41,6 +41,8 @@
 #include "android/skin/qt/ui-event-recorder.h"
 #include "android/skin/qt/user-actions-counter.h"
 #include "android/skin/qt/virtualscene-control-window.h"
+#include "android/skin/qt/left-hand-dialog.h"
+#include "android/skin/qt/right-hand-dialog.h"
 #include "android/ui-emu-agent.h"
 #include "host-common/qt_ui_defs.h"
 
@@ -239,6 +241,8 @@ private:
     ResizableDialog* mResizableDialog;
     XrEnvironmentModeDialog* mXrEnvironmentModeDialog;
     XrInputModeDialog* mXrInputModeDialog;
+    LeftHandDialog* mLeftHandDialog;
+    RightHandDialog* mRightHandDialog;
     // A map of all XR specific pushbuttons in the main panel, which is used
     // to identify XR specific buttons and also group them together based on
     // specific type.
@@ -310,6 +314,12 @@ private slots:
     void on_xr_input_mode_button_clicked();
     void on_xr_input_mode_changed(int mode);
     void on_dismiss_xr_input_mode_dialog();
+    void on_left_hand_button_clicked();
+    void on_right_hand_button_clicked();
+    void on_left_hand_gesture_changed(const QString& gesture);
+    void on_right_hand_gesture_changed(const QString& gesture);
+    void on_dismiss_left_hand_dialog();
+    void on_dismiss_right_hand_dialog();
     void on_xr_screen_recenter_button_clicked();
     void on_xr_viewport_pan_button_clicked();
     void on_xr_viewport_dolly_button_clicked();

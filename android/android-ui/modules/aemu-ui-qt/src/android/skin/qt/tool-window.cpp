@@ -163,6 +163,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
       mResizableDialog(new ResizableDialog(this)),
       mXrEnvironmentModeDialog(new XrEnvironmentModeDialog(this)),
       mXrInputModeDialog(new XrInputModeDialog(this)),
+      mLeftHandDialog(new LeftHandDialog(this)),
+      mRightHandDialog(new RightHandDialog(this)),
       mFoldableSyncToAndroidSuccess(false),
       mFoldableSyncToAndroidTimeout(false),
       mFoldableSyncToAndroid([this](FoldableSyncToAndroidItem&& item) {
@@ -481,6 +483,28 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     } else {
         resizableChangeIcon(getResizableActiveConfigId());
     }
+
+    if (!getConsoleAgents()
+                 ->settings->android_cmdLineOptions()
+                 ->hands_in_space) {
+        mToolsUi->left_hand_button->setHidden(true);
+        mToolsUi->right_hand_button->setHidden(true);
+    }
+
+    connect(mToolsUi->left_hand_button, &QPushButton::clicked, this,
+                &ToolWindow::on_left_hand_button_clicked);
+    connect(mToolsUi->right_hand_button, &QPushButton::clicked, this,
+                &ToolWindow::on_right_hand_button_clicked);
+
+    connect(mLeftHandDialog, &LeftHandDialog::leftHandGestureSelected, this,
+            &ToolWindow::on_left_hand_gesture_changed);
+    connect(mRightHandDialog, &RightHandDialog::rightHandGestureSelected, this,
+            &ToolWindow::on_right_hand_gesture_changed);
+
+    connect(mLeftHandDialog, &QDialog::finished, this,
+            &ToolWindow::on_dismiss_left_hand_dialog);
+    connect(mRightHandDialog, &QDialog::finished, this,
+            &ToolWindow::on_dismiss_right_hand_dialog);
 
     sToolWindow = this;
     skin_winsys_touch_qt_extended_virtual_sensors();
@@ -1683,10 +1707,8 @@ void ToolWindow::on_xr_environment_mode_button_clicked() {
 
 void ToolWindow::on_xr_input_mode_button_clicked() {
     const auto* opts = getConsoleAgents()->settings->android_cmdLineOptions();
-    bool support_multi = opts->support_multiple_input_modalities;
-    bool hands_in_space_enabled = opts->hands_in_space;
 
-    if (support_multi || hands_in_space_enabled) {
+    if (opts->support_multiple_input_modalities) {
         mXrInputModeDialog->show();
         // Align pop-up input selection dialog to the right of input button.
         QRect geoTool = this->geometry();
@@ -2206,4 +2228,74 @@ bool ToolWindow::eventFilter(QObject* o, QEvent* event) {
         repaint();
     }
     return false;
+}
+
+void ToolWindow::on_left_hand_button_clicked() {
+    mLeftHandDialog->show();
+    QRect geoTool = this->geometry();
+    mLeftHandDialog->move(
+            geoTool.right(),
+            geoTool.top() + mToolsUi->left_hand_button->geometry().top());
+}
+
+void ToolWindow::on_right_hand_button_clicked() {
+    mRightHandDialog->show();
+    QRect geoTool = this->geometry();
+    mRightHandDialog->move(
+            geoTool.right(),
+            geoTool.top() + mToolsUi->right_hand_button->geometry().top());
+}
+
+void ToolWindow::on_left_hand_gesture_changed(const QString& gesture) {
+    // 1. Set the emulator's general input mode to Hand Raycast.
+    //    The value '2' corresponds to XR_INPUT_MODE_HAND_RAYCAST.
+    mLastInputModeRequested = 2;
+    handleUICommand(QtUICommand::CHANGE_XR_INPUT_MODE, true);
+
+    // 2. Update the button icon and send the specific gesture to the guest.
+    if (gesture == "pinch") {
+        ChangeIcon(mToolsUi->left_hand_button, "xr_left_hand_pinch",
+                   "Left hand: Pinch");
+    } else if (gesture == "grab") {
+        ChangeIcon(mToolsUi->left_hand_button, "xr_left_hand_grab",
+                   "Left hand: Grab");
+    } else if (gesture == "poke") {
+        ChangeIcon(mToolsUi->left_hand_button, "xr_left_hand_poke",
+                   "Left hand: Poke");
+    }
+
+    // 3. Explicitly check the left hand button to show it's active.
+    updateXrNavigationButtonsChecked(QtUICommand::XR_LEFT_HAND);
+    qDebug() << "Left hand gesture changed to:" << gesture;
+}
+
+void ToolWindow::on_right_hand_gesture_changed(const QString& gesture) {
+        // 1. Set the emulator's general input mode to Hand Raycast.
+    //    The value '2' corresponds to XR_INPUT_MODE_HAND_RAYCAST.
+    mLastInputModeRequested = 2;
+    handleUICommand(QtUICommand::CHANGE_XR_INPUT_MODE, true);
+
+    // 2. Update the button icon and send the specific gesture to the guest.
+    if (gesture == "pinch") {
+        ChangeIcon(mToolsUi->right_hand_button, "xr_right_hand_pinch",
+                   "Right hand: Pinch");
+    } else if (gesture == "grab") {
+        ChangeIcon(mToolsUi->right_hand_button, "xr_right_hand_grab",
+                   "Right hand: Grab");
+    } else if (gesture == "poke") {
+        ChangeIcon(mToolsUi->right_hand_button, "xr_right_hand_poke",
+                   "Right hand: Poke");
+    }
+
+    // 3. Explicitly check the right hand button to show it's active.
+    updateXrNavigationButtonsChecked(QtUICommand::XR_RIGHT_HAND);
+    qDebug() << "Right hand gesture changed to:" << gesture;
+}
+
+void ToolWindow::on_dismiss_left_hand_dialog() {
+    // TODO: implement logic if needed
+}
+
+void ToolWindow::on_dismiss_right_hand_dialog() {
+    // TODO: implement logic if needed
 }

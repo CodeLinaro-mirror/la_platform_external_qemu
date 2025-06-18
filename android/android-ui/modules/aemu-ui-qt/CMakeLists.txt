@@ -30,6 +30,8 @@ android_qt_lib(
       android/skin/qt/extended.ui
       android/skin/qt/FramelessDetector.cpp
       android/skin/qt/init-qt.cpp
+      android/skin/qt/left-hand-dialog.cpp
+      android/skin/qt/left-hand-dialog.ui
       android/skin/qt/ModalOverlay.cpp
       android/skin/qt/mouse-event-handler.cpp
       android/skin/qt/multi-display-widget.cpp
@@ -42,6 +44,8 @@ android_qt_lib(
       android/skin/qt/resizable-dialog.cpp
       android/skin/qt/resizable-dialog.ui
       android/skin/qt/resources.qrc
+      android/skin/qt/right-hand-dialog.cpp
+      android/skin/qt/right-hand-dialog.ui
       android/skin/qt/screen-mask.cpp
       android/skin/qt/static_resources.qrc
       android/skin/qt/stylesheet.cpp
