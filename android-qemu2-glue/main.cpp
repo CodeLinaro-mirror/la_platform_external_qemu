@@ -908,7 +908,11 @@ extern "C" int run_qemu_main(int argc,
                              void (*on_main_loop_done)(void));
 
 static void enter_qemu_main_loop(int argc, char** argv) {
-#ifndef _WIN32
+#if _WIN32
+    if (!SetConsoleOutputCP(CP_UTF8)) {
+        dwarning("Failed to set ouput code page to utf8. Log outputs may be corrupted");
+    }
+#else
     sigset_t set;
     sigemptyset(&set);
     pthread_sigmask(SIG_SETMASK, &set, NULL);
