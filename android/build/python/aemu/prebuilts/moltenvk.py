@@ -32,13 +32,17 @@ CMAKE_PATH = os.path.join(AOSP_ROOT, "prebuilts", "cmake", HOST_OS + "-x86", "bi
 NINJA_PATH = os.path.join(AOSP_ROOT, "prebuilts", "ninja", HOST_OS + "-x86")
 
 def fetchMoltenVkDependencies():
-    logging.debug(">> CMD: ./fetchDependencies --macos")
-    res = subprocess.run(args=["./fetchDependencies", "--macos"], cwd=AOSP_MOLTENVK_SRC_PATH,
+    args=["./fetchDependencies", "--macos"]
+    if os.environ.get("BUILD_MOLTENVK_KEEP_CACHE") == "1":
+        args.append("--keep-cache")
+    logging.debug(">> CMD: '%s'" % " ".join(args))
+    res = subprocess.run(args=args,
+                         cwd=AOSP_MOLTENVK_SRC_PATH,
                          env=os.environ.copy())
     if res.returncode != 0:
         logging.critical("fetchDependencies exited with non-zero code (%s)", res.returncode)
         exit(res.returncode)
-    logging.debug(">> CMD: ./fetchDependencies --macos succeeded")
+    logging.debug(">> CMD: '%s' succeeded" % " ".join(args))
 
 def buildMoltenVk():
     """Builds MoltenVK.
