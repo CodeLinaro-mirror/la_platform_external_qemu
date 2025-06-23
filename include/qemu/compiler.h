@@ -362,6 +362,9 @@
         __builtin_types_compatible_p(typeof(expr), const volatile unsigned short), \
         (unsigned short)1,                                                         \
       (expr)+0))))))
+#else
+#define typeof_strip_qual(expr)                                                    \
+            std::decay_t<decltype(expr)>
 #endif
 
 #endif /* COMPILER_H */
