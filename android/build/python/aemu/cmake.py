@@ -308,9 +308,7 @@ def launch():
         sys.exit(1)
     except Exception as exc:
         logging.critical("Build failure due to %s", exc)
-        if args.verbose:
-            raise exc
-        sys.exit(1)
+        raise exc
 
 
 if __name__ == "__main__":
