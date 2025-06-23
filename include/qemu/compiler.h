@@ -7,6 +7,10 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#ifdef __cplusplus
+#include <type_traits>
+#endif
+
 #define HOST_BIG_ENDIAN (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 
 /* HOST_LONG_BITS is the size of a native pointer in bits. */
@@ -377,6 +381,9 @@
         __builtin_types_compatible_p(typeof(expr), const volatile unsigned short), \
         (unsigned short)1,                                                         \
       (expr)+0))))))
+#else
+#define typeof_strip_qual(expr)                                                    \
+            std::decay_t<decltype(expr)>
 #endif
 
 #endif /* COMPILER_H */
