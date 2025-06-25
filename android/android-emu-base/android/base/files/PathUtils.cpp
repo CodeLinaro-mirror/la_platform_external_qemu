@@ -17,6 +17,10 @@
 #define _SUPPORT_FILESYSTEM
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #ifdef _SUPPORT_FILESYSTEM
 #include <filesystem>
 #endif                                   //_SUPPORT_FILESYSTEM
@@ -438,6 +442,31 @@ Optional<std::string> PathUtils::pathWithEnvSubstituted(
     return PathUtils::recompose(dest);
 }
 
+#ifdef _WIN32
+bool PathUtils::move(const std::string& from, const std::string& to) {
+    Win32UnicodeString wfrom(from);
+    Win32UnicodeString wto(to);
+    // _wrename returns 0 on success.
+    if (_wrename(wfrom.c_str(),wto.c_str())) {
+        if (errno == ENOENT) {
+            return false;
+        }
+
+#ifdef _SUPPORT_FILESYSTEM
+        // Rename can fail if files are on different disks
+        if (CopyFileW(wfrom.c_str(), wto.c_str(), false)) {
+            _wremove(wfrom.c_str());
+            return true;
+        } else {
+            return false;
+        }
+#else   // _SUPPORT_FILESYSTEM
+        return false;
+#endif  // _SUPPORT_FILESYSTEM
+    }
+    return true;
+}
+#else
 bool PathUtils::move(const std::string& from, const std::string& to) {
     // std::rename returns 0 on success.
     if (std::rename(from.c_str(), to.c_str())) {
@@ -459,6 +488,7 @@ bool PathUtils::move(const std::string& from, const std::string& to) {
     }
     return true;
 }
+#endif
 
 }  // namespace base
 }  // namespace android

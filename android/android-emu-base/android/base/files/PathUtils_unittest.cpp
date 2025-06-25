@@ -604,5 +604,36 @@ TEST(PathUtils, streams_use_unicode_paths) {
 
     EXPECT_TRUE(android::base::System::get()->pathExists(unicode_file));
 }
+
+TEST(PathUtils, move_with_unicode) {
+    // If this test is green then you are able to open a UTF-8 encoded file path
+    // by calling the PathUtils::asUnicodePath translation function.
+    android::base::TestSystem testSystem("/", android::base::System::kProgramBitness);
+    std::string fname_old = "⺁⺶ɥǝןןo.txtиdŠэл.txt";
+    std::string fname_new = "Šaэл⺁⺶ɥǝןןo.txt2.txt";
+    std::string contents = "Hello there!";
+
+    auto testDir = testSystem.getTempRoot();
+    auto unicode_file_old = android::base::pj(testDir->path(), fname_old);
+    auto unicode_file_new = android::base::pj(testDir->path(), fname_new);
+
+    // Note that using the unicode_file directly on windows will fail
+    // std::ofstream out(unicode_file);
+    std::ofstream out(android::base::PathUtils::asUnicodePath(unicode_file_old.c_str()).c_str());
+    out << contents;
+    out.close();
+
+    EXPECT_TRUE(PathUtils::move(unicode_file_old, unicode_file_new));
+
+    std::ifstream in(android::base::PathUtils::asUnicodePath(unicode_file_new.c_str()).c_str());
+    EXPECT_TRUE(in.is_open());
+
+    std::string line;
+    std::getline(in, line);
+    in.close();
+
+    EXPECT_STREQ(contents.c_str(), line.c_str());
+}
+
 }  // namespace android
 }  // namespace base
