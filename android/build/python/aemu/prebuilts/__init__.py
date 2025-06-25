@@ -56,18 +56,24 @@ def buildPrebuilts(args):
         os.environ = orig_environ
     logging.info("Done building prebuilts list. Prebuilts located at [%s]", prebuilts_dir)
 
-    # zip each prebuilt in out/prebuilts and binplace under dist/prebuilts/.
-    dist_prebuilts_dir = Path(args.dist) / "prebuilts"
-    os.makedirs(dist_prebuilts_dir)
-    for dir in Path(prebuilts_dir).glob("*"):
-        bname = os.path.basename(dir)
-        prebuilts_zip = os.path.join(
-                args.dist, _prebuilts_dir_name, _prebuilts_zip_name.format(
-                    prebuilt_name=bname, build_number=args.sdk_build_number))
-        logging.info(f"Creating {prebuilts_zip}")
-        with zipfile.ZipFile(prebuilts_zip, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zipf:
-            search_dir = dir
-            for fname in search_dir.glob("**/*"):
-                arcname = fname.relative_to(search_dir)
-                logging.info("[%s] Adding %s as %s", prebuilts_zip, fname, arcname)
-                zipf.write(fname, arcname)
+    if not args.dist:
+        logging.info("Argument 'dist' is not provided, skipping zip file creation")
+    else:
+        # zip each prebuilt in out/prebuilts and binplace under dist/prebuilts/.
+        dist_prebuilts_dir = Path(args.dist) / "prebuilts"
+        logging.info("Argument 'dist' is provided, creating zip file for prebuilts at: %s", dist_prebuilts_dir)
+        os.makedirs(dist_prebuilts_dir)
+        for dir in Path(prebuilts_dir).glob("*"):
+            bname = os.path.basename(dir)
+            prebuilts_zip = os.path.join(
+                    args.dist, _prebuilts_dir_name, _prebuilts_zip_name.format(
+                        prebuilt_name=bname, build_number=args.sdk_build_number))
+            logging.info(f"Creating {prebuilts_zip}")
+            with zipfile.ZipFile(prebuilts_zip, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zipf:
+                search_dir = dir
+                for fname in search_dir.glob("**/*"):
+                    arcname = fname.relative_to(search_dir)
+                    logging.info("[%s] Adding %s as %s", prebuilts_zip, fname, arcname)
+                    zipf.write(fname, arcname)
+
+    logging.info("Successfully finished buildPrebuilts.")

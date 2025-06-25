@@ -26,7 +26,12 @@ AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
 HOST_ARCH = platform.machine().lower()
 
+# This is where moltenvk lives
 AOSP_MOLTENVK_SRC_PATH = AOSP_ROOT / "external" / "moltenvk"
+
+# This is where moltenvk prebuilts should be submitted
+AOSP_MOLTENVK_PREBUILTS_PATH =  AOSP_ROOT / "prebuilts" / "android-emulator-build" / "common" / "vulkan" / "darwin-aarch64" / "icds"
+
 MOLTENVK_OUT_FILES = ["MoltenVK_icd.json", "libMoltenVK.dylib"]
 CMAKE_PATH = os.path.join(AOSP_ROOT, "prebuilts", "cmake", HOST_OS + "-x86", "bin")
 NINJA_PATH = os.path.join(AOSP_ROOT, "prebuilts", "ninja", HOST_OS + "-x86")
@@ -75,12 +80,15 @@ def installMoltenVk(builddir, installdir):
         installdir (str): The location of the moltenvk install directory.
     """
     logging.info("Installing MoltenVk to %s", installdir)
-    os.makedirs(installdir)
+    os.makedirs(installdir, exist_ok=True)
 
     for f in MOLTENVK_OUT_FILES:
         src_file = builddir / f
         dst_file = installdir / f
         logging.info("Copy %s => %s", str(src_file), str(dst_file))
+        if os.path.exists(dst_file):
+            logging.info("Target file '%s' exists, deleting.", str(dst_file))
+            os.remove(dst_file)
         shutil.copyfile(src_file, dst_file)
     logging.info("Installed MoltenVK files to %s", installdir)
 
@@ -104,6 +112,13 @@ def buildPrebuilt(args, prebuilts_out_dir):
         logging.critical("MoltenVK build failed")
         exit(1)
 
-    moltenvk_install_dir = Path(prebuilts_out_dir) / "moltenvk"
-    installMoltenVk(build_dir, moltenvk_install_dir)
+    # Copy into prebuilts path that'll be used by the emulator build
+    installMoltenVk(build_dir, AOSP_MOLTENVK_PREBUILTS_PATH)
+
+    if (args.dist):
+        # Build will create a distribution zip file, move the files
+        # also into prebuilts_out_dir
+        moltenvk_install_dir = Path(prebuilts_out_dir) / "moltenvk"
+        installMoltenVk(build_dir, moltenvk_install_dir)
+
     logging.info("Successfully built MoltenVk!")
