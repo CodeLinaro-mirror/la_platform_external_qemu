@@ -409,17 +409,32 @@ static const PCIIOMMUOps npcm_pcierc_iommu_ops = {
 
 static void npcm_pcierc_reset_pcie_windows(NPCMPCIERCState *s)
 {
-    memset(s->axi2pcie, 0, sizeof(s->axi2pcie));
-    memset(s->pcie2axi, 0, sizeof(s->pcie2axi));
-
     for (int i = 0; i < NPCM_PCIERC_NUM_PA_WINDOWS; i++) {
+        s->pcie2axi[i].sal = 0;
+        s->pcie2axi[i].sah = 0;
+        s->pcie2axi[i].tal = 0;
+        s->pcie2axi[i].tah = 0;
+        s->pcie2axi[i].params = 0;
         s->pcie2axi[i].id = i;
         s->pcie2axi[i].type = PCIE2AXI;
+        s->pcie2axi[i].set_fields = 0;
+
+        npcm_pcierc_unmap_disabled(s, &s->pcie2axi[i]);
+        memset(&s->pcie2axi[i].mem, 0, sizeof(s->pcie2axi[i].mem));
     }
 
     for (int i = 0; i < NPCM_PCIERC_NUM_AP_WINDOWS; i++) {
+        s->axi2pcie[i].sal = 0;
+        s->axi2pcie[i].sah = 0;
+        s->axi2pcie[i].tal = 0;
+        s->axi2pcie[i].tah = 0;
+        s->axi2pcie[i].params = 0;
         s->axi2pcie[i].id = i;
         s->axi2pcie[i].type = AXI2PCIE;
+        s->axi2pcie[i].set_fields = 0;
+
+        npcm_pcierc_unmap_disabled(s, &s->axi2pcie[i]);
+        memset(&s->axi2pcie[i].mem, 0, sizeof(s->axi2pcie[i].mem));
     }
 }
 
