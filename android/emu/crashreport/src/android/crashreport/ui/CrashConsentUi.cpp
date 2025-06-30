@@ -82,6 +82,9 @@ public:
         if (shouldAsk == Consent::ALWAYS) {
             return ReportAction::UPLOAD_REMOVE;
         }
+        if (shouldAsk == Consent::NEVER) {
+            return ReportAction::REMOVE;
+        }
 
         auto file_path = report.file_path.value();
         std::ifstream dump_file(file_path, std::ios::in | std::ios::binary);
