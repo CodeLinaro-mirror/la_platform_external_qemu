@@ -13,6 +13,7 @@
 #include "android/base/system/System.h"
 #include "android/emulation/compatibility_check.h"
 #include "android/cpu_accelerator.h"
+#include "aemu/base/system/Win32Utils.h"
 
 #ifdef _WIN32
 namespace android {
@@ -57,6 +58,15 @@ AvdCompatibilityCheckResult hasCompatibleHypervisor(AvdInfo* avd) {
                         name),
                 .status = AvdCompatibility::Warning,
                 .metrics = metrics};
+    }
+
+    if (accelerator == ANDROID_CPU_ACCELERATOR_NONE &&
+       ::android::base::Win32Utils::getServiceStatus("intelhaxm") == SVC_RUNNING) {
+        return {
+                .description = "Your current hypervisor HAXM is no longer supported by the Android Emulator. "
+                        "Using WHPX is recommended. "
+                        "Refer to https://developer.android.com/studio/run/emulator-acceleration#vm-windows-whpx",
+                .status = AvdCompatibility::Error,};
     }
 
     return {
