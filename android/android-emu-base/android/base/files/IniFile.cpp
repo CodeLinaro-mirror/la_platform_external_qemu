@@ -15,9 +15,6 @@
 #include "android/utils/debug.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
-#ifdef _MSC_VER
-#include "aemu/base/system/Win32UnicodeString.h"
-#endif
 
 #ifdef _MSC_VER
 #include "msvc-posix.h"
@@ -179,12 +176,7 @@ bool IniFile::read(bool keepComments) {
         return false;
     }
 
-#ifdef _MSC_VER
-    Win32UnicodeString wBackingFilePath(mBackingFilePath);
-    ifstream inFile(wBackingFilePath.c_str(), ios_base::in | ios_base::ate);
-#else
-    ifstream inFile(mBackingFilePath, ios_base::in | ios_base::ate);
-#endif
+    ifstream inFile(PathUtils::asUnicodePath(mBackingFilePath.c_str()).c_str(), ios_base::in | ios_base::ate);
 
     if (!inFile) {
         LOG(WARNING) << "Failed to process .ini file " << mBackingFilePath
@@ -236,12 +228,7 @@ bool IniFile::readFromMemory(std::string_view data) {
 }
 
 bool IniFile::writeCommonImpl(bool discardEmpty, const std::string& filePath) {
-#ifdef _MSC_VER
-    Win32UnicodeString wFilePath(filePath);
-    std::ofstream outFile(wFilePath.c_str(), ios_base::out | ios_base::trunc);
-#else
-    std::ofstream outFile(filePath, std::ios_base::out | std::ios_base::trunc);
-#endif
+    std::ofstream outFile(PathUtils::asUnicodePath(filePath.c_str()).c_str(), std::ios_base::out | std::ios_base::trunc);
 
     if (!outFile) {
         LOG(WARNING) << "Failed to open '" << filePath << "' for writing.";
@@ -289,7 +276,7 @@ bool IniFile::writeCommon(const bool discardEmpty) {
     }
 
     const std::string iniFileOld = mBackingFilePath + ".old";
-    std::filesystem::remove(iniFileOld.c_str()); // just in case `myRemove` below failed
+    PathUtils::remove(iniFileOld.c_str()); // just in case `myRemove` below failed
 
     const bool deleteOldConfig =
         PathUtils::move(mBackingFilePath.c_str(), iniFileOld.c_str());
@@ -310,12 +297,12 @@ bool IniFile::writeCommon(const bool discardEmpty) {
             LOG(WARNING) << "Failed to save '" << mBackingFilePath << "'";
         }
 
-        std::filesystem::remove(iniFileNew.c_str());
+        PathUtils::remove(iniFileNew.c_str());
         return false;
     }
 
     if (deleteOldConfig) {
-        std::filesystem::remove(iniFileOld.c_str());
+        PathUtils::remove(iniFileOld.c_str());
     }
 
     return true;

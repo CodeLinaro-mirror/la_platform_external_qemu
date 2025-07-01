@@ -701,16 +701,16 @@ void RecordMacroPage::stopRecording() {
                   newName;
         newName.append(".emu-macro");
         const std::string newPath = PathUtils::join(macrosLocation, newName);
-        if (std::rename(oldPath.c_str(), newPath.c_str()) != 0) {
+        if (PathUtils::move(oldPath.c_str(), newPath.c_str()) != 0) {
             LOG(ERROR) << "Renaming file failed.";
-            std::remove(oldPath.c_str());
+            PathUtils::remove(oldPath.c_str());
         } else {
             createMacroItem(newName, false);
             reportMacroRecorded();
         }
     } else {
         // Delete file.
-        std::remove(oldPath.c_str());
+        PathUtils::remove(oldPath.c_str());
     }
 
     setMacroUiState(MacroUiState::Waiting);
@@ -962,7 +962,7 @@ void RecordMacroPage::deleteMacroItem(RecordMacroSavedItem* macroItem) {
         mUi->macroList->model()->removeRow(mUi->macroList->row(listItem));
         const std::string macrosLocation = getCustomMacrosDirectory();
         const std::string path = PathUtils::join(macrosLocation, name);
-        if (std::remove(path.c_str()) != 0) {
+        if (PathUtils::remove(path.c_str()) != 0) {
             displayErrorBox("Deletion failed.");
         } else {
             reportMacroDeleted();

@@ -466,6 +466,11 @@ bool PathUtils::move(const std::string& from, const std::string& to) {
     }
     return true;
 }
+
+bool PathUtils::remove(const std::string& name) {
+    Win32UnicodeString wname(name);
+    return _wremove(wname.c_str());
+}
 #else
 bool PathUtils::move(const std::string& from, const std::string& to) {
     // std::rename returns 0 on success.
@@ -487,6 +492,10 @@ bool PathUtils::move(const std::string& from, const std::string& to) {
 #endif  // _SUPPORT_FILESYSTEM
     }
     return true;
+}
+
+bool PathUtils::remove(const std::string& name) {
+    return std::remove(name.c_str());
 }
 #endif
 
