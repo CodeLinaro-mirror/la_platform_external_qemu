@@ -635,5 +635,23 @@ TEST(PathUtils, move_with_unicode) {
     EXPECT_STREQ(contents.c_str(), line.c_str());
 }
 
+TEST(PathUtils, remove_with_unicode) {
+    // If this test is green then you are able to open a UTF-8 encoded file path
+    // by calling the PathUtils::asUnicodePath translation function.
+    android::base::TestSystem testSystem("/", android::base::System::kProgramBitness);
+    std::string name = "⺁⺶ɥǝןןo.txtиdŠэл.txt";
+
+    auto testDir = testSystem.getTempRoot();
+    auto file_name = android::base::pj(testDir->path(), name);
+
+    std::ofstream out(android::base::PathUtils::asUnicodePath(file_name.c_str()).c_str());
+    out.close();
+
+    PathUtils::remove(file_name.c_str());
+
+    std::ifstream check_delete(android::base::PathUtils::asUnicodePath(file_name.c_str()).c_str());
+    EXPECT_FALSE(check_delete.is_open());
+}
+
 }  // namespace android
 }  // namespace base

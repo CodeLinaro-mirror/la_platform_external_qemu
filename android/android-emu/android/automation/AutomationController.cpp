@@ -1083,12 +1083,12 @@ void AutomationControllerImpl::copyStreamToStream(
         modifiedStream->putString(binaryProto);
     }
 
-    if (std::remove(mFilePath.c_str()) != 0) {
+    if (PathUtils::remove(mFilePath.c_str()) != 0) {
         LOG(WARNING) << "Could not remove original macro-file.";
     }
 
     const std::string tmpPath = mFilePath + "_tmp";
-    if (std::rename(tmpPath.c_str(), mFilePath.c_str()) != 0) {
+    if (PathUtils::move(tmpPath.c_str(), mFilePath.c_str()) != 0) {
         LOG(WARNING) << "Could not rename modified macro-file.";
     }
 }
