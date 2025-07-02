@@ -530,7 +530,7 @@ def linux_postInstall(installdir, target, is_webengine):
             ["patchelf", "--force-rpath", "--set-rpath", "$ORIGIN/../lib", exe],
             cwd=installdir, env=os.environ.copy())
 
-def buildPrebuilt(args, prebuilts_out_dir):
+def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
     atexit.register(cleanup)
 
     if HOST_OS == "windows":

@@ -23,6 +23,7 @@ import aemu.prebuilts.moltenvk as moltenvk
 import aemu.prebuilts.lavapipe as lavapipe
 
 HOST_OS = platform.system().lower()
+HOST_ARCH = platform.machine().lower()
 
 _prebuilts_dir_name = "prebuilts"
 _prebuilts_zip_name = "PREBUILT-{prebuilt_name}-{build_number}.zip"
@@ -42,7 +43,24 @@ if HOST_OS == "darwin":
         'moltenvk': moltenvk.buildPrebuilt,
     })
 
-def buildPrebuilts(args):
+def buildPrebuilts(args, is_emulator_build):
+    build_if_sha1_changed = False
+    # In an emulator build, we check if the SHA1 of the latest commit in each repository and build
+    # it if different from the SHA1 of the current prebuilt.
+    if is_emulator_build:
+        if HOST_OS == "darwin" and (HOST_ARCH == "aarch64" or HOST_ARCH == "arm64"):
+            logging.info("Prebuilts compilation in emulator build starting up for "
+                         + f"{HOST_OS}-{HOST_ARCH}.")
+            build_if_sha1_changed = True
+            # Continue to add support for more platforms/prebuilts in emulator build.
+            _prebuilt_funcs = {
+                'moltenvk': moltenvk.buildPrebuilt,
+            }
+        else:
+            logging.info("Prebuilts compilation in emulator build is not supported yet for "
+                         + f"{HOST_OS}-{HOST_ARCH}. Skipping.")
+            return
+
     # out/prebuilts
     prebuilts_dir = os.path.join(args.out, _prebuilts_dir_name)
     build_list = args.prebuilts if args.prebuilts else _prebuilt_funcs.keys()
@@ -50,7 +68,7 @@ def buildPrebuilts(args):
     logging.info("Prebuilts list: " + str(build_list))
     for prebuilt in build_list:
         logging.info(">> Building prebuilt [%s]", prebuilt)
-        _prebuilt_funcs.get(prebuilt)(args, prebuilts_dir)
+        _prebuilt_funcs.get(prebuilt)(args, prebuilts_dir, build_if_sha1_changed)
         # Ours + third_party build scripts may modify our envirionment. We should start
         # from the same environment for each prebuilt.
         os.environ = orig_environ

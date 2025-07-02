@@ -296,7 +296,7 @@ def installAngle(builddir, installdir):
     logging.info("Done installing Angle")
     return True
 
-def buildPrebuilt(args, prebuilts_out_dir):
+def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
     if HOST_OS == "darwin":
         # Our buildbots may define LIBRARY_PATH=/usr/local/lib, which will break the ANGLE build.
         # Unset it.
