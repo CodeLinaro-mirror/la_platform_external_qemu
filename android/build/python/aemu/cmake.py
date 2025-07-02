@@ -30,6 +30,7 @@ from aemu.tasks.configure import ConfigureTask
 from aemu.tasks.distribution import DistributionTask
 from aemu.tasks.gen_entries import GenEntriesTestTask
 from aemu.tasks.integration_tests import IntegrationTestTask, ZipIntegrationTestsTask
+from aemu.tasks.prebuilts import PrebuiltsTask
 from aemu.tasks.unit_tests import AccelerationCheckTask, CTestTask, CoverageReportTask
 from aemu.tasks.emugen_test import EmugenTestTask
 from aemu.tasks.package_samples import PackageSamplesTask
@@ -50,6 +51,7 @@ def get_tasks(args) -> List[BuildTask]:
         # A task can be disabled, or explicitly enabled by calling
         # .enable(False) <- Disable the task
         CleanTask(destination=args.out, aosp=args.aosp),
+        PrebuiltsTask(args, is_emulator_build=True),
         ConfigureTask(
             aosp=args.aosp,
             target=args.target,
@@ -120,7 +122,7 @@ def main(args):
         logging.info("Building the prebuilts [{}]".format(args.prebuilts))
         from aemu.prebuilts import buildPrebuilts
 
-        buildPrebuilts(args)
+        buildPrebuilts(args, is_emulator_build=False)
         return
 
     if args.feature_list:

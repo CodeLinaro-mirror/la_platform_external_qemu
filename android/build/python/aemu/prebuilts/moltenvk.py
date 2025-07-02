@@ -32,7 +32,8 @@ AOSP_MOLTENVK_SRC_PATH = AOSP_ROOT / "external" / "moltenvk"
 # This is where moltenvk prebuilts should be submitted
 AOSP_MOLTENVK_PREBUILTS_PATH =  AOSP_ROOT / "prebuilts" / "android-emulator-build" / "common" / "vulkan" / "darwin-aarch64" / "icds"
 
-MOLTENVK_OUT_FILES = ["MoltenVK_icd.json", "libMoltenVK.dylib"]
+MOLTENVK_SHA1_FILE = "moltenvk.sha1"
+MOLTENVK_OUT_FILES = ["MoltenVK_icd.json", "libMoltenVK.dylib", MOLTENVK_SHA1_FILE]
 CMAKE_PATH = os.path.join(AOSP_ROOT, "prebuilts", "cmake", HOST_OS + "-x86", "bin")
 NINJA_PATH = os.path.join(AOSP_ROOT, "prebuilts", "ninja", HOST_OS + "-x86")
 
@@ -64,6 +65,11 @@ def buildMoltenVk():
         logging.critical("[%s] failed (%s)", build_cmd, res.returncode)
         exit(res.returncode)
 
+    # Create the SHA1 file
+    git_sha1 = deps_common.getSHA1FromGitProject(AOSP_MOLTENVK_SRC_PATH)
+    with open(BUILD_DIR / MOLTENVK_SHA1_FILE, 'w') as f:
+        f.write(git_sha1)
+
     for f in MOLTENVK_OUT_FILES:
         if not os.path.exists(BUILD_DIR / f):
             logging.critical("Build output missing %s", str(BUILD_DIR / f))
@@ -92,7 +98,19 @@ def installMoltenVk(builddir, installdir):
         shutil.copyfile(src_file, dst_file)
     logging.info("Installed MoltenVK files to %s", installdir)
 
-def buildPrebuilt(args, prebuilts_out_dir):
+def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
+    if check_sha1:
+        logging.info("Checking MoltenVK SHA1...")
+        try:
+            if deps_common.isSHA1Same(git_src_dir=AOSP_MOLTENVK_SRC_PATH,
+                                      sha1_file=AOSP_MOLTENVK_PREBUILTS_PATH / MOLTENVK_SHA1_FILE):
+                logging.info("Same MoltenVK SHA1. Skipping MoltenVK build.")
+                return
+            else:
+                logging.info("Different MoltenVK sha1 detected. Rebuilding MoltenVK.")
+        except Exception as e:
+            logging.fatal(e)
+
     # Use cmake from our prebuilts
     deps_common.addToSearchPath(CMAKE_PATH)
     # Use ninja from our prebuilts

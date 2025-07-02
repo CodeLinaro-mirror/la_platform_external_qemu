@@ -118,7 +118,7 @@ def installLavapipe(builddir, installdir):
     logging.info("Installation succeeded")
 
 
-def buildPrebuilt(args, prebuilts_out_dir):
+def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
     # Use meson from our prebuilts
     deps_common.addToSearchPath(MESON_PATH)
     # Use ninja from our prebuilts

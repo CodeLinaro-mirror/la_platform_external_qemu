@@ -133,3 +133,56 @@ def getMesonDirectory():
 
 def addToSearchPath(searchDir):
     os.environ["PATH"] = searchDir + os.pathsep + os.environ["PATH"]
+
+def getSHA1FromGitProject(git_src_dir: Path) -> str:
+    try:
+        # Get the SHA1 of the latest commit in the git repository
+        # --no-pager ensures git output is not piped through a pager like less
+        # show -s --format=%H gets the commit hash only
+        git_sha1_cmd = ["git", "--no-pager", "show", "-s", "--format=%H"]
+        git_sha1_process = subprocess.run(
+            git_sha1_cmd,
+            cwd=git_src_dir,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        latest_git_sha1 = git_sha1_process.stdout.strip()
+
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Failed to get git SHA1 from {git_src_dir}: {e.stderr}")
+    except FileNotFoundError:
+        raise RuntimeError("Git command not found. Please ensure Git is installed and in your PATH.")
+
+    return latest_git_sha1
+
+def isSHA1Same(git_src_dir: Path, sha1_file: Path) -> bool:
+    """Check if the SHA1 of the latest commit in the git repository, `git_src_dir` is the same
+       as the SHA1 string contained in the file, `sha1_file`.
+
+    Args:
+        git_src_dir (Path): Path to the git repository.
+        sha1_file (Path): Path to the SHA1 file.
+
+    Returns:
+        bool: True if the SHA1s are the same, False otherwise.
+    """
+    if not git_src_dir.is_dir():
+        raise FileNotFoundError(f"Git source directory not found: {git_src_dir}")
+    if not sha1_file.is_file():
+        # If the sha1_file doesn't exist, it means there's no previous SHA1 to compare against.
+        # In this specific comparison function, it should return False as they cannot be "the same".
+        logging.info(f"{sha1_file} not found.")
+        return False
+
+    latest_git_sha1 = getSHA1FromGitProject(git_src_dir=git_src_dir)
+    logging.info(f"{git_src_dir} SHA1={latest_git_sha1}")
+
+    try:
+        # Read the SHA1 from the file
+        with open(sha1_file, 'r', encoding='utf-8') as f:
+            file_sha1 = f.read().strip()
+    except IOError as e:
+        raise IOError(f"Failed to read SHA1 from file {sha1_file}: {e}")
+
+    return latest_git_sha1 == file_sha1
