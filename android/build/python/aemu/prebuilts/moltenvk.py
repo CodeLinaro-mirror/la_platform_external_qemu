@@ -30,7 +30,9 @@ HOST_ARCH = platform.machine().lower()
 AOSP_MOLTENVK_SRC_PATH = AOSP_ROOT / "external" / "moltenvk"
 
 # This is where moltenvk prebuilts should be submitted
-AOSP_MOLTENVK_PREBUILTS_PATH =  AOSP_ROOT / "prebuilts" / "android-emulator-build" / "common" / "vulkan" / "darwin-aarch64" / "icds"
+AOSP_MOLTENVK_PREBUILTS_ARCH = "x86_64" if HOST_ARCH == "x86_64" else "aarch64"
+AOSP_MOLTENVK_PREBUILTS_PATH =  AOSP_ROOT / "prebuilts" / "android-emulator-build" / "common" \
+        / "vulkan" / f"darwin-{AOSP_MOLTENVK_PREBUILTS_ARCH}" / "icds"
 
 MOLTENVK_SHA1_FILE = "moltenvk.sha1"
 MOLTENVK_OUT_FILES = ["MoltenVK_icd.json", "libMoltenVK.dylib", MOLTENVK_SHA1_FILE]
