@@ -15,6 +15,7 @@
 #include <stdint.h>                                         // for uint32_t
 #include <map>                                              // for map, __ma...
 #include <utility>                                          // for pair
+#include <cstring>                                          // for memcpy
 
 #include "host-common/MultiDisplay.h"                 // for MultiDisp...
 #include "host-common/multi_display_agent.h"  // for QAndroidM...
@@ -139,6 +140,27 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             *y = mMultiDisplay[displayId].pos_y;
             *w = mMultiDisplay[displayId].width;
             *h = mMultiDisplay[displayId].height;
+            return 0;
+        },
+        .setDisplayColorTransform = [](uint32_t displayId,
+                                       const float colorMatrix[16]) -> int {
+            if (!colorMatrix ||
+                mMultiDisplay.find(displayId) == mMultiDisplay.end()) {
+                return -1;
+            }
+            std::memcpy(mMultiDisplay[displayId].colorTransform.mat,
+                        colorMatrix, sizeof(float) * 16);
+            return 0;
+        },
+        .getDisplayColorTransform = [](uint32_t displayId,
+                                       float outColorMatrix[16]) -> int {
+            if (!outColorMatrix ||
+                mMultiDisplay.find(displayId) == mMultiDisplay.end()) {
+                return -1;
+            }
+            std::memcpy(outColorMatrix,
+                        mMultiDisplay[displayId].colorTransform.mat,
+                        sizeof(float) * 16);
             return 0;
         },
         .getDisplayColorBuffer = [](uint32_t displayId,
