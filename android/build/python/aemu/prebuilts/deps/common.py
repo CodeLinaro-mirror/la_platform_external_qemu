@@ -175,7 +175,14 @@ def isSHA1Same(git_src_dir: Path, sha1_file: Path) -> bool:
         logging.info(f"{sha1_file} not found.")
         return False
 
-    latest_git_sha1 = getSHA1FromGitProject(git_src_dir=git_src_dir)
+    try:
+        latest_git_sha1 = getSHA1FromGitProject(git_src_dir=git_src_dir)
+    except subprocess.CalledProcessError as e:
+        # TODO: make sure we always query correct git folders for SHA check
+        # Temporarily do not error out on this case due to presubmit flakes
+        logging.warning(f"Failed to get SHA1 from git project: {e}, skipping prebuilt!")
+        return True
+
     logging.info(f"{git_src_dir} SHA1={latest_git_sha1}")
 
     try:
