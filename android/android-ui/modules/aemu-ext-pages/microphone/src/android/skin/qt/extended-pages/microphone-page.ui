@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>622</width>
+    <width>640</width>
     <height>580</height>
    </rect>
   </property>
@@ -17,7 +17,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>20</y>
+     <y>212</y>
      <width>251</width>
      <height>24</height>
     </rect>
@@ -26,7 +26,7 @@
     <string notr="true">border: 0px;</string>
    </property>
    <property name="title">
-    <string>Virtual headset plug inserted</string>
+    <string>Simulate Insert Headset</string>
    </property>
    <property name="ColorGroup" stdset="0">
     <string notr="true">Title</string>
@@ -36,7 +36,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>38</y>
+     <y>230</y>
      <width>211</width>
      <height>24</height>
     </rect>
@@ -66,14 +66,17 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>20</x>
-     <y>112</y>
+     <x>230</x>
+     <y>230</y>
      <width>211</width>
      <height>24</height>
     </rect>
    </property>
    <property name="accessibleDescription">
-    <string>Virtual headset has microphone</string>
+    <string>Virtual microphone attached</string>
+   </property>
+   <property name="text">
+    <string>Virtual microphone attached</string>
    </property>
    <property name="iconSize">
     <size>
@@ -84,9 +87,6 @@
    <property name="checked">
     <bool>true</bool>
    </property>
-   <property name="ColorGroup" stdset="0">
-    <string>Toggle</string>
-   </property>
    <property name="report_metrics" stdset="0">
     <bool>false</bool>
    </property>
@@ -94,8 +94,8 @@
   <widget class="QGroupBox" name="mic_hasMicLabel">
    <property name="geometry">
     <rect>
-     <x>20</x>
-     <y>94</y>
+     <x>230</x>
+     <y>212</y>
      <width>251</width>
      <height>24</height>
     </rect>
@@ -104,7 +104,7 @@
     <string notr="true">border: 0px;</string>
    </property>
    <property name="title">
-    <string>Virtual headset has microphone</string>
+    <string>Configuration</string>
    </property>
    <property name="ColorGroup" stdset="0">
     <string notr="true">Title</string>
@@ -117,7 +117,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>242</y>
+     <y>130</y>
      <width>132</width>
      <height>36</height>
     </rect>
@@ -149,7 +149,7 @@
    <property name="geometry">
     <rect>
      <x>168</x>
-     <y>242</y>
+     <y>130</y>
      <width>132</width>
      <height>36</height>
     </rect>
@@ -178,7 +178,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>168</y>
+     <y>70</y>
      <width>251</width>
      <height>24</height>
     </rect>
@@ -187,7 +187,7 @@
     <string notr="true">border: 0px;</string>
    </property>
    <property name="title">
-    <string>Virtual microphone uses host audio input</string>
+    <string>Enable Host Microphone Access</string>
    </property>
    <property name="ColorGroup" stdset="0">
     <string notr="true">Title</string>
@@ -197,7 +197,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>186</y>
+     <y>90</y>
      <width>211</width>
      <height>24</height>
     </rect>
@@ -221,14 +221,88 @@
     <bool>false</bool>
    </property>
   </widget>
-  <zorder>mic_insertedLabel</zorder>
-  <zorder>mic_hasMicLabel</zorder>
-  <zorder>mic_voiceAssistButton</zorder>
-  <zorder>mic_hookButton</zorder>
-  <zorder>mic_inserted</zorder>
-  <zorder>mic_hasMic</zorder>
+  <widget class="QLabel" name="microphoneSection">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>40</y>
+     <width>251</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="font">
+    <font>
+     <family>Roboto</family>
+     <weight>75</weight>
+     <bold>true</bold>
+    </font>
+   </property>
+   <property name="styleSheet">
+    <string notr="true"/>
+   </property>
+   <property name="text">
+    <string>Microphone</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="headsetSection">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>180</y>
+     <width>251</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="font">
+    <font>
+     <family>Roboto</family>
+     <weight>75</weight>
+     <bold>true</bold>
+    </font>
+   </property>
+   <property name="styleSheet">
+    <string notr="true"/>
+   </property>
+   <property name="text">
+    <string>Virtual Headset</string>
+   </property>
+  </widget>
+  <widget class="Line" name="line">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>170</y>
+     <width>451</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+  </widget>
+  <zorder>microphoneSection</zorder>
   <zorder>mic_allowRealAudioLabel</zorder>
   <zorder>mic_allowRealAudio</zorder>
+  <zorder>mic_voiceAssistButton</zorder>
+  <zorder>mic_hookButton</zorder>
+  <zorder>line</zorder>
+  <zorder>headsetSection</zorder>
+  <zorder>mic_insertedLabel</zorder>
+  <zorder>mic_inserted</zorder>
+  <zorder>mic_hasMicLabel</zorder>
+  <zorder>mic_hasMic</zorder>
  </widget>
  <customwidgets>
   <customwidget>
