@@ -1,29 +1,29 @@
 {
-    "description": "UEFI firmware for aarch64",
+    "description": "UEFI firmware for riscv64",
     "interface-types": [
         "uefi"
     ],
     "mapping": {
         "device": "flash",
         "executable": {
-            "filename": "C:/temp/bazeliczxs1yf/build/release/share/qemu/edk2-aarch64-code.fd",
+            "filename": "C:/temp/bazeliczxs1yf/build/release/share/qemu/edk2-riscv-code.fd",
             "format": "raw"
         },
         "nvram-template": {
-            "filename": "C:/temp/bazeliczxs1yf/build/release/share/qemu/edk2-arm-vars.fd",
+            "filename": "C:/temp/bazeliczxs1yf/build/release/share/qemu/edk2-riscv-vars.fd",
             "format": "raw"
         }
     },
     "targets": [
         {
-            "architecture": "aarch64",
+            "architecture": "riscv64",
             "machines": [
-                "virt-*"
+                "virt*"
             ]
         }
     ],
     "features": [
-        "verbose-static"
+
     ],
     "tags": [
 

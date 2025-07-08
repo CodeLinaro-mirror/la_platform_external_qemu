@@ -15,11 +15,13 @@
 
 #define CONFIG_TCG 1
 
-#define CONFIG_TCG_BUILTIN 1
-
 #define QEMU_ARCH QEMU_ARCH_RISCV
 
 #define TARGET_BIG_ENDIAN 0
+
+#define TARGET_KVM_HAVE_GUEST_DEBUG 1
+
+#define TARGET_LONG_BITS 64
 
 #define TARGET_NAME "riscv64"
 

@@ -6,11 +6,11 @@
     "mapping": {
         "device": "flash",
         "executable": {
-            "filename": "C:/temp/bazelw2enuacn/build/release/share/qemu/edk2-i386-code.fd",
+            "filename": "C:/temp/bazeliczxs1yf/build/release/share/qemu/edk2-i386-code.fd",
             "format": "raw"
         },
         "nvram-template": {
-            "filename": "C:/temp/bazelw2enuacn/build/release/share/qemu/edk2-i386-vars.fd",
+            "filename": "C:/temp/bazeliczxs1yf/build/release/share/qemu/edk2-i386-vars.fd",
             "format": "raw"
         }
     },

@@ -37,6 +37,8 @@
 
 #define CONFIG_ACPI_VIOT 1
 
+#define CONFIG_ACPI_VMCLOCK 1
+
 #define CONFIG_ACPI_VMGENID 1
 
 #define CONFIG_ACPI_X86 1
@@ -79,6 +81,8 @@
 
 #define CONFIG_DDC 1
 
+#define CONFIG_DEVICE_TREE 1
+
 #define CONFIG_DIMM 1
 
 #define CONFIG_E1000E_PCI_EXPRESS 1
@@ -107,11 +111,15 @@
 
 #define CONFIG_GUEST_LOADER 1
 
+#define CONFIG_GUEST_ONLY_PCI 1
+
 #define CONFIG_GUS 1
 
 #define CONFIG_HDA 1
 
 #define CONFIG_HPET 1
+
+#define CONFIG_HPET_C 1
 
 #define CONFIG_HV_BALLOON_SUPPORTED 1
 
@@ -123,6 +131,8 @@
 
 #define CONFIG_I2C_ECHO 1
 
+#define CONFIG_I386 1
+
 #define CONFIG_I440FX 1
 
 #define CONFIG_I8254 1
@@ -133,15 +143,19 @@
 
 #define CONFIG_I82801B11 1
 
+#define CONFIG_IDE_BUS 1
+
+#define CONFIG_IDE_CF 1
+
 #define CONFIG_IDE_CORE 1
+
+#define CONFIG_IDE_DEV 1
 
 #define CONFIG_IDE_ISA 1
 
 #define CONFIG_IDE_PCI 1
 
 #define CONFIG_IDE_PIIX 1
-
-#define CONFIG_IDE_QDEV 1
 
 #define CONFIG_IGB_PCI_EXPRESS 1
 
@@ -151,15 +165,21 @@
 
 #define CONFIG_IOH3420 1
 
+#define CONFIG_IOMMUFD 1
+
 #define CONFIG_IPACK 1
 
 #define CONFIG_IPMI 1
 
 #define CONFIG_IPMI_EXTERN 1
 
+#define CONFIG_IPMI_HOST 1
+
 #define CONFIG_IPMI_LOCAL 1
 
 #define CONFIG_IPMI_SSIF 1
+
+#define CONFIG_IP_OCTAL_232 1
 
 #define CONFIG_ISAPC 1
 
@@ -174,6 +194,8 @@
 #define CONFIG_ISA_TESTDEV 1
 
 #define CONFIG_IVSHMEM_DEVICE 1
+
+#define CONFIG_IVSHMEM_FLAT_DEVICE 1
 
 #define CONFIG_LPC_ICH9 1
 
@@ -199,6 +221,8 @@
 
 #define CONFIG_NMC93XX_EEPROM 1
 
+#define CONFIG_NUVOTON_PCI_IPMI_KCS 1
+
 #define CONFIG_NVDIMM 1
 
 #define CONFIG_NVME_PCI 1
@@ -214,6 +238,8 @@
 #define CONFIG_PCIE_PCI_BRIDGE 1
 
 #define CONFIG_PCIE_PORT 1
+
+#define CONFIG_PCI_BRIDGE 1
 
 #define CONFIG_PCI_DEVICES 1
 
@@ -246,6 +272,8 @@
 #define CONFIG_PFLASH_CFI01 1
 
 #define CONFIG_PIIX 1
+
+#define CONFIG_PLX_VSWITCH 1
 
 #define CONFIG_PS2 1
 
@@ -287,15 +315,23 @@
 
 #define CONFIG_SMBIOS 1
 
+#define CONFIG_SMBIOS_LEGACY 1
+
 #define CONFIG_SMBUS 1
 
 #define CONFIG_SMBUS_EEPROM 1
+
+#define CONFIG_SPDM_SOCKET 1
 
 #define CONFIG_SYNDBG 1
 
 #define CONFIG_TEST_DEVICES 1
 
+#define CONFIG_TPCI200 1
+
 #define CONFIG_TULIP 1
+
+#define CONFIG_UEFI_VARS 1
 
 #define CONFIG_UFS_PCI 1
 
@@ -308,6 +344,10 @@
 #define CONFIG_USB_EHCI 1
 
 #define CONFIG_USB_EHCI_PCI 1
+
+#define CONFIG_USB_HID 1
+
+#define CONFIG_USB_HUB 1
 
 #define CONFIG_USB_NETWORK 1
 
@@ -375,9 +415,9 @@
 
 #define CONFIG_VHOST_USER_RNG 1
 
-#define CONFIG_VHOST_USER_SCMI 1
-
 #define CONFIG_VHOST_USER_SCSI 1
+
+#define CONFIG_VHOST_USER_SND 1
 
 #define CONFIG_VHOST_USER_VGA 1
 
@@ -404,6 +444,8 @@
 #define CONFIG_VIRTIO_IOMMU 1
 
 #define CONFIG_VIRTIO_MD 1
+
+#define CONFIG_VIRTIO_MD_SUPPORTED 1
 
 #define CONFIG_VIRTIO_MEM 1
 
