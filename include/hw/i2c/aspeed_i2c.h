@@ -234,6 +234,8 @@ REG32(I2CS_DMA_TX_ADDR_HI, 0x68)
     FIELD(I2CS_DMA_TX_ADDR_HI, ADDR_HI, 0, 7)
 REG32(I2CS_DMA_RX_ADDR_HI, 0x6c)
     FIELD(I2CS_DMA_RX_ADDR_HI, ADDR_HI, 0, 7)
+/* Debug register */
+REG32(BYTE_DATA_LOG, 0x84)
 
 struct AspeedI2CState;
 
@@ -303,6 +305,7 @@ struct AspeedI2CClass {
     bool has_share_pool;
     uint64_t mem_size;
     bool has_dma64;
+    bool has_data_log;
 };
 
 static inline bool aspeed_i2c_is_new_mode(AspeedI2CState *s)

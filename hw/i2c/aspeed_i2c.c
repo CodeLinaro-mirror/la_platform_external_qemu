@@ -377,6 +377,10 @@ static void aspeed_i2c_bus_recv(AspeedI2CBus *bus)
 
         for (i = 0; i < pool_rx_count; i++) {
             pool_base[i] = i2c_recv(bus->bus);
+            if (aic->has_data_log) {
+                bus->regs[R_BYTE_DATA_LOG] = pool_base[i];
+            }
+
             trace_aspeed_i2c_bus_recv("BUF", i + 1, pool_rx_count,
                                       pool_base[i]);
         }
@@ -400,6 +404,9 @@ static void aspeed_i2c_bus_recv(AspeedI2CBus *bus)
             MemTxResult result;
 
             data = i2c_recv(bus->bus);
+            if (aic->has_data_log) {
+                bus->regs[R_BYTE_DATA_LOG] = data;
+            }
             trace_aspeed_i2c_bus_recv("DMA", bus->regs[reg_dma_len],
                                       bus->regs[reg_dma_len], data);
 
@@ -430,6 +437,10 @@ static void aspeed_i2c_bus_recv(AspeedI2CBus *bus)
         SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, RX_DMA_EN, 0);
     } else {
         data = i2c_recv(bus->bus);
+        if (aic->has_data_log) {
+            bus->regs[R_BYTE_DATA_LOG] = data;
+        }
+
         trace_aspeed_i2c_bus_recv("BYTE", 1, 1, bus->regs[reg_byte_buf]);
         SHARED_ARRAY_FIELD_DP32(bus->regs, reg_byte_buf, RX_BUF, data);
     }
@@ -1790,6 +1801,7 @@ static void aspeed_2700_i2c_class_init(ObjectClass *klass, const void *data)
     aic->has_dma = true;
     aic->mem_size = 0x2000;
     aic->has_dma64 = true;
+    aic->has_data_log = true;
 }
 
 static const TypeInfo aspeed_2700_i2c_info = {
