@@ -3459,6 +3459,7 @@ hxtool = find_program('scripts/hxtool')
 shaderinclude = find_program('scripts/shaderinclude.py')
 qapi_gen = find_program('scripts/qapi-gen.py')
 qapi_gen_depends = [ meson.current_source_dir() / 'scripts/qapi/__init__.py',
+                     meson.current_source_dir() / 'scripts/qapi/backend.py',
                      meson.current_source_dir() / 'scripts/qapi/commands.py',
                      meson.current_source_dir() / 'scripts/qapi/common.py',
                      meson.current_source_dir() / 'scripts/qapi/error.py',
