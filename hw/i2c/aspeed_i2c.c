@@ -388,6 +388,11 @@ static void aspeed_i2c_bus_recv(AspeedI2CBus *bus)
         /* In new mode, clear how many bytes we RXed */
         if (aspeed_i2c_is_new_mode(bus->controller)) {
             ARRAY_FIELD_DP32(bus->regs, I2CM_DMA_LEN_STS, RX_LEN, 0);
+            /*
+             * This field is updated in DMA mode, even though the datasheet
+             * says otherwise.
+             */
+            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_byte_buf, RX_BUF, 0);
         }
 
         aspeed_i2c_set_rx_dma_dram_offset(bus);
@@ -406,6 +411,11 @@ static void aspeed_i2c_bus_recv(AspeedI2CBus *bus)
                               __func__, bus->dma_dram_offset);
                 return;
             }
+            /*
+             * This field is updated in DMA mode, even though the datasheet
+             * says otherwise.
+             */
+            SHARED_ARRAY_FIELD_DP32(bus->regs, reg_byte_buf, RX_BUF, data);
 
             bus->dma_dram_offset++;
             bus->regs[reg_dma_len]--;
@@ -416,6 +426,7 @@ static void aspeed_i2c_bus_recv(AspeedI2CBus *bus)
                                                   RX_LEN) + 1);
             }
         }
+
         SHARED_ARRAY_FIELD_DP32(bus->regs, reg_cmd, RX_DMA_EN, 0);
     } else {
         data = i2c_recv(bus->bus);
