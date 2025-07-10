@@ -212,7 +212,7 @@ if(OPTION_GFXSTREAM_BACKEND)
     add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/renderdoc ${GFXSTREAM_PREFIX}-third-party-renderdoc)
     add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/x11 ${GFXSTREAM_PREFIX}-third-party-x11)
     add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/vulkan ${GFXSTREAM_PREFIX}-third-party-vulkan)
-    add_subdirectory(${GFXSTREAM_REPO_ROOT}/host ${GFXSTREAM_PREFIX}-stream-servers)
+    add_subdirectory(${GFXSTREAM_REPO_ROOT}/host ${GFXSTREAM_PREFIX}-host)
     target_link_libraries(
         GLES_V2_translator_static PRIVATE ANGLE::ANGLE
     )
