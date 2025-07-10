@@ -48,7 +48,7 @@ def buildPrebuilts(args, is_emulator_build):
     # In an emulator build, we check if the SHA1 of the latest commit in each repository and build
     # it if different from the SHA1 of the current prebuilt.
     if is_emulator_build:
-        if HOST_OS == "darwin" and (HOST_ARCH == "aarch64" or HOST_ARCH == "arm64"):
+        if HOST_OS == "darwin":
             logging.info("Prebuilts compilation in emulator build starting up for "
                          + f"{HOST_OS}-{HOST_ARCH}.")
             build_if_sha1_changed = True
