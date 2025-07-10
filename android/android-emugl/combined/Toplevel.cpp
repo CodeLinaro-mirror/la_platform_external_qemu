@@ -366,6 +366,21 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
                 *h = mMultiDisplay[displayId].height;
             return 0;
         },
+        .setDisplayColorTransform = [](uint32_t displayId,
+                                       const float outColorMatrix[16]) -> int {
+            if (!outColorMatrix) {
+                return -1;
+            }
+            memcpy(mMultiDisplay[displayId].colorTransform, outColorMatrix,
+                   sizeof(float) * 16);
+            return 0;
+        },
+        .getDisplayColorTransform = [](uint32_t displayId,
+                                       float outColorMatrix[16]) -> int {
+            memcpy(outColorMatrix, mMultiDisplay[displayId].colorTransform,
+                   sizeof(float) * 16);
+            return 0;
+        },
         .getDisplayColorBuffer = [](uint32_t displayId,
                                     uint32_t* colorBuffer) -> int {
             *colorBuffer = mMultiDisplay[displayId].cb;

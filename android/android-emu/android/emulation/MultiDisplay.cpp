@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <cstring>
 
 #include "aemu/base/LayoutResolver.h"
 #include "aemu/base/files/Stream.h"
@@ -674,6 +675,37 @@ int MultiDisplay::setDisplayPose(uint32_t displayId,
                << " w " << w << " h " << h << " dpi " << dpi;
 
     fireEvent(DisplayChangeEvent{DisplayChange::DisplayChanged, displayId});
+    return 0;
+}
+
+int MultiDisplay::getColorTransformMatrix(uint32_t displayId,
+                                          float outColorTransformMatrix[16]) {
+    if (mGuestMode) {
+        return -1;
+    }
+    AutoLock lock(mLock);
+    auto display = mMultiDisplay.find(displayId);
+    if (display == mMultiDisplay.end()) {
+        return -1;
+    }
+    std::memcpy(outColorTransformMatrix, display->second.colorTransform.mat,
+                sizeof(float) * 16);
+    return 0;
+}
+
+int MultiDisplay::setColorTransformMatrix(
+        uint32_t displayId,
+        const float colorTransformMatrix[16]) {
+    if (mGuestMode) {
+        return -1;
+    }
+    AutoLock lock(mLock);
+    auto display = mMultiDisplay.find(displayId);
+    if (display == mMultiDisplay.end()) {
+        return -1;
+    }
+    std::memcpy(display->second.colorTransform.mat, colorTransformMatrix,
+                sizeof(float) * 16);
     return 0;
 }
 

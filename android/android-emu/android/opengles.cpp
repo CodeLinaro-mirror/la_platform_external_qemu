@@ -458,6 +458,8 @@ int android_startOpenglesRenderer(
         .get_color_buffer_display = multi_display_agent->getColorBufferDisplay,
         .get_display_pose = multi_display_agent->getDisplayPose,
         .set_display_pose = multi_display_agent->setDisplayPose,
+        .get_color_transform_matrix = multi_display_agent->getDisplayColorTransform,
+        .set_color_transform_matrix = multi_display_agent->setDisplayColorTransform,
     });
 
     sRenderer = sRenderLib->initRenderer(width, height, gfxstreamFeatures,
