@@ -93,7 +93,7 @@ class QemuBuilder:
             [self.toolchain / "meson"]
             + ["setup", self.dest]
             + self.meson_config()
-            + [self.toolchain / "aosp-cl.ini"]
+            + ["--native-file", self.toolchain / "aosp-cl.ini"]
             + meson_flags,
             cwd=self.aosp / "third_party" / "qemu",
             toolchain_path=self.toolchain,

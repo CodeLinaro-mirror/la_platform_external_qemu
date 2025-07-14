@@ -204,7 +204,6 @@ class DarwinBuilder(QemuBuilder):
             "-Ddocs=disabled",
             "-Db_pie=false",
             f"-Dprefix={self.dest / 'release'}",
-            "--native-file",
         ]
 
     def packages(self):

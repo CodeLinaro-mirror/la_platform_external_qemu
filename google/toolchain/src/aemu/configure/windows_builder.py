@@ -163,7 +163,6 @@ class WindowsBuilder(QemuBuilder):
             "-Ddocs=disabled",
             f"-Dprefix={prefix}",
             "--vsenv",
-            "--native-file",
         ]
 
     def packages(self):

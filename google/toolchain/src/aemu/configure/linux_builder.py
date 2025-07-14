@@ -162,7 +162,6 @@ class LinuxBuilder(QemuBuilder):
             "-Dwerror=true",
             "-Ddocs=disabled",
             f"-Dprefix={self.dest / 'release'}",
-            "--native-file",
         ]
 
     def packages(self):
