@@ -654,9 +654,16 @@ void VirtualSensorsPage::setTargetHeadingDegrees(double heading) {
     while (heading <= -180.0) {
         heading += 360.0;
     }
-    setPhysicalParameterTarget(PHYSICAL_PARAMETER_ROTATION,
-                               PHYSICAL_INTERPOLATION_STEP,
-                               {-90.0F, 0.0F, static_cast<float>(-heading)});
+    if (!android_is_automotive()) {
+        setPhysicalParameterTarget(PHYSICAL_PARAMETER_ROTATION,
+                                   PHYSICAL_INTERPOLATION_STEP,
+                                   {-90.0F, 0.0F, static_cast<float>(-heading)});
+    } else {
+        setPhysicalParameterTarget(PHYSICAL_PARAMETER_ROTATION,
+                                   PHYSICAL_INTERPOLATION_STEP,
+                                   {0.0F, 0.0F, static_cast<float>(-heading)});
+    }
+
 }
 
 void VirtualSensorsPage::onTargetStateChanged() {
