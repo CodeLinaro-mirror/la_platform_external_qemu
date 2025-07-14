@@ -42,6 +42,7 @@ enum ssd0303_mode : uint32_t
 };
 
 enum ssd0303_cmd  : uint32_t
+{
     SSD0303_CMD_NONE,
     SSD0303_CMD_SKIP1
 };
