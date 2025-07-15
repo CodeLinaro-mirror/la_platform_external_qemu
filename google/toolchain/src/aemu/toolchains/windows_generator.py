@@ -122,7 +122,7 @@ class WindowsToWindowsGenerator(ToolchainGenerator):
         Returns:
             _type_: _description_
         """
-        prgrfiles = Path(os.getenv("ProgramFiles(x86)", "C:\Program Files (x86)"))
+        prgrfiles = Path(os.getenv("ProgramFiles(x86)", "C:\\Program Files (x86)"))
         res = subprocess.check_output(
             [
                 str(

@@ -104,7 +104,7 @@ def get_builder(
 
     # Get the class that is capable of configuring the toolchain
     # from the current host targeting our target.
-    toolchain = get_toolchain_generator(target, dest, toolchain_dir, "", aosp, ccache)
+    toolchain = get_toolchain_generator(target, dest, toolchain_dir, prefix, aosp, ccache)
 
     if target not in builder_map:
         logging.info("Mapping %s -> %s", target, TARGET_ALIAS[target])
@@ -157,7 +157,7 @@ def get_toolchain_dir(base_dir):
 
 def toolchain_command(args):
     mkdirs(Path(args.out).absolute(), args.force)
-    toolchain_dir = get_toolchain_dir(args.out),
+    toolchain_dir = get_toolchain_dir(args.out)
     toolchain = get_toolchain_generator(
         args.target,
         get_build_dir(args.out),
