@@ -112,7 +112,7 @@
   </widget>
   <widget class="RaisedMaterialButton" name="mic_voiceAssistButton">
    <property name="enabled">
-    <bool>false</bool>
+    <bool>true</bool>
    </property>
    <property name="geometry">
     <rect>
@@ -292,6 +292,70 @@
     <enum>Qt::Horizontal</enum>
    </property>
   </widget>
+  <widget class="QPushButton" name="mic_helpSimulateInsert">
+   <property name="geometry">
+    <rect>
+     <x>145</x>
+     <y>215</y>
+     <width>15</width>
+     <height>15</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+   <property name="icon">
+    <iconset resource="../../../../../../../aemu-ui-qt/src/android/skin/qt/resources.qrc">
+     <normaloff>:/light/help_outline</normaloff>:/light/help_outline</iconset>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>15</width>
+     <height>15</height>
+    </size>
+   </property>
+   <property name="flat">
+    <bool>true</bool>
+   </property>
+   <property name="themeIconName" stdset="0">
+    <string>help_outline</string>
+   </property>
+   <property name="helpButton" stdset="0">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="mic_helpMicrophoneAttached">
+   <property name="geometry">
+    <rect>
+     <x>410</x>
+     <y>235</y>
+     <width>15</width>
+     <height>15</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+   <property name="icon">
+    <iconset resource="../../../../../../../aemu-ui-qt/src/android/skin/qt/resources.qrc">
+     <normaloff>:/light/help_outline</normaloff>:/light/help_outline</iconset>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>15</width>
+     <height>15</height>
+    </size>
+   </property>
+   <property name="flat">
+    <bool>true</bool>
+   </property>
+   <property name="themeIconName" stdset="0">
+    <string>help_outline</string>
+   </property>
+   <property name="helpButton" stdset="0">
+    <bool>true</bool>
+   </property>
+  </widget>
   <zorder>microphoneSection</zorder>
   <zorder>mic_allowRealAudioLabel</zorder>
   <zorder>mic_allowRealAudio</zorder>
@@ -301,8 +365,10 @@
   <zorder>headsetSection</zorder>
   <zorder>mic_insertedLabel</zorder>
   <zorder>mic_inserted</zorder>
+  <zorder>mic_helpSimulateInsert</zorder>
   <zorder>mic_hasMicLabel</zorder>
   <zorder>mic_hasMic</zorder>
+  <zorder>mic_helpMicrophoneAttached</zorder>
  </widget>
  <customwidgets>
   <customwidget>
@@ -316,6 +382,8 @@
   <tabstop>mic_hasMic</tabstop>
   <tabstop>mic_voiceAssistButton</tabstop>
   <tabstop>mic_hookButton</tabstop>
+  <tabstop>mic_helpSimulateInsert</tabstop>
+  <tabstop>mic_helpMicrophoneAttached</tabstop>
  </tabstops>
  <resources>
   <include location="../resources.qrc"/>
