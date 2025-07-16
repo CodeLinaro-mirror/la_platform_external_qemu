@@ -31,6 +31,10 @@
 #define NPCM_UDC_MEMORY_ADDRESS_SIZE 0x1000
 #define NPCM_UDC_CONTROL_EP_ADDRESS 0
 
+/* Capability Length Register */
+#define CAPLENGTH_INIT_VALUE 0x40
+REG8(CAPLENGTH, 0x100)
+
 /* Device Control Capability Parameters Register */
 #define DCCPARAMS_INIT_VALUE 0x83
 REG32(DCCPARAMS, 0x124)
@@ -394,6 +398,9 @@ static uint64_t npcm_udc_read(void *opaque, hwaddr offset, unsigned size)
     uint32_t value = 0;
 
     switch (offset) {
+    case A_CAPLENGTH:
+        value = CAPLENGTH_INIT_VALUE;
+        break;
     case A_DCCPARAMS:
         value = DCCPARAMS_INIT_VALUE;
         break;
