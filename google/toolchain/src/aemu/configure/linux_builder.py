@@ -38,7 +38,7 @@ class LinuxBuilder(QemuBuilder):
 
             "-Dandroid=enabled",
             "-Daudio_drv_list=default",
-            "-Dfdt=auto",
+            "-Dfdt=enabled",
             "-Dalsa=disabled",
             "-Dattr=disabled",
             "-Dauth_pam=disabled",

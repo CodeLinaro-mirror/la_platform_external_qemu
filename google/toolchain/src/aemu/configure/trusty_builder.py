@@ -27,15 +27,12 @@ class TrustyBuilder(LinuxBuilder):
 
         linux = dict(split_def(x) for x in super().meson_config())
         linux["-Db_pie"] = "false"
-        linux["-Ddefault_devices"] = "false"
         linux["-Dmodules"] = "disabled"
         linux["-Dpa"] = "disabled"
-        # linux["-Dpixman"] = "disabled"
         linux["-Dplugins"] = "false"
         linux["-Dprefer_static"] = "true"
         linux["-Drutabaga_gfx"] = "disabled"
         linux["-Dslirp"] = "enabled"
-        linux["-Dtcg"] = "disabled"
         linux["-Dtools"] = "disabled"
         linux["-Dvnc"] = "disabled"
         linux["-Dwerror"] = "false"
@@ -46,14 +43,6 @@ class TrustyBuilder(LinuxBuilder):
         # Similar to linux, but using static dependencies.
         super().packages()
 
-        includes = [
-            self.aosp / "third_party" / "glib",
-            self.aosp / "third_party" / "glib" / "gmodule",
-            self.aosp / "third_party" / "glib" / "os" / "linux",
-            self.aosp / "third_party" / "glib" / "os" / "linux" / "glib",
-            self.aosp / "third_party" / "glib" / "os" / "linux" / "gmodule",
-            "${libdir}",
-        ]
         # Next we have our dependencies.
         return [
             BazelLib("//third_party/dtc:libfdt", "1.6.0", {}),
@@ -63,7 +52,6 @@ class TrustyBuilder(LinuxBuilder):
                 "2.77.2",
                 {
                     "name": "glib-2.0",
-                    "includes": [str(x) for x in includes],
                     "link_flags": "-pthread",
                     "Requires": "pcre2, gmodule-static",
                 },
