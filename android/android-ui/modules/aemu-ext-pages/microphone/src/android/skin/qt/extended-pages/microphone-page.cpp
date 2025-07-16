@@ -12,6 +12,7 @@
 #include "android/skin/qt/extended-pages/microphone-page.h"
 
 #include <QCheckBox>                                  // for QCheckBox
+#include <QDesktopServices>                           // for QDesktopServices
 
 #include "android/skin/backend-defs.h"
 #include "android/avd/info.h"                         // for avdInfo_getAvdF...
@@ -149,12 +150,23 @@ void MicrophonePage::on_mic_hookButton_released() {
     forwardKeyToEmulator(KEY_HEADSETHOOK, false);
 }
 
+void MicrophonePage::on_mic_helpSimulateInsert_clicked() {
+    QDesktopServices::openUrl(
+            QUrl::fromEncoded("https://developer.android.com/studio/run/"
+                              "emulator-extended-controls#microphone"));
+}
+
+void MicrophonePage::on_mic_helpMicrophoneAttached_clicked() {
+    QDesktopServices::openUrl(
+            QUrl::fromEncoded("https://developer.android.com/studio/run/"
+                              "emulator-extended-controls#microphone"));
+}
+
 void MicrophonePage::on_mic_inserted_toggled(bool checked) {
     saveHasMicInserted(checked);
 
     // Enable or disable the subordinate controls
     mUi->mic_hasMic->setEnabled(checked);
-    setButtonEnabled(mUi->mic_voiceAssistButton, getSelectedTheme(), checked);
     setButtonEnabled(mUi->mic_hookButton, getSelectedTheme(), checked);
 
     // Send the indication to the device

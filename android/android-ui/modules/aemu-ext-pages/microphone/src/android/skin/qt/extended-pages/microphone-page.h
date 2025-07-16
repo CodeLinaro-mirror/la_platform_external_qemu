@@ -47,6 +47,8 @@ private slots:
     void on_mic_allowRealAudio_toggled(bool checked);
     void on_mic_voiceAssistButton_pressed();
     void on_mic_voiceAssistButton_released();
+    void on_mic_helpSimulateInsert_clicked();
+    void on_mic_helpMicrophoneAttached_clicked();
 
 private:
     void forwardGenericEventToEmulator(int type, int code, int value);
