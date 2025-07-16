@@ -224,16 +224,16 @@ static void *qpa_thread_out (void *arg)
     for (;;) {
         int decr, to_mix, rpos;
 
-        for (;;) {
-            if (pa->done) {
+        if (pa->done) {
+            goto exit;
+        }
+
+        while (pa->live <= 0) {
+            if (audio_pt_wait(&pa->pt, __func__)) {
                 goto exit;
             }
 
-            if (pa->live > 0) {
-                break;
-            }
-
-            if (audio_pt_wait(&pa->pt, __func__)) {
+            if (pa->done) {
                 goto exit;
             }
         }
@@ -315,16 +315,16 @@ static void *qpa_thread_in (void *arg)
     for (;;) {
         int incr, to_grab, wpos;
 
-        for (;;) {
-            if (pa->done) {
+        if (pa->done) {
+            goto exit;
+        }
+
+        while (pa->dead <= 0) {
+            if (audio_pt_wait(&pa->pt, __func__)) {
                 goto exit;
             }
 
-            if (pa->dead > 0) {
-                break;
-            }
-
-            if (audio_pt_wait(&pa->pt, __func__)) {
+            if (pa->done) {
                 goto exit;
             }
         }
