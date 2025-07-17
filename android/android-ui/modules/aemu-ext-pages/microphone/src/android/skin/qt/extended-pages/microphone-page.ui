@@ -295,7 +295,7 @@
   <widget class="QPushButton" name="mic_helpSimulateInsert">
    <property name="geometry">
     <rect>
-     <x>145</x>
+     <x>155</x>
      <y>215</y>
      <width>15</width>
      <height>15</height>
@@ -327,7 +327,7 @@
   <widget class="QPushButton" name="mic_helpMicrophoneAttached">
    <property name="geometry">
     <rect>
-     <x>410</x>
+     <x>415</x>
      <y>235</y>
      <width>15</width>
      <height>15</height>
