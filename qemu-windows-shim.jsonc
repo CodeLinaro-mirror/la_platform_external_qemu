@@ -36,7 +36,10 @@
         ],
         // Replace standard launcher with google launcher
         "-srcs": ["system/main.c"],
-        "+srcs": ["google/system/aemu_main.cpp"],
+        "+srcs": [
+          "google/system/aemu_main.cpp",
+          "google/system/aemu_plugins.c"
+        ],
         "-deps": [
           // We will bring our own version of libmodinfo, so strip it!
           ":libmodinfo-.*"
@@ -47,27 +50,18 @@
     {
       "target": "qemu-system-aarch64",
       "shims": {
-        "+deps": [
-          "//hardware/generic/goldfish/emulator/plugin/registration:aarch64"
-        ],
         "win_def_file": "platform/windows-amd64/qemu-system-aarch64.def"
       }
     },
     {
       "target": "qemu-system-riscv64",
       "shims": {
-        "+deps": [
-          "//hardware/generic/goldfish/emulator/plugin/registration:riscv64"
-        ],
         "win_def_file": "platform/windows-amd64/qemu-system-riscv64.def"
       }
     },
     {
       "target": "qemu-system-x86_64",
       "shims": {
-        "+deps": [
-          "//hardware/generic/goldfish/emulator/plugin/registration:x86_64"
-        ],
         "win_def_file": "platform/windows-amd64/qemu-system-x86_64.def"
       }
     },
