@@ -43,7 +43,7 @@ typedef struct NetSocketState {
     IOHandler *send_fn;           /* differs between SOCK_STREAM/SOCK_DGRAM */
     bool read_poll;               /* waiting to receive data? */
     bool write_poll;              /* waiting to transmit data? */
-    sa_family_t sa_family;        /* address family */
+    u_short sa_family;     /* address family */
 } NetSocketState;
 
 static void net_socket_accept(void *opaque);
