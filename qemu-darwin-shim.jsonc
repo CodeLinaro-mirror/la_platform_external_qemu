@@ -34,7 +34,10 @@
         ],
         // Replace standard launcher with google launcher
         "-srcs": ["system/main.c"],
-        "+srcs": ["google/system/aemu_main.cpp"],
+        "+srcs": [
+          "google/system/aemu_main.cpp",
+          "google/system/aemu_plugins.c"
+        ],
         "-deps": [
           // We will bring our own version of libmodinfo, so strip it!
           ":libmodinfo-.*"
@@ -47,28 +50,19 @@
     {
       "target": "qemu-system-aarch64-unsigned",
       "shims": {
-        "name": "qemu-system-aarch64",
-        "+deps": [
-          "//hardware/generic/goldfish/emulator/plugin/registration:aarch64"
-        ]
+        "name": "qemu-system-aarch64"
       }
     },
     {
       "target": "qemu-system-riscv64-unsigned",
       "shims": {
-        "name": "qemu-system-riscv64",
-        "+deps": [
-          "//hardware/generic/goldfish/emulator/plugin/registration:riscv64"
-        ]
+        "name": "qemu-system-riscv64"
       }
     },
     {
       "target": "qemu-system-x86_64-unsigned",
       "shims": {
-        "name": "qemu-system-x86_64",
-        "+deps": [
-          "//hardware/generic/goldfish/emulator/plugin/registration:x86_64"
-        ]
+        "name": "qemu-system-x86_64"
       }
     },
     {

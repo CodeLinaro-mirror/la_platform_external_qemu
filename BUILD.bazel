@@ -376,7 +376,10 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + ["google/system/aemu_main.cpp"],
+    }) + [
+        "google/system/aemu_main.cpp",
+        "google/system/aemu_plugins.c",
+    ],
     copts = select({
         "@platforms//os:macos": [
             "-fwrapv",
@@ -451,7 +454,6 @@ cc_interface_binary(
         ":qemu-headers",
         "//hardware/generic/goldfish/android/system",
         "//hardware/generic/goldfish/emulator/crashreport:init",
-        "//hardware/generic/goldfish/emulator/plugin/registration:aarch64",
         "@glib//:glib-static",
         "@glib//:gmodule-static",
         "@pixman//:pixman-1",
@@ -468,7 +470,10 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + ["google/system/aemu_main.cpp"],
+    }) + [
+        "google/system/aemu_main.cpp",
+        "google/system/aemu_plugins.c",
+    ],
     copts = select({
         "@platforms//os:macos": [
             "-fwrapv",
@@ -542,7 +547,6 @@ cc_interface_binary(
         ":qemu-headers",
         "//hardware/generic/goldfish/android/system",
         "//hardware/generic/goldfish/emulator/crashreport:init",
-        "//hardware/generic/goldfish/emulator/plugin/registration:riscv64",
         "@glib//:glib-static",
         "@glib//:gmodule-static",
         "@pixman//:pixman-1",
@@ -559,7 +563,10 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + ["google/system/aemu_main.cpp"],
+    }) + [
+        "google/system/aemu_main.cpp",
+        "google/system/aemu_plugins.c",
+    ],
     copts = select({
         "@platforms//os:macos": [
             "-fwrapv",
@@ -633,7 +640,6 @@ cc_interface_binary(
         ":qemu-headers",
         "//hardware/generic/goldfish/android/system",
         "//hardware/generic/goldfish/emulator/crashreport:init",
-        "//hardware/generic/goldfish/emulator/plugin/registration:x86_64",
         "@glib//:glib-static",
         "@glib//:gmodule-static",
         "@pixman//:pixman-1",

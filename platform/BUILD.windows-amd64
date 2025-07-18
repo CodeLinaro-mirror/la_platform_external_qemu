@@ -55,34 +55,34 @@ cc_binary(
 )
 cc_interface_binary(
    defines = ['COMPILING_PER_TARGET', 'CONFIG_DEVICES=\\"aarch64-softmmu-config-devices.h\\"', 'CONFIG_TARGET=\\"aarch64-softmmu-config-target.h\\"', 'GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
-   deps = ['//third_party/dtc:libfdt', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-aarch64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', '//hardware/generic/goldfish/emulator/plugin/registration:aarch64', ':qemu-headers'],
+   deps = ['//third_party/dtc:libfdt', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-aarch64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', ':qemu-headers'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
    name = 'qemu-system-aarch64',
-   srcs = ['google/system/aemu_main.cpp'],
+   srcs = ['google/system/aemu_main.cpp', 'google/system/aemu_plugins.c'],
    visibility = ['//visibility:public'],
    win_def_file = 'platform/windows-amd64/qemu-system-aarch64.def',
 )
 cc_interface_binary(
    defines = ['COMPILING_PER_TARGET', 'CONFIG_DEVICES=\\"riscv64-softmmu-config-devices.h\\"', 'CONFIG_TARGET=\\"riscv64-softmmu-config-target.h\\"', 'GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
-   deps = ['//third_party/dtc:libfdt', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-riscv64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', '//hardware/generic/goldfish/emulator/plugin/registration:riscv64', ':qemu-headers'],
+   deps = ['//third_party/dtc:libfdt', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-riscv64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', ':qemu-headers'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
    name = 'qemu-system-riscv64',
-   srcs = ['google/system/aemu_main.cpp'],
+   srcs = ['google/system/aemu_main.cpp', 'google/system/aemu_plugins.c'],
    visibility = ['//visibility:public'],
    win_def_file = 'platform/windows-amd64/qemu-system-riscv64.def',
 )
 cc_interface_binary(
    defines = ['COMPILING_PER_TARGET', 'CONFIG_DEVICES=\\"x86_64-softmmu-config-devices.h\\"', 'CONFIG_TARGET=\\"x86_64-softmmu-config-target.h\\"', 'GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
-   deps = ['//third_party/dtc:libfdt', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-x86_64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', '//hardware/generic/goldfish/emulator/plugin/registration:x86_64', ':qemu-headers'],
+   deps = ['//third_party/dtc:libfdt', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-x86_64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', ':qemu-headers'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
    name = 'qemu-system-x86_64',
-   srcs = ['google/system/aemu_main.cpp'],
+   srcs = ['google/system/aemu_main.cpp', 'google/system/aemu_plugins.c'],
    visibility = ['//visibility:public'],
    win_def_file = 'platform/windows-amd64/qemu-system-x86_64.def',
 )
