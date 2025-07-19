@@ -57,27 +57,6 @@
       }
     },
     {
-      "target": "libqemu-aarch64-softmmu",
-      "shims": {
-        "-deps": [":libcommon_qemu-system-aarch64-unsigned"],
-        "+deps": [":libcommon_qemu-system-aarch64"]
-      }
-    },
-    {
-      "target": "libqemu-riscv64-softmmu",
-      "shims": {
-        "-deps": [":libcommon_qemu-system-riscv64-unsigned"],
-        "+deps": [":libcommon_qemu-system-riscv64"]
-      }
-    },
-    {
-      "target": "libqemu-x86_64-softmmu",
-      "shims": {
-        "-deps": [":libcommon_qemu-system-x86_64-unsigned"],
-        "+deps": [":libcommon_qemu-system-x86_64"]
-      }
-    },
-    {
       "target": ".*",
       "shims": {
         "restrict_to": "cc_shared_library",
