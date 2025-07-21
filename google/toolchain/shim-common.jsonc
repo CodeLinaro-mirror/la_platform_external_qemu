@@ -1,0 +1,152 @@
+{
+  "shims": [
+    {
+      "target": "qemu-system-.*",
+      "shims": {
+        "_bzl_type": "cc_interface_binary",
+        "+deps": [
+          "//hardware/generic/goldfish/emulator/crashreport:init",
+          "//hardware/generic/goldfish/android/system"
+        ],
+        // Replace standard launcher with google launcher
+        "-srcs": ["system/main.c"],
+        "+srcs": [
+          "google/system/aemu_main.cpp",
+          "google/system/aemu_plugins.c"
+        ],
+        "-deps": [
+          // We will bring our own version of libmodinfo, so strip it!
+          ":libmodinfo-.*"
+        ]
+      }
+    },
+    {
+      "target": "generate_shared_QAPI_source_files",
+      "shims": {
+        "+outs": ["qapi/qapi-features.h", "qapi/qapi-features.c"],
+        "cmd": "$(location :qapi-gen) -o $(RULEDIR)/qapi -b $(location qapi/qapi-schema.json)",
+        "cmd_bat": "$(location :qapi-gen) -o $(RULEDIR)/qapi -b $(location qapi/qapi-schema.json)"
+      }
+    },
+    {
+      "target": "generate_config-poison_h",
+      "shims": {
+        // TODO: It would be nice if we could generalize this in the generator
+        "cmd": "$(location :make-config-poison) $(SRCS) > $(location config-poison.h)",
+        "cmd_bat": "$(location :make-config-poison) $(SRCS) > $(location config-poison.h)"
+      }
+    },
+    {
+      "target": "keymap-gen",
+      "shims": {
+        "srcs": [
+          "subprojects/keycodemapdb/tools/keymap-gen.py"
+        ]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "cc_library|cc_binary|cc_interface_binary|objc_library",
+        // xs4all!
+        "visibility": ["//visibility:public"],
+        "-hdrs": ["include/.*", "platform/.*", "qapi/.*"],
+        "-srcs": ["include/.*", "platform/.*", "qapi/.*\\.h"],
+        "-includes": ["include", "platform/.*", "trace"],
+        "+deps": [":qemu-headers"]
+      }
+    },
+    {
+      "target": "libqemu-aarch64-softmmu",
+      "shims": {
+        "-deps": [":libcommon_qemu-system-aarch64-unsigned"],
+        "+deps": [":libcommon_qemu-system-aarch64"]
+      }
+    },
+    {
+      "target": "libqemu-riscv64-softmmu",
+      "shims": {
+        "-deps": [":libcommon_qemu-system-riscv64-unsigned"],
+        "+deps": [":libcommon_qemu-system-riscv64"]
+      }
+    },
+    {
+      "target": "libqemu-x86_64-softmmu",
+      "shims": {
+        "-deps": [":libcommon_qemu-system-x86_64-unsigned"],
+        "+deps": [":libcommon_qemu-system-x86_64"]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "cc_shared_library",
+        // xs4all!
+        "visibility": ["//visibility:public"]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "cc_library",
+        "alwayslink": 1
+      }
+    },
+    {
+      "target": "libqemuutil|libprintstub",
+      "shims": {
+        "alwayslink": 0
+      }
+    },
+    {
+      "target": "libqemuutil",
+      "shims": {
+        "-srcs": [
+          // These are instead added to our libprintstub in the stubs/meson.build
+          // so remove them from libqemuutil (not sure why they are still here).
+          "stubs/monitor-core.c",
+          "stubs/error-printf.c"
+        ]
+      }
+    }
+  ],
+  // These are the bazel mappings we are going to use for
+  // external dependencies. For every pkg config dependency
+  // you will need to provide a bazel target
+  "external_deps": {
+    "glib-2.0": [
+      "@glib//:glib-static"
+    ],
+    "gmodule-export-2.0": [
+      "@glib//:gmodule-static"
+    ],
+    "zlib": [
+      "@zlib//:zlib"
+    ],
+    "pixman-1": [
+      "@pixman//:pixman-1",
+      "@pixman//:pixman_simd"
+    ],
+    "libfdt": [
+      "//third_party/dtc:libfdt"
+    ],
+    "rutabaga_gfx_ffi": [
+      "@crosvm//:rutabaga_c_ffi"
+    ]
+  },
+  // The actual set of targets you wish to generate bazel targets for.
+  // These are the targets that will be exported.
+  "export": [
+    "qemu-img",
+    "hw-display-virtio-gpu",
+    "hw-display-virtio-vga",
+    "hw-display-virtio-gpu-pci",
+    "hw-display-virtio-gpu-rutabaga",
+    "hw-display-virtio-gpu-pci-rutabaga"
+  ],
+  "exclude": [
+    // We will provide our own module info that will be build into qemu
+    // This will allow us to provide our own custom drivers.
+    "modinfo-.*"
+  ]
+}

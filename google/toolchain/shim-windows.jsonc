@@ -1,0 +1,111 @@
+{
+  // This will be at the start of the bazel file.
+  "bazel_prefix": "load(\"//build/bazel/rules:windows_resources.bzl\", \"windows_resources\") \nfilegroup(name = \"hw-display-virtio-gpu.lib\", srcs = [\":hw-display-virtio-gpu\"], output_group = \"interface_library\", visibility = [\"//visibility:private\"],) \ncc_import(name = \"hw-display-virtio-gpu.if\", interface_library = \":hw-display-virtio-gpu.lib\", shared_library = \":hw-display-virtio-gpu\", visibility = [\"//visibility:public\"],)",
+  "shims": [
+    {
+      "target": "qemu-system-aarch64",
+      "shims": {
+        "win_def_file": "platform/windows-amd64/qemu-system-aarch64.def"
+      }
+    },
+    {
+      "target": "qemu-system-riscv64",
+      "shims": {
+        "win_def_file": "platform/windows-amd64/qemu-system-riscv64.def"
+      }
+    },
+    {
+      "target": "qemu-system-x86_64",
+      "shims": {
+        "win_def_file": "platform/windows-amd64/qemu-system-x86_64.def"
+      }
+    },
+    {
+      "target": "^hw-display-virtio-gpu$",
+      "shims": {
+        "win_def_file": "platform/windows-amd64/hw-display-virtio-gpu.def"
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        // TODO still needed?
+        "restrict_to": "py_binary",
+        // For some reason bazel on windows is not able to figure out
+        // the import path, so let's just explicitly add it.
+        "imports": [
+          "scripts"
+        ]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "cc_library|cc_binary|cc_interface_binary",
+        // TODO not needed? Remove our compat libs if present
+        "-hdrs": [
+          ".*subprojects.*"
+        ],
+        "+copts": [
+          "-Wno-constant-conversion",
+          "-Wno-macro-redefined",
+          "-Wno-invalid-noreturn",
+          "-Wno-bitfield-constant-conversion",
+          "-Wno-int-to-void-pointer-cast",
+          "-Wno-unused-command-line-argument",
+          "-Wno-undef",
+          "-Wno-microsoft-enum-forward-reference",
+          "-Wno-microsoft-include",
+          "-Wno-deprecated-declarations",
+          "-fms-extensions",
+          "-march=native",
+          // QEMU does not support NDEBUG (see qemu/osdep.h), so explicitly disable it
+          "-UNDEBUG"
+        ],
+        // We need a compat layer for some windows magic.
+        "+deps": [
+          "//third_party/qemu/google/compat/windows:compat"
+        ]
+      }
+    },
+    {
+      "target": "hw-display-virtio-gpu-pci|hw-display-virtio-gpu|hw-display-virtio-vga|hw-display-virtio-gpu-rutabaga|hw-display-virtio-gpu-pci-rutabaga",
+      "shims": {
+        "+deps": [
+          ":qemu-system-x86_64.if"
+        ]
+      }
+    },
+    {
+      "target": "hw-display-virtio-gpu-rutabaga",
+      "shims": {
+        "+deps": [
+          ":hw-display-virtio-gpu.if"
+        ]
+      }
+    }
+  ],
+  "external_deps": {
+    // Override to include gmodule-static - is this needed?
+    "glib-2.0": [
+      "@glib//:glib-static",
+      "@glib//:gmodule-static"
+    ],
+    // TODO are these needed on windows?
+    "libpulse": [
+      "@pulse//:libpulse"
+    ],
+    "vhost-user": [
+      "//third_party/qemu/subprojects/libvhost-user:vhost-user"
+    ],
+    "vhost-user-glib": [
+      "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib"
+    ]
+  },
+  "export": [
+    "qemu-system-x86_64",
+    "qemu-system-aarch64",
+    "qemu-system-riscv64"
+  ],
+  "exclude": []
+}

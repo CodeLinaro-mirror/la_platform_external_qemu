@@ -1,0 +1,93 @@
+{
+  "shims": [
+    {
+      "target": "qemu-system-.*-unsigned",
+      "shims": {
+        "_bzl_type": "cc_interface_binary",
+        "+deps": [
+          "//hardware/generic/goldfish/emulator/crashreport:init",
+          "//hardware/generic/goldfish/android/system"
+        ],
+        // Replace standard launcher with google launcher
+        "-srcs": ["system/main.c"],
+        "+srcs": [
+          "google/system/aemu_main.cpp",
+          "google/system/aemu_plugins.c"
+        ],
+        "-deps": [
+          // We will bring our own version of libmodinfo, so strip it!
+          ":libmodinfo-.*"
+        ]
+      }
+    },
+    // Rename the macos targets. Note these do not have
+    // any entitlements set.
+    {
+      "target": "qemu-system-aarch64-unsigned",
+      "shims": {
+        "name": "qemu-system-aarch64"
+      }
+    },
+    {
+      "target": "qemu-system-riscv64-unsigned",
+      "shims": {
+        "name": "qemu-system-riscv64"
+      }
+    },
+    {
+      "target": "qemu-system-x86_64-unsigned",
+      "shims": {
+        "name": "qemu-system-x86_64"
+      }
+    },
+    {
+      "target": "libcommon_qemu-system-aarch64-unsigned",
+      "shims": {
+        "name": "libcommon_qemu-system-aarch64"
+      }
+    },
+    {
+      "target":  "libcommon_qemu-system-riscv64-unsigned",
+      "shims": {
+        "name":  "libcommon_qemu-system-riscv64"
+      }
+    },
+    {
+      "target":  "libcommon_qemu-system-x86_64-unsigned",
+      "shims": {
+        "name":  "libcommon_qemu-system-x86_64"
+      }
+    },
+    {
+      "target": "hw-display-virtio-gpu|hw-display-virtio-vga|hw-display-virtio-gpu-pci|hw-display-virtio-gpu-rutabaga|hw-display-virtio-gpu-pci-rutabaga",
+      "shims": {
+        "+linkopts": ["-undefined dynamic_lookup"]
+      }
+    },
+    {
+      "target": ".*",
+      "shims": {
+        "restrict_to": "cc_library|cc_binary|cc_interface_binary|objc_library",
+        "+copts": [
+          "-fwrapv",
+          "-Wno-implicit-function-declaration",
+          // QEMU does not support NDEBUG (see qemu/osdep.h), so explicitly disable it
+          "-UNDEBUG",
+          "-Wno-error=unguarded-availability-new"
+        ]
+      }
+    }
+  ],
+  // These are the bazel mappings we are going to use for
+  // external dependencies. For every pkg config dependency
+  // you will need to provide a bazel target
+  "external_deps": {},
+  // The actual set of targets you wish to generate bazel targets for.
+  // These are the targets that will be exported.
+  "export": [
+    "qemu-system-x86_64-unsigned",
+    "qemu-system-aarch64-unsigned",
+    "qemu-system-riscv64-unsigned"
+  ],
+  "exclude": []
+}

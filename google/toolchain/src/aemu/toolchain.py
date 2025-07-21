@@ -15,6 +15,7 @@
 # limitations under the License.
 import argparse
 import datetime
+import json
 import logging
 import platform
 import shutil
@@ -227,6 +228,29 @@ def release_command(args):
             zipf.write(fname, arcname)
 
 
+def _read_jsonc(path):
+    jsonc = path.read_text()
+    noc = '\n'.join(l for l in jsonc.split('\n') if not l.lstrip(' ').startswith('//'))
+    return json.loads(noc)
+
+
+def _create_shim(aosp_path, build_path):
+    toolchain_path = aosp_path / "third_party" / "qemu" / "google" / "toolchain"
+    common = _read_jsonc(toolchain_path / "shim-common.jsonc")
+    plat = _read_jsonc(toolchain_path / f"shim-{platform.system().lower()}.jsonc")
+    out = {}
+    out["bazel_prefix"] = common.get("bazel_prefix", "") + plat.get("bazel_prefix", "")
+    out["shims"] = common.get("shims", []) + plat.get("shims", [])
+    # platform external_deps entries can override common ones.
+    out["external_deps"] = common.get("external_deps", {}) | plat.get("external_deps", {})
+    out["export"] = common.get("export", []) + plat.get("export", [])
+    out["exclude"] = common.get("exclude", []) + plat.get("exclude", [])
+
+    out_path = build_path / "shim.jsonc"
+    out_path.write_text(json.dumps(out))
+    return out_path
+
+
 def bazel_command(args):
     bazel_out = Path(args.out)
     bazel_out.mkdir(parents=True, exist_ok=True)
@@ -253,6 +277,12 @@ def bazel_command(args):
         # issues when trying to find dependencies
         build_dir = Path(build_dir).resolve()
         bazel_build_dir = Path(bazel_build_dir).resolve()
+
+        if args.shim:
+            shim_path = Path(args.shim)
+        else:
+            shim_path = _create_shim(Path(args.aosp), Path(build_dir))
+
         builder = get_builder(
             args.target,
             get_build_dir(bazel_build_dir),
@@ -263,14 +293,7 @@ def bazel_command(args):
             _split_list(args.bazel_startup_options),
             _split_list(args.bazel_build_options),
         )
-        shim_file = (
-            Path(args.aosp)
-            / "third_party"
-            / "qemu"
-            / f"qemu-{platform.system().lower()}-shim.jsonc"
-            if not args.shim
-            else Path(args.shim)
-        ).absolute()
+        shim_file = shim_path.absolute()
         builder.configure_meson(
             [
                 "--backend",
