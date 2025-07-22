@@ -58,29 +58,6 @@ const QemuModinfo qemu_modinfo[] = {
                 .objs = ((const char*[]){"virtio-vga-rutabaga", NULL}),
                 .deps = ((const char*[]){LIB_PREFIX "hw-display-virtio-vga", NULL}),
         },
-        {
-                .name = LIB_PREFIX "avd",
-                .opts = ((const char*[]){"device", NULL}),
-                .objs = ((const char*[]){"avdstart", "virtio-goldfish-adb", "goldfish_battery",
-                                         "avdend", NULL}),
-                .deps = ((const char*[]){LIB_PREFIX "virtio-vsock-goldfish-" ARCH_SUFFIX, NULL}),
-        },
-        {
-                .name = LIB_PREFIX "grpc",
-                .opts = ((const char*[]){"device", NULL}),
-                .objs = ((const char*[]){"grpc", NULL}),
-                // The gRPC module contains gpu forwarding logic, and links against the
-                // vga lib
-                .deps = ((const char*[]){LIB_PREFIX "hw-display-virtio-gpu-rutabaga",
-                                         LIB_PREFIX "avd", NULL}),
-        },
-        {
-                .name = LIB_PREFIX "virtio-vsock-goldfish-" ARCH_SUFFIX,
-                .objs = ((const char*[]){"virtio-goldfish-vsock", "virtio-goldfish-vsock-pci",
-                                         "virtio-goldfish-hostfwd-socket", NULL}),
-                .opts = ((const char*[]){"device", NULL}),
-                .deps = ((const char*[]){LIB_PREFIX "avd", NULL}),
-        },
 #ifdef __linux__
         {
                 /* audio-pa.modinfo */

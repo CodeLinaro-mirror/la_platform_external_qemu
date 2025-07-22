@@ -168,6 +168,7 @@ EXPORTS
     object_property_try_add_child
     object_ref
     object_resolve_path_component
+    object_resolve_path_type
     object_unparent
     object_unref
     OnOffAuto_lookup
