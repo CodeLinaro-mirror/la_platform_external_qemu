@@ -29,20 +29,15 @@ using android::base::StringFormat;
 using android::base::System;
 
 // static
-std::vector<std::string> EmuglBackendScanner::scanDir(const char* execDir,
-                                                      int programBitness) {
+std::vector<std::string> EmuglBackendScanner::scanDir(const char* execDir) {
     std::vector<std::string> names;
 
     if (!execDir || !System::get()->pathExists(execDir)) {
         LOG(ERROR) << "Invalid executable directory: " << execDir;
         return names;
     }
-    if (!programBitness) {
-        programBitness = System::get()->getProgramBitness();
-    }
-    const char* subdir = (programBitness == 64) ? "lib64" : "lib";
-    std::string subDir = StringFormat("%s" PATH_SEP "%s" PATH_SEP, execDir, subdir);
 
+    std::string subDir = StringFormat("%s" PATH_SEP "%s" PATH_SEP, execDir, "lib64");
     std::vector<std::string> entries = System::get()->scanDirEntries(subDir);
 
     static const char kBackendPrefix[] = "gles_";

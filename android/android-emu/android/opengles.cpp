@@ -549,11 +549,6 @@ int android_startOpenglesRenderer(
     };
     AddressSpaceGraphicsContext::setConsumer(interface);
 
-    if (!sRenderer) {
-        ERR("Can't start OpenGLES renderer?");
-        return -1;
-    }
-
     // after initRenderer is a success, the maximum GLES API is calculated
     // depending on feature control and host GPU support. Set the obtained GLES
     // version here.

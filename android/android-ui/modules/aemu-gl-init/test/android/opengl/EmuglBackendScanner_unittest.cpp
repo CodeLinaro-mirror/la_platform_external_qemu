@@ -117,27 +117,16 @@ TEST(EmuglBackendScanner, listBackendsWithProgramBitness) {
     TestTempDir* myDir = testSys.getTempRoot();
 
     myDir->makeSubDir("foo");
-    myDir->makeSubDir("foo/lib");
-    myDir->makeSubDir("foo/lib/gles_first");
-    myDir->makeSubDir("foo/lib/gles_second");
-    myDir->makeSubDir("foo/lib/gles_third");
-
     myDir->makeSubDir("foo/lib64");
-    myDir->makeSubDir("foo/lib64/gles_fourth");
-    myDir->makeSubDir("foo/lib64/gles_fifth");
-    myDir->makeSubDir("foo/lib64/gles_sixth");
+    myDir->makeSubDir("foo/lib64/gles_first");
+    myDir->makeSubDir("foo/lib64/gles_second");
+    myDir->makeSubDir("foo/lib64/gles_third");
 
-    std::vector<std::string> names = EmuglBackendScanner::scanDir(PATH_SEP "foo", 32);
+    std::vector<std::string> names = EmuglBackendScanner::scanDir(PATH_SEP "foo");
     ASSERT_EQ(3U, names.size());
     EXPECT_STREQ("first", names[0].c_str());
     EXPECT_STREQ("second", names[1].c_str());
     EXPECT_STREQ("third", names[2].c_str());
-
-    names = EmuglBackendScanner::scanDir(PATH_SEP "foo", 64);
-    ASSERT_EQ(3U, names.size());
-    EXPECT_STREQ("fifth", names[0].c_str());
-    EXPECT_STREQ("fourth", names[1].c_str());
-    EXPECT_STREQ("sixth", names[2].c_str());
 }
 
 }  // namespace opengl

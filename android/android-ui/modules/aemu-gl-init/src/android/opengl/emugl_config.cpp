@@ -72,17 +72,17 @@ namespace fc = android::featurecontrol;
 
 static EmuglBackendList* sBackendList = NULL;
 
-static void resetBackendList(int bitness) {
+static void resetBackendList() {
     delete sBackendList;
     if (System::getEnvironmentVariable("ANDROID_EMUGL_FIXED_BACKEND_LIST") == "1") {
         std::vector<std::string> fixedBackendNames = {
             "swiftshader_indirect",
             "angle_indirect",
         };
-        sBackendList = new EmuglBackendList(64, fixedBackendNames);
+        sBackendList = new EmuglBackendList(fixedBackendNames);
     } else {
         sBackendList = new EmuglBackendList(
-                System::get()->getLauncherDirectory().c_str(), bitness);
+                System::get()->getLauncherDirectory().c_str());
     }
 }
 
@@ -722,9 +722,18 @@ bool emuglConfig_init(EmuglConfig* config,
     // zero all fields first.
     memset(config, 0, sizeof(*config));
 
+    // Only 64-bit bitness is supported
+    if (bitness == 0) {
+        bitness = System::get()->getProgramBitness();
+    }
+    if (bitness != 64) {
+        derror("%s: Unsupported bitness type: %d\n", __func__, bitness);
+        return false;
+    }
+    config->bitness = bitness;
+
     bool host_set_in_hwconfig = false;
     bool has_auto_no_window = false;
-
     bool hasUiPreference = (enum WinsysPreferredGlesBackend)uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO;
 
     // The value of '-gpu <mode>' overrides both the hardware properties
@@ -797,18 +806,13 @@ bool emuglConfig_init(EmuglConfig* config,
         gpu_mode = "swangle_indirect";
     }
 
-    if (!bitness) {
-        bitness = System::get()->getProgramBitness();
-    }
-
 #if defined(__APPLE__) && defined(__arm64__)
     if (!strcmp("host", gpu_mode)) {
         use_host_vulkan = true;
     }
 #endif
 
-    config->bitness = bitness;
-    resetBackendList(bitness);
+    resetBackendList();
 
     // For GPU mode in software rendering:
     // On Mac, both swiftshader and swangle will redirect to swangle.
@@ -1106,7 +1110,7 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
 #endif
     // $EXEC_DIR/<lib>/ is already added to the library search path by default,
     // since generic libraries are bundled there. We may need more though:
-    resetBackendList(config->bitness);
+    resetBackendList();
     if (strcmp(config->backend, "host") != 0) {
         // If the backend is not 'host', we also need to add the
         // backend directory.

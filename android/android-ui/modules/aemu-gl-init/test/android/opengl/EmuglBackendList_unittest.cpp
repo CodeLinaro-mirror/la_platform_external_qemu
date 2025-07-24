@@ -52,7 +52,7 @@ TEST(EmuglBackendList, init) {
     makeLibSubDir(myDir, "gles_fourth");
     makeLibSubDir(myDir, "gles_fifth");
 
-    EmuglBackendList list("foo", System::kProgramBitness);
+    EmuglBackendList list("foo");
 
     // NOTE: Must appear in alphabetical order
     const char* const kExpected[] = {
@@ -104,7 +104,7 @@ TEST(EmuglBackendList, getBackendLibPath) {
     }
 
     auto sysdir = pj("/", "foo");
-    EmuglBackendList list(sysdir.c_str(), System::kProgramBitness);
+    EmuglBackendList list(sysdir.c_str());
     const std::vector<std::string>& names = list.names();
 
     EXPECT_EQ(1U, names.size());
@@ -122,7 +122,7 @@ TEST(EmuglBackendList, getBackendLibPath) {
 }
 
 TEST(EmuglBackend, defaultName) {
-    EmuglBackendList list("foo", 0);
+    EmuglBackendList list("foo");
     EXPECT_STREQ("auto", list.defaultName().c_str());
 }
 
