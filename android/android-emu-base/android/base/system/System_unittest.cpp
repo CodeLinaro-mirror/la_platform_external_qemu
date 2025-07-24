@@ -423,16 +423,6 @@ TEST(System, scanDirEntriesWithFullPaths) {
     }
 }
 
-TEST(System, isRemoteSession) {
-    std::string sessionType;
-    bool isRemote = System::get()->isRemoteSession(&sessionType);
-    if (isRemote) {
-        LOG(INFO) << "Remote session type [" << sessionType.c_str() << "]";
-    } else {
-        LOG(INFO) << "Local session type";
-    }
-}
-
 TEST(System, addLibrarySearchDir) {
     TestSystem testSys("/foo/bar", 32);
     TestTempDir* testDir = testSys.getTempRoot();

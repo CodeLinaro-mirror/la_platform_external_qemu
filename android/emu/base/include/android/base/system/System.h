@@ -397,12 +397,6 @@ public:
     // Time related functions.
     // /////////////////////////////////////////////////////////////////////////
 
-    // Checks the system to see if it is running under a remoting session
-    // like Nomachine's NX, Chrome Remote Desktop or Windows Terminal Services.
-    // On success, return true and sets |*sessionType| to the detected
-    // session type. Otherwise, just return false.
-    virtual bool isRemoteSession(std::string* sessionType) const = 0;
-
     // Returns Times structure for the current process
     virtual Times getProcessTimes() const = 0;
 

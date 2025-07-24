@@ -65,7 +65,6 @@ public:
           mAppDataDir(appDataDir),
           mCurrentDir(homeDir),
           mHostBitness(hostBitness),
-          mIsRemoteSession(false),
           mRemoteSessionType(),
           mTempDir(NULL),
           mTempRootPrefix(),
@@ -345,24 +344,6 @@ public:
         return mTempDir;
     }
 
-    virtual bool isRemoteSession(std::string* sessionType) const override {
-        if (!mIsRemoteSession) {
-            return false;
-        }
-        *sessionType = mRemoteSessionType;
-        return true;
-    }
-
-    // Force the remote session type. If |sessionType| is NULL or empty,
-    // this sets the session as local. Otherwise, |*sessionType| must be
-    // a session type.
-    void setRemoteSessionType(std::string_view sessionType) {
-        mIsRemoteSession = !sessionType.empty();
-        if (mIsRemoteSession) {
-            mRemoteSessionType = sessionType;
-        }
-    }
-
     virtual Times getProcessTimes() const override { return mTimes; }
 
     void setProcessTimes(const Times& times) { mTimes = times; }
@@ -506,7 +487,6 @@ private:
     std::string mAppDataDir;
     std::string mCurrentDir;
     int mHostBitness;
-    bool mIsRemoteSession;
     std::string mRemoteSessionType;
     mutable TestTempDir* mTempDir;
     mutable std::string mTempRootPrefix;
