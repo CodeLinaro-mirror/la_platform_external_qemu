@@ -21,14 +21,15 @@
 #include "aemu/base/Compiler.h"  // for DISALLOW_COPY_AND_ASSIGN
 #include "aemu/base/async/RecurrentTask.h"
 #include "aemu/base/async/ThreadLooper.h"
-#include "aemu/base/files/PathUtils.h"          // for pj, PathUtils
-#include "aemu/base/logging/Log.h"             // for dinfo, dwarning
-#include "aemu/base/memory/LazyInstance.h"      // for LazyInstance, LAZY_IN...
+#include "aemu/base/files/PathUtils.h"      // for pj, PathUtils
+#include "aemu/base/logging/Log.h"          // for dinfo, dwarning
+#include "aemu/base/memory/LazyInstance.h"  // for LazyInstance, LAZY_IN...
 #include "aemu/base/system/Win32UnicodeString.h"
 #include "android/base/system/System.h"         // for System
 #include "android/crashreport/CrashConsent.h"   // for CrashReportDatabase
 #include "android/crashreport/CrashReporter.h"  // for CrashReporter
-#include "android/crashreport/HangDetector.h"   // for HangDetector
+#include "android/crashreport/CrashpadLogSink.h"
+#include "android/crashreport/HangDetector.h"  // for HangDetector
 #include "android/crashreport/Uploader.h"
 #include "android/version.h"                     // for EMULATOR_FULL_VERSION...
 #include "client/crash_report_database.h"        // for CrashReportDatabase::...
@@ -131,7 +132,6 @@ public:
               message, mInitialized ? "enabled" : "disabled",
               System::get()->getCurrentProcessId());
 
-
         auto collect = mConsentProvider->consentRequired();
         bool areUploadsEnabled = (collect == CrashConsent::Consent::ALWAYS);
         if (mDatabase && areUploadsEnabled) {
@@ -174,7 +174,7 @@ public:
             }
         }
 
-        for(const auto& report: toRemove) {
+        for (const auto& report : toRemove) {
             mDatabase->DeleteReport(report);
         }
     }
@@ -253,6 +253,7 @@ bool crashhandler_init(int argc, char** argv) {
         dinfo("Crashreporting disabled, not reporting crashes.");
         return false;
     }
+    android::crashreport::CrashpadLogSink::registerSink();
 
     // Catch crashes in everything.
     // This promises to not launch any threads...
