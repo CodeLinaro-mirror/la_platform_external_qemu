@@ -56,13 +56,11 @@ static const uint32_t VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR =
 #include <dlfcn.h>
 #endif
 
-#define DEBUG_EMUGL 0
-
-#if DEBUG_EMUGL
-#define D(...)  dprint(__VA_ARGS__)
-#else
-#define D(...)  crashhandler_append_message_format(__VA_ARGS__)
-#endif
+#define D(...)                                           \
+    do {                                                 \
+        dprint(__VA_ARGS__);                             \
+        crashhandler_append_message_format(__VA_ARGS__); \
+    } while (0)
 
 using android::base::RunOptions;
 using android::base::StringFormat;
@@ -159,7 +157,7 @@ static bool sCurrentRendererSet = false;
 
 SelectedRenderer emuglConfig_get_current_renderer() {
     if (!sCurrentRendererSet) {
-        ERR("%s called before selecting the renderer!", __func__);
+        derror("%s called before selecting the renderer!", __func__);
     }
     return sCurrentRenderer;
 }
@@ -228,8 +226,8 @@ void free_emugl_host_gpu_props(emugl_host_gpu_prop_list proplist) {
 static void setCurrentRenderer(const char* gpuMode) {
     sCurrentRenderer = emuglConfig_get_renderer(gpuMode);
     sCurrentRendererSet = true;
-    VERBOSE("%s: %s %s", __func__, gpuMode,
-            emuglConfig_renderer_to_string(sCurrentRenderer));
+    dprint("%s: %s %s", __func__, gpuMode,
+           emuglConfig_renderer_to_string(sCurrentRenderer));
 }
 
 struct DeviceSupportInfo {
@@ -303,7 +301,7 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
     std::string enforcedGpuStr = android::base::getEnvironmentVariable(EnvVarSelectGpu);
     int enforceGpuIndex = -1;
     if (enforcedGpuStr.size()) {
-        INFO("%s is set to %s", EnvVarSelectGpu, enforcedGpuStr.c_str());
+        dinfo("%s is set to %s", EnvVarSelectGpu, enforcedGpuStr.c_str());
 
         if (enforcedGpuStr[0] == '0') {
             enforceGpuIndex = 0;
@@ -320,7 +318,7 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
                     std::string deviceName = std::string(deviceInfos[i].physdevProps.deviceName);
                     std::transform(deviceName.begin(), deviceName.end(), deviceName.begin(),
                                    [](unsigned char c) { return std::tolower(c); });
-                    INFO("Physical device [%d] = %s", i, deviceName.c_str());
+                    dinfo("Physical device [%d] = %s", i, deviceName.c_str());
 
                     if (deviceName.find(enforcedGpuStr) != std::string::npos) {
                         enforceGpuIndex = i;
@@ -330,10 +328,10 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
         }
 
         if (enforceGpuIndex != -1 && enforceGpuIndex >= 0 && enforceGpuIndex < deviceInfos.size()) {
-            INFO("Selecting GPU (%s) at index %d.",
+            dinfo("Selecting GPU (%s) at index %d.",
                  deviceInfos[enforceGpuIndex].physdevProps.deviceName, enforceGpuIndex);
         } else {
-            WARN("Could not select the GPU with ANDROID_EMU_VK_GPU_SELECT.");
+            dwarning("Could not select the GPU with ANDROID_EMU_VK_GPU_SELECT.");
             enforceGpuIndex = -1;
         }
     }

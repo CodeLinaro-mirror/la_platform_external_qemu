@@ -288,8 +288,8 @@ int android_startOpenglesRenderer(
 
     const GpuInfoList& gpuList = globalGpuInfoList();
     std::string gpuInfoAsString = gpuList.dump();
-    INFO("%s: gpu info", __func__);
-    INFO("%s", gpuInfoAsString.c_str());
+    dinfo("%s: gpu info", __func__);
+    dinfo("%s", gpuInfoAsString.c_str());
 
     sRenderLib->setLogger(gfxstreamLoggingCallback);
     if (getMinLogLevel() <= EMULATOR_LOG_DEBUG) {
@@ -394,9 +394,9 @@ int android_startOpenglesRenderer(
         (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled =
                 android::featurecontrol::isEnabled(aemuFeature);
 
-        VERBOSE("gfxstreamFeature:%s = %d",
-                (gfxstreamFeatures.*gfxstreamFeaturePtr).name.c_str(),
-                (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled);
+        dprint("gfxstreamFeature:%s = %d",
+               (gfxstreamFeatures.*gfxstreamFeaturePtr).name.c_str(),
+               (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled);
 
         // These flags should not be changed anymore, as that won't be
         // reflected on the gfxstream side.
@@ -566,8 +566,8 @@ bool android_asyncReadbackSupported() {
     if (sRenderer) {
         return sRenderer->asyncReadbackSupported();
     } else {
-        VERBOSE("tried to query async readback support "
-          "before renderer initialized. Likely guest rendering");
+        dprint("tried to query async readback support "
+               "before renderer initialized. Likely guest rendering");
         return false;
     }
 }
