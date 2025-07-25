@@ -174,7 +174,7 @@ static const int kGenericError = 100;
 
 static CommandReturn help();
 
-// check ability to launch haxm/kvm accelerated VM and exit
+// check ability to launch kvm accelerated VM and exit
 // designed for use by Android Studio
 static CommandReturn checkCpuAcceleration() {
     char* status = nullptr;

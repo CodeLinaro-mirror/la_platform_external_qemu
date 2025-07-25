@@ -338,7 +338,6 @@ public slots:
 private slots:
     void slot_adbWarningMessageAccepted();
     void slot_vgkWarningMessageAccepted();
-    void slot_haxmWarningMessageAccepted();
     void slot_nestedWarningMessageAccepted();
     void slot_blit(SkinSurfaceBitmap* src,
                    QRect srcRect,
@@ -446,7 +445,6 @@ private:
     void checkShouldShowGpuWarning();
     void showGpuWarning();
     void checkVgkAndWarn();
-    void checkHaxmAndWarn();
     void checkNestedAndWarn();
     void displayCheckWarnings();
 
@@ -566,7 +564,6 @@ private:
     OnDemandMessageBox mGpuWarningBox;
     OnDemandMessageBox mAdbWarningBox;
     OnDemandMessageBox mVgkWarningBox;
-    OnDemandMessageBox mHaxmWarningBox;
     OnDemandMessageBox mNestedWarningBox;
 
     // First-show related warning messages state

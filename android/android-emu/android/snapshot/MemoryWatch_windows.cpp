@@ -54,13 +54,6 @@ public:
     }
 
     bool registerMemoryRange(void* start, size_t length) {
-        static constexpr int hax_max_slots = 32;
-        uint64_t gpa[hax_max_slots];
-        uint64_t size[hax_max_slots];
-        int count = hva2gpa_call(start, length, hax_max_slots, gpa, size);
-        for (int i = 0; i < count; ++i) {
-            guest_mem_protect_call(gpa[i], size[i], 0);
-        }
         mRanges.push_back(std::make_pair(start, length));
         return protectHostRange(start, length, PAGE_NOACCESS);
     }
@@ -110,13 +103,6 @@ public:
             memcpy(start, data, length);
         }
 
-        if (mAccel == CPU_ACCELERATOR_HAX) {
-            uint64_t gpa, size;
-            int count = hva2gpa_call(start, 1, 1, &gpa, &size);
-            if (count) {
-                guest_mem_protect_call(gpa, length, PROT_READ | PROT_WRITE | PROT_EXEC);
-            }
-        }
         return true;
     }
 
@@ -128,13 +114,6 @@ public:
         uint64_t size[32];
 
         protectHostRange(startPtr, length, PAGE_READWRITE);
-
-        if (mAccel == CPU_ACCELERATOR_HAX) {
-            int count = hva2gpa_call(startPtr, length, 32, gpa, size);
-            for (int i = 0; i < count; ++i) {
-                guest_mem_protect_call(gpa[i], size[i], PROT_READ | PROT_WRITE | PROT_EXEC);
-            }
-        }
     }
 
     bool fillPageBulk(void* startPtr, size_t length, const void* data,
@@ -204,27 +183,7 @@ private:
 
 // static
 bool MemoryAccessWatch::isSupported() {
-    if (!android::featurecontrol::isEnabled(
-            android::featurecontrol::OnDemandSnapshotLoad)) {
-        return false;
-    }
-
-    if (android::featurecontrol::isEnabled(
-            android::featurecontrol::QuickbootFileBacked)) {
-        return false;
-    }
-
-    if (!android::featurecontrol::isEnabled(
-            android::featurecontrol::WindowsOnDemandSnapshotLoad)) {
-        return false;
-    }
-
-    if (GetCurrentCpuAccelerator() == CPU_ACCELERATOR_HAX
-        && guest_mem_protect_call)
-        return guest_mem_protection_supported_call();
-
-    return GetCurrentCpuAccelerator() == CPU_ACCELERATOR_HAX &&
-           guest_mem_protect_call;
+    return false;
 }
 
 MemoryAccessWatch::MemoryAccessWatch(AccessCallback&& accessCallback,

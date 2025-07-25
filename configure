@@ -171,17 +171,6 @@ glob() {
     eval test -z '"${1#'"$2"'}"'
 }
 
-supported_hax_target() {
-    test "$hax" = "yes" || return 1
-    glob "$1" "*-softmmu" || return 1
-    case "${1%-softmmu}" in
-        i386|x86_64)
-            return 0
-        ;;
-    esac
-    return 1
-}
-
 supported_kvm_target() {
     test "$kvm" = "yes" || return 1
     glob "$1" "*-softmmu" || return 1
@@ -269,7 +258,6 @@ supported_target() {
     supported_kvm_target "$1" && return 0
     supported_aehd_target "$1" && return 0
     supported_xen_target "$1" && return 0
-    supported_hax_target "$1" && return 0
     supported_hvf_target "$1" && return 0
     supported_whpx_target "$1" && return 0
     print_error "TCG disabled, but hardware accelerator not available for '$target'"
@@ -363,7 +351,6 @@ vhost_user=""
 kvm="no"
 aehd="no"
 whpx="no"
-hax="no"
 colo="yes"
 hvf="no"
 whpx="no"
@@ -735,7 +722,6 @@ MINGW32*)
   if check_define _MSC_VER ; then
     msvc="yes"
   fi
-  hax="yes"
   audio_possible_drivers="dsound sdl winaudio"
   if check_include dsound.h; then
     audio_drv_list="dsound"
@@ -791,7 +777,6 @@ OpenBSD)
 Darwin)
   bsd="yes"
   darwin="yes"
-  hax="yes"
   LDFLAGS_SHARED="-bundle -undefined dynamic_lookup"
   if [ "$cpu" = "x86_64" ] ; then
     QEMU_CFLAGS="-arch x86_64 $QEMU_CFLAGS"
@@ -884,7 +869,6 @@ if test "$mingw32" = "yes" ; then
   sysconfdir="\${prefix}"
   local_statedir=
   confsuffix=""
-  hax="yes"
   libs_qga="-lws2_32 -lwinmm -lpowrprof -lwtsapi32 -lwininet -liphlpapi -lnetapi32 -lkernel32  $libs_qga"
 fi
 
@@ -1096,14 +1080,7 @@ for opt do
   ;;
   --enable-whpx) whpx="yes"
   ;;
-
-  --disable-hax) hax="no"
-  ;;
-  --enable-hax) hax="yes"
-  ;;
   --disable-colo) colo="no"
-  ;;
-  --enable-hax) hax="yes"
   ;;
   --disable-whpx) whpx="no"
   ;;
@@ -1643,7 +1620,6 @@ disabled with --disable-FEATURE, default is enabled if available:
   kvm             KVM acceleration support
   aehd            AEHD acceleration support
   whpx            Windows Hypervisor Platform acceleration support
-  hax             HAX acceleration support
   colo            COarse-grain LOck-stepping VM for Non-stop Service
   hvf             Hypervisor.framework acceleration support
   whpx            Windows Hypervisor Platform acceleration support
@@ -5886,7 +5862,6 @@ echo "ATTR/XATTR support $attr"
 echo "Install blobs     $blobs"
 echo "KVM support       $kvm"
 echo "AEHD support       $aehd"
-echo "HAX support       $hax"
 echo "WHPX support      $whpx"
 echo "COLO support      $colo"
 echo "HVF support       $hvf"
@@ -7032,10 +7007,6 @@ if supported_kvm_target $target; then
 fi
 if supported_aehd_target $target; then
     echo "CONFIG_AEHD=y" >> $config_target_mak
-fi
-
-if supported_hax_target $target; then
-    echo "CONFIG_HAX=y" >> $config_target_mak
 fi
 
 if test "$whpx" = "yes" ; then

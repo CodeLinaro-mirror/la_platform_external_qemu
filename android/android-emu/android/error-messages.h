@@ -36,9 +36,6 @@ const char* android_init_error_get_message(void);
 
 /*** Error message ***/
 
-// Error message to explain why haxm's vcpu sync failed
-extern const char* const kHaxVcpuSyncFailed;
-
 // Error message indicating that some unknown error occurred during startup
 extern const char* const kUnknownInitError;
 

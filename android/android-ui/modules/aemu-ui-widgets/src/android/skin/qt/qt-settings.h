@@ -39,7 +39,6 @@ constexpr char SHOW_AVD_ARCH_WARNING[] = "showAvdArchWarning";
 constexpr char SHOW_GPU_WARNING[] = "showGpuWarning";
 constexpr char SHOW_VIRTUALSCENE_INFO[] = "showVirtualSceneInfo";
 constexpr char SHOW_VGK_WARNING[] = "showVgkWarning";
-constexpr char SHOW_HAXM_WARNING[] = "showHaxmWarning";
 constexpr char SHOW_NESTED_WARNING[] = "showNestedWarning";
 constexpr char SHOW_COMPATIBILITY_WARNING[] = "showCompatibilityWarning";
 

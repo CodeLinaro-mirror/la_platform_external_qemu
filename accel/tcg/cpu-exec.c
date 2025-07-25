@@ -23,9 +23,6 @@
 #include "exec/exec-all.h"
 #include "tcg.h"
 #include "qemu/atomic.h"
-#ifdef CONFIG_HAX
-#include "sysemu/hax.h"
-#endif /* CONFIG_HAX */
 #include "sysemu/qtest.h"
 #include "qemu/timer.h"
 #include "exec/address-spaces.h"
@@ -528,17 +525,6 @@ static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
 
 static inline int cpu_get_interrupt_request(CPUState *cpu)
 {
-#ifdef CONFIG_HAX
-    /* When HAX is enabled, there are two cases where TCG emulation might happen:
-     * MMIO instructions, or non-paged mode. When this is due to an MMIO, the interrupt
-     * should not be emulated because only one instruction will be translated and run
-     * through TCG before returning to the HAX kernel.
-     */
-    if (hax_enabled() && !hax_vcpu_emulation_mode(cpu)) {
-        /* Mask interrupt during MMIO emulation. */
-        return 0;
-    }
-#endif
     return atomic_read(&cpu->interrupt_request);
 }
 
@@ -736,19 +722,6 @@ int cpu_exec(CPUState *cpu)
         TranslationBlock *last_tb = NULL;
         int tb_exit = 0;
 
-#ifdef CONFIG_HAX
-        /* When HAX is enabled but VMX "unrestricted guest" mode is not
-         * supported, call hax_vcpu_exec() to run the current instructions.
-         * The function returns 1 when execution should stop immediately
-         * (e.g. if the vCPU is halted, or received an interrupt). However,
-         * it will return 0 to indicate that the next instructions need to
-         * be handled through TCG. This happens when the virtual CPU runs
-         * in "real mode", or to handle MMIO operations only. */
-        if (hax_enabled() && !hax_vcpu_exec(cpu)) {
-            break;
-        }
-#endif /* CONFIG_HAX */
-
         while (!cpu_handle_interrupt(cpu, &last_tb)) {
             uint32_t cflags = cpu->cflags_next_tb;
             TranslationBlock *tb;
@@ -766,17 +739,6 @@ int cpu_exec(CPUState *cpu)
 
             tb = tb_find(cpu, last_tb, tb_exit, cflags);
             cpu_loop_exec_tb(cpu, tb, &last_tb, &tb_exit);
-#ifdef CONFIG_HAX
-            if (hax_enabled() && hax_stop_emulation(cpu)) {
-                /* This will end TCG emulation of instructions if the vCPU
-                 * just switched to paged-mode (which can be handled by
-                 * hax_vcpu_exec() in the next call to this function), or
-                 * if the single-instruction MMIO operation has completed.
-                 * (see target-i386/translate.c).
-                 */
-                cpu_loop_exit(cpu);
-            }
-#endif /* CONFIG_HAX */
             /* Try to align the host and virtual clocks
                if the guest is in advance */
             align_clocks(&sc, cpu);

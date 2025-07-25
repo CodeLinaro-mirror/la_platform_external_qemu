@@ -278,7 +278,6 @@ Feature: 'ForceSwiftshader' (2), value: 0, default: 0, is overridden: 0
 Feature: 'HYPERV' (3), value: 0, default: 0, is overridden: 0
 Feature: 'HVF' (4), value: 0, default: 0, is overridden: 0
 Feature: 'KVM' (5), value: 0, default: 0, is overridden: 0
-Feature: 'HAXM' (6), value: 0, default: 0, is overridden: 0
 Feature: 'FastSnapshotV1' (7), value: 0, default: 0, is overridden: 0
 Feature: 'ScreenRecording' (8), value: 0, default: 0, is overridden: 0
 Feature: 'VirtualScene' (9), value: 0, default: 0, is overridden: 0

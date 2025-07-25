@@ -85,7 +85,6 @@ class GitFiles(object):
     IGNORED_OBJECTS = [
         "audio/sdlaudio",
         "gdbstub-xml",
-        "hax-stub",
         # These have to be compiled with specific flags, and cannot be included
         "hw/i386/acpi-build",
         "hw/i386/pc_piix",  # in the default build..

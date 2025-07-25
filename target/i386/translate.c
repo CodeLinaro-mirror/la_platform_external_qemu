@@ -32,10 +32,6 @@
 #include "trace-tcg.h"
 #include "exec/log.h"
 
-#ifdef CONFIG_HAX
-#include "sysemu/hax.h"
-#endif
-
 #define PREFIX_REPZ   0x01
 #define PREFIX_REPNZ  0x02
 #define PREFIX_LOCK   0x04
@@ -8513,19 +8509,6 @@ static void i386_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *dc = container_of(dcbase, DisasContext, base);
     target_ulong pc_next = disas_insn(dc, cpu);
-
-
-#ifdef CONFIG_HAX
-        if (hax_enabled() && hax_stop_translate(cpu)) {
-            /* When the host CPU doesn't support VMX "unrestricted guest" mode,
-             * TCG is used to execute MMIO instructions. This code path is used
-             * to limit the translation to a single machine instruction, in order
-             * to try to return to HAX execution as soon as possible. */
-            gen_jmp_im(pc_next - dc->cs_base);
-            gen_eob(dc);
-            return;
-        }
-#endif /* CONFIG_HAX */
 
     if (dc->tf || (dc->base.tb->flags & HF_INHIBIT_IRQ_MASK)) {
         /* if single step mode, we generate only one instruction and

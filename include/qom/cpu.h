@@ -256,7 +256,9 @@ struct hvf_vcpu_state;
 struct hvf_x86_state;
 #endif
 
-struct hax_vcpu_state;
+#ifdef CONFIG_WHPX
+struct whpx_vcpu;
+#endif
 
 #define TB_JMP_CACHE_BITS 12
 #define TB_JMP_CACHE_SIZE (1 << TB_JMP_CACHE_BITS)
@@ -419,7 +421,7 @@ struct CPUState {
     uint32_t can_do_io;
     int32_t exception_index;
 
-    /* shared by kvm, hax and hvf */
+    /* shared by kvm and hvf */
     bool vcpu_dirty;
 
     /* Used to keep track of an outstanding cpu throttle thread for migration
@@ -450,7 +452,7 @@ struct CPUState {
         icount_decr_u16 u16;
     } icount_decr;
 
-    struct hax_vcpu_state *hax_vcpu;
+    struct whpx_vcpu *whpx_vcpu;
 
     /* The pending_tlb_flush flag is set and cleared atomically to
      * avoid potential races. The aim of the flag is to avoid

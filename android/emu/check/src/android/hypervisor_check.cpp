@@ -13,6 +13,7 @@
 #include "android/base/system/System.h"
 #include "android/emulation/compatibility_check.h"
 #include "android/cpu_accelerator.h"
+#include "aemu/base/system/Win32Utils.h"
 
 #ifdef _WIN32
 namespace android {
@@ -46,18 +47,26 @@ AvdCompatibilityCheckResult hasCompatibleHypervisor(AvdInfo* avd) {
     const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_XR);
     AndroidCpuAccelerator accelerator = androidCpuAcceleration_getAccelerator();
 
-    if (isXrAvd && (accelerator == ANDROID_CPU_ACCELERATOR_AEHD ||
-                    accelerator == ANDROID_CPU_ACCELERATOR_HAX)) {
+    if (isXrAvd && accelerator == ANDROID_CPU_ACCELERATOR_AEHD) {
         metrics.set_check(EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_GPU_CHECK_NO_VULKAN);
         metrics.set_details("Accelerator for Xr");
         return {
                 .description = absl::StrFormat(
-                        "Your current hypervisor (AEHD or HAXM) is not compatible with Android XR AVD %s. "
+                        "Your current hypervisor AEHD is not compatible with Android XR AVD %s. "
                         "Please install WHPX instead. "
                         "Refer to https://developer.android.com/studio/run/emulator-acceleration#vm-windows-whpx",
                         name),
                 .status = AvdCompatibility::Warning,
                 .metrics = metrics};
+    }
+
+    if (accelerator == ANDROID_CPU_ACCELERATOR_NONE &&
+       ::android::base::Win32Utils::getServiceStatus("intelhaxm") == SVC_RUNNING) {
+        return {
+                .description = "Your current hypervisor HAXM is no longer supported by the Android Emulator. "
+                        "Using WHPX is recommended. "
+                        "Refer to https://developer.android.com/studio/run/emulator-acceleration#vm-windows-whpx",
+                .status = AvdCompatibility::Error,};
     }
 
     return {

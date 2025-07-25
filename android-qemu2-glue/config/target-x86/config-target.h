@@ -10,8 +10,6 @@
 
 #else // __linux__
 
-#define CONFIG_HAX 1
-
 #ifdef _WIN32
 
 #define CONFIG_WHPX 1

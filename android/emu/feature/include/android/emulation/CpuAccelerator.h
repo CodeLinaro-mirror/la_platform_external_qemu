@@ -28,10 +28,6 @@ namespace android {
 //  to be installed and that /dev/kvm is properly accessible by the current
 //  user.
 //
-//  CPU_ACCELERATOR_HAX means Intel's Hardware Accelerated eXecution,
-//  which can be installed on Windows and OS X machines running on an
-//  Intel processor.
-//
 //  CPU_ACCELERATOR_HVF means Apple's Hypervisor.framework, which
 //  requres an Intel Mac running OS X 10.10+.
 //
@@ -40,7 +36,6 @@ namespace android {
 enum CpuAccelerator {
     CPU_ACCELERATOR_NONE = 0,
     CPU_ACCELERATOR_KVM,
-    CPU_ACCELERATOR_HAX,
     CPU_ACCELERATOR_HVF,
     CPU_ACCELERATOR_WHPX,
     CPU_ACCELERATOR_AEHD,

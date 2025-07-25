@@ -1038,7 +1038,6 @@ bool handleCpuAccelerationForMinConfig(int argc,
     dprint("%s: configure CPU acceleration", __func__);
 
     int hasEnableKvm = 0;
-    int hasEnableHax = 0;
     int hasEnableHvf = 0;
     int hasEnableWhpx = 0;
     int hasEnableAehd = 0;
@@ -1046,8 +1045,6 @@ bool handleCpuAccelerationForMinConfig(int argc,
     for (int i = 0; i < argc; i++) {
         if (!strcmp(argv[i], "-enable-kvm")) {
             hasEnableKvm = 1;
-        } else if (!strcmp(argv[i], "-enable-hax")) {
-            hasEnableHax = 1;
         } else if (!strcmp(argv[i], "-enable-hvf")) {
             hasEnableHvf = 1;
         } else if (!strcmp(argv[i], "-enable-whpx")) {
@@ -1057,13 +1054,13 @@ bool handleCpuAccelerationForMinConfig(int argc,
         }
     }
 
-    int totalEnabled = hasEnableKvm + hasEnableHax + hasEnableHvf +
+    int totalEnabled = hasEnableKvm + hasEnableHvf +
                        hasEnableWhpx + hasEnableAehd;
 
     if (totalEnabled > 1) {
         derror("%s: tried to enable more than once acceleration mode. "
-               "Attempted enables: kvm %d haxm %d hvf %d whpx %d aehd %d",
-               __func__, hasEnableKvm, hasEnableHax, hasEnableHvf,
+               "Attempted enables: kvm %d hvf %d whpx %d aehd %d",
+               __func__, hasEnableKvm, hasEnableHvf,
                hasEnableWhpx, hasEnableAehd);
         exit(1);
     }
@@ -1099,9 +1096,6 @@ bool handleCpuAccelerationForMinConfig(int argc,
     if (hasEnableKvm) {
         dprint("%s: Selecting KVM for CPU acceleration", __func__);
         androidCpuAcceleration_resetCpuAccelerator(ANDROID_CPU_ACCELERATOR_KVM);
-    } else if (hasEnableHax) {
-        dprint("%s: Selecting HAXM for CPU acceleration", __func__);
-        androidCpuAcceleration_resetCpuAccelerator(ANDROID_CPU_ACCELERATOR_HAX);
     } else if (hasEnableHvf) {
         dprint("%s: Selecting HVF for CPU acceleration", __func__);
         androidCpuAcceleration_resetCpuAccelerator(ANDROID_CPU_ACCELERATOR_HVF);
@@ -2703,8 +2697,7 @@ extern "C" int main(int argc, char** argv) {
     AFREE(accel_status);
 
 #ifdef _WIN32
-    if ((accelerator == ANDROID_CPU_ACCELERATOR_HAX ||
-         accelerator == ANDROID_CPU_ACCELERATOR_AEHD) &&
+    if (accelerator == ANDROID_CPU_ACCELERATOR_AEHD &&
         ::android::base::Win32Utils::getServiceStatus("vgk") > SVC_NOT_FOUND) {
         dwarning(
                 "Vanguard anti-cheat software is detected on your system. "
