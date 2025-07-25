@@ -67,7 +67,6 @@ cat <<EOT > runemu.sh
 
 export LD_PRELOAD=$PWD/$RUNROOT/lib/stubxlib/libStubXlib.so
 export QT_NO_GLIB=1
-export ANDROID_EMUGL_FIXED_BACKEND_LIST=1
 export ANDROID_EMUGL_VERBOSE=1
 
 emulator -gpu swiftshader_indirect -avd a1 -verbose -show-kernel -feature -RefCountPipe -no-snapshot -no-window "\$@"

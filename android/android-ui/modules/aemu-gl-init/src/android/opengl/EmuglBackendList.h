@@ -20,13 +20,12 @@ namespace opengl {
 class EmuglBackendList {
 public:
     // Parse the content of |execDir|/<lib>/ for Emugl backends.
-    // |programBitness| can be 0 (autodetect), 32 or 64, and determines
     // the value of <lib> which will be 'lib' for 32-bit systems,
     // and 'lib64' for 64-bit ones.
-    EmuglBackendList(const char* execDir, int programBitness);
+    EmuglBackendList(const char* execDir);
 
     // Create a backend list with a fixed list of names
-    EmuglBackendList(int programBitness, const std::vector<std::string>& names);
+    EmuglBackendList(const std::vector<std::string>& names);
 
     // Return the name of the default Emugl backend.
     const std::string& defaultName() const { return mDefaultName; }
@@ -61,7 +60,6 @@ public:
 private:
     std::string mDefaultName;
     std::vector<std::string> mNames;
-    int mProgramBitness;
     std::string mExecDir;
 };
 

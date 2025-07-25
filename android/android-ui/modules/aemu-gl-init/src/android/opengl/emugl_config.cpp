@@ -72,18 +72,10 @@ namespace fc = android::featurecontrol;
 
 static EmuglBackendList* sBackendList = NULL;
 
-static void resetBackendList(int bitness) {
+static void resetBackendList() {
     delete sBackendList;
-    if (System::getEnvironmentVariable("ANDROID_EMUGL_FIXED_BACKEND_LIST") == "1") {
-        std::vector<std::string> fixedBackendNames = {
-            "swiftshader_indirect",
-            "angle_indirect",
-        };
-        sBackendList = new EmuglBackendList(64, fixedBackendNames);
-    } else {
-        sBackendList = new EmuglBackendList(
-                System::get()->getLauncherDirectory().c_str(), bitness);
-    }
+    sBackendList = new EmuglBackendList(
+            System::get()->getLauncherDirectory().c_str());
 }
 
 static bool stringVectorContains(const std::vector<std::string>& list,
@@ -722,9 +714,18 @@ bool emuglConfig_init(EmuglConfig* config,
     // zero all fields first.
     memset(config, 0, sizeof(*config));
 
+    // Only 64-bit bitness is supported
+    if (bitness == 0) {
+        bitness = System::get()->getProgramBitness();
+    }
+    if (bitness != 64) {
+        derror("%s: Unsupported bitness type: %d\n", __func__, bitness);
+        return false;
+    }
+    config->bitness = bitness;
+
     bool host_set_in_hwconfig = false;
     bool has_auto_no_window = false;
-
     bool hasUiPreference = (enum WinsysPreferredGlesBackend)uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO;
 
     // The value of '-gpu <mode>' overrides both the hardware properties
@@ -797,18 +798,13 @@ bool emuglConfig_init(EmuglConfig* config,
         gpu_mode = "swangle_indirect";
     }
 
-    if (!bitness) {
-        bitness = System::get()->getProgramBitness();
-    }
-
 #if defined(__APPLE__) && defined(__arm64__)
     if (!strcmp("host", gpu_mode)) {
         use_host_vulkan = true;
     }
 #endif
 
-    config->bitness = bitness;
-    resetBackendList(bitness);
+    resetBackendList();
 
     // For GPU mode in software rendering:
     // On Mac, both swiftshader and swangle will redirect to swangle.
@@ -827,37 +823,11 @@ bool emuglConfig_init(EmuglConfig* config,
 #endif
 
     // Check that the GPU mode is a valid value. 'auto' means determine
-    // the best mode depending on the environment. Its purpose is to
-    // enable 'swiftshader' mode automatically when NX or Chrome Remote Desktop
-    // is detected.
+    // the best mode depending on the environment.
     if (!strcmp(gpu_mode, "auto") || host_set_in_hwconfig) {
-        // The default will be 'host' unless:
-        // 1. NX or Chrome Remote Desktop is detected, or |no_window| is true.
-        // 2. The user's host GPU is on the blacklist.
-        std::string sessionType;
-        if (System::get()->isRemoteSession(&sessionType)) {
-            D("%s: %s session detected\n", __FUNCTION__, sessionType.c_str());
-            if (swangle_backend_name &&
-                    sBackendList->contains(swangle_backend_name)) {
-                D("%s: 'swangle_indirect' mode auto-selected\n", __FUNCTION__);
-                gpu_mode = "swangle_indirect";
-            } else if (sBackendList->contains(swiftshader_backend_name)) {
-                D("%s: 'swiftshader_indirect' mode auto-selected\n", __FUNCTION__);
-                gpu_mode = "swiftshader_indirect";
-            } else {
-                config->enabled = false;
-                gpu_mode = "off";
-                snprintf(config->backend, sizeof(config->backend), "%s", gpu_mode);
-                snprintf(config->status, sizeof(config->status),
-                        "GPU emulation is disabled under %s without Swiftshader",
-                        sessionType.c_str());
-                setCurrentRenderer(gpu_mode);
-                return true;
-            }
-            setCurrentRenderer(gpu_mode);
-        }
-        else if ((!has_auto_no_window && no_window) ||
-                (blacklisted && !hasUiPreference)) {
+        const bool switch_to_software = (no_window && !has_auto_no_window) ||
+                                        (blacklisted && !hasUiPreference);
+        if (switch_to_software) {
             if (swangle_backend_name && stringVectorContains(sBackendList->names(),
                     swangle_backend_name)) {
                 D("%s: Headless mode or blacklisted GPU driver, "
@@ -1090,23 +1060,13 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         system->envSet("ANDROID_EMU_VK_ICD", "swiftshader");
     }
 
-    if (!config->enabled) {
-        // There is no real GPU emulation. As a special case, define
-        // SDL_RENDER_DRIVER to 'software' to ensure that the
-        // software SDL renderer is being used. This allows one
-        // to run with '-gpu off' under NX and Chrome Remote Desktop
-        // properly.
-        system->envSet("SDL_RENDER_DRIVER", "software");
-        return;
-    }
-
     bool use_swangle = strstr(config->backend, "swangle");
 #ifdef __APPLE__
     use_swangle |= strstr(config->backend, "swiftshader") != nullptr;
 #endif
     // $EXEC_DIR/<lib>/ is already added to the library search path by default,
     // since generic libraries are bundled there. We may need more though:
-    resetBackendList(config->bitness);
+    resetBackendList();
     if (strcmp(config->backend, "host") != 0) {
         // If the backend is not 'host', we also need to add the
         // backend directory.

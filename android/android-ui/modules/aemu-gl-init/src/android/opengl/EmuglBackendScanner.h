@@ -23,10 +23,7 @@ public:
 // <lib> is either 'lib' or 'lib64' depending on current host bitness,
 // and <name> is an arbitrary names. Returns a vector of matching <name>
 // strings, which will be empty on error.
-// If |programBitness| is 0, the this will use the current program
-// bitness, otherwise the value must be either 32 or 64.
-    static std::vector<std::string> scanDir(const char* execDir,
-                                            int programBitness = 0);
+    static std::vector<std::string> scanDir(const char* execDir);
 };
 
 }  // namespace opengl

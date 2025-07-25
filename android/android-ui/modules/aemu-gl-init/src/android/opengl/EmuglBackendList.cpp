@@ -33,21 +33,13 @@ namespace opengl {
 
 using android::base::System;
 
-EmuglBackendList::EmuglBackendList(const char* execDir,
-                                   int programBitness) :
-        mDefaultName("auto"), mNames(), mProgramBitness(0), mExecDir(execDir) {
-    // Fix host bitness if needed.
-    if (!programBitness) {
-        programBitness = System::get()->getProgramBitness();
-    }
-    mProgramBitness = programBitness;
-
-    mNames = EmuglBackendScanner::scanDir(execDir, programBitness);
+EmuglBackendList::EmuglBackendList(const char* execDir) :
+        mDefaultName("auto"), mNames(), mExecDir(execDir) {
+    mNames = EmuglBackendScanner::scanDir(execDir);
 }
 
-EmuglBackendList::EmuglBackendList(int programBitness,
-                                   const std::vector<std::string>& names) :
-        mDefaultName("auto"), mNames(names), mProgramBitness(programBitness) { }
+EmuglBackendList::EmuglBackendList(const std::vector<std::string>& names) :
+        mDefaultName("auto"), mNames(names) { }
 
 bool EmuglBackendList::contains(const char* name) const {
     for (size_t n = 0; n < mNames.size(); ++n) {
@@ -68,9 +60,8 @@ std::string EmuglBackendList::getLibDirPath(const char* name) {
         nameNoSuffix.erase(nameNoSuffixLen);
     }
     return android::base::StringFormat(
-            "%s" PATH_SEP "%s" PATH_SEP "gles_%s",
+            "%s" PATH_SEP "lib64" PATH_SEP "gles_%s",
             mExecDir,
-            mProgramBitness == 64 ? "lib64" : "lib",
             nameNoSuffix.c_str());
 }
 
