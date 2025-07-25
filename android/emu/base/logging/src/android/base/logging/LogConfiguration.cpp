@@ -23,6 +23,7 @@
 #include "aemu/base/logging/LogSeverity.h"
 
 #include "android/base/logging/ColorLogSink.h"
+#include "android/base/logging/LogRegistry.h"
 #include "android/base/logging/StudioLogSink.h"
 #ifdef _WIN32
 #include <io.h>
@@ -124,3 +125,11 @@ void base_configure_logs(LoggingFlags flags) {
     }
     VLOG(1) << "Logging " << (useColor() ? "in color" : "without color");
 }
+
+namespace android {
+namespace base {
+void registerSink(absl::LogSink* sink) {
+    absl::AddLogSink(sink);
+}
+}  // namespace base
+}  // namespace android

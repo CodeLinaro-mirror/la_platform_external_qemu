@@ -21,8 +21,10 @@
 #include <thread>
 
 #include "android/crashreport/CrashConsent.h"
+#include "android/crashreport/CrashpadLogSink.h"
 #include "android/crashreport/crash-initializer.h"
-
+#include "aemu/base/logging/LogSeverity.h"
+#include "absl/log/log.h"
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -113,7 +115,12 @@ int main(int argc, char** argv) {
         load_consent_provider(dll);
     }
 
+    base_configure_logs(LoggingFlags::kLogDefaultOptions);
+
     crashhandler_init(argc, argv);
+
+    LOG(ERROR) << "Crash message should appear on the log.";
+
     crashme(argc, nocrash, delay_ms);
     printf("test crasher done\n");
     return 0;

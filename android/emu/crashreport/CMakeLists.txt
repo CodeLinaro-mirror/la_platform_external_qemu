@@ -32,12 +32,14 @@ android_add_library(
   SOURCE_DIR
   src
   SRC android/crashreport/Breadcrumb.cpp
+      android/crashreport/CrashpadLogSink.cpp
       android/crashreport/CrashReporter.cpp
       android/crashreport/detectors/CrashDetectors.cpp
       android/crashreport/detectors/TimeoutMonitor.cpp
       android/crashreport/HangDetector.cpp
   DEPS absl::strings
        android-emu-agents
+       android-emu-base-logging
        android-emu-cmdline
        android-emu-files
        android-emu-utils
@@ -151,8 +153,8 @@ android_add_executable(
   TARGET crash-me
   NODISTRIBUTE SOURCE_DIR test
   SRC android/crashreport/testing/main-test-crasher.cpp
-  DEPS android-emu android-emu-crash-initializer android-emu-crashreport
-       android-emu-crashreport-consent-never)
+  DEPS android-emu android-emu-base-logging android-emu-crash-initializer
+       android-emu-crashreport android-emu-crashreport-consent-never)
 
 android_upload_symbols(TARGET crash-me DIRECTORY ${ANDROID_SYMBOL_DIR})
 
@@ -171,8 +173,11 @@ android_add_test(
        android-emu-crashreport
        android-emu-test-launcher
        android-emu-utils
+       breakpad_common
        breakpad_processor
-       crashpad_client)
+       crashpad_client
+       crashpad_handler_lib
+       nlohmann_json::nlohmann_json)
 
 target_compile_options(android-emu-crashreport-testing
                        PRIVATE -Wno-extern-c-compat)
