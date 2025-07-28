@@ -466,7 +466,7 @@ GoldfishOpenglTestEnv::GoldfishOpenglTestEnv() {
             useHostGpu ? "host" : "swiftshader_indirect", /* gpu mode, option */
             64,                                           /* bitness */
             true,                                         /* no window */
-            false,                                        /* blacklisted */
+            false,                                        /* denylisted */
             false, /* has guest renderer */
             WINSYS_GLESBACKEND_PREFERENCE_AUTO, false);
 

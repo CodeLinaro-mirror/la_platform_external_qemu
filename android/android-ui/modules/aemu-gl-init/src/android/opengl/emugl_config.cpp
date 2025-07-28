@@ -699,13 +699,13 @@ bool emuglConfig_init(EmuglConfig* config,
                       const char* gpu_option,
                       int bitness,
                       bool no_window,
-                      bool blacklisted,
+                      bool denylisted,
                       bool has_guest_renderer,
                       int uiPreferredBackend,
                       bool use_host_vulkan) {
-    D("%s: blacklisted=%d has_guest_renderer=%d, mode: %s, option: %s\n",
+    D("%s: denylisted=%d has_guest_renderer=%d, mode: %s, option: %s\n",
       __FUNCTION__,
-      blacklisted,
+      denylisted,
       has_guest_renderer,
       gpu_mode, gpu_option);
 
@@ -824,22 +824,22 @@ bool emuglConfig_init(EmuglConfig* config,
     // the best mode depending on the environment.
     if (!strcmp(gpu_mode, "auto") || host_set_in_hwconfig) {
         const bool switch_to_software = (no_window && !has_auto_no_window) ||
-                                        (blacklisted && !hasUiPreference);
+                                        (denylisted && !hasUiPreference);
         if (switch_to_software) {
             if (swangle_backend_name && stringVectorContains(sBackendList->names(),
                     swangle_backend_name)) {
-                D("%s: Headless mode or blacklisted GPU driver, "
+                D("%s: Headless mode or denylisted GPU driver, "
                   "using SwANGLE backend\n",
                   __FUNCTION__);
                 gpu_mode = "swangle_indirect";
             } else if (stringVectorContains(sBackendList->names(),
                     swiftshader_backend_name)) {
-                D("%s: Headless mode or blacklisted GPU driver, "
+                D("%s: Headless mode or denylisted GPU driver, "
                   "using Swiftshader backend\n",
                   __FUNCTION__);
                 gpu_mode = "swiftshader_indirect";
             } else if (!has_guest_renderer) {
-                D("%s: Headless (-no-window) mode (or blacklisted GPU driver)"
+                D("%s: Headless (-no-window) mode (or denylisted GPU driver)"
                   " without Swiftshader, forcing '-gpu off'\n",
                   __FUNCTION__);
                 config->enabled = false;
@@ -850,7 +850,7 @@ bool emuglConfig_init(EmuglConfig* config,
                 setCurrentRenderer(gpu_mode);
                 return true;
             } else {
-                D("%s: Headless (-no-window) mode (or blacklisted GPU driver)"
+                D("%s: Headless (-no-window) mode (or denylisted GPU driver)"
                   ", using guest GPU backend\n",
                   __FUNCTION__);
                 config->enabled = false;

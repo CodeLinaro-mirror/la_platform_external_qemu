@@ -38,7 +38,7 @@ bool androidEmuglConfigInit(EmuglConfig* config,
                             int wantedBitness,
                             bool noWindow,
                             enum WinsysPreferredGlesBackend uiPreferredBackend,
-                            bool* hostGpuVulkanBlacklisted,
+                            bool* hostGpuVulkanDenylisted,
                             bool forceUseHostGpuVulkan) {
     bool gpuEnabled = false;
 
@@ -157,7 +157,7 @@ bool androidEmuglConfigInit(EmuglConfig* config,
 #endif
             if (isUnsupportedGpuDriver) {
                 dwarning(
-                        "Your GPU '%s' has driver version %d.%d.%d,"
+                        "Your GPU '%s' has Vulkan API version %d.%d.%d,"
                         " and cannot support Vulkan properly."
                         " Please try updating your GPU Drivers.",
                         vkVendor, vkMajor, vkMinor, vkPatch);
@@ -174,7 +174,7 @@ bool androidEmuglConfigInit(EmuglConfig* config,
     }
 #endif
 
-    *hostGpuVulkanBlacklisted =
+    *hostGpuVulkanDenylisted =
             isUnsupportedGpuDriver || async_query_host_gpu_VulkanBlacklisted();
 
     return result;

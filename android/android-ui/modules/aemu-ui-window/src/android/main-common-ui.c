@@ -317,13 +317,13 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         str_reset(&hw->hw_gpu_mode, DEFAULT_SOFTWARE_GPU_MODE);
     }
 
-    bool hostGpuVulkanBlacklisted = true;
+    bool hostGpuVulkanDenylisted = true;
 
     if (!androidEmuglConfigInit(
                 &config, opts->avd, api_arch, api_level, isGoogle, opts->gpu,
                 &hw->hw_gpu_mode, 0,
                 getConsoleAgents()->settings->host_emulator_is_headless(),
-                uiPreferredBackend, &hostGpuVulkanBlacklisted,
+                uiPreferredBackend, &hostGpuVulkanDenylisted,
                 opts->use_host_vulkan)) {
         derror("%s", config.status);
 
@@ -353,13 +353,13 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
                 "Selected renderer: %d "
                 "API level: %d host GPU on the denylist? %d\n",
                 config_out->selectedRenderer, api_level,
-                hostGpuVulkanBlacklisted);
+                hostGpuVulkanDenylisted);
         switch (config_out->selectedRenderer) {
             // Host gpu: enable as long as not on blacklist
             // and api >= 29
             case SELECTED_RENDERER_HOST:
                 shouldEnableVulkan =
-                        (api_level >= 29) && !hostGpuVulkanBlacklisted;
+                        (api_level >= 29) && !hostGpuVulkanDenylisted;
                 if (shouldEnableVulkan) {
                     crashhandler_append_message_format(
                             "Host GPU selected, enabling Vulkan.\n");
@@ -367,7 +367,7 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
                     crashhandler_append_message_format(
                             "Host GPU selected, not enabling Vulkan because "
                             "either API level is < 29 or host GPU driver is "
-                            "blacklisted.\n");
+                            "denylisted.\n");
                 }
                 break;
             // Swiftshader: always enable if api level >= 29
