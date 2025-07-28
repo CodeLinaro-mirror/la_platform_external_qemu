@@ -76,49 +76,89 @@ bool androidEmuglConfigInit(EmuglConfig* config,
                              (apiLevel >= 23) &&
                              hasGoogleApis;
 
-    bool blacklisted = false;
-    bool onBlacklist = false;
+    const bool vulkanRequired =
+            (!agentsAvailable() || !fc::isOverridden(fc::Vulkan) ||
+             fc::isEnabled(fc::Vulkan));
+    const bool glesRequired = true;
+
+    bool hostGpuDenylisted = false;
 
     const char* gpuChoice = gpuOption ? gpuOption : *hwGpuModePtr;
     // If the user has specified a renderer
     // that is neither "auto", "host" nor "on",
     // don't check the blacklist.
     // Only check the blacklist for 'auto', 'host' or 'on' mode.
-    if (gpuChoice && (!strcmp(gpuChoice, "auto") ||
-                      !strcmp(gpuChoice, "host") ||
-                      !strcmp(gpuChoice, "auto-no-window") ||
-                      !strcmp(gpuChoice, "on"))) {
+    bool gpuChoiceAuto = gpuChoice && (!strcmp(gpuChoice, "auto") ||
+                                       !strcmp(gpuChoice, "auto-no-window"));
+    bool gpuChoiceHost = gpuChoice && (!strcmp(gpuChoice, "host") ||
+                                       !strcmp(gpuChoice, "on"));
 
-         onBlacklist = isHostGpuBlacklisted();
-    }
+    if (gpuChoiceAuto || gpuChoiceHost) {
+        bool switchToSoftware = false;
 
-    if (gpuChoice && (!strcmp(gpuChoice, "auto") || !strcmp(gpuChoice, "auto-no-window"))) {
-        if (onBlacklist) {
-            dwarning("Your GPU drivers may have a bug. "
-                     "Switching to software rendering.");
+        // Decide if a switch to software is needed
+        const bool onDenyList = isHostGpuBlacklisted();
+        if (onDenyList) {
+            if (gpuChoiceAuto) {
+                // Auto switch to software if denylisted
+                dwarning(
+                        "Your GPU drivers may have a bug. "
+                        "Switching to software rendering.");
+                switchToSoftware = true;
+            } else {
+                // Check if things might work in 'host' modes.
+                if (vulkanRequired) {
+                    char* vkVendor = nullptr;
+                    int vkMajor = 0, vkMinor = 0, vkPatch = 0;
+                    emuglConfig_get_vulkan_hardware_gpu(
+                            &vkVendor, &vkMajor, &vkMinor, &vkPatch, nullptr,
+                            nullptr, nullptr);
+                    if (vkVendor) {
+                        // We can create an instance and get driver information,
+                        // maybe it'll work, just warn the user and keep the gpu
+                        // choice unchanged
+                        dwarning(
+                                "Your GPU drivers (%s, Vulkan API version "
+                                "%d.%d.%d) may have a bug. "
+                                "If you experience graphical issues, "
+                                "please consider switching to software "
+                                "rendering mode.",
+                                vkVendor, vkMajor, vkMinor, vkPatch);
+                        free(vkVendor);
+                    } else {
+                        // We cannot use vulkan on this device, it's highly
+                        // likely that it'll crash with host GPU Overwrite
+                        // user's 'host' setting and use software rendering
+                        derror("Your GPU cannot be used for hardware rendering."
+                               " Software rendering will be used.");
+
+                        switchToSoftware = true;
+                    }
+                }
+
+                if (glesRequired) {
+                    // TODO(b/405458902): Also add GLES control here if
+                    // GuestAngle is not in use
+                }
+            }
         }
-        blacklisted = onBlacklist;
-        setGpuBlacklistStatus(blacklisted);
-    } else if (onBlacklist && gpuChoice &&
-            (!strcmp(gpuChoice, "host") || !strcmp(gpuChoice, "on"))) {
-        dwarning("Your GPU drivers may have a bug. "
-                 "If you experience graphical issues, "
-                 "please consider switching to software rendering.");
+
+        if (switchToSoftware) {
+            hostGpuDenylisted = onDenyList;
+            setGpuBlacklistStatus(hostGpuDenylisted);
+        }
     }
 
     bool result = emuglConfig_init(
             config, gpuEnabled, *hwGpuModePtr, gpuOption, wantedBitness,
-            noWindow, blacklisted, hasGuestRenderer, uiPreferredBackend,
+            noWindow, hostGpuDenylisted, hasGuestRenderer, uiPreferredBackend,
             forceUseHostGpuVulkan);
 
     bool isUnsupportedGpuDriver = false;
 #if defined(_WIN32) || defined(__linux__)
     const bool hwGpuRequested =
             (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST);
-    const bool vulkanIsNotDisabled =
-            (!agentsAvailable() || !fc::isOverridden(fc::Vulkan) ||
-             fc::isEnabled(fc::Vulkan));
-    if (hwGpuRequested && vulkanIsNotDisabled) {
+    if (hwGpuRequested && vulkanRequired) {
         char* vkVendor = nullptr;
         int vkMajor = 0;
         int vkMinor = 0;
