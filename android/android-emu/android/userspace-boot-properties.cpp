@@ -763,11 +763,11 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         key_to_val_map[key] = params[i].second;
     }
 
-    INFO("Userspace boot properties:");
+    dinfo("Userspace boot properties:");
     std::vector<std::pair<std::string, std::string>> unique_params;
     for (const auto& it : key_to_val_map) {
         unique_params.push_back({it.first, it.second});
-        INFO("  %s=%s", it.first.c_str(), it.second.c_str());
+        dinfo("  %s=%s", it.first.c_str(), it.second.c_str());
     }
 
     return unique_params;
