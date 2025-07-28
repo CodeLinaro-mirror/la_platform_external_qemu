@@ -16,155 +16,32 @@ import shutil
 import sys
 
 from aemu.configure.base_builder import QemuBuilder
-from aemu.configure.libraries import BazelLib, CMakeLib
+from aemu.configure.libraries import BazelLib
 
 
 class LinuxBuilder(QemuBuilder):
     def meson_config(self):
-        return [
-            "-Ddefault_devices=true",
-            "-Dplugins=true",
-            "-Daf_xdp=disabled",
-            "-Dhv_balloon=disabled",
-            "-Dlibkeyutils=disabled",
-            "-Dpvg=disabled",
-            "-Dqatzip=disabled",
-            "-Dqpl=disabled",
-            "-Drust=disabled",
-            "-Dtcg=enabled",
-            "-Ddebug_tcg=false",
-            "-Duadk=disabled",
-            "-Dlibcbor=disabled",
+        features = super().meson_config()
 
-            "-Dandroid=enabled",
-            "-Daudio_drv_list=default",
-            "-Dfdt=enabled",
-            "-Dalsa=disabled",
-            "-Dattr=disabled",
-            "-Dauth_pam=disabled",
-            "-Davx2=enabled",
-            "-Davx512bw=enabled",
-            "-Dblkio=disabled",
-            "-Dbochs=disabled",
-            "-Dbpf=disabled",
-            "-Dbrlapi=disabled",
-            "-Dbzip2=disabled",
-            "-Dcanokey=disabled",
-            "-Dcap_ng=disabled",
-            "-Dcapstone=disabled",
-            "-Dcloop=disabled",
-            "-Dcocoa=disabled",
-            "-Dcolo_proxy=disabled",
-            "-Dcoreaudio=disabled",
-            "-Dcrypto_afalg=enabled",
-            "-Dcurl=disabled",
-            "-Dcurses=disabled",
-            "-Ddbus_display=disabled",
-            "-Ddmg=disabled",
-            "-Ddsound=disabled",
-            "-Dfuse=disabled",
-            "-Dfuse_lseek=disabled",
-            "-Dgcrypt=disabled",
-            "-Dgettext=disabled",
-            "-Dgio=disabled",
-            "-Dglusterfs=disabled",
-            "-Dgnutls=disabled",
-            "-Dgtk=disabled",
-            "-Dgtk_clipboard=disabled",
-            "-Dguest_agent=disabled",
-            "-Dguest_agent_msi=disabled",
-            "-Dhvf=disabled",
-            "-Diconv=disabled",
-            "-Djack=disabled",
-            "-Dkeyring=disabled",
-            "-Dkvm=enabled",
-            "-Dl2tpv3=disabled",
-            "-Dlibdaxctl=disabled",
-            "-Dlibdw=disabled",
-            "-Dlibiscsi=disabled",
-            "-Dlibnfs=disabled",
-            "-Dlibpmem=disabled",
-            "-Dlibssh=disabled",
-            "-Dlibudev=disabled",
-            "-Dlibusb=disabled",
-            "-Dlibvduse=disabled",
-            "-Dlinux_aio=disabled",
-            "-Dlinux_io_uring=disabled",
-            "-Dlzfse=disabled",
-            "-Dlzo=disabled",
-            "-Dmalloc_trim=enabled",
-            "-Dmembarrier=disabled",
-            "-Dmodules=enabled",
-            "-Dmpath=disabled",
-            "-Dmultiprocess=disabled",
-            "-Dnetmap=disabled",
-            "-Dnettle=disabled",
-            "-Dnuma=disabled",
-            "-Dnvmm=disabled",
-            "-Dopengl=disabled",
-            "-Doss=disabled",
-            "-Dpa=enabled",
-            "-Dparallels=disabled",
-            "-Dpipewire=disabled",
-            "-Dpixman=enabled",
-            "-Dpng=disabled",
-            "-Dqcow1=disabled",
-            "-Dqed=disabled",
-            "-Dqga_vss=disabled",
-            "-Drbd=disabled",
-            "-Drdma=disabled",
-            "-Dreplication=disabled",
-            "-Drutabaga_gfx=enabled",
-            "-Dsdl=disabled",
-            "-Dsdl_image=disabled",
-            "-Dseccomp=disabled",
-            "-Dselinux=disabled",
-            "-Dslirp=disabled",
-            "-Dslirp_smbd=disabled",
-            "-Dsmartcard=disabled",
-            "-Dsnappy=disabled",
-            "-Dsndio=disabled",
-            "-Dsparse=disabled",
-            "-Dspice=disabled",
-            "-Dspice_protocol=disabled",
-            "-Dstack_protector=disabled",
-            "-Dtools=enabled",
-            "-Dtpm=disabled",
-            "-Du2f=disabled",
-            "-Dusb_redir=disabled",
-            "-Dvde=disabled",
-            "-Dvdi=disabled",
-            "-Dvduse_blk_export=disabled",
-            "-Dvfio_user_server=disabled",
-            "-Dvhdx=disabled",
-            "-Dvhost_crypto=enabled",
-            "-Dvhost_kernel=enabled",
-            "-Dvhost_net=enabled",
-            "-Dvhost_user=enabled",
-            "-Dvhost_user_blk_server=enabled",
-            "-Dvhost_vdpa=disabled",
-            "-Dvirglrenderer=disabled",
-            "-Dvirtfs=disabled",
-            "-Dvmdk=disabled",
-            "-Dvmnet=disabled",
-            "-Dvnc=enabled",
-            "-Dvnc_jpeg=disabled",
-            "-Dvnc_sasl=disabled",
-            "-Dvpc=disabled",
-            "-Dvte=disabled",
-            "-Dvvfat=disabled",
-            "-Dwhpx=disabled",
-            "-Dxen=disabled",
-            "-Dxen_pci_passthrough=disabled",
-            "-Dxkbcommon=disabled",
-            "-Dzstd=disabled",
-            "-Dauto_features=disabled",
-            "-Dwerror=true",
-            "-Ddocs=disabled",
-            f"-Dprefix={self.dest / 'release'}",
-        ]
+        features["-Daudio_drv_list"] = "pa"
+        features["-Davx2"] = "enabled"
+        features["-Davx512bw"] = "enabled"
+        features["-Db_pie"] = "true"
+        features["-Dcrypto_afalg"] = "enabled"
+        features["-Dkvm"] = "enabled"
+        features["-Dmalloc_trim"] = "enabled"
+        features["-Dpa"] = "enabled"
+        features["-Dvhost_crypto"] = "enabled"
+        features["-Dvhost_kernel"] = "enabled"
+        features["-Dvhost_net"] = "enabled"
+        features["-Dvhost_user"] = "enabled"
+        features["-Dvhost_user_blk_server"] = "enabled"
+        features["-Dwerror"] = "true"
+
+        return features
 
     def packages(self):
+        # TODO(whollins): Is this still necessary?
         # We need the original .pc from our aosp sysroot, so let's copy them over.
         destination_directory = self.toolchain_generator.pkgconfig_directory
         destination_directory.mkdir(parents=True, exist_ok=True)
@@ -201,8 +78,8 @@ class LinuxBuilder(QemuBuilder):
                 "2.77.2",
                 {
                     "name": "glib-2.0",
-                    "link_flags": "-pthread",
                     "Requires": "pcre2, gmodule-export-2.0",
+                    "link_flags": "-pthread",
                 },
             ),
             BazelLib("@pixman//:pixman-1", "0.42.3", {"Requires": "pixman_simd"}),

@@ -88,12 +88,15 @@ class QemuBuilder:
         with open(self.dest / "config-host.mak", "w", encoding="utf-8") as f:
             f.write("\n".join(self.config_mak()))
 
+        prefix = (self.dest / "release").as_posix()
         # Invoke Meson setup with the proper configuration.
         run(
             [self.toolchain / "meson"]
             + ["setup", self.dest]
-            + self.meson_config()
-            + ["--native-file", self.toolchain / "aosp-cl.ini"]
+            + [f"{k}={v}" if v else k for k, v in self.meson_config().items()]
+            + [f"-Dprefix={prefix}",
+               "--native-file",
+               self.toolchain / "aosp-cl.ini"]
             + meson_flags,
             cwd=self.aosp / "third_party" / "qemu",
             toolchain_path=self.toolchain,
@@ -107,8 +110,194 @@ class QemuBuilder:
         raise ValueError("Subclasses need to provide this.")
 
     def meson_config(self):
-        """The set of meson configuration flags that need to be provided to meson setup to configure qemu"""
-        raise ValueError("Subclasses need to provide this.")
+        """The set of meson configuration flags that need to be provided to meson setup to configure qemu
+
+        Returns a dict - if value is not none then the setting becomes key=value.
+        """
+        # First we turn everything off.
+        # TODO
+        #option('trace_backends', type: 'array', value: ['log'],
+        #option('x86_version', type : 'combo', choices : ['0', '1', '2', '3', '4'], value: '1',
+        #option('coroutine_backend', type: 'combo', - auto
+        #option('malloc', type : 'combo', choices : ['system', 'tcmalloc', 'jemalloc'],
+        features = {
+            "-Daf_xdp": "disabled",
+            "-Dalsa": "disabled",
+            "-Dandroid": "disabled",
+            "-Dasan": "false",
+            "-Dattr": "disabled",
+            "-Daudio_drv_list": "default",
+            "-Dauth_pam": "disabled",
+            "-Dauto_features": "disabled",
+            "-Davx2": "disabled",
+            "-Davx512bw": "disabled",
+            "-Db_coverage": "false",
+            "-Db_lto": "false",
+            "-Db_pie": "false",
+            "-Dblkio": "disabled",
+            "-Dbochs": "disabled",
+            "-Dbpf": "disabled",
+            "-Dbrlapi": "disabled",
+            "-Dbzip2": "disabled",
+            "-Dcanokey": "disabled",
+            "-Dcap_ng": "disabled",
+            "-Dcapstone": "disabled",
+            "-Dcfi": "false",
+            "-Dcfi_debug": "false",
+            "-Dcloop": "disabled",
+            "-Dcocoa": "disabled",
+            "-Dcolo_proxy": "disabled",
+            "-Dcoreaudio": "disabled",
+            "-Dcoroutine_pool": "false",
+            "-Dcrypto_afalg": "disabled",
+            "-Dcurl": "disabled",
+            "-Dcurses": "disabled",
+            "-Ddbus_display": "disabled",
+            "-Ddebug_graph_lock": "false",
+            "-Ddebug_mutex": "false",
+            "-Ddebug_remap": "false",
+            "-Ddebug_stack_usage": "false",
+            "-Ddebug_tcg": "false",
+            "-Ddefault_devices": "false",
+            "-Ddmg": "disabled",
+            "-Ddocs": "disabled",
+            "-Ddsound": "disabled",
+            "-Dfdt": "disabled",
+            "-Dfuse": "disabled",
+            "-Dfuse_lseek": "disabled",
+            "-Dfuzzing": "false",
+            "-Dgcrypt": "disabled",
+            "-Dgettext": "disabled",
+            "-Dgio": "disabled",
+            "-Dglusterfs": "disabled",
+            "-Dgnutls": "disabled",
+            "-Dgtk": "disabled",
+            "-Dgtk_clipboard": "disabled",
+            "-Dguest_agent": "disabled",
+            "-Dguest_agent_msi": "disabled",
+            "-Dhexagon_idef_parser": "false",
+            "-Dhv_balloon": "disabled",
+            "-Dhvf": "disabled",
+            "-Diconv": "disabled",
+            "-Dinstall_blobs": "false",
+            "-Djack": "disabled",
+            "-Dkeyring": "disabled",
+            "-Dkvm": "disabled",
+            "-Dl2tpv3": "disabled",
+            "-Dlibcbor": "disabled",
+            "-Dlibdaxctl": "disabled",
+            "-Dlibdw": "disabled",
+            "-Dlibiscsi": "disabled",
+            "-Dlibkeyutils": "disabled",
+            "-Dlibnfs": "disabled",
+            "-Dlibpmem": "disabled",
+            "-Dlibssh": "disabled",
+            "-Dlibudev": "disabled",
+            "-Dlibusb": "disabled",
+            "-Dlibvduse": "disabled",
+            "-Dlinux_aio": "disabled",
+            "-Dlinux_io_uring": "disabled",
+            "-Dlzfse": "disabled",
+            "-Dlzo": "disabled",
+            "-Dmalloc_trim": "disabled",
+            "-Dmembarrier": "disabled",
+            "-Dmodule_upgrades": "false",
+            "-Dmodules": "disabled",
+            "-Dmpath": "disabled",
+            "-Dmultiprocess": "disabled",
+            "-Dnetmap": "disabled",
+            "-Dnettle": "disabled",
+            "-Dnuma": "disabled",
+            "-Dnvmm": "disabled",
+            "-Dopengl": "disabled",
+            "-Doss": "disabled",
+            "-Dpa": "disabled",
+            "-Dparallels": "disabled",
+            "-Dpipewire": "disabled",
+            "-Dpixman": "disabled",
+            "-Dplugins": "false",
+            "-Dpng": "disabled",
+            "-Dprefer_static": "false",
+            "-Dpvg": "disabled",
+            "-Dqatzip": "disabled",
+            "-Dqcow1": "disabled",
+            "-Dqed": "disabled",
+            "-Dqga_vss": "disabled",
+            "-Dqom_cast_debug": "false",
+            "-Dqpl": "disabled",
+            "-Drbd": "disabled",
+            "-Drdma": "disabled",
+            "-Drelocatable": "false",
+            "-Dreplication": "disabled",
+            "-Drng_none": "false",
+            "-Drust": "disabled",
+            "-Drutabaga_gfx": "disabled",
+            "-Dsafe_stack": "false",
+            "-Dsdl": "disabled",
+            "-Dsdl_image": "disabled",
+            "-Dseccomp": "disabled",
+            "-Dselinux": "disabled",
+            "-Dslirp": "disabled",
+            "-Dslirp_smbd": "disabled",
+            "-Dsmartcard": "disabled",
+            "-Dsnappy": "disabled",
+            "-Dsndio": "disabled",
+            "-Dsparse": "disabled",
+            "-Dspice": "disabled",
+            "-Dspice_protocol": "disabled",
+            "-Dstack_protector": "disabled",
+            "-Dstrict_rust_lints": "false",
+            "-Dtcg": "disabled",
+            "-Dtcg_interpreter": "false",
+            "-Dtools": "disabled",
+            "-Dtpm": "disabled",
+            "-Dtsan": "false",
+            "-Du2f": "disabled",
+            "-Duadk": "disabled",
+            "-Dubsan": "false",
+            "-Dusb_redir": "disabled",
+            "-Dvde": "disabled",
+            "-Dvdi": "disabled",
+            "-Dvduse_blk_export": "disabled",
+            "-Dvfio_user_server": "disabled",
+            "-Dvhdx": "disabled",
+            "-Dvhost_crypto": "disabled",
+            "-Dvhost_kernel": "disabled",
+            "-Dvhost_net": "disabled",
+            "-Dvhost_user": "disabled",
+            "-Dvhost_user_blk_server": "disabled",
+            "-Dvhost_vdpa": "disabled",
+            "-Dvirglrenderer": "disabled",
+            "-Dvirtfs": "disabled",
+            "-Dvmdk": "disabled",
+            "-Dvmnet": "disabled",
+            "-Dvnc": "disabled",
+            "-Dvnc_jpeg": "disabled",
+            "-Dvnc_sasl": "disabled",
+            "-Dvpc": "disabled",
+            "-Dvte": "disabled",
+            "-Dvvfat": "disabled",
+            "-Dwerror": "false",
+            "-Dwhpx": "disabled",
+            "-Dxen": "disabled",
+            "-Dxen_pci_passthrough": "disabled",
+            "-Dxkbcommon": "disabled",
+            "-Dzstd": "disabled",
+            }
+
+        # Now we enabled the features than are on for all AEMU platforms.
+        features["-Dandroid"] = "enabled"
+        features["-Dcoroutine_pool"] = "true"
+        features["-Ddefault_devices"] = "true"
+        features["-Dfdt"] = "enabled"
+        features["-Dmodules"] = "enabled"
+        features["-Dpixman"] = "enabled"
+        features["-Drutabaga_gfx"] = "enabled"
+        features["-Dtcg"] = "enabled"
+        features["-Dtools"] = "enabled"
+        features["-Dvnc"] = "enabled"
+
+        return features;
 
     def config_mak(self):
         """The config.mak file needed by meson to configure qemu."""

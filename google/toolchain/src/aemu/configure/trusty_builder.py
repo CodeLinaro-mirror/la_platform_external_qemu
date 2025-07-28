@@ -19,17 +19,13 @@ from aemu.configure.libraries import BazelLib
 
 class TrustyBuilder(LinuxBuilder):
     def meson_config(self):
-        # TODO(whollins): Just use dicts when specifying all platforms.
-        def split_def(x):
-            if x.startswith("-D"):
-                return x.split("=", 1)
-            return x, None
+        linux = super().meson_config()
 
-        linux = dict(split_def(x) for x in super().meson_config())
+        linux["-Daudio_drv_list"] = "default"
         linux["-Db_pie"] = "false"
+        linux["-Dhexagon_idef_parser"] = "true"
         linux["-Dmodules"] = "disabled"
         linux["-Dpa"] = "disabled"
-        linux["-Dplugins"] = "false"
         linux["-Dprefer_static"] = "true"
         linux["-Drutabaga_gfx"] = "disabled"
         linux["-Dslirp"] = "enabled"
@@ -37,7 +33,7 @@ class TrustyBuilder(LinuxBuilder):
         linux["-Dvnc"] = "disabled"
         linux["-Dwerror"] = "false"
 
-        return [f"{k}={v}" if v else k for k, v in linux.items()]
+        return linux
 
     def packages(self):
         # Similar to linux, but using static dependencies.
