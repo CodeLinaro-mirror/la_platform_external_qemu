@@ -345,19 +345,9 @@ static void npcm8xx_gcr_enter_reset(Object *obj, ResetType type)
     s->regs[NPCM8XX_GCR_SCRPAD_B] = s->reset_scrpad_b;
 }
 
-static void npcm_gcr_realize(DeviceState *dev, Error **errp)
+static void npcm7xx_gcr_dram_init(NPCMGCRState *s, uint64_t dram_size,
+                                  Error **errp)
 {
-    ERRP_GUARD();
-    NPCMGCRState *s = NPCM_GCR(dev);
-    uint64_t dram_size;
-    Object *obj;
-
-    obj = object_property_get_link(OBJECT(dev), "dram-mr", errp);
-    if (!obj) {
-        error_prepend(errp, "%s: required dram-mr link not found: ", __func__);
-        return;
-    }
-    dram_size = memory_region_size(MEMORY_REGION(obj));
     if (!is_power_of_2(dram_size) ||
         dram_size < NPCM7XX_GCR_MIN_DRAM_SIZE ||
         dram_size > NPCM7XX_GCR_MAX_DRAM_SIZE) {
@@ -370,9 +360,6 @@ static void npcm_gcr_realize(DeviceState *dev, Error **errp)
                           " inclusive.\n", min_sz, max_sz);
         return;
     }
-
-    /* Power-on reset value */
-    s->reset_intcr3 = 0x00001002;
 
     /*
      * The GMMAP (Graphics Memory Map) field is used by u-boot to detect the
@@ -388,7 +375,11 @@ static void npcm_gcr_realize(DeviceState *dev, Error **errp)
      * https://github.com/Nuvoton-Israel/u-boot/blob/2aef993bd2aafeb5408dbaad0f3ce099ee40c4aa/board/nuvoton/poleg/poleg.c#L244
      */
     s->reset_intcr3 |= ctz64(dram_size / NPCM7XX_GCR_MIN_DRAM_SIZE) << 8;
+}
 
+static void npcm8xx_gcr_dram_init(NPCMGCRState *s, uint64_t dram_size,
+                                  Error **errp)
+{
     /*
      * The boot block starting from 0.0.6 for NPCM8xx SoCs stores the DRAM size
      * in the SCRPAD2 registers. We need to set this field correctly since
@@ -396,6 +387,25 @@ static void npcm_gcr_realize(DeviceState *dev, Error **errp)
      * https://github.com/Nuvoton-Israel/u-boot/blob/npcm8mnx-v2019.01_tmp/board/nuvoton/arbel/arbel.c#L737
      */
     s->reset_scrpad_b = dram_size;
+}
+
+static void npcm_gcr_realize(DeviceState *dev, Error **errp)
+{
+    ERRP_GUARD();
+    NPCMGCRState *s = NPCM_GCR(dev);
+    NPCMGCRClass *ngc = NPCM_GCR_GET_CLASS(dev);
+    Object *obj;
+
+    /* Power-on reset value */
+    s->reset_intcr3 = 0x00001002;
+
+    obj = object_property_get_link(OBJECT(dev), "dram-mr", errp);
+    if (!obj) {
+        error_prepend(errp, "%s: required dram-mr link not found: ", __func__);
+        return;
+    }
+    uint64_t dram_size = memory_region_size(MEMORY_REGION(obj));
+    ngc->dram_init(s, dram_size, errp);
 }
 
 static void npcm_gcr_init(Object *obj)
@@ -443,6 +453,7 @@ static void npcm7xx_gcr_class_init(ObjectClass *klass, const void *data)
 
     c->nr_regs = NPCM7XX_GCR_NR_REGS;
     c->cold_reset_values = npcm7xx_cold_reset_values;
+    c->dram_init = npcm7xx_gcr_dram_init;
     rc->phases.enter = npcm7xx_gcr_enter_reset;
 }
 
@@ -455,6 +466,7 @@ static void npcm8xx_gcr_class_init(ObjectClass *klass, const void *data)
     dc->desc = "NPCM8xx System Global Control Registers";
     c->nr_regs = NPCM8XX_GCR_NR_REGS;
     c->cold_reset_values = npcm8xx_cold_reset_values;
+    c->dram_init = npcm8xx_gcr_dram_init;
     rc->phases.enter = npcm8xx_gcr_enter_reset;
 }
 

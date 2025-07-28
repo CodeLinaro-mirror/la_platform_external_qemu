@@ -107,6 +107,7 @@ typedef struct NPCMGCRClass {
 
     size_t nr_regs;
     const uint32_t *cold_reset_values;
+    void (*dram_init)(NPCMGCRState *s, uint64_t dram_size, Error **errp);
 } NPCMGCRClass;
 
 #define TYPE_NPCM_GCR "npcm-gcr"
