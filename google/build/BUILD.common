@@ -1,5 +1,5 @@
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
-load("platform/cc_interface_binary.bzl", "cc_interface_binary")
+load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
 
 # Make all the headers available, including the generated ones.
 cc_library(

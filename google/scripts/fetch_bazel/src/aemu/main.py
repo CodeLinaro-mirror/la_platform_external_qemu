@@ -230,7 +230,7 @@ def fetch_and_merge(args):
         str(dest / "platform" / "BUILD.linux-x86_64"),
         "@platforms//os:linux",
         "--verbatim-buildfile",
-        str(qemu / "platform" / "BUILD.common"),
+        str(qemu / "google" / "build" / "BUILD.common"),
         "--unique",
         "win_def_file",
         "-o",

@@ -9,7 +9,7 @@ def cc_interface_binary(
         tags = None,
         visibility = None,
         linkopts = None,
-        mac_entitlements = "//third_party/qemu:platform/darwin-arm64/entitlements.plist",
+        mac_entitlements = "//third_party/qemu:google/build/darwin-entitlements.plist",
         **kwargs):
     """Creates a C++ binary and a shared library with an interface library.
 
