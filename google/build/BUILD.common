@@ -1,6 +1,12 @@
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
 
+cc_library(
+    name = "aemu_func_defs",
+    hdrs = ["google/system/aemu_func_defs.h"],
+    visibility = ["//visibility:public"],
+)
+
 # Make all the headers available, including the generated ones.
 cc_library(
     name = "qemu-headers",
@@ -184,14 +190,20 @@ cc_library(
         "-UNDEBUG",
     ],
     # Note that . is needed for config-poison.h.
-    includes = [".", "include"] + select({
+    includes = [
+        ".",
+        "include",
+    ] + select({
         "@platforms//os:windows": ["platform/windows-amd64"],
         "@platforms//os:macos": ["platform/darwin-arm64"],
         "@platforms//os:linux": ["platform/linux-x86_64"],
         "//conditions:default": [],
     }),
-    deps = ["@glib//:glib-static", "@glib//:gmodule-static"],
     visibility = ["//visibility:public"],
+    deps = [
+        "@glib//:glib-static",
+        "@glib//:gmodule-static",
+    ],
 )
 
 # Set of common build rules that we want to merge in

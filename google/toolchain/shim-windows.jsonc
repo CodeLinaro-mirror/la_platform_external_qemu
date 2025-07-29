@@ -1,6 +1,6 @@
 {
   // This will be at the start of the bazel file.
-  "bazel_prefix": "load(\"//build/bazel/rules:windows_resources.bzl\", \"windows_resources\") \nfilegroup(name = \"hw-display-virtio-gpu.lib\", srcs = [\":hw-display-virtio-gpu\"], output_group = \"interface_library\", visibility = [\"//visibility:private\"],) \ncc_import(name = \"hw-display-virtio-gpu.if\", interface_library = \":hw-display-virtio-gpu.lib\", shared_library = \":hw-display-virtio-gpu\", visibility = [\"//visibility:public\"],)",
+  "bazel_prefix": "load(\"//build/bazel/rules:windows_resources.bzl\", \"windows_resources\")",
   "shims": [
     {
       "target": "qemu-system-aarch64",

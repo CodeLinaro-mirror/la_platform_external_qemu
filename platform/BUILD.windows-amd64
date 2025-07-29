@@ -3,9 +3,7 @@
 # Using the experimental bazel build plugin.
 # It targets windows-amd64
 
-load("//build/bazel/rules:windows_resources.bzl", "windows_resources") 
-filegroup(name = "hw-display-virtio-gpu.lib", srcs = [":hw-display-virtio-gpu"], output_group = "interface_library", visibility = ["//visibility:private"],) 
-cc_import(name = "hw-display-virtio-gpu.if", interface_library = ":hw-display-virtio-gpu.lib", shared_library = ":hw-display-virtio-gpu", visibility = ["//visibility:public"],)
+load("//build/bazel/rules:windows_resources.bzl", "windows_resources")
 cc_binary(
    copts = ['-Wno-constant-conversion', '-Wno-macro-redefined', '-Wno-invalid-noreturn', '-Wno-bitfield-constant-conversion', '-Wno-int-to-void-pointer-cast', '-Wno-unused-command-line-argument', '-Wno-undef', '-Wno-microsoft-enum-forward-reference', '-Wno-microsoft-include', '-Wno-deprecated-declarations', '-fms-extensions', '-march=native', '-UNDEBUG'],
    defines = ['GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
@@ -20,36 +18,36 @@ cc_binary(
 cc_interface_binary(
    copts = ['-Wno-constant-conversion', '-Wno-macro-redefined', '-Wno-invalid-noreturn', '-Wno-bitfield-constant-conversion', '-Wno-int-to-void-pointer-cast', '-Wno-unused-command-line-argument', '-Wno-undef', '-Wno-microsoft-enum-forward-reference', '-Wno-microsoft-include', '-Wno-deprecated-declarations', '-fms-extensions', '-march=native', '-UNDEBUG'],
    defines = ['COMPILING_PER_TARGET', 'CONFIG_DEVICES=\\"aarch64-softmmu-config-devices.h\\"', 'CONFIG_TARGET=\\"aarch64-softmmu-config-target.h\\"', 'GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
-   deps = ['//third_party/dtc:libfdt', '@crosvm//:rutabaga_c_ffi', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-aarch64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', ':qemu-headers', '//third_party/qemu/google/compat/windows:compat'],
+   deps = ['//third_party/dtc:libfdt', '@crosvm//:rutabaga_c_ffi', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-aarch64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', '//third_party/qemu/google/compat/windows:compat'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
    name = 'qemu-system-aarch64',
-   srcs = ['google/system/aemu_main.cpp'],
+   srcs = ['google/system/aemu_main.cpp', 'google/system/aemu_func_defs.h'],
    visibility = ['//visibility:public'],
    win_def_file = 'platform/windows-amd64/qemu-system-aarch64.def',
 )
 cc_interface_binary(
    copts = ['-Wno-constant-conversion', '-Wno-macro-redefined', '-Wno-invalid-noreturn', '-Wno-bitfield-constant-conversion', '-Wno-int-to-void-pointer-cast', '-Wno-unused-command-line-argument', '-Wno-undef', '-Wno-microsoft-enum-forward-reference', '-Wno-microsoft-include', '-Wno-deprecated-declarations', '-fms-extensions', '-march=native', '-UNDEBUG'],
    defines = ['COMPILING_PER_TARGET', 'CONFIG_DEVICES=\\"riscv64-softmmu-config-devices.h\\"', 'CONFIG_TARGET=\\"riscv64-softmmu-config-target.h\\"', 'GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
-   deps = ['//third_party/dtc:libfdt', '@crosvm//:rutabaga_c_ffi', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-riscv64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', ':qemu-headers', '//third_party/qemu/google/compat/windows:compat'],
+   deps = ['//third_party/dtc:libfdt', '@crosvm//:rutabaga_c_ffi', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-riscv64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', '//third_party/qemu/google/compat/windows:compat'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
    name = 'qemu-system-riscv64',
-   srcs = ['google/system/aemu_main.cpp'],
+   srcs = ['google/system/aemu_main.cpp', 'google/system/aemu_func_defs.h'],
    visibility = ['//visibility:public'],
    win_def_file = 'platform/windows-amd64/qemu-system-riscv64.def',
 )
 cc_interface_binary(
    copts = ['-Wno-constant-conversion', '-Wno-macro-redefined', '-Wno-invalid-noreturn', '-Wno-bitfield-constant-conversion', '-Wno-int-to-void-pointer-cast', '-Wno-unused-command-line-argument', '-Wno-undef', '-Wno-microsoft-enum-forward-reference', '-Wno-microsoft-include', '-Wno-deprecated-declarations', '-fms-extensions', '-march=native', '-UNDEBUG'],
    defines = ['COMPILING_PER_TARGET', 'CONFIG_DEVICES=\\"x86_64-softmmu-config-devices.h\\"', 'CONFIG_TARGET=\\"x86_64-softmmu-config-target.h\\"', 'GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
-   deps = ['//third_party/dtc:libfdt', '@crosvm//:rutabaga_c_ffi', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-x86_64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', '//hardware/generic/goldfish/emulator/crashreport:init', '//hardware/generic/goldfish/android/system', ':qemu-headers', '//third_party/qemu/google/compat/windows:compat'],
+   deps = ['//third_party/dtc:libfdt', '@crosvm//:rutabaga_c_ffi', '@glib//:glib-static', '@glib//:gmodule-static', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-x86_64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', '//third_party/qemu/google/compat/windows:compat'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
    name = 'qemu-system-x86_64',
-   srcs = ['google/system/aemu_main.cpp'],
+   srcs = ['google/system/aemu_main.cpp', 'google/system/aemu_func_defs.h'],
    visibility = ['//visibility:public'],
    win_def_file = 'platform/windows-amd64/qemu-system-x86_64.def',
 )

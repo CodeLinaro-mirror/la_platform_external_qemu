@@ -4,13 +4,9 @@
       "target": "qemu-system-.*-unsigned",
       "shims": {
         "_bzl_type": "cc_interface_binary",
-        "+deps": [
-          "//hardware/generic/goldfish/emulator/crashreport:init",
-          "//hardware/generic/goldfish/android/system"
-        ],
         // Replace standard launcher with google launcher
         "-srcs": ["system/main.c"],
-        "+srcs": ["google/system/aemu_main.cpp"]
+        "+srcs": ["google/system/aemu_main.cpp", "google/system/aemu_func_defs.h"]
       }
     },
     // Rename the macos targets. Note these do not have

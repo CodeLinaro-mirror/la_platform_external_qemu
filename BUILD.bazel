@@ -103,13 +103,6 @@ cc_binary(
     ],
 )
 
-cc_import(
-    name = "hw-display-virtio-gpu.if",
-    interface_library = ":hw-display-virtio-gpu.lib",
-    shared_library = ":hw-display-virtio-gpu",
-    visibility = ["//visibility:public"],
-)
-
 cc_interface_binary(
     name = "qemu-system-aarch64",
     srcs = select({
@@ -118,7 +111,10 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + ["google/system/aemu_main.cpp"],
+    }) + [
+        "google/system/aemu_func_defs.h",
+        "google/system/aemu_main.cpp",
+    ],
     copts = select({
         "@platforms//os:windows": [
             "-Wno-constant-conversion",
@@ -181,7 +177,10 @@ cc_interface_binary(
             "-framework QuartzCore",
             "-framework vmnet",
         ],
-        "@platforms//os:linux": ["-rdynamic"],
+        "@platforms//os:linux": [
+            "-rdynamic",
+            "-lrt",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -215,8 +214,6 @@ cc_interface_binary(
         ":libqom",
         ":libtcg_system",
         ":qemu-headers",
-        "//hardware/generic/goldfish/android/system",
-        "//hardware/generic/goldfish/emulator/crashreport:init",
         "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
         "@pixman//:pixman-1",
@@ -233,7 +230,10 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + ["google/system/aemu_main.cpp"],
+    }) + [
+        "google/system/aemu_func_defs.h",
+        "google/system/aemu_main.cpp",
+    ],
     copts = select({
         "@platforms//os:windows": [
             "-Wno-constant-conversion",
@@ -295,7 +295,10 @@ cc_interface_binary(
             "-framework QuartzCore",
             "-framework vmnet",
         ],
-        "@platforms//os:linux": ["-rdynamic"],
+        "@platforms//os:linux": [
+            "-rdynamic",
+            "-lrt",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -329,8 +332,6 @@ cc_interface_binary(
         ":libqom",
         ":libtcg_system",
         ":qemu-headers",
-        "//hardware/generic/goldfish/android/system",
-        "//hardware/generic/goldfish/emulator/crashreport:init",
         "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
         "@pixman//:pixman-1",
@@ -347,7 +348,10 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + ["google/system/aemu_main.cpp"],
+    }) + [
+        "google/system/aemu_func_defs.h",
+        "google/system/aemu_main.cpp",
+    ],
     copts = select({
         "@platforms//os:windows": [
             "-Wno-constant-conversion",
@@ -409,7 +413,10 @@ cc_interface_binary(
             "-framework QuartzCore",
             "-framework vmnet",
         ],
-        "@platforms//os:linux": ["-rdynamic"],
+        "@platforms//os:linux": [
+            "-rdynamic",
+            "-lrt",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -443,8 +450,6 @@ cc_interface_binary(
         ":libqom",
         ":libtcg_system",
         ":qemu-headers",
-        "//hardware/generic/goldfish/android/system",
-        "//hardware/generic/goldfish/emulator/crashreport:init",
         "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
         "@pixman//:pixman-1",
@@ -7167,13 +7172,6 @@ cc_library(
     alwayslink = 1,
 )
 
-filegroup(
-    name = "hw-display-virtio-gpu.lib",
-    srcs = [":hw-display-virtio-gpu"],
-    output_group = "interface_library",
-    visibility = ["//visibility:private"],
-)
-
 genrule(
     name = "generate_aarch64-softmmu-gdbstub-xml_c",
     srcs = [
@@ -10975,6 +10973,12 @@ windows_resources(
     name = "version_rc",
     rc_files = ["version.rc"],
     resources = ["version.rc_version.res"],
+)
+
+cc_library(
+    name = "aemu_func_defs",
+    hdrs = ["google/system/aemu_func_defs.h"],
+    visibility = ["//visibility:public"],
 )
 
 # Make all the headers available, including the generated ones.

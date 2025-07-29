@@ -22,9 +22,10 @@
  * THE SOFTWARE.
  */
 
-#include <gmodule.h>
 #include <cstdio>
 #include <string>
+
+#include <gmodule.h>
 
 extern "C" {
 #include "qemu/osdep.h"
@@ -32,10 +33,14 @@ extern "C" {
 #include "system/system.h"
 }
 
+#include "aemu_func_defs.h"
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
  // Note this file is almost a duplicate of system/main.c
  // The main difference is that this will dynamically load the goldfish plugins
- // library and initialize the crashpad crash engine upon launch.
-#include "android/crashreport/crash-initializer.h"
+ // library.
 
 int qemu_default_main(void) {
   int status;
@@ -45,8 +50,6 @@ int qemu_default_main(void) {
 
   return status;
 }
-
-int (*qemu_main)(void) = qemu_default_main;
 
 #ifdef _WIN32
 #define LIB_PREFIX ""
@@ -58,8 +61,11 @@ int (*qemu_main)(void) = qemu_default_main;
 #error CPU architecture not set
 #endif
 
-static bool module_load_gf(bool export_symbols)
-{
+typedef void (*gf_register_types_func_t)(void);
+typedef void (*gf_startup_func_t)(int argc, char **argv);
+typedef void (*gf_shutdown_func_t)(void);
+
+static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func, gf_shutdown_func_t *shutdown_func) {
     char *module_dir = getenv("QEMU_MODULE_DIR");
     if (module_dir == nullptr) {
         fprintf(stderr, "error, can't load goldfish module as QEMU_MODULE_DIR is not set");
@@ -70,7 +76,6 @@ static bool module_load_gf(bool export_symbols)
 
     printf("loading %s\n", full_path.c_str());
     GModule *g_module;
-    void (*register_types_func)(void);
     int flags;
 
     flags = 0;
@@ -83,25 +88,39 @@ static bool module_load_gf(bool export_symbols)
         return false;
     }
 
-    if (!g_module_symbol(g_module, "goldfish_register_types", (gpointer *)&register_types_func)) {
-        fprintf(stderr, "error, failed to find goldfish_register_types function\n");
-        g_module_close(g_module);
+    gf_register_types_func_t gf_register_types_func = NULL;
+    if (!g_module_symbol(g_module, TOSTRING(GF_REGISTER_TYPES_FUNC), (gpointer *)&gf_register_types_func)) {
+        fprintf(stderr, "error, failed to find %s function\n", TOSTRING(GF_REGISTER_TYPES_FUNC));
+        return false;
+    }
+    if (!g_module_symbol(g_module, TOSTRING(GF_STARTUP_FUNC), (gpointer *)startup_func)) {
+        fprintf(stderr, "error, failed to find %s function\n", TOSTRING(GF_STARTUP_FUNC));
+        return false;
+    }
+    if (!g_module_symbol(g_module, TOSTRING(GF_SHUTDOWN_FUNC), (gpointer *)shutdown_func)) {
+        fprintf(stderr, "error, failed to find %s function\n", TOSTRING(GF_SHUTDOWN_FUNC));
         return false;
     }
 
-    register_module_init(register_types_func, MODULE_INIT_QOM);
+    register_module_init(gf_register_types_func, MODULE_INIT_QOM);
 
     return true;
 }
 
 int main(int argc, char **argv) {
-  if (!module_load_gf(true)) {
-      exit(1);
+  gf_startup_func_t gf_startup_func = NULL;
+  gf_shutdown_func_t gf_shutdown_func = NULL;
+
+  if (!module_load_gf(false, &gf_startup_func, &gf_shutdown_func)) {
+      return 1;
   }
 
-  // TODO(whollins): move these to the goldfish library.
-  crashhandler_init(argc, argv);
+  gf_startup_func(argc, argv);
 
   qemu_init(argc, argv);
-  return qemu_main();
+  int status = qemu_default_main();
+
+  gf_shutdown_func();
+
+  return status;
 }
