@@ -21,12 +21,6 @@
       }
     },
     {
-      "target": "^hw-display-virtio-gpu$",
-      "shims": {
-        "win_def_file": "platform/windows-amd64/hw-display-virtio-gpu.def"
-      }
-    },
-    {
       "target": ".*",
       "shims": {
         // TODO still needed?
@@ -67,22 +61,6 @@
           "//third_party/qemu/google/compat/windows:compat"
         ]
       }
-    },
-    {
-      "target": "hw-display-virtio-gpu-pci|hw-display-virtio-gpu|hw-display-virtio-vga|hw-display-virtio-gpu-rutabaga|hw-display-virtio-gpu-pci-rutabaga",
-      "shims": {
-        "+deps": [
-          ":qemu-system-x86_64.if"
-        ]
-      }
-    },
-    {
-      "target": "hw-display-virtio-gpu-rutabaga",
-      "shims": {
-        "+deps": [
-          ":hw-display-virtio-gpu.if"
-        ]
-      }
     }
   ],
   "external_deps": {
@@ -92,9 +70,6 @@
       "@glib//:gmodule-static"
     ],
     // TODO are these needed on windows?
-    "libpulse": [
-      "@pulse//:libpulse"
-    ],
     "vhost-user": [
       "//third_party/qemu/subprojects/libvhost-user:vhost-user"
     ],

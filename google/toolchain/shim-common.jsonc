@@ -10,14 +10,7 @@
         ],
         // Replace standard launcher with google launcher
         "-srcs": ["system/main.c"],
-        "+srcs": [
-          "google/system/aemu_main.cpp",
-          "google/system/aemu_plugins.c"
-        ],
-        "-deps": [
-          // We will bring our own version of libmodinfo, so strip it!
-          ":libmodinfo-.*"
-        ]
+        "+srcs": ["google/system/aemu_main.cpp"]
       }
     },
     {
@@ -116,16 +109,7 @@
   // The actual set of targets you wish to generate bazel targets for.
   // These are the targets that will be exported.
   "export": [
-    "qemu-img",
-    "hw-display-virtio-gpu",
-    "hw-display-virtio-vga",
-    "hw-display-virtio-gpu-pci",
-    "hw-display-virtio-gpu-rutabaga",
-    "hw-display-virtio-gpu-pci-rutabaga"
+    "qemu-img"
   ],
-  "exclude": [
-    // We will provide our own module info that will be build into qemu
-    // This will allow us to provide our own custom drivers.
-    "modinfo-.*"
-  ]
+  "exclude": []
 }

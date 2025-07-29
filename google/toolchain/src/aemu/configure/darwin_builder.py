@@ -29,7 +29,6 @@ class DarwinBuilder(QemuBuilder):
         features["-Dcoreaudio"] = "enabled"
         features["-Dhvf"] = "enabled"
         features["-Dvmnet"] = "enabled"
-        features["-Dwerror"] = "true"
 
         return features
 

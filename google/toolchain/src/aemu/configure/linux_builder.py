@@ -36,7 +36,6 @@ class LinuxBuilder(QemuBuilder):
         features["-Dvhost_net"] = "enabled"
         features["-Dvhost_user"] = "enabled"
         features["-Dvhost_user_blk_server"] = "enabled"
-        features["-Dwerror"] = "true"
 
         return features
 

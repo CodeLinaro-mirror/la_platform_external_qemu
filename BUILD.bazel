@@ -6,266 +6,6 @@ load("//build/bazel/rules:windows_resources.bzl", "windows_resources")
 load("platform/cc_interface_binary.bzl", "cc_interface_binary")
 
 cc_binary(
-    name = "audio-pa",
-    copts = [
-        "-fwrapv",
-        "-mcx16",
-        "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
-    ],
-    linkshared = True,
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libaudio-pa",
-        ":libmodule-common",
-        ":qemu-headers",
-        "//third_party/qemu/google/compat/linux:compat",
-    ],
-)
-
-cc_binary(
-    name = "hw-display-virtio-gpu",
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    linkopts = select({
-        "@platforms//os:macos": ["-undefined dynamic_lookup"],
-        "//conditions:default": [],
-    }),
-    linkshared = True,
-    visibility = ["//visibility:public"],
-    win_def_file = "platform/windows-amd64/hw-display-virtio-gpu.def",
-    deps = [
-        ":libhw-display-virtio-gpu",
-        ":libmodule-common",
-    ] + select({
-        "@platforms//os:windows": [
-            ":qemu-system-x86_64.if",
-            "//third_party/qemu/google/compat/windows:compat",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-)
-
-cc_binary(
-    name = "hw-display-virtio-gpu-pci",
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    linkopts = select({
-        "@platforms//os:macos": ["-undefined dynamic_lookup"],
-        "//conditions:default": [],
-    }),
-    linkshared = True,
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libhw-display-virtio-gpu-pci",
-        ":libmodule-common",
-    ] + select({
-        "@platforms//os:windows": [
-            ":qemu-system-x86_64.if",
-            "//third_party/qemu/google/compat/windows:compat",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-)
-
-cc_binary(
-    name = "hw-display-virtio-gpu-pci-rutabaga",
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    linkopts = select({
-        "@platforms//os:macos": ["-undefined dynamic_lookup"],
-        "//conditions:default": [],
-    }),
-    linkshared = True,
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libhw-display-virtio-gpu-pci-rutabaga",
-        ":libmodule-common",
-    ] + select({
-        "@platforms//os:windows": [
-            ":qemu-system-x86_64.if",
-            "//third_party/qemu/google/compat/windows:compat",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-)
-
-cc_binary(
-    name = "hw-display-virtio-gpu-rutabaga",
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    linkopts = select({
-        "@platforms//os:macos": ["-undefined dynamic_lookup"],
-        "//conditions:default": [],
-    }),
-    linkshared = True,
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libhw-display-virtio-gpu-rutabaga",
-        ":libmodule-common",
-    ] + select({
-        "@platforms//os:windows": [
-            ":hw-display-virtio-gpu.if",
-            ":qemu-system-x86_64.if",
-            "//third_party/qemu/google/compat/windows:compat",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-)
-
-cc_binary(
-    name = "hw-display-virtio-vga",
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    linkopts = select({
-        "@platforms//os:macos": ["-undefined dynamic_lookup"],
-        "//conditions:default": [],
-    }),
-    linkshared = True,
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libhw-display-virtio-vga",
-        ":libmodule-common",
-    ] + select({
-        "@platforms//os:windows": [
-            ":qemu-system-x86_64.if",
-            "//third_party/qemu/google/compat/windows:compat",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-)
-
-cc_binary(
     name = "qemu-img",
     srcs = ["config-poison.h"] + select({
         "@platforms//os:linux": [
@@ -338,7 +78,10 @@ cc_binary(
     }),
     visibility = ["//visibility:public"],
     deps = select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": [
             "//third_party/qemu/google/compat/linux:compat",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user",
@@ -356,7 +99,6 @@ cc_binary(
         ":libqom",
         ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@zlib",
     ],
 )
@@ -376,34 +118,49 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + [
-        "google/system/aemu_main.cpp",
-        "google/system/aemu_plugins.c",
-    ],
+    }) + ["google/system/aemu_main.cpp"],
     copts = select({
+        "@platforms//os:windows": [
+            "-Wno-constant-conversion",
+            "-Wno-macro-redefined",
+            "-Wno-invalid-noreturn",
+            "-Wno-bitfield-constant-conversion",
+            "-Wno-int-to-void-pointer-cast",
+            "-Wno-unused-command-line-argument",
+            "-Wno-undef",
+            "-Wno-microsoft-enum-forward-reference",
+            "-Wno-microsoft-include",
+            "-Wno-deprecated-declarations",
+            "-fms-extensions",
+            "-march=native",
+        ],
         "@platforms//os:macos": [
             "-fwrapv",
             "-Wno-implicit-function-declaration",
-            "-UNDEBUG",
             "-Wno-error=unguarded-availability-new",
         ],
+        "@platforms//os:linux": [
+            "-fwrapv",
+            "-mcx16",
+            "-Wno-implicit-function-declaration",
+        ],
         "//conditions:default": [],
-    }),
+    }) + ["-UNDEBUG"],
     defines = [
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"aarch64-softmmu-config-devices.h\\"',
         'CONFIG_TARGET=\\"aarch64-softmmu-config-target.h\\"',
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
     ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = [
         ".",
@@ -430,9 +187,15 @@ cc_interface_binary(
     visibility = ["//visibility:public"],
     win_def_file = "platform/windows-amd64/qemu-system-aarch64.def",
     deps = ["//third_party/dtc:libfdt"] + select({
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": [
+            "//third_party/qemu/google/compat/linux:compat",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "@gcc_lib//:libpulse",
         ],
         "//conditions:default": [],
     }) + [
@@ -454,8 +217,8 @@ cc_interface_binary(
         ":qemu-headers",
         "//hardware/generic/goldfish/android/system",
         "//hardware/generic/goldfish/emulator/crashreport:init",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -470,34 +233,49 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + [
-        "google/system/aemu_main.cpp",
-        "google/system/aemu_plugins.c",
-    ],
+    }) + ["google/system/aemu_main.cpp"],
     copts = select({
+        "@platforms//os:windows": [
+            "-Wno-constant-conversion",
+            "-Wno-macro-redefined",
+            "-Wno-invalid-noreturn",
+            "-Wno-bitfield-constant-conversion",
+            "-Wno-int-to-void-pointer-cast",
+            "-Wno-unused-command-line-argument",
+            "-Wno-undef",
+            "-Wno-microsoft-enum-forward-reference",
+            "-Wno-microsoft-include",
+            "-Wno-deprecated-declarations",
+            "-fms-extensions",
+            "-march=native",
+        ],
         "@platforms//os:macos": [
             "-fwrapv",
             "-Wno-implicit-function-declaration",
-            "-UNDEBUG",
             "-Wno-error=unguarded-availability-new",
         ],
+        "@platforms//os:linux": [
+            "-fwrapv",
+            "-mcx16",
+            "-Wno-implicit-function-declaration",
+        ],
         "//conditions:default": [],
-    }),
+    }) + ["-UNDEBUG"],
     defines = [
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"riscv64-softmmu-config-devices.h\\"',
         'CONFIG_TARGET=\\"riscv64-softmmu-config-target.h\\"',
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
     ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = [
         ".",
@@ -523,9 +301,15 @@ cc_interface_binary(
     visibility = ["//visibility:public"],
     win_def_file = "platform/windows-amd64/qemu-system-riscv64.def",
     deps = ["//third_party/dtc:libfdt"] + select({
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": [
+            "//third_party/qemu/google/compat/linux:compat",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "@gcc_lib//:libpulse",
         ],
         "//conditions:default": [],
     }) + [
@@ -547,8 +331,8 @@ cc_interface_binary(
         ":qemu-headers",
         "//hardware/generic/goldfish/android/system",
         "//hardware/generic/goldfish/emulator/crashreport:init",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -563,34 +347,49 @@ cc_interface_binary(
             "linux-headers/linux/stddef.h",
         ],
         "//conditions:default": [],
-    }) + [
-        "google/system/aemu_main.cpp",
-        "google/system/aemu_plugins.c",
-    ],
+    }) + ["google/system/aemu_main.cpp"],
     copts = select({
+        "@platforms//os:windows": [
+            "-Wno-constant-conversion",
+            "-Wno-macro-redefined",
+            "-Wno-invalid-noreturn",
+            "-Wno-bitfield-constant-conversion",
+            "-Wno-int-to-void-pointer-cast",
+            "-Wno-unused-command-line-argument",
+            "-Wno-undef",
+            "-Wno-microsoft-enum-forward-reference",
+            "-Wno-microsoft-include",
+            "-Wno-deprecated-declarations",
+            "-fms-extensions",
+            "-march=native",
+        ],
         "@platforms//os:macos": [
             "-fwrapv",
             "-Wno-implicit-function-declaration",
-            "-UNDEBUG",
             "-Wno-error=unguarded-availability-new",
         ],
+        "@platforms//os:linux": [
+            "-fwrapv",
+            "-mcx16",
+            "-Wno-implicit-function-declaration",
+        ],
         "//conditions:default": [],
-    }),
+    }) + ["-UNDEBUG"],
     defines = [
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"x86_64-softmmu-config-devices.h\\"',
         'CONFIG_TARGET=\\"x86_64-softmmu-config-target.h\\"',
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
     ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = [
         ".",
@@ -616,9 +415,15 @@ cc_interface_binary(
     visibility = ["//visibility:public"],
     win_def_file = "platform/windows-amd64/qemu-system-x86_64.def",
     deps = ["//third_party/dtc:libfdt"] + select({
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": [
+            "//third_party/qemu/google/compat/linux:compat",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "@gcc_lib//:libpulse",
         ],
         "//conditions:default": [],
     }) + [
@@ -640,53 +445,12 @@ cc_interface_binary(
         ":qemu-headers",
         "//hardware/generic/goldfish/android/system",
         "//hardware/generic/goldfish/emulator/crashreport:init",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
     ],
-)
-
-cc_library(
-    name = "libaudio-pa",
-    srcs = ["audio/paaudio.c"],
-    hdrs = [
-        "audio/audio.h",
-        "audio/audio_int.h",
-        "audio/mixeng.h",
-        "config-poison.h",
-        "linux-headers/asm-generic/bitsperlong.h",
-        "linux-headers/linux/stddef.h",
-    ],
-    copts = [
-        "-fwrapv",
-        "-mcx16",
-        "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
-    ],
-    defines = [
-        "BUILD_DSO",
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-        "_REENTRANT",
-    ],
-    # buildifier: leave-alone
-    includes = [
-        ".",
-        "qapi",
-        "linux-headers",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libmodule-common",
-        ":qemu-headers",
-        "//third_party/qemu/google/compat/linux:compat",
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
-    ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -760,16 +524,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -931,14 +696,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@zlib",
     ] + select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -1032,6 +800,7 @@ cc_library(
     deps = select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": [
@@ -1043,7 +812,6 @@ cc_library(
     }) + [
         ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ],
     alwayslink = 1,
 )
@@ -1146,16 +914,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -1179,15 +948,11 @@ cc_library(
         "audio/audio-hmp-cmds.c",
         "audio/mixeng.c",
         "audio/noaudio.c",
-        "audio/wavaudio.c",
-        "audio/wavcapture.c",
-        "backends/confidential-guest-support.c",
-        "backends/cryptodev-builtin.c",
-        "backends/cryptodev-hmp-cmds.c",
     ] + select({
         "@platforms//os:windows": [
             "audio/audio_win_int.c",
             "audio/dsoundaudio.c",
+            "hw/display/virtio-gpu-udmabuf-stubs.c",
             "hw/net/vhost_net-stub.c",
             "hw/virtio/vhost-stub.c",
             "hw/virtio/virtio-md-stubs.c",
@@ -1201,6 +966,7 @@ cc_library(
             "fsdev/qemu-fsdev-dummy.c",
             "fsdev/qemu-fsdev-opts.c",
             "fsdev/qemu-fsdev-throttle.c",
+            "hw/display/virtio-gpu-udmabuf-stubs.c",
             "hw/net/vhost_net-stub.c",
             "hw/usb/dev-mtp.c",
             "hw/virtio/vhost-stub.c",
@@ -1209,13 +975,9 @@ cc_library(
             "net/tap-bsd.c",
             "net/vmnet-host.c",
             "net/vmnet-shared.c",
-            "plugins/api.c",
-            "plugins/api-system.c",
-            "plugins/core.c",
-            "plugins/loader.c",
-            "plugins/system.c",
         ],
         "@platforms//os:linux": [
+            "audio/paaudio.c",
             "backends/cryptodev-vhost-user.c",
             "backends/host_iommu_device.c",
             "backends/hostmem-file.c",
@@ -1227,6 +989,9 @@ cc_library(
             "fsdev/qemu-fsdev-dummy.c",
             "fsdev/qemu-fsdev-opts.c",
             "fsdev/qemu-fsdev-throttle.c",
+            "hw/display/vhost-user-gpu.c",
+            "hw/display/vhost-user-gpu-pci.c",
+            "hw/display/virtio-gpu-udmabuf.c",
             "hw/input/virtio-input-host.c",
             "hw/misc/ivshmem-flat.c",
             "hw/misc/ivshmem-pci.c",
@@ -1263,18 +1028,18 @@ cc_library(
             "net/tap.c",
             "net/tap-linux.c",
             "net/vhost-user.c",
-            "plugins/api.c",
-            "plugins/api-system.c",
-            "plugins/core.c",
-            "plugins/loader.c",
-            "plugins/system.c",
             "system/async-teardown.c",
             "ui/input-linux.c",
             "ui/udmabuf.c",
         ],
         "//conditions:default": [],
     }) + [
+        "audio/wavaudio.c",
+        "audio/wavcapture.c",
+        "backends/confidential-guest-support.c",
         "backends/cryptodev.c",
+        "backends/cryptodev-builtin.c",
+        "backends/cryptodev-hmp-cmds.c",
         "backends/cryptodev-vhost.c",
         "backends/hostmem.c",
         "backends/hostmem-ram.c",
@@ -1437,6 +1202,11 @@ cc_library(
         "hw/display/vga.c",
         "hw/display/vga-pci.c",
         "hw/display/virtio-dmabuf.c",
+        "hw/display/virtio-gpu.c",
+        "hw/display/virtio-gpu-base.c",
+        "hw/display/virtio-gpu-pci.c",
+        "hw/display/virtio-gpu-pci-rutabaga.c",
+        "hw/display/virtio-gpu-rutabaga.c",
         "hw/display/xlnx_dp.c",
         "hw/dma/bcm2835_dma.c",
         "hw/dma/npcm8xx-gdma.c",
@@ -1852,6 +1622,16 @@ cc_library(
         "hw/timer/stm32f2xx_timer.c",
         "hw/timer/xilinx_timer.c",
         "hw/uefi/hardware-info.c",
+        "hw/uefi/var-service-auth.c",
+        "hw/uefi/var-service-core.c",
+        "hw/uefi/var-service-guid.c",
+        "hw/uefi/var-service-json.c",
+        "hw/uefi/var-service-pkcs7-stub.c",
+        "hw/uefi/var-service-policy.c",
+        "hw/uefi/var-service-siglist.c",
+        "hw/uefi/var-service-sysbus.c",
+        "hw/uefi/var-service-utils.c",
+        "hw/uefi/var-service-vars.c",
         "hw/ufs/lu.c",
         "hw/ufs/ufs.c",
         "hw/usb/bus.c",
@@ -2055,7 +1835,6 @@ cc_library(
             "host/include/aarch64/host/atomic128-ldst.h.inc",
             "host/include/aarch64/host/cpuinfo.h",
             "net/vmnet_int.h",
-            "plugins/plugin.h",
             "tcg/aarch64/tcg-target.h",
             "tcg/aarch64/tcg-target-opc.h.inc",
             "tcg/aarch64/tcg-target-reg-bits.h",
@@ -2073,14 +1852,15 @@ cc_library(
             "hw/vfio/pci.h",
             "hw/vfio/trace.h",
             "linux-headers/asm-generic/bitsperlong.h",
+            "linux-headers/asm-generic/hugetlb_encode.h",
             "linux-headers/linux/iommufd.h",
+            "linux-headers/linux/memfd.h",
             "linux-headers/linux/stddef.h",
             "linux-headers/linux/userfaultfd.h",
             "linux-headers/linux/vfio.h",
             "linux-headers/linux/vhost.h",
             "linux-headers/linux/vhost_types.h",
             "net/tap-linux.h",
-            "plugins/plugin.h",
             "tcg/i386/tcg-target.h",
             "tcg/i386/tcg-target-opc.h.inc",
             "tcg/i386/tcg-target-reg-bits.h",
@@ -2294,6 +2074,7 @@ cc_library(
         "trace/trace-hw_sensor.h",
         "trace/trace-hw_ssi.h",
         "trace/trace-hw_timer.h",
+        "trace/trace-hw_uefi.h",
         "trace/trace-hw_ufs.h",
         "trace/trace-hw_usb.h",
         "trace/trace-hw_virtio.h",
@@ -2369,17 +2150,18 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + ["-UNDEBUG"],
-    defines = select({
+    defines = [
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
+    ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = ["."] + select({
         "@platforms//os:windows": [
@@ -2411,7 +2193,10 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = ["//third_party/dtc:libfdt"] + select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:macos": [":internal_common_qemu-system-aarch64-unsigned_darwin"],
         "@platforms//os:linux": [
             "//third_party/qemu/google/compat/linux:compat",
@@ -2422,8 +2207,8 @@ cc_library(
     }) + [
         ":libqemuutil",
         ":qemu-headers",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -2451,15 +2236,11 @@ cc_library(
         "audio/audio-hmp-cmds.c",
         "audio/mixeng.c",
         "audio/noaudio.c",
-        "audio/wavaudio.c",
-        "audio/wavcapture.c",
-        "backends/confidential-guest-support.c",
-        "backends/cryptodev-builtin.c",
-        "backends/cryptodev-hmp-cmds.c",
     ] + select({
         "@platforms//os:windows": [
             "audio/audio_win_int.c",
             "audio/dsoundaudio.c",
+            "hw/display/virtio-gpu-udmabuf-stubs.c",
             "hw/net/vhost_net-stub.c",
             "hw/virtio/vhost-stub.c",
             "net/tap-win32.c",
@@ -2472,6 +2253,7 @@ cc_library(
             "fsdev/qemu-fsdev-dummy.c",
             "fsdev/qemu-fsdev-opts.c",
             "fsdev/qemu-fsdev-throttle.c",
+            "hw/display/virtio-gpu-udmabuf-stubs.c",
             "hw/net/vhost_net-stub.c",
             "hw/usb/dev-mtp.c",
             "hw/virtio/vhost-stub.c",
@@ -2479,13 +2261,9 @@ cc_library(
             "net/tap-bsd.c",
             "net/vmnet-host.c",
             "net/vmnet-shared.c",
-            "plugins/api.c",
-            "plugins/api-system.c",
-            "plugins/core.c",
-            "plugins/loader.c",
-            "plugins/system.c",
         ],
         "@platforms//os:linux": [
+            "audio/paaudio.c",
             "backends/cryptodev-vhost-user.c",
             "backends/host_iommu_device.c",
             "backends/hostmem-file.c",
@@ -2496,6 +2274,10 @@ cc_library(
             "fsdev/qemu-fsdev-dummy.c",
             "fsdev/qemu-fsdev-opts.c",
             "fsdev/qemu-fsdev-throttle.c",
+            "hw/display/vhost-user-gpu.c",
+            "hw/display/vhost-user-gpu-pci.c",
+            "hw/display/vhost-user-vga.c",
+            "hw/display/virtio-gpu-udmabuf.c",
             "hw/input/virtio-input-host.c",
             "hw/misc/ivshmem-flat.c",
             "hw/misc/ivshmem-pci.c",
@@ -2531,18 +2313,18 @@ cc_library(
             "net/tap.c",
             "net/tap-linux.c",
             "net/vhost-user.c",
-            "plugins/api.c",
-            "plugins/api-system.c",
-            "plugins/core.c",
-            "plugins/loader.c",
-            "plugins/system.c",
             "system/async-teardown.c",
             "ui/input-linux.c",
             "ui/udmabuf.c",
         ],
         "//conditions:default": [],
     }) + [
+        "audio/wavaudio.c",
+        "audio/wavcapture.c",
+        "backends/confidential-guest-support.c",
         "backends/cryptodev.c",
+        "backends/cryptodev-builtin.c",
+        "backends/cryptodev-hmp-cmds.c",
         "backends/cryptodev-vhost.c",
         "backends/hostmem.c",
         "backends/hostmem-ram.c",
@@ -2657,6 +2439,13 @@ cc_library(
         "hw/display/vga.c",
         "hw/display/vga-pci.c",
         "hw/display/virtio-dmabuf.c",
+        "hw/display/virtio-gpu.c",
+        "hw/display/virtio-gpu-base.c",
+        "hw/display/virtio-gpu-pci.c",
+        "hw/display/virtio-gpu-pci-rutabaga.c",
+        "hw/display/virtio-gpu-rutabaga.c",
+        "hw/display/virtio-vga.c",
+        "hw/display/virtio-vga-rutabaga.c",
         "hw/dma/sifive_pdma.c",
         "hw/dma/xilinx_axidma.c",
         "hw/gpio/sifive_gpio.c",
@@ -2793,6 +2582,16 @@ cc_library(
         "hw/timer/sifive_pwm.c",
         "hw/timer/xilinx_timer.c",
         "hw/uefi/hardware-info.c",
+        "hw/uefi/var-service-auth.c",
+        "hw/uefi/var-service-core.c",
+        "hw/uefi/var-service-guid.c",
+        "hw/uefi/var-service-json.c",
+        "hw/uefi/var-service-pkcs7-stub.c",
+        "hw/uefi/var-service-policy.c",
+        "hw/uefi/var-service-siglist.c",
+        "hw/uefi/var-service-sysbus.c",
+        "hw/uefi/var-service-utils.c",
+        "hw/uefi/var-service-vars.c",
         "hw/ufs/lu.c",
         "hw/ufs/ufs.c",
         "hw/usb/bus.c",
@@ -2995,7 +2794,6 @@ cc_library(
             "host/include/aarch64/host/atomic128-ldst.h.inc",
             "host/include/aarch64/host/cpuinfo.h",
             "net/vmnet_int.h",
-            "plugins/plugin.h",
             "tcg/aarch64/tcg-target.h",
             "tcg/aarch64/tcg-target-opc.h.inc",
             "tcg/aarch64/tcg-target-reg-bits.h",
@@ -3012,13 +2810,14 @@ cc_library(
             "hw/vfio/pci.h",
             "hw/vfio/trace.h",
             "linux-headers/asm-generic/bitsperlong.h",
+            "linux-headers/asm-generic/hugetlb_encode.h",
+            "linux-headers/linux/memfd.h",
             "linux-headers/linux/stddef.h",
             "linux-headers/linux/userfaultfd.h",
             "linux-headers/linux/vfio.h",
             "linux-headers/linux/vhost.h",
             "linux-headers/linux/vhost_types.h",
             "net/tap-linux.h",
-            "plugins/plugin.h",
             "tcg/i386/tcg-target.h",
             "tcg/i386/tcg-target-opc.h.inc",
             "tcg/i386/tcg-target-reg-bits.h",
@@ -3052,6 +2851,7 @@ cc_library(
         "hw/display/vga-helpers.h",
         "hw/display/vga_int.h",
         "hw/display/vga_regs.h",
+        "hw/display/virtio-vga.h",
         "hw/dma/trace.h",
         "hw/gpio/trace.h",
         "hw/i2c/trace.h",
@@ -3184,6 +2984,7 @@ cc_library(
         "trace/trace-hw_scsi.h",
         "trace/trace-hw_sd.h",
         "trace/trace-hw_timer.h",
+        "trace/trace-hw_uefi.h",
         "trace/trace-hw_ufs.h",
         "trace/trace-hw_usb.h",
         "trace/trace-hw_virtio.h",
@@ -3259,17 +3060,18 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + ["-UNDEBUG"],
-    defines = select({
+    defines = [
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
+    ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = ["."] + select({
         "@platforms//os:windows": [
@@ -3301,7 +3103,10 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = ["//third_party/dtc:libfdt"] + select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:macos": [":internal_common_qemu-system-riscv64-unsigned_darwin"],
         "@platforms//os:linux": [
             "//third_party/qemu/google/compat/linux:compat",
@@ -3312,8 +3117,8 @@ cc_library(
     }) + [
         ":libqemuutil",
         ":qemu-headers",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -3341,15 +3146,11 @@ cc_library(
         "audio/audio-hmp-cmds.c",
         "audio/mixeng.c",
         "audio/noaudio.c",
-        "audio/wavaudio.c",
-        "audio/wavcapture.c",
-        "backends/confidential-guest-support.c",
-        "backends/cryptodev-builtin.c",
-        "backends/cryptodev-hmp-cmds.c",
     ] + select({
         "@platforms//os:windows": [
             "audio/audio_win_int.c",
             "audio/dsoundaudio.c",
+            "hw/display/virtio-gpu-udmabuf-stubs.c",
             "hw/net/vhost_net-stub.c",
             "hw/virtio/vhost-stub.c",
             "net/tap-win32.c",
@@ -3362,6 +3163,7 @@ cc_library(
             "fsdev/qemu-fsdev-dummy.c",
             "fsdev/qemu-fsdev-opts.c",
             "fsdev/qemu-fsdev-throttle.c",
+            "hw/display/virtio-gpu-udmabuf-stubs.c",
             "hw/net/vhost_net-stub.c",
             "hw/usb/dev-mtp.c",
             "hw/virtio/vhost-stub.c",
@@ -3369,13 +3171,9 @@ cc_library(
             "net/tap-bsd.c",
             "net/vmnet-host.c",
             "net/vmnet-shared.c",
-            "plugins/api.c",
-            "plugins/api-system.c",
-            "plugins/core.c",
-            "plugins/loader.c",
-            "plugins/system.c",
         ],
         "@platforms//os:linux": [
+            "audio/paaudio.c",
             "backends/cryptodev-vhost-user.c",
             "backends/host_iommu_device.c",
             "backends/hostmem-epc.c",
@@ -3390,6 +3188,10 @@ cc_library(
             "fsdev/qemu-fsdev-throttle.c",
             "hw/block/xen-block.c",
             "hw/char/xen_console.c",
+            "hw/display/vhost-user-gpu.c",
+            "hw/display/vhost-user-gpu-pci.c",
+            "hw/display/vhost-user-vga.c",
+            "hw/display/virtio-gpu-udmabuf.c",
             "hw/display/xenfb.c",
             "hw/input/virtio-input-host.c",
             "hw/misc/ivshmem-flat.c",
@@ -3432,18 +3234,18 @@ cc_library(
             "net/tap.c",
             "net/tap-linux.c",
             "net/vhost-user.c",
-            "plugins/api.c",
-            "plugins/api-system.c",
-            "plugins/core.c",
-            "plugins/loader.c",
-            "plugins/system.c",
             "system/async-teardown.c",
             "ui/input-linux.c",
             "ui/udmabuf.c",
         ],
         "//conditions:default": [],
     }) + [
+        "audio/wavaudio.c",
+        "audio/wavcapture.c",
+        "backends/confidential-guest-support.c",
         "backends/cryptodev.c",
+        "backends/cryptodev-builtin.c",
+        "backends/cryptodev-hmp-cmds.c",
         "backends/cryptodev-vhost.c",
         "backends/hostmem.c",
         "backends/hostmem-ram.c",
@@ -3572,6 +3374,13 @@ cc_library(
         "hw/display/vga-isa.c",
         "hw/display/vga-pci.c",
         "hw/display/virtio-dmabuf.c",
+        "hw/display/virtio-gpu.c",
+        "hw/display/virtio-gpu-base.c",
+        "hw/display/virtio-gpu-pci.c",
+        "hw/display/virtio-gpu-pci-rutabaga.c",
+        "hw/display/virtio-gpu-rutabaga.c",
+        "hw/display/virtio-vga.c",
+        "hw/display/virtio-vga-rutabaga.c",
         "hw/display/vmware_vga.c",
         "hw/dma/i8257.c",
         "hw/i2c/bitbang_i2c.c",
@@ -3734,6 +3543,16 @@ cc_library(
         "hw/timer/i8254.c",
         "hw/timer/i8254_common.c",
         "hw/uefi/hardware-info.c",
+        "hw/uefi/var-service-auth.c",
+        "hw/uefi/var-service-core.c",
+        "hw/uefi/var-service-guid.c",
+        "hw/uefi/var-service-json.c",
+        "hw/uefi/var-service-pkcs7-stub.c",
+        "hw/uefi/var-service-policy.c",
+        "hw/uefi/var-service-siglist.c",
+        "hw/uefi/var-service-sysbus.c",
+        "hw/uefi/var-service-utils.c",
+        "hw/uefi/var-service-vars.c",
         "hw/ufs/lu.c",
         "hw/ufs/ufs.c",
         "hw/usb/bus.c",
@@ -3926,7 +3745,6 @@ cc_library(
             "host/include/aarch64/host/atomic128-ldst.h.inc",
             "host/include/aarch64/host/cpuinfo.h",
             "net/vmnet_int.h",
-            "plugins/plugin.h",
             "tcg/aarch64/tcg-target.h",
             "tcg/aarch64/tcg-target-opc.h.inc",
             "tcg/aarch64/tcg-target-reg-bits.h",
@@ -3948,14 +3766,15 @@ cc_library(
             "hw/vfio/trace.h",
             "hw/xen/trace.h",
             "linux-headers/asm-generic/bitsperlong.h",
+            "linux-headers/asm-generic/hugetlb_encode.h",
             "linux-headers/linux/iommufd.h",
+            "linux-headers/linux/memfd.h",
             "linux-headers/linux/stddef.h",
             "linux-headers/linux/userfaultfd.h",
             "linux-headers/linux/vfio.h",
             "linux-headers/linux/vhost.h",
             "linux-headers/linux/vhost_types.h",
             "net/tap-linux.h",
-            "plugins/plugin.h",
             "tcg/i386/tcg-target.h",
             "tcg/i386/tcg-target-opc.h.inc",
             "tcg/i386/tcg-target-reg-bits.h",
@@ -4004,6 +3823,7 @@ cc_library(
         "hw/display/vga-helpers.h",
         "hw/display/vga_int.h",
         "hw/display/vga_regs.h",
+        "hw/display/virtio-vga.h",
         "hw/dma/trace.h",
         "hw/i2c/trace.h",
         "hw/i386/acpi-build.h",
@@ -4141,6 +3961,7 @@ cc_library(
         "trace/trace-hw_scsi.h",
         "trace/trace-hw_sd.h",
         "trace/trace-hw_timer.h",
+        "trace/trace-hw_uefi.h",
         "trace/trace-hw_ufs.h",
         "trace/trace-hw_usb.h",
         "trace/trace-hw_virtio.h",
@@ -4216,17 +4037,18 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + ["-UNDEBUG"],
-    defines = select({
+    defines = [
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
+    ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = ["."] + select({
         "@platforms//os:windows": [
@@ -4258,7 +4080,10 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = ["//third_party/dtc:libfdt"] + select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:macos": [":internal_common_qemu-system-x86_64-unsigned_darwin"],
         "@platforms//os:linux": [
             "//third_party/qemu/google/compat/linux:compat",
@@ -4269,8 +4094,8 @@ cc_library(
     }) + [
         ":libqemuutil",
         ":qemu-headers",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -4393,16 +4218,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -4464,16 +4290,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -4548,427 +4375,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "libhw-display-virtio-gpu",
-    srcs = select({
-        "@platforms//os:windows": ["hw/display/virtio-gpu-udmabuf-stubs.c"],
-        "@platforms//os:macos": ["hw/display/virtio-gpu-udmabuf-stubs.c"],
-        "@platforms//os:linux": [
-            "hw/display/vhost-user-gpu.c",
-            "hw/display/virtio-gpu-udmabuf.c",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "hw/display/virtio-gpu.c",
-        "hw/display/virtio-gpu-base.c",
-    ],
-    hdrs = [
-        "config-poison.h",
-        "hw/display/trace.h",
-    ] + select({
-        "@platforms//os:linux": [
-            "linux-headers/asm-generic/bitsperlong.h",
-            "linux-headers/asm-generic/hugetlb_encode.h",
-            "linux-headers/linux/memfd.h",
-            "linux-headers/linux/stddef.h",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "trace/control.h",
-        "trace/control-internal.h",
-        "trace/event-internal.h",
-        "trace/trace-hw_display.h",
-    ],
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    defines = ["BUILD_DSO"] + select({
-        "@platforms//os:windows": [
-            "GLIB_STATIC_COMPILATION",
-            "GMODULE_STATIC_COMPILATION",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
-    # buildifier: leave-alone
-    includes = [
-        ".",
-        "qapi",
-    ] + select({
-        "@platforms//os:linux": ["linux-headers"],
-        "//conditions:default": [],
     }),
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libmodule-common",
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
-        "@pixman//:pixman-1",
-        "@pixman//:pixman_simd",
-    ] + select({
-        "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
-            "@zlib",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "libhw-display-virtio-gpu-pci",
-    srcs = select({
-        "@platforms//os:linux": ["hw/display/vhost-user-gpu-pci.c"],
-        "//conditions:default": [],
-    }) + ["hw/display/virtio-gpu-pci.c"],
-    hdrs = ["config-poison.h"] + select({
-        "@platforms//os:linux": [
-            "linux-headers/asm-generic/bitsperlong.h",
-            "linux-headers/linux/stddef.h",
-        ],
-        "//conditions:default": [],
-    }),
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    defines = ["BUILD_DSO"] + select({
-        "@platforms//os:windows": [
-            "GLIB_STATIC_COMPILATION",
-            "GMODULE_STATIC_COMPILATION",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
-    # buildifier: leave-alone
-    includes = [
-        ".",
-        "qapi",
-    ] + select({
-        "@platforms//os:linux": ["linux-headers"],
-        "//conditions:default": [],
-    }),
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libmodule-common",
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
-        "@pixman//:pixman-1",
-        "@pixman//:pixman_simd",
-    ] + select({
-        "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
-            "@zlib",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "libhw-display-virtio-gpu-pci-rutabaga",
-    srcs = ["hw/display/virtio-gpu-pci-rutabaga.c"],
-    hdrs = ["config-poison.h"] + select({
-        "@platforms//os:linux": [
-            "linux-headers/asm-generic/bitsperlong.h",
-            "linux-headers/linux/stddef.h",
-        ],
-        "//conditions:default": [],
-    }),
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    defines = ["BUILD_DSO"] + select({
-        "@platforms//os:windows": [
-            "GLIB_STATIC_COMPILATION",
-            "GMODULE_STATIC_COMPILATION",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
-    # buildifier: leave-alone
-    includes = [
-        ".",
-        "qapi",
-    ] + select({
-        "@platforms//os:linux": ["linux-headers"],
-        "//conditions:default": [],
-    }),
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libmodule-common",
-        "@crosvm//:rutabaga_c_ffi",
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
-        "@pixman//:pixman-1",
-        "@pixman//:pixman_simd",
-    ] + select({
-        "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
-            "@zlib",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "libhw-display-virtio-gpu-rutabaga",
-    srcs = ["hw/display/virtio-gpu-rutabaga.c"],
-    hdrs = [
-        "config-poison.h",
-        "hw/display/trace.h",
-    ] + select({
-        "@platforms//os:linux": [
-            "linux-headers/asm-generic/bitsperlong.h",
-            "linux-headers/linux/stddef.h",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "trace/control.h",
-        "trace/control-internal.h",
-        "trace/event-internal.h",
-        "trace/trace-hw_display.h",
-    ],
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    defines = ["BUILD_DSO"] + select({
-        "@platforms//os:windows": [
-            "GLIB_STATIC_COMPILATION",
-            "GMODULE_STATIC_COMPILATION",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
-    # buildifier: leave-alone
-    includes = [
-        ".",
-        "qapi",
-    ] + select({
-        "@platforms//os:linux": ["linux-headers"],
-        "//conditions:default": [],
-    }),
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libmodule-common",
-        "@crosvm//:rutabaga_c_ffi",
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
-        "@pixman//:pixman-1",
-        "@pixman//:pixman_simd",
-    ] + select({
-        "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
-            "@zlib",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "libhw-display-virtio-vga",
-    srcs = ["hw/display/acpi-vga.c"] + select({
-        "@platforms//os:linux": ["hw/display/vhost-user-vga.c"],
-        "//conditions:default": [],
-    }) + ["hw/display/virtio-vga.c"],
-    hdrs = [
-        "config-poison.h",
-        "hw/display/vga_int.h",
-        "hw/display/virtio-vga.h",
-    ] + select({
-        "@platforms//os:linux": [
-            "linux-headers/asm-generic/bitsperlong.h",
-            "linux-headers/linux/stddef.h",
-        ],
-        "//conditions:default": [],
-    }),
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    defines = ["BUILD_DSO"] + select({
-        "@platforms//os:windows": [
-            "GLIB_STATIC_COMPILATION",
-            "GMODULE_STATIC_COMPILATION",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
-    # buildifier: leave-alone
-    includes = [
-        ".",
-        "qapi",
-    ] + select({
-        "@platforms//os:linux": ["linux-headers"],
-        "//conditions:default": [],
-    }),
-    visibility = ["//visibility:public"],
-    deps = [
-        ":libmodule-common",
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
-        "@pixman//:pixman-1",
-        "@pixman//:pixman_simd",
-    ] + select({
-        "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
-            "@zlib",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
     alwayslink = 1,
 )
 
@@ -5049,16 +4466,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -5144,6 +4562,7 @@ cc_library(
     deps = select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": [
@@ -5156,7 +4575,6 @@ cc_library(
         ":libqemuutil",
         ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ],
     alwayslink = 1,
 )
@@ -5248,84 +4666,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "libmodule-common",
-    srcs = ["module-common.c"],
-    hdrs = ["config-poison.h"] + select({
-        "@platforms//os:linux": [
-            "linux-headers/asm-generic/bitsperlong.h",
-            "linux-headers/linux/stddef.h",
-        ],
-        "//conditions:default": [],
     }),
-    copts = select({
-        "@platforms//os:windows": [
-            "-Wno-constant-conversion",
-            "-Wno-macro-redefined",
-            "-Wno-invalid-noreturn",
-            "-Wno-bitfield-constant-conversion",
-            "-Wno-int-to-void-pointer-cast",
-            "-Wno-unused-command-line-argument",
-            "-Wno-undef",
-            "-Wno-microsoft-enum-forward-reference",
-            "-Wno-microsoft-include",
-            "-Wno-deprecated-declarations",
-            "-fms-extensions",
-            "-march=native",
-        ],
-        "@platforms//os:macos": [
-            "-fwrapv",
-            "-Wno-implicit-function-declaration",
-            "-Wno-error=unguarded-availability-new",
-        ],
-        "@platforms//os:linux": [
-            "-fwrapv",
-            "-mcx16",
-            "-Wno-implicit-function-declaration",
-        ],
-        "//conditions:default": [],
-    }) + ["-UNDEBUG"],
-    defines = ["BUILD_DSO"] + select({
-        "@platforms//os:windows": [
-            "GLIB_STATIC_COMPILATION",
-            "GMODULE_STATIC_COMPILATION",
-        ],
-        "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
-    # buildifier: leave-alone
-    includes = ["."] + select({
-        "@platforms//os:linux": ["linux-headers"],
-        "//conditions:default": [],
-    }),
-    visibility = ["//visibility:public"],
-    deps = [
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
-    ] + select({
-        "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
-            "@zlib",
-        ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
-        "//conditions:default": [],
-    }) + [":qemu-headers"],
     alwayslink = 1,
 )
 
@@ -5390,16 +4741,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
 )
 
 cc_library(
@@ -5407,48 +4759,11 @@ cc_library(
     srcs = [
         "aarch64-softmmu-gdbstub-xml.c",
         "accel/accel-target.c",
+        "accel/qtest/qtest.c",
         "accel/stubs/kvm-stub.c",
         "accel/stubs/xen-stub.c",
         "accel/tcg/cpu-exec.c",
         "accel/tcg/cputlb.c",
-    ] + select({
-        "@platforms//os:macos": [
-            "accel/hvf/hvf-accel-ops.c",
-            "accel/hvf/hvf-all.c",
-            "accel/tcg/plugin-gen.c",
-            "target/arm/hvf/hvf.c",
-            "target/arm/hyp_gdbstub.c",
-        ],
-        "@platforms//os:linux": [
-            "accel/tcg/plugin-gen.c",
-            "hw/block/vhost-user-blk.c",
-            "hw/scsi/vhost-scsi-common.c",
-            "hw/vfio/common.c",
-            "hw/vfio/container.c",
-            "hw/vfio/pci.c",
-            "hw/vfio/pci-quirks.c",
-            "hw/vfio/platform.c",
-            "hw/virtio/vhost-backend.c",
-            "hw/virtio/vhost-iova-tree.c",
-            "hw/virtio/vhost-scsi-pci.c",
-            "hw/virtio/vhost-user.c",
-            "hw/virtio/vhost-user-blk-pci.c",
-            "hw/virtio/vhost-user-fs.c",
-            "hw/virtio/vhost-user-fs-pci.c",
-            "hw/virtio/vhost-user-scmi.c",
-            "hw/virtio/vhost-user-scmi-pci.c",
-            "hw/virtio/vhost-user-scsi-pci.c",
-            "hw/virtio/vhost-user-vsock.c",
-            "hw/virtio/vhost-user-vsock-pci.c",
-            "hw/virtio/vhost-vsock.c",
-            "hw/virtio/vhost-vsock-pci.c",
-            "hw/virtio/virtio-input-host-pci.c",
-            "hw/virtio/virtio-md-pci.c",
-            "hw/virtio/virtio-mem.c",
-            "hw/virtio/virtio-mem-pci.c",
-        ],
-        "//conditions:default": [],
-    }) + [
         "accel/tcg/tb-maint.c",
         "accel/tcg/tcg-all.c",
         "accel/tcg/translate-all.c",
@@ -5525,6 +4840,42 @@ cc_library(
         "hw/arm/xlnx-versal-virt.c",
         "hw/arm/xlnx-zcu102.c",
         "hw/arm/xlnx-zynqmp.c",
+    ] + select({
+        "@platforms//os:macos": [
+            "accel/hvf/hvf-accel-ops.c",
+            "accel/hvf/hvf-all.c",
+            "target/arm/hvf/hvf.c",
+            "target/arm/hyp_gdbstub.c",
+        ],
+        "@platforms//os:linux": [
+            "hw/block/vhost-user-blk.c",
+            "hw/scsi/vhost-scsi-common.c",
+            "hw/vfio/common.c",
+            "hw/vfio/container.c",
+            "hw/vfio/pci.c",
+            "hw/vfio/pci-quirks.c",
+            "hw/vfio/platform.c",
+            "hw/virtio/vhost-backend.c",
+            "hw/virtio/vhost-iova-tree.c",
+            "hw/virtio/vhost-scsi-pci.c",
+            "hw/virtio/vhost-user.c",
+            "hw/virtio/vhost-user-blk-pci.c",
+            "hw/virtio/vhost-user-fs.c",
+            "hw/virtio/vhost-user-fs-pci.c",
+            "hw/virtio/vhost-user-scmi.c",
+            "hw/virtio/vhost-user-scmi-pci.c",
+            "hw/virtio/vhost-user-scsi-pci.c",
+            "hw/virtio/vhost-user-vsock.c",
+            "hw/virtio/vhost-user-vsock-pci.c",
+            "hw/virtio/vhost-vsock.c",
+            "hw/virtio/vhost-vsock-pci.c",
+            "hw/virtio/virtio-input-host-pci.c",
+            "hw/virtio/virtio-md-pci.c",
+            "hw/virtio/virtio-mem.c",
+            "hw/virtio/virtio-mem-pci.c",
+        ],
+        "//conditions:default": [],
+    }) + [
         "hw/block/virtio-blk.c",
         "hw/block/virtio-blk-common.c",
         "hw/char/virtio-serial-bus.c",
@@ -5841,17 +5192,17 @@ cc_library(
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"aarch64-softmmu-config-devices.h\\"',
         'CONFIG_TARGET=\\"aarch64-softmmu-config-target.h\\"',
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
     ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = ["target/arm"] + select({
         "@platforms//os:windows": [
@@ -5876,7 +5227,10 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = ["//third_party/dtc:libfdt"] + select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": [
             "//third_party/qemu/google/compat/linux:compat",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user",
@@ -5887,8 +5241,8 @@ cc_library(
         ":libcommon_qemu-system-aarch64",
         ":libqemuutil",
         ":qemu-headers",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -5900,14 +5254,19 @@ cc_library(
     name = "libqemu-riscv64-softmmu",
     srcs = [
         "accel/accel-target.c",
+        "accel/qtest/qtest.c",
         "accel/stubs/kvm-stub.c",
         "accel/stubs/xen-stub.c",
         "accel/tcg/cpu-exec.c",
         "accel/tcg/cputlb.c",
+        "accel/tcg/tb-maint.c",
+        "accel/tcg/tcg-all.c",
+        "accel/tcg/translate-all.c",
+        "accel/tcg/translator.c",
+        "cpu-target.c",
+        "dump/win_dump.c",
     ] + select({
-        "@platforms//os:macos": ["accel/tcg/plugin-gen.c"],
         "@platforms//os:linux": [
-            "accel/tcg/plugin-gen.c",
             "hw/block/vhost-user-blk.c",
             "hw/scsi/vhost-scsi-common.c",
             "hw/vfio/common.c",
@@ -5931,12 +5290,6 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + [
-        "accel/tcg/tb-maint.c",
-        "accel/tcg/tcg-all.c",
-        "accel/tcg/translate-all.c",
-        "accel/tcg/translator.c",
-        "cpu-target.c",
-        "dump/win_dump.c",
         "hw/block/virtio-blk.c",
         "hw/block/virtio-blk-common.c",
         "hw/char/virtio-serial-bus.c",
@@ -6231,17 +5584,17 @@ cc_library(
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"riscv64-softmmu-config-devices.h\\"',
         'CONFIG_TARGET=\\"riscv64-softmmu-config-target.h\\"',
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
     ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = ["target/riscv"] + select({
         "@platforms//os:windows": [
@@ -6266,7 +5619,10 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = ["//third_party/dtc:libfdt"] + select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": [
             "//third_party/qemu/google/compat/linux:compat",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user",
@@ -6277,8 +5633,8 @@ cc_library(
         ":libcommon_qemu-system-riscv64",
         ":libqemuutil",
         ":qemu-headers",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -6302,7 +5658,6 @@ cc_library(
         ],
         "@platforms//os:macos": [
             "accel/stubs/kvm-stub.c",
-            "accel/tcg/plugin-gen.c",
             "hw/i386/kvm/xen-stubs.c",
             "hw/i386/pc_sysfw_ovmf-stubs.c",
             "hw/i386/sgx-stub.c",
@@ -6312,7 +5667,6 @@ cc_library(
         "@platforms//os:linux": [
             "accel/kvm/kvm-accel-ops.c",
             "accel/kvm/kvm-all.c",
-            "accel/tcg/plugin-gen.c",
             "hw/block/dataplane/xen-block.c",
             "hw/block/vhost-user-blk.c",
             "hw/hyperv/hyperv.c",
@@ -6366,6 +5720,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + [
+        "accel/qtest/qtest.c",
         "accel/stubs/xen-stub.c",
         "accel/tcg/cpu-exec.c",
         "accel/tcg/cputlb.c",
@@ -6709,17 +6064,17 @@ cc_library(
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"x86_64-softmmu-config-devices.h\\"',
         'CONFIG_TARGET=\\"x86_64-softmmu-config-target.h\\"',
+        "_FILE_OFFSET_BITS=64",
+        "_GNU_SOURCE",
+        "_LARGEFILE_SOURCE",
     ] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
             "GMODULE_STATIC_COMPILATION",
         ],
+        "@platforms//os:linux": ["_REENTRANT"],
         "//conditions:default": [],
-    }) + [
-        "_FILE_OFFSET_BITS=64",
-        "_GNU_SOURCE",
-        "_LARGEFILE_SOURCE",
-    ],
+    }),
     # buildifier: leave-alone
     includes = ["target/i386"] + select({
         "@platforms//os:windows": [
@@ -6743,7 +6098,10 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = ["//third_party/dtc:libfdt"] + select({
-        "@platforms//os:windows": ["//third_party/qemu/google/compat/windows:compat"],
+        "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
+        ],
         "@platforms//os:linux": [
             "//third_party/qemu/google/compat/linux:compat",
             "//third_party/qemu/subprojects/libvhost-user:vhost-user",
@@ -6754,8 +6112,8 @@ cc_library(
         ":libcommon_qemu-system-x86_64",
         ":libqemuutil",
         ":qemu-headers",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -7487,6 +6845,7 @@ cc_library(
     deps = select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": [
@@ -7498,7 +6857,6 @@ cc_library(
     }) + [
         ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ],
 )
 
@@ -7573,16 +6931,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -7655,16 +7014,17 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -7793,16 +7153,17 @@ cc_library(
     }) + ["host/include/generic"],
     visibility = ["//visibility:public"],
     deps = [
+        ":qemu-headers",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
     ] + select({
         "@platforms//os:windows": [
             "//third_party/qemu/google/compat/windows:compat",
+            "@glib//:gmodule-static",
             "@zlib",
         ],
         "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
         "//conditions:default": [],
-    }) + [":qemu-headers"],
+    }),
     alwayslink = 1,
 )
 
@@ -11290,8 +10651,8 @@ objc_library(
         ":libqemuutil",
         ":qemu-headers",
         "//third_party/dtc:libfdt",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -11342,8 +10703,8 @@ objc_library(
         ":libqemuutil",
         ":qemu-headers",
         "//third_party/dtc:libfdt",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -11394,8 +10755,8 @@ objc_library(
         ":libqemuutil",
         ":qemu-headers",
         "//third_party/dtc:libfdt",
+        "@crosvm//:rutabaga_c_ffi",
         "@glib//:glib-static",
-        "@glib//:gmodule-static",
         "@pixman//:pixman-1",
         "@pixman//:pixman_simd",
         "@zlib",
@@ -11798,14 +11159,21 @@ cc_library(
         "-fwrapv",
         "-UNDEBUG",
     ],
-    includes = ["include"] + select({
+    # Note that . is needed for config-poison.h.
+    includes = [
+        ".",
+        "include",
+    ] + select({
         "@platforms//os:windows": ["platform/windows-amd64"],
         "@platforms//os:macos": ["platform/darwin-arm64"],
         "@platforms//os:linux": ["platform/linux-x86_64"],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = ["@glib//:glib-static"],
+    deps = [
+        "@glib//:glib-static",
+        "@glib//:gmodule-static",
+    ],
 )
 
 # Set of common build rules that we want to merge in

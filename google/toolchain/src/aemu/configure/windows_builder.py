@@ -26,7 +26,6 @@ class WindowsBuilder(QemuBuilder):
         features["-Davx512bw"] = "auto"
         features["-Ddsound"] = "enabled"
         features["-Dvhost_net"] = "enabled"
-        features["-Dwerror"] = "true"
         features["-Dwhpx"] = "enabled"
 
         return features

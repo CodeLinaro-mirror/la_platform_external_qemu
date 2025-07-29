@@ -290,14 +290,15 @@ class QemuBuilder:
         features["-Dcoroutine_pool"] = "true"
         features["-Ddefault_devices"] = "true"
         features["-Dfdt"] = "enabled"
-        features["-Dmodules"] = "enabled"
+        # features["-Dmodules"] = "enabled"
         features["-Dpixman"] = "enabled"
         features["-Drutabaga_gfx"] = "enabled"
         features["-Dtcg"] = "enabled"
         features["-Dtools"] = "enabled"
         features["-Dvnc"] = "enabled"
+        features["-Dwerror"] = "true"
 
-        return features;
+        return features
 
     def config_mak(self):
         """The config.mak file needed by meson to configure qemu."""

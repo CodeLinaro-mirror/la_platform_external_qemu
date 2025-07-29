@@ -183,13 +183,14 @@ cc_library(
         "-fwrapv",
         "-UNDEBUG",
     ],
-    includes = ["include"] + select({
+    # Note that . is needed for config-poison.h.
+    includes = [".", "include"] + select({
         "@platforms//os:windows": ["platform/windows-amd64"],
         "@platforms//os:macos": ["platform/darwin-arm64"],
         "@platforms//os:linux": ["platform/linux-x86_64"],
         "//conditions:default": [],
     }),
-    deps = ["@glib//:glib-static"],
+    deps = ["@glib//:glib-static", "@glib//:gmodule-static"],
     visibility = ["//visibility:public"],
 )
 

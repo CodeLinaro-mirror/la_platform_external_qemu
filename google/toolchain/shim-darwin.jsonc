@@ -10,14 +10,7 @@
         ],
         // Replace standard launcher with google launcher
         "-srcs": ["system/main.c"],
-        "+srcs": [
-          "google/system/aemu_main.cpp",
-          "google/system/aemu_plugins.c"
-        ],
-        "-deps": [
-          // We will bring our own version of libmodinfo, so strip it!
-          ":libmodinfo-.*"
-        ]
+        "+srcs": ["google/system/aemu_main.cpp"]
       }
     },
     // Rename the macos targets. Note these do not have
@@ -56,12 +49,6 @@
       "target":  "libcommon_qemu-system-x86_64-unsigned",
       "shims": {
         "name":  "libcommon_qemu-system-x86_64"
-      }
-    },
-    {
-      "target": "hw-display-virtio-gpu|hw-display-virtio-vga|hw-display-virtio-gpu-pci|hw-display-virtio-gpu-rutabaga|hw-display-virtio-gpu-pci-rutabaga",
-      "shims": {
-        "+linkopts": ["-undefined dynamic_lookup"]
       }
     },
     {
