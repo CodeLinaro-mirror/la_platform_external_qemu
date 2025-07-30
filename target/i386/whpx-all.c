@@ -8,6 +8,7 @@
  *
  */
 
+#include "whp-dispatch.h"
 #include "qemu/osdep.h"
 #include "cpu.h"
 #include "exec/address-spaces.h"
@@ -30,7 +31,6 @@
 #include "qemu/queue.h"
 #include "qapi/error.h"
 #include "migration/migration.h"
-#include "whp-dispatch.h"
 
 #include <sdkddkver.h>
 #if !defined(NTDDI_WIN10_CO)
@@ -184,6 +184,11 @@ static bool whpx_has_xsave(void)
     return whpx_xsave_cap.XsaveSupport;
 }
 
+static bool whpx_has_xsave_supervisor(void)
+{
+    return whpx_xsave_cap.XsaveSupervisorSupport;
+}
+
 /*
  * VP support
  */
@@ -235,24 +240,38 @@ static SegmentCache whpx_seg_h2q(const WHV_X64_SEGMENT_REGISTER *hs)
 }
 
 /* X64 Extended Control Registers */
-static void whpx_set_xcrs(CPUState *cpu)
+static void whpx_set_xcrs_and_xss(CPUState *cpu)
 {
     struct CPUX86State *env = (CPUArchState *)(cpu->env_ptr);
     HRESULT hr;
     struct whpx_state *whpx = &whpx_global;
-    WHV_REGISTER_VALUE xcr0;
-    WHV_REGISTER_NAME xcr0_name = WHvX64RegisterXCr0;
+    WHV_REGISTER_VALUE reg_val;
+    WHV_REGISTER_NAME reg_name;
 
     if (!whpx_has_xsave()) {
         return;
     }
 
     /* Only xcr0 is supported by the hypervisor currently */
-    xcr0.Reg64 = env->xcr0;
+    reg_val.Reg64 = env->xcr0;
+    reg_name = WHvX64RegisterXCr0;
     hr = whp_dispatch.WHvSetVirtualProcessorRegisters(
-        whpx->partition, cpu->cpu_index, &xcr0_name, 1, &xcr0);
+        whpx->partition, cpu->cpu_index, &reg_name, 1, &reg_val);
     if (FAILED(hr)) {
         error_report("WHPX: Failed to set register xcr0, hr=%08lx", hr);
+    }
+
+    /* IA32_XSS */
+    if (!whpx_has_xsave_supervisor()) {
+        return;
+    }
+
+    reg_val.Reg64 = env->xss;
+    reg_name = WHvX64RegisterXss;
+    hr = whp_dispatch.WHvSetVirtualProcessorRegisters(
+        whpx->partition, cpu->cpu_index, &reg_name, 1, &reg_val);
+    if (FAILED(hr)) {
+        error_report("WHPX: Failed to set register IA32_XSS, hr=%08lx", hr);
     }
 }
 
@@ -332,7 +351,7 @@ static void whpx_set_registers(CPUState *cpu)
     /* 8 Debug Registers - Skipped */
 
     /* Extended control registers */
-    whpx_set_xcrs(cpu);
+    whpx_set_xcrs_and_xss(cpu);
 
     /* 16 XMM registers */
     assert(whpx_register_names[idx] == WHvX64RegisterXmm0);
@@ -424,27 +443,41 @@ static void whpx_set_registers(CPUState *cpu)
 }
 
 /* X64 Extended Control Registers */
-static void whpx_get_xcrs(CPUState *cpu)
+static void whpx_get_xcrs_and_xss(CPUState *cpu)
 {
     struct CPUX86State *env = (CPUArchState *)(cpu->env_ptr);
     HRESULT hr;
     struct whpx_state *whpx = &whpx_global;
-    WHV_REGISTER_VALUE xcr0;
-    WHV_REGISTER_NAME xcr0_name = WHvX64RegisterXCr0;
+    WHV_REGISTER_VALUE reg_val;
+    WHV_REGISTER_NAME reg_name;
 
     if (!whpx_has_xsave()) {
         return;
     }
 
     /* Only xcr0 is supported by the hypervisor currently */
+    reg_name = WHvX64RegisterXCr0;
     hr = whp_dispatch.WHvGetVirtualProcessorRegisters(
-        whpx->partition, cpu->cpu_index, &xcr0_name, 1, &xcr0);
+        whpx->partition, cpu->cpu_index, &reg_name, 1, &reg_val);
     if (FAILED(hr)) {
         error_report("WHPX: Failed to get register xcr0, hr=%08lx", hr);
         return;
     }
+    env->xcr0 = reg_val.Reg64;
 
-    env->xcr0 = xcr0.Reg64;
+    /* IA32_XSS */
+    if (!whpx_has_xsave_supervisor()) {
+        return;
+    }
+
+    reg_name = WHvX64RegisterXss;
+    hr = whp_dispatch.WHvGetVirtualProcessorRegisters(
+        whpx->partition, cpu->cpu_index, &reg_name, 1, &reg_val);
+    if (FAILED(hr)) {
+        error_report("WHPX: Failed to get register xcr0, hr=%08lx", hr);
+        return;
+    }
+    env->xss = reg_val.Reg64;
 }
 
 static void whpx_get_registers(CPUState *cpu)
@@ -525,7 +558,7 @@ static void whpx_get_registers(CPUState *cpu)
     /* 8 Debug Registers - Skipped */
 
     /* Extended control registers */
-    whpx_get_xcrs(cpu);
+    whpx_get_xcrs_and_xss(cpu);
 
     /* 16 XMM registers */
     assert(whpx_register_names[idx] == WHvX64RegisterXmm0);
