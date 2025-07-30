@@ -11,15 +11,6 @@ typedef int WINBOOL;
 
 #include "./whpx-headers/WinHvPlatformDefs.h"
 
-typedef struct WHV_DOORBELL_MATCH_DATA {
-    WHV_GUEST_PHYSICAL_ADDRESS GuestAddress;
-    UINT64 Value;
-    UINT32 Length;
-    UINT32 MatchOnValue:1;
-    UINT32 MatchOnLength:1;
-    UINT32 Reserved:30;
-} WHV_DOORBELL_MATCH_DATA;
-
 #endif
 
 #include <WinHvPlatform.h>
