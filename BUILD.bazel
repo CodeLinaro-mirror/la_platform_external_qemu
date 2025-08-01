@@ -176,6 +176,7 @@ cc_interface_binary(
             "-framework IOKit",
             "-framework QuartzCore",
             "-framework vmnet",
+            "-Wl,-export_dynamic",
         ],
         "@platforms//os:linux": [
             "-rdynamic",
@@ -294,6 +295,7 @@ cc_interface_binary(
             "-framework IOKit",
             "-framework QuartzCore",
             "-framework vmnet",
+            "-Wl,-export_dynamic",
         ],
         "@platforms//os:linux": [
             "-rdynamic",
@@ -412,6 +414,7 @@ cc_interface_binary(
             "-framework IOKit",
             "-framework QuartzCore",
             "-framework vmnet",
+            "-Wl,-export_dynamic",
         ],
         "@platforms//os:linux": [
             "-rdynamic",
