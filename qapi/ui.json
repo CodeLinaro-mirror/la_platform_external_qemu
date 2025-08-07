@@ -1479,6 +1479,19 @@
   'data'    : { '*grab-mod'   : 'HotKeyMod' } }
 
 ##
+# @DisplayAndroid:
+#
+# Android display options.
+#
+# @grab-mod: Modifier keys that should be pressed together with the
+#     "G" key to release the mouse grab.
+#
+# Since: 10
+##
+{ 'struct'  : 'DisplayAndroid',
+  'data'    : { '*grab-mod'   : 'HotKeyMod' } }
+
+##
 # @DisplayType:
 #
 # Display (user interface) type.
@@ -1513,6 +1526,7 @@
 #
 # @dbus: Start a D-Bus service for the display.  (Since 7.0)
 #
+# @android: Android Emulator specific backend over gRPC (Anroid only)
 # Since: 2.12
 ##
 { 'enum'    : 'DisplayType',
@@ -1525,7 +1539,8 @@
     { 'name': 'curses', 'if': 'CONFIG_CURSES' },
     { 'name': 'cocoa', 'if': 'CONFIG_COCOA' },
     { 'name': 'spice-app', 'if': 'CONFIG_SPICE' },
-    { 'name': 'dbus', 'if': 'CONFIG_DBUS_DISPLAY' }
+    { 'name': 'dbus', 'if': 'CONFIG_DBUS_DISPLAY' },
+    { 'name': 'android' }
   ]
 }
 
@@ -1563,7 +1578,8 @@
       'egl-headless': { 'type': 'DisplayEGLHeadless',
                         'if': 'CONFIG_OPENGL' },
       'dbus': { 'type': 'DisplayDBus', 'if': 'CONFIG_DBUS_DISPLAY' },
-      'sdl': { 'type': 'DisplaySDL', 'if': 'CONFIG_SDL' }
+      'sdl': { 'type': 'DisplaySDL', 'if': 'CONFIG_SDL' },
+      'android': { 'type': 'DisplayAndroid'}
   }
 }
 
