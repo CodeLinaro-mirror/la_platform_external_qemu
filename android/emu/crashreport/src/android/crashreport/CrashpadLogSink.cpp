@@ -31,8 +31,6 @@ void CrashpadLogSink::registerSink() {
     static CrashpadLogSink crashpadSink;
     if (!initialized.exchange(true)) {
         android::base::registerSink(&crashpadSink);
-        LOG(INFO) << "CrashpadLogSink registered, error messages will be "
-                     "included in crashreports.";
     }
 }
 
