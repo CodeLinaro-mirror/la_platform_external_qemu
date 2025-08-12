@@ -293,6 +293,7 @@ class QemuBuilder:
         # features["-Dmodules"] = "enabled"
         features["-Dpixman"] = "enabled"
         features["-Drutabaga_gfx"] = "enabled"
+        features["-Drelocatable"] = "true"
         features["-Dtcg"] = "enabled"
         features["-Dtools"] = "enabled"
         features["-Dvnc"] = "enabled"
