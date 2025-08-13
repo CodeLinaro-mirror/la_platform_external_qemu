@@ -22,16 +22,14 @@
  * THE SOFTWARE.
  */
 
-#include <cstdio>
-#include <string>
+#include <stdio.h>
+#include <limits.h>
 
 #include <gmodule.h>
 
-extern "C" {
 #include "qemu/osdep.h"
 #include "qemu/module.h"
 #include "system/system.h"
-}
 
 #include "aemu_func_defs.h"
 
@@ -67,14 +65,17 @@ typedef void (*gf_shutdown_func_t)(void);
 
 static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func, gf_shutdown_func_t *shutdown_func) {
     char *module_dir = getenv("QEMU_MODULE_DIR");
-    if (module_dir == nullptr) {
+    if (module_dir == NULL) {
         fprintf(stderr, "error, can't load goldfish module as QEMU_MODULE_DIR is not set");
         return false;
     }
-    std::string full_path(module_dir);
-    full_path += "/" LIB_PREFIX "goldfish_" TARGET_NAME;
+    char full_path[PATH_MAX];
+    if (snprintf(full_path, sizeof(full_path), "%s/" LIB_PREFIX "goldfish_" TARGET_NAME, module_dir) < 0) {
+      fprintf(stderr, "error, failed to generate goldfish module path - %s\n", module_dir);
+      return false;
+    }
 
-    printf("loading %s\n", full_path.c_str());
+    printf("loading %s\n", full_path);
     GModule *g_module;
     int flags;
 
@@ -82,7 +83,7 @@ static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func,
     if (!export_symbols) {
         flags |= G_MODULE_BIND_LOCAL;
     }
-    g_module = g_module_open(full_path.c_str(), (GModuleFlags)flags);
+    g_module = g_module_open(full_path, (GModuleFlags)flags);
     if (!g_module) {
         fprintf(stderr, "error, failed to load goldfish module - %s\n", g_module_error());
         return false;

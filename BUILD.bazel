@@ -112,7 +112,7 @@ cc_interface_binary(
         "//conditions:default": [],
     }) + [
         "google/system/aemu_func_defs.h",
-        "google/system/aemu_main.cpp",
+        "google/system/aemu_main.c",
     ],
     copts = ["-fwrapv"] + select({
         "@platforms//os:macos": ["-Wno-error=unguarded-availability-new"],
@@ -204,7 +204,7 @@ cc_interface_binary(
         "//conditions:default": [],
     }) + [
         "google/system/aemu_func_defs.h",
-        "google/system/aemu_main.cpp",
+        "google/system/aemu_main.c",
     ],
     copts = ["-fwrapv"] + select({
         "@platforms//os:macos": ["-Wno-error=unguarded-availability-new"],
@@ -295,7 +295,7 @@ cc_interface_binary(
         "//conditions:default": [],
     }) + [
         "google/system/aemu_func_defs.h",
-        "google/system/aemu_main.cpp",
+        "google/system/aemu_main.c",
     ],
     copts = select({
         "@platforms//os:windows": [

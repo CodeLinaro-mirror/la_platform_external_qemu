@@ -6,7 +6,7 @@
         "_bzl_type": "cc_interface_binary",
         // Replace standard launcher with google launcher
         "-srcs": ["system/main.c"],
-        "+srcs": ["google/system/aemu_main.cpp", "google/system/aemu_func_defs.h"],
+        "+srcs": ["google/system/aemu_main.c", "google/system/aemu_func_defs.h"],
         // Make sure that LTO doesn't remove the symbols our plugin needs.
         "+linkopts": ["-Wl,-export_dynamic"]
       }
