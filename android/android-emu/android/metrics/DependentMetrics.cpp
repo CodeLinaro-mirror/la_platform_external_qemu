@@ -707,6 +707,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::GUEST_ANGLE;
         case android::featurecontrol::XrModeUI:
             return android_studio::EmulatorFeatureFlagState::XR_MODE_UI;
+        case android::featurecontrol::XrModeGlassesUI:
+            return android_studio::EmulatorFeatureFlagState::XR_MODE_GLASSES_UI;
         case android::featurecontrol::VirtioDualModeMouse:
             return android_studio::EmulatorFeatureFlagState::VIRTIO_DUAL_MODE_MOUSE;
         case android::featurecontrol::AllAppsForHomeTray:

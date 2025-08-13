@@ -1432,8 +1432,12 @@ bool android_foldable_hinge_enabled() {
              getResizableActiveConfigId() == PRESET_SIZE_UNFOLDED));
 }
 
-bool android_is_xr_mode() {
+bool android_is_xr_vst_headset_mode() {
     return fc::isEnabled(fc::XrModeUI);
+}
+
+bool android_is_xr_glasses_mode() {
+    return fc::isEnabled(fc::XrModeGlassesUI);
 }
 
 bool android_foldable_any_folded_area_configured() {
