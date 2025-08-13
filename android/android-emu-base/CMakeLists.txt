@@ -87,7 +87,7 @@ android_add_library(
       android/utils/file_io.cpp
       android/utils/looper.cpp
       android/utils/misc.c
-      android/utils/panic.c
+      android/utils/panic.cpp
       android/utils/path.cpp
       android/utils/path_system.cpp
       android/utils/socket_drainer.cpp
@@ -180,6 +180,15 @@ android_target_compile_definitions(
 # we really want to limit the usage of these flags.
 android_target_compile_options(
   android-emu-base Clang PRIVATE "-Wno-parentheses" "-Wno-invalid-constexpr")
+
+
+android_add_test(
+  TARGET android-emu-base-panic_unittest
+  SRC android/utils/panic_unittest.cpp
+)
+target_link_libraries(android-emu-base-panic_unittest PRIVATE android-emu-base
+                                                         android-emu-base-headers
+                                                         gmock_main)
 
 android_add_test(
   TARGET android-emu-base_unittests

@@ -10,18 +10,24 @@
 ** GNU General Public License for more details.
 */
 #include "android/utils/panic.h"
+#include "android/utils/debug.h"
+
 #include <stdio.h>
 #include <stdlib.h>
+#include "android/base/logging//StudioMessage.h"
+
 
 static void __attribute__((noreturn))
 _android_panic_defaultHandler( const char*  fmt, va_list  args )
 {
-    fprintf(stderr, "PANIC: ");
-    vfprintf(stderr, fmt, args);
-    exit(1);
+    char buffer[4096];
+    vsnprintf(buffer, sizeof(buffer), fmt, args);
+    android::base::EXIT_WITH_FATAL_MESSAGE("%s", buffer);
 }
 
 static APanicHandlerFunc  _panicHandler = _android_panic_defaultHandler;
+
+extern "C" {
 
 void android_panic( const char*  fmt, ... )
 {
@@ -44,4 +50,6 @@ void android_panic_registerHandler( APanicHandlerFunc  handler )
         android_panic("Passing NULL to %s", __FUNCTION__);
 
     _panicHandler = handler;
+}
+
 }
