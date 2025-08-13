@@ -213,7 +213,8 @@ qtests_npcm7xx = \
    'npcm7xx_watchdog_timer-test'] + \
    (slirp.found() ? ['npcm7xx_emc-test'] : [])
 qtests_npcm8xx = \
-  ['npcm_gmac-test']
+  ['npcm_gmac-test',
+   'npcm8xx_sgpio-test',]
 # TODO(b/376868143): disable test while flakiness is diagnosed
 
 qtests_aspeed = \

@@ -22,6 +22,7 @@
 #include "hw/dma/npcm8xx-gdma.h"
 #include "hw/gpio/npcm7xx_gpio.h"
 #include "hw/i2c/npcm7xx_smbus.h"
+#include "hw/gpio/npcm8xx_sgpio.h"
 #include "hw/i3c/svc-i3c.h"
 #include "hw/ipmi/npcm7xx_kcs.h"
 #include "hw/intc/arm_gic_common.h"
@@ -123,6 +124,7 @@ struct NPCM8xxState {
     NPCMESPIState       espi;
     NPCM8xxGDMA         gdma[3];
     SVCI3C              i3c[6];
+    NPCM8xxSGPIOState   sgpio[2];
 };
 
 struct NPCM8xxClass {
