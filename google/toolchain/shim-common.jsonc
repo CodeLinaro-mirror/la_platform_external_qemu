@@ -96,7 +96,7 @@
       "@pixman//:pixman_simd"
     ],
     "libfdt": [
-      "//third_party/dtc:libfdt"
+      "@dtc//:libfdt"
     ],
     "rutabaga_gfx_ffi": [
       "@crosvm//:rutabaga_c_ffi"

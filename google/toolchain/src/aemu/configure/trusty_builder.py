@@ -24,7 +24,6 @@ class TrustyBuilder(LinuxBuilder):
         linux["-Daudio_drv_list"] = "default"
         linux["-Db_pie"] = "false"
         linux["-Dhexagon_idef_parser"] = "true"
-        #linux["-Dmodules"] = "disabled"
         linux["-Dpa"] = "disabled"
         linux["-Dprefer_static"] = "true"
         linux["-Drutabaga_gfx"] = "disabled"
@@ -41,7 +40,7 @@ class TrustyBuilder(LinuxBuilder):
 
         # Next we have our dependencies.
         return [
-            BazelLib("//third_party/dtc:libfdt", "1.6.0", {}),
+            BazelLib("@dtc//:libfdt", "1.6.0", {}),
             BazelLib("@glib//:gmodule-static", "2.77.2", {}),
             BazelLib(
                 "@glib//:glib-static",

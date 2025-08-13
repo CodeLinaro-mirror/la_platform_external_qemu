@@ -46,7 +46,7 @@ class DarwinBuilder(QemuBuilder):
                     "archive_target": "@crosvm//:rutabaga_ffi",
                 },
             ),
-            BazelLib("//third_party/dtc:libfdt", "1.6.0", {}),
+            BazelLib("@dtc//:libfdt", "1.6.0", {}),
             BazelLib(
                 "@glib//:gmodule-static",
                 "2.77.2",

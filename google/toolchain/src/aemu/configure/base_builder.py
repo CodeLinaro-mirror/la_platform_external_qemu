@@ -290,7 +290,6 @@ class QemuBuilder:
         features["-Dcoroutine_pool"] = "true"
         features["-Ddefault_devices"] = "true"
         features["-Dfdt"] = "enabled"
-        # features["-Dmodules"] = "enabled"
         features["-Dpixman"] = "enabled"
         features["-Drutabaga_gfx"] = "enabled"
         features["-Drelocatable"] = "true"

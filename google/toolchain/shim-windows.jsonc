@@ -1,6 +1,6 @@
 {
   // This will be at the start of the bazel file.
-  "bazel_prefix": "load(\"//build/bazel/rules:windows_resources.bzl\", \"windows_resources\")",
+  "bazel_prefix": "load(\"@//build/bazel/rules:windows_resources.bzl\", \"windows_resources\")",
   "shims": [
     {
       "target": "qemu-system-aarch64",
@@ -21,6 +21,12 @@
       }
     },
     {
+      "target": "libcommon",
+      "shims": {
+        "name": "libcommon_qemu-system-x86_64"
+      }
+    },
+    {
       "target": ".*",
       "shims": {
         // TODO still needed?
@@ -36,10 +42,6 @@
       "target": ".*",
       "shims": {
         "restrict_to": "cc_library|cc_binary|cc_interface_binary",
-        // TODO not needed? Remove our compat libs if present
-        "-hdrs": [
-          ".*subprojects.*"
-        ],
         "+copts": [
           "-Wno-constant-conversion",
           "-Wno-macro-redefined",
@@ -57,9 +59,7 @@
           "-UNDEBUG"
         ],
         // We need a compat layer for some windows magic.
-        "+deps": [
-          "//third_party/qemu/google/compat/windows:compat"
-        ]
+        "+deps": ["//third_party/qemu/google/compat/windows:compat"]
       }
     }
   ],
@@ -68,19 +68,8 @@
     "glib-2.0": [
       "@glib//:glib-static",
       "@glib//:gmodule-static"
-    ],
-    // TODO are these needed on windows?
-    "vhost-user": [
-      "//third_party/qemu/subprojects/libvhost-user:vhost-user"
-    ],
-    "vhost-user-glib": [
-      "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib"
     ]
   },
-  "export": [
-    "qemu-system-x86_64",
-    "qemu-system-aarch64",
-    "qemu-system-riscv64"
-  ],
+  "export": ["qemu-system-x86_64"],
   "exclude": []
 }
