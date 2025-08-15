@@ -1081,14 +1081,16 @@ int main(int argc, char** argv) {
 #ifdef __x86_64__
             if (sarch == "arm64" && apiLevel >= 28) {
                 APANIC("Avd's CPU Architecture '%s' is not supported by the "
-                       "QEMU2 emulator on x86_64 host.\n",
+                       "QEMU2 emulator on x86_64 host. "
+                       "System image must match the host architecture.\n",
                        avdarch);
             }
 #endif
 #if defined(__aarch64__)
             if (sarch != "arm64" && sarch != "arm") {
                 APANIC("Avd's CPU Architecture '%s' is not supported by the "
-                       "QEMU2 emulator on aarch64 host.\n",
+                       "QEMU2 emulator on aarch64 host. "
+                       "System image must match the host architecture.\n",
                        avdarch);
             }
 #endif
