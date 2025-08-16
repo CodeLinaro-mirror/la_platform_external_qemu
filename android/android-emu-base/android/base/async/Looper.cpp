@@ -41,7 +41,11 @@ Looper* Looper::create() {
     return new DefaultLooper();
 }
 
-Looper::~Looper() = default;
+Looper::~Looper() {
+    for (auto& callback : mExitListeners) {
+        callback(this);
+    }
+}
 
 void Looper::run() {
     runWithDeadlineMs(kDurationInfinite);
@@ -60,6 +64,10 @@ Looper::Timer::~Timer() = default;
 
 Looper* Looper::Timer::parentLooper() const {
     return mLooper;
+}
+
+void Looper::addExitListener(Looper::ExitListener&& callback) {
+    mExitListeners.push_back(std::move(callback));
 }
 
 Looper::Timer::Timer(Looper* looper,
