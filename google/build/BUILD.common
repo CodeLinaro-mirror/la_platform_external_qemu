@@ -4,6 +4,7 @@ load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
 cc_library(
     name = "aemu_func_defs",
     hdrs = ["google/system/aemu_func_defs.h"],
+    includes = ["."],
     visibility = ["//visibility:public"],
 )
 
