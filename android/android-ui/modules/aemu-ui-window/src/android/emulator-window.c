@@ -747,7 +747,7 @@ bool emulator_window_rotate(int rot) {
 
 void emulator_window_set_screen_mask(int width,
                                      int height,
-                                     const unsigned char* rgbaData) {
+                                     const uint8_t* rgbaData) {
     // Save this info for later. This gets called too early
     // for us to invoke android_setOpenglesScreenMask() now.
     emulator_screen_mask.width = width;
