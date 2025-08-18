@@ -4,3 +4,5 @@ alias(
     actual = "@//hardware/google/aemu/windows:compat",
     visibility = ["//visibility:public"],
 )
+
+exports_files(["file.h"])

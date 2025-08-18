@@ -10865,6 +10865,7 @@ cc_library(
         "ui/input-keymap-xorgxwin-to-qcode.c.inc",
     ] + select({
         "@platforms//os:windows": [
+            "//third_party/qemu/google/compat/windows:file.h",
             "platform/windows-amd64/aarch64-softmmu-config-devices.h",
             "platform/windows-amd64/aarch64-softmmu-config-target.h",
             "platform/windows-amd64/config-host.h",

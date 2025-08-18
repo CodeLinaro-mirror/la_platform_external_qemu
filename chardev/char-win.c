@@ -27,6 +27,7 @@
 #include "qemu/module.h"
 #include "qapi/error.h"
 #include "chardev/char-win.h"
+#include "google/compat/windows/file.h"
 
 static void win_chr_read(Chardev *chr, DWORD len)
 {
@@ -93,7 +94,7 @@ int win_chr_serial_init(Chardev *chr, const char *filename, Error **errp)
         goto fail;
     }
 
-    s->file = CreateFile(filename, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+    s->file = aemu_CreateFile(filename, GENERIC_READ | GENERIC_WRITE, 0, NULL,
                       OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
     if (s->file == INVALID_HANDLE_VALUE) {
         error_setg_win32(errp, GetLastError(), "Failed CreateFile");
