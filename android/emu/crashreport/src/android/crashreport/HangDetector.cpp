@@ -47,6 +47,7 @@ private:
     base::Looper* const mLooper;
     std::unique_ptr<base::Looper::Task> mTask;
     bool mIsTaskRunning = false;
+    bool mIsLooperExited = false;
 
     std::chrono::high_resolution_clock::time_point mLastCheckTime;
     const std::chrono::milliseconds mTimeout;
@@ -63,7 +64,15 @@ HangDetector::LooperWatcher::LooperWatcher(
         std::chrono::milliseconds hangCheckTimeout)
     : mLooper(looper),
       mTimeout(hangTimeout),
-      mhangCheckTimeout(hangCheckTimeout) {}
+      mhangCheckTimeout(hangCheckTimeout) {
+    mLooper->addExitListener([this](base::Looper* looper) {
+        {
+            std::unique_lock<std::mutex> l(*mLock);
+            mIsLooperExited = true;
+        }
+        cancelHangCheck();
+    });
+}
 
 HangDetector::LooperWatcher::~LooperWatcher() {
     if (mTask) {
@@ -89,6 +98,11 @@ void HangDetector::LooperWatcher::cancelHangCheck() {
 
 void HangDetector::LooperWatcher::process(const HangCallback& hangCallback) {
     std::unique_lock<std::mutex> l(*mLock);
+
+    if (mIsLooperExited) {
+        LOG(VERBOSE) << __func__ << ": Looper(" << mLooper << ") exited. Ignoring hang detection.";
+        return;
+    }
 
     const auto now = std::chrono::high_resolution_clock::now();
     if (mIsTaskRunning) {
