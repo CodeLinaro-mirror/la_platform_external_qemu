@@ -2339,6 +2339,10 @@ static void help_systemui_renderer(stralloc_t* out) {
     PRINTF("  Set guest side renderer backend. Available options: skiagl, skiavk\n");
 }
 
+static void help_is_ost(stralloc_t* out){
+    PRINTF(" Determine if XR device uses OST Behaviors");
+}
+
 #define  help_no_skin   NULL
 #define  help_netspeed  help_shaper
 #define  help_netdelay  help_shaper
