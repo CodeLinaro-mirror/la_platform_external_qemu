@@ -710,7 +710,7 @@ void android_setOpenglesTranslation(float px, float py) {
 
 void android_setOpenglesScreenMask(int width,
                                    int height,
-                                   const unsigned char* rgbaData) {
+                                   const uint8_t* rgbaData) {
     if (sRenderer) {
         sRenderer->setScreenMask(width, height, rgbaData);
     }
