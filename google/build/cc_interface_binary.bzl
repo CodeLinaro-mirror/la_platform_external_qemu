@@ -59,12 +59,6 @@ def cc_interface_binary(
         linkopts = (linkopts or []) + select({
             # win_def_file is ignored if linkshared=False so we have to pass the linkopts manually.
             "@platforms//os:windows": ["/DEF:$(location " + win_def_file + ")"] if win_def_file else [],
-            "@platforms//os:macos": [
-                #"-framework Cocoa",
-                #"-framework CoreVideo",
-                #"-framework CoreAudio",
-                #"-framework vmnet",
-            ],
             "//conditions:default": [],
         }),
         data = (data or []) + ([win_def_file] if win_def_file else []),
