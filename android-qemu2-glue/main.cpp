@@ -68,6 +68,7 @@
 #include "android/utils/filelock.h"
 #include "android/utils/lineinput.h"
 #include "android/utils/path.h"
+#include "android/utils/panic.h"
 #include "android/utils/property_file.h"
 #include "android/utils/stralloc.h"
 #include "android/utils/string.h"
@@ -594,7 +595,7 @@ static int createUserData(AvdInfo* avd,
 
             if (path_copy_file(hw->disk_dataPartition_path,
                                hw->disk_dataPartition_initPath) < 0) {
-                derror("Could not create %s: %s", hw->disk_dataPartition_path,
+                android_panic("Could not create %s: %s", hw->disk_dataPartition_path,
                        strerror(errno));
                 return 1;
             }
@@ -1897,7 +1898,7 @@ extern "C" int main(int argc, char** argv) {
             filelock_create_timeout(snapshotLockFilePath, 10000 /* ms */);
     if (!snapshotLock) {
         // Some snapshot operation took too long.
-        derror("A snapshot operation for '%s' is pending "
+        android_panic("A snapshot operation for '%s' is pending "
                "and timeout has expired. Exiting...",
                avdInfo_getName(avd));
         return 1;
@@ -1913,9 +1914,9 @@ extern "C" int main(int argc, char** argv) {
         /* The AVD is already in use, we still support this as an
          * experimental feature. Use a temporary hardware-qemu.ini
          * file though to avoid overwriting the existing one. */
-        derror("Running multiple emulators with the same AVD ");
-        derror("is an experimental feature.");
-        derror("Please use -read-only flag to enable this feature.");
+        android_panic("Running multiple emulators with the same AVD "
+            "is an experimental feature."
+            "Please use -read-only flag to enable this feature.");
         return 1;
     }
 
@@ -2224,7 +2225,7 @@ extern "C" int main(int argc, char** argv) {
         char charmap_name[SKIN_CHARMAP_NAME_SIZE];
 
         if (!path_exists(opts->charmap)) {
-            derror("Charmap file does not exist: %s", opts->charmap);
+            android_panic("Charmap file does not exist: %s", opts->charmap);
             return 1;
         }
         /* We need to store the charmap name in the hardware
@@ -2511,10 +2512,11 @@ extern "C" int main(int argc, char** argv) {
                 double available = (double)availableSpace / (1024.0 * 1024.0);
 
                 if (needed > available) {
-                    derror("Not enough space to create userdata partition. "
-                           "Available: %f MB at %s, "
-                           "need %f MB.",
-                           available, dataPartitionPathAsDir->c_str(), needed);
+                    android_panic(
+                            "Not enough space to create userdata partition. "
+                            "Available: %.2f MB at %s, "
+                            "need %.2f MB.",
+                            available, dataPartitionPathAsDir->c_str(), needed);
                     return 1;
                 }
             } else {
@@ -2529,7 +2531,7 @@ extern "C" int main(int argc, char** argv) {
             if (!strncmp("pixel_fold", hw->hw_device_name, 10) ||
                 !strncmp("resizable", hw->hw_device_name, 9)) {
                 if (!feature_is_enabled(kFeature_SupportPixelFold)) {
-                    derror("Device %s requires foldable feature, but the "
+                    android_panic("Device %s requires foldable feature, but the "
                            "system image does not support. Quit.",
                            hw->hw_device_name);
                     return 1;
@@ -2593,7 +2595,7 @@ extern "C" int main(int argc, char** argv) {
     if (fc::isEnabled(fc::EncryptUserData)) {
         if (hw->disk_encryptionKeyPartition_path == NULL) {
             if (!createInitalEncryptionKeyPartition(hw)) {
-                derror("Encryption is requested but failed to create "
+                android_panic("Encryption is requested but failed to create "
                        "encrypt "
                        "partition.");
                 return 1;
@@ -2625,7 +2627,7 @@ extern "C" int main(int argc, char** argv) {
                                                hw->disk_cachePartition_size,
                                                "cache");
         if (ret < 0) {
-            derror("Could not create %s: %s", hw->disk_cachePartition_path,
+            android_panic("Could not create %s: %s", hw->disk_cachePartition_path,
                    strerror(-ret));
             return 1;
         }
@@ -2675,9 +2677,8 @@ extern "C" int main(int argc, char** argv) {
 
     if (accel_mode == ACCEL_ON) {  // 'accel on' is specified'
         if (!accel_ok) {
-            derror("CPU acceleration is not supported on this "
-                   "machine!");
-            derror("Reason: %s", accel_status);
+            android_panic("CPU acceleration is not supported on this "
+                   "machine! Reason: %s", accel_status);
             AFREE(accel_status);
             return 1;
         }
@@ -2843,7 +2844,7 @@ extern "C" int main(int argc, char** argv) {
                 args.add2("-initrd", hw->disk_ramdisk_path);
             }
         } else {
-            derror("disk_ramdisk_path is required but missing");
+            android_panic("disk_ramdisk_path is required but missing");
             return 1;
         }
 
@@ -2866,12 +2867,12 @@ extern "C" int main(int argc, char** argv) {
 
                 exitStatus = createDtbFile(params, dtbFileName);
                 if (exitStatus) {
-                    derror("Could not create a DTB file (%s)",
+                    android_panic("Could not create a DTB file (%s)",
                            dtbFileName.c_str());
                     return exitStatus;
                 }
             } else {
-                derror("No vendor path found");
+                android_panic("No vendor path found");
                 return 1;
             }
         }
@@ -3466,7 +3467,7 @@ extern "C" int main(int argc, char** argv) {
                     hw->disk_ramdisk_path, bootconfigInitrdPath.c_str(),
                     userspaceBootOpts);
             if (r) {
-                derror("%s:%d Could not prepare the ramdisk with bootconfig, "
+                android_panic("%s:%d Could not prepare the ramdisk with bootconfig, "
                        "error=%d src=%s dst=%s",
                        __func__, __LINE__, r, hw->disk_ramdisk_path,
                        bootconfigInitrdPath.c_str());
