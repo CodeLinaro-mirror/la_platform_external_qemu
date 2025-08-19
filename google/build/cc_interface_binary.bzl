@@ -5,6 +5,7 @@ load("@rules_cc//cc:cc_import.bzl", "cc_import")
 
 def cc_interface_binary(
         name,
+        win_def_file = None,
         data = None,
         tags = None,
         visibility = None,
@@ -50,38 +51,45 @@ def cc_interface_binary(
 
     Other targets can link against the interface library `my_binary.if`, and can be loaded by `my_binary`
     """
-    dll_name = "_%s_dll" % name
-    interface_filegroup_name = "_%s.if" % name
-    interface_import_name = "%s.if" % name
 
-    local_linkopts = linkopts or []
-    local_linkopts = local_linkopts + select({
-        "@platforms//os:windows": [
-        ],
-        "@platforms//os:macos": [
-            "-framework Cocoa",
-            "-framework CoreVideo",
-            "-framework CoreAudio",
-            "-framework vmnet",
-        ],
-        "//conditions:default": [],
-    })
-
-    local_data = data or []
     cc_binary(
-        name = name + "_std",
+        name = name,
         tags = tags,
         visibility = visibility,
-        linkopts = local_linkopts,
-        data = local_data,
+        linkopts = (linkopts or []) + select({
+            # win_def_file is ignored if linkshared=False so we have to pass the linkopts manually.
+            "@platforms//os:windows": ["/DEF:$(location " + win_def_file + ")"] if win_def_file else [],
+            "@platforms//os:macos": [
+                #"-framework Cocoa",
+                #"-framework CoreVideo",
+                #"-framework CoreAudio",
+                #"-framework vmnet",
+            ],
+            "//conditions:default": [],
+        }),
+        data = (data or []) + ([win_def_file] if win_def_file else []),
         **kwargs
     )
 
-    # Intentionally omits data so that the main binary target can data-depend on
-    # a shared library dynamically linked against it without creating a cyclic
-    # dependency.
+    # Sign the binary on darwin.
+    native.genrule(
+        name = name + "_signed",
+        srcs = [name, mac_entitlements],
+        outs = [name + ".signed"],
+        executable = True,
+        exec_compatible_with = ["@platforms//os:macos"],
+        target_compatible_with = ["@platforms//os:macos"],
+        cmd = "cp -L $(location {name}) \"$@\" && /usr/bin/codesign -s - --entitlements $(location {entitlements}) \"$@\"".format(name = name, entitlements = mac_entitlements),
+        visibility = visibility,
+    )
+
+    # This DLL rule only exists because the EXE rule above doesn't export the interface_library group needed
+    # by cc_import. See github.com/bazelbuild/bazel/issues/15107
+    # It will never be used directly.
+    dll_name = "_" + name + "_dll"
     cc_binary(
         name = dll_name,
+        win_def_file = win_def_file,
         linkshared = True,
         tags = ["manual"],
         visibility = ["//visibility:private"],
@@ -89,37 +97,20 @@ def cc_interface_binary(
         **kwargs
     )
 
-    # Sign the binary on darwin.
-    native.genrule(
-        name = name + "_signed",
-        srcs = [name + "_std", mac_entitlements],
-        outs = [name + ".signed"],
-        executable = True,
-        exec_compatible_with = ["@platforms//os:macos"],
-        target_compatible_with = ["@platforms//os:macos"],
-        cmd = "cp -L $(location {name}_std) \"$@\" && /usr/bin/codesign -s - --entitlements $(location {entitlements}) \"$@\"".format(name = name, entitlements = mac_entitlements),
-    )
-
+    if_group_name = "_" + name + ".if"
     native.filegroup(
-        name = interface_filegroup_name,
-        srcs = [":" + dll_name],
+        name = if_group_name,
+        srcs = [dll_name],
         output_group = "interface_library",
         tags = ["manual"],
         visibility = ["//visibility:private"],
     )
+
+    if_name = name + ".if"
     cc_import(
-        name = interface_import_name,
-        interface_library = ":" + interface_filegroup_name,
+        name = if_name,
+        interface_library = if_group_name,
         system_provided = True,
         tags = ["manual"],
-        visibility = visibility,
-    )
-
-    native.alias(
-        name = name,
-        actual = select({
-            "@platforms//os:macos": ":" + name + "_signed",
-            "//conditions:default": ":" + name + "_std",
-        }),
         visibility = visibility,
     )
