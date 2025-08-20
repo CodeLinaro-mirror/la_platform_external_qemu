@@ -62,14 +62,7 @@ class WindowsToWindowsGenerator(ToolchainGenerator):
             / "bin"
         )
         self.compat_path = (
-            (
-                self.aosp
-                / "hardware"
-                / "google"
-                / "aemu"
-                / "windows"
-                / "includes"
-            )
+            (self.aosp / "hardware" / "google" / "aemu" / "windows" / "includes")
             .absolute()
             .as_posix()
         )

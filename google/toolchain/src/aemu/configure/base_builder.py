@@ -40,7 +40,16 @@ class QemuBuilder:
 
     TOOLCHAIN_DIR = "toolchain"
 
-    def __init__(self, aosp, dest, toolchain_dir, ccache, generator, bazel_startup_options, bazel_build_options) -> None:
+    def __init__(
+        self,
+        aosp,
+        dest,
+        toolchain_dir,
+        ccache,
+        generator,
+        bazel_startup_options,
+        bazel_build_options,
+    ) -> None:
         """Initialize the QemuBuilder instance.
 
         Args:
@@ -51,7 +60,9 @@ class QemuBuilder:
         self.dest: Path = Path(dest).absolute()
         self.toolchain: Path = Path(toolchain_dir).absolute()
         self.dest.mkdir(parents=True, exist_ok=True)
-        self.bazel: Bazel = Bazel(self.aosp, self.dest, bazel_startup_options, bazel_build_options)
+        self.bazel: Bazel = Bazel(
+            self.aosp, self.dest, bazel_startup_options, bazel_build_options
+        )
         self.cmake: CMake = CMake(self.aosp, self.toolchain, self.dest)
         CMakeLib.builder = self.cmake
         BazelLib.builder = self.bazel
@@ -94,9 +105,7 @@ class QemuBuilder:
             [self.toolchain / "meson"]
             + ["setup", self.dest]
             + [f"{k}={v}" if v else k for k, v in self.meson_config().items()]
-            + [f"-Dprefix={prefix}",
-               "--native-file",
-               self.toolchain / "aosp-cl.ini"]
+            + [f"-Dprefix={prefix}", "--native-file", self.toolchain / "aosp-cl.ini"]
             + meson_flags,
             cwd=self.aosp / "third_party" / "qemu",
             toolchain_path=self.toolchain,
@@ -116,10 +125,10 @@ class QemuBuilder:
         """
         # First we turn everything off.
         # TODO
-        #option('trace_backends', type: 'array', value: ['log'],
-        #option('x86_version', type : 'combo', choices : ['0', '1', '2', '3', '4'], value: '1',
-        #option('coroutine_backend', type: 'combo', - auto
-        #option('malloc', type : 'combo', choices : ['system', 'tcmalloc', 'jemalloc'],
+        # option('trace_backends', type: 'array', value: ['log'],
+        # option('x86_version', type : 'combo', choices : ['0', '1', '2', '3', '4'], value: '1',
+        # option('coroutine_backend', type: 'combo', - auto
+        # option('malloc', type : 'combo', choices : ['system', 'tcmalloc', 'jemalloc'],
         features = {
             "-Daf_xdp": "disabled",
             "-Dalsa": "disabled",
@@ -283,7 +292,7 @@ class QemuBuilder:
             "-Dxen_pci_passthrough": "disabled",
             "-Dxkbcommon": "disabled",
             "-Dzstd": "disabled",
-            }
+        }
 
         # Now we enabled the features than are on for all AEMU platforms.
         features["-Dandroid"] = "enabled"

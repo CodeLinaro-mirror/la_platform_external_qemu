@@ -41,14 +41,22 @@ class TrustyBuilder(LinuxBuilder):
         # Next we have our dependencies.
         return [
             BazelLib("@dtc//:libfdt", "1.6.0", {}),
-            BazelLib("@glib//:gmodule-static", "2.77.2", {}),
             BazelLib(
-                "@glib//:glib-static",
+                "@glib//gmodule",
+                "2.77.2",
+                {
+                    "name": "gmodule-export-2.0",
+                    "link_flags": "-pthread",
+                    "Requires": "pcre2",
+                },
+            ),
+            BazelLib(
+                "@glib//glib",
                 "2.77.2",
                 {
                     "name": "glib-2.0",
+                    "Requires": "pcre2, gmodule-export-2.0",
                     "link_flags": "-pthread",
-                    "Requires": "pcre2, gmodule-static",
                 },
             ),
             BazelLib("@zlib//:zlib", "1.2.10", {}),

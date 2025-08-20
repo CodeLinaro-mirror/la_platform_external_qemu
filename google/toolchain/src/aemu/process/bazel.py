@@ -22,7 +22,13 @@ from aemu.process.runner import check_output, run
 
 
 class Bazel:
-    def __init__(self, aosp: Path, dist: Path, startup_options: list[str] = [], build_options: list[str] = []):
+    def __init__(
+        self,
+        aosp: Path,
+        dist: Path,
+        startup_options: list[str] = [],
+        build_options: list[str] = [],
+    ):
         self.aosp = aosp.absolute()
         self.log_dir = dist.absolute() / "bazel-logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -51,18 +57,25 @@ class Bazel:
         Returns:
             List of targets that were build.
         """
-        label = bazel_target[bazel_target.index(":") + 1 :]
+        if ":" in bazel_target:
+            label = bazel_target[bazel_target.rfind(":") + 1 :]
+        else:
+            label = bazel_target[bazel_target.rfind("/") + 1 :]
         bazel_explain_file = (self.log_dir / f"explain-{label}.txt").absolute()
 
         build_options = self.build_options + [
-                f"--explain={bazel_explain_file}",
-                "--verbose_explanations",
-                ]
+            f"--explain={bazel_explain_file}",
+            "--verbose_explanations",
+        ]
         if build_for_includes:
             build_options.append("--output_groups=compilation_prerequisites_INTERNAL_")
 
         output = run(
-            [self.exe] + self.startup_options + ["build"] + build_options + [bazel_target],
+            [self.exe]
+            + self.startup_options
+            + ["build"]
+            + build_options
+            + [bazel_target],
             cwd=self.aosp,
         )
         return [x for x in output if x.startswith("bazel")]
@@ -106,12 +119,16 @@ class Bazel:
         query_script = self.aosp / "build" / "bazel" / "utils" / "cmake.cquery.bzl"
 
         build_options = self.build_options + [
-                f"--starlark:file={query_script}",
-                "--output=starlark",
-                ]
+            f"--starlark:file={query_script}",
+            "--output=starlark",
+        ]
 
         starlark = check_output(
-            [self.exe] + self.startup_options + ["cquery"] + build_options + [bazel_target],
+            [self.exe]
+            + self.startup_options
+            + ["cquery"]
+            + build_options
+            + [bazel_target],
             cwd=self.aosp,
         )
         normalized = self._replace_labels(starlark)
@@ -144,5 +161,8 @@ class Bazel:
         # committed-heap-size: 209MB
         # execution_root: /private/var/tmp/_bazel_me/66e1d3546ce0030819ddb695de13f5d3/execroot/_main
         # gc-count: 121
-        info = check_output(cmd=[self.exe] + self.startup_options + ["info"] + self.build_options, cwd=self.aosp).splitlines()
+        info = check_output(
+            cmd=[self.exe] + self.startup_options + ["info"] + self.build_options,
+            cwd=self.aosp,
+        ).splitlines()
         return dict(line.strip().split(": ") for line in info)
