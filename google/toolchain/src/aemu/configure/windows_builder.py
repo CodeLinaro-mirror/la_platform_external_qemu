@@ -30,7 +30,6 @@ class WindowsBuilder(QemuBuilder):
 
         return features
 
-
     def packages(self):
         return [
             BazelLib(
@@ -43,7 +42,7 @@ class WindowsBuilder(QemuBuilder):
             ),
             BazelLib("@dtc//:libfdt", "1.6.0", {}),
             BazelLib(
-                "@glib//:gmodule-static",
+                "@glib//gmodule",
                 "2.77.2",
                 {
                     "name": "gmodule-export-2.0",
@@ -51,11 +50,11 @@ class WindowsBuilder(QemuBuilder):
                     "Requires": "pcre2",
                 },
             ),
-            BazelLib("@glib//:gnulib", "2.77.2", {}),
-            BazelLib("@glib//:dirent", "2.77.2", {}),
+            BazelLib("@glib//glib:gnulib", "2.77.2", {}),
+            BazelLib("@glib//glib/dirent", "2.77.2", {"name": "dirent"}),
             BazelLib("@zlib//:zlib", "1.2.10", {}),
             BazelLib(
-                "@glib//:glib-static",
+                "@glib//glib",
                 "2.77.2",
                 {
                     "name": "glib-2.0",

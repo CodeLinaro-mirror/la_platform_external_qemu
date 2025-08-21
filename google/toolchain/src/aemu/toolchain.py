@@ -92,7 +92,14 @@ def get_toolchain_generator(
 
 
 def get_builder(
-        target: str, dest: Path, toolchain_dir: Path, prefix: str, aosp: Path, ccache: Path, bazel_startup_options: List[str], bazel_build_options: List[str]
+    target: str,
+    dest: Path,
+    toolchain_dir: Path,
+    prefix: str,
+    aosp: Path,
+    ccache: Path,
+    bazel_startup_options: List[str],
+    bazel_build_options: List[str],
 ) -> QemuBuilder:
     builder_map = {
         "windows-x64": WindowsBuilder,
@@ -105,14 +112,22 @@ def get_builder(
 
     # Get the class that is capable of configuring the toolchain
     # from the current host targeting our target.
-    toolchain = get_toolchain_generator(target, dest, toolchain_dir, prefix, aosp, ccache)
+    toolchain = get_toolchain_generator(
+        target, dest, toolchain_dir, prefix, aosp, ccache
+    )
 
     if target not in builder_map:
         logging.info("Mapping %s -> %s", target, TARGET_ALIAS[target])
         target = TARGET_ALIAS[target]
 
     return builder_map[target](
-        Path(aosp), Path(dest), Path(toolchain_dir), ccache, toolchain, bazel_startup_options, bazel_build_options
+        Path(aosp),
+        Path(dest),
+        Path(toolchain_dir),
+        ccache,
+        toolchain,
+        bazel_startup_options,
+        bazel_build_options,
     )
 
 
@@ -167,7 +182,12 @@ def toolchain_command(args):
         args.aosp,
         args.ccache,
     )
-    toolchain.bazel = Bazel(args.aosp.absolute(), toolchain_dir, _split_list(args.bazel_startup_options), _split_list(args.bazel_build_options))
+    toolchain.bazel = Bazel(
+        args.aosp.absolute(),
+        toolchain_dir,
+        _split_list(args.bazel_startup_options),
+        _split_list(args.bazel_build_options),
+    )
 
     toolchain.gen_toolchain()
 
@@ -230,7 +250,7 @@ def release_command(args):
 
 def _read_jsonc(path):
     jsonc = path.read_text()
-    noc = '\n'.join(l for l in jsonc.split('\n') if not l.lstrip(' ').startswith('//'))
+    noc = "\n".join(l for l in jsonc.split("\n") if not l.lstrip(" ").startswith("//"))
     return json.loads(noc)
 
 
@@ -242,7 +262,9 @@ def _create_shim(aosp_path, build_path):
     out["bazel_prefix"] = common.get("bazel_prefix", "") + plat.get("bazel_prefix", "")
     out["shims"] = common.get("shims", []) + plat.get("shims", [])
     # platform external_deps entries can override common ones.
-    out["external_deps"] = common.get("external_deps", {}) | plat.get("external_deps", {})
+    out["external_deps"] = common.get("external_deps", {}) | plat.get(
+        "external_deps", {}
+    )
     out["export"] = common.get("export", []) + plat.get("export", [])
     out["exclude"] = common.get("exclude", []) + plat.get("exclude", [])
 

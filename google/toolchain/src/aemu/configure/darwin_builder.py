@@ -48,7 +48,7 @@ class DarwinBuilder(QemuBuilder):
             ),
             BazelLib("@dtc//:libfdt", "1.6.0", {}),
             BazelLib(
-                "@glib//:gmodule-static",
+                "@glib//gmodule",
                 "2.77.2",
                 {
                     "name": "gmodule-export-2.0",
@@ -56,20 +56,13 @@ class DarwinBuilder(QemuBuilder):
                     "Requires": "pcre2",
                 },
             ),
-            BazelLib(
-                "@glib//:glib-darwin",
-                "2.77.2",
-                {
-                    "link_flags": "-lobjc -framework Foundation",
-                },
-            ),
             BazelLib("@zlib//:zlib", "1.2.10", {}),
             BazelLib(
-                "@glib//:glib-static",
+                "@glib//glib",
                 "2.77.2",
                 {
                     "name": "glib-2.0",
-                    "Requires": "pcre2, gmodule-export-2.0, glib-darwin",
+                    "Requires": "pcre2, gmodule-export-2.0",
                     "link_flags": "-liconv",
                 },
             ),

@@ -26,7 +26,13 @@ class LinuxToLinuxGenerator(ToolchainGenerator):
         version_path = (self.clang() / "lib" / "clang" / self.cc_version()).absolute()
 
         compat_isystem_path = (
-            self.aosp / "third_party" / "qemu" / "google" / "compat" / "linux" / "include"
+            self.aosp
+            / "third_party"
+            / "qemu"
+            / "google"
+            / "compat"
+            / "linux"
+            / "include"
         ).absolute()
 
         self.linux_sys_root = (

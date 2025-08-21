@@ -66,8 +66,8 @@
   "external_deps": {
     // Override to include gmodule-static - is this needed?
     "glib-2.0": [
-      "@glib//:glib-static",
-      "@glib//:gmodule-static"
+      "@glib//glib",
+      "@glib//gmodule"
     ]
   },
   "export": ["qemu-system-x86_64"],

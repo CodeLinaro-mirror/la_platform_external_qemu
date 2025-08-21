@@ -63,7 +63,7 @@ class LinuxBuilder(QemuBuilder):
             ),
             BazelLib("@dtc//:libfdt", "1.6.0", {}),
             BazelLib(
-                "@glib//:gmodule-static",
+                "@glib//gmodule",
                 "2.77.2",
                 {
                     "name": "gmodule-export-2.0",
@@ -73,7 +73,7 @@ class LinuxBuilder(QemuBuilder):
             ),
             BazelLib("@zlib//:zlib", "1.2.10", {}),
             BazelLib(
-                "@glib//:glib-static",
+                "@glib//glib",
                 "2.77.2",
                 {
                     "name": "glib-2.0",

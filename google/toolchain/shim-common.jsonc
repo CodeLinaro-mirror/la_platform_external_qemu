@@ -83,10 +83,10 @@
   // you will need to provide a bazel target
   "external_deps": {
     "glib-2.0": [
-      "@glib//:glib-static"
+      "@glib//glib"
     ],
     "gmodule-export-2.0": [
-      "@glib//:gmodule-static"
+      "@glib//gmodule"
     ],
     "zlib": [
       "@zlib//:zlib"
