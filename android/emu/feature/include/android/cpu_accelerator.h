@@ -83,6 +83,8 @@ AndroidCpuAcceleration androidCpuAcceleration_getStatus(char** status);
 typedef enum {
     ANDROID_CPU_ACCELERATOR_NONE = 0,
     ANDROID_CPU_ACCELERATOR_KVM,
+    // Deprecated: HAXM is reserved only for metrics compatibility
+    ANDROID_CPU_ACCELERATOR_HAX,
     ANDROID_CPU_ACCELERATOR_HVF,
     ANDROID_CPU_ACCELERATOR_WHPX,
     ANDROID_CPU_ACCELERATOR_AEHD,

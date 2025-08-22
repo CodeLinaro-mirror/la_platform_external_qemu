@@ -36,6 +36,8 @@ namespace android {
 enum CpuAccelerator {
     CPU_ACCELERATOR_NONE = 0,
     CPU_ACCELERATOR_KVM,
+    // Deprecated: HAXM is reserved only for metrics compatibility
+    CPU_ACCELERATOR_HAX,
     CPU_ACCELERATOR_HVF,
     CPU_ACCELERATOR_WHPX,
     CPU_ACCELERATOR_AEHD,
