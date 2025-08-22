@@ -17,6 +17,7 @@
 #include "android/multitouch-screen.h"
 #include "android/skin/event.h"
 
+#include "host-common/hw-config.h"
 #include "qemu/osdep.h"
 
 #include "hw/virtio/virtio.h"
@@ -47,7 +48,22 @@
     OBJECT_CHECK(VirtIOInputMultiTouchPCI##num, (obj), \
                  TYPE_VIRTIO_INPUT_MULTI_TOUCH_PCI(num))
 
+#define TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD \
+    "virtio_input_multi_touch_touchpad_0"
+
+#define VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD(obj)         \
+    OBJECT_CHECK(VirtIOInputMultiTouchTouchpad, (obj), \
+                 TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD)
+
+#define TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD_PCI \
+    "virtio_input_multi_touch_touchpad_pci_0"
+
+#define VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD_PCI(obj)        \
+    OBJECT_CHECK(VirtIOInputMultiTouchTouchpadPCI, (obj), \
+                 TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD_PCI)
+
 static VirtIOInput* s_virtio_input_multi_touch[VIRTIO_INPUT_MAX_NUM];
+static VirtIOInput* s_virtio_input_multi_touch_touchpad;
 
 static void translate_mouse_event(int x,
                                   int y,
@@ -98,40 +114,42 @@ void android_virtio_touch_event(const SkinEvent* const data,
     multitouch_update_displayId(0);
 }
 
-#define VIRTIO_INPUT_MT_STRUCT(id) \
-typedef struct VirtIOInputMultiTouch##id { \
-    VirtIOInput parent_obj; \
-} VirtIOInputMultiTouch##id;
+#define VIRTIO_INPUT_MT_STRUCT(name, id)         \
+typedef struct VirtIOInputMultiTouch##name##id { \
+    VirtIOInput parent_obj;                      \
+} VirtIOInputMultiTouch##name##id;
 
-VIRTIO_INPUT_MT_STRUCT(1)
-VIRTIO_INPUT_MT_STRUCT(2)
-VIRTIO_INPUT_MT_STRUCT(3)
-VIRTIO_INPUT_MT_STRUCT(4)
-VIRTIO_INPUT_MT_STRUCT(5)
-VIRTIO_INPUT_MT_STRUCT(6)
-VIRTIO_INPUT_MT_STRUCT(7)
-VIRTIO_INPUT_MT_STRUCT(8)
-VIRTIO_INPUT_MT_STRUCT(9)
-VIRTIO_INPUT_MT_STRUCT(10)
-VIRTIO_INPUT_MT_STRUCT(11)
+VIRTIO_INPUT_MT_STRUCT(, 1)
+VIRTIO_INPUT_MT_STRUCT(, 2)
+VIRTIO_INPUT_MT_STRUCT(, 3)
+VIRTIO_INPUT_MT_STRUCT(, 4)
+VIRTIO_INPUT_MT_STRUCT(, 5)
+VIRTIO_INPUT_MT_STRUCT(, 6)
+VIRTIO_INPUT_MT_STRUCT(, 7)
+VIRTIO_INPUT_MT_STRUCT(, 8)
+VIRTIO_INPUT_MT_STRUCT(, 9)
+VIRTIO_INPUT_MT_STRUCT(, 10)
+VIRTIO_INPUT_MT_STRUCT(, 11)
+VIRTIO_INPUT_MT_STRUCT(Touchpad, )
 
-#define VIRTIO_INPUT_MT_PCI_STRUCT(id) \
-typedef struct VirtIOInputMultiTouchPCI##id { \
-    VirtIOPCIProxy parent_obj; \
-    VirtIOInputMultiTouch##id vdev; \
-} VirtIOInputMultiTouchPCI##id;
+#define VIRTIO_INPUT_MT_PCI_STRUCT(name, id)          \
+typedef struct VirtIOInputMultiTouch##name##PCI##id { \
+    VirtIOPCIProxy parent_obj;                        \
+    VirtIOInputMultiTouch##name##id vdev;             \
+} VirtIOInputMultiTouch##name##PCI##id;
 
-VIRTIO_INPUT_MT_PCI_STRUCT(1)
-VIRTIO_INPUT_MT_PCI_STRUCT(2)
-VIRTIO_INPUT_MT_PCI_STRUCT(3)
-VIRTIO_INPUT_MT_PCI_STRUCT(4)
-VIRTIO_INPUT_MT_PCI_STRUCT(5)
-VIRTIO_INPUT_MT_PCI_STRUCT(6)
-VIRTIO_INPUT_MT_PCI_STRUCT(7)
-VIRTIO_INPUT_MT_PCI_STRUCT(8)
-VIRTIO_INPUT_MT_PCI_STRUCT(9)
-VIRTIO_INPUT_MT_PCI_STRUCT(10)
-VIRTIO_INPUT_MT_PCI_STRUCT(11)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 1)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 2)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 3)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 4)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 5)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 6)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 7)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 8)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 9)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 10)
+VIRTIO_INPUT_MT_PCI_STRUCT(, 11)
+VIRTIO_INPUT_MT_PCI_STRUCT(Touchpad, )
 
 // Vendor and product values must be 0 to
 // indicate an internal device and prevent a
@@ -165,6 +183,26 @@ VIRTIO_INPUT_MT_CONFIG(8)
 VIRTIO_INPUT_MT_CONFIG(9)
 VIRTIO_INPUT_MT_CONFIG(10)
 VIRTIO_INPUT_MT_CONFIG(11)
+
+static struct virtio_input_config virtio_input_multi_touch_touchpad_config[] = {
+        {
+            .select = VIRTIO_INPUT_CFG_ID_NAME,
+            .size = sizeof(TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD),
+            .u.string = TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD,
+        },
+        {
+            .select = VIRTIO_INPUT_CFG_ID_DEVIDS,
+            .size = sizeof(struct virtio_input_devids),
+            .u.ids =
+                {
+                        .bustype = const_le16(BUS_VIRTUAL),
+                        .vendor = const_le16(0),
+                        .product = const_le16(0),
+                        .version = const_le16(0),
+                }
+            },
+        {/* end of list */},
+};
 
 static struct virtio_input_config multi_touch_config[] = {
         {
@@ -255,6 +293,25 @@ static struct virtio_input_config multi_touch_config[] = {
         {/* end of list */},
 };
 
+static void adjust_multi_touch_config_xy_bounds(int x_max, int y_max) {
+    int i = 0;
+    while (multi_touch_config[i].select) {
+        switch (multi_touch_config[i].subsel) {
+            case ABS_X:
+            case ABS_MT_POSITION_X:
+                multi_touch_config[i].u.abs.max = cpu_to_le32(x_max);
+                break;
+            case ABS_Y:
+            case ABS_MT_POSITION_Y:
+                multi_touch_config[i].u.abs.max = cpu_to_le32(y_max);
+                break;
+            default:
+                break;
+        }
+        i++;
+    }
+}
+
 static const unsigned short ev_key_codes[] = {
     BTN_TOOL_RUBBER,
     BTN_STYLUS
@@ -314,6 +371,26 @@ static void configure_multi_touch_ev(VirtIOInput* vinput) {
     }
 }
 
+static void configure_multi_touch_touchpad_ev(VirtIOInput* vinput) {
+    // Configure EV_KEY
+    virtio_multi_touch_ev_config(vinput, ev_key_codes, ARRAY_SIZE(ev_key_codes),
+                                 EV_KEY);
+    // Configure EV_ABS
+    virtio_multi_touch_ev_config(vinput, ev_abs_codes, ARRAY_SIZE(ev_abs_codes),
+                                 EV_ABS);
+
+    adjust_multi_touch_config_xy_bounds(
+            getConsoleAgents()->settings->hw()->hw_touchpad0_width,
+            getConsoleAgents()->settings->hw()->hw_touchpad0_height);
+    int i = 0;
+    while (multi_touch_config[i].select) {
+        virtio_input_add_config(vinput, multi_touch_config + i);
+        i++;
+    }
+    adjust_multi_touch_config_xy_bounds(INPUT_EVENT_ABS_MAX,
+                                        INPUT_EVENT_ABS_MAX);
+}
+
 #define VIRTIO_INPUT_MT_INSTANCE_INIT(id) \
 static void virtio_input_multi_touch_init##id(Object* obj) { \
     VirtIOInput* vinput = VIRTIO_INPUT(obj); \
@@ -333,6 +410,13 @@ VIRTIO_INPUT_MT_INSTANCE_INIT(8)
 VIRTIO_INPUT_MT_INSTANCE_INIT(9)
 VIRTIO_INPUT_MT_INSTANCE_INIT(10)
 VIRTIO_INPUT_MT_INSTANCE_INIT(11)
+
+static void virtio_input_multi_touch_touchpad_init(Object* obj) {
+    VirtIOInput* vinput = VIRTIO_INPUT(obj);
+    s_virtio_input_multi_touch_touchpad = vinput;
+    virtio_input_init_config(vinput, virtio_input_multi_touch_touchpad_config);
+    configure_multi_touch_touchpad_ev(vinput);
+};
 
 #define VIRTIO_INPUT_MT_TYPE_INFO(id) \
     { \
@@ -359,6 +443,12 @@ VIRTIO_INPUT_MT_PCI_INSTANCE_INIT(8)
 VIRTIO_INPUT_MT_PCI_INSTANCE_INIT(9)
 VIRTIO_INPUT_MT_PCI_INSTANCE_INIT(10)
 VIRTIO_INPUT_MT_PCI_INSTANCE_INIT(11)
+static void virtio_input_multi_touch_touchpad_pci_init(Object* obj) {
+    VirtIOInputMultiTouchTouchpadPCI* dev =
+            VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD_PCI(obj);
+    virtio_instance_init_common(obj, &dev->vdev, sizeof(dev->vdev),
+                                TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD);
+}
 
 #define VIRTIO_INPUT_MT_PCI_TYPE_INFO(id) \
     { \
@@ -391,6 +481,18 @@ static const TypeInfo types[] = {
     VIRTIO_INPUT_MT_PCI_TYPE_INFO(9),
     VIRTIO_INPUT_MT_PCI_TYPE_INFO(10),
     VIRTIO_INPUT_MT_PCI_TYPE_INFO(11),
+    {
+        .name = TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD,
+        .parent = TYPE_VIRTIO_INPUT,
+        .instance_size = sizeof(VirtIOInputMultiTouchTouchpad),
+        .instance_init = virtio_input_multi_touch_touchpad_init,
+    },
+    {
+        .name = TYPE_VIRTIO_INPUT_MULTI_TOUCH_TOUCHPAD_PCI,
+        .parent = TYPE_VIRTIO_INPUT_PCI,
+        .instance_size = sizeof(VirtIOInputMultiTouchTouchpadPCI),
+        .instance_init = virtio_input_multi_touch_touchpad_pci_init,
+    }
 };
 
 DEFINE_TYPES(types)

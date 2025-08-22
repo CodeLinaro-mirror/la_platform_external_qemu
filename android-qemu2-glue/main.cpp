@@ -859,6 +859,11 @@ static void initialize_virtio_input_devs(android::ParameterList& args,
             args.add("-device");
             args.add("virtio-keyboard-pci");
         }
+
+        if (hw->hw_touchpad0) {
+            args.add("-device");
+            args.add("virtio_input_multi_touch_touchpad_pci_0");
+        }
     }
 }
 
