@@ -377,6 +377,8 @@ OPT_PARAM(systemui_renderer,
           "<option list>",
           "Set guest side renderer backend. Available options: skiagl, skiavk")
 
+OPT_FLAG(is_ost, "Determine if XR device is using OST behaviors")
+
 #undef CFG_FLAG
 #undef CFG_PARAM
 #undef OPT_FLAG
