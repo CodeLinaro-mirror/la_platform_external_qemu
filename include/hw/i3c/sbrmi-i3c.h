@@ -70,8 +70,12 @@ typedef enum {
 /* BIT definition for SBRMI_REG_CONTROL */
 #define SBRMI_BIT_ALERT_MASK (0)
 #define SBRMI_BIT_ALERT_MASK_LEN (1)
+#define SBRMI_BIT_SW_ALERT_MASK (4)
+#define SBRMI_BIT_SW_ALERT_MASK_LEN (1)
 #define SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE (5)
 #define SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE_LEN (1)
+#define SBRMI_BIT_HW_ALERT_MASK (7)
+#define SBRMI_BIT_HW_ALERT_MASK_LEN (1)
 
 /* BIT definition for SBRMI_REG_STATUS */
 #define SBRMI_BIT_SW_ALERT_STATUS (1)
@@ -250,6 +254,8 @@ struct SbrmiI3cTargetState {
         /* revision 0x21: 2-bytes command code. 0x20: 1-byte command code. */
         uint8_t sbrmi_rev;
     } cfg;
+
+    qemu_irq alert;
 };
 
 I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,

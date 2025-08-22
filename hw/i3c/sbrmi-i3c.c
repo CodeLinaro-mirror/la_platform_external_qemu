@@ -12,6 +12,7 @@
 #include "qemu/log.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/sbrmi-i3c.h"
+#include "hw/core/irq.h"
 #include "hw/core/qdev-properties.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
@@ -390,6 +391,40 @@ static void sbrmi_i3c_target_cpu_reg_reset(SbrmiI3cTargetState *s)
     memset(s->cpu_reg_read_data, 0, sizeof(s->cpu_reg_read_data));
 }
 
+static void sbrmi_i3c_update_alert(SbrmiI3cTargetState *s)
+{
+    if (extract8(s->sbrmi_control, SBRMI_BIT_ALERT_MASK,
+                 SBRMI_BIT_ALERT_MASK_LEN)) {
+        /* alert is disabled */
+        return;
+    }
+
+    /* sw alert signaling */
+    if (!extract8(s->sbrmi_control, SBRMI_BIT_SW_ALERT_MASK,
+                  SBRMI_BIT_SW_ALERT_MASK_LEN) &&
+         extract8(s->sbrmi_status, SBRMI_BIT_SW_ALERT_STATUS,
+                  SBRMI_BIT_SW_ALERT_STATUS_LEN)) {
+        qemu_irq_raise(s->alert);
+        return;
+    }
+
+    /* hw alert signaling */
+    if (!extract8(s->sbrmi_control, SBRMI_BIT_HW_ALERT_MASK,
+                  SBRMI_BIT_HW_ALERT_MASK_LEN) &&
+         extract8(s->sbrmi_status, SBRMI_BIT_HW_ALERT_STATUS,
+                  SBRMI_BIT_HW_ALERT_STATUS_LEN)) {
+        qemu_irq_raise(s->alert);
+        return;
+    }
+
+    /* mce alert signaling, not supported */
+
+    /* clear alert */
+    qemu_irq_lower(s->alert);
+
+    return;
+}
+
 static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
                                uint32_t num_to_read)
 {
@@ -595,6 +630,9 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
     }
 
     *num_sent = num_to_send;
+
+    sbrmi_i3c_update_alert(s);
+
     return 0;
 }
 
@@ -698,6 +736,7 @@ static void sbrmi_i3c_target_reset(I3CTarget *i3c)
                                  SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE,
                                  SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE_LEN, 1);
     sbrmi_i3c_target_mailbox_reset(s);
+    qemu_irq_lower(s->alert);
 }
 
 static void sbrmi_i3c_target_realize(DeviceState *dev, Error **errp)
@@ -774,6 +813,9 @@ static void sbrmi_i3c_target_init(Object *obj)
     object_property_add_uint32_ptr(obj, "ucode_rev",
                                     &s->cpu.ucode_rev,
                                     OBJ_PROP_FLAG_READWRITE);
+
+    /* alert */
+    qdev_init_gpio_out_named(DEVICE(obj), &s->alert, "alert_l", 0);
 }
 
 static const Property sbrmi_i3c_props[] = {
