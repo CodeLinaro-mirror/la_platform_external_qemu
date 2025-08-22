@@ -74,6 +74,8 @@
         <file alias="tablet_mode">images/light/tablet_mode.svg</file>
         <file alias="volume_down">images/light/ic_volume_down_678_48px.svg</file>
         <file alias="volume_up">images/light/ic_volume_up_678_48px.svg</file>
+        <file alias="mic_enabled">images/light/ic_mic_on.svg</file>
+        <file alias="mic_disabled">images/light/ic_mic_off.svg</file>
         <file alias="xr_input_eye_tacking">images/light/ic_xr_eye_tacking.svg</file>
         <file alias="xr_input_hand_raycast">images/light/ic_xr_hand_raycast.svg</file>
         <file alias="xr_input_mouse_keyboard_mode">images/light/ic_xr_mouse_keyboard_mode.svg</file>
@@ -281,6 +283,8 @@
         <file alias="tablet_mode">images/dark/tablet_mode_dark.svg</file>
         <file alias="volume_down">images/dark/ic_volume_down_48px.svg</file>
         <file alias="volume_up">images/dark/ic_volume_up_48px.svg</file>
+        <file alias="mic_enabled">images/dark/ic_mic_on.svg</file>
+        <file alias="mic_disabled">images/dark/ic_mic_off.svg</file>
         <file alias="xr_input_eye_tacking">images/dark/ic_xr_eye_tacking.svg</file>
         <file alias="xr_input_hand_raycast">images/dark/ic_xr_hand_raycast.svg</file>
         <file alias="xr_input_mouse_keyboard_mode">images/dark/ic_xr_mouse_keyboard_mode.svg</file>
