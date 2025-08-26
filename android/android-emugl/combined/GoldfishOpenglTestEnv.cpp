@@ -441,7 +441,7 @@ GoldfishOpenglTestEnv::GoldfishOpenglTestEnv() {
     android::featurecontrol::setEnabledOverride(
             android::featurecontrol::VulkanShaderFloat16Int8, true);
     android::featurecontrol::setEnabledOverride(
-            android::featurecontrol::GuestUsesAngle, false);
+            android::featurecontrol::GuestAngle, false);
     android::featurecontrol::setEnabledOverride(
             android::featurecontrol::VulkanQueueSubmitWithCommands, false);
     android::featurecontrol::setEnabledOverride(

@@ -324,7 +324,7 @@ int android_startOpenglesRenderer(
                      &gfxstream::host::FeatureSet::GlPipeChecksum},
                     {android::featurecontrol::GrallocSync,
                      &gfxstream::host::FeatureSet::GrallocSync},
-                    {android::featurecontrol::GuestUsesAngle,
+                    {android::featurecontrol::GuestAngle,
                      &gfxstream::host::FeatureSet::GuestVulkanOnly},
                     {android::featurecontrol::HasSharedSlotsHostMemoryAllocator,
                      &gfxstream::host::FeatureSet::
@@ -393,6 +393,19 @@ int android_startOpenglesRenderer(
          kAemuToGfxstreamFeatureMap) {
         (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled =
                 android::featurecontrol::isEnabled(aemuFeature);
+
+        // TODO(b/389646068): special handling of 'GuestVulkanOnly' as we still
+        // depend on flush-to-gl behavior on GL host composition (ie. when
+        // VulkanNativeSwapchain is NOT enabled). So this feature requires 2
+        // separate aemu features to be checked to enable.
+        if (gfxstreamFeaturePtr ==
+            &gfxstream::host::FeatureSet::GuestVulkanOnly) {
+            gfxstreamFeatures.GuestVulkanOnly.enabled =
+                    android::featurecontrol::isEnabled(
+                            android::featurecontrol::GuestAngle) &&
+                    android::featurecontrol::isEnabled(
+                            android::featurecontrol::VulkanNativeSwapchain);
+        }
 
         dprint("gfxstreamFeature:%s = %d",
                (gfxstreamFeatures.*gfxstreamFeaturePtr).name.c_str(),
