@@ -67,6 +67,7 @@ constexpr CommandInfo kCommands[] = {
         INIT_COMMAND(PAN_RIGHT, "Pan right (when in zoom mode)"),
         INIT_COMMAND(VOLUME_UP, "Volume up"),
         INIT_COMMAND(VOLUME_DOWN, "Volume down"),
+        INIT_COMMAND(TOGGLE_MICROPHONE, "Toggle Microphone"),
         INIT_COMMAND(POWER, "Power"),
         INIT_COMMAND(TABLET_MODE, "Tablet mode"),
         INIT_COMMAND(HOME, "Home"),

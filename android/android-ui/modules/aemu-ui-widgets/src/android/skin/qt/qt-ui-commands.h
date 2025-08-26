@@ -47,6 +47,7 @@ enum class QtUICommand {
     PAN_RIGHT,
     VOLUME_UP,
     VOLUME_DOWN,
+    TOGGLE_MICROPHONE,
     POWER,
     MENU,
     HOME,

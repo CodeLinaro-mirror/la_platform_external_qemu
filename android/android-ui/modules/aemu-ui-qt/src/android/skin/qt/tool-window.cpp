@@ -296,6 +296,10 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
        mToolsUi->all_apps_button->setHidden(true);
     }
 
+    if (!fc::isEnabled(fc::MicrophoneToggleUI)) {
+       mToolsUi->microphone_button->setHidden(true);
+    }
+
     if (avdFlavor != AVD_TV) {
         if (avdFlavor != AVD_XR) {
             default_shortcuts +=
@@ -901,6 +905,9 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             break;
         case QtUICommand::VOLUME_DOWN:
             forwardKeyToEmulator(LINUX_KEY_VOLUMEDOWN, down);
+            break;
+        case QtUICommand::TOGGLE_MICROPHONE:
+            // TODO(b/440383173): Handle microphone toggle button
             break;
         case QtUICommand::POWER:
             forwardKeyToEmulator(LINUX_KEY_POWER, down);
@@ -1819,6 +1826,11 @@ void ToolWindow::on_volume_down_button_pressed() {
 void ToolWindow::on_volume_down_button_released() {
     mEmulatorWindow->activateWindow();
     handleUICommand(QtUICommand::VOLUME_DOWN, false);
+}
+
+void ToolWindow::on_microphone_button_clicked() {
+    mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::TOGGLE_MICROPHONE, true);
 }
 
 void ToolWindow::on_overview_button_pressed() {
