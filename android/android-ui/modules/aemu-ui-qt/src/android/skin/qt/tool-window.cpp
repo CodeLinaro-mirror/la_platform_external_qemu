@@ -465,7 +465,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
             SLOT(on_new_resizable_requested(PresetEmulatorSizeType)));
     connect(mResizableDialog, SIGNAL(finished(int)), this,
             SLOT(on_dismiss_resizable_dialog()));
-    if (android_is_xr_mode()) {
+    if (android_is_xr_vst_headset_mode()) {
         connect(mXrEnvironmentModeDialog, SIGNAL(onXrEnvironmentModeRequested(int)),
                 this, SLOT(on_xr_environment_mode_changed(int)));
         connect(mXrEnvironmentModeDialog, SIGNAL(finished(int)),
@@ -538,7 +538,7 @@ void ToolWindow::updateFoldableButtonVisibility() {
 }
 
 void ToolWindow::updateXrButtonsVisibility() {
-    auto is_xr_mode = android_is_xr_mode();
+    auto is_xr_mode = android_is_xr_vst_headset_mode();
     for (const auto &[xrButtonType, xrButtonList] :
             mXrButtonTypeToPushButtonsMap) {
         for (const auto& xrButtonRef : xrButtonList) {
@@ -1043,7 +1043,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
 
             break;
         case QtUICommand::CHANGE_XR_INPUT_MODE:
-            if (android_is_xr_mode()) {
+            if (android_is_xr_vst_headset_mode()) {
                 if (down) {
                     float mode = static_cast<float>(mLastInputModeRequested);
                     LOG(DEBUG) << "Sending XR Input Mode: " << mode;
@@ -1062,7 +1062,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             }
             break;
         case QtUICommand::CHANGE_XR_ENVIRONMENT_MODE:
-            if (android_is_xr_mode()) {
+            if (android_is_xr_vst_headset_mode()) {
                 if (down) {
                     float mode = static_cast<float>(mLastEnvironmentModeRequested);
                     LOG(DEBUG) << "Sending XR Environment Mode " << mode;
@@ -1073,7 +1073,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             }
             break;
         case QtUICommand::XR_SCREEN_RECENTER:
-            if (android_is_xr_mode()) {
+            if (android_is_xr_vst_headset_mode()) {
                 if (down) {
                     float mode = 1;
                     LOG(DEBUG) << "Sending XR Screen Recenter";
@@ -1084,7 +1084,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             }
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_PAN:
-            if (android_is_xr_mode()) {
+            if (android_is_xr_vst_headset_mode()) {
                 if (down) {
                     float control = VIEWPORT_CONTROL_MODE_PAN;
                     LOG(DEBUG) << "Sending XR Viewport Mode: " << control;
@@ -1103,7 +1103,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             }
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_DOLLY:
-            if (android_is_xr_mode()) {
+            if (android_is_xr_vst_headset_mode()) {
                 if (down) {
                     float control = VIEWPORT_CONTROL_MODE_ZOOM;
                     LOG(DEBUG) << "Sending XR Viewport Mode: " << control;
@@ -1122,7 +1122,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             }
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_ROTATE:
-            if (android_is_xr_mode()) {
+            if (android_is_xr_vst_headset_mode()) {
                 if (down) {
                     float control = VIEWPORT_CONTROL_MODE_ROTATE;
                     LOG(DEBUG) << "Sending XR Viewport Mode: " << control;
@@ -1744,7 +1744,7 @@ void ToolWindow::on_xr_viewport_rotate_button_clicked() {
 // checked (activated). The parameter `currentMode` is the current selected
 // command.
 void ToolWindow::updateXrNavigationButtonsChecked(QtUICommand currentMode) {
-    if (!android_is_xr_mode()) {
+    if (!android_is_xr_vst_headset_mode()) {
         return;
     }
     for (const auto &[buttonType, buttonList] : mXrButtonTypeToPushButtonsMap) {
