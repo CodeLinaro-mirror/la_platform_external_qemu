@@ -2440,7 +2440,7 @@ static bool load_whp_dispatch_fns(HMODULE *handle,
 
     #define WHP_LOAD_LIB(lib_name, handle_lib) \
     if (!handle_lib) { \
-        handle_lib = LoadLibrary(lib_name); \
+        handle_lib = LoadLibraryA(lib_name); \
         if (!handle_lib) { \
             error_report("Could not load library %s.", lib_name); \
             goto error; \
