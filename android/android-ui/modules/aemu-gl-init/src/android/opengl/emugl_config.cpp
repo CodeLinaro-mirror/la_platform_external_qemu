@@ -750,7 +750,15 @@ bool emuglConfig_init(EmuglConfig* config,
         } else {
             gpu_enabled = true;
             if (!strcmp(gpu_option, "lavapipe")) {
-                gpu_mode = "swangle_indirect";
+                const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
+                bool use_swiftshader = (android::base::getEnvironmentVariable(EnvVarSelectGL) == "1");
+
+                const char* lavapipe_gl_mode = "swangle_indirect";
+                if (use_swiftshader) {
+                    lavapipe_gl_mode = "swiftshader_indirect";
+                    dinfo("'%s' envvar is set, using %s for GL", EnvVarSelectGL, lavapipe_gl_mode);
+                }
+                gpu_mode = lavapipe_gl_mode;
             } else {
                 gpu_mode = gpu_option;
             }
