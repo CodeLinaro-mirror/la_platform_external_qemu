@@ -215,6 +215,7 @@
         <file alias="toggle_off_disabled">images/light/toggle_off_disabled_light.png</file>
         <file alias="toggle_on">images/light/toggle_on_light.png</file>
         <file alias="toggle_on_disabled">images/light/toggle_on_disabled_light.png</file>
+        <file alias="touchpad">images/light/ic_trackpad_input_678_48dp.svg</file>
         <file alias="transit">images/light/ic_directions_transit_222_48dp.svg</file>
         <file alias="trash">images/light/ic_delete_777_48px.svg</file>
         <file alias="trip_origin">images/light/ic_trip_origin_24dp.svg</file>
@@ -419,6 +420,7 @@
         <file alias="toggle_off_disabled">images/dark/toggle_off_disabled_dark.png</file>
         <file alias="toggle_on">images/dark/toggle_on_dark.png</file>
         <file alias="toggle_on_disabled">images/dark/toggle_on_disabled_dark.png</file>
+        <file alias="touchpad">images/dark/ic_trackpad_input_677_48dp.svg</file>
         <file alias="transit">images/dark/ic_directions_transit_EEE_48dp.svg</file>
         <file alias="trash">images/dark/ic_delete_bcc_48px.svg</file>
         <file alias="trip_origin">images/dark/ic_trip_origin_white_24dp.svg</file>
@@ -599,6 +601,7 @@
         <file alias="toggle_off_disabled">images/studio-light/toggle_off_disabled_light.png</file>
         <file alias="toggle_on">images/studio-light/toggle_on_light.png</file>
         <file alias="toggle_on_disabled">images/studio-light/toggle_on_disabled_light.png</file>
+        <file alias="touchpad">images/studio-light/ic_trackpad_input_666_48dp.svg</file>
         <file alias="transit">images/studio-light/ic_directions_transit_666_48dp.svg</file>
         <file alias="trash">images/studio-light/ic_delete_666_48px.svg</file>
         <file alias="trip_origin">images/studio-light/ic_trip_origin_24dp.svg</file>
@@ -760,6 +763,7 @@
         <file alias="toggle_off_disabled">images/studio-dark/toggle_off_disabled_dark.png</file>
         <file alias="toggle_on">images/studio-dark/toggle_on_dark.png</file>
         <file alias="toggle_on_disabled">images/studio-dark/toggle_on_disabled_dark.png</file>
+        <file alias="touchpad">images/studio-dark/ic_trackpad_input_ABB_48dp.svg</file>
         <file alias="transit">images/studio-dark/ic_directions_transit_666_48dp.svg</file>
         <file alias="trash">images/studio-dark/ic_delete_ABB_48px.svg</file>
         <file alias="trip_origin">images/studio-dark/ic_trip_origin_white_24dp.svg</file>
@@ -920,6 +924,7 @@
         <file alias="toggle_off_disabled">images/studio-contrast/toggle_off_disabled_contrast.png</file>
         <file alias="toggle_on">images/studio-contrast/toggle_on_contrast.png</file>
         <file alias="toggle_on_disabled">images/studio-contrast/toggle_on_disabled_contrast.png</file>
+        <file alias="touchpad">images/studio-contrast/ic_trackpad_input_FFF_48dp.svg</file>
         <file alias="transit">images/studio-contrast/ic_directions_transit_FFF_48dp.svg</file>
         <file alias="trash">images/studio-contrast/ic_delete_FFF_48px.svg</file>
         <file alias="trip_origin">images/studio-contrast/ic_trip_origin_white_24dp.svg</file>

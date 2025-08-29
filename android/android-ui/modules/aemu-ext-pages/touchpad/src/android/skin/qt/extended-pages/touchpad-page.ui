@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TouchpadPage</class>
+ <widget class="QWidget" name="TouchpadPage">
+  <layout class="QGridLayout" name="gridLayout">
+   <property name="alignment">
+    <set>Qt::AlignHCenter</set>
+   </property>
+   <item row="0" column="0">
+    <spacer name="verticalSpacerTop">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Policy::Expanding</enum>
+     </property>
+    </spacer>
+   </item>
+   <item row="3" column="0">
+    <spacer name="verticalSpacerBottom">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Policy::Expanding</enum>
+     </property>
+    </spacer>
+   </item>
+   <item row="1" column="0">
+    <spacer name="horizontalSpacerLeft">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Policy::Expanding</enum>
+     </property>
+    </spacer>
+   </item>
+   <item row="1" column="4">
+    <spacer name="horizontalSpacerRight">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Policy::Expanding</enum>
+     </property>
+    </spacer>
+   </item>
+   <item row="1" column="1" colspan="3">
+    <widget class="TouchpadWidget" name="touchpadBox"/>
+   </item>
+   <item row="2" column="1">
+    <widget class="QGroupBox" name="tp_twoFingerLabel">
+     <property name="styleSheet">
+      <string notr="true">border: 0px;</string>
+     </property>
+     <property name="title">
+      <string>Two Finger</string>
+     </property>
+     <property name="ColorGroup" stdset="0">
+      <string notr="true">Title</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="2">
+    <widget class="QCheckBox" name="tp_addSecondFinger">
+     <property name="accessibleDescription">
+      <string>Add Second Finger</string>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
+     <property name="ColorGroup" stdset="0">
+      <string>Toggle</string>
+     </property>
+     <property name="report_metrics" stdset="0">
+      <bool>false</bool>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>RaisedMaterialButton</class>
+   <extends>QPushButton</extends>
+   <header>android/skin/qt/raised-material-button.h</header>
+  </customwidget>
+  <customwidget>
+   <class>TouchpadWidget</class>
+   <extends>QWidget</extends>
+   <header>android/skin/qt/touchpadwidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <tabstops>
+  <tabstop>tp_addSecondFinger</tabstop>
+ </tabstops>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>
