@@ -105,6 +105,10 @@ static void user_event_touch(const SkinEvent * const data,
     android_virtio_touch_event(data, displayId);
 }
 
+static void user_event_touchpad(const SkinEvent* const data, int touchpadId) {
+    android_virtio_touchpad_event(data, touchpadId);
+}
+
 static void user_event_mouse(int dx,
                              int dy,
                              int dz,
@@ -206,6 +210,7 @@ static void on_new_event(void) {
 
 static const QAndroidUserEventAgent sQAndroidUserEventAgent = {
         .sendTouchEvents = user_event_touch,
+        .sendTouchpadEvents = user_event_touchpad,
         .sendKey = user_event_key,
         .sendKeyCode = user_event_keycode,
         .sendKeyCodes = user_event_keycodes,
