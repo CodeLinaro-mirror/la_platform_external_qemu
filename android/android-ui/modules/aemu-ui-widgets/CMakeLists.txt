@@ -24,6 +24,7 @@ android_qt_lib(
       android/skin/qt/ui-event-recorder.cpp
       android/skin/qt/user-actions-counter.cpp
       android/skin/qt/wavefront-obj-parser.cpp
+      android/skin/qt/touchpadwidget.cpp
   DEPS aemu-recording
        android-emu
        android-emu-base
