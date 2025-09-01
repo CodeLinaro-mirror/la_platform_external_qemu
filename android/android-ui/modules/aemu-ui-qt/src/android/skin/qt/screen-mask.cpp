@@ -37,8 +37,11 @@ static LazyInstance<ScreenMaskGlobals> sGlobals = LAZY_INSTANCE_INIT;
 
 namespace ScreenMask {
 
-// Force the rgb as '0' if alpha is '0'
+// Force the rgb as '0' if alpha is '0', ensure RGBA layout
 static void processMask(QImage& image) {
+    // Convert the image to RGBA8888, which guarantees RGBA order needed
+    image = image.convertToFormat(QImage::Format_RGBA8888);
+
     for (int row = 0; row < image.height() - 1; row++) {
         for (int col = 0; col < image.width() - 1; col++) {
             QRgb p = image.pixel(col, row);
