@@ -1048,7 +1048,19 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
 
     if (config->use_host_vulkan) {
 #ifdef __APPLE__
-        system->envSet("ANDROID_EMU_VK_ICD", "moltenvk");
+        // TODO(b/433496880) temprary way of enabling kosmickrisp ICD.
+        // Ideally, we should instead just respect user's VK_DRIVER_FILES
+        // selection.
+        const char* EnvVarSelectICD = "ANDROID_EMU_VK_SELECT_ICD";
+        std::string selectedICDStr =
+                android::base::getEnvironmentVariable(EnvVarSelectICD);
+        if (selectedICDStr.empty()) {
+            selectedICDStr = "moltenvk";
+        } else {
+            INFO("%s: Setting ICD from envvar %s, to '%s'", __func__,
+                 EnvVarSelectICD, selectedICDStr.c_str());
+        }
+        system->envSet("ANDROID_EMU_VK_ICD", selectedICDStr);
 #else
         system->envSet("ANDROID_EMU_VK_ICD", NULL);
 #endif
