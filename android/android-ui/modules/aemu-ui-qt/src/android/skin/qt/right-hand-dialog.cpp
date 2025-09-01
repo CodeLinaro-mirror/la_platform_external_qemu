@@ -1,3 +1,4 @@
+#include "hand-constants.h"
 #include "right-hand-dialog.h"
 #include "ui_right-hand-dialog.h"
 
@@ -20,16 +21,16 @@ RightHandDialog::~RightHandDialog() {
 
 void RightHandDialog::on_btn_right_hand_pinch_clicked() {
     qDebug() << "Right hand gesture: Pinch";
-    emit rightHandGestureSelected("pinch");
+    emit rightHandGestureSelected(Ui::GESTURE_NAME_PINCH);
     accept();
 }
 void RightHandDialog::on_btn_right_hand_grab_clicked() {
     qDebug() << "Right hand gesture: Grab";
-    emit rightHandGestureSelected("grab");
+    emit rightHandGestureSelected(Ui::GESTURE_NAME_GRAB);
     accept();
 }
 void RightHandDialog::on_btn_right_hand_poke_clicked() {
     qDebug() << "Right hand gesture: Poke";
-    emit rightHandGestureSelected("poke");
+    emit rightHandGestureSelected(Ui::GESTURE_NAME_POKE);
     accept();
 }

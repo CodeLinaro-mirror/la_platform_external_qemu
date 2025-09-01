@@ -63,6 +63,7 @@ message PhysicalModelEvent {
         XR_HEAD_ANGULAR_VELOCITY = 27;
         XR_HEAD_VELOCITY = 28;
         XR_OPTIONS = 29;
+        XR_HAND_GESTURE = 30;
     }
 
     optional ParameterType type = 1;

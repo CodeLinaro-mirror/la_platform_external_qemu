@@ -199,6 +199,17 @@ vec3 XrDeviceModel::getXrOptions(
     return {XrOptions::LIVING_ROOM_DAY, mPassthroughCoefficient, /*unused*/ 0};
 }
 
+void XrDeviceModel::setXrHandGesture(int gesture, PhysicalInterpolation /*mode*/) {
+    const auto g = (xr_emulator_proto::HandGesture)gesture;
+    sendXrHandGesture(g);
+    mLastHandGestureRequested = g;
+}
+
+float XrDeviceModel::getXrHandGesture(
+        ParameterValueType /*parameterValueType*/) const {
+    return mLastHandGestureRequested;
+}
+
 void XrDeviceModel::sendXrInputMode(enum XrInputMode mode) {
     D("XrDeviceModel::sendXrInputMode");
     EmulatorRequest request;
@@ -276,6 +287,14 @@ void XrDeviceModel::sendXrViewportControlMode(enum XrViewportControlMode mode) {
             return;
     }
     request.set_viewport_control_mode(proto_mode);
+    qemudClientSend(request);
+}
+
+void XrDeviceModel::sendXrHandGesture(xr_emulator_proto::HandGesture gesture) {
+    D("XrDeviceModel::sendXrHandGesture %d", gesture);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_HAND_GESTURE);
+    request.set_hand_gesture(gesture);
     qemudClientSend(request);
 }
 

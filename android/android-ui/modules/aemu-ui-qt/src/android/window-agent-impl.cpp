@@ -427,6 +427,9 @@ static const QAndroidEmulatorWindowAgent sQAndroidEmulatorWindowAgent = {
                            float* passthroughCoefficient) -> bool {
             return android_xr_get_options(environment, passthroughCoefficient);
         },
+        .setXrHandGesture = [](int gesture) -> bool {
+            return android_xr_set_hand_gesture(gesture);
+        },
 };
 
 const QAndroidEmulatorWindowAgent* const gQAndroidEmulatorWindowAgent =

@@ -893,6 +893,17 @@ void PhysicalModelImpl::setTargetInternalXrOptions(
     targetStateChanged();
 }
 
+void PhysicalModelImpl::setTargetInternalXrHandGesture(
+        float value,
+        PhysicalInterpolation mode) {
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrHandGesture(static_cast<int>(value), mode);
+    }
+    targetStateChanged();
+}
+
 vec3 PhysicalModelImpl::getParameterAccelerometerUncalibrated(ParameterValueType) const {
     return fromGlm(mInertialModel.getAcceleration());
 }
@@ -1066,6 +1077,12 @@ vec3 PhysicalModelImpl::getParameterXrHeadVelocity(
 vec3 PhysicalModelImpl::getParameterXrOptions(
         ParameterValueType parameterValueType) const {
     return mXrDeviceModel.getXrOptions(parameterValueType);
+}
+
+float PhysicalModelImpl::getParameterXrHandGesture(
+        ParameterValueType parameterValueType) const {
+    std::lock_guard<std::recursive_mutex> lock(mMutex);
+    return mXrDeviceModel.getXrHandGesture(parameterValueType);
 }
 
 #define GET_FUNCTION_NAME(x) get##x

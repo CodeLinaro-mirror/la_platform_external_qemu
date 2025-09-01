@@ -35,14 +35,15 @@
 #include "aemu/base/threads/WorkerThread.h"
 #include "android/emulation/resizable_display_config.h"
 #include "android/skin/qt/extended-window-base.h"
+#include "android/skin/qt/hand-constants.h"
+#include "android/skin/qt/left-hand-dialog.h"
 #include "android/skin/qt/qt-ui-commands.h"
 #include "android/skin/qt/resizable-dialog.h"
+#include "android/skin/qt/right-hand-dialog.h"
 #include "android/skin/qt/shortcut-key-store.h"
 #include "android/skin/qt/ui-event-recorder.h"
 #include "android/skin/qt/user-actions-counter.h"
 #include "android/skin/qt/virtualscene-control-window.h"
-#include "android/skin/qt/left-hand-dialog.h"
-#include "android/skin/qt/right-hand-dialog.h"
 #include "android/ui-emu-agent.h"
 #include "host-common/qt_ui_defs.h"
 
@@ -179,6 +180,11 @@ private:
     // `currentMode` command, otherwise uncheck the button.
     void updateXrNavigationButtonsChecked(QtUICommand currentMode);
 
+    // Notify guest (Android) about the hand gesture selection for left hand.
+    void notifyGuestOnLeftHandGesture(const QString& gesture);
+    // Notify guest (Android) about the hand gesture selection for right hand.
+    void notifyGuestOnRightHandGesture(const QString& gesture);
+
     virtual void closeEvent(QCloseEvent* ce) override;
     virtual void mousePressEvent(QMouseEvent* event) override;
     virtual void paintEvent(QPaintEvent*) override;
@@ -215,6 +221,9 @@ private:
     int mLastInputModeRequested = /*XR_INPUT_MODE_MOUSE_KEYBOARD*/ 1;
     QtUICommand mXrLastMouseKeyboardModeCommand = QtUICommand::CHANGE_XR_INPUT_MODE;
     std::vector<std::reference_wrapper<QPushButton>> mXrMouseKeyboardModeButtons;
+
+    QString mCurrentLeftHandGesture = Ui::GESTURE_NAME_PINCH;
+    QString mCurrentRightHandGesture = Ui::GESTURE_NAME_PINCH;
 
     static const UiEmuAgent* sUiEmuAgent;
 
