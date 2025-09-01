@@ -88,14 +88,20 @@ Image takeScreenshot(
             outputFormat = ImageFormat::RGB888;
         }
         size_t cPixels = 0;
-        if (renderer->getScreenshot(nChannels, &width, &height,
-                                    pixelBuffer.data(), &cPixels, displayId,
-                                    desiredWidth, desiredHeight, rotation,
-                                    {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}}) != 0) {
+        int screenshotRes = renderer->getScreenshot(
+                nChannels, &width, &height, pixelBuffer.data(), &cPixels,
+                displayId, desiredWidth, desiredHeight, rotation,
+                {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
+        if (screenshotRes != 0) {
             pixelBuffer.resize(cPixels);
-            renderer->getScreenshot(
+            screenshotRes = renderer->getScreenshot(
                     nChannels, &width, &height, pixelBuffer.data(), &cPixels,
-                    displayId, desiredWidth, desiredHeight, rotation, {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
+                    displayId, desiredWidth, desiredHeight, rotation,
+                    {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
+        }
+        if (screenshotRes != 0) {
+            ERR("Could not take screenshot, error: %d", screenshotRes);
+            return Image(0, 0, 0, ImageFormat::RGB888, {});
         }
     } else {  // when -gpu guest is used.
         unsigned char* pixels = nullptr;
@@ -278,6 +284,7 @@ bool captureScreenshot(
         *pOutputFilepath = outputFilePath;
     }
 
+    VERBOSE("Saving screenshot to file: %s", outputFilePath.c_str());
     // already rotated through rendering
     rotation = renderer ? SKIN_ROTATION_0 : rotation;
     savepng(outputFilePath.c_str(), img.getChannels(), img.getWidth(),
