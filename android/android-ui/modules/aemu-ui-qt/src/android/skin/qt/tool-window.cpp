@@ -437,6 +437,15 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         mToolsUi->next_layout_button->setHidden(true);
     }
 
+    if (fc::isEnabled(fc::XrModeGlassesUI)) {
+        mToolsUi->power_button->setHidden(true);
+        mToolsUi->zoom_button->setHidden(true);
+        mToolsUi->prev_layout_button->setHidden(true);
+        mToolsUi->next_layout_button->setHidden(true);
+        mToolsUi->home_button->setHidden(true);
+        mToolsUi->overview_button->setHidden(true);
+    }
+
 #ifndef Q_OS_MAC
     // Swap minimize and close buttons on non-apple OSes
     auto closeBtn = mToolsUi->winButtonsLayout->takeAt(0);
