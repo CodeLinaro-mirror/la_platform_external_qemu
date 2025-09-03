@@ -900,6 +900,9 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
     } else if (vk_icd == "moltenvk") {
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::MOLTEN_VK);
+    } else if (vk_icd == "kosmickrisp") {
+        event->mutable_emulator_details()->set_vulkan_icd(
+                android_studio::EmulatorDetails::KOSMICKRISP_VK);
     } else {
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::UNKNOWN_VK);
