@@ -7,6 +7,10 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#ifdef __cplusplus
+#include <type_traits>
+#endif
+
 #define HOST_BIG_ENDIAN (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 
 /* HOST_LONG_BITS is the size of a native pointer in bits. */
