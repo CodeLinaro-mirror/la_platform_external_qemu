@@ -31,6 +31,7 @@ typedef struct SkinGenericEventCode {
     // With multiple display, mouse input events can be sent to different
     // devices.
     int displayId;
+    bool touchpad;
 } SkinGenericEventCode;
 
 // Type of a function used to flush buffered events

@@ -95,6 +95,9 @@ void generateAvd(const AvdGenerateInfo& genInfo) {
     configIni.setInt("hw.lcd.density", genInfo.hwLcdDensity);
     configIni.setInt("hw.lcd.height", genInfo.hwLcdHeight);
     configIni.setInt("hw.lcd.width", genInfo.hwLcdWidth);
+    configIni.setString("hw.touchpad0", genInfo.hwTouchpad0);
+    configIni.setInt("hw.touchpad0.width", genInfo.hwTouchpad0Width);
+    configIni.setInt("hw.touchpad0.height", genInfo.hwTouchpad0Height);
     configIni.setString("hw.mainKeys", genInfo.hwMainKeys);
     configIni.setInt("hw.ramSize", genInfo.hwRamSize);
     configIni.setString("hw.sdCard", genInfo.hwSdCard);
@@ -190,6 +193,9 @@ void generateAvdWithDefaults(std::string_view avdName,
         /* hw.lcd.density */ 120,
         /* hw.lcd.height */ 480,
         /* hw.lcd.width */ 640,
+        /* hw.touchpad0 */ "no",
+        /* hw.touchpad0.width */ 600,
+        /* hw.touchpad0.height */ 400,
         /* hw.mainKeys */ "no",
         /* hw.ramSize */ 128,
         /* hw.sdCard */ "yes",

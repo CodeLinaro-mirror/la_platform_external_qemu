@@ -108,6 +108,8 @@ typedef struct MTSState {
     int             ydir;
     /* Current display ID. */
     int             displayId;
+    /* Is this on the touchpad */
+    bool            touchpad;
     /* Current framebuffer pointer. */
     uint8_t*        current_fb;
 } MTSState;
@@ -128,6 +130,7 @@ _push_event(int type, int code, int value)
     evt.code = code;
     evt.value = value;
     evt.displayId = mts_state->displayId;
+    evt.touchpad = mts_state->touchpad;
     _UserEventAgent->sendGenericEvent(evt);
 }
 
@@ -750,6 +753,13 @@ void multitouch_update_displayId(int displayId) {
     }
     MTSState* const mts_state = &_MTSState;
     mts_state->displayId = displayId;
+    mts_state->touchpad = false;
+}
+
+void multitouch_update_touchpad(int touchpadId) {
+    MTSState* const mts_state = &_MTSState;
+    mts_state->displayId = touchpadId;
+    mts_state->touchpad = true;
 }
 
 void multitouch_update(MTESource source,

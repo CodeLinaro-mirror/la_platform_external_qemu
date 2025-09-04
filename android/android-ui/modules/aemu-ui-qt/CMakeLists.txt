@@ -95,6 +95,7 @@ android_qt_lib(
        ext-page-snapshot-grpc
        ext-page-telephony
        ext-page-telephony-grpc
+       ext-page-touchpad
        ext-page-tv-remote
        FFMPEG::FFMPEG
        protobuf::libprotobuf

@@ -69,8 +69,8 @@
 #include "android/emulation/control/keyboard/MouseEventSender.h"
 #include "android/emulation/control/keyboard/PenEventSender.h"
 #include "android/emulation/control/keyboard/TouchEventSender.h"
+#include "android/emulation/control/keyboard/TouchpadEventSender.h"
 #include "android/emulation/control/keyboard/WheelEventSender.h"
-#include "android/emulation/control/xr/XrInputEventSender.h"
 #include "android/emulation/control/location_agent.h"
 #include "android/emulation/control/logcat/LogcatParser.h"
 #include "android/emulation/control/logcat/LogcatStream.h"
@@ -81,6 +81,7 @@
 #include "android/emulation/control/utils/EventWaiter.h"
 #include "android/emulation/control/utils/ScreenshotUtils.h"
 #include "android/emulation/control/utils/SharedMemoryLibrary.h"
+#include "android/emulation/control/xr/XrInputEventSender.h"
 #include "android/emulation/resizable_display_config.h"
 #include "android/gpu_frame.h"
 #include "android/grpc/utils/SimpleAsyncGrpc.h"
@@ -138,6 +139,7 @@ public:
           mMouseEventSender(agents),
           mPenEventSender(agents),
           mTouchEventSender(agents),
+          mTouchpadEventSender(agents),
           mWheelEventSender(agents),
           mXrInputEventSender(agents),
           mCamera(agents->sensors),
@@ -508,6 +510,8 @@ public:
                                 mMouseEventSender.send(request->mouse_event());
                             } else if (request->has_touch_event()) {
                                 mTouchEventSender.send(request->touch_event());
+                            } else if (request->has_touchpad_event()) {
+                                mTouchpadEventSender.send(request->touchpad_event());
                             } else if (request->has_android_event()) {
                                 mAndroidEventSender.send(request->android_event());
                             } else if (request->has_pen_event()) {
@@ -1544,6 +1548,7 @@ private:
     MouseEventSender mMouseEventSender;
     PenEventSender mPenEventSender;
     TouchEventSender mTouchEventSender;
+    TouchpadEventSender mTouchpadEventSender;
     AndroidEventSender mAndroidEventSender;
     WheelEventSender mWheelEventSender;
     XrInputEventSender mXrInputEventSender;

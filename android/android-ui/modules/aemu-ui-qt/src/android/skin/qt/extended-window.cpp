@@ -174,6 +174,7 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         {PANE_IDX_MULTIDISPLAY,  mExtendedUi->displaysButton},
         {PANE_IDX_FINGER,        mExtendedUi->fingerButton},
         {PANE_IDX_VIRT_SENSORS,  mExtendedUi->virtSensorsButton},
+        {PANE_IDX_TOUCHPAD,      mExtendedUi->touchpadButton},
         {PANE_IDX_SNAPSHOT,      mExtendedUi->snapshotButton},
         {PANE_IDX_BUGREPORT,     mExtendedUi->bugreportButton},
         {PANE_IDX_SETTINGS,      mExtendedUi->settingsButton},
@@ -283,6 +284,13 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->snapshotButton->setVisible(true);
     } else {
         mExtendedUi->snapshotButton->setVisible(false);
+    }
+
+    if (getConsoleAgents()->settings->hw()->hw_touchpad0) {
+        mSidebarButtons.addButton(mExtendedUi->touchpadButton);
+        mExtendedUi->touchpadButton->setVisible(true);
+    } else {
+        mExtendedUi->touchpadButton->setVisible(false);
     }
 
     mSidebarButtons.addButton(mExtendedUi->bugreportButton);
@@ -422,6 +430,7 @@ static std::string translate_idx(ExtendedWindowPane value) {
         PANE(PANE_IDX_MICROPHONE)
         PANE(PANE_IDX_FINGER)
         PANE(PANE_IDX_VIRT_SENSORS)
+        PANE(PANE_IDX_TOUCHPAD)
         PANE(PANE_IDX_SNAPSHOT)
         PANE(PANE_IDX_BUGREPORT)
         PANE(PANE_IDX_RECORD)
@@ -627,6 +636,9 @@ void ExtendedWindow::on_carRotaryButton_clicked() {
 }
 void ExtendedWindow::on_sensorReplayButton_clicked() {
     adjustTabs(PANE_IDX_SENSOR_REPLAY);
+}
+void ExtendedWindow::on_touchpadButton_clicked() {
+    adjustTabs(PANE_IDX_TOUCHPAD);
 }
 
 void ExtendedWindow::adjustTabs(ExtendedWindowPane thisIndex) {
