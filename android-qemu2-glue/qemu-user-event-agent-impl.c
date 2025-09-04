@@ -85,7 +85,7 @@ static void user_event_generic(SkinGenericEventCode event) {
     bool sent = false;
     if (feature_is_enabled(kFeature_VirtioInput)) {
         sent = android_virtio_input_send(event.type, event.code, event.value,
-                                         event.displayId);
+                                         event.displayId, event.touchpad);
     }
 
     if (!sent) {

@@ -4756,8 +4756,11 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
         android_camera_service_init();
 
         /* Initialize multi-touch emulation. */
-        if (androidHwConfig_isScreenMultiTouch(getConsoleAgents()->settings->hw())) {
-            mts_port_create(NULL, getConsoleAgents()->user_event, getConsoleAgents()->display);
+        if (androidHwConfig_isScreenMultiTouch(
+                getConsoleAgents()->settings->hw()) ||
+            getConsoleAgents()->settings->hw()->hw_touchpad0) {
+          mts_port_create(NULL, getConsoleAgents()->user_event,
+                          getConsoleAgents()->display);
         }
 
         /* Enable ADB authenticaiton, or not. */

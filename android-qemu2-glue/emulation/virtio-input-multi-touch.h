@@ -25,7 +25,8 @@ ANDROID_BEGIN_HEADER
 extern int android_virtio_input_send(int type,
                                      int code,
                                      int value,
-                                     int displayId);
+                                     int displayId,
+                                     bool touchpad);
 
 extern void android_virtio_kbd_mouse_event(int dx,
                                            int dy,
@@ -41,4 +42,7 @@ extern void android_virtio_pen_event(int dx,
 
 extern void android_virtio_touch_event(const SkinEvent* const data,
                                        int displayId);
+
+extern void android_virtio_touchpad_event(const SkinEvent* const data,
+                                          int touchpadId);
 ANDROID_END_HEADER

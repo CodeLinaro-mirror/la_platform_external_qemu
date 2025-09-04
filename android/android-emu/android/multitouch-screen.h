@@ -95,6 +95,7 @@ extern bool multitouch_should_skip_sync(int buttons_state);
 extern bool multitouch_is_second_finger(int buttons_state);
 
 extern void multitouch_update_displayId(int displayId);
+extern void multitouch_update_touchpad();
 
 extern void multitouch_update(MTESource source,
                               const SkinEvent* const data,

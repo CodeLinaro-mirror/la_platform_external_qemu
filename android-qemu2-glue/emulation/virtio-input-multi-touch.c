@@ -114,6 +114,14 @@ void android_virtio_touch_event(const SkinEvent* const data,
     multitouch_update_displayId(0);
 }
 
+void android_virtio_touchpad_event(const SkinEvent* const data,
+                                   int touchpadId) {
+    multitouch_update_touchpad(touchpadId);
+    multitouch_update(MTES_FINGER, data, data->u.multi_touch_point.x,
+                      data->u.multi_touch_point.y);
+    multitouch_update_displayId(0);
+}
+
 #define VIRTIO_INPUT_MT_STRUCT(name, id)         \
 typedef struct VirtIOInputMultiTouch##name##id { \
     VirtIOInput parent_obj;                      \
@@ -497,14 +505,20 @@ static const TypeInfo types[] = {
 
 DEFINE_TYPES(types)
 
-int android_virtio_input_send(int type, int code, int value, int displayId) {
+int android_virtio_input_send(int type,
+                              int code,
+                              int value,
+                              int displayId,
+                              bool touchpad) {
     if (type != EV_ABS && type != EV_KEY && type != EV_SYN && type != EV_SW) {
         return 0;
     }
     if (displayId < 0 || displayId >= VIRTIO_INPUT_MAX_NUM) {
         displayId = 0;
     }
-    VirtIOInput* vinput = VIRTIO_INPUT(s_virtio_input_multi_touch[displayId]);
+    VirtIOInput* vinput =
+            touchpad ? VIRTIO_INPUT(s_virtio_input_multi_touch_touchpad)
+                     : VIRTIO_INPUT(s_virtio_input_multi_touch[displayId]);
     if (vinput) {
         virtio_input_event event;
         event.type = cpu_to_le16(type);
