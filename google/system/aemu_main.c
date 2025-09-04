@@ -49,6 +49,8 @@ int qemu_default_main(void) {
   return status;
 }
 
+static const char *const LIB_PATH_ENV_VAR = "ANDROID_EMULATOR_LIBRARY_DIR";
+
 #ifdef _WIN32
 #define LIB_PREFIX ""
 #else
@@ -64,7 +66,7 @@ typedef void (*gf_startup_func_t)(int argc, char **argv);
 typedef void (*gf_shutdown_func_t)(void);
 
 static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func, gf_shutdown_func_t *shutdown_func) {
-    char *module_dir = getenv("QEMU_MODULE_DIR");
+    char *module_dir = getenv(LIB_PATH_ENV_VAR);
     if (module_dir == NULL) {
         fprintf(stderr, "error, can't load goldfish module as QEMU_MODULE_DIR is not set");
         return false;
