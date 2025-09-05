@@ -13,6 +13,7 @@
 
 #include "android/skin/event.h"
 
+#include <QColor>
 #include <QList>
 #include <QPointF>
 #include <QWidget>
@@ -54,10 +55,15 @@ private:
     QList<QList<QPointF>> mTrailPoints;
 
     // When duplicating fingers, they will be separated by this amount
-    const QPointF mFingerSeperation = QPointF(200, 0);
+    static constexpr QPointF mFingerSeperation = QPointF(200, 0);
 
     // How many points to store for the trail
-    const int mMaxTrailPoints = 30;
+    static constexpr int mMaxTrailPoints = 30;
     // Maximum number of duplicated fingers allowed
-    const int mMaxFingers = 3;
+    static constexpr int mMaxFingers = 3;
+
+    static constexpr QColor mFingerColorLight{0, 0, 200, 30};
+    static constexpr QColor mFingerColorDark{50, 50, 250, 70};
+    static constexpr int mFingerWidth = 200;
+    static constexpr int mFingerGlow = 770;
 };
