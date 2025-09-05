@@ -2198,7 +2198,7 @@ message EmulatorDetails {
   // Connectivity from adb of the running emulator instance.
   optional EmulatorAdbLiveness adb_liveness = 11;
   // Information about the gl implementation in the guest image.
-  optional EmulatorGuestGlInfo guest_gl = 12;
+  optional EmulatorGuestGlInfo guest_gl = 12 [lazy = true];
   // Information about the host GPUs (one per GPU).
   repeated EmulatorGpuInfo host_gpu = 13;
   // The "phase" of an emulator session where crash happened.
@@ -2207,44 +2207,44 @@ message EmulatorDetails {
   optional string core_version = 15;
   // Renderer of the current emulator session.
   optional EmulatorRenderer renderer = 16;
-  // Flags for the used UI featurs.
-  optional EmulatorFeatures used_features = 17;
+  // Flags for the used UI features.
+  optional EmulatorFeatures used_features = 17 [lazy = true];
   // Information about the currently loaded AVD.
-  optional EmulatorAvdInfo avd_info = 18;
+  optional EmulatorAvdInfo avd_info = 18 [lazy = true];
   // State tracking emulator feature flag enable/disable.
-  optional EmulatorFeatureFlagState feature_flag_state = 19;
+  optional EmulatorFeatureFlagState feature_flag_state = 19 [lazy = true];
   // Hypervisor used in current session.
   optional EmulatorHypervisor hypervisor = 20;
   // Information about quickboot status of the current session.
-  optional EmulatorQuickbootLoad quickboot_load = 21;
-  optional EmulatorQuickbootSave quickboot_save = 22;
+  optional EmulatorQuickbootLoad quickboot_load = 21 [lazy = true];
+  optional EmulatorQuickbootSave quickboot_save = 22 [lazy = true];
   // Track GLES command usages
-  optional EmulatorGLESUsages gles_usages = 23;
+  optional EmulatorGLESUsages gles_usages = 23 [lazy = true];
   // Metrics on all generic emulator snapshot saves and loads.
   repeated EmulatorSnapshot snapshot_loads = 24;
   repeated EmulatorSnapshot snapshot_saves = 25;
   // Metrics on all snapshot UI.
-  optional EmulatorSnapshotUICounts snapshot_ui_counts = 26;
+  optional EmulatorSnapshotUICounts snapshot_ui_counts = 26 [lazy = true];
   // Metrics on camera usage.
-  optional EmulatorCameraSession camera = 27;
+  optional EmulatorCameraSession camera = 27 [lazy = true];
   // Metrics for virtual scene camera sessions.
-  optional EmulatorVirtualSceneSession virtual_scene = 28;
+  optional EmulatorVirtualSceneSession virtual_scene = 28 [lazy = true];
   // Metrics for emulator boot status and time.
-  optional EmulatorBootInfo boot_info = 29;
+  optional EmulatorBootInfo boot_info = 29 [lazy = true];
   // Metrics for automation/macros.
-  optional EmulatorAutomation automation = 30;
+  optional EmulatorAutomation automation = 30 [lazy = true];
   // Metrics for multi-display
-  optional EmulatorMultiDisplay multi_display = 31;
+  optional EmulatorMultiDisplay multi_display = 31 [lazy = true];
   // Metrics for gRPC invocation
-  optional EmulatorGrpc grpc = 32;
+  optional EmulatorGrpc grpc = 32 [lazy = true];
   // Metrics for LocationUiV2
-  optional EmulatorLocationV2 location_v2 = 33;
+  optional EmulatorLocationV2 location_v2 = 33 [lazy = true];
   // Metrics for streamScreenshot
-  optional EmulatorStreamScreenshot screenshot = 34;
+  optional EmulatorStreamScreenshot screenshot = 34 [lazy = true];
   // Metrics for Icebox
   repeated EmulatorIcebox icebox = 35;
   // Metrics for resizable display
-  optional EmulatorResizableDisplay resizable_display = 36;
+  optional EmulatorResizableDisplay resizable_display = 36 [lazy = true];
   // Process ID of the emulator wrapper process.
   optional int32 emu_pid = 37;
   // Process ID of the child qemu process that does the real job.
@@ -2314,11 +2314,11 @@ message EmulatorDetails {
   enum EmulatorHypervisor {
     UNKNOWN_HYPERVISOR = 0;
     NO_HYPERVISOR = 1;
-    KVM = 2;  // KVM
+    KVM = 2;     // KVM
     HAXM = 3 [deprecated = true];
     HVF = 4;     // Apple Hypervisor.Framework
     HYPERV = 5;  // Microsoft Hyper-V
-    AEHD = 6;    // AEHD
+    AEHD = 6;    // Android Emulator hypervisor driver
                  // Next tag: 7
   }
 
@@ -2329,6 +2329,7 @@ message EmulatorDetails {
     SWIFTSHADER_VK = 2;  // Swiftshader software renderer
     MOLTEN_VK = 3;       // Mac only
     LAVAPIPE_VK = 4;     // Lavapipe software renderer
+    KOSMICKRISP_VK = 5;  // Mac only, mesa based vulkan driver
   }
 }
 
