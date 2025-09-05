@@ -28,7 +28,7 @@
 #include "host-common/feature_control.h"
 #include "host-common/hw-config.h"
 #include "host-common/opengles.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #include <atomic>
 #include <map>

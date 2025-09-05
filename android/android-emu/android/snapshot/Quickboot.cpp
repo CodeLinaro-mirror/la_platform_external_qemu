@@ -27,7 +27,7 @@
 #include "host-common/hw-config.h"
 
 #if SNAPSHOT_METRICS
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #endif
 
 #include "android/snapshot/Loader.h"

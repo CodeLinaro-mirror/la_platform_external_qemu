@@ -37,7 +37,7 @@
 #include "android/skin/qt/extended-pages/multi-display-arrangement.h"
 #include "android/skin/qt/extended-pages/multi-display-item.h"
 #include "android/skin/qt/raised-material-button.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 // Allow at most 5 reports every 60 seconds.
 static constexpr uint64_t kReportWindowDurationUs = 1000 * 1000 * 60;

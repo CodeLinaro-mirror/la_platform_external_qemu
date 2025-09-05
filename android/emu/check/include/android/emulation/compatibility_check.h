@@ -19,7 +19,7 @@
 #include <vector>
 #include "absl/strings/str_format.h"
 #include "android/avd/info.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 namespace android {
 namespace emulation {

@@ -46,7 +46,7 @@
 #include "host-common/snapshot_interface.h"  // for androidS...
 #include "openssl/base.h"                // for RSA
 #include "openssl/nid.h"                 // for NID_sha1
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "aemu/base/logging/Log.h"
 
 #define DEBUG 0

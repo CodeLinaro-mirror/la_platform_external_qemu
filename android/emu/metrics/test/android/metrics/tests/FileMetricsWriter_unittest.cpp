@@ -23,7 +23,7 @@
 #include "android/protobuf/DelimitedSerialization.h"
 #include "android/utils/path.h"
 #include "google_logs_publishing.pb.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #include <google/protobuf/util/message_differencer.h>
 #include <gtest/gtest.h>

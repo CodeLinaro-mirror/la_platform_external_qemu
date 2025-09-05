@@ -43,7 +43,7 @@
 #include "android/skin/qt/raised-material-button.h"
 #include "android/utils/system.h"
 #include "emulator_controller.pb.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 // Allow at most 5 reports every 60 seconds.
 static constexpr uint64_t kReportWindowDurationUs = 1000 * 1000 * 60;

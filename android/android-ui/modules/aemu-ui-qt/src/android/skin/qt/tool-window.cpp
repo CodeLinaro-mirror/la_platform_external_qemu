@@ -94,7 +94,7 @@
 #include "host-common/window_agent.h"
 #include "host-common/snapshot_common.h"
 #include "host-common/snapshot_interface.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_tools.h"
 
 namespace {

@@ -53,7 +53,7 @@
 #include "android/skin/qt/raised-material-button.h"
 #include "android/skin/qt/stylesheet.h"
 #include "android/utils/path.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_bug-report-page.h"
 
 using android::base::PathUtils;

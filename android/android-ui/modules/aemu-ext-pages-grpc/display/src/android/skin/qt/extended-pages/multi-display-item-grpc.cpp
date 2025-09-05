@@ -28,7 +28,7 @@
 #include "android/skin/qt/extended-pages/common.h"
 #include "host-common/window_agent.h"
 #include "multi-display-page-grpc.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #define MULTI_DISPLAY_DEBUG 0
 

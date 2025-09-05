@@ -16,7 +16,7 @@
 #include "aemu/base/memory/LazyInstance.h"
 #include "aemu/base/synchronization/Lock.h"
 
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 using android::base::AutoLock;
 using android::base::Lock;

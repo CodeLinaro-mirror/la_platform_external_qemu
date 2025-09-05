@@ -28,7 +28,7 @@
 #include "android/skin/qt/extended-pages/common.h"    // for getSelectedTheme
 #include "android/skin/qt/qt-settings.h"              // for PER_AVD_SETTIN...
 #include "android/skin/qt/raised-material-button.h"   // for RaisedMaterialB...
-#include "studio_stats.pb.h"                          // for EmulatorUiEvent
+#include "android/metrics/studio_stats_wrapper.pb.h"                          // for EmulatorUiEvent
 
 #include "host-common/FeatureControl.h"
 #include "host-common/feature_control.h"

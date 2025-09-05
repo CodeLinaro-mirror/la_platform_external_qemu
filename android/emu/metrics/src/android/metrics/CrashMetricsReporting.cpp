@@ -11,7 +11,7 @@
 
 #include "android/metrics/CrashMetricsReporting.h"
 
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #include <string>
 
