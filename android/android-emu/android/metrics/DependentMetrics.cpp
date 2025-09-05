@@ -713,6 +713,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::VIRTIO_DUAL_MODE_MOUSE;
         case android::featurecontrol::AllAppsForHomeTray:
             return android_studio::EmulatorFeatureFlagState::ALL_APPS_FOR_HOME_TRAY;
+        case android::featurecontrol::MicrophoneToggleUI:
+            return android_studio::EmulatorFeatureFlagState::MICROPHONE_TOGGLE_UI;
         case android::featurecontrol::AndroidVirtualizationFramework:
             return android_studio::EmulatorFeatureFlagState::ANDROID_VIRTUALIZATION_FRAMEWORK;
         case android::featurecontrol::DualModeMouseDisplayHostCursor:

@@ -385,6 +385,7 @@ Feature: 'VulkanVirtualQueue' (110), value: 0, default: 0, is overridden: 0
 Feature: 'VulkanRobustness' (111), value: 0, default: 0, is overridden: 0
 Feature: 'AllAppsForHomeTray' (112), value: 0, default: 0, is overridden: 0
 Feature: 'XrModeGlassesUI' (113), value: 0, default: 0, is overridden: 0
+Feature: 'MicrophoneToggleUI' (114), value: 0, default: 0, is overridden: 0
 )#";
     EXPECT_EQ(feature_list, ss.str());
 }
