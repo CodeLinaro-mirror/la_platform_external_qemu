@@ -546,8 +546,8 @@ static void test_bmdma_no_busmaster(void)
 
     /* Not entirely clear what the expected result is, but this is what we get
      * in practice. At least we want to be aware of any changes. */
-    g_assert_cmphex(status, ==, BM_STS_ACTIVE | BM_STS_INTR);
-    assert_bit_clear(qpci_io_readb(dev, ide_bar, reg_status), DF | ERR);
+    g_assert_cmphex(status, ==, BM_STS_INTR);
+    assert_bit_set(qpci_io_readb(dev, ide_bar, reg_status), ERR);
     free_pci_device(dev);
     test_bmdma_teardown(qts);
 }
