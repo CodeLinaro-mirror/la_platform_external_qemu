@@ -331,6 +331,12 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->telephoneButton->setVisible(false);
     }
 
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
+        AVD_WEAR) {
+        mExtendedUi->fingerButton->setVisible(false);
+        mExtendedUi->dpadButton->setVisible(false);
+    }
+
     mExtendedUi->carRotaryButton->setVisible(false);
 
     if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
