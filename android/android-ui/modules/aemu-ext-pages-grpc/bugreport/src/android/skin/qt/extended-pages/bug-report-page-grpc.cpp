@@ -55,7 +55,7 @@
 #include "android/skin/qt/stylesheet.h"
 #include "android/utils/path.h"
 #include "emulator_controller.pb.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_bug-report-page-grpc.h"
 
 using android::base::PathUtils;

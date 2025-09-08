@@ -16,7 +16,7 @@
 
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/base/testing/GTestUtils.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #include <gtest/gtest.h>
 

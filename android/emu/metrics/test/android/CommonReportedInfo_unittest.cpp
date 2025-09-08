@@ -20,7 +20,7 @@
 #include "android/utils/path.h"
 #include "android/utils/tempfile.h"
 
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "google/protobuf/text_format.h"
 
 #include <gtest/gtest.h>

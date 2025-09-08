@@ -75,7 +75,7 @@
 #include "host-common/Features.h"
 #include "host-common/hw-config-helper.h"
 #include "host-common/multi_display_agent.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_extended.h"
 
 ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)

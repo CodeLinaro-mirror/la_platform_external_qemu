@@ -24,7 +24,7 @@
 #include "android/utils/file_io.h"
 
 #include "google_logs_publishing.pb.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #include <string_view>
 

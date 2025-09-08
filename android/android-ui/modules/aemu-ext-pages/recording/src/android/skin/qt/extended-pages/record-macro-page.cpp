@@ -73,7 +73,7 @@
 #include "android/skin/qt/video-player/QtVideoPlayerNotifier.h"
 #include "android/skin/qt/video-player/VideoInfo.h"
 #include "android/skin/qt/video-player/VideoPlayerWidget.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_record-macro-page.h"
 
 class CCListItem;

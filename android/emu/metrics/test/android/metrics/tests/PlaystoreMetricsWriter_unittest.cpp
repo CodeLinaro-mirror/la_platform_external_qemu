@@ -35,7 +35,7 @@
 #include "android/curl-support.h"
 #include "android/metrics/MetricsLogging.h"
 #include "google_logs_publishing.pb.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 using namespace android;
 using namespace android::base;

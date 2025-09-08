@@ -25,7 +25,7 @@
 
 #ifndef Q_MOC_RUN
 // Qt 6.5.3 moc complains of a parsing error with this protobuf file. So exclude it from moc runs.
-#include "studio_stats.pb.h"  // for EmulatorAutomatio...
+#include "android/metrics/studio_stats_wrapper.pb.h"  // for EmulatorAutomatio...
 #endif  // Q_MOC_RUN
 
 class CCListItem;

@@ -22,7 +22,7 @@
 #include "android/console.h"   // for getConsoleAgents()->settings->avdInfo()
 #include "android/emulation/control/finger_agent.h"  // for QAndroidFingerAgent
 #include "android/metrics/UiEventTracker.h"          // for UiEventTracker
-#include "studio_stats.pb.h"                         // for EmulatorUiEvent
+#include "android/metrics/studio_stats_wrapper.pb.h"                         // for EmulatorUiEvent
 
 static const QAndroidFingerAgent* sFingerAgent = nullptr;
 

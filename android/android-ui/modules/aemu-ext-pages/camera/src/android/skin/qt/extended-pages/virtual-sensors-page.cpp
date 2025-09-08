@@ -43,7 +43,7 @@
 #include "android/skin/qt/emulator-qt-window.h"       // for EmulatorQtWindow
 #include "android/skin/qt/raised-material-button.h"   // for RaisedMaterialB...
 #include "android/skin/qt/stylesheet.h"               // for stylesheetFontSize
-#include "studio_stats.pb.h"                          // for AndroidStudioEvent
+#include "android/metrics/studio_stats_wrapper.pb.h"                          // for AndroidStudioEvent
 #include "android/metrics/UiEventTracker.h"          // for UiEventTracker
 
 class QShowEvent;

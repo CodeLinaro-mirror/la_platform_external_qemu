@@ -107,7 +107,7 @@
 #include "host-common/opengles.h"
 #include "host-common/vm_operations.h"
 #include "render-utils/Renderer.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 using ::google::protobuf::Empty;
 using ::grpc::ServerContext;

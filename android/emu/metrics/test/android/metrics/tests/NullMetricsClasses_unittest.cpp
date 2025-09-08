@@ -18,7 +18,7 @@
 #include "android/metrics/tests/MockMetricsWriter.h"
 #include "android/utils/system.h"
 #include "google_logs_publishing.pb.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #include <gtest/gtest.h>
 

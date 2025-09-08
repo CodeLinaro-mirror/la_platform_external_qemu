@@ -75,7 +75,7 @@
 #include "host-common/MultiDisplay.h"
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/snapshot_common.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #define DEBUG 1
 

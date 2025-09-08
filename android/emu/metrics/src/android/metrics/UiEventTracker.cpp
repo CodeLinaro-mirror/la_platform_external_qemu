@@ -16,7 +16,7 @@
 
 #include "aemu/base/memory/LazyInstance.h"  // for LazyInstance
 #include "android/metrics/MetricsReporter.h"   // for MetricsReporter
-#include "studio_stats.pb.h"                   // for EmulatorUiEvent, Andro...
+#include "android/metrics/studio_stats_wrapper.pb.h"                   // for EmulatorUiEvent, Andro...
 
 namespace android {
 namespace metrics {

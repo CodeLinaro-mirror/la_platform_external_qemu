@@ -65,7 +65,7 @@
 // #include "glm/gtc/../detail/func_geometric.inl"
 // #include "glm/gtc/../detail/func_trigonometric.inl"
 #include "glm/gtc/quaternion.hpp"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_virtualscene-controls.h"
 
 class QHideEvent;

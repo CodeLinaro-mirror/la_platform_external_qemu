@@ -82,7 +82,7 @@
 #include "snapshot.pb.h"
 #include "snapshot_service.grpc.pb.h"
 #include "snapshot_service.pb.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 using android::emulation::control::EmulatorGrpcClient;
 using android::emulation::control::SnapshotDetails;

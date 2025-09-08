@@ -12,7 +12,7 @@
 #include "android/metrics/AsyncMetricsReporter.h"
 
 #include "android/metrics/MetricsLogging.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #include <string_view>
 

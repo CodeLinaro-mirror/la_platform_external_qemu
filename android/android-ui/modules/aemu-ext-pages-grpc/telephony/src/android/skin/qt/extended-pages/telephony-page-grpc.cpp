@@ -38,7 +38,7 @@
 #include "android/skin/qt/raised-material-button.h"
 #include "android/telephony/sms.h"
 #include "host-common/qt_ui_defs.h"
-#include "studio_stats.pb.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_telephony-page-grpc.h"
 
 #define MAX_SMS_MSG_SIZE 1024  // Arbitrary emulator limitation

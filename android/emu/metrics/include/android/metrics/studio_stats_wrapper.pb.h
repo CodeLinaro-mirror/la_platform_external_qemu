@@ -1,4 +1,4 @@
-// Copyright 2017 The Android Open Source Project
+// Copyright (C) 2024 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "android/session_phase_reporter.h"
 
-#include "android/CommonReportedInfo.h"
-#include "android/metrics/studio_stats_wrapper.pb.h"
+// Wraps the studio_stats.pb.h header to prevent compilation errors on Windows.
+// It undefines macros (e.g., WAIT_FAILED, WAIT_TIMEOUT) that conflict with
+// the Windows SDK. This is necessary because the emulator and Android Studio
+// share the same source .proto file, but the conflicting symbols are not
+// needed in the emulator.
 
-static AndroidSessionPhase sCurrentSessionPhase;
+#pragma once
 
-void android_report_session_phase(
-        AndroidSessionPhase phase) {
-    sCurrentSessionPhase = phase;
-    android::CommonReportedInfo::setSessionPhase(phase);
-    // TODO: Also report session phase to metrics. But should we?
-}
+#ifdef _WIN32
+#undef WAIT_FAILED
+#undef WAIT_TIMEOUT
+#undef WINDOWS
+#endif  // _WIN32
 
-AndroidSessionPhase android_get_session_phase() {
-    return sCurrentSessionPhase;
-}
+#include "studio_stats.pb.h"
