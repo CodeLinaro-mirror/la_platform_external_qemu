@@ -229,9 +229,11 @@ EXPORTS
     qemu_cond_init
     qemu_cond_signal
     qemu_cond_wait_bql
+    qemu_console_get_head
     qemu_console_get_index
     qemu_console_get_name
     qemu_console_lookup_by_index
+    qemu_console_lookup_default
     qemu_cpu_is_self
     qemu_cpu_kick
     qemu_cpu_list_lock
