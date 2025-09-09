@@ -1057,7 +1057,7 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         if (selectedICDStr.empty()) {
             selectedICDStr = "moltenvk";
         } else {
-            INFO("%s: Setting ICD from envvar %s, to '%s'", __func__,
+            dinfo("%s: Setting ICD from envvar %s, to '%s'", __func__,
                  EnvVarSelectICD, selectedICDStr.c_str());
         }
         system->envSet("ANDROID_EMU_VK_ICD", selectedICDStr);

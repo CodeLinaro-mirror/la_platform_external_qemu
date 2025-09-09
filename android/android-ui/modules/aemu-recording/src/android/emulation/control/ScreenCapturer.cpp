@@ -100,7 +100,7 @@ Image takeScreenshot(
                     {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
         }
         if (screenshotRes != 0) {
-            ERR("Could not take screenshot, error: %d", screenshotRes);
+            derror("Could not take screenshot, error: %d", screenshotRes);
             return Image(0, 0, 0, ImageFormat::RGB888, {});
         }
     } else {  // when -gpu guest is used.
@@ -284,7 +284,7 @@ bool captureScreenshot(
         *pOutputFilepath = outputFilePath;
     }
 
-    VERBOSE("Saving screenshot to file: %s", outputFilePath.c_str());
+    dprint("Saving screenshot to file: %s", outputFilePath.c_str());
     // already rotated through rendering
     rotation = renderer ? SKIN_ROTATION_0 : rotation;
     savepng(outputFilePath.c_str(), img.getChannels(), img.getWidth(),
