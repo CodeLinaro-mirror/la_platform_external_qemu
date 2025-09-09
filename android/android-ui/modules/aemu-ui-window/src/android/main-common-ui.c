@@ -391,20 +391,20 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         }
 
         if (shouldEnableGLDirectMem) {
-            crashhandler_append_message_format("Enabling GLDirectMem");
+            crashhandler_append_message_format("Enabling GLDirectMem\n");
             // Do not enable if we did not enable it on the API 29 image itself.
             feature_set_if_not_overridden_or_guest_disabled(
                     kFeature_GLDirectMem, true);
         }
 
         if (shouldEnableVulkan) {
-            crashhandler_append_message_format("Enabling Vulkan");
+            crashhandler_append_message_format("Enabling Vulkan\n");
             feature_set_if_not_overridden(kFeature_Vulkan, true);
             feature_set_if_not_overridden(kFeature_GLDirectMem, true);
         } else {
             crashhandler_append_message_format(
                     "Not enabling Vulkan here "
-                    "(feature flag may be turned on manually)");
+                    "(feature flag may be turned on manually)\n");
         }
     }
 
