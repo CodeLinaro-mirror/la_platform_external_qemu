@@ -31,6 +31,11 @@ config ADP1050
     bool
     depends on I2C
 
+config ADT7475
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
 config MAX34451
     bool
     depends on I2C

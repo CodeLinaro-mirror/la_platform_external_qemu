@@ -5,6 +5,10 @@ ad5321_event(const char *id, const char *event) "%s: %s"
 ad5321_recv(const char *id, uint8_t data, uint16_t reg) "%s: recv data: 0x%" PRIx8 " shift reg: 0x%" PRIx16
 ad5321_send(const char *id, uint8_t data, uint16_t reg) "%s: send data: 0x%" PRIx8 " shift reg: 0x%" PRIx16
 
+# adt7475.c
+adt7475_receive(const char *id, uint8_t cmd, uint8_t data) "%s cmd: 0x%" PRIx8 " data 0x%" PRIx8
+adt7475_write(const char *id, uint8_t cmd, uint8_t data) "%s cmd: 0x%" PRIx8 " data 0x%" PRIx8
+
 # max6581.c
 max6581_receive(const char *id, uint8_t cmd, uint8_t data) "%s cmd: 0x%" PRIx8 " data 0x%" PRIx8
 max6581_write(const char *id, uint8_t cmd, uint8_t data) "%s cmd: 0x%" PRIx8 " data 0x%" PRIx8
