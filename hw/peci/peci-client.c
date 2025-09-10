@@ -228,6 +228,9 @@ static void peci_client_reset(Object *obj, ResetType type)
     PECIClientDevice *client = PECI_CLIENT(obj);
     client->core_temp_max = 0;
     client->dimm_temp_max = 0;
+
+    /* Pick up the sensor temperature immediately after reset. */
+    peci_client_update_temps(client);
 }
 
 static const VMStateDescription vmstate_peci_client = {
