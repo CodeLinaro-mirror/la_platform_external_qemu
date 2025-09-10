@@ -367,12 +367,13 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
                     }
                     angle_overrides_disabled += extensionLimitStr;
                 } else {
-                    WARN("Cannot add angle boot parameter '%s', character "
-                         "limit exceeded (len=%u max=%u).",
-                         extensionLimitStr,
-                         angle_overrides_disabled.size() +
-                                 strlen(extensionLimitStr),
-                         MAX_PARAM_LENGTH);
+                    dwarning(
+                            "Cannot add angle boot parameter '%s', character "
+                            "limit exceeded (len=%u max=%u).",
+                            extensionLimitStr,
+                            angle_overrides_disabled.size() +
+                                    strlen(extensionLimitStr),
+                            MAX_PARAM_LENGTH);
                 }
             }
         }

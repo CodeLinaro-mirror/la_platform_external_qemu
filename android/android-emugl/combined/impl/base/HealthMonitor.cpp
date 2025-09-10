@@ -17,8 +17,8 @@
 
 #include <map>
 
+#include "aemu/base/Log.h"
 #include "aemu/base/system/System.h"
-#include "host-common/GfxstreamFatalError.h"
 #include "testing/TestClock.h"
 
 namespace emugl {
@@ -28,8 +28,6 @@ using android::base::MetricEventHang;
 using android::base::MetricEventUnHang;
 using android::base::TestClock;
 using std::chrono::duration_cast;
-using emugl::ABORT_REASON_OTHER;
-using emugl::FatalError;
 
 template <class... Ts>
 struct MonitoredEventVisitor : Ts... {
@@ -62,7 +60,7 @@ typename HealthMonitor<Clock>::Id HealthMonitor<Clock>::startMonitoringTask(
     uint64_t timeout, std::optional<Id> parentId) {
     auto intervalMs = duration_cast<std::chrono::milliseconds>(mInterval).count();
     if (timeout < intervalMs) {
-        WARN("Timeout value %d is too low (heartbeat is every %d). Increasing to %d", timeout,
+        dwarning("Timeout value %d is too low (heartbeat is every %d). Increasing to %d", timeout,
              intervalMs, intervalMs * 2);
         timeout = intervalMs * 2;
     }
@@ -136,19 +134,17 @@ intptr_t HealthMonitor<Clock>::main() {
 
             std::visit(MonitoredEventVisitor{
                            [](std::monostate& event) {
-                               ERR("MonitoredEvent type not found");
-                               GFXSTREAM_ABORT(FatalError(ABORT_REASON_OTHER)) <<
-                                   "MonitoredEvent type not found";
+                               dfatal("MonitoredEvent type not found");
                            },
                            [this, &events](typename MonitoredEventType::Start& event) {
                                auto it = mMonitoredTasks.find(event.id);
                                if (it != mMonitoredTasks.end()) {
-                                   ERR("Registered multiple start events for task %d", event.id);
+                                   derror("Registered multiple start events for task %d", event.id);
                                    return;
                                }
                                if (event.parentId && mMonitoredTasks.find(event.parentId.value()) ==
                                                          mMonitoredTasks.end()) {
-                                   WARN("Requested parent task %d does not exist.",
+                                   dwarning("Requested parent task %d does not exist.",
                                         event.parentId.value());
                                    event.parentId = std::nullopt;
                                }
@@ -170,7 +166,7 @@ intptr_t HealthMonitor<Clock>::main() {
                            [this, &events](typename MonitoredEventType::Touch& event) {
                                auto it = mMonitoredTasks.find(event.id);
                                if (it == mMonitoredTasks.end()) {
-                                   ERR("HealthMonitor has no task in progress for id %d", event.id);
+                                   derror("HealthMonitor has no task in progress for id %d", event.id);
                                    return;
                                }
 
@@ -182,7 +178,7 @@ intptr_t HealthMonitor<Clock>::main() {
                             &events](typename MonitoredEventType::Stop& event) {
                                auto it = mMonitoredTasks.find(event.id);
                                if (it == mMonitoredTasks.end()) {
-                                   ERR("HealthMonitor has no task in progress for id %d", event.id);
+                                   derror("HealthMonitor has no task in progress for id %d", event.id);
                                    return;
                                }
 
@@ -244,7 +240,7 @@ intptr_t HealthMonitor<Clock>::main() {
         }
 
         if (mHungTasks != newHungTasks) {
-            ERR("HealthMonitor: Number of unresponsive tasks %s: %d -> %d",
+            derror("HealthMonitor: Number of unresponsive tasks %s: %d -> %d",
                 mHungTasks < newHungTasks ? "increased" : "decreaased", mHungTasks, newHungTasks);
             mHungTasks = newHungTasks;
         }
@@ -272,10 +268,10 @@ std::unique_ptr<HealthMonitor<>> CreateHealthMonitor(
         MetricsLogger& metricsLogger,
         uint64_t heartbeatInterval) {
 #if ENABLE_HEALTH_MONITOR
-    INFO("HealthMonitor enabled.");
+    dinfo("HealthMonitor enabled.");
     return std::make_unique<HealthMonitor<>>(metricsLogger, heartbeatInterval);
 #else
-    INFO("HealthMonitor disabled.");
+    dinfo("HealthMonitor disabled.");
     return nullptr;
 #endif
 }

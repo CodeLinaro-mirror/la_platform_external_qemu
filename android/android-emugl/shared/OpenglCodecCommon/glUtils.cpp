@@ -120,7 +120,7 @@ size_t glSizeof(GLenum type)
         retval = 4 + 4;
         break;
     default:
-        ERR("**** ERROR unknown type 0x%x", type);
+        derror("**** ERROR unknown type 0x%x", type);
         retval = 4;
     }
     return retval;
@@ -374,7 +374,7 @@ size_t glUtilsParamSize(GLenum param)
         s = 16;
     break;
     default:
-        ERR("glUtilsParamSize: unknown param 0x%08x", param);
+        derror("glUtilsParamSize: unknown param 0x%08x", param);
         s = 1; // assume 1
     }
     return s;
@@ -426,7 +426,7 @@ int glUtilsPixelBitSize(GLenum format, GLenum type)
         pixelsize = 32;
         break;
     default:
-        ERR("glUtilsPixelBitSize: unknown pixel type - assuming pixel data 0");
+        derror("glUtilsPixelBitSize: unknown pixel type - assuming pixel data 0");
         componentsize = 0;
     }
 
@@ -457,7 +457,7 @@ int glUtilsPixelBitSize(GLenum format, GLenum type)
             components = 4;
             break;
         default:
-            ERR("glUtilsPixelBitSize: unknown pixel format...");
+            derror("glUtilsPixelBitSize: unknown pixel format...");
             components = 0;
         }
         pixelsize = components * componentsize;

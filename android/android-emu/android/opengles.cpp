@@ -17,6 +17,7 @@
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/Stream.h"
 #include "aemu/base/memory/MemoryTracker.h"
+#include "aemu/base/Log.h"
 #include "aemu/base/logging/LogSeverity.h"
 #include "android/base/system/System.h"
 #include "android/console.h"
@@ -92,7 +93,7 @@ static int initOpenglesEmulationFuncs(ADynamicLibrary* rendererLib) {
         using type = ret(sig);                                              \
         name = (type*)symbol;                                               \
     } else {                                                                \
-        ERR("GLES emulation: Could not find required symbol (%s): %s", #name, \
+        derror("GLES emulation: Could not find required symbol (%s): %s", #name, \
           error);                                                           \
         free(error);                                                        \
         return -1;                                                          \
@@ -111,7 +112,7 @@ static int initOpenglesEmulationFuncs(ADynamicLibrary* rendererLib) {
         using type = ret(sig);                                              \
         gfxstream_##name = (type*)symbol;                                   \
     } else {                                                                \
-        ERR("GLES emulation: Could not find required symbol (%s): %s", #name, \
+        derror("GLES emulation: Could not find required symbol (%s): %s", #name, \
           error);                                                           \
         free(error);                                                        \
         return -1;                                                          \
@@ -159,10 +160,10 @@ int android_initOpenglesEmulation() {
     ADynamicLibrary* rendererSo =
             adynamicLibrary_open(RENDERER_LIB_NAME, &error);
     if (rendererSo == NULL) {
-        ERR("Could not load OpenGLES emulation library [%s]: %s",
+        derror("Could not load OpenGLES emulation library [%s]: %s",
           RENDERER_LIB_NAME, error);
 
-        ERR("Retrying in program directory/lib64...");
+        derror("Retrying in program directory/lib64...");
 
         auto progDir = System::get()->getProgramDirectory();
 
@@ -171,7 +172,7 @@ int android_initOpenglesEmulation() {
         rendererSo = adynamicLibrary_open(retryLibPath.c_str(), &error);
 
         if (rendererSo == nullptr) {
-            ERR("Could not load OpenGLES emulation library [%s]: %s (2nd try)",
+            derror("Could not load OpenGLES emulation library [%s]: %s (2nd try)",
               retryLibPath.c_str(), error);
             return -1;
         }
@@ -179,7 +180,7 @@ int android_initOpenglesEmulation() {
 
     /* Resolve the functions */
     if (initOpenglesEmulationFuncs(rendererSo) < 0) {
-        ERR("OpenGLES emulation library mismatch. Be sure to use the correct "
+        derror("OpenGLES emulation library mismatch. Be sure to use the correct "
           "version!");
         crashhandler_append_message_format(
                 "OpenGLES emulation library mismatch. Be sure to use the "
@@ -189,7 +190,7 @@ int android_initOpenglesEmulation() {
 
     sRenderLib = initLibrary();
     if (!sRenderLib) {
-        ERR("OpenGLES initialization failed!");
+        derror("OpenGLES initialization failed!");
         crashhandler_append_message_format("OpenGLES initialization failed!");
         goto BAD_EXIT;
     }
@@ -211,7 +212,7 @@ int android_initOpenglesEmulation() {
     return 0;
 
 BAD_EXIT:
-    ERR("OpenGLES emulation library could not be initialized!");
+    derror("OpenGLES emulation library could not be initialized!");
     adynamicLibrary_close(rendererSo);
     return -1;
 }
@@ -278,7 +279,7 @@ int android_startOpenglesRenderer(
         int* glesMajorVersion_out,
         int* glesMinorVersion_out) {
     if (!sRenderLib) {
-        ERR("Can't start OpenGLES renderer without support libraries");
+        derror("Can't start OpenGLES renderer without support libraries");
         return -1;
     }
 
@@ -480,7 +481,7 @@ int android_startOpenglesRenderer(
                                          sRendererUsesSubWindow);
 
     if (sRenderer == nullptr) {
-        ERR("Can't initialize RenderLib with parameters: width=%d, height=%d "
+        derror("Can't initialize RenderLib with parameters: width=%d, height=%d "
         "sRendererUsesSubWindow=%d",
         width, height, sRendererUsesSubWindow);
         return -2;
@@ -639,7 +640,7 @@ void android_getOpenglesHardwareStrings(char** vendor,
     assert(vendor != NULL && renderer != NULL && version != NULL);
     assert(*vendor == NULL && *renderer == NULL && *version == NULL);
     if (!sRenderer) {
-        ERR("Can't get OpenGL ES hardware strings when renderer not started");
+        derror("Can't get OpenGL ES hardware strings when renderer not started");
         return;
     }
 
