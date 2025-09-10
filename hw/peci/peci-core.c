@@ -192,7 +192,17 @@ int peci_handle_cmd(PECIBus *bus, PECICmd *pcmd)
          * The data is returned as a negative value representing the number of
          * degrees centigrade below the maximum processor junction temperature
          */
-        memcpy(pcmd->tx, &client->core_temp_max, sizeof(client->core_temp_max));
+        if (client->cpu_id >= FAM6_SAPPHIRE_RAPIDS_X) {
+            /*
+             * The value is returned in 10.6 format (10 bits signed decimal,
+             * 6 bits fractional).
+             */
+            int16_t get_temp = client->core_temp_max << 6;
+            memcpy(pcmd->tx, &get_temp, sizeof(get_temp));
+        } else {
+            memcpy(pcmd->tx, &client->core_temp_max,
+                   sizeof(client->core_temp_max));
+        }
         break;
 
     case PECI_CMD_RD_PKG_CFG:
