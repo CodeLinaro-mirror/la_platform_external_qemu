@@ -294,6 +294,7 @@ private slots:
     void on_volume_down_button_released();
     void on_volume_up_button_pressed();
     void on_volume_up_button_released();
+    void on_microphone_button_clicked();
     void on_zoom_button_clicked();
     void on_tablet_mode_button_clicked();
     void on_change_posture_button_clicked();
