@@ -27,8 +27,7 @@
 
 TouchpadPage::TouchpadPage(QWidget* parent)
     : QWidget(parent),
-      mUi(new Ui::TouchpadPage()),
-      mButtonSpacer(QSpacerItem(0, 0, QSizePolicy::Expanding)) {
+      mUi(new Ui::TouchpadPage()) {
     mUi->setupUi(this);
 
     constexpr int margin = 20;
@@ -47,7 +46,7 @@ TouchpadPage::TouchpadPage(QWidget* parent)
     mUi->touchpadBox->installEventFilter(this);
 
     // This will force the buttons to the left
-    mUi->gridLayout->addItem(&mButtonSpacer, 2, 3);
+    mUi->gridLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding), 2, 3);
 }
 
 void TouchpadPage::on_tp_addSecondFinger_toggled(bool checked) {

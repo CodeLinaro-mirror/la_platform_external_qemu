@@ -34,12 +34,10 @@ class TouchpadPage : public QWidget {
 
 public:
     explicit TouchpadPage(QWidget* parent = 0);
-    void setEmulatorWindow(EmulatorQtWindow* eW);
 
 private slots:
     void on_tp_addSecondFinger_toggled(bool checked);
 
 private:
     std::unique_ptr<Ui::TouchpadPage> mUi;
-    QSpacerItem mButtonSpacer;
 };
