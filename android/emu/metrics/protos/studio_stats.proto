@@ -853,6 +853,10 @@ message AndroidStudioEvent {
   // set when kind = MARKETING_EMAIL_EVENT
   optional MarketingEmailEvent marketing_email_event = 238 [lazy = true];
 
+  // set when kind = ADVERTISER_NOTIFICATION_EVENT
+  optional AdvertiserNotificationEvent advertiser_notification_event = 239
+      [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1829,6 +1833,9 @@ message AndroidStudioEvent {
 
     // Event related to marketing emails
     MARKETING_EMAIL_EVENT = 357;
+
+    // Event related to Gemini Advertiser notifications
+    ADVERTISER_NOTIFICATION_EVENT = 358;
   }
 
   // Represents different Performance Monitoring types.
@@ -2953,6 +2960,10 @@ message EmulatorAvdInfo {
     AUTOMOTIVE_ULTRAWIDE_DISPLAY = 51;
     AUTOMOTIVE_LARGE_PORTRAIT = 52;
     PIXEL_9A = 53;
+    PIXEL_10 = 54;
+    PIXEL_10_PRO = 55;
+    PIXEL_10_PRO_XL = 56;
+    PIXEL_10_PRO_FOLD = 57;
   }
   // Name of the AVD. Deprecated as it could potentially contain PII.
   optional string name = 1 [deprecated = true];
@@ -13082,6 +13093,8 @@ message UpgradeAssistantComponentInfo {
     UNIQUE_PACKAGE_NAMES = 59;
     DEPENDENCY_CONSTRAINTS_DEFAULT = 60;
     BUILT_IN_KOTLIN_DEFAULT = 61;
+    NEWDSL_DEFAULT = 62;
+    KOTLIN20_COMPOSE = 63;
   }
 
   message Java8DefaultProcessorSettings {
@@ -17862,4 +17875,27 @@ message MarketingEmailEvent {
   optional bool opted_in = 1;
   // The source of the event.
   optional EventSource event_source = 2;
+}
+
+message AdvertiserNotificationEvent {
+  enum Type {
+    UNKNOWN_TYPE = 0;
+    // Agent mode is now available.
+    AGENT_MODE_AVAILABLE = 1;
+  }
+
+  enum Action {
+    UNKNOWN = 0;
+    // Notification was shown to the user
+    SHOWN = 1;
+    // User clicked Open
+    OPEN = 2;
+    // User clicked Learn more
+    LEARN_MORE = 3;
+    // User clicked Do not show again
+    DO_NOT_SHOW_AGAIN = 4;
+  }
+
+  optional Type type = 1;
+  optional Action action = 2;
 }
