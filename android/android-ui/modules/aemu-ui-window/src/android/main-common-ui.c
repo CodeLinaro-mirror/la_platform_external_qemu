@@ -513,9 +513,14 @@ bool startRenderer(RendererConfig* config_inout) {
         derror("Could not start Opengl ES Renderer! (Error: %d)",
             renderer_startup_res);
         crashhandler_append_message_format(
-                "android_startOpenglesRenderer failed. "
+                "android_startOpenglesRenderer failed with gpu mode: %s."
                 "Error: %d\n",
+                hw->hw_gpu_mode ? hw->hw_gpu_mode : "unknown",
                 renderer_startup_res);
+        if (hw->hw_gpu_mode &&
+            strcmp("swiftshader_indirect", hw->hw_gpu_mode)) {
+            str_reset(&hw->hw_gpu_mode, "swiftshader_indirect");
+        }
         return false;
     }
 
