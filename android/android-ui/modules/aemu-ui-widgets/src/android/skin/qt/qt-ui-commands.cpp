@@ -95,6 +95,8 @@ constexpr CommandInfo kCommands[] = {
         INIT_COMMAND(PALM, "Palm gesture"),
         INIT_COMMAND(TILT, "Tilt gesture"),
         INIT_COMMAND(CHANGE_XR_INPUT_MODE, "Input Mode"),
+        INIT_COMMAND(XR_LEFT_HAND, "Left hand gesture"),
+        INIT_COMMAND(XR_RIGHT_HAND, "Right hand gesture"),
         INIT_COMMAND(CHANGE_XR_ENVIRONMENT_MODE, "Environment selector"),
         INIT_COMMAND(XR_SCREEN_RECENTER, "Reset Position"),
         INIT_COMMAND(XR_VIEWPORT_CONTROL_MODE_PAN, "Drag mouse to pan"),

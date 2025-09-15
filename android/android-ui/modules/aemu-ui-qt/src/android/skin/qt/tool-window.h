@@ -35,8 +35,11 @@
 #include "aemu/base/threads/WorkerThread.h"
 #include "android/emulation/resizable_display_config.h"
 #include "android/skin/qt/extended-window-base.h"
+#include "android/skin/qt/hand-constants.h"
+#include "android/skin/qt/left-hand-dialog.h"
 #include "android/skin/qt/qt-ui-commands.h"
 #include "android/skin/qt/resizable-dialog.h"
+#include "android/skin/qt/right-hand-dialog.h"
 #include "android/skin/qt/shortcut-key-store.h"
 #include "android/skin/qt/ui-event-recorder.h"
 #include "android/skin/qt/user-actions-counter.h"
@@ -177,6 +180,11 @@ private:
     // `currentMode` command, otherwise uncheck the button.
     void updateXrNavigationButtonsChecked(QtUICommand currentMode);
 
+    // Notify guest (Android) about the hand gesture selection for left hand.
+    void notifyGuestOnLeftHandGesture(const QString& gesture);
+    // Notify guest (Android) about the hand gesture selection for right hand.
+    void notifyGuestOnRightHandGesture(const QString& gesture);
+
     virtual void closeEvent(QCloseEvent* ce) override;
     virtual void mousePressEvent(QMouseEvent* event) override;
     virtual void paintEvent(QPaintEvent*) override;
@@ -214,6 +222,9 @@ private:
     QtUICommand mXrLastMouseKeyboardModeCommand = QtUICommand::CHANGE_XR_INPUT_MODE;
     std::vector<std::reference_wrapper<QPushButton>> mXrMouseKeyboardModeButtons;
 
+    QString mCurrentLeftHandGesture = Ui::GESTURE_NAME_PINCH;
+    QString mCurrentRightHandGesture = Ui::GESTURE_NAME_PINCH;
+
     static const UiEmuAgent* sUiEmuAgent;
 
     PostureSelectionDialog* mPostureSelectionDialog;
@@ -239,6 +250,8 @@ private:
     ResizableDialog* mResizableDialog;
     XrEnvironmentModeDialog* mXrEnvironmentModeDialog;
     XrInputModeDialog* mXrInputModeDialog;
+    LeftHandDialog* mLeftHandDialog;
+    RightHandDialog* mRightHandDialog;
     // A map of all XR specific pushbuttons in the main panel, which is used
     // to identify XR specific buttons and also group them together based on
     // specific type.
@@ -311,6 +324,12 @@ private slots:
     void on_xr_input_mode_button_clicked();
     void on_xr_input_mode_changed(int mode);
     void on_dismiss_xr_input_mode_dialog();
+    void on_left_hand_button_clicked();
+    void on_right_hand_button_clicked();
+    void on_left_hand_gesture_changed(const QString& gesture);
+    void on_right_hand_gesture_changed(const QString& gesture);
+    void on_dismiss_left_hand_dialog();
+    void on_dismiss_right_hand_dialog();
     void on_xr_screen_recenter_button_clicked();
     void on_xr_viewport_pan_button_clicked();
     void on_xr_viewport_dolly_button_clicked();

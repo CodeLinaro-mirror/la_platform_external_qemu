@@ -53,7 +53,6 @@
 
 #include "aemu/base/logging/Log.h"
 #include "aemu/base/logging/LogSeverity.h"
-#include "aemu/base/memory/OnDemand.h"
 #include "android/avd/info.h"
 #include "android/avd/util.h"
 #include "android/base/system/System.h"
@@ -88,16 +87,45 @@
 #include "host-common/FeatureControl.h"
 #include "host-common/Features.h"
 #include "host-common/hw-config-helper.h"
-#include "host-common/misc.h"
 #include "host-common/opengles.h"
-#include "host-common/screen-recorder.h"
 #include "host-common/window_agent.h"
 #include "host-common/snapshot_common.h"
 #include "host-common/snapshot_interface.h"
 #include "android/metrics/studio_stats_wrapper.pb.h"
 #include "ui_tools.h"
+#include "xr_emulator_conn.pb.h"
 
 namespace {
+
+struct GestureData {
+    const char* button_name;
+    const char* button_tip;
+    xr_emulator_proto::HandGesture protoId;
+};
+
+const std::map<QString, GestureData> LEFT_HAND_GESTURE_DATA = {
+        {Ui::GESTURE_NAME_PINCH,
+         {"xr_left_hand_pinch", "Left hand: Pinch",
+          xr_emulator_proto::LEFT_HAND_PINCH}},
+        {Ui::GESTURE_NAME_GRAB,
+         {"xr_left_hand_grab", "Left hand: Grab",
+          xr_emulator_proto::LEFT_HAND_GRAB}},
+        {Ui::GESTURE_NAME_POKE,
+         {"xr_left_hand_poke", "Left hand: Poke",
+          xr_emulator_proto::LEFT_HAND_POKE}},
+};
+
+const std::map<QString, GestureData> RIGHT_HAND_GESTURE_DATA = {
+        {Ui::GESTURE_NAME_PINCH,
+         {"xr_right_hand_pinch", "Right hand: Pinch",
+          xr_emulator_proto::RIGHT_HAND_PINCH}},
+        {Ui::GESTURE_NAME_GRAB,
+         {"xr_right_hand_grab", "Right hand: Grab",
+          xr_emulator_proto::RIGHT_HAND_GRAB}},
+        {Ui::GESTURE_NAME_POKE,
+         {"xr_right_hand_poke", "Right hand: Poke",
+          xr_emulator_proto::RIGHT_HAND_POKE}},
+};
 
 void ChangeIcon(QPushButton* button, const char* icon, const char* tip) {
     button->setIcon(getIconForCurrentTheme(icon));
@@ -163,6 +191,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
       mResizableDialog(new ResizableDialog(this)),
       mXrEnvironmentModeDialog(new XrEnvironmentModeDialog(this)),
       mXrInputModeDialog(new XrInputModeDialog(this)),
+      mLeftHandDialog(new LeftHandDialog(this)),
+      mRightHandDialog(new RightHandDialog(this)),
       mFoldableSyncToAndroidSuccess(false),
       mFoldableSyncToAndroidTimeout(false),
       mFoldableSyncToAndroid([this](FoldableSyncToAndroidItem&& item) {
@@ -487,12 +517,24 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
                 SLOT(on_xr_input_mode_changed(int)));
         connect(mXrInputModeDialog, SIGNAL(finished(int)), this,
                 SLOT(on_dismiss_xr_input_mode_dialog()));
+
+        connect(mLeftHandDialog, &LeftHandDialog::leftHandGestureSelected, this,
+                &ToolWindow::on_left_hand_gesture_changed);
+        connect(mRightHandDialog, &RightHandDialog::rightHandGestureSelected,
+                this, &ToolWindow::on_right_hand_gesture_changed);
     }
 
     if (!resizableEnabled()) {
         mToolsUi->resizable_button->setHidden(true);
     } else {
         resizableChangeIcon(getResizableActiveConfigId());
+    }
+
+    if (!getConsoleAgents()
+                 ->settings->android_cmdLineOptions()
+                 ->hands_in_space) {
+        mToolsUi->left_hand_button->setHidden(true);
+        mToolsUi->right_hand_button->setHidden(true);
     }
 
     sToolWindow = this;
@@ -1699,10 +1741,8 @@ void ToolWindow::on_xr_environment_mode_button_clicked() {
 
 void ToolWindow::on_xr_input_mode_button_clicked() {
     const auto* opts = getConsoleAgents()->settings->android_cmdLineOptions();
-    bool support_multi = opts->support_multiple_input_modalities;
-    bool hands_in_space_enabled = opts->hands_in_space;
 
-    if (support_multi || hands_in_space_enabled) {
+    if (opts->support_multiple_input_modalities) {
         mXrInputModeDialog->show();
         // Align pop-up input selection dialog to the right of input button.
         QRect geoTool = this->geometry();
@@ -2227,4 +2267,96 @@ bool ToolWindow::eventFilter(QObject* o, QEvent* event) {
         repaint();
     }
     return false;
+}
+
+void ToolWindow::notifyGuestOnLeftHandGesture(const QString& gesture) {
+    auto data = LEFT_HAND_GESTURE_DATA.find(gesture);
+    if (data == LEFT_HAND_GESTURE_DATA.end()) {
+        return;
+    }
+    sUiEmuAgent->window->setXrHandGesture(data->second.protoId);
+
+    mCurrentLeftHandGesture = gesture;
+}
+
+void ToolWindow::notifyGuestOnRightHandGesture(const QString& gesture) {
+    auto data = RIGHT_HAND_GESTURE_DATA.find(gesture);
+    if (data == RIGHT_HAND_GESTURE_DATA.end()) {
+        return;
+    }
+    sUiEmuAgent->window->setXrHandGesture(data->second.protoId);
+
+    mCurrentRightHandGesture = gesture;
+}
+
+void ToolWindow::on_left_hand_button_clicked() {
+    mLeftHandDialog->show();
+    QRect geoTool = this->geometry();
+    mLeftHandDialog->move(
+            geoTool.right(),
+            geoTool.top() + mToolsUi->left_hand_button->geometry().top());
+
+    // make only this button checked
+    updateXrNavigationButtonsChecked(QtUICommand::XR_LEFT_HAND);
+
+    notifyGuestOnLeftHandGesture(mCurrentLeftHandGesture);
+}
+
+void ToolWindow::on_right_hand_button_clicked() {
+    mRightHandDialog->show();
+    QRect geoTool = this->geometry();
+    mRightHandDialog->move(
+            geoTool.right(),
+            geoTool.top() + mToolsUi->right_hand_button->geometry().top());
+    
+    // make only this button checked
+    updateXrNavigationButtonsChecked(QtUICommand::XR_RIGHT_HAND);
+
+    notifyGuestOnRightHandGesture(mCurrentRightHandGesture);
+}
+
+void ToolWindow::on_left_hand_gesture_changed(const QString& gesture) {
+    const auto emulatorWindow = EmulatorQtWindow::getInstance();
+    if (emulatorWindow) {
+        emulatorWindow->setRelativeMouseCoordMode(false);
+    } else {
+        LOG(WARNING)
+                << "No window found to set mouse coordinates mode";
+    }
+
+    auto gestureData = LEFT_HAND_GESTURE_DATA.find(gesture);
+    if (gestureData == LEFT_HAND_GESTURE_DATA.end()) {
+        LOG(ERROR) << "Unsupported gesture from UI: " << gesture.toStdString();
+        return;
+    }
+    ChangeIcon(mToolsUi->left_hand_button, gestureData->second.button_name,
+               gestureData->second.button_tip);
+
+    notifyGuestOnLeftHandGesture(gesture);
+}
+
+void ToolWindow::on_right_hand_gesture_changed(const QString& gesture) {
+    const auto emulatorWindow = EmulatorQtWindow::getInstance();
+    if (emulatorWindow) {
+        emulatorWindow->setRelativeMouseCoordMode(false);
+    } else {
+        LOG(WARNING)
+                << "No window found to set mouse coordinates mode";
+    }
+
+    auto gestureData = RIGHT_HAND_GESTURE_DATA.find(gesture);
+    if (gestureData == RIGHT_HAND_GESTURE_DATA.end()) {
+        LOG(ERROR) << "Unsupported gesture from UI: " << gesture.toStdString();
+        return;
+    }
+    ChangeIcon(mToolsUi->right_hand_button, gestureData->second.button_name,
+               gestureData->second.button_tip);
+
+    notifyGuestOnRightHandGesture(gesture);
+}
+
+void ToolWindow::on_dismiss_left_hand_dialog() {
+}
+
+void ToolWindow::on_dismiss_right_hand_dialog() {
 }

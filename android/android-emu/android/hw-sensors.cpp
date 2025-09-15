@@ -1746,3 +1746,11 @@ bool android_xr_get_options(int* environment, float* passthroughCoefficient) {
 void* android_get_xr_options_publisher() {
     return physicalModel_getXrOptionsPublisher(android_physical_model_instance());
 }
+
+bool android_xr_set_hand_gesture(int gesture) {
+    auto f_gesture = static_cast<float>(gesture);
+    return static_cast<bool>(
+            android_physical_model_set(PHYSICAL_PARAMETER_XR_HAND_GESTURE,
+                                       &f_gesture, 1,
+                                       PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}

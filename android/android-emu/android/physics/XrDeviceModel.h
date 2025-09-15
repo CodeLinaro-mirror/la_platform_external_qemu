@@ -91,6 +91,10 @@ public:
     vec3 getXrOptions(
         ParameterValueType parameterValueType) const;
 
+    // Send Hand Gesture to the guest operating system.
+    void setXrHandGesture(int gesture, PhysicalInterpolation mode);
+    float getXrHandGesture(ParameterValueType parameterValueType) const;
+
     XrOptionsPublisher* getXrOptionsPublisher() {
         return &mXrOptionsPublisher;
     }
@@ -107,11 +111,14 @@ private:
             XrEnvironmentMode::XR_ENVIRONMENT_MODE_PASSTHROUGH_OFF;
     XrViewportControlMode mLastViewportControlModeRequested =
             XrViewportControlMode::VIEWPORT_CONTROL_MODE_UNKNOWN;
+    xr_emulator_proto::HandGesture mLastHandGestureRequested =
+            xr_emulator_proto::HAND_GESTURE_UNKNOWN;
 
     void sendXrInputMode(enum XrInputMode mode);
     void sendXrEnvironmentMode(enum XrEnvironmentMode mode);
     void sendXrScreenRecenter();
     void sendXrViewportControlMode(enum XrViewportControlMode mode);
+    void sendXrHandGesture(xr_emulator_proto::HandGesture gesture);
 
     XrOptionsPublisher mXrOptionsPublisher;
 
