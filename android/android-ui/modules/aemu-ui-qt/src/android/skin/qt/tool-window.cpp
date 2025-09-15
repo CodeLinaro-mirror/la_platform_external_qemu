@@ -473,15 +473,6 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         mToolsUi->next_layout_button->setHidden(true);
     }
 
-    if (fc::isEnabled(fc::XrModeGlassesUI)) {
-        mToolsUi->power_button->setHidden(true);
-        mToolsUi->zoom_button->setHidden(true);
-        mToolsUi->prev_layout_button->setHidden(true);
-        mToolsUi->next_layout_button->setHidden(true);
-        mToolsUi->home_button->setHidden(true);
-        mToolsUi->overview_button->setHidden(true);
-    }
-
 #ifndef Q_OS_MAC
     // Swap minimize and close buttons on non-apple OSes
     auto closeBtn = mToolsUi->winButtonsLayout->takeAt(0);
@@ -500,6 +491,23 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     }
     updateFoldableButtonVisibility();
     updateXrButtonsVisibility();
+
+    if (avdFlavor == AVD_GLASSES) {
+        mToolsUi->power_button->setHidden(true);
+        mToolsUi->zoom_button->setHidden(true);
+        mToolsUi->prev_layout_button->setHidden(true);
+        mToolsUi->next_layout_button->setHidden(true);
+        mToolsUi->home_button->setHidden(true);
+        mToolsUi->overview_button->setHidden(true);
+        mToolsUi->glasses_button_1->setEnabled(true);
+        mToolsUi->glasses_button_2->setEnabled(true);
+        mToolsUi->zoom_generic_button->setEnabled(true);
+
+    } else {
+        mToolsUi->glasses_button_1->setVisible(false);
+        mToolsUi->glasses_button_2->setVisible(false);
+        mToolsUi->zoom_generic_button->setVisible(false);
+    }
 
     connect(mPostureSelectionDialog, SIGNAL(newPostureRequested(int)), this,
             SLOT(on_new_posture_requested(int)));
@@ -1907,6 +1915,16 @@ void ToolWindow::on_volume_down_button_released() {
 void ToolWindow::on_microphone_button_clicked() {
     mEmulatorWindow->activateWindow();
     handleUICommand(QtUICommand::TOGGLE_MICROPHONE, true);
+}
+
+void ToolWindow::on_glasses_button_1_clicked() {
+    mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::GLASSES_1, true);
+}
+
+void ToolWindow::on_glasses_button_2_clicked() {
+    mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::GLASSES_2, true);
 }
 
 void ToolWindow::on_overview_button_pressed() {

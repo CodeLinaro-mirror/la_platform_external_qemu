@@ -242,6 +242,7 @@ AvdFlavor propertyFile_getAvdFlavor(const FileData* data) {
     const char* car_names[] = {"car"};
     const char* desktop_names[] = {"pc"};
     const char* xr_names[] = {"xr"};
+    const char* glasses_names[] = {"glasses"};
 
     if (IN_PRODUCT_NAME(data, phone_names)) {
         res = AVD_PHONE;
@@ -255,6 +256,8 @@ AvdFlavor propertyFile_getAvdFlavor(const FileData* data) {
         res = AVD_DESKTOP;
     } else if (IN_PRODUCT_NAME(data, xr_names)) {
         res = AVD_XR;
+    } else if (IN_PRODUCT_NAME(data, glasses_names)) {
+        res = AVD_GLASSES;
     }
 
     return res;
