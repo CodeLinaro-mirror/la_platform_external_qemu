@@ -154,6 +154,8 @@ signals:
     void guestClipboardChanged(QString text);
     void haveClipboardSharingKnown(bool have);
     void themeChanged(SettingsTheme theme);
+    // Signal to indicate the host microphone input setting has changed
+    void microphoneEnabledChanged();
 
 private:
     bool eventFilter(QObject* o, QEvent* event) override;
@@ -282,6 +284,8 @@ public slots:
     void showVirtualSceneControls(bool show);
     void ensureVirtualSceneWindowCreated();
     void on_close_button_clicked();
+    // Signal handler for host microphone input toggle changes
+    void onMicrophoneEnabledChanged();
 
 private slots:
     void on_back_button_pressed();

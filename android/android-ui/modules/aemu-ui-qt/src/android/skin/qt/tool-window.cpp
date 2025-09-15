@@ -1318,6 +1318,13 @@ void ToolWindow::setMicrophoneEnabled(bool enabled) {
                 Ui::Settings::MIC_ALLOW_READ_AUDIO, enabled);
 
     updateMicrophoneUI();
+
+    // Emit the signal to allow the microphone page to update its UI
+    emit microphoneEnabledChanged();
+}
+
+void ToolWindow::onMicrophoneEnabledChanged() {
+    updateMicrophoneUI();
 }
 
 void ToolWindow::updateMicrophoneUI() {

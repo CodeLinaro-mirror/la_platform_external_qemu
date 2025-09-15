@@ -160,6 +160,14 @@ void MicrophonePage::on_mic_inserted_toggled(bool checked) {
 void MicrophonePage::on_mic_allowRealAudio_toggled(bool checked) {
     saveMicAllowRealAudio(checked);
     getConsoleAgents()->vm->allowRealAudio(checked);
+
+    // Emit the signal to allow the main toolbar to update its UI
+    emit microphoneEnabledChanged();
+}
+
+void MicrophonePage::onMicrophoneEnabledChanged() {
+    // Update the UI to match the external state change
+    mUi->mic_allowRealAudio->setCheckState(getSavedMicAllowRealAudio() ? Qt::Checked : Qt::Unchecked);
 }
 
 void MicrophonePage::on_mic_voiceAssistButton_pressed() {

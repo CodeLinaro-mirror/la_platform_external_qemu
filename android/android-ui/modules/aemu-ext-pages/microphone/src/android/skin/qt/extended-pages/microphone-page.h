@@ -39,6 +39,14 @@ public:
 
     static void loadSettings();
 
+signals:
+    // Signal to indicate the host microphone input setting has changed
+    void microphoneEnabledChanged();
+
+public slots:
+    // Signal handler for host microphone input toggle changes
+    void onMicrophoneEnabledChanged();
+
 private slots:
     void on_mic_hasMic_toggled(bool checked);
     void on_mic_hookButton_pressed();
