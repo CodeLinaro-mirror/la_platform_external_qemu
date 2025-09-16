@@ -34,6 +34,7 @@ void cpu_stop_current(void);
 void qemu_cpu_kick_self(void);
 
 bool cpus_are_resettable(void);
+int cpus_count(void);
 
 void cpu_synchronize_all_states(void);
 void cpu_synchronize_all_post_reset(void);
