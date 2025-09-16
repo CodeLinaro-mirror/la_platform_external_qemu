@@ -13,10 +13,6 @@
 // limitations under the License.
 #pragma once
 
-#ifndef AEMU_GFXSTREAM_BACKEND
-#error "Don't include migration stubs if AEMU_GFXSTREAM_BACKEND not defined"
-#endif
-
 #include <inttypes.h>
 
 typedef uint64_t hwaddr;

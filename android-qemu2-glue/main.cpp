@@ -935,7 +935,7 @@ static void enter_qemu_main_loop(int argc, char** argv) {
     int retval = run_qemu_main(argc, (const char**)argv, [] {
         skin_winsys_run_ui_update(
                 [](void*) {
-                    // It is only safe to stop the OpenGL ES renderer after the
+                    // It is only safe to stop the renderer after the
                     // main loop has exited. This is not necessarily before
                     // |skin_window_free| is called, especially on Windows!
                     android_stopOpenglesRenderer(false);

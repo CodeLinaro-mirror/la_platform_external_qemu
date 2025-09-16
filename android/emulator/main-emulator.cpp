@@ -84,12 +84,6 @@
 #include <sys/types.h>
 #endif
 
-#ifdef AEMU_GFXSTREAM_BACKEND
-static constexpr bool HAS_GFXSTREAM = true;
-#else
-static constexpr bool HAS_GFXSTREAM = false;
-#endif
-
 using android::ConfigDirs;
 using android::base::PathUtils;
 using android::base::RunOptions;
@@ -879,8 +873,7 @@ int main(int argc, char** argv) {
           EMULATOR_CL_SHA1);
 #endif
 
-    dinfo("Graphics backend: %s",
-          HAS_GFXSTREAM ? "gfxstream" : "non-gfxstream");
+    dinfo("Graphics backend: gfxstream");
     // check version requirement in avd's config.ini file and make
     // sure curent version >= the required version;
     if (avdName) {

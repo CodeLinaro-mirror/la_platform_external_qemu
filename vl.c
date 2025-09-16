@@ -3332,8 +3332,8 @@ static void android_teardown_metrics()
 }
 
 
-static const char openglInitFailureMessage[] =
-    "OpenGLES emulation failed to initialize. "
+static const char gpuEmulationInitFailureMessage[] =
+    "GPU emulation failed to initialize. "
     "Please consider the following troubleshooting steps:\n\n"
     "1. Make sure your GPU drivers are up to date.\n\n"
     "2. Erase and re-download the emulator ($ANDROID_SDK_ROOT/emulator).\n\n"
@@ -3349,9 +3349,9 @@ static bool android_reporting_setup(void)
     registerCrashInfo();
 
     if (!is_opengl_alive) {
-        derror(openglInitFailureMessage);
+        derror(gpuEmulationInitFailureMessage);
         android_teardown_metrics();
-        crashhandler_die(openglInitFailureMessage);
+        crashhandler_die(gpuEmulationInitFailureMessage);
         return false;
     }
     android_check_for_updates();

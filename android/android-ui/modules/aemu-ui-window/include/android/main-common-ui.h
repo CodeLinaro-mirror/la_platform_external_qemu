@@ -70,7 +70,7 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 bool startRenderer(RendererConfig* config_inout);
 
 // stopRenderer() - stop all the render threads and wait until their exit.
-// NOTE: It is only safe to stop the OpenGL ES renderer after the main loop
+// NOTE: It is only safe to stop the renderer after the main loop
 //   has exited. This is not necessarily before |skin_window_free| is called,
 //   especially on Windows!
 void stopRenderer(void);
