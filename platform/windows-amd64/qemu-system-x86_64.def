@@ -40,8 +40,7 @@ EXPORTS
     cpu_watchpoint_remove
     cpu_watchpoint_remove_all
     cpu_work_list_empty
-    cpus_queue
-    current_machine
+    cpus_count
     cursor_alloc
     device_class_set_props_n
     dpy_cursor_define
@@ -79,6 +78,7 @@ EXPORTS
     iov_from_buf_full
     iov_size
     iov_to_buf_full
+    machine_current_cpu_type
     memory_region_add_subregion
     memory_region_del_subregion
     memory_region_init

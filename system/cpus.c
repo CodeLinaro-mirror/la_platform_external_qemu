@@ -203,6 +203,19 @@ bool cpus_are_resettable(void)
     return true;
 }
 
+int cpus_count(void) {
+    int count = 0;
+    CPUState* cpu;
+
+    cpu_list_lock();
+    CPU_FOREACH(cpu) {
+        count++;
+    }
+    cpu_list_unlock();
+
+    return count;
+}
+
 void cpu_exec_reset_hold(CPUState *cpu)
 {
     if (cpus_accel->cpu_reset_hold) {
