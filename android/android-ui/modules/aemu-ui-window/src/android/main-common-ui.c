@@ -510,7 +510,7 @@ bool startRenderer(RendererConfig* config_inout) {
             multi_display_agent, NULL, &config_inout->gles_major_version,
             &config_inout->gles_minor_version);
     if (renderer_startup_res < 0) {
-        derror("Could not start Opengl ES Renderer! (Error: %d)",
+        derror("Could not start renderer! (Error: %d)",
             renderer_startup_res);
         crashhandler_append_message_format(
                 "android_startOpenglesRenderer failed. "

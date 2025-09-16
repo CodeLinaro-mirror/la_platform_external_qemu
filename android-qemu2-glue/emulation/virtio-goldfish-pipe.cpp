@@ -43,11 +43,7 @@ extern "C" {
 #include "host-common/goldfish_pipe.h"
 #include "hw/virtio/virtio-goldfish-pipe.h"
 
-#ifdef AEMU_GFXSTREAM_BACKEND
 #include "migration-stubs.h"
-#else
-#include "migration/migration.h"
-#endif
 
 #include "virgl_hw.h"
 }  // extern "C"

@@ -69,11 +69,7 @@
 
 #define ALLOW_CHANGE_RENDERER
 
-#ifdef AEMU_GFXSTREAM_BACKEND
 static constexpr bool HAS_GFXSTREAM = true;
-#else
-static constexpr bool HAS_GFXSTREAM = false;
-#endif
 
 using android::base::c_str;
 using android::base::endsWith;

@@ -63,15 +63,11 @@ using gfxstream::ConsumerCallbacks;
 using gfxstream::ConsumerInterface;
 
 /* Name of the GLES rendering library we're going to use */
-#ifdef AEMU_GFXSTREAM_BACKEND
 #define RENDERER_LIB_NAME "libgfxstream_backend"
 
 static void (*gfxstream_android_setOpenglesRenderer)(
         gfxstream::RendererPtr* ptr) = NULL;
 static void (*gfxstream_android_stopOpenglesRenderer)(bool wait) = NULL;
-#else
-#define RENDERER_LIB_NAME "libOpenglRender"
-#endif  // AEMU_GFXSTREAM_BACKEND
 
 /* Declared in "android/console.h" */
 int android_gles_fast_pipes = 1;
@@ -101,7 +97,6 @@ static int initOpenglesEmulationFuncs(ADynamicLibrary* rendererLib) {
     LIST_RENDER_API_FUNCTIONS(FUNCTION_)
 #undef FUNCTION_
 
-#ifdef AEMU_GFXSTREAM_BACKEND
 #define LIST_GFXSTREAM_MISC_FUNCTIONS(X)                                \
     X(void, android_setOpenglesRenderer, (gfxstream::RendererPtr*), ()) \
     X(void, android_stopOpenglesRenderer, (bool), ())
@@ -120,7 +115,6 @@ static int initOpenglesEmulationFuncs(ADynamicLibrary* rendererLib) {
     LIST_GFXSTREAM_MISC_FUNCTIONS(FUNCTION_)
 #undef LIST_GFXSTREAM_MISC_FUNCTIONS
 #undef FUNCTION_
-#endif  // AEMU_GFXSTREAM_BACKEND
     return 0;
 }
 
@@ -132,7 +126,6 @@ static gfxstream::RendererPtr sRenderer = nullptr;
 static const EGLDispatch* sEgl = nullptr;
 static const GLESv2Dispatch* sGlesv2 = nullptr;
 
-#ifdef AEMU_GFXSTREAM_BACKEND
 static bool sRunningInGfxstreamBackend = false;
 // The two functions below only are called in gfxstream backend, which assumes
 // RenderLib is a static library.
@@ -147,7 +140,6 @@ int android_setOpenglesEmulation(void* renderLib,
     sRunningInGfxstreamBackend = true;
     return 0;
 }
-#endif  // AEMU_GFXSTREAM_BACKEND
 
 int android_initOpenglesEmulation() {
     char* error = NULL;
@@ -155,12 +147,12 @@ int android_initOpenglesEmulation() {
     if (sRenderLib != NULL)
         return 0;
 
-    dinfo("Initializing hardware OpenGLES emulation support");
+    dinfo("Initializing gfxstream backend");
 
     ADynamicLibrary* rendererSo =
             adynamicLibrary_open(RENDERER_LIB_NAME, &error);
     if (rendererSo == NULL) {
-        derror("Could not load OpenGLES emulation library [%s]: %s",
+        derror("Could not load gfxstream backend library [%s]: %s",
           RENDERER_LIB_NAME, error);
 
         derror("Retrying in program directory/lib64...");
@@ -172,7 +164,7 @@ int android_initOpenglesEmulation() {
         rendererSo = adynamicLibrary_open(retryLibPath.c_str(), &error);
 
         if (rendererSo == nullptr) {
-            derror("Could not load OpenGLES emulation library [%s]: %s (2nd try)",
+            derror("Could not load gfxstream backend library [%s]: %s (2nd try)",
               retryLibPath.c_str(), error);
             return -1;
         }
@@ -180,18 +172,18 @@ int android_initOpenglesEmulation() {
 
     /* Resolve the functions */
     if (initOpenglesEmulationFuncs(rendererSo) < 0) {
-        derror("OpenGLES emulation library mismatch. Be sure to use the correct "
+        derror("Gfxstream backend library mismatch. Be sure to use the correct "
           "version!");
         crashhandler_append_message_format(
-                "OpenGLES emulation library mismatch. Be sure to use the "
+                "Gfxstream backend library mismatch. Be sure to use the "
                 "correct version!");
         goto BAD_EXIT;
     }
 
     sRenderLib = initLibrary();
     if (!sRenderLib) {
-        derror("OpenGLES initialization failed!");
-        crashhandler_append_message_format("OpenGLES initialization failed!");
+        derror("Gfxstream backend initialization failed!");
+        crashhandler_append_message_format("Gfxstream backend initialization failed!");
         goto BAD_EXIT;
     }
 
@@ -212,7 +204,7 @@ int android_initOpenglesEmulation() {
     return 0;
 
 BAD_EXIT:
-    derror("OpenGLES emulation library could not be initialized!");
+    derror("Gfxstream backend library could not be initialized!");
     adynamicLibrary_close(rendererSo);
     return -1;
 }
@@ -279,7 +271,7 @@ int android_startOpenglesRenderer(
         int* glesMajorVersion_out,
         int* glesMinorVersion_out) {
     if (!sRenderLib) {
-        derror("Can't start OpenGLES renderer without support libraries");
+        derror("Can't start the renderer without support libraries");
         return -1;
     }
 
@@ -302,7 +294,6 @@ int android_startOpenglesRenderer(
     sRenderLib->setGuestAndroidApiLevel(guestApiLevel);
 
     gfxstream::host::FeatureSet gfxstreamFeatures;
-#if defined(AEMU_GFXSTREAM_BACKEND)
     using GfxstreamFeaturePtr =
             gfxstream::host::FeatureInfo(gfxstream::host::FeatureSet::*);
     const std::map<android::featurecontrol::Feature, GfxstreamFeaturePtr>
@@ -417,9 +408,6 @@ int android_startOpenglesRenderer(
         android::featurecontrol::makeReadOnly(aemuFeature);
     }
     gfxstreamFeatures.EglOnEgl.enabled = sEgl2egl;
-#else
-    // libOpenglRender uses feature control directly.
-#endif
 
     sRenderLib->setSyncDevice(
             goldfish_sync_create_timeline, goldfish_sync_create_fence,
@@ -486,9 +474,8 @@ int android_startOpenglesRenderer(
         width, height, sRendererUsesSubWindow);
         return -2;
     }
-#ifdef AEMU_GFXSTREAM_BACKEND
+
     gfxstream_android_setOpenglesRenderer(&sRenderer);
-#endif  // AEMU_GFXSTREAM_BACKEND
 
     sEgl = (const EGLDispatch*)sRenderer->getEglDispatch();
     sGlesv2 = (const GLESv2Dispatch*)sRenderer->getGles2Dispatch();
@@ -640,14 +627,14 @@ void android_getOpenglesHardwareStrings(char** vendor,
     assert(vendor != NULL && renderer != NULL && version != NULL);
     assert(*vendor == NULL && *renderer == NULL && *version == NULL);
     if (!sRenderer) {
-        derror("Can't get OpenGL ES hardware strings when renderer not started");
+        derror("Can't get GPU strings when renderer not started");
         return;
     }
 
     auto strings = sRenderer->getHardwareStrings();
-    dinfo("OpenGL Vendor=[%s]", strings.vendor.c_str());
-    dinfo("OpenGL Renderer=[%s]", strings.renderer.c_str());
-    dinfo("OpenGL Version=[%s]", strings.version.c_str());
+    dinfo("GPU Vendor=[%s]", strings.vendor.c_str());
+    dinfo("GPU Renderer=[%s]", strings.renderer.c_str());
+    dinfo("GPU Version=[%s]", strings.version.c_str());
 
     /* Special case for the default ES to GL translators: extract the strings
      * of the underlying OpenGL implementation. */
@@ -674,11 +661,9 @@ void android_stopOpenglesRenderer(bool wait) {
         sRenderer->stop(wait);
         if (wait) {
             sRenderer.reset();
-#ifdef AEMU_GFXSTREAM_BACKEND
             if (gfxstream_android_stopOpenglesRenderer) {
                 gfxstream_android_stopOpenglesRenderer(wait);
             }
-#endif  // AEMU_GFXSTREAM_BACKEND
         }
     }
 }
@@ -790,7 +775,6 @@ const gfxstream::RendererPtr& android_getOpenglesRenderer() {
 
 void android_setOpenglesRenderer(gfxstream::RendererPtr* ptr) {
     sRenderer = *ptr;
-#ifdef AEMU_GFXSTREAM_BACKEND
     // We inject our own opengles.cpp into gfxstream.
     ConsumerInterface interface = {
             // create
@@ -840,7 +824,6 @@ void android_setOpenglesRenderer(gfxstream::RendererPtr* ptr) {
             },
     };
     AddressSpaceGraphicsContext::setConsumer(interface);
-#endif  // AEMU_GFXSTREAM_BACKEND
 }
 }  // extern "C"
 
