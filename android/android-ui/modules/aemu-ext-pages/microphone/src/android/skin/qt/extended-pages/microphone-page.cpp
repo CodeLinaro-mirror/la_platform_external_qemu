@@ -24,6 +24,7 @@
 #include "android/metrics/UiEventTracker.h"           // for UiEventTracker
 #include "android/skin/keycode.h"                     // for kKeyCodeAssist
 #include "android/skin/event.h"                       // for SkinEvent, Skin...
+#include "android/skin/qt/avd-settings-helper.h"      // for getAvdSettingsFile
 #include "android/skin/qt/emulator-qt-window.h"       // for EmulatorQtWindow
 #include "android/skin/qt/extended-pages/common.h"    // for getSelectedTheme
 #include "android/skin/qt/qt-settings.h"              // for PER_AVD_SETTIN...
@@ -34,38 +35,6 @@
 #include "host-common/feature_control.h"
 
 namespace {
-QString getAvdSettingsFile() {
-    const char* avdPath = path_getAvdContentPath(getConsoleAgents()->settings->hw()->avd_name);
-    if (avdPath) {
-        return QString(avdPath) + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
-    } else {
-        return {};
-    }
-}
-
-QVariant getSavedSetting(const char* avdSpecificKey, const char* globalKey,
-                         const QVariant& defaultValue) {
-    const QString avdSettingsFile = getAvdSettingsFile();
-    if (avdSettingsFile.isEmpty()) {
-        QSettings settings;
-        return settings.value(globalKey, defaultValue);
-    } else {
-        QSettings settings(avdSettingsFile, QSettings::IniFormat);
-        return settings.value(avdSpecificKey, defaultValue);
-    }
-}
-
-void saveSetting(const char* avdSpecificKey, const char* globalKey,
-                 const QVariant& value) {
-    const QString avdSettingsFile = getAvdSettingsFile();
-    if (avdSettingsFile.isEmpty()) {
-        QSettings settings;
-        settings.setValue(globalKey, value);
-    } else {
-        QSettings settings(avdSettingsFile, QSettings::IniFormat);
-        settings.setValue(avdSpecificKey, value);
-    }
-}
 
 bool getSavedMicInserted() {
     return getSavedSetting(Ui::Settings::PER_AVD_MIC_INSERTED,

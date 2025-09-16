@@ -4,6 +4,7 @@ android_qt_lib(
   ALIAS ui::widgets
   SRC android/skin/qt/angle-input-widget.cpp
       android/skin/qt/angle-input-widget.h
+      android/skin/qt/avd-settings-helper.cpp
       android/skin/qt/common-controls/
       android/skin/qt/common-controls/cc-list-item.cpp
       android/skin/qt/common-controls/cc-list-item.h
