@@ -174,6 +174,10 @@ private:
     bool askWhetherToSaveSnapshot();
     void resizableChangeIcon(PresetEmulatorSizeType type);
 
+    bool getMicrophoneEnabled();
+    void setMicrophoneEnabled(bool enabled);
+    void updateMicrophoneUI();
+
     void showOrRaiseExtendedWindow(ExtendedWindowPane pane);
     void updateButtonUiCommand(QPushButton* button, const char* uiCommand);
     // Check the input or viewport control button which matches the

@@ -69,6 +69,7 @@
 #include "android/skin/android_keycodes.h"
 #include "android/skin/event.h"
 #include "android/skin/linux_keycodes.h"
+#include "android/skin/qt/avd-settings-helper.h"
 #include "android/skin/qt/emulator-qt-window.h"
 #include "android/skin/qt/extended-pages/common.h"
 #include "android/skin/qt/extended-pages/virtual-sensors-page.h"
@@ -329,6 +330,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     if (!fc::isEnabled(fc::MicrophoneToggleUI)) {
        mToolsUi->microphone_button->setHidden(true);
     }
+    updateMicrophoneUI();
 
     if (avdFlavor != AVD_TV) {
         if (avdFlavor != AVD_XR) {
@@ -949,7 +951,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             forwardKeyToEmulator(LINUX_KEY_VOLUMEDOWN, down);
             break;
         case QtUICommand::TOGGLE_MICROPHONE:
-            // TODO(b/440383173): Handle microphone toggle button
+            setMicrophoneEnabled(!getMicrophoneEnabled());
             break;
         case QtUICommand::POWER:
             forwardKeyToEmulator(LINUX_KEY_POWER, down);
@@ -1298,6 +1300,33 @@ void ToolWindow::resizableChangeIcon(PresetEmulatorSizeType type) {
             break;
         default:
             LOG(ERROR) << "Invalid display mode " << type;
+    }
+}
+
+bool ToolWindow::getMicrophoneEnabled() {
+    return getSavedSetting(Ui::Settings::PER_AVD_MIC_ALLOW_READ_AUDIO,
+                           Ui::Settings::MIC_ALLOW_READ_AUDIO, false)
+            .toBool();
+}
+
+void ToolWindow::setMicrophoneEnabled(bool enabled) {
+    // Enable or disable host audio into the AVD
+    getConsoleAgents()->vm->allowRealAudio(enabled);
+
+    // Save the setting into persistent storage
+    saveSetting(Ui::Settings::PER_AVD_MIC_ALLOW_READ_AUDIO,
+                Ui::Settings::MIC_ALLOW_READ_AUDIO, enabled);
+
+    updateMicrophoneUI();
+}
+
+void ToolWindow::updateMicrophoneUI() {
+    if (getMicrophoneEnabled()) {
+        ChangeIcon(mToolsUi->microphone_button, "mic_enabled",
+                   "Microphone: Enabled");
+    } else {
+        ChangeIcon(mToolsUi->microphone_button, "mic_disabled",
+                   "Microphone: Disabled");
     }
 }
 
