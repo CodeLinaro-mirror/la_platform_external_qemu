@@ -443,8 +443,15 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         params.push_back({bootanimProp, bootanimPropValue});
     }
 
-    if (opts->is_ost) {
-        params.push_back({"androidboot.dev.xr.is_ost", "1"});
+    if (opts->display_modality) {
+        const char* mode = opts->display_modality;
+        const char* modeValue = "unknown";
+        if (strncmp(mode, "ost", 3) == 0){
+            modeValue = "ost";
+        } else if (strncmp(mode, "vst", 3) == 0){
+            modeValue = "vst";
+        }
+        params.push_back({"androidboot.dev.xr.display_modality", modeValue});
     }
     // qemu.gles is used to pass the GPU emulation mode to the guest
     // through kernel parameters. Note that the ro.opengles.version
