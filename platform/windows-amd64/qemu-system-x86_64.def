@@ -41,7 +41,6 @@ EXPORTS
     cpu_watchpoint_remove_all
     cpu_work_list_empty
     cpus_queue
-    current_cpu
     current_machine
     cursor_alloc
     device_class_set_props_n
@@ -92,7 +91,6 @@ EXPORTS
     module_load_qom
     module_object_class_by_name
     monitor_init_hmp
-    mttcg_enabled
     object_apply_compat_props
     object_apply_global_props
     object_child_foreach
@@ -285,8 +283,6 @@ EXPORTS
     qmp_quit
     qobject_destroy
     rcu_add_force_rcu_notifier
-    rcu_gp_ctr
-    rcu_gp_event
     rcu_register_thread
     rcu_remove_force_rcu_notifier
     rcu_unregister_thread
@@ -301,7 +297,6 @@ EXPORTS
     replay_char_write_event_save
     replay_chr_be_write
     replay_get_instructions
-    replay_mode
     replay_mutex_lock
     replay_mutex_unlock
     replay_register_char_driver
@@ -313,7 +308,6 @@ EXPORTS
     sysbus_get_default
     sysbus_init_irq
     sysbus_init_mmio
-    tcg_allowed
     tcg_flush_jmp_cache
     tcg_register_thread
     timer_del
@@ -323,10 +317,8 @@ EXPORTS
     timer_mod_ns
     timer_pending
     tlb_flush
-    trace_events_enabled_count
     type_register_static
     type_register_static_array
-    use_icount
     vga_common_init
     vga_common_reset
     vga_dirty_log_start
@@ -376,7 +368,6 @@ EXPORTS
     vmstate_register_with_alias_id
     vmstate_save_state
     vmstate_unregister
-    vmstate_vga_common
     warn_report
     warn_report_err
     yank_register_function
