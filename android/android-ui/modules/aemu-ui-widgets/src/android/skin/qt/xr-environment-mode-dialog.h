@@ -30,8 +30,6 @@ signals:
 private slots:
     void on_btn_xr_environment_passthrough_on_clicked();
     void on_btn_xr_environment_passthrough_off_clicked();
-    void on_btn_xr_environment_living_room_day_clicked();
-    void on_btn_xr_environment_living_room_night_clicked();
 
 private:
     Ui::XrEnvironmentModeDialog* ui;
