@@ -59,7 +59,8 @@
           "-UNDEBUG"
         ],
         // We need a compat layer for some windows magic.
-        "+deps": ["//third_party/qemu/google/compat/windows:compat"]
+        "+deps": ["//third_party/qemu/google/compat/windows:compat"],
+        "-hdrs": ["google/compat/windows/file.h"]
       }
     }
   ],
