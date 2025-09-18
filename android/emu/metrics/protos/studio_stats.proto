@@ -857,6 +857,9 @@ message AndroidStudioEvent {
   optional AdvertiserNotificationEvent advertiser_notification_event = 239
       [lazy = true];
 
+  // set when kind = ASSET_STUDIO_WIZARD_EVENT
+  optional AssetStudioWizardEvent asset_studio_wizard_event = 240 [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1836,6 +1839,9 @@ message AndroidStudioEvent {
 
     // Event related to Gemini Advertiser notifications
     ADVERTISER_NOTIFICATION_EVENT = 358;
+
+    // Event related to Asset Studio Wizard
+    ASSET_STUDIO_WIZARD_EVENT = 359;
   }
 
   // Represents different Performance Monitoring types.
@@ -2903,7 +2909,8 @@ message EmulatorAvdInfo {
     // Do not use this -- use XR_AVD below.
     DEV_2024_AVD = 11 [deprecated = true];
     XR_AVD = 12;
-    // Next tag: 13
+    XR_GLASSES_AVD = 13;
+    // Next tag: 14
   }
   enum EmulatorDeviceName {
     UNKNOWN_EMULATOR_DEVICE_NAME = 0;
@@ -13044,7 +13051,7 @@ message UpgradeAssistantComponentInfo {
     REMOVE_IMPLEMENTATION_PROPERTIES = 11;
     GRADLE_PLUGINS = 12;
     MIGRATE_TO_INSTALLATION = 13;
-    MIGRATE_TO_EMULATOR_SNAPSHOTS = 14;
+    MIGRATE_TO_EMULATOR_SNAPSHOTS = 14 [deprecated = true];
     MIGRATE_TO_TEST_COVERAGE = 15;
     MIGRATE_PACKAGING_OPTIONS = 16;
     MIGRATE_TO_LINT = 17;
@@ -13095,6 +13102,7 @@ message UpgradeAssistantComponentInfo {
     BUILT_IN_KOTLIN_DEFAULT = 61;
     NEWDSL_DEFAULT = 62;
     KOTLIN20_COMPOSE = 63;
+    REMOVE_EMULATOR_SNAPSHOTS = 64;
   }
 
   message Java8DefaultProcessorSettings {
@@ -17897,5 +17905,24 @@ message AdvertiserNotificationEvent {
   }
 
   optional Type type = 1;
+  optional Action action = 2;
+}
+
+message AssetStudioWizardEvent {
+  enum Type {
+    UNKNOWN_TYPE = 0;
+    // The Asset Studio Wizard is generating an adaptive launcher icon.
+    ADAPTIVE_LAUNCHER_ICON = 1;
+  }
+
+  enum Action {
+    UNKNOWN = 0;
+    // A monochrome icon was created.
+    MONOCHROME_ICON_CREATED = 1;
+  }
+
+  // The type of asset that the Asset Studio Wizard is generating.
+  optional Type type = 1;
+  // The action that was performed by the Asset Studio Wizard.
   optional Action action = 2;
 }
