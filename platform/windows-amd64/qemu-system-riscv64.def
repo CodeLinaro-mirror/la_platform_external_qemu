@@ -142,11 +142,6 @@ EXPORTS
     qbase64_decode
     qcrypto_tls_creds_check_endpoint
     qdev_find_recursive
-    qdev_prop_bit
-    qdev_prop_size
-    qdev_prop_uint8
-    qdev_prop_uint32
-    qdev_prop_uint64
     qdev_realize
     qemu_add_polling_cb
     qemu_add_wait_object
@@ -331,10 +326,6 @@ EXPORTS
     visit_type_uint64
     visit_type_uint8
     vmstate_check_only_migratable
-    vmstate_info_int32
-    vmstate_info_uint32
-    vmstate_info_uint32_equal
-    vmstate_info_uint64
     vmstate_load_state
     vmstate_register_with_alias_id
     vmstate_save_state

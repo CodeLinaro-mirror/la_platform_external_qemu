@@ -60,7 +60,8 @@
         ],
         // We need a compat layer for some windows magic.
         "+deps": ["//third_party/qemu/google/compat/windows:compat"],
-        "-hdrs": ["google/compat/windows/file.h"]
+        "-hdrs": ["google/compat/windows/file.h"],
+        "+local_defines": ["BUILDING_QEMU_BINARY"]
       }
     }
   ],
