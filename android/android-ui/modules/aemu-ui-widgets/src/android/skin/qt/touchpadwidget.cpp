@@ -121,13 +121,13 @@ void TouchpadWidget::paintEvent(QPaintEvent* event) {
         case SETTINGS_THEME_DARK:
         case SETTINGS_THEME_STUDIO_DARK:
             borderPen.setColor(QColor("#272727"));
-            fingerColor.setRgb(50, 50, 250, 70);
+            fingerColor = mFingerColorDark;
             break;
         case SETTINGS_THEME_LIGHT:
         case SETTINGS_THEME_STUDIO_LIGHT:
         default:
             borderPen.setColor(QColor("#d8d8d8"));
-            fingerColor.setRgb(0, 0, 200, 30);
+            fingerColor = mFingerColorLight;
             break;
     }
 
@@ -143,27 +143,32 @@ void TouchpadWidget::paintEvent(QPaintEvent* event) {
         // Draw Current touch location
         auto current_loc = mTrailPoints[i][mTrailPoints[i].size() - 1];
 
-        QRadialGradient gradient(current_loc, 300);
+        QRadialGradient gradient(current_loc, mScale * mFingerGlow);
         gradient.setColorAt(0, fingerColor);
         gradient.setColorAt(1.0, Qt::transparent);
         painter.setBrush(QBrush(gradient));
         painter.setPen(Qt::NoPen);
 
-        painter.drawEllipse(current_loc, 300, 300);
+        painter.drawEllipse(current_loc, mScale * mFingerGlow, mScale * mFingerGlow);
 
         if (mTrailPoints[i].size() < 2) {
+            painter.setBrush(QBrush(fingerColor));
+            painter.drawEllipse(current_loc, mScale * mFingerWidth * 0.5, mScale * mFingerWidth * 0.5);
             continue;
         }
 
         // Draw touch trail
         QPen pen;
         pen.setColor(fingerColor);
-        pen.setWidth(10);
+        pen.setWidth(mScale * mFingerWidth);
+        pen.capStyle();
+        pen.setCapStyle(Qt::RoundCap);
+        pen.setJoinStyle(Qt::RoundJoin);
         painter.setPen(pen);
         painter.setBrush(Qt::NoBrush);
 
         QPainterPath p(current_loc);
-        for (int j = 1; j < mTrailPoints[i].size(); ++j) {
+        for (int j = 1; j <= mTrailPoints[i].size(); ++j) {
             p.lineTo(mTrailPoints[i][mTrailPoints[i].size() - j]);
         }
         painter.drawPath(p);
