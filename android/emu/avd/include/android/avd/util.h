@@ -129,6 +129,7 @@ typedef enum {
     AVD_ANDROID_AUTO = 3,
     AVD_DESKTOP = 4,
     AVD_XR = 5,
+    AVD_GLASSES = 6,
     AVD_OTHER = 255,
 } AvdFlavor;
 
