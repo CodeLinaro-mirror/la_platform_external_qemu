@@ -502,28 +502,28 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     updateXrButtonsVisibility();
 
     connect(mPostureSelectionDialog, SIGNAL(newPostureRequested(int)), this,
-            SLOT(on_new_posture_requested(int)));
+            SLOT(onNewPostureRequested(int)));
     connect(mPostureSelectionDialog, SIGNAL(finished(int)), this,
-            SLOT(on_dismiss_posture_selection_dialog()));
+            SLOT(onDismissPostureSelectionDialog()));
     connect(mResizableDialog,
             SIGNAL(newResizableRequested(PresetEmulatorSizeType)), this,
-            SLOT(on_new_resizable_requested(PresetEmulatorSizeType)));
+            SLOT(onNewResizableRequested(PresetEmulatorSizeType)));
     connect(mResizableDialog, SIGNAL(finished(int)), this,
-            SLOT(on_dismiss_resizable_dialog()));
+            SLOT(onDismissResizableDialog()));
     if (android_is_xr_vst_headset_mode()) {
         connect(mXrEnvironmentModeDialog, SIGNAL(onXrEnvironmentModeRequested(int)),
-                this, SLOT(on_xr_environment_mode_changed(int)));
+                this, SLOT(onXrEnvironmentModeChanged(int)));
         connect(mXrEnvironmentModeDialog, SIGNAL(finished(int)),
-                this, SLOT(on_dismiss_xr_environment_mode_dialog()));
+                this, SLOT(onDismissXrEnvironmentModeDialog()));
         connect(mXrInputModeDialog, SIGNAL(onXrInputModeRequested(int)), this,
-                SLOT(on_xr_input_mode_changed(int)));
+                SLOT(onXrInputModeChanged(int)));
         connect(mXrInputModeDialog, SIGNAL(finished(int)), this,
-                SLOT(on_dismiss_xr_input_mode_dialog()));
+                SLOT(onDismissXrInputModeDialog()));
 
         connect(mLeftHandDialog, &LeftHandDialog::leftHandGestureSelected, this,
-                &ToolWindow::on_left_hand_gesture_changed);
+                &ToolWindow::onLeftHandGestureChanged);
         connect(mRightHandDialog, &RightHandDialog::rightHandGestureSelected,
-                this, &ToolWindow::on_right_hand_gesture_changed);
+                this, &ToolWindow::onRightHandGestureChanged);
     }
 
     if (!resizableEnabled()) {
@@ -546,9 +546,9 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     installEventFilter(this);
 
     mSleepTimer.setSingleShot(true);
-    connect(&mSleepTimer, SIGNAL(timeout()), this, SLOT(on_sleep_timer_done()));
+    connect(&mSleepTimer, SIGNAL(timeout()), this, SLOT(onSleepTimerDone()));
     mUnfoldTimer.setSingleShot(true);
-    connect(&mUnfoldTimer, SIGNAL(timeout()), this, SLOT(on_unfold_timer_done()));
+    connect(&mUnfoldTimer, SIGNAL(timeout()), this, SLOT(onUnfoldTimerDone()));
 }
 
 ToolWindow::~ToolWindow() {
@@ -564,11 +564,11 @@ void ToolWindow::startSleepTimer() {
 
 void ToolWindow::startUnfoldTimer(PresetEmulatorSizeType newSize) {
     mDesiredNewSize = newSize;
-    on_new_posture_requested(POSTURE_OPENED);
+    onNewPostureRequested(POSTURE_OPENED);
     mUnfoldTimer.start(2000);
 }
 
-void ToolWindow::on_sleep_timer_done() {
+void ToolWindow::onSleepTimerDone() {
     if (android_getShouldSkipDraw()) {
         android_setShouldSkipDraw(false);
         android_redrawOpenglesWindow();
@@ -583,8 +583,8 @@ void ToolWindow::on_sleep_timer_done() {
     }
 }
 
-void ToolWindow::on_unfold_timer_done() {
-    on_new_resizable_requested(mDesiredNewSize);
+void ToolWindow::onUnfoldTimerDone() {
+    onNewResizableRequested(mDesiredNewSize);
 }
 
 void ToolWindow::updateFoldableButtonVisibility() {
@@ -1236,7 +1236,7 @@ void ToolWindow::presetSizeAdvance(PresetEmulatorSizeType newSize) {
         mLastRequestedFoldablePosture == POSTURE_CLOSED) {
         // Directly call posture change function without going through emit,
         // because we want it to be processed before the resizable event.
-        on_new_posture_requested(POSTURE_OPENED);
+        onNewPostureRequested(POSTURE_OPENED);
     }
 
     setResizableTransitionInProgress(true);
@@ -1757,11 +1757,11 @@ void ToolWindow::on_change_posture_button_clicked() {
             geoTool.top() + mToolsUi->change_posture_button->geometry().top());
 }
 
-void ToolWindow::on_dismiss_posture_selection_dialog() {
+void ToolWindow::onDismissPostureSelectionDialog() {
     mToolsUi->change_posture_button->setChecked(false);
 }
 
-void ToolWindow::on_dismiss_resizable_dialog() {
+void ToolWindow::onDismissResizableDialog() {
     mToolsUi->resizable_button->setChecked(false);
 }
 
@@ -1788,7 +1788,7 @@ void ToolWindow::on_xr_input_mode_button_clicked() {
     } else {
         // Neither flag is set, so only "Mouse" mode is available.
         // Don't show the dialog, just set the mode.
-        on_xr_input_mode_changed(XR_INPUT_MODE_MOUSE_KEYBOARD);
+        onXrInputModeChanged(XR_INPUT_MODE_MOUSE_KEYBOARD);
     }
 }
 
@@ -1797,18 +1797,18 @@ void ToolWindow::on_xr_screen_recenter_button_clicked() {
     handleUICommand(QtUICommand::XR_SCREEN_RECENTER, true);
 }
 
-void ToolWindow::on_dismiss_xr_environment_mode_dialog() {
+void ToolWindow::onDismissXrEnvironmentModeDialog() {
     mToolsUi->xr_environment_mode_button->setChecked(false);
 }
 
-void ToolWindow::on_dismiss_xr_input_mode_dialog() {
+void ToolWindow::onDismissXrInputModeDialog() {
     updateXrNavigationButtonsChecked(mXrLastMouseKeyboardModeCommand);
 }
 
 void ToolWindow::on_xr_viewport_pan_button_clicked() {
     mEmulatorWindow->activateWindow();
     if (mXrLastMouseKeyboardModeCommand == QtUICommand::XR_VIEWPORT_CONTROL_MODE_PAN) {
-        on_xr_input_mode_changed(mLastInputModeRequested);
+        onXrInputModeChanged(mLastInputModeRequested);
     } else {
         handleUICommand(QtUICommand::XR_VIEWPORT_CONTROL_MODE_PAN, true);
     }
@@ -1817,7 +1817,7 @@ void ToolWindow::on_xr_viewport_pan_button_clicked() {
 void ToolWindow::on_xr_viewport_dolly_button_clicked() {
     mEmulatorWindow->activateWindow();
     if (mXrLastMouseKeyboardModeCommand == QtUICommand::XR_VIEWPORT_CONTROL_MODE_DOLLY) {
-        on_xr_input_mode_changed(mLastInputModeRequested);
+        onXrInputModeChanged(mLastInputModeRequested);
     } else {
         handleUICommand(QtUICommand::XR_VIEWPORT_CONTROL_MODE_DOLLY, true);
     }
@@ -1826,7 +1826,7 @@ void ToolWindow::on_xr_viewport_dolly_button_clicked() {
 void ToolWindow::on_xr_viewport_rotate_button_clicked() {
     mEmulatorWindow->activateWindow();
     if (mXrLastMouseKeyboardModeCommand == QtUICommand::XR_VIEWPORT_CONTROL_MODE_ROTATE) {
-        on_xr_input_mode_changed(mLastInputModeRequested);
+        onXrInputModeChanged(mLastInputModeRequested);
     } else {
         handleUICommand(QtUICommand::XR_VIEWPORT_CONTROL_MODE_ROTATE, true);
     }
@@ -1882,7 +1882,7 @@ void ToolWindow::on_resizable_button_clicked() {
             geoTool.top() + mToolsUi->resizable_button->geometry().top());
 }
 
-void ToolWindow::on_new_resizable_requested(PresetEmulatorSizeType newSize) {
+void ToolWindow::onNewResizableRequested(PresetEmulatorSizeType newSize) {
     mEmulatorWindow->activateWindow();
     presetSizeAdvance(newSize);
 }
@@ -2118,13 +2118,13 @@ void ToolWindow::applyFoldableQuirk(int newPosture) {
     mLastRequestedFoldablePosture = newPosture;
 }
 
-void ToolWindow::on_new_posture_requested(int newPosture) {
+void ToolWindow::onNewPostureRequested(int newPosture) {
     mEmulatorWindow->activateWindow();
     applyFoldableQuirk(newPosture);
     handleUICommand(QtUICommand::CHANGE_FOLDABLE_POSTURE, true);
 }
 
-void ToolWindow::on_xr_environment_mode_changed(int mode) {
+void ToolWindow::onXrEnvironmentModeChanged(int mode) {
     if (mode == /*XR_ENVIRONMENT_MODE_UNKNOWN*/ 0) {
         LOG(WARNING) << "Unknown XR environment mode requested: " << mode;
         return;
@@ -2135,7 +2135,7 @@ void ToolWindow::on_xr_environment_mode_changed(int mode) {
     handleUICommand(QtUICommand::CHANGE_XR_ENVIRONMENT_MODE, true);
 }
 
-void ToolWindow::on_xr_input_mode_changed(int mode) {
+void ToolWindow::onXrInputModeChanged(int mode) {
     if (mode == /*XR_INPUT_MODE_MOUSE_UNKNOWN*/ 0) {
         LOG(WARNING) << "Unknown XR input mode requested: " << mode;
         return;
@@ -2344,14 +2344,14 @@ void ToolWindow::on_right_hand_button_clicked() {
     mRightHandDialog->move(
             geoTool.right(),
             geoTool.top() + mToolsUi->right_hand_button->geometry().top());
-    
+
     // make only this button checked
     updateXrNavigationButtonsChecked(QtUICommand::XR_RIGHT_HAND);
 
     notifyGuestOnRightHandGesture(mCurrentRightHandGesture);
 }
 
-void ToolWindow::on_left_hand_gesture_changed(const QString& gesture) {
+void ToolWindow::onLeftHandGestureChanged(const QString& gesture) {
     const auto emulatorWindow = EmulatorQtWindow::getInstance();
     if (emulatorWindow) {
         emulatorWindow->setRelativeMouseCoordMode(false);
@@ -2371,7 +2371,7 @@ void ToolWindow::on_left_hand_gesture_changed(const QString& gesture) {
     notifyGuestOnLeftHandGesture(gesture);
 }
 
-void ToolWindow::on_right_hand_gesture_changed(const QString& gesture) {
+void ToolWindow::onRightHandGestureChanged(const QString& gesture) {
     const auto emulatorWindow = EmulatorQtWindow::getInstance();
     if (emulatorWindow) {
         emulatorWindow->setRelativeMouseCoordMode(false);
@@ -2389,10 +2389,4 @@ void ToolWindow::on_right_hand_gesture_changed(const QString& gesture) {
                gestureData->second.button_tip);
 
     notifyGuestOnRightHandGesture(gesture);
-}
-
-void ToolWindow::on_dismiss_left_hand_dialog() {
-}
-
-void ToolWindow::on_dismiss_right_hand_dialog() {
 }

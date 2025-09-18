@@ -29,17 +29,6 @@ void XrEnvironmentModeDialog::on_btn_xr_environment_passthrough_off_clicked() {
     accept();  // hides dialog
 }
 
-void XrEnvironmentModeDialog::on_btn_xr_environment_living_room_day_clicked() {
-    emit onXrEnvironmentModeRequested(XR_ENVIRONMENT_MODE_LIVING_ROOM_DAY);
-    accept();  // hides dialog
-}
-
-void XrEnvironmentModeDialog::
-        on_btn_xr_environment_living_room_night_clicked() {
-    emit onXrEnvironmentModeRequested(XR_ENVIRONMENT_MODE_LIVING_ROOM_NIGHT);
-    accept();  // hides dialog
-}
-
 XrEnvironmentModeDialog::~XrEnvironmentModeDialog() {
     delete ui;
 }
