@@ -22,10 +22,12 @@ android_qt_lib(
       android/skin/qt/QtThreading.cpp
       android/skin/qt/raised-material-button.h
       android/skin/qt/size-tweaker.cpp
+      android/skin/qt/touchpad-holder.cpp
+      android/skin/qt/touchpad-holder.ui
+      android/skin/qt/touchpad-widget.cpp
       android/skin/qt/ui-event-recorder.cpp
       android/skin/qt/user-actions-counter.cpp
       android/skin/qt/wavefront-obj-parser.cpp
-      android/skin/qt/touchpadwidget.cpp
   DEPS aemu-recording
        android-emu
        android-emu-base

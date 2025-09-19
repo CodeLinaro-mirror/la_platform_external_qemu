@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>TouchpadPage</class>
- <widget class="QWidget" name="TouchpadPage">
+ <class>TouchpadHolder</class>
+ <widget class="QWidget" name="TouchpadHolder">
   <layout class="QGridLayout" name="gridLayout">
    <property name="alignment">
     <set>Qt::AlignHCenter</set>
@@ -89,7 +89,7 @@
   <customwidget>
    <class>TouchpadWidget</class>
    <extends>QWidget</extends>
-   <header>android/skin/qt/touchpadwidget.h</header>
+   <header>android/skin/qt/touchpad-widget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

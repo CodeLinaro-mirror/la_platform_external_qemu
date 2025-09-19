@@ -9,7 +9,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#include "android/skin/qt/touchpadwidget.h"
+#include "android/skin/qt/touchpad-widget.h"
 
 #include "aemu/base/Log.h"
 #include "android-qemu2-glue/emulation/virtio-input-multi-touch.h"

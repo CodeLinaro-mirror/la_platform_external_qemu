@@ -18,7 +18,7 @@
 #include <QWidget>      // for QWidget
 #include <memory>       // for shared_ptr, unique_ptr
 
-#include "ui_touchpad-page.h"  // for TouchpadPage
+#include "ui_touchpad-holder.h"
 
 namespace android {
 namespace metrics {
@@ -29,15 +29,15 @@ class UiEventTracker;
 class QObject;
 class EmulatorQtWindow;
 
-class TouchpadPage : public QWidget {
+class TouchpadHolder : public QWidget {
     Q_OBJECT
 
 public:
-    explicit TouchpadPage(QWidget* parent = 0);
+    explicit TouchpadHolder(QWidget* parent = nullptr);
 
 private slots:
     void on_tp_addSecondFinger_toggled(bool checked);
 
 private:
-    std::unique_ptr<Ui::TouchpadPage> mUi;
+    std::unique_ptr<Ui::TouchpadHolder> mUi;
 };

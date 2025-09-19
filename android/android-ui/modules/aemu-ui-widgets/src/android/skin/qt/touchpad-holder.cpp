@@ -9,10 +9,10 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#include "android/skin/qt/extended-pages/touchpad-page.h"
+#include "android/skin/qt/touchpad-holder.h"
 #include "aemu/base/Log.h"
 #include "android/console.h"
-#include "android/skin/qt/emulator-qt-window.h"
+#include "android/skin/qt/touchpad-widget.h"
 #include "host-common/hw-config.h"
 
 #include <QComboBox>
@@ -25,9 +25,9 @@
 #include <QWidget>
 #include <Qt>
 
-TouchpadPage::TouchpadPage(QWidget* parent)
+TouchpadHolder::TouchpadHolder(QWidget* parent)
     : QWidget(parent),
-      mUi(new Ui::TouchpadPage()) {
+      mUi(new Ui::TouchpadHolder()) {
     mUi->setupUi(this);
 
     constexpr int margin = 20;
@@ -49,7 +49,7 @@ TouchpadPage::TouchpadPage(QWidget* parent)
     mUi->gridLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding), 2, 3);
 }
 
-void TouchpadPage::on_tp_addSecondFinger_toggled(bool checked) {
+void TouchpadHolder::on_tp_addSecondFinger_toggled(bool checked) {
     if (checked) {
         mUi->touchpadBox->setMultiFinger(2);
     } else {
