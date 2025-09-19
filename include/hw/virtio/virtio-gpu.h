@@ -299,6 +299,7 @@ struct VirtIOGPURutabaga {
     uint64_t capset_mask;
     char *wayland_socket_path;
     char *wsi;
+    char *renderer_features;
     bool headless;
     uint32_t num_capsets;
     struct rutabaga *rutabaga;

@@ -989,6 +989,7 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     builder.user_data = (uint64_t)g;
     builder.display_width = base->conf.xres;
     builder.display_height = base->conf.yres;
+    builder.renderer_features = vr->renderer_features;
 
     /*
      * If the user doesn't specify the wayland socket path, we try to infer
@@ -1110,6 +1111,7 @@ static const Property virtio_gpu_rutabaga_properties[] = {
     DEFINE_PROP_STRING("wayland-socket-path", VirtIOGPURutabaga,
                        wayland_socket_path),
     DEFINE_PROP_STRING("wsi", VirtIOGPURutabaga, wsi),
+    DEFINE_PROP_STRING("renderer_features", VirtIOGPURutabaga, renderer_features),
 };
 
 static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
