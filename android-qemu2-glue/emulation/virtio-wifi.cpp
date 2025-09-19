@@ -132,7 +132,6 @@ static ssize_t virtio_wifi_add_buf(VirtIODevice* vdev,
     VirtQueueElement* elem = static_cast<VirtQueueElement*>(
             virtqueue_pop(vq, sizeof(VirtQueueElement)));
     if (!elem) {
-        virtio_queue_set_notification(vq, 0);
         return -1;
     }
 
@@ -142,8 +141,6 @@ static ssize_t virtio_wifi_add_buf(VirtIODevice* vdev,
                      << " bytes) buffer, truncating to " << elemCapacity << " bytes.";
         size = elemCapacity;
     }
-
-    virtio_queue_set_notification(vq, 1);
 
     iov_from_buf(elem->in_sg, elem->in_num, 0, buf, size);
     virtqueue_push(vq, elem, size);
@@ -208,7 +205,6 @@ static bool virtio_wifi_flush_tx(VirtIOWifiQueue* q) {
         VirtQueueElement* elem = static_cast<VirtQueueElement*>(
                 virtqueue_pop(vq, sizeof(VirtQueueElement)));
         if (!elem) {
-            virtio_queue_set_notification(vq, 1);
             if (num_packets > 0) {
                 virtio_notify(vdev, vq);
                 return true;
@@ -221,7 +217,6 @@ static bool virtio_wifi_flush_tx(VirtIOWifiQueue* q) {
         const int sendResult = state.wifiService->send(iovec);
         if (sendResult == -EBUSY) {
             q->async_tx.elem = elem;
-            virtio_queue_set_notification(vq, 0);
             return false;
         }
 
@@ -229,7 +224,6 @@ static bool virtio_wifi_flush_tx(VirtIOWifiQueue* q) {
         ++num_packets;
     }
 
-    virtio_queue_set_notification(vq, 1);
     return false;
 }
 
@@ -339,7 +333,6 @@ static void virtio_wifi_handle_tx(VirtIODevice* vdev, VirtQueue* vq) {
     if (!vdev->vm_running) {
         return;
     }
-    virtio_queue_set_notification(vq, 0);
     qemu_bh_schedule(q->tx_bh);
 }
 
@@ -466,7 +459,6 @@ static void virtio_wifi_set_status(VirtIODevice* vdev, uint8_t status) {
             qemu_bh_cancel(q->tx_bh);
             if (status & VIRTIO_CONFIG_S_DRIVER_OK &&
                 vdev->vm_running) {
-                virtio_queue_set_notification(q->tx, 1);
             }
         }
     }
