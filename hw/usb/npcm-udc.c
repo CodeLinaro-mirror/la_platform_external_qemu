@@ -14,6 +14,7 @@
 
 #include "exec/cpu-common.h"
 #include "system/memory.h"
+#include "exec/memattrs.h"
 #include "hw/core/irq.h"
 #include "hw/core/qdev.h"
 #include "hw/core/qdev-properties.h"
@@ -26,6 +27,9 @@
 #include "qemu/module.h"
 #include "qemu/typedefs.h"
 #include "qom/object.h"
+#include "system/dma.h"
+#include "system/memory.h"
+#include "system/address-spaces.h"
 #include "trace.h"
 
 #define NPCM_UDC_MEMORY_ADDRESS_SIZE 0x1000
@@ -286,14 +290,19 @@ static inline void npcm_udc_send_data(NPCMUDC *udc,
                                       TransferDescriptor *td_head)
 {
     TransferDescriptor next_td;
-    cpu_physical_memory_read(td_head->next_pointer, &next_td,
-                             sizeof(TransferDescriptor));
+    if (dma_memory_read(&address_space_memory, td_head->next_pointer, &next_td,
+                       sizeof(TransferDescriptor), MEMTXATTRS_UNSPECIFIED)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: dma read failed", __func__);
+    }
     int data_size =
         (next_td.info & TD_INFO_TOTAL_BYTES_MASK) >> TD_INFO_TOTAL_BYTES_SHIFT;
     int sent_data_size = 0;
 
     uint8_t *data = g_malloc(data_size);
-    cpu_physical_memory_read(next_td.buffer_pointers[0], data, data_size);
+    if (dma_memory_read(&address_space_memory, next_td.buffer_pointers[0], data,
+                       data_size, MEMTXATTRS_UNSPECIFIED)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: dma read failed", __func__);
+    }
 
     if (endpoint_number == 0) {
         sent_data_size = usbredir_host_control_transfer_complete(
@@ -308,8 +317,11 @@ static inline void npcm_udc_send_data(NPCMUDC *udc,
     if (data_size == sent_data_size) {
         /* Clear status if transfer succeeds */
         next_td.info = TD_INFO_INTERRUPT_ON_COMPLETE_MASK;
-        cpu_physical_memory_write(td_head->next_pointer + 4, &next_td.info,
-                                  sizeof(uint32_t));
+        if (dma_memory_write(&address_space_memory, td_head->next_pointer + 4,
+                            &next_td.info, sizeof(uint32_t),
+                            MEMTXATTRS_UNSPECIFIED)) {
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: dma write failed", __func__);
+        }
     } else {
         error_report("%s: unable to send data via usbredir host.",
                      DEVICE(udc)->canonical_path);
@@ -356,9 +368,11 @@ static inline void npcm_udc_write_endptprime(NPCMUDC *udc, uint32_t value)
             continue;
         }
 
-        cpu_physical_memory_read(
-            tx_qh_base_address + (ep_num << 1) * sizeof(QueueHead),
-            &qh_in, sizeof(QueueHead));
+        if (dma_memory_read(&address_space_memory,
+                         tx_qh_base_address + (ep_num << 1) * sizeof(QueueHead),
+           &qh_in, sizeof(QueueHead), MEMTXATTRS_UNSPECIFIED)) {
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: dma read failed", __func__);
+        }
         npcm_udc_send_data(udc, ep_num, &qh_in.td);
     }
 
@@ -622,29 +636,38 @@ static void npcm_udc_usbredir_write_data(void *opaque,
     QueueHead rx_qh;
     TransferDescriptor rx_td;
     uint32_t request_len;
-    uint32_t current_rx_td_pointer;
+    uint32_t rx_td_ptr;
     const uint32_t qh_base_address = registers->endpoint_list_address;
     const uint8_t ep_num = endpoint_address & LIBUSB_ENDPOINT_ADDRESS_MASK;
 
-    cpu_physical_memory_read(
-        qh_base_address + (ep_num << 1) * sizeof(QueueHead), &rx_qh,
-        sizeof(QueueHead));
-
-    if (udc->next_rx_td_pointer) {
-        current_rx_td_pointer = udc->next_rx_td_pointer;
-    } else {
-        current_rx_td_pointer = rx_qh.td.next_pointer;
+    if (dma_memory_read(&address_space_memory,
+                        qh_base_address + ((ep_num << 1) * sizeof(QueueHead)),
+                        &rx_qh, sizeof(QueueHead), MEMTXATTRS_UNSPECIFIED)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: dma read failed", __func__);
     }
 
-    cpu_physical_memory_read(current_rx_td_pointer, &rx_td,
-                             sizeof(TransferDescriptor));
+    if (udc->next_rx_td_pointer) {
+        rx_td_ptr = udc->next_rx_td_pointer;
+    } else {
+        rx_td_ptr = rx_qh.td.next_pointer;
+    }
+
+    if (dma_memory_read(&address_space_memory, rx_td_ptr, &rx_td,
+                       sizeof(TransferDescriptor), MEMTXATTRS_UNSPECIFIED)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: dma read failed", __func__);
+    }
     request_len = rx_td.info >> TD_INFO_TOTAL_BYTES_SHIFT;
     rx_td.info = ((request_len - data_len) << TD_INFO_TOTAL_BYTES_SHIFT) |
                  TD_INFO_INTERRUPT_ON_COMPLETE_MASK;
 
-    cpu_physical_memory_write(current_rx_td_pointer + 4, &rx_td.info,
-                              sizeof(uint32_t));
-    cpu_physical_memory_write(rx_td.buffer_pointers[0], data, data_len);
+    if (dma_memory_write(&address_space_memory, rx_td_ptr + 4, &rx_td.info,
+                         sizeof(uint32_t), MEMTXATTRS_UNSPECIFIED)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: dma write failed", __func__);
+    }
+    if (dma_memory_write(&address_space_memory, rx_td.buffer_pointers[0],
+                         data, data_len, MEMTXATTRS_UNSPECIFIED)) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: dma write failed", __func__);
+    }
 
     if ((rx_td.next_pointer & 1) == 0) {
         udc->next_rx_td_pointer = rx_td.next_pointer;
