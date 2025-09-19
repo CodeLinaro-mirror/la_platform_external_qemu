@@ -134,6 +134,15 @@ void ChangeIcon(QPushButton* button, const char* icon, const char* tip) {
     button->setProperty("toolTip", tip);
 }
 
+void setRelativeMouseMode(bool relative) {
+    const auto emulatorWindow = EmulatorQtWindow::getInstance();
+    if (emulatorWindow) {
+        emulatorWindow->setRelativeMouseCoordMode(relative);
+    } else {
+        LOG(WARNING) << "No window found to set mouse coordinates mode";
+    }
+}
+
 }  // namespace
 
 using android::base::System;
@@ -1120,13 +1129,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
                             PHYSICAL_INTERPOLATION_SMOOTH);
                     updateXrNavigationButtonsChecked(cmd);
                 }
-                const auto emulatorWindow = EmulatorQtWindow::getInstance();
-                if (emulatorWindow) {
-                    emulatorWindow->setRelativeMouseCoordMode(false);
-                } else {
-                    LOG(WARNING)
-                            << "No window found to set mouse coordinates mode";
-                }
+                setRelativeMouseMode(false);
             }
             break;
         case QtUICommand::CHANGE_XR_ENVIRONMENT_MODE:
@@ -1161,13 +1164,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
                             1, PHYSICAL_INTERPOLATION_SMOOTH);
                     updateXrNavigationButtonsChecked(cmd);
                 }
-                const auto emulatorWindow = EmulatorQtWindow::getInstance();
-                if (emulatorWindow) {
-                    emulatorWindow->setRelativeMouseCoordMode(true);
-                } else {
-                    LOG(WARNING)
-                            << "No window found to set mouse coordinates mode";
-                }
+                setRelativeMouseMode(true);
             }
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_DOLLY:
@@ -1180,13 +1177,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
                             1, PHYSICAL_INTERPOLATION_SMOOTH);
                     updateXrNavigationButtonsChecked(cmd);
                 }
-                const auto emulatorWindow = EmulatorQtWindow::getInstance();
-                if (emulatorWindow) {
-                    emulatorWindow->setRelativeMouseCoordMode(true);
-                } else {
-                    LOG(WARNING)
-                            << "No window found to set mouse coordinates mode";
-                }
+                setRelativeMouseMode(true);
             }
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_ROTATE:
@@ -1199,13 +1190,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
                             1, PHYSICAL_INTERPOLATION_SMOOTH);
                     updateXrNavigationButtonsChecked(cmd);
                 }
-                const auto emulatorWindow = EmulatorQtWindow::getInstance();
-                if (emulatorWindow) {
-                    emulatorWindow->setRelativeMouseCoordMode(true);
-                } else {
-                    LOG(WARNING)
-                            << "No window found to set mouse coordinates mode";
-                }
+                setRelativeMouseMode(true);
             }
             break;
         case QtUICommand::SHOW_MULTITOUCH:
@@ -2370,13 +2355,7 @@ void ToolWindow::on_right_hand_button_clicked() {
 }
 
 void ToolWindow::onLeftHandGestureChanged(const QString& gesture) {
-    const auto emulatorWindow = EmulatorQtWindow::getInstance();
-    if (emulatorWindow) {
-        emulatorWindow->setRelativeMouseCoordMode(false);
-    } else {
-        LOG(WARNING)
-                << "No window found to set mouse coordinates mode";
-    }
+    setRelativeMouseMode(false);
 
     auto gestureData = LEFT_HAND_GESTURE_DATA.find(gesture);
     if (gestureData == LEFT_HAND_GESTURE_DATA.end()) {
@@ -2390,13 +2369,7 @@ void ToolWindow::onLeftHandGestureChanged(const QString& gesture) {
 }
 
 void ToolWindow::onRightHandGestureChanged(const QString& gesture) {
-    const auto emulatorWindow = EmulatorQtWindow::getInstance();
-    if (emulatorWindow) {
-        emulatorWindow->setRelativeMouseCoordMode(false);
-    } else {
-        LOG(WARNING)
-                << "No window found to set mouse coordinates mode";
-    }
+    setRelativeMouseMode(false);
 
     auto gestureData = RIGHT_HAND_GESTURE_DATA.find(gesture);
     if (gestureData == RIGHT_HAND_GESTURE_DATA.end()) {
