@@ -2792,15 +2792,39 @@ extern "C" int main(int argc, char** argv) {
     }
 
     // XR specific feature overrides
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_XR) {
+    const bool isXrAvd =
+            avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
+            AVD_XR;
+    if (isXrAvd) {
         // XR image needs this feature to pass modifier keys to the guest.
         fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
+
+        derror(" >>>>> VulkanVirtualQueue = false NOW <<<< \n");
 
 #if defined(__APPLE__) && defined(__aarch64__)
         // TODO(b/404619245): XR emulator restarts at login screen when
         // VulkanVirtualQueue is enabled on Mac.
         fc::setIfNotOverriden(fc::VulkanVirtualQueue, false);
 #endif
+    }
+
+    // When GuestAngle is used, Vulkan host composition can be automatically
+    // enabled on currently supported platforms and device types to get better
+    // performance.
+    if (!fc::isEnabled(fc::VulkanNativeSwapchain)) {
+        bool autoEnableVulkanComposition = false;
+        if (fc::isEnabled(fc::GuestAngle)) {
+#if defined(__APPLE__) && defined(__aarch64__)
+            // Only auto enable on XR for now, as some features like display
+            // rotations or screen masking are not supported yet for gphones.
+            // TODO(b/442398020): increase auto enablement range to other
+            // platforms and devices
+            autoEnableVulkanComposition = isXrAvd;
+#endif
+        }
+        if (autoEnableVulkanComposition) {
+            fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
+        }
     }
 
     // Support for changing default lcd-density
