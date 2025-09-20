@@ -161,6 +161,7 @@ EXPORTS
     qemu_cond_signal
     qemu_cond_wait_bql
     qemu_console_get_name
+    qemu_console_is_graphic
     qemu_console_lookup_by_index
     qemu_console_lookup_default
     qemu_cpu_is_self
@@ -168,6 +169,7 @@ EXPORTS
     qemu_cpu_list_lock
     qemu_create
     qemu_create_displaysurface_pixman
+    qemu_display_register
     qemu_displaysurface_set_share_handle
     qemu_del_polling_cb
     qemu_del_wait_object
