@@ -174,6 +174,7 @@ EXPORTS
     qemu_console_get_head
     qemu_console_get_index
     qemu_console_get_name
+    qemu_console_is_graphic
     qemu_console_lookup_by_index
     qemu_console_lookup_default
     qemu_cpu_is_self
@@ -183,6 +184,7 @@ EXPORTS
     qemu_create_displaysurface_pixman
     qemu_del_polling_cb
     qemu_del_wait_object
+    qemu_display_register
     qemu_displaysurface_set_share_handle
     qemu_edid_generate
     qemu_event_set
