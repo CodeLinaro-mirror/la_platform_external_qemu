@@ -26,7 +26,7 @@ if(LINUX_X86_64)
       "${PREBUILT_ROOT}/icds/vk_swiftshader_icd.json>lib64/vulkan/vk_swiftshader_icd.json"
       # Lavapipe
       "${PREBUILT_ROOT}/icds/libvulkan_lvp.so>lib64/vulkan/libvulkan_lvp.so"
-      "${PREBUILT_ROOT}/icds/lvp_icd.x86_64.json>lib64/vulkan/lvp_icd.x86_64.json"
+      "${PREBUILT_ROOT}/icds/lvp_icd.json>lib64/vulkan/lvp_icd.json"
       "${PREBUILT_ROOT}/icds/libzstd.so>lib64/libzstd.so"
       "${PREBUILT_ROOT}/icds/libdrm.so>lib64/libdrm.so"
       # for translating shaders to SPIRV
@@ -77,8 +77,8 @@ elseif(WINDOWS)
   set(VULKAN_DEPENDENCIES
       "${PREBUILT_ROOT}/icds/vk_swiftshader.dll>lib64/vulkan/vulkan-1.dll"
       # Lavapipe
-      "${PREBUILT_ROOT}/icds/vulkan_lvp.dll>lib64/vulkan/vulkan_lvp.dll"
-      "${PREBUILT_ROOT}/icds/lvp_icd.x86_64.json>lib64/vulkan/lvp_icd.x86_64.json"
+      "${PREBUILT_ROOT}/icds/libvulkan_lvp.dll>lib64/vulkan/libvulkan_lvp.dll"
+      "${PREBUILT_ROOT}/icds/lvp_icd.json>lib64/vulkan/lvp_icd.json"
       # Swiftshader
       "${PREBUILT_ROOT}/icds/vk_swiftshader.dll>lib64/vulkan/vk_swiftshader.dll"
       "${PREBUILT_ROOT}/icds/vk_swiftshader_icd.json>lib64/vulkan/vk_swiftshader_icd.json"
