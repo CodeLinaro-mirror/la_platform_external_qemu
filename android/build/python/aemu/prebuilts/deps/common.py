@@ -128,9 +128,6 @@ def getClangDirectory():
         clang_path = clang_path / toolchain_json['clang_emu_prebuilts']
     return clang_path
 
-def getMesonDirectory():
-    return AOSP_ROOT / "prebuilts" / "meson"
-
 def addToSearchPath(searchDir):
     os.environ["PATH"] = searchDir + os.pathsep + os.environ["PATH"]
 
