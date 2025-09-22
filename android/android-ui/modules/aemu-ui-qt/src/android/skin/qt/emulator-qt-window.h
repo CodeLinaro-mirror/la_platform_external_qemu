@@ -67,6 +67,8 @@ class SwipeGesture;
 class CarClusterWindow;
 class CarClusterConnector;
 class MultiDisplayWidget;
+class SharedMemoryRenderer;
+class SharedStreamEmulator;
 
 
 using RunOnUiThreadFunc = std::function<void()>;
@@ -123,6 +125,8 @@ public:
     static Ptr getInstancePtr();
 
     virtual ~EmulatorQtWindow();
+
+    void setSharedMemoryRenderer(SharedMemoryRenderer* renderer);
 
     void queueQuitEvent();
     void focusOutEvent(QFocusEvent* event) override;
@@ -408,6 +412,7 @@ private slots:
             QString dismissText,
             Ui::OverlayChildWidget::DismissFunc func,
             int timeoutMs);
+    void slot_updateGuestScreen(const QImage& frame);
 
 public slots:
     // Here are conventional slots that perform interesting high-level functions
@@ -429,7 +434,12 @@ public:
         return mMainLoopThread && mMainLoopThread->isRunning();
     }
 
+    void initializeStreamer(std::string_view shm_handle);
+
 private:
+    std::unique_ptr<SharedMemoryRenderer> mSharedMemoryRenderer;
+    std::unique_ptr<SharedStreamEmulator> mStreamer;
+
     static const std::string_view kRemoteDownloadsDir;
     static const std::string_view kRemoteDownloadsDirApi10;
     // When the main window appears, close the "Starting..."
@@ -477,6 +487,8 @@ private:
     bool mStartupDone = false;
 
     SkinSurface* mBackingSurface;
+
+    QPixmap mGuestScreenPixmap;
     QPixmap mScaledBackingImage;
     bool mBackingBitmapChanged = true;
 

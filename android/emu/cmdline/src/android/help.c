@@ -983,6 +983,14 @@ help_audio(stralloc_t*  out)
 }
 
 static void
+help_fishtank(stralloc_t*  out)
+{
+    PRINTF(
+    "  fishtank ui launch flag. \n\n"
+    );
+}
+
+static void
 help_scale(stralloc_t*  out)
 {
     PRINTF(
@@ -2520,7 +2528,6 @@ android_help_main( stralloc_t*  out )
 
     /*printf( "%.*s", out->n, out->s );*/
 }
-
 
 void
 android_help_all( stralloc_t*  out )

@@ -66,7 +66,7 @@ static bool s_use_emugl_subwindow = 1;
 // extended control window.
 static bool s_qt_hide_windw = 0;
 
-static void emulator_window_refresh(EmulatorWindow* emulator);
+void emulator_window_refresh(EmulatorWindow* emulator);
 
 static bool emulator_window_load_environment(const AvdInfo* avdInfo);
 
@@ -261,7 +261,7 @@ static void _emulator_window_on_gpu_frame(void* context,
 }
 
 extern void android_load_multi_display_config();
-static void emulator_window_setup(EmulatorWindow* emulator) {
+void emulator_window_setup(EmulatorWindow* emulator) {
     user_event_agent = emulator->uiEmuAgent->userEvents;
 
     static const SkinWindowFuncs my_window_funcs = {
@@ -673,7 +673,7 @@ void emulator_window_done(EmulatorWindow* emulator) {
 }
 
 /* called periodically to poll for user input events */
-static void emulator_window_refresh(EmulatorWindow* emulator) {
+void emulator_window_refresh(EmulatorWindow* emulator) {
     /* this will eventually call sdl_update if the content of the VGA
      * framebuffer has changed */
     qframebuffer_check_updates();

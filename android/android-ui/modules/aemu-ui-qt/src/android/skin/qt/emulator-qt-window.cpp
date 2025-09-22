@@ -12,17 +12,14 @@
 
 #include "android/skin/qt/emulator-qt-window.h"
 
+#include "aemu/base/Optional.h"
 #include "aemu/base/async/ThreadLooper.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/memory/LazyInstance.h"
 #include "aemu/base/memory/ScopedPtr.h"
-#include "aemu/base/Optional.h"
 #include "aemu/base/synchronization/Lock.h"
 #include "aemu/base/system/Win32Utils.h"
 #include "aemu/base/threads/Async.h"
-#include "android/emu/check/include/android/emulation/compatibility_check.h"
-#include "android/emulation/control/globals_agent.h"
-#include "android_modem_v2.h"
 #include "android/android.h"
 #include "android/avd/info.h"
 #include "android/base/system/System.h"
@@ -30,17 +27,24 @@
 #include "android/console.h"
 #include "android/cpu_accelerator.h"
 #include "android/crashreport/CrashReporter.h"
+#include "android/emu/check/include/android/emulation/compatibility_check.h"
 #include "android/emulation/compatibility_check.h"
+#include "android/emulation/control/globals_agent.h"
 #include "android/emulation/control/user_event_agent.h"
 #include "android/emulator-window.h"
 #include "android/hw-sensors.h"
 #include "android/metrics/DependentMetrics.h"
 #include "android/metrics/PeriodicReporter.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "android/multitouch-screen.h"
 #include "android/opengl/gpuinfo.h"
 #include "android/skin/EmulatorSkin.h"
 #include "android/skin/event.h"
 #include "android/skin/keycode.h"
+#include "android/skin/qt/FramelessDetector.h"
+#include "android/skin/qt/QtLooper.h"
+#include "android/skin/qt/SharedMemoryRenderer.h"
+#include "android/skin/qt/SharedStreamEmulator.h"
 #include "android/skin/qt/car-cluster-window.h"
 #include "android/skin/qt/event-serializer.h"
 #include "android/skin/qt/extended-pages/car-cluster-connector/car-cluster-connector.h"
@@ -51,11 +55,9 @@
 #include "android/skin/qt/extended-pages/snapshot-page-grpc.h"
 #include "android/skin/qt/extended-pages/snapshot-page.h"
 #include "android/skin/qt/extended-pages/telephony-page.h"
-#include "android/skin/qt/FramelessDetector.h"
 #include "android/skin/qt/multi-display-widget.h"
 #include "android/skin/qt/qt-keycode.h"
 #include "android/skin/qt/qt-settings.h"
-#include "android/skin/qt/QtLooper.h"
 #include "android/skin/qt/screen-mask.h"
 #include "android/skin/qt/winsys-qt.h"
 #include "android/skin/rect.h"
@@ -67,15 +69,15 @@
 #include "android/utils/filelock.h"
 #include "android/utils/x86_cpuid.h"
 #include "android/virtualscene/TextureUtils.h"
-#include "host-common/crash-handler.h"
-#include "host-common/feature_control.h"
+#include "android_modem_v2.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/Features.h"
-#include "host-common/multi_display_agent.h"
 #include "host-common/MultiDisplay.h"
+#include "host-common/crash-handler.h"
+#include "host-common/feature_control.h"
+#include "host-common/multi_display_agent.h"
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/snapshot_common.h"
-#include "android/metrics/studio_stats_wrapper.pb.h"
 
 #define DEBUG 1
 
@@ -89,10 +91,9 @@
 #include <QBitmap>
 #include <QCheckBox>
 #include <QCursor>
-#include <Qt>
-#include <QInputDevice>
 #include <QFileDialog>
 #include <QIcon>
+#include <QInputDevice>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
@@ -107,6 +108,7 @@
 #include <QToolTip>
 #include <QTouchEvent>
 #include <QWindow>
+#include <Qt>
 #include <QtCore>
 #include <QtMath>
 
@@ -147,15 +149,14 @@ using android::base::ScopedCPtr;
 using android::base::System;
 using android::crashreport::CrashReporter;
 using android::emulation::ApkInstaller;
-using android::emulation::FilePusher;
 using android::emulation::AvdCompatibility;
 using android::emulation::AvdCompatibilityManager;
+using android::emulation::FilePusher;
 using android::virtualscene::TextureUtils;
 
 namespace {
 
-#define QT_TO_LINUX_KEY(x, y) \
-    { Qt::Key_##x, LINUX_KEY_##y }
+#define QT_TO_LINUX_KEY(x, y) {Qt::Key_##x, LINUX_KEY_##y}
 #define QT_LINUX_SAME_KEY(x) QT_TO_LINUX_KEY(x, x)
 
 const std::unordered_map<int, int> QT_TO_LINUX_KEYCODE_BASE{
@@ -231,7 +232,8 @@ const std::unordered_map<int, int> QT_TO_LINUX_KEYCODE_BASE{
         // Qt treats "SHIFT + TAB" as "Backtab", just convert it back to
         // TAB.
         QT_TO_LINUX_KEY(Backtab, TAB),
-        // LINUX_KEY_GREEN is mapped to LINUX_KEY_GRAVE in emulator system image qwerty2.kl
+        // LINUX_KEY_GREEN is mapped to LINUX_KEY_GRAVE in emulator system image
+        // qwerty2.kl
         QT_TO_LINUX_KEY(QuoteLeft, GREEN),
 };
 
@@ -490,16 +492,18 @@ SkinEvent EmulatorQtWindow::createSkinEventScreenChanged() {
     double dpr;
     getDevicePixelRatio(&dpr);
 
-    // On multi-monitor setups, x and y coordinates can have negative values, as the coordinates are
-    // relative to the top-left corner (0, 0) of the primary display.
+    // On multi-monitor setups, x and y coordinates can have negative values, as
+    // the coordinates are relative to the top-left corner (0, 0) of the primary
+    // display.
     SkinEvent skin_event = createSkinEvent(kEventScreenChanged);
     skin_event.u.screen.x = screen_geo.x();
     skin_event.u.screen.y = screen_geo.y();
     skin_event.u.screen.w = screen_geo.width();
     skin_event.u.screen.h = screen_geo.height();
     skin_event.u.screen.dpr = dpr;
-    D("%s: x=%d y=%d w=%d h=%d dpr=%f\n", __func__, skin_event.u.screen.x, skin_event.u.screen.y,
-      skin_event.u.screen.w, skin_event.u.screen.h, skin_event.u.screen.dpr);
+    D("%s: x=%d y=%d w=%d h=%d dpr=%f\n", __func__, skin_event.u.screen.x,
+      skin_event.u.screen.y, skin_event.u.screen.w, skin_event.u.screen.h,
+      skin_event.u.screen.dpr);
     return skin_event;
 }
 
@@ -631,15 +635,17 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
 
     if (EmulatorSkin::getInstance()->isPortrait()) {
         mOrientation = !strcasecmp(getConsoleAgents()
-                ->settings->hw() ->hw_initialOrientation,
-                               "landscape")
+                                           ->settings->hw()
+                                           ->hw_initialOrientation,
+                                   "landscape")
                                ? SKIN_ROTATION_270
                                : SKIN_ROTATION_0;
     } else {
         // landscape
         mOrientation = !strcasecmp(getConsoleAgents()
-                ->settings->hw() ->hw_initialOrientation,
-                               "landscape")
+                                           ->settings->hw()
+                                           ->hw_initialOrientation,
+                                   "landscape")
                                ? SKIN_ROTATION_0
                                : SKIN_ROTATION_90;
     }
@@ -773,14 +779,14 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
         // RawKeyboardInput feature always forwards the keyboard shortcuts to
         // the Device, which are not used by the emulator host itself.
         shortcutBool =
-            settings.value(Ui::Settings::FORWARD_SHORTCUTS_TO_DEVICE, false)
-                    .toBool();
+                settings.value(Ui::Settings::FORWARD_SHORTCUTS_TO_DEVICE, false)
+                        .toBool();
     }
     setForwardShortcutsToDevice(shortcutBool ? 1 : 0);
 
     initErrorDialog(this, getConsoleAgents()
-                ->settings->android_cmdLineOptions()
-                ->qt_hide_window);
+                                  ->settings->android_cmdLineOptions()
+                                  ->qt_hide_window);
     setObjectName("MainWindow");
     mEventLogger->startRecording(this);
     mEventLogger->startRecording(mToolWindow);
@@ -1352,7 +1358,8 @@ Qt::CursorShape EmulatorQtWindow::getCursorShape(bool mouseGrabbed) {
             return DUAL_MODE_MOUSE_RELATIVE_MODE_CURSOR;
         } else {
             if (android::featurecontrol::isEnabled(
-                    android::featurecontrol::DualModeMouseDisplayHostCursor)) {
+                        android::featurecontrol::
+                                DualModeMouseDisplayHostCursor)) {
                 return DUAL_MODE_MOUSE_DEFAULT_CURSOR_DISPLAY_HOST_MODE;
             } else {
                 return DUAL_MODE_MOUSE_DEFAULT_CURSOR_DISPLAY_GUEST_MODE;
@@ -1395,10 +1402,11 @@ void EmulatorQtWindow::mousePressEvent(QMouseEvent* event) {
     // visual artifacts. This may require additional debugging and a possible
     // QT changes. Hence, grabbed mode is disabled on VirtioDualModeMouse for
     // now.
-    bool enableMouseGrab = android::featurecontrol::isEnabled(
-                                android::featurecontrol::VirtioMouse) &&
-                           !android::featurecontrol::isEnabled(
-                                android::featurecontrol::VirtioDualModeMouse);
+    bool enableMouseGrab =
+            android::featurecontrol::isEnabled(
+                    android::featurecontrol::VirtioMouse) &&
+            !android::featurecontrol::isEnabled(
+                    android::featurecontrol::VirtioDualModeMouse);
     if (enableMouseGrab && !mMouseGrabbed) {
         if (mPromptMouseRestoreMessageBox) {
             QMessageBox msgBox;
@@ -1482,7 +1490,7 @@ void EmulatorQtWindow::mouseReleaseEvent(QMouseEvent* event) {
     }
 }
 
-void EmulatorQtWindow::focusInEvent(QFocusEvent *event) {
+void EmulatorQtWindow::focusInEvent(QFocusEvent* event) {
     // FocusIn event may not be received unless setFocusPolicy(Qt::StrongFocus)
     // is called on the widget. However, this breaks the zoom behavior because
     // of EmulatorOverlay::focusOutEvent() hides the overlay itself right after
@@ -1711,6 +1719,11 @@ void EmulatorQtWindow::paintEvent(QPaintEvent*) {
             painter.drawPixmap(r, mScaledBackingImage);
         }
     }
+    if (!mGuestScreenPixmap.isNull()) {
+        // Draw the pixmap to fill the frame's contents rect
+        auto r = contentsRect();
+        painter.drawPixmap(r, mGuestScreenPixmap);
+    }
 }
 
 void EmulatorQtWindow::raise() {
@@ -1719,6 +1732,42 @@ void EmulatorQtWindow::raise() {
     if (mCarClusterWindow) {
         mCarClusterWindow->raise();
     }
+}
+
+void EmulatorQtWindow::setSharedMemoryRenderer(SharedMemoryRenderer* renderer) {
+    mSharedMemoryRenderer.reset(renderer);
+    if (mSharedMemoryRenderer) {
+        // Connect the signal from the renderer to our slot.
+        // Qt will handle the cross-thread invocation automatically.
+        connect(mSharedMemoryRenderer.get(), &SharedMemoryRenderer::frameReady,
+                this, &EmulatorQtWindow::slot_updateGuestScreen);
+    }
+}
+
+void EmulatorQtWindow::initializeStreamer(std::string_view shm_handle) {
+    int width = getConsoleAgents()->settings->hw()->hw_lcd_width;
+    int height = getConsoleAgents()->settings->hw()->hw_lcd_height;
+
+    mSharedMemoryRenderer = std::make_unique<SharedMemoryRenderer>(
+            std::string(shm_handle), width, height,
+            SharedMemoryRenderer::ImgFormat::RGB888);
+    mSharedMemoryRenderer->initialize();
+
+    connect(mSharedMemoryRenderer.get(), &SharedMemoryRenderer::frameReady,
+            this, &EmulatorQtWindow::slot_updateGuestScreen);
+
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            shm_handle, [this]() { mSharedMemoryRenderer->update(); }, width,
+            height);
+    mStreamer->startStream();
+}
+
+void EmulatorQtWindow::slot_updateGuestScreen(const QImage& frame) {
+    // This code runs safely on the UI thread.
+    // LOG(INFO) << "Updating guest!";
+    mGuestScreenPixmap = QPixmap::fromImage(frame);
+    // Trigger a repaint of the window to display the new pixmap.
+    update();
 }
 
 void EmulatorQtWindow::show() {
@@ -1992,7 +2041,7 @@ void EmulatorQtWindow::slot_clearInstance() {
     // Force kill any parallel tasks that may be running, as this can make Qt
     // hang on exit.
     System::get()->cleanupWaitingPids();
-    if(mMainLoopThread && mMainLoopThread->isRunning()) {
+    if (mMainLoopThread && mMainLoopThread->isRunning()) {
         requestClose();
         mMainLoopThread->wait();
     }
@@ -2026,7 +2075,8 @@ void EmulatorQtWindow::slot_fill(SkinSurface* s,
 void EmulatorQtWindow::slot_getDevicePixelRatio(double* out_dpr,
                                                 QSemaphore* semaphore) {
     QSemaphoreReleaser semReleaser(semaphore);
-    auto screen = window()->windowHandle() ? window()->windowHandle()->screen() : nullptr;
+    auto screen = window()->windowHandle() ? window()->windowHandle()->screen()
+                                           : nullptr;
     *out_dpr = screen ? screen->devicePixelRatio() : 1.0;
 }
 
@@ -2044,8 +2094,8 @@ void EmulatorQtWindow::slot_getScreenDimensions(QRect* out_rect,
         D("Can't get screen geometry. Window is off screen.");
         return;
     }
-    // Use availableGeometry() instead of geometry() to get coordinates that are excluding things
-    // like a dock, menu bar, etc.
+    // Use availableGeometry() instead of geometry() to get coordinates that are
+    // excluding things like a dock, menu bar, etc.
     QRect rect = newScreen->availableGeometry();
     D("slot_getScreenDimensions: Getting screen geometry (done)");
     out_rect->setX(rect.x());
@@ -2144,9 +2194,9 @@ void EmulatorQtWindow::pollEvent(SkinEvent* event, bool* hasEvent) {
 void EmulatorQtWindow::queueSkinEvent(SkinEvent event) {
     const auto eventType = event.type;
     const auto rotationEventLayout =
-        (eventType == kEventLayoutRotate)
-            ? makeOptional(event.u.layout_rotation.rotation)
-            : kNullopt;
+            (eventType == kEventLayoutRotate)
+                    ? makeOptional(event.u.layout_rotation.rotation)
+                    : kNullopt;
 
     const std::lock_guard<std::mutex> lock(mSkinEventQueueMtx);
     const bool firstEvent = mSkinEventQueue.empty();
@@ -2158,22 +2208,22 @@ void EmulatorQtWindow::queueSkinEvent(SkinEvent event) {
     bool replaced = false;
 
     switch (eventType) {
-    case kEventScrollBarChanged:
-    case kEventZoomedWindowResized:
-    case kEventScreenChanged: {
-            const auto i = std::find_if(mSkinEventQueue.begin(), mSkinEventQueue.end(),
-                                        [eventType](const SkinEvent& ev){
-                                            return ev.type == eventType;
-                                        });
+        case kEventScrollBarChanged:
+        case kEventZoomedWindowResized:
+        case kEventScreenChanged: {
+            const auto i =
+                    std::find_if(mSkinEventQueue.begin(), mSkinEventQueue.end(),
+                                 [eventType](const SkinEvent& ev) {
+                                     return ev.type == eventType;
+                                 });
             if (i != mSkinEventQueue.end()) {
                 *i = std::move(event);
                 replaced = true;
             }
-        }
-        break;
+        } break;
 
-    default:
-        break;
+        default:
+            break;
     }
 
     if (!replaced) {
@@ -2683,8 +2733,9 @@ void EmulatorQtWindow::resizeAndChangeAspectRatio(bool isFolded) {
         if (isFolded) {
             setFoldedSkin();
         } else {
-            if(resizableEnabled34()) {
-                PresetEmulatorSizeType activeConfig = getResizableActiveConfigId();
+            if (resizableEnabled34()) {
+                PresetEmulatorSizeType activeConfig =
+                        getResizableActiveConfigId();
                 if (activeConfig == 1) {
                     restoreSkin();
                 }
@@ -2852,8 +2903,7 @@ void EmulatorQtWindow::handleMouseEvent(SkinEventType type,
     SkinEvent skin_event = createSkinEvent(type);
     skin_event.u.mouse.button = button;
     skin_event.u.mouse.skip_sync = skipSync;
-    skin_event.u.mouse.send_relative_coordinates =
-            sendRelativeMouseCoordinates;
+    skin_event.u.mouse.send_relative_coordinates = sendRelativeMouseCoordinates;
     skin_event.u.mouse.x = pos.x();
     skin_event.u.mouse.y = pos.y();
     skin_event.u.mouse.x_global = gPos.x();
@@ -2912,7 +2962,8 @@ void EmulatorQtWindow::forwardKeyEventToEmulator(SkinEventType type,
     SkinEventKeyData& keyData = skin_event.u.key;
     bool isModifier = false;
     keyData.keycode = convertKeyCode(event.key(), isModifier);
-    if (android::featurecontrol::isEnabled(android::featurecontrol::QtRawKeyboardInput)) {
+    if (android::featurecontrol::isEnabled(
+                android::featurecontrol::QtRawKeyboardInput)) {
         if (!isModifier) {
             std::optional<int> result = android::qt::getUnmodifiedQtKey(event);
             if (result && *result != event.key()) {
@@ -2944,7 +2995,8 @@ void EmulatorQtWindow::forwardKeyEventToEmulator(SkinEventType type,
     queueSkinEvent(std::move(skin_event));
 }
 
-void EmulatorQtWindow::handleKeyEvent(SkinEventType type, const QKeyEvent& event) {
+void EmulatorQtWindow::handleKeyEvent(SkinEventType type,
+                                      const QKeyEvent& event) {
     // TODO(liyl): Make this shortcut configurable instead of hard-coding it
     // inside the code.
     if (!android::featurecontrol::isEnabled(
@@ -2971,9 +3023,9 @@ void EmulatorQtWindow::handleKeyEvent(SkinEventType type, const QKeyEvent& event
     }
 
     bool sendRawKeyboardInputToGuest = android::featurecontrol::isEnabled(
-                     android::featurecontrol::QtRawKeyboardInput);
-    if (!mForwardShortcutsToDevice && !mInZoomMode && !sendRawKeyboardInputToGuest &&
-        event.key() == Qt::Key_Control &&
+            android::featurecontrol::QtRawKeyboardInput);
+    if (!mForwardShortcutsToDevice && !mInZoomMode &&
+        !sendRawKeyboardInputToGuest && event.key() == Qt::Key_Control &&
         (event.modifiers() == Qt::ControlModifier ||
          event.modifiers() == (Qt::ControlModifier | Qt::ShiftModifier))) {
         if (type == kEventKeyDown && !mDisablePinchToZoom) {
@@ -3506,22 +3558,29 @@ void EmulatorQtWindow::wheelEvent(QWheelEvent* event) {
         if (!inputDeviceActive) {
             return;
         }
-        const int kScrollAggregationAmount = (abs(event->angleDelta().x()) >= 120 ||
-                                              abs(event->angleDelta().y()) >= 120) ? 120 : 15;
+        const int kScrollAggregationAmount =
+                (abs(event->angleDelta().x()) >= 120 ||
+                 abs(event->angleDelta().y()) >= 120)
+                        ? 120
+                        : 15;
         if (android::featurecontrol::isEnabled(
-                        android::featurecontrol::VirtioDualModeMouse)) {
+                    android::featurecontrol::VirtioDualModeMouse)) {
             mScrollOverflowXInDegrees += event->angleDelta().x();
             if (abs(mScrollOverflowXInDegrees) >= kScrollAggregationAmount) {
-                int scrollDelta = mScrollOverflowXInDegrees / kScrollAggregationAmount;
+                int scrollDelta =
+                        mScrollOverflowXInDegrees / kScrollAggregationAmount;
                 handleMouseWheelEvent(scrollDelta, Qt::Orientation::Horizontal);
-                mScrollOverflowXInDegrees = mScrollOverflowXInDegrees % kScrollAggregationAmount;
+                mScrollOverflowXInDegrees =
+                        mScrollOverflowXInDegrees % kScrollAggregationAmount;
             }
 
             mScrollOverflowYInDegrees += event->angleDelta().y();
             if (abs(mScrollOverflowYInDegrees) >= kScrollAggregationAmount) {
-                int scrollDelta = mScrollOverflowYInDegrees / kScrollAggregationAmount;
+                int scrollDelta =
+                        mScrollOverflowYInDegrees / kScrollAggregationAmount;
                 handleMouseWheelEvent(scrollDelta, Qt::Orientation::Vertical);
-                mScrollOverflowYInDegrees = mScrollOverflowYInDegrees % kScrollAggregationAmount;
+                mScrollOverflowYInDegrees =
+                        mScrollOverflowYInDegrees % kScrollAggregationAmount;
             }
             mTrackpadAggregateTimer.start();
         } else {
@@ -3580,17 +3639,17 @@ void EmulatorQtWindow::wheelScrollTimeout() {
 
 void EmulatorQtWindow::trackpadAggregateTimeout() {
     if (android::featurecontrol::isEnabled(
-        android::featurecontrol::VirtioDualModeMouse)) {
-        // Sending out a scrolling of 960 so it will be scaled to 1 scroll click unit
-        // in android-qemu2-glue/qemu-user-event-agent-impl.c
-        if(mScrollOverflowXInDegrees > 0){
+                android::featurecontrol::VirtioDualModeMouse)) {
+        // Sending out a scrolling of 960 so it will be scaled to 1 scroll click
+        // unit in android-qemu2-glue/qemu-user-event-agent-impl.c
+        if (mScrollOverflowXInDegrees > 0) {
             handleMouseWheelEvent(960, Qt::Orientation::Horizontal);
-        } else if (mScrollOverflowXInDegrees < 0){
+        } else if (mScrollOverflowXInDegrees < 0) {
             handleMouseWheelEvent(-960, Qt::Orientation::Horizontal);
         }
-        if(mScrollOverflowYInDegrees > 0){
+        if (mScrollOverflowYInDegrees > 0) {
             handleMouseWheelEvent(960, Qt::Orientation::Vertical);
-        } else if (mScrollOverflowYInDegrees < 0){
+        } else if (mScrollOverflowYInDegrees < 0) {
             handleMouseWheelEvent(-960, Qt::Orientation::Vertical);
         }
         mTrackpadAggregateTimer.stop();
@@ -3753,7 +3812,8 @@ void EmulatorQtWindow::displayCheckWarnings() {
     auto opts = getConsoleAgents()->settings->android_cmdLineOptions();
     auto name = avdInfo_getName(avd);
 
-    auto key = absl::StrCat(Ui::Settings::SHOW_COMPATIBILITY_WARNING, "_", name);
+    auto key =
+            absl::StrCat(Ui::Settings::SHOW_COMPATIBILITY_WARNING, "_", name);
     bool showWarnings = settings.value(key, true).toBool();
 
     auto results = AvdCompatibilityManager::instance().check(avd);
@@ -3764,9 +3824,9 @@ void EmulatorQtWindow::displayCheckWarnings() {
     if (!opts->no_window && showWarnings && !warningString.empty()) {
         QMessageBox* nestedGeneralWarningBox = new QMessageBox(
                 QMessageBox::Information, tr("Compatibility Warnings"),
-                QString::fromStdString(warningString), QMessageBox::Ok,
-                this);
-        LOG(INFO) << "Displaying warning message dialog with " << warningString << " to user.";
+                QString::fromStdString(warningString), QMessageBox::Ok, this);
+        LOG(INFO) << "Displaying warning message dialog with " << warningString
+                  << " to user.";
         QCheckBox* checkbox =
                 new QCheckBox(QString::fromStdString(absl::StrFormat(
                         "Never show warnings for avd `%s` again.", name)));
@@ -3775,14 +3835,15 @@ void EmulatorQtWindow::displayCheckWarnings() {
         nestedGeneralWarningBox->setCheckBox(checkbox);
         QAbstractButton* okButton =
                 nestedGeneralWarningBox->button(QMessageBox::Ok);
-        QObject::connect(okButton, &QAbstractButton::clicked, [key, checkbox, nestedGeneralWarningBox]() {
-            if (checkbox->checkState() == Qt::Checked) {
-                QSettings settings;
-                settings.setValue(key, false);
-            }
-            nestedGeneralWarningBox->deleteLater();
-            checkbox->deleteLater();
-        });
+        QObject::connect(okButton, &QAbstractButton::clicked,
+                         [key, checkbox, nestedGeneralWarningBox]() {
+                             if (checkbox->checkState() == Qt::Checked) {
+                                 QSettings settings;
+                                 settings.setValue(key, false);
+                             }
+                             nestedGeneralWarningBox->deleteLater();
+                             checkbox->deleteLater();
+                         });
         nestedGeneralWarningBox->show();
     }
 }
@@ -3820,7 +3881,8 @@ void EmulatorQtWindow::rotateSkin(SkinRotation rot) {
         }
     }
 
-    if (not_pixel_fold && mToolWindow->getUiEmuAgent()->multiDisplay->isMultiDisplayEnabled()) {
+    if (not_pixel_fold &&
+        mToolWindow->getUiEmuAgent()->multiDisplay->isMultiDisplayEnabled()) {
         {
             uint32_t w = 0;
             uint32_t h = 0;
@@ -3959,9 +4021,8 @@ void EmulatorQtWindow::setFoldedSkin() {
         ScreenMask::loadMask();
         EmulatorSkin::getInstance()->reset();
     }
-    runOnUiThread([this]() {
-        skin_event_add(createSkinEvent(kEventSetFoldedSkin));
-    });
+    runOnUiThread(
+            [this]() { skin_event_add(createSkinEvent(kEventSetFoldedSkin)); });
 }
 
 void EmulatorQtWindow::setNoSkin() {
@@ -4042,7 +4103,7 @@ bool EmulatorQtWindow::addMultiDisplayWindow(uint32_t id,
             char title[16];
             uint32_t tId;
             if (id >= android::MultiDisplay::s_displayIdInternalBegin &&
-                    id < android::MultiDisplay::s_maxNumMultiDisplay) {
+                id < android::MultiDisplay::s_maxNumMultiDisplay) {
                 // displayIds created by rcCommands
                 tId = id - android::MultiDisplay::s_displayIdInternalBegin + 1;
             } else {
@@ -4242,7 +4303,8 @@ SkinEventType EmulatorQtWindow::translateMouseEventType(
             if ((type == kEventMouseButtonDown) && (button == buttons)) {
                 mMouseTouchState = TouchState::TOUCHING;
                 newType = kEventMouseButtonDown;
-            } else if (android::featurecontrol::isEnabled(android::featurecontrol::VirtioTablet)) {
+            } else if (android::featurecontrol::isEnabled(
+                               android::featurecontrol::VirtioTablet)) {
                 newType = kEventMouseMotion;
             } else {
                 newType = kEventMouseButtonUp;

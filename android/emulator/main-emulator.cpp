@@ -397,6 +397,7 @@ int main(int argc, char** argv) {
     bool doListSnapshots = false;
     bool doListUSB = false;
     bool isHeadless = false;
+    bool isFishtank = false;
     bool useSystemLibs = false;
     bool forceEngineLaunch = false;
     bool isFuchsia = false;
@@ -672,6 +673,11 @@ int main(int argc, char** argv) {
             nn++;
             continue;
         }
+        if (!strcmp(opt, "-fishtank")) {
+            isFishtank = true;
+            continue;
+        }
+
 
         if (!strcmp(opt, "-no-qt")) {
             isHeadless = true;
@@ -1113,6 +1119,10 @@ int main(int argc, char** argv) {
             break;
         }
         emulatorPath = nullptr;
+    }
+    if (isFishtank) {
+        std::string fishtank = std::string(progDir) + std::string(PATH_SEP) + "fishtank";
+        emulatorPath =  path_get_absolute(fishtank.c_str());
     }
 
     if (emulatorPath == nullptr) {

@@ -14,16 +14,13 @@
 #include "android/skin/qt/SharedStreamEmulator.h"
 
 #include "aemu/base/logging/Log.h"
-#include "android/console.h"
-#include "host-common/hw-config.h"
 
 SharedStreamEmulator::SharedStreamEmulator(
         std::string_view handle,
         FrameCallback callback,
         int width,
         int height,
-                std::shared_ptr<android::emulation::control::EmulatorGrpcClient>
-                        client)
+        std::shared_ptr<android::emulation::control::EmulatorGrpcClient> client)
     : mWidth(width),
       mHeight(height),
       mClient(client),

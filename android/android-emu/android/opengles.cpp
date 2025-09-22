@@ -48,6 +48,7 @@
 #include "render-utils/dma_device.h"
 #include "render-utils/logging_operations.h"
 #include "render-utils/render_api_functions.h"
+#include "aemu/base/Log.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -679,6 +680,12 @@ static gfxstream::RenderOpt sOpt;
 static int sWidth, sHeight;
 static int sNewWidth, sNewHeight;
 
+static bool sExternalRendererActive = false;
+
+void android_set_external_renderer_active(bool active) {
+    sExternalRendererActive = active;
+}
+
 int android_showOpenglesWindow(void* window,
                                int wx,
                                int wy,
@@ -690,6 +697,9 @@ int android_showOpenglesWindow(void* window,
                                float rotation,
                                bool deleteExisting,
                                bool hideWindow) {
+    if (sExternalRendererActive) {
+        return 0;
+    }
     if (!sRenderer) {
         return -1;
     }
@@ -867,6 +877,7 @@ extern void tinyepoxy_init(const GLESv2Dispatch* gles, int version);
 
 static bool prepare_epoxy(void) {
     if (!sRenderLib->getOpt(&sOpt)) {
+        LOG(ERROR) << "Options not available";
         return false;
     }
     int major, minor;
@@ -876,11 +887,13 @@ static bool prepare_epoxy(void) {
     sContext = sEgl->eglCreateContext(sOpt.display, sOpt.config, EGL_NO_CONTEXT,
                                       attr);
     if (sContext == nullptr) {
+        LOG(ERROR) << "Unable to create context";
         return false;
     }
     sRenderContext =
             sEgl->eglCreateContext(sOpt.display, sOpt.config, sContext, attr);
     if (sRenderContext == nullptr) {
+        LOG(ERROR) << "Unable to create  render context";
         return false;
     }
     static constexpr EGLint surface_attr[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1,
@@ -888,6 +901,7 @@ static bool prepare_epoxy(void) {
     sSurface = sEgl->eglCreatePbufferSurface(sOpt.display, sOpt.config,
                                              surface_attr);
     if (sSurface == EGL_NO_SURFACE) {
+        LOG(ERROR) << "No egl surface";
         return false;
     }
     static_assert(sizeof(attr) == sizeof(s_gles_attr), "Mismatch");
@@ -903,6 +917,7 @@ void* android_gl_create_context(DisplayChangeListener* unuse1,
                                 QEMUGLParams* unuse2) {
     static bool ok = prepare_epoxy();
     if (!ok) {
+
         return nullptr;
     }
     sEgl->eglMakeCurrent(sOpt.display, sSurface, sSurface, sContext);
@@ -964,6 +979,14 @@ void android_gl_scanout_flush(DisplayChangeListener* unuse,
     sEgl->eglMakeCurrent(sOpt.display, sOpt.surface, sOpt.surface,
                          sRenderContext);
 
+    unsigned long long count = *(unsigned long long*)unuse;
+        if (count % 3 == 0) {
+            sGlesv2->glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+        } else if (count % 3 == 1) {
+            sGlesv2->glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+        } else {
+            sGlesv2->glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+        }
     sGlesv2->glBindFramebuffer(GL_READ_FRAMEBUFFER, s_fbo_id);
     sGlesv2->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
@@ -973,6 +996,7 @@ void android_gl_scanout_flush(DisplayChangeListener* unuse,
     sGlesv2->glViewport(0, 0, sWidth, sHeight);
     sGlesv2->glBlitFramebuffer(0, y1, s_gfx_w, y2, 0, 0, sWidth, sHeight,
                                GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    sGlesv2->glClear(GL_COLOR_BUFFER_BIT);
     sEgl->eglSwapBuffers(sOpt.display, sOpt.surface);
     sGlesv2->glBindFramebuffer(GL_FRAMEBUFFER_EXT, s_fbo_id);
 }

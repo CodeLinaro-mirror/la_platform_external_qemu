@@ -62,6 +62,7 @@ function(android_qt_lib)
   endif()
 endfunction()
 
+add_subdirectory(apps)
 add_subdirectory(modules/aemu-gl-bridge)
 add_subdirectory(modules/aemu-gl-init)
 add_subdirectory(modules/aemu-ui-headless)
