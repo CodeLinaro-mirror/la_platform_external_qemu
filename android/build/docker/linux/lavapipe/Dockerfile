@@ -120,4 +120,4 @@ RUN jq '.ICD.library_path = "./libvulkan_lvp.so"' /tmp/mesa/build_docker/src/gal
 
 FROM scratch AS final
 COPY --from=build /tmp/mesa/build_docker/src/gallium/targets/lavapipe/libvulkan_lvp.so ./
-COPY --from=build /tmp/mesa/build_docker/src/gallium/targets/lavapipe/lvp_icd.x86_64.json ./
+COPY --from=build /tmp/mesa/build_docker/src/gallium/targets/lavapipe/lvp_icd.x86_64.json ./lvp_icd.json

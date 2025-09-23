@@ -85,13 +85,20 @@ def buildLavapipe(srcdir, builddir):
     logging.info("Build succeeded")
 
 def installLavapipe(builddir, installdir):
+    libExtensions = {
+        "linux": "so",
+        "windows": "dll",
+        "darwin": "dylib"
+    }
+    libExtension = libExtensions.get(HOST_OS, "so")
 
     def retargetICDFile(icdFile):
         try:
             with open(icdFile, 'r') as f:
                 data = json.load(f)
 
-            data["ICD"]["library_path"] = "./libvulkan_lvp.so"
+            # Replace library path to use a local one, keep extension (so, dylib, dll)
+            data["ICD"]["library_path"] = f"./libvulkan_lvp.{libExtension}"
 
             with open(icdFile, 'w') as f:
                 json.dump(data, f, indent=4)
@@ -103,16 +110,21 @@ def installLavapipe(builddir, installdir):
         except Exception as e:
             logging.error(f"An unexpected error occurred: {e}")
 
+    srcArch = "aarch64" if HOST_ARCH == "aarch64" else "x86_64"
+
     os.makedirs(installdir,exist_ok=True)
     LAVAPIPE_PREFIX= os.path.join(builddir, "src/gallium/targets/lavapipe")
-    LAVAPIPE_SO_SRC = os.path.join(LAVAPIPE_PREFIX, "libvulkan_lvp.so")
-    LAVAPIPE_SO_DST = os.path.join(installdir, "libvulkan_lvp.so")
-    LAVAPIPE_ICD_SRC = os.path.join(LAVAPIPE_PREFIX, "lvp_icd.x86_64.json")
-    LAVAPIPE_ICD_DST = os.path.join(installdir, "lvp_icd.x86_64.json")
+    LAVAPIPE_SO_SRC = os.path.join(LAVAPIPE_PREFIX, "libvulkan_lvp.{libExtension}")
+    LAVAPIPE_SO_DST = os.path.join(installdir, "libvulkan_lvp.{libExtension}")
+    LAVAPIPE_ICD_SRC = os.path.join(LAVAPIPE_PREFIX, f"lvp_icd.{srcArch}.json")
+    LAVAPIPE_ICD_DST = os.path.join(installdir, "lvp_icd.json")
+
     logging.info("Installing Lavapipe to %s", installdir)
+
     # The ICD file built in MESA expects the library to be installed in system path.
-    # We will be shipping icd and .so in the same dir so rewrite to point locally.
+    # We will be shipping icd and library in the same dir so rewrite to point locally.
     retargetICDFile(LAVAPIPE_ICD_SRC)
+
     shutil.copyfile(LAVAPIPE_ICD_SRC, LAVAPIPE_ICD_DST)
     shutil.copyfile(LAVAPIPE_SO_SRC, LAVAPIPE_SO_DST)
     logging.info("Installation succeeded")
