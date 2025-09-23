@@ -860,6 +860,10 @@ message AndroidStudioEvent {
   // set when kind = ASSET_STUDIO_WIZARD_EVENT
   optional AssetStudioWizardEvent asset_studio_wizard_event = 240 [lazy = true];
 
+  // set when kind = NEXT_EDIT_PREDICTION_EVENT
+  optional NextEditPredictionEvent next_edit_prediction_event = 241
+      [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1842,6 +1846,9 @@ message AndroidStudioEvent {
 
     // Event related to Asset Studio Wizard
     ASSET_STUDIO_WIZARD_EVENT = 359;
+
+    // Event related to Next Edit Prediction
+    NEXT_EDIT_PREDICTION_EVENT = 360;
   }
 
   // Represents different Performance Monitoring types.
@@ -2827,6 +2834,31 @@ message EmulatorGuestGlInfo {
   optional string version = 3;
 }
 
+// Emulator: VK GPU info.
+message EmulatorGpuVkInfo {
+  // Represents VkPhysicalDeviceType, offset by 1 (0 is
+  // UNKNOWN_PHYSICAL_DEVICE_TYPE as per proto best practices)
+  enum PhysicalDeviceType {
+    UNKNOWN_PHYSICAL_DEVICE_TYPE = 0;
+    PHYSICAL_DEVICE_TYPE_OTHER = 1;
+    PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU = 2;
+    PHYSICAL_DEVICE_TYPE_DISCRETE_GPU = 3;
+    PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU = 4;
+    PHYSICAL_DEVICE_TYPE_CPU = 5;
+  }
+
+  optional int32 api_version = 1;
+  optional int32 driver_version = 2;
+  optional int32 vendor_id = 3;
+  optional int32 device_id = 4;
+  // The type of the GPU device. Matches VkPhysicalDeviceType.
+  optional PhysicalDeviceType device_type = 5;
+  optional string device_name = 6;
+  // Memory size of the GPU in bytes.
+  optional int64 gpu_memory = 7;
+  optional string driver_info = 8;
+}
+
 // Emulator: Host GPU info.
 message EmulatorGpuInfo {
   // Make of the Graphics card.
@@ -3778,7 +3810,9 @@ message EmulatorDetails {
   optional VulkanIcd vulkan_icd = 39;
   // Results of emulator compatibility checks.
   optional EmulatorCompatibilityInfo emu_compat_info = 40;
-  // Next tag: 41
+  // In-use Vulkan GPU
+  optional EmulatorGpuVkInfo active_vulkan_host_gpu = 41;
+  // Next tag: 42
 
   // Emulator instance liveness as determined via adb connectivity.
   enum EmulatorAdbLiveness {
@@ -17725,6 +17759,18 @@ message JourneyEngineErrorEvent {
 }
 
 message BackupAndSyncEvent {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    // Settings were synced (logged once per session)
+    TYPE_SYNC = 1;
+    // Sync was enabled
+    TYPE_ENABLED = 2;
+    // Sync was disabled
+    TYPE_DISABLED = 3;
+    // The user changed the synced categories
+    TYPE_CHANGE_CATEGORIES = 4;
+  }
+
   enum Provider {
     UNKNOWN_PROVIDER = 0;
     // Uses Google Drive to store the settings
@@ -17745,6 +17791,7 @@ message BackupAndSyncEvent {
 
   optional Provider provider_in_use = 1;
   optional EnablementFlow enablement_flow = 2;
+  optional Type type = 3;
 }
 
 message SentimentSurveyEvent {
@@ -17925,4 +17972,24 @@ message AssetStudioWizardEvent {
   optional Type type = 1;
   // The action that was performed by the Asset Studio Wizard.
   optional Action action = 2;
+}
+
+message NextEditPredictionEvent {
+  message PredictionShown {
+    // Add fields specific to the SHOWN event here, if any.
+  }
+
+  message PredictionAccepted {
+    // Add fields specific to the ACCEPTED event here, if any.
+  }
+
+  message PredictionRejected {
+    // Add fields specific to the REJECTED event here, if any.
+  }
+
+  oneof next_edit_prediction {
+    PredictionShown shown = 1 [lazy = true];
+    PredictionAccepted accepted = 2 [lazy = true];
+    PredictionRejected rejected = 3 [lazy = true];
+  }
 }
