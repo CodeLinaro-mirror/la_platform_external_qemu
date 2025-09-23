@@ -2768,6 +2768,17 @@ extern "C" int main(int argc, char** argv) {
         fc::setIfNotOverriden(fc::VsockSnapshotLoadFixed_b231345789, true);
     }
 
+#if defined(__APPLE__) && defined(__aarch64__)
+    const bool isAppleArm = true;
+    const bool isWindows = false;
+#elif defined(_WIN32)
+    const bool isAppleArm = false;
+    const bool isWindows = true;
+#else
+    const bool isAppleArm = false;
+    const bool isWindows = false;
+#endif
+
     // XR specific feature overrides
     const AvdFlavor avdFlavor = avdInfo_getAvdFlavor(avd);
     const bool isXrAvd = (avdFlavor == AVD_XR);
@@ -2775,11 +2786,11 @@ extern "C" int main(int argc, char** argv) {
         // XR image needs this feature to pass modifier keys to the guest.
         fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
 
-#if defined(__APPLE__) && defined(__aarch64__)
-        // TODO(b/404619245): XR emulator restarts at login screen when
-        // VulkanVirtualQueue is enabled on Mac.
-        fc::setIfNotOverriden(fc::VulkanVirtualQueue, false);
-#endif
+        if (isAppleArm) {
+            // TODO(b/404619245): XR emulator restarts at login screen when
+            // VulkanVirtualQueue is enabled on Mac.
+            fc::setIfNotOverriden(fc::VulkanVirtualQueue, false);
+        }
     }
 
     // When GuestAngle is used, Vulkan host composition can be automatically
@@ -2792,14 +2803,13 @@ extern "C" int main(int argc, char** argv) {
     if (!embeddedMode && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
         bool autoEnableVulkanComposition = false;
         if (fc::isEnabled(fc::GuestAngle)) {
-#if defined(__APPLE__) && defined(__aarch64__)
             // Only auto enable on XR for now, as some features like display
             // rotations or screen masking are not supported yet for gphones.
             // TODO(b/442398020): increase auto enablement range to other
             // platforms and devices
-            autoEnableVulkanComposition = isXrAvd;
-#endif
+            autoEnableVulkanComposition = isXrAvd && (isAppleArm || isWindows);
         }
+
         if (autoEnableVulkanComposition) {
             fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
         }
