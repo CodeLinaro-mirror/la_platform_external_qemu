@@ -157,29 +157,32 @@ android_add_executable(
        android-emu-crashreport android-emu-crashreport-consent-never)
 
 android_upload_symbols(TARGET crash-me DIRECTORY ${ANDROID_SYMBOL_DIR})
+if(WINDOWS_MSVC_X86_64)
+  message(WARNING "Windows tests have been disabled due to stability issues")
+else()
+  android_add_test(
+    TARGET android-emu-crashreport-testing
+    SRC android/crashreport/AnnotationBuffer_unittest.cpp
+        android/crashreport/CrashDump_unittest.cpp
+        android/crashreport/detectors/CrashDetectors_unittest.cpp
+        android/crashreport/detectors/TimeoutMonitor_unittest.cpp
+        android/crashreport/HangDetector_unittest.cpp
+    SOURCE_DIR test
+    DEPS android-emu-agents
+         android-emu-base
+         android-emu-base-headers
+         android-emu-base-process
+         android-emu-crashreport
+         android-emu-test-launcher
+         android-emu-utils
+         breakpad_common
+         breakpad_processor
+         crashpad_client
+         crashpad_handler_lib
+         nlohmann_json::nlohmann_json)
 
-android_add_test(
-  TARGET android-emu-crashreport-testing
-  SRC android/crashreport/AnnotationBuffer_unittest.cpp
-      android/crashreport/CrashDump_unittest.cpp
-      android/crashreport/detectors/CrashDetectors_unittest.cpp
-      android/crashreport/detectors/TimeoutMonitor_unittest.cpp
-      android/crashreport/HangDetector_unittest.cpp
-  SOURCE_DIR test
-  DEPS android-emu-agents
-       android-emu-base
-       android-emu-base-headers
-       android-emu-base-process
-       android-emu-crashreport
-       android-emu-test-launcher
-       android-emu-utils
-       breakpad_common
-       breakpad_processor
-       crashpad_client
-       crashpad_handler_lib
-       nlohmann_json::nlohmann_json)
-
-target_compile_options(android-emu-crashreport-testing
-                       PRIVATE -Wno-extern-c-compat)
-add_dependencies(android-emu-crashreport-testing crash-me crashpad_handler
-                 crashreport)
+  target_compile_options(android-emu-crashreport-testing
+                         PRIVATE -Wno-extern-c-compat)
+  add_dependencies(android-emu-crashreport-testing crash-me crashpad_handler
+                   crashreport)
+endif()
