@@ -12,25 +12,25 @@
 
 #pragma once
 
-#include <stdbool.h>                            // for bool
+#include <stdbool.h>  // for bool
 
 #include "aemu/base/c_header.h"
 #include "android/cmdline-definitions.h"
-#include "android/skin/file.h"                  // for SkinFile, SkinLayout
-#include "android/skin/image.h"                 // for SkinImage
-#include "android/skin/ui.h"                    // for SkinUI
-#include "android/ui-emu-agent.h"               // for UiEmuAgent
-#include "android/utils/aconfig-file.h"         // for AConfig
+#include "android/skin/file.h"           // for SkinFile, SkinLayout
+#include "android/skin/image.h"          // for SkinImage
+#include "android/skin/ui.h"             // for SkinUI
+#include "android/ui-emu-agent.h"        // for UiEmuAgent
+#include "android/utils/aconfig-file.h"  // for AConfig
 #include "host-common/misc.h"
 #include "host-common/screen-recorder.h"  // for RecordingInfo, Record...
 
 ANDROID_BEGIN_HEADER
 
-typedef struct EmulatorScreenMask {
-    int    width;
-    int    height;
+typedef struct EmulatorScreenImage {
+    int width;
+    int height;
     const uint8_t* rgbaData;
-} EmulatorScreenMask;
+} EmulatorScreenImage;
 
 #define MY_PRESET_SIZE_MAX 4
 
