@@ -263,7 +263,7 @@ def main():
     )
     parser.add_argument(
         "--cc",
-        default="jansene@google.com,shuohsu@google.com,hyunjaemoon@google.com",
+        default="jansene@google.com,shuohsu@google.com,formosa@google.com",
         dest="cc",
         type=str,
         help="Set of ccs for the gerrit change that will be created.",
