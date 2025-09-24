@@ -20,7 +20,8 @@
 #include <memory>       // for shared_ptr, unique_ptr
 
 #include "android/skin/qt/qt-ui-commands.h"
-#include "ui_touchpad-holder.h"
+#include "android/skin/qt/touchpad-holder.h"
+#include "android/skin/qt/touchpad-window.h"
 
 namespace android {
 namespace metrics {
@@ -32,22 +33,21 @@ class QObject;
 class EmulatorQtWindow;
 class ToolWindow;
 
-class TouchpadHolder : public QWidget {
+class TouchpadWindow : public TouchpadHolder {
     Q_OBJECT
 
 public:
-    explicit TouchpadHolder(QWidget* parent = nullptr);
+    explicit TouchpadWindow(QWidget* parent = nullptr);
+    TouchpadWindow(EmulatorQtWindow* emulatorWindow,
+                   ToolWindow* toolWindow,
+                   QWidget* parent = nullptr);
 
-    void setWidth(int width);
-
-private slots:
-    void on_tp_addSecondFinger_toggled(bool checked);
-
-protected:
-    std::unique_ptr<Ui::TouchpadHolder> mUi;
+    void closeEvent(QCloseEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
+    void dockMainWindow();
 
 private:
-    int mTouchpadWidth;
-    int mTouchpadHeight;
-    static constexpr int mMargin = 5;
+    EmulatorQtWindow* mEmulatorWindow;
+    ToolWindow* mToolWindow;
 };

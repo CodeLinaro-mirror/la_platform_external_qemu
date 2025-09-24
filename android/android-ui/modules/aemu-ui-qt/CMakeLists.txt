@@ -52,6 +52,7 @@ android_qt_lib(
       android/skin/qt/surface-qt.cpp
       android/skin/qt/tool-window.cpp
       android/skin/qt/tools.ui
+      android/skin/qt/touchpad-window.cpp
       android/skin/qt/virtualscene-control-window.cpp
       android/skin/qt/virtualscene-controls.ui
       android/skin/qt/virtualscene-info-dialog.ui

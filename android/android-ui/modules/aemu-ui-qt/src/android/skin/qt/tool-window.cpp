@@ -36,6 +36,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPen>
+#include <QPoint>
 #include <QPushButton>
 #include <QRect>
 #include <QScreen>
@@ -65,6 +66,7 @@
 #include "android/hw-sensors.h"
 #include "android/metrics/MetricsReporter.h"
 #include "android/metrics/MetricsWriter.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "android/physics/Physics.h"
 #include "android/skin/android_keycodes.h"
 #include "android/skin/event.h"
@@ -79,6 +81,7 @@
 #include "android/skin/qt/qt-settings.h"
 #include "android/skin/qt/qt-ui-commands.h"
 #include "android/skin/qt/stylesheet.h"
+#include "android/skin/qt/touchpad-window.h"
 #include "android/skin/qt/virtualscene-control-window.h"
 #include "android/skin/qt/xr-environment-mode-dialog.h"
 #include "android/skin/qt/xr-input-mode-dialog.h"
@@ -89,10 +92,9 @@
 #include "host-common/Features.h"
 #include "host-common/hw-config-helper.h"
 #include "host-common/opengles.h"
-#include "host-common/window_agent.h"
 #include "host-common/snapshot_common.h"
 #include "host-common/snapshot_interface.h"
-#include "android/metrics/studio_stats_wrapper.pb.h"
+#include "host-common/window_agent.h"
 #include "ui_tools.h"
 #include "xr_emulator_conn.pb.h"
 
@@ -194,6 +196,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
       mExtendedWindow(this, &ToolWindow ::onExtendedWindowCreated),
       mVirtualSceneControlWindow(this,
                                  &ToolWindow::onVirtualSceneWindowCreated),
+      mTouchpadWindow(this, &ToolWindow::onTouchpadWindowCreated),
       mToolsUi(new Ui::ToolControls),
       mUIEventRecorder(event_recorder),
       mUserActionsCounter(user_actions_counter),
@@ -511,7 +514,9 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         mToolsUi->glasses_button_1->setEnabled(true);
         mToolsUi->glasses_button_2->setEnabled(true);
         mToolsUi->zoom_generic_button->setEnabled(true);
-
+        if (getConsoleAgents()->settings->hw()->hw_touchpad0) {
+            mTouchpadWindow->get();
+        }
     } else {
         mToolsUi->glasses_button_1->setVisible(false);
         mToolsUi->glasses_button_2->setVisible(false);
@@ -645,6 +650,9 @@ void ToolWindow::raise() {
         mVirtualSceneControlWindow.get()->isActive()) {
         mVirtualSceneControlWindow.get()->raise();
     }
+    if (mTouchpadWindow.hasInstance()) {
+        mTouchpadWindow.get()->raise();
+    }
     if (mTopSwitched) {
         mExtendedWindow.ifExists([&] {
             mExtendedWindow.get()->raise();
@@ -700,6 +708,12 @@ void ToolWindow::onVirtualSceneWindowCreated(
     });
 }
 
+void ToolWindow::onTouchpadWindowCreated(TouchpadWindow* touchpadWindow) {
+    setupSubwindow(touchpadWindow);
+    SettingsTheme theme = getSelectedTheme();
+    touchpadWindow->setStyleSheet(Ui::stylesheetForTheme(theme));
+}
+
 void ToolWindow::setupSubwindow(QWidget* window) {
     if (auto recorderPtr = mUIEventRecorder.lock()) {
         recorderPtr->startRecording(window);
@@ -715,6 +729,7 @@ void ToolWindow::hide() {
     QFrame::hide();
     mVirtualSceneControlWindow.ifExists(
             [&] { mVirtualSceneControlWindow.get()->hide(); });
+    mTouchpadWindow.ifExists([&] { mTouchpadWindow.get()->hide(); });
     hideExtendedWindow();
 }
 
@@ -743,6 +758,10 @@ void ToolWindow::show() {
 
     if (mIsVirtualSceneWindowVisibleOnShow) {
         mVirtualSceneControlWindow.get()->show();
+    }
+
+    if (mTouchpadWindow.hasInstance()) {
+        mTouchpadWindow.get()->show();
     }
 
     if (mIsExtendedWindowVisibleOnShow) {
@@ -1421,8 +1440,13 @@ void ToolWindow::dockMainWindow() {
          parentWidget()->geometry().top() +
                  mEmulatorWindow->getTopTransparency());
 
+    QPoint offset(0, 0);
+    mTouchpadWindow.ifExists([&] {
+        mTouchpadWindow->get()->dockMainWindow();
+        offset += QPoint(0, mTouchpadWindow.get()->height());
+    });
     mVirtualSceneControlWindow.ifExists(
-            [&] { mVirtualSceneControlWindow.get()->dockMainWindow(); });
+            [&] { mVirtualSceneControlWindow.get()->dockMainWindow(offset); });
 }
 
 void ToolWindow::raiseMainWindow() {
@@ -1433,6 +1457,8 @@ void ToolWindow::raiseMainWindow() {
 void ToolWindow::updateTheme(const QString& styleSheet) {
     mVirtualSceneControlWindow.ifExists(
             [&] { mVirtualSceneControlWindow.get()->updateTheme(styleSheet); });
+    mTouchpadWindow.ifExists(
+            [&] { mTouchpadWindow.get()->setStyleSheet(styleSheet); });
     setStyleSheet(styleSheet);
 }
 

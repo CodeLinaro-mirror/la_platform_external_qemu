@@ -44,6 +44,8 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
 
+    void resizeEvent(QResizeEvent* event) override;
+
     // This event is called whenever the widget needs to be repainted.
     void paintEvent(QPaintEvent* event) override;
 

@@ -89,6 +89,7 @@ enum class QtUICommand {
 enum class QtKeyEventSource {
     ExtendedWindow,
     EmulatorWindow,
+    TouchpadWindow,
     VirtualSceneControlWindow
 };
 

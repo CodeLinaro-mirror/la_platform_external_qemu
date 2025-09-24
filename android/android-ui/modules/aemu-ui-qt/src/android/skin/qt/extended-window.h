@@ -105,6 +105,7 @@ private slots:
 private:
     void closeEvent(QCloseEvent* ce) override;
     void keyPressEvent(QKeyEvent* e) override;
+    void keyReleaseEvent(QKeyEvent* e) override;
     void adjustTabs(ExtendedWindowPane thisIndex);
     void showEvent(QShowEvent* e) override;
     void hideEvent(QHideEvent* e) override;

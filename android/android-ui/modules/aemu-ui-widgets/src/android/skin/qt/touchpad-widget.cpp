@@ -59,6 +59,11 @@ bool TouchpadWidget::hasHeightForWidth() const {
     return true;
 }
 
+// Apparently the QT layout is not set up to respect heightForWidth
+void TouchpadWidget::resizeEvent(QResizeEvent* event) {
+    this->setFixedHeight(heightForWidth(this->width()));
+}
+
 void TouchpadWidget::setMultiFinger(int num_fingers) {
     if (num_fingers > mMaxFingers) {
         num_fingers = mMaxFingers;
@@ -213,6 +218,10 @@ void TouchpadWidget::doTouchEnd(int i) {
 void TouchpadWidget::doTouch(QPointF p, int i, SkinEventType type) {
     int x = p.x() / getScale();
     int y = (this->rect().height() - p.y()) / getScale();
+
+    // Adjust for any rounding issue for touchpad dimensions
+    x = std::min(x, mTouchpadWidth);
+    y = std::min(y, mTouchpadHeight);
     SkinEvent skin_event = createSkinEvent(type);
 
     skin_event.u.multi_touch_point.id = i + 1;

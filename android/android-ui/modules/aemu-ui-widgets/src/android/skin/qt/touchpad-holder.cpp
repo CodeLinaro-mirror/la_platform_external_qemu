@@ -41,12 +41,6 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
                                            QSizePolicy::Expanding);
         mUi->verticalSpacerBottom->changeSize(0, mMargin, QSizePolicy::Minimum,
                                               QSizePolicy::Expanding);
-
-        auto policy = mUi->touchpadBox->sizePolicy();
-        policy.setHorizontalPolicy(QSizePolicy::Expanding);
-        policy.setVerticalPolicy(QSizePolicy::Minimum);
-        policy.setHeightForWidth(true);
-        mUi->touchpadBox->setSizePolicy(policy);
     } else {
         mUi->horizontalSpacerLeft->changeSize(mMargin, 0,
                                               QSizePolicy::Expanding);
@@ -56,19 +50,27 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
                                            QSizePolicy::Expanding);
         mUi->verticalSpacerBottom->changeSize(0, mMargin, QSizePolicy::Minimum,
                                               QSizePolicy::Expanding);
-
-        auto policy = mUi->touchpadBox->sizePolicy();
-        policy.setHorizontalPolicy(QSizePolicy::Expanding);
-        policy.setVerticalPolicy(QSizePolicy::Minimum);
-        policy.setHeightForWidth(true);
-        mUi->touchpadBox->setSizePolicy(policy);
     }
+
+    auto policy = mUi->touchpadBox->sizePolicy();
+    policy.setHorizontalPolicy(QSizePolicy::Expanding);
+    policy.setVerticalPolicy(QSizePolicy::Minimum);
+    policy.setHeightForWidth(true);
+    mUi->touchpadBox->setSizePolicy(policy);
 
     mUi->touchpadBox->setTouchpadDimensions(mTouchpadWidth, mTouchpadHeight);
     mUi->touchpadBox->installEventFilter(this);
 
     // This will force the buttons to the left
     mUi->gridLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding), 2, 3);
+}
+
+void TouchpadHolder::setWidth(int width) {
+    // Setting the width will resize the touchpad
+    this->setFixedWidth(width);
+    // Use the new touchpad height to set the window height
+    this->setFixedHeight(mMargin * 2 + 2 * mUi->tp_addSecondFinger->height() +
+                         mUi->touchpadBox->height());
 }
 
 void TouchpadHolder::on_tp_addSecondFinger_toggled(bool checked) {
