@@ -39,5 +39,8 @@ private slots:
     void on_tp_addSecondFinger_toggled(bool checked);
 
 private:
+    int mTouchpadWidth;
+    int mTouchpadHeight;
+    static constexpr int mMargin = 20;
     std::unique_ptr<Ui::TouchpadHolder> mUi;
 };

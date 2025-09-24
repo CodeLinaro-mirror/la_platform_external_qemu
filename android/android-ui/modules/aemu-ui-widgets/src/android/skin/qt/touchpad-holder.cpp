@@ -30,19 +30,41 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
       mUi(new Ui::TouchpadHolder()) {
     mUi->setupUi(this);
 
-    constexpr int margin = 20;
-    float touchpad_width =
-            getConsoleAgents()->settings->hw()->hw_touchpad0_width;
-    float touchpad_height =
-            getConsoleAgents()->settings->hw()->hw_touchpad0_height;
-    float allowed_width = this->size().width() - margin * 2;
-    float allowed_height = this->size().height() - margin * 2;
+    mTouchpadWidth = getConsoleAgents()->settings->hw()->hw_touchpad0_width;
+    mTouchpadHeight = getConsoleAgents()->settings->hw()->hw_touchpad0_height;
 
-    float scale = std::min(allowed_width / touchpad_width,
-                           allowed_height / touchpad_height);
-    mUi->touchpadBox->setFixedSize(scale * touchpad_width,
-                                   scale * touchpad_height);
-    mUi->touchpadBox->setScale(scale);
+    if (mTouchpadWidth > mTouchpadHeight) {
+        mUi->horizontalSpacerLeft->changeSize(mMargin, 0, QSizePolicy::Minimum);
+        mUi->horizontalSpacerRight->changeSize(mMargin, 0,
+                                               QSizePolicy::Minimum);
+        mUi->verticalSpacerTop->changeSize(0, mMargin, QSizePolicy::Minimum,
+                                           QSizePolicy::Expanding);
+        mUi->verticalSpacerBottom->changeSize(0, mMargin, QSizePolicy::Minimum,
+                                              QSizePolicy::Expanding);
+
+        auto policy = mUi->touchpadBox->sizePolicy();
+        policy.setHorizontalPolicy(QSizePolicy::Expanding);
+        policy.setVerticalPolicy(QSizePolicy::Minimum);
+        policy.setHeightForWidth(true);
+        mUi->touchpadBox->setSizePolicy(policy);
+    } else {
+        mUi->horizontalSpacerLeft->changeSize(mMargin, 0,
+                                              QSizePolicy::Expanding);
+        mUi->horizontalSpacerRight->changeSize(mMargin, 0,
+                                               QSizePolicy::Expanding);
+        mUi->verticalSpacerTop->changeSize(0, mMargin, QSizePolicy::Minimum,
+                                           QSizePolicy::Expanding);
+        mUi->verticalSpacerBottom->changeSize(0, mMargin, QSizePolicy::Minimum,
+                                              QSizePolicy::Expanding);
+
+        auto policy = mUi->touchpadBox->sizePolicy();
+        policy.setHorizontalPolicy(QSizePolicy::Expanding);
+        policy.setVerticalPolicy(QSizePolicy::Minimum);
+        policy.setHeightForWidth(true);
+        mUi->touchpadBox->setSizePolicy(policy);
+    }
+
+    mUi->touchpadBox->setTouchpadDimensions(mTouchpadWidth, mTouchpadHeight);
     mUi->touchpadBox->installEventFilter(this);
 
     // This will force the buttons to the left
