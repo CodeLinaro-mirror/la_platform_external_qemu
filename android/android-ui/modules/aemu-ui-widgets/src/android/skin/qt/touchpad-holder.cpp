@@ -73,6 +73,38 @@ void TouchpadHolder::setWidth(int width) {
                          mUi->touchpadBox->height());
 }
 
+bool TouchpadHolder::handleQtKeyEvent(const QKeyEvent& event,
+                                      QtKeyEventSource source) {
+    const bool down = event.type() == QEvent::KeyPress;
+    // Trigger when the Shift key but no other modifiers is held.
+
+    if (event.key() == Qt::Key_Shift) {
+        if (down && mUi->touchpadBox->getMultiFinger() != 2 &&
+            event.modifiers() == Qt::ShiftModifier) {
+            mUi->tp_addSecondFinger->setChecked(true);
+        } else if (!down && mUi->touchpadBox->getMultiFinger() == 2) {
+            mUi->tp_addSecondFinger->setChecked(false);
+        }
+        return true;
+    }
+
+    // Look out for other modifier presses and cancel the capture.
+    if (mUi->touchpadBox->getMultiFinger() == 2 && down &&
+        event.modifiers() != Qt::ShiftModifier) {
+        mUi->tp_addSecondFinger->setChecked(false);
+    }
+
+    return false;
+}
+
+void TouchpadHolder::keyPressEvent(QKeyEvent* e) {
+    TouchpadHolder::handleQtKeyEvent(*e, QtKeyEventSource::TouchpadWindow);
+}
+
+void TouchpadHolder::keyReleaseEvent(QKeyEvent* e) {
+    TouchpadHolder::handleQtKeyEvent(*e, QtKeyEventSource::TouchpadWindow);
+}
+
 void TouchpadHolder::on_tp_addSecondFinger_toggled(bool checked) {
     if (checked) {
         mUi->touchpadBox->setMultiFinger(2);

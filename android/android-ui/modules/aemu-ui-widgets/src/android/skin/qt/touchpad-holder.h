@@ -38,6 +38,9 @@ class TouchpadHolder : public QWidget {
 public:
     explicit TouchpadHolder(QWidget* parent = nullptr);
 
+    void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
+    bool handleQtKeyEvent(const QKeyEvent& event, QtKeyEventSource source);
     void setWidth(int width);
 
 private slots:

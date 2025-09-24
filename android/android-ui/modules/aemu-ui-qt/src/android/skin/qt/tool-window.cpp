@@ -1387,6 +1387,13 @@ bool ToolWindow::handleQtKeyEvent(const QKeyEvent& event, QtKeyEventSource sourc
         }
     }
 
+    // If the touchpad is enabled, give it a chance to see the keys next.
+    if (mTouchpadWindow.hasInstance()) {
+        if (mTouchpadWindow.get()->handleQtKeyEvent(event, source)) {
+            return true;
+        }
+    }
+
     // We don't care about the keypad modifier for anything, and it gets added
     // to the arrow keys of OSX by default, so remove it.
     QKeySequence event_key_sequence(event.key() |
