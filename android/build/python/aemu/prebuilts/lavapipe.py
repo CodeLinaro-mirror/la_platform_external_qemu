@@ -30,10 +30,12 @@ import json
 AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
 HOST_ARCH = platform.machine().lower()
+PREBUILTS_ARCH = "x86_64" if HOST_ARCH == "x86_64" else "aarch64"
 
 AOSP_MESA_SRC_PATH = os.path.join(AOSP_ROOT, "external", "mesa3d")
-MESON_PATH = os.path.join(AOSP_ROOT, "prebuilts", "meson")
-NINJA_PATH = os.path.join(AOSP_ROOT, "prebuilts", "ninja", HOST_OS + "-x86")
+AOSP_LAVAPIPE_PREBUILTS_PATH =  AOSP_ROOT / "prebuilts" / "android-emulator-build" / "common" \
+        / "vulkan" / f"{HOST_OS}-{PREBUILTS_ARCH}" / "icds"
+LAVAPIPE_SHA1_FILE = "lavapipe.sha1"
 
 def checkDependencies():
     logging.info("Checking for required build dependencies..")
@@ -56,6 +58,14 @@ def checkDependencies():
     return True
 
 def configureLavapipeBuild(srcdir, builddir):
+    # TODO(b/446627550): Use ninja and meson prebuilts from prebuilts by making them
+    # compatible for building lavapipe and add into search path instead
+    # deps_common.addToSearchPath(NINJA_PATH)
+    if not shutil.which("ninja"):
+        raise Exception(f"'ninja' is not available!")
+    if not shutil.which("meson"):
+        raise Exception(f"'meson' is not available!")
+
     if Path(builddir).exists():
         shutil.rmtree(builddir)
     old_umask = os.umask(0o027)
@@ -63,16 +73,29 @@ def configureLavapipeBuild(srcdir, builddir):
     os.umask(old_umask)
 
     config_script = "meson"
-    conf_args = [config_script, "setup", builddir, "-Dvulkan-drivers=swrast", "-Dgallium-drivers=llvmpipe", "-Dshared-llvm=false"]
-    toolchain_dir = Path(builddir) / "toolchain"
-    os.makedirs(Path(builddir) / "toolchain")
+    conf_args = [config_script, "setup",
+                 builddir,
+                 "-Dvulkan-drivers=swrast",
+                 "-Dgallium-drivers=llvmpipe",
+                 "-Dopengl=false",
+                 "-Degl=disabled",
+                 "-Dgles1=disabled",
+                 "-Dgles2=disabled",
+                 "-Dvideo-codecs=[]",
+                 "-Dzstd=disabled",
+                 "-Dshared-llvm=disabled"]
 
-    meson_dir = deps_common.getMesonDirectory()
-    with open(toolchain_dir / "meson", 'x') as f:
-        f.write(f"#!/bin/sh\n{meson_dir}/meson.py $@\n")
-    os.chmod(toolchain_dir / "meson", 0o777)
+    debugBuild = False
+    if debugBuild:
+        conf_args.append("--buildtype=debug")
 
-    deps_common.addToSearchPath(str(toolchain_dir))
+    if HOST_OS == "darwin":
+        conf_args.append(f"-Dplatforms=macos")
+    elif HOST_OS == "windows":
+        conf_args.append(f"-Dplatforms=windows")
+    elif HOST_OS == "linux":
+        conf_args.append(f"-Dplatforms=x11,wayland")
+
     logging.info("[%s] Running %s in %s", builddir, config_script, srcdir)
     logging.info(conf_args)
     subprocess.run(args=conf_args, stderr=subprocess.STDOUT, check=True, cwd=srcdir, env=os.environ.copy())
@@ -82,6 +105,13 @@ def buildLavapipe(srcdir, builddir):
     ninja_build_cmd = ["ninja" + EXE_SUFFIX, "-C", builddir]
     logging.info(ninja_build_cmd)
     subprocess.run(args=ninja_build_cmd, stderr=subprocess.STDOUT, check=True, cwd=srcdir, env=os.environ.copy())
+
+    # Create the SHA1 file
+    git_sha1 = deps_common.getSHA1FromGitProject(AOSP_MESA_SRC_PATH)
+    sha1_path = os.path.join(builddir, LAVAPIPE_SHA1_FILE)
+    with open(sha1_path, 'w') as f:
+        f.write(git_sha1)
+
     logging.info("Build succeeded")
 
 def installLavapipe(builddir, installdir):
@@ -97,7 +127,7 @@ def installLavapipe(builddir, installdir):
             with open(icdFile, 'r') as f:
                 data = json.load(f)
 
-            # Replace library path to use a local one, keep extension (so, dylib, dll)
+            # Replace library path to use a local one, keep the extension
             data["ICD"]["library_path"] = f"./libvulkan_lvp.{libExtension}"
 
             with open(icdFile, 'w') as f:
@@ -110,14 +140,14 @@ def installLavapipe(builddir, installdir):
         except Exception as e:
             logging.error(f"An unexpected error occurred: {e}")
 
-    srcArch = "aarch64" if HOST_ARCH == "aarch64" else "x86_64"
-
     os.makedirs(installdir,exist_ok=True)
     LAVAPIPE_PREFIX= os.path.join(builddir, "src/gallium/targets/lavapipe")
-    LAVAPIPE_SO_SRC = os.path.join(LAVAPIPE_PREFIX, "libvulkan_lvp.{libExtension}")
-    LAVAPIPE_SO_DST = os.path.join(installdir, "libvulkan_lvp.{libExtension}")
-    LAVAPIPE_ICD_SRC = os.path.join(LAVAPIPE_PREFIX, f"lvp_icd.{srcArch}.json")
+    LAVAPIPE_LIB_SRC = os.path.join(LAVAPIPE_PREFIX, f"libvulkan_lvp.{libExtension}")
+    LAVAPIPE_LIB_DST = os.path.join(installdir, f"libvulkan_lvp.{libExtension}")
+    LAVAPIPE_ICD_SRC = os.path.join(LAVAPIPE_PREFIX, f"lvp_icd.{PREBUILTS_ARCH}.json")
     LAVAPIPE_ICD_DST = os.path.join(installdir, "lvp_icd.json")
+    LAVAPIPE_SHA1_SRC = os.path.join(builddir, LAVAPIPE_SHA1_FILE)
+    LAVAPIPE_SHA1_DST = os.path.join(installdir, LAVAPIPE_SHA1_FILE)
 
     logging.info("Installing Lavapipe to %s", installdir)
 
@@ -125,16 +155,27 @@ def installLavapipe(builddir, installdir):
     # We will be shipping icd and library in the same dir so rewrite to point locally.
     retargetICDFile(LAVAPIPE_ICD_SRC)
 
+    logging.info("Copying %s to %s", LAVAPIPE_ICD_SRC, LAVAPIPE_ICD_DST)
     shutil.copyfile(LAVAPIPE_ICD_SRC, LAVAPIPE_ICD_DST)
-    shutil.copyfile(LAVAPIPE_SO_SRC, LAVAPIPE_SO_DST)
+    logging.info("Copying %s to %s", LAVAPIPE_LIB_SRC, LAVAPIPE_LIB_DST)
+    shutil.copyfile(LAVAPIPE_LIB_SRC, LAVAPIPE_LIB_DST)
+    logging.info("Copying %s to %s", LAVAPIPE_SHA1_SRC, LAVAPIPE_SHA1_DST)
+    shutil.copyfile(LAVAPIPE_SHA1_SRC, LAVAPIPE_SHA1_DST)
     logging.info("Installation succeeded")
 
 
 def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
-    # Use meson from our prebuilts
-    deps_common.addToSearchPath(MESON_PATH)
-    # Use ninja from our prebuilts
-    deps_common.addToSearchPath(NINJA_PATH)
+    if check_sha1:
+        logging.info("Checking Lavapipe SHA1...")
+        try:
+            if deps_common.isSHA1Same(git_src_dir=AOSP_MESA_SRC_PATH,
+                                      sha1_file=AOSP_LAVAPIPE_PREBUILTS_PATH / LAVAPIPE_SHA1_FILE):
+                logging.info("Same Lavapipe SHA1. Skipping Lavapipe build.")
+                return
+            else:
+                logging.info("Different Lavapipe sha1 detected. Rebuilding Lavapipe.")
+        except Exception as e:
+            logging.fatal(e)
 
     logging.info(os.environ)
 
@@ -145,9 +186,14 @@ def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
     mesa_src_path = AOSP_MESA_SRC_PATH
     with tempfile.TemporaryDirectory() as mesa_build_path:
         logging.info("Building Lavapipe")
-        lavapipe_install_dir =  os.path.join(prebuilts_out_dir, "lavapipe")
         configureLavapipeBuild(mesa_src_path, mesa_build_path)
         buildLavapipe(mesa_src_path, mesa_build_path)
-        installLavapipe(mesa_build_path, lavapipe_install_dir)
+        installLavapipe(mesa_build_path, AOSP_LAVAPIPE_PREBUILTS_PATH)
+
+        if (args.dist):
+            # Build will create a distribution zip file, move the files
+            # also into prebuilts_out_dir
+            moltenvk_install_dir = Path(prebuilts_out_dir) / "lavapipe"
+            installLavapipe(mesa_build_path, moltenvk_install_dir)
 
         logging.info("Successfully built Lavapipe!")

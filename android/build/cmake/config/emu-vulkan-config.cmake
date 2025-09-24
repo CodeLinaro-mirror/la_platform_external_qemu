@@ -51,6 +51,9 @@ elseif(DARWIN_X86_64 OR DARWIN_AARCH64)
       # Swiftshader
       "${PREBUILT_ROOT}/icds/libvk_swiftshader.dylib>lib64/vulkan/libvk_swiftshader.dylib"
       "${PREBUILT_ROOT}/icds/vk_swiftshader_icd.json>lib64/vulkan/vk_swiftshader_icd.json"
+      # Lavapipe
+      "${PREBUILT_ROOT}/icds/libvulkan_lvp.dylib>lib64/vulkan/libvulkan_lvp.dylib"
+      "${PREBUILT_ROOT}/icds/lvp_icd.json>lib64/vulkan/lvp_icd.json"
       # for translating shaders to SPIRV
       "${PREBUILT_ROOT}/glslangValidator>lib64/vulkan/glslangValidator"
       # On mac we need these on our load path MoltenVK

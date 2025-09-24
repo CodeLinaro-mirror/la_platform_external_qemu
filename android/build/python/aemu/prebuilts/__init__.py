@@ -41,18 +41,20 @@ if HOST_OS == "linux":
 if HOST_OS == "darwin":
     _prebuilt_funcs.update({
         'moltenvk': moltenvk.buildPrebuilt,
+        'lavapipe': lavapipe.buildPrebuilt,
     })
 
 def buildPrebuilts(args, is_emulator_build):
     build_if_sha1_changed = False
+    global _prebuilt_funcs
     # In an emulator build, we check if the SHA1 of the latest commit in each repository and build
     # it if different from the SHA1 of the current prebuilt.
     if is_emulator_build:
+        logging.info("Prebuilts compilation in emulator build starting up for "
+                        + f"{HOST_OS}-{HOST_ARCH}.")
+        build_if_sha1_changed = True
+        # Continue to add support for more platforms/prebuilts in emulator build.
         if HOST_OS == "darwin":
-            logging.info("Prebuilts compilation in emulator build starting up for "
-                         + f"{HOST_OS}-{HOST_ARCH}.")
-            build_if_sha1_changed = True
-            # Continue to add support for more platforms/prebuilts in emulator build.
             _prebuilt_funcs = {
                 'moltenvk': moltenvk.buildPrebuilt,
             }
