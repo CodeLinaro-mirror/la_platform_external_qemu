@@ -3884,11 +3884,15 @@ message EmulatorDetails {
   // Vulkan backend
   enum VulkanIcd {
     UNKNOWN_VK = 0;
-    HARDWARE_VK = 1;
-    SWIFTSHADER_VK = 2;  // Swiftshader software renderer
-    MOLTEN_VK = 3;       // Mac only
-    LAVAPIPE_VK = 4;     // Lavapipe software renderer
-    KOSMICKRISP_VK = 5;  // Mac only, mesa based vulkan driver
+    // Deprecated, use HOST_DEFAULT_VK instead.
+    HARDWARE_VK = 1 [deprecated = true];
+    SWIFTSHADER_VK = 2;   // Swiftshader software renderer
+    MOLTEN_VK = 3;        // Mac only
+    LAVAPIPE_VK = 4;      // Lavapipe software renderer
+    KOSMICKRISP_VK = 5;   // Mac only, mesa based vulkan driver
+    DISABLED_VK = 6;      // Vulkan is disabled
+    HOST_DEFAULT_VK = 7;  // Host Vulkan ICD
+    // Next tag: 8
   }
 }
 
@@ -17763,12 +17767,16 @@ message BackupAndSyncEvent {
     TYPE_UNKNOWN = 0;
     // Settings were synced (logged once per session)
     TYPE_SYNC = 1;
-    // Sync was enabled
+    // Sync was enabled (through any mechanism). This will always be logged on
+    // enablement.
     TYPE_ENABLED = 2;
     // Sync was disabled
     TYPE_DISABLED = 3;
+    // Sync was enabled through the Studio-specific flows, where the onboarding
+    // wizard is shown. Note an event with TYPE_ENABLED will also be logged.
+    TYPE_ENABLED_THROUGH_WIZARD = 4;
     // The user changed the synced categories
-    TYPE_CHANGE_CATEGORIES = 4;
+    TYPE_CHANGE_CATEGORIES = 5;
   }
 
   enum Provider {
@@ -17785,7 +17793,8 @@ message BackupAndSyncEvent {
     UNIFIED_SIGN_IN_FLOW = 1;
     // Enable via the Google Accounts settings page (feature allow button)
     ACCOUNT_SETTINGS_PAGE = 2;
-    // Enable via the Backup and Sync settings page
+    // Enable via the Backup and Sync settings page. Currently unused since
+    // there's no appropriate hook in JB code to log in this situation.
     FEATURE_SETTINGS_PAGE = 3;
   }
 
