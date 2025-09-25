@@ -105,6 +105,9 @@ bool emulator_window_stop_recording_async(void);
 RecorderStates emulator_window_recorder_state_get(void);
 
 void emulator_window_set_screen_mask(int width, int height, const uint8_t* rgbaData);
+void emulator_window_set_screen_background(int width,
+                                           int height,
+                                           const uint8_t* rgbaData);
 
 void emulator_window_set_no_skin();
 
