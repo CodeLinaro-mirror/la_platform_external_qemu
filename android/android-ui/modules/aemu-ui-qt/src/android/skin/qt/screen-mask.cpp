@@ -38,15 +38,17 @@ static LazyInstance<ScreenMaskGlobals> sGlobals = LAZY_INSTANCE_INIT;
 namespace ScreenMask {
 
 // Force the rgb as '0' if alpha is '0', ensure RGBA layout
-static void processMask(QImage& image) {
+static void processImage(QImage& image, bool setAlphaToBlack) {
     // Convert the image to RGBA8888, which guarantees RGBA order needed
     image = image.convertToFormat(QImage::Format_RGBA8888);
 
-    for (int row = 0; row < image.height() - 1; row++) {
-        for (int col = 0; col < image.width() - 1; col++) {
-            QRgb p = image.pixel(col, row);
-            if (!qAlpha(p)) {
-                image.setPixel(col, row, qRgba(0, 0, 0, 0));
+    if (setAlphaToBlack) {
+        for (int row = 0; row < image.height() - 1; row++) {
+            for (int col = 0; col < image.width() - 1; col++) {
+                QRgb p = image.pixel(col, row);
+                if (qAlpha(p) == 0) {
+                    image.setPixel(col, row, qRgba(0, 0, 0, 0));
+                }
             }
         }
     }
@@ -72,37 +74,31 @@ static void loadMaskImage(AConfig* config, char* skinDir, char* skinName) {
     if (sGlobals->screenMaskImage.isNull()) {
         return;
     }
-    processMask(sGlobals->screenMaskImage);
+    processImage(sGlobals->screenMaskImage, true);
     emulator_window_set_screen_mask(sGlobals->screenMaskImage.width(),
                                     sGlobals->screenMaskImage.height(),
                                     sGlobals->screenMaskImage.bits());
 }
 
-AConfig* getForegroundConfig() {
-    char* skinName;
-    char* skinDir;
+AConfig* getPartsConfig(AConfig* rootConfig) {
+    return aconfig_find(rootConfig, "parts");
+}
 
-    avdInfo_getSkinInfo(getConsoleAgents()->settings->avdInfo(), &skinName, &skinDir);
-    QString layoutPath =
-            PathUtils::join(skinDir ? skinDir : "", skinName ? skinName : "", "layout").c_str();
+AConfig* getPortraitConfig(AConfig* rootConfig) {
+    AConfig* nextConfig = getPartsConfig(rootConfig);
+    if (nextConfig == nullptr) {
+        return nullptr;
+    }
+    return aconfig_find(nextConfig, "portrait");
+}
 
-    AFREE(skinName);
-    AFREE(skinDir);
-
-    AConfig* rootConfig = aconfig_node("", "");
-    aconfig_load_file(rootConfig, layoutPath.toStdString().c_str());
-
+AConfig* getForegroundConfig(AConfig* rootConfig) {
     // Look for parts/portrait/foreground
-    AConfig* nextConfig = aconfig_find(rootConfig, "parts");
-    if (nextConfig == nullptr) {
+    AConfig* portraitConfig = getPortraitConfig(rootConfig);
+    if (portraitConfig == nullptr) {
         return nullptr;
     }
-    nextConfig = aconfig_find(nextConfig, "portrait");
-    if (nextConfig == nullptr) {
-        return nullptr;
-    }
-
-    return aconfig_find(nextConfig, "foreground");
+    return aconfig_find(portraitConfig, "foreground");
 }
 
 // Handle the screen mask. This includes the mask image itself
@@ -112,7 +108,13 @@ void loadMask() {
     char* skinDir;
 
     avdInfo_getSkinInfo(getConsoleAgents()->settings->avdInfo(), &skinName, &skinDir);
-    AConfig* foregroundConfig = getForegroundConfig();
+    QString layoutPath =
+            PathUtils::join(skinDir ? skinDir : "", skinName ? skinName : "", "layout").c_str();
+
+    AConfig* rootConfig = aconfig_node("", "");
+    aconfig_load_file(rootConfig, layoutPath.toStdString().c_str());
+
+    AConfig* foregroundConfig = getForegroundConfig(rootConfig);
     if (foregroundConfig != nullptr) {
         loadMaskImage(foregroundConfig, skinDir, skinName);
     }

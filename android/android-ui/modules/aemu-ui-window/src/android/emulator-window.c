@@ -52,7 +52,7 @@
 /* EmulatorWindow structure instance. */
 static EmulatorWindow qemulator[1] = {0};
 
-static EmulatorScreenMask emulator_screen_mask = {0, 0, NULL};
+static EmulatorScreenImage emulator_screen_mask = {0, 0, NULL};
 
 // Our very own stash of a pointer to a device that handles user events.
 const QAndroidUserEventAgent* user_event_agent;
