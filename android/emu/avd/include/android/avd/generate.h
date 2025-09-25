@@ -55,6 +55,7 @@ struct AvdGenerateInfo {
     int hwLcdDensity; // hw.lcd.density=420
     int hwLcdHeight; // hw.lcd.height=1920
     int hwLcdWidth; // hw.lcd.width=1080
+    const char* hwLcdTransparent; // hw.lcd.transparent=false
     const char* hwTouchpad0; // hw.touchpad0=no
     int hwTouchpad0Width; // hw.touchpad0.width=600
     int hwTouchpad0Height; // hw.touchpad0.height=400
