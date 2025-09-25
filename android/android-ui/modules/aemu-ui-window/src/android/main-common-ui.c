@@ -41,6 +41,7 @@
 #include "host-common/multi_display_agent.h"
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/vm_operations.h"
+#include "android/metrics/DependentMetrics.h"
 
 #ifdef __APPLE__
 #include <ApplicationServices/ApplicationServices.h>
@@ -522,6 +523,10 @@ bool startRenderer(RendererConfig* config_inout) {
             str_reset(&hw->hw_gpu_mode, "swiftshader_indirect");
         }
         return false;
+    }
+
+    if (feature_is_enabled(kFeature_Vulkan)) {
+        android_metrics_report_vulkan_gpu_info();
     }
 
     VERBOSE_INFO(init, "Setting vsync to %d hz", hw->hw_lcd_vsync);
