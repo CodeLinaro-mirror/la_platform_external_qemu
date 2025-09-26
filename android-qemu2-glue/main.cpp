@@ -2799,8 +2799,6 @@ extern "C" int main(int argc, char** argv) {
         // XR image needs this feature to pass modifier keys to the guest.
         fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
 
-        derror(" >>>>> VulkanVirtualQueue = false NOW <<<< \n");
-
 #if defined(__APPLE__) && defined(__aarch64__)
         // TODO(b/404619245): XR emulator restarts at login screen when
         // VulkanVirtualQueue is enabled on Mac.
@@ -2811,7 +2809,11 @@ extern "C" int main(int argc, char** argv) {
     // When GuestAngle is used, Vulkan host composition can be automatically
     // enabled on currently supported platforms and device types to get better
     // performance.
-    if (!fc::isEnabled(fc::VulkanNativeSwapchain)) {
+    // TODO(b/447601952): Support vulkan composition in embedded emulator mode
+    const bool embeddedMode = getConsoleAgents()
+                                      ->settings->android_cmdLineOptions()
+                                      ->qt_hide_window;
+    if (!embeddedMode && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
         bool autoEnableVulkanComposition = false;
         if (fc::isEnabled(fc::GuestAngle)) {
 #if defined(__APPLE__) && defined(__aarch64__)
