@@ -715,6 +715,14 @@ void android_setOpenglesScreenMask(int width,
     }
 }
 
+void android_setOpenglesScreenBackground(int width,
+                                         int height,
+                                         const uint8_t* rgbaData) {
+    if (sRenderer) {
+        sRenderer->setScreenBackground(width, height, rgbaData);
+    }
+}
+
 int android_hideOpenglesWindow(void) {
     if (!sRenderer) {
         return -1;
