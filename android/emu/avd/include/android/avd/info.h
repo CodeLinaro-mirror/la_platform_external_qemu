@@ -293,10 +293,15 @@ const FileData* avdInfo_getBootProperties(const AvdInfo* i);
  */
 const FileData* avdInfo_getBuildProperties(const AvdInfo* i);
 
-/* Return a reference to the avd/confif.init file for this AVD.
+/* Return a reference to the avd/config.ini file for this AVD.
  * Note that this vaue could be NULL.
  */
 CIniFile* avdInfo_getConfigIni(const AvdInfo* i);
+
+/* Return a reference to the avd/environment.ini file for this AVD.
+ * Note that this vaue could be NULL.
+ */
+CIniFile* avdInfo_getEnvironmentIni(const AvdInfo* i);
 
 /* Returns the path to a given AVD image file. This will return NULL if
  * the file cannot be found / does not exist.
