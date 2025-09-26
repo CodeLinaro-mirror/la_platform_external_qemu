@@ -75,6 +75,7 @@ def fetch_artifact(
             build_target,
             bid,
         )
+        raise e
 
     return location
 
