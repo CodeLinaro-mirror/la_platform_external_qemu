@@ -46,6 +46,7 @@ struct AvdInfo {
     CIniFile* rootIni;   /* root <foo>.ini file, empty if missing */
     CIniFile* configIni; /* virtual device's config.ini, NULL if missing */
     CIniFile* skinHardwareIni; /* skin-specific hardware.ini */
+    CIniFile* environmentIni; /* environment.ini, NULL if missing */
 
     /* for both */
     int apiLevel;

@@ -144,6 +144,11 @@ void avdInfo_free(AvdInfo* i) {
             i->rootIni = NULL;
         }
 
+        if (i->environmentIni) {
+            iniFile_free(i->environmentIni);
+            i->environmentIni = NULL;
+        }
+
         AFREE(i->contentPath);
         AFREE(i->sdkRootPath);
         AFREE(i->rootIniPath);
@@ -684,6 +689,29 @@ int _avdInfo_getConfigIni(AvdInfo* i) {
     return 0;
 }
 
+
+/* find and parse the environment.ini file from the content directory */
+int _avdInfo_getEnvironmentIni(AvdInfo* i) {
+    char* iniPath = _avdInfo_getContentFilePath(i, AVD_ENVIRONMENT_INI);
+
+    /* Allow non-existing environment.ini */
+    if (iniPath == NULL) {
+        D("virtual device has no environment file - no problem");
+        return 0;
+    }
+
+    D("virtual device environment file: %s", iniPath);
+    i->environmentIni = iniFile_newFromFile(iniPath);
+    AFREE(iniPath);
+
+    if (i->environmentIni == NULL) {
+        derror("bad environment config: %s",
+               "virtual device has corrupted " AVD_ENVIRONMENT_INI);
+        return -1;
+    }
+    return 0;
+}
+
 /* The AVD's config.ini contains a list of search paths (all beginning
  * with SEARCH_PREFIX) which are directory locations searched for
  * AVD platform files.
@@ -894,6 +922,7 @@ AvdInfo* avdInfo_new(const char* name, AvdInfoParams* __unused_params, const cha
 
     if (_avdInfo_getSdkRoot(i) < 0 || _avdInfo_getRootIni(i) < 0 ||
         _avdInfo_getContentPath(i) < 0 || _avdInfo_getConfigIni(i) < 0 ||
+        _avdInfo_getEnvironmentIni(i) < 0 ||
         _avdInfo_getCoreHwIniPath(i, i->contentPath) < 0 ||
         _avdInfo_getSnapshotLockFilePath(i, i->contentPath) < 0 ||
         _avdInfo_getMultiInstanceLockFilePath(i, i->contentPath) < 0)
@@ -1031,6 +1060,7 @@ AvdInfo* avdInfo_newForAndroidBuild(const char* androidBuildRoot,
     /* out/target/product/<name>/config.ini, if exists, provide configuration
      * from build files. */
     if (_avdInfo_getConfigIni(i) < 0 ||
+        _avdInfo_getEnvironmentIni(i) < 0 ||
         _avdInfo_getCoreHwIniPath(i, i->androidOut) < 0 ||
         _avdInfo_getSnapshotLockFilePath(i, i->androidOut) < 0 ||
         _avdInfo_getMultiInstanceLockFilePath(i, i->androidOut) < 0)
@@ -1793,6 +1823,10 @@ const FileData* avdInfo_getBuildProperties(const AvdInfo* i) {
 
 CIniFile* avdInfo_getConfigIni(const AvdInfo* i) {
     return i->configIni;
+}
+
+CIniFile* avdInfo_getEnvironmentIni(const AvdInfo* i) {
+    return i->environmentIni;
 }
 
 int avdInfo_getSysImgIncrementalVersion(const AvdInfo* i) {
