@@ -8,11 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if 0
-#define LOG(x...) fprintf(stderr,"error: " x)
-#else
-#define LOG(x...) do {} while (0)
-#endif
+// LOG is only used for errors, enable by default
+#define LOG(format, ...) dwarning("Error: " format, ##__VA_ARGS__)
 
 void *loadpng(const char *fn, unsigned *_width, unsigned *_height)
 {
@@ -374,13 +371,13 @@ void *readpng(const unsigned char *base, size_t   size, unsigned *_width, unsign
 
     p = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
     if(p == 0) {
-        LOG("%s: failed to allocate png read struct\n", fn);
+        LOG("%s: failed to allocate png read struct\n", __func__);
         return 0;
     }
 
     pi = png_create_info_struct(p);
     if(pi == 0) {
-        LOG("%s: failed to allocate png info struct\n", fn);
+        LOG("%s: failed to allocate png info struct\n", __func__);
         goto oops;
     }
 
@@ -389,14 +386,14 @@ void *readpng(const unsigned char *base, size_t   size, unsigned *_width, unsign
     reader.cursor = base;
 
     if(size < 8 || png_sig_cmp((unsigned char*)base, 0, 8)) {
-        LOG("%s: header is not a PNG header\n", fn);
+        LOG("%s: header is not a PNG header\n", __func__);
         goto oops;
     }
 
     reader.cursor += 8;
 
     if(setjmp(png_jmpbuf(p))) {
-        LOG("%s: png library error\n", fn);
+        LOG("%s: png library error\n", __func__);
     oops:
         png_destroy_read_struct(&p, &pi, 0);
         if(data != 0) free(data);
