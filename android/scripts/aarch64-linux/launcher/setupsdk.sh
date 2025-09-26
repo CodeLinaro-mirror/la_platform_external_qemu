@@ -87,6 +87,7 @@ hw.trackBall=no
 image.sysdir.1=system-images/android-30/default/$IMGNAME/
 skin.dynamic=no
 hw.lcd.density=$avdDPI
+hw.lcd.transparent=false
 skin.name=${avdWidth}x${avdHeight}
 skin.path=${avdWidth}x${avdHeight}
 tag.display=$ABI
