@@ -23,6 +23,7 @@
 #include "android/avd/keys.h"
 #include "android/avd/util.h"
 #include "android/console.h"
+#include "android/loadpng.h"
 #include "android/emulation/control/cellular_agent.h"
 #include "android/emulation/control/globals_agent.h"
 #include "android/emulation/control/hw_control_agent.h"
@@ -66,6 +67,8 @@ static bool s_use_emugl_subwindow = 1;
 static bool s_qt_hide_windw = 0;
 
 static void emulator_window_refresh(EmulatorWindow* emulator);
+
+static bool emulator_window_load_environment(const AvdInfo* avdInfo);
 
 static void write_window_name(char* buff,
                               size_t buff_len,
@@ -349,6 +352,15 @@ static void emulator_window_setup(EmulatorWindow* emulator) {
                     0, getConsoleAgents()->settings->hw()->hw_lcd_width, getConsoleAgents()->settings->hw()->hw_lcd_height,
                     getConsoleAgents()->settings->hw()->hw_lcd_density, getConsoleAgents()->settings->hw()->hw_lcd_density);
             android_setOpenglesDisplayActiveConfig(0);
+        }
+    }
+
+    // The environments are only supported when the display is transparent
+    // to make the background visible through host composition.
+    if (getConsoleAgents()->settings->hw()->hw_lcd_transparent) {
+        if (!emulator_window_load_environment(
+                    getConsoleAgents()->settings->avdInfo())) {
+            derror("%s: Could not setup environment", __func__);
         }
     }
 
@@ -753,4 +765,95 @@ void emulator_window_set_screen_mask(int width,
     emulator_screen_mask.width = width;
     emulator_screen_mask.height = height;
     emulator_screen_mask.rgbaData = rgbaData;
+}
+
+static bool emulator_window_load_environment(const AvdInfo* avdInfo) {
+    if (!avdInfo) {
+        derror("%s: Invalid AVD info", __func__);
+        return false;
+    }
+
+    CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
+    if (!environmentIni) {
+        derror("%s: Cannot find AVD environment config", __func__);
+        return false;
+    }
+
+    const char* avdBasePath = avdInfo_getContentPath(avdInfo);
+    if (!avdBasePath) {
+        derror("%s: Cannot find AVD path", __func__);
+        return false;
+    }
+
+    // Load background image
+    const char* backgroundFilename =
+            iniFile_getString(environmentIni, "background.image.filename", 0);
+    if (backgroundFilename && backgroundFilename[0] != '\0' &&
+        strlen(backgroundFilename) < MAX_PATH) {
+        const char backgroundPath[1024];
+        sprintf(backgroundPath, "%s%s%s", avdBasePath, PATH_SEP,
+                backgroundFilename);
+        dinfo("%s: Setting up background image: %s", __func__, backgroundPath);
+
+        // Read and decode this file
+        // TODO: support other file formats
+        uint32_t width = 0, height = 0;
+        void* backgroundImageData = loadpng(backgroundPath, &width, &height);
+
+        if (backgroundImageData) {
+            const int left = iniFile_getInteger(
+                    environmentIni, "background.image.crop.left", 0);
+            const int right = iniFile_getInteger(
+                    environmentIni, "background.image.crop.right", 0);
+            const int top = iniFile_getInteger(environmentIni,
+                                               "background.image.crop.top", 0);
+            const int bottom = iniFile_getInteger(
+                    environmentIni, "background.image.crop.bottom", 0);
+
+            const int croppedWidth = right - left;
+            const int croppedHeight = bottom - top;
+            dinfo("Background image size: %dx%d. "
+                  "Crop parameters [%d %d %dx%d]",
+                  width, height, left, right, croppedWidth, croppedHeight);
+            if (left >= 0 && right <= width && top >= 0 && bottom <= height &&
+                croppedWidth > 0 && croppedHeight > 0) {
+                // Copy pixels into a new buffer
+                dinfo("Cropping the background image [%d %d %d %d]", left,
+                      right, top, bottom);
+                uint32_t* croppedPixels =
+                        malloc(croppedWidth * croppedHeight * sizeof(uint32_t));
+                {
+                    // Copy cropped region into croppedPixels
+                    const uint32_t* srcData = backgroundImageData;
+                    uint32_t* dstData = croppedPixels;
+                    for (int dstY = 0; dstY < croppedHeight; dstY++) {
+                        memcpy(dstData, srcData + left,
+                               croppedWidth * sizeof(uint32_t));
+                        dstData += croppedWidth;
+                        srcData += width;
+                    }
+                }
+
+                android_setOpenglesScreenBackground(
+                        croppedWidth, croppedHeight,
+                        (const uint8_t*)(croppedPixels));
+                free(croppedPixels);
+            } else {
+                // no cropping, provide all the pixels directly
+                android_setOpenglesScreenBackground(
+                        width, height, (const uint8_t*)(backgroundImageData));
+            }
+
+            free(backgroundImageData);
+        } else {
+            derror("%s: Could not load background image: %s", __func__,
+                   backgroundPath);
+        }
+    } else {
+        derror("%s: Invalidbackground image filename.", __func__);
+    }
+
+    free(backgroundFilename);
+
+    return true;
 }

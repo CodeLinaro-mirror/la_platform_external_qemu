@@ -17,6 +17,7 @@ android_qt_lib(
        android-emu-sockets
        android-emu-utils
        qemu-host-common-headers
+       png
        ui::common)
 target_include_directories(
   aemu-ui-window
