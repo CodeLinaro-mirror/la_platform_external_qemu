@@ -190,6 +190,10 @@ private:
     void notifyGuestOnLeftHandGesture(const QString& gesture);
     // Notify guest (Android) about the hand gesture selection for right hand.
     void notifyGuestOnRightHandGesture(const QString& gesture);
+    // Update UI (e.g. icon, tooltip) of the button.
+    void updateLeftHandButton(const QString& gesture);
+    // Update UI (e.g. icon, tooltip) of the button.
+    void updateRightHandButton(const QString& gesture);
 
     virtual void closeEvent(QCloseEvent* ce) override;
     virtual void mousePressEvent(QMouseEvent* event) override;

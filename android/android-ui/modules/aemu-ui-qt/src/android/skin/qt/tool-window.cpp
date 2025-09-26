@@ -13,6 +13,7 @@
 #include "android/skin/qt/tool-window.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <cassert>
 #include <istream>
 #include <memory>
@@ -104,27 +105,57 @@ struct GestureData {
     xr_emulator_proto::HandGesture protoId;
 };
 
+// To rotate a hand, press Cmd key on Mac or Ctrl key on Win&Linux, plus mouse move.
+#ifdef __APPLE__
+#define C_KEY_NAME "Cmd"
+#else
+#define C_KEY_NAME "Ctrl"
+#endif
+
+// clang-format off
+
+#define TABLE_ROW(column1, column2) \
+    "<tr><th align=\"left\">" column1 "</th><td>" column2 "</td></tr>"
+
+// HTML text of help that will be shown in the tooltip of hand buttons
+// so that user knows how to manipulate the hand.
+#define HAND_HELP \
+    "<br>Manipulate hand with keyboard/mouse:\
+    <table>"\
+        TABLE_ROW("Q/E", "Move up/down")\
+        TABLE_ROW("A/D", "Move left/right")\
+        TABLE_ROW("W/S", "Move forward/back")\
+        TABLE_ROW("Mouse Button Press", "Start gesture")\
+        TABLE_ROW("Mouse Button Release", "End gesture")\
+        TABLE_ROW(C_KEY_NAME "+Mouse Move", "Rotate hand")\
+    "</table>"
+
+#define HAND_BUTTON_TOOLTIP(base) \
+    ("<html>" base HAND_HELP "</html>")
+
+// clang-format on
+
 const std::map<QString, GestureData> LEFT_HAND_GESTURE_DATA = {
         {Ui::GESTURE_NAME_PINCH,
-         {"xr_left_hand_pinch", "Left hand: Pinch",
+         {"xr_left_hand_pinch", HAND_BUTTON_TOOLTIP("Left hand: Pinch"),
           xr_emulator_proto::LEFT_HAND_PINCH}},
         {Ui::GESTURE_NAME_GRAB,
-         {"xr_left_hand_grab", "Left hand: Grab",
+         {"xr_left_hand_grab", HAND_BUTTON_TOOLTIP("Left hand: Grab"),
           xr_emulator_proto::LEFT_HAND_GRAB}},
         {Ui::GESTURE_NAME_POKE,
-         {"xr_left_hand_poke", "Left hand: Poke",
+         {"xr_left_hand_poke", HAND_BUTTON_TOOLTIP("Left hand: Poke"),
           xr_emulator_proto::LEFT_HAND_POKE}},
 };
 
 const std::map<QString, GestureData> RIGHT_HAND_GESTURE_DATA = {
         {Ui::GESTURE_NAME_PINCH,
-         {"xr_right_hand_pinch", "Right hand: Pinch",
+         {"xr_right_hand_pinch", HAND_BUTTON_TOOLTIP("Right hand: Pinch"),
           xr_emulator_proto::RIGHT_HAND_PINCH}},
         {Ui::GESTURE_NAME_GRAB,
-         {"xr_right_hand_grab", "Right hand: Grab",
+         {"xr_right_hand_grab", HAND_BUTTON_TOOLTIP("Right hand: Grab"),
           xr_emulator_proto::RIGHT_HAND_GRAB}},
         {Ui::GESTURE_NAME_POKE,
-         {"xr_right_hand_poke", "Right hand: Poke",
+         {"xr_right_hand_poke", HAND_BUTTON_TOOLTIP("Right hand: Poke"),
           xr_emulator_proto::RIGHT_HAND_POKE}},
 };
 
@@ -153,7 +184,6 @@ using Ui::Settings::SaveSnapshotOnExit;
 
 namespace proto = android_studio;
 namespace fc = android::featurecontrol;
-using fc::Feature;
 
 template <typename T>
 ToolWindow::WindowHolder<T>::WindowHolder(ToolWindow* tw,
@@ -409,6 +439,10 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
             }
         }
     }
+
+    // update tooltips of these two buttons
+    updateLeftHandButton(mCurrentLeftHandGesture);
+    updateRightHandButton(mCurrentRightHandGesture);
 
     if (getConsoleAgents()->settings->hw()->hw_arc) {
         // Chrome OS doesn't support rotation now.
@@ -2308,6 +2342,28 @@ bool ToolWindow::eventFilter(QObject* o, QEvent* event) {
     return false;
 }
 
+void ToolWindow::updateLeftHandButton(const QString& gesture) {
+    auto data = LEFT_HAND_GESTURE_DATA.find(gesture);
+    if (data == LEFT_HAND_GESTURE_DATA.end()) {
+        LOG(ERROR) << "Unsupported gesture from UI: " << gesture.toStdString();
+        return;
+    }
+
+    ChangeIcon(mToolsUi->left_hand_button, data->second.button_name,
+               data->second.button_tip);
+}
+
+void ToolWindow::updateRightHandButton(const QString& gesture) {
+    auto data = RIGHT_HAND_GESTURE_DATA.find(gesture);
+    if (data == RIGHT_HAND_GESTURE_DATA.end()) {
+        LOG(ERROR) << "Unsupported gesture from UI: " << gesture.toStdString();
+        return;
+    }
+
+    ChangeIcon(mToolsUi->right_hand_button, data->second.button_name,
+               data->second.button_tip);
+}
+
 void ToolWindow::notifyGuestOnLeftHandGesture(const QString& gesture) {
     auto data = LEFT_HAND_GESTURE_DATA.find(gesture);
     if (data == LEFT_HAND_GESTURE_DATA.end()) {
@@ -2357,13 +2413,7 @@ void ToolWindow::on_right_hand_button_clicked() {
 void ToolWindow::onLeftHandGestureChanged(const QString& gesture) {
     setRelativeMouseMode(false);
 
-    auto gestureData = LEFT_HAND_GESTURE_DATA.find(gesture);
-    if (gestureData == LEFT_HAND_GESTURE_DATA.end()) {
-        LOG(ERROR) << "Unsupported gesture from UI: " << gesture.toStdString();
-        return;
-    }
-    ChangeIcon(mToolsUi->left_hand_button, gestureData->second.button_name,
-               gestureData->second.button_tip);
+    updateLeftHandButton(gesture);
 
     notifyGuestOnLeftHandGesture(gesture);
 }
@@ -2371,13 +2421,7 @@ void ToolWindow::onLeftHandGestureChanged(const QString& gesture) {
 void ToolWindow::onRightHandGestureChanged(const QString& gesture) {
     setRelativeMouseMode(false);
 
-    auto gestureData = RIGHT_HAND_GESTURE_DATA.find(gesture);
-    if (gestureData == RIGHT_HAND_GESTURE_DATA.end()) {
-        LOG(ERROR) << "Unsupported gesture from UI: " << gesture.toStdString();
-        return;
-    }
-    ChangeIcon(mToolsUi->right_hand_button, gestureData->second.button_name,
-               gestureData->second.button_tip);
+    updateRightHandButton(gesture);
 
     notifyGuestOnRightHandGesture(gesture);
 }

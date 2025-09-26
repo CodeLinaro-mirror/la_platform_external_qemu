@@ -98,9 +98,10 @@ constexpr CommandInfo kCommands[] = {
         INIT_COMMAND(XR_LEFT_HAND, "Left hand gesture"),
         INIT_COMMAND(XR_RIGHT_HAND, "Right hand gesture"),
         INIT_COMMAND(CHANGE_XR_ENVIRONMENT_MODE, "Environment selector"),
-        INIT_COMMAND(XR_SCREEN_RECENTER, "Reset Position"),
+        INIT_COMMAND(XR_SCREEN_RECENTER, "Reset All"),  // reset headset, hands, etc
         INIT_COMMAND(XR_VIEWPORT_CONTROL_MODE_PAN, "Drag mouse to pan"),
-        INIT_COMMAND(XR_VIEWPORT_CONTROL_MODE_DOLLY, "Drag mouse to dolly backwards/forwards"),
+        INIT_COMMAND(XR_VIEWPORT_CONTROL_MODE_DOLLY,
+                     "Drag mouse to dolly backwards/forwards"),
         INIT_COMMAND(XR_VIEWPORT_CONTROL_MODE_ROTATE, "Drag mouse to rotate"),
         INIT_COMMAND(GLASSES_1, "Glasses Button 1"),
         INIT_COMMAND(GLASSES_2, "Glasses Button 2"),
