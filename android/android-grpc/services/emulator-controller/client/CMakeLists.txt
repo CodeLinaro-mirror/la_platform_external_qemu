@@ -13,3 +13,11 @@ target_include_directories(emulator_controller-service-client PUBLIC include
 target_link_libraries(
   emulator_controller-service-client
   PUBLIC emulator_controller-service android-grpc-utils android-grpc-client)
+
+android_add_test(
+  TARGET emulator_controller-service-client_unittest
+  SOURCE_DIR test
+  SRC EmulatorControlClientTest.cpp
+  DEPS emulator_controller-service-client gmock_main
+)
+

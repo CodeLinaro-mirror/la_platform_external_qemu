@@ -14,11 +14,13 @@
 #include "android/emulation/control/utils/EmulatorGrcpClient.h"
 
 #include <grpcpp/grpcpp.h>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -188,6 +190,38 @@ std::shared_ptr<grpc::ClientContext> EmulatorGrpcClient::newContext() {
 void EmulatorGrpcClient::cancelAll(std::chrono::milliseconds maxWait) {
     mActiveContexts.forEach([](auto context) { context->TryCancel(); });
     mActiveContexts.waitUntilLibraryIsClear(maxWait);
+}
+
+EmulatorGrpcClient::~EmulatorGrpcClient() {
+    cancelAll();
+    /*
+     * Hack: Poll for the channel's reference count to drop to 1.
+     * This waits for other components to release their shared_ptr to the
+     * channel, but will time out after 1 second to prevent an infinite hang.
+     *
+     * This gives gRPC internals a chance to properly cleanup.
+     */
+    const auto timeout = std::chrono::seconds(1);
+    auto start = std::chrono::steady_clock::now();
+
+    if (mChannel.use_count() > 2) {
+        dwarning(
+                "Someone else besides the gRPC stack has a reference to the "
+                "channel! %ld references remain.",
+                mChannel.use_count());
+    }
+
+    while (mChannel.use_count() > 1 &&
+           (std::chrono::steady_clock::now() - start) < timeout) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    // Optional: You might want to log a warning if the timeout was exceeded,
+    // as it indicates a potential issue or resource leak.
+    if (mChannel.use_count() > 1) {
+        dwarning("Timeout waiting for channel cleanup! %ld references remain.",
+                 mChannel.use_count());
+    }
 }
 
 absl::StatusOr<std::unique_ptr<EmulatorGrpcClient>>

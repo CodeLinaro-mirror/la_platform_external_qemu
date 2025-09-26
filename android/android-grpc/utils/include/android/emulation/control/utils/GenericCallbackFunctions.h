@@ -28,6 +28,7 @@ using OnCompleted = std::function<void(absl::StatusOr<T*>)>;
 using OnFinished = std::function<void(absl::Status)>;
 template <typename T>
 using OnEvent = std::function<void(const T*)>;
+using OnFinally = std::function<void()>;
 
 using ::google::protobuf::Empty;
 static OnCompleted<Empty> nothing = [](absl::StatusOr<Empty*> _ignored) {};
@@ -90,8 +91,9 @@ std::function<void(::grpc::Status)> grpcCallCompletionHandler(
         std::shared_ptr<grpc::ClientContext> context,
         Request* request,
         Response* response,
-        OnCompleted<Response> onDone) {
-    return [context, request, response, onDone](::grpc::Status status) {
+        OnCompleted<Response> onDone,
+        OnFinally onFinally = nullptr) {
+    return [context, request, response, onDone, onFinally](::grpc::Status status) {
         if (status.ok()) {
             // Call completed successfully, invoke the onDone callback with the
             // response object.
@@ -107,6 +109,11 @@ std::function<void(::grpc::Status)> grpcCallCompletionHandler(
         // Cleanup the resources used by the gRPC call.
         delete request;
         delete response;
+
+        // Notify we are completely finished.
+        if (onFinally) {
+            onFinally();
+        }
     };
 }
 }  // namespace control

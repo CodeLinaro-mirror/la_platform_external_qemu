@@ -14,6 +14,7 @@
 #include "android/emulation/control/utils/EmulatorControlClient.h"
 
 #include <grpcpp/grpcpp.h>
+#include <thread>
 #include <utility>
 
 #include "absl/status/status.h"
@@ -32,43 +33,78 @@ namespace android {
 namespace emulation {
 namespace control {
 
+EmulatorControlClient::EmulatorControlClient(
+        std::shared_ptr<EmulatorGrpcClient> client,
+        EmulatorController::StubInterface* service)
+    : mClient(client), mService(service) {
+    if (!service) {
+        mService = client->stub<EmulatorController>();
+    }
+    mOnFinally = [this]() {
+        if (--mOutstandingRpcs == 0) {
+            // If this was the last RPC, notify the waiting destructor
+            mOutstandingCondition.notify_one();
+        }
+    };
+}
+
+EmulatorControlClient::~EmulatorControlClient() {
+    mClient->cancelAll();
+    {
+        std::unique_lock<std::mutex> lock(mOutstandingMutex);
+        mOutstandingCondition.wait(lock,
+                                   [this] { return mOutstandingRpcs == 0; });
+
+    }
+    mInputEventWriter.reset();
+    mService.reset();
+    mClient.reset();
+}
+
 void EmulatorControlClient::setBatteryAsync(BatteryState state,
-                                                 OnCompleted<Empty> onDone) {
+                                            OnCompleted<Empty> onDone) {
     DD("setBattery %s", state.ShortDebugString().c_str());
     auto [request, response, context] =
             createGrpcRequestContext<BatteryState, Empty>(mClient);
     request->CopyFrom(state);
+    mOutstandingRpcs++;
     mService->async()->setBattery(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::getScreenshotAsync(ImageFormat format,
-                                                    OnCompleted<Image> onDone) {
+                                               OnCompleted<Image> onDone) {
     auto [request, response, context] =
             createGrpcRequestContext<ImageFormat, Image>(mClient);
     request->CopyFrom(format);
+    mOutstandingRpcs++;
     mService->async()->getScreenshot(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
-void EmulatorControlClient::getStatusAsync(
-        OnCompleted<EmulatorStatus> onDone) {
+void EmulatorControlClient::getStatusAsync(OnCompleted<EmulatorStatus> onDone) {
     auto [request, response, context] =
             createGrpcRequestContext<Empty, EmulatorStatus>(mClient);
+    mOutstandingRpcs++;
     mService->async()->getStatus(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::getDisplayConfigurationsAsync(
         OnCompleted<DisplayConfigurations> onDone) {
     auto [request, response, context] =
             createGrpcRequestContext<Empty, DisplayConfigurations>(mClient);
+    mOutstandingRpcs++;
     mService->async()->getDisplayConfigurations(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::setDisplayConfigurationsAsync(
@@ -78,9 +114,11 @@ void EmulatorControlClient::setDisplayConfigurationsAsync(
             createGrpcRequestContext<DisplayConfigurations,
                                      DisplayConfigurations>(mClient);
     request->CopyFrom(state);
+    mOutstandingRpcs++;
     mService->async()->setDisplayConfigurations(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::registerNotificationListener(
@@ -92,20 +130,22 @@ void EmulatorControlClient::registerNotificationListener(
             context, incoming, [onDone](auto status) {
                 onDone(ConvertGrpcStatusToAbseilStatus(status));
             });
+    mOutstandingRpcs++;
     mService->async()->streamNotification(context.get(), &empty, read);
-    read->StartRead();
     read->StartCall();
+    read->StartRead();
 }
 
-void EmulatorControlClient::sendFingerprintAsync(
-        Fingerprint finger,
-        OnCompleted<Empty> onDone) {
+void EmulatorControlClient::sendFingerprintAsync(Fingerprint finger,
+                                                 OnCompleted<Empty> onDone) {
     auto [request, response, context] =
             createGrpcRequestContext<Fingerprint, Empty>(mClient);
     request->CopyFrom(finger);
+    mOutstandingRpcs++;
     mService->async()->sendFingerprint(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::setVmStateAsync(VmRunState state,
@@ -113,9 +153,11 @@ void EmulatorControlClient::setVmStateAsync(VmRunState state,
     auto [request, response, context] =
             createGrpcRequestContext<VmRunState, Empty>(mClient);
     request->CopyFrom(state);
+    mOutstandingRpcs++;
     mService->async()->setVmState(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::setClipboardAsync(std::string state,
@@ -123,9 +165,11 @@ void EmulatorControlClient::setClipboardAsync(std::string state,
     auto [request, response, context] =
             createGrpcRequestContext<ClipData, Empty>(mClient);
     request->set_text(state);
+    mOutstandingRpcs++;
     mService->async()->setClipboard(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::setBrightnessAsync(BrightnessValue bv,
@@ -133,9 +177,11 @@ void EmulatorControlClient::setBrightnessAsync(BrightnessValue bv,
     auto [request, response, context] =
             createGrpcRequestContext<BrightnessValue, Empty>(mClient);
     request->CopyFrom(bv);
+    mOutstandingRpcs++;
     mService->async()->setBrightness(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 void EmulatorControlClient::setGpsAsync(GpsState gps,
@@ -143,9 +189,11 @@ void EmulatorControlClient::setGpsAsync(GpsState gps,
     auto [request, response, context] =
             createGrpcRequestContext<GpsState, Empty>(mClient);
     request->CopyFrom(gps);
+    mOutstandingRpcs++;
     mService->async()->setGps(
             context.get(), request, response,
-            grpcCallCompletionHandler(context, request, response, onDone));
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
 }
 
 absl::StatusOr<GpsState> EmulatorControlClient::getGps() {
@@ -172,6 +220,7 @@ EmulatorControlClient::asyncInputEventWriter() {
             std::move(context));
     mService->async()->streamInputEvent(mInputEventWriter->context(), &empty,
                                         mInputEventWriter.get());
+    mInputEventWriter->StartCall();
     return mInputEventWriter;
 }
 
