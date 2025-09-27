@@ -12,6 +12,8 @@
 #include "android/console_internal.h"
 
 #include "aemu/base/sockets/SocketUtils.h"
+#include "android/avd/info.h"
+#include "android/console.h"
 #include "android/telephony/modem_driver.h"
 
 #include <gtest/gtest.h>
@@ -65,6 +67,86 @@ TEST(Console, postauth_help_size_max) {
     test_control_client_close(opaque);
     socketClose(sock[1]);
     socketClose(sock[0]);
+}
+
+TEST(Console, NetworkSpeedNoArgsFails) {
+    const char kExpected[] =
+            "KO: missing <speed> argument, see 'help network speed'\r\n";
+    const int BUFF_SIZE = 1024;
+    char buff[BUFF_SIZE] = {};
+    int sock[2];
+
+    ASSERT_EQ(0, socketCreatePair(&sock[0], &sock[1]));
+
+    // Create a fake client that will send the output through this socket
+    void* opaque = test_control_client_create(sock[1]);
+    ASSERT_TRUE(opaque != NULL);
+
+    send_test_string(opaque, "network speed");
+
+    // Read back the output.
+    socketRecvAll(sock[0], buff, sizeof(kExpected) - 1);
+    EXPECT_STREQ(kExpected, buff);
+
+    test_control_client_close(opaque);
+    socketClose(sock[1]);
+    socketClose(sock[0]);
+}
+
+TEST(Console, multidisplay_add_xr_fails) {
+    const int BUFF_SIZE = STUDIO_BUFF_SIZE + 1;
+    char buff[BUFF_SIZE];
+    int sock[2];
+
+    ASSERT_EQ(0, socketCreatePair(&sock[0], &sock[1]));
+
+    // Create a fake client that will send the output through this socket
+    void* opaque = test_control_client_create(sock[1]);
+    ASSERT_TRUE(opaque != NULL);
+
+    // Create a mock AVD info for an XR device.
+    AvdInfo* avdInfo = avdInfo_new_for_testing(AVD_XR);
+    getConsoleAgents()->settings->inject_AvdInfo(avdInfo);
+
+    send_test_string(opaque, "multidisplay add 1 800 600 240 0");
+
+    // Read back the output.
+    memset(buff, 0, BUFF_SIZE);
+    socketRecvAll(sock[0], buff, BUFF_SIZE);
+    EXPECT_STREQ(buff, "KO: multidisplay is not supported on XR devices\r\n");
+
+    test_control_client_close(opaque);
+    socketClose(sock[1]);
+    socketClose(sock[0]);
+    avdInfo_free(avdInfo);
+}
+
+TEST(Console, rotate_xr_fails) {
+    const int BUFF_SIZE = STUDIO_BUFF_SIZE + 1;
+    char buff[BUFF_SIZE];
+    int sock[2];
+
+    ASSERT_EQ(0, socketCreatePair(&sock[0], &sock[1]));
+
+    // Create a fake client that will send the output through this socket
+    void* opaque = test_control_client_create(sock[1]);
+    ASSERT_TRUE(opaque != NULL);
+
+    // Create a mock AVD info for an XR device.
+    AvdInfo* avdInfo = avdInfo_new_for_testing(AVD_XR);
+    getConsoleAgents()->settings->inject_AvdInfo(avdInfo);
+
+    send_test_string(opaque, "rotate");
+
+    // Read back the output.
+    memset(buff, 0, BUFF_SIZE);
+    socketRecvAll(sock[0], buff, BUFF_SIZE);
+    EXPECT_STREQ(buff, "KO: rotation is not supported for XR devices.\r\n");
+
+    test_control_client_close(opaque);
+    socketClose(sock[1]);
+    socketClose(sock[0]);
+    avdInfo_free(avdInfo);
 }
 
 static void ping_test();

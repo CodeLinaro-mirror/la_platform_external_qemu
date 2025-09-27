@@ -2102,3 +2102,10 @@ bool avdInfo_getBuildPropertyBool(const AvdInfo* info, const char* property, boo
 char* avdInfo_getBuildPropertyString(const AvdInfo* info, const char* property) {
     return propertyFile_getValue((const char*)info->buildProperties->data, info->buildProperties->size, property);
 }
+
+// function used to mock AvdInfo on Test
+AvdInfo* avdInfo_new_for_testing(AvdFlavor flavor) {
+    AvdInfo* info = (AvdInfo*)calloc(1, sizeof(AvdInfo));
+    info->flavor = flavor;
+    return info;
+}
