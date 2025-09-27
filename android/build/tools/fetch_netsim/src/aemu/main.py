@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 import oauth2client.client
+import googleapiclient.errors
 from aemu.android_build_client import AndroidBuildClient
 from aemu.fetch_artifact import unzip_artifact
 from aemu.log import configure_logging
@@ -116,27 +117,28 @@ You can recreate the commit by running:
 
 
 def get_bid(args):
-    """Retrieves the Build ID (BID) to use for the netsim update.
+    """Retrieves the Build ID (BID) and type to use for the netsim update.
 
     Args:
-        args: An argparse.Namespace object containing the following arguments:
-            - bid: An optional BID provided directly. If specified, it takes
-                precedence.
-            - token: The authentication token for the Android Build Client.
-            - branch: The branch to query for the latest BID.
-            - prefix: The prefix for the build name to filter by.
+        args: An argparse.Namespace object containing the command-line arguments.
 
     Returns:
-        The Build ID (BID) to use for the update.
+        A tuple containing the Build ID (str) and build type (str).
     """
-    if args.bid:
-        return args.bid
+    build_type = "submitted"
+    bid = args.bid
+    if bid:
+        if bid.lower().startswith("p"):
+            build_type = "pending"
 
-    ab_client = AndroidBuildClient(args.token)
-    return ab_client.get_latest_build_id(args.branch, f"{args.prefix}_linux_x64")
+    ab_client = AndroidBuildClient(args.token, build_type)
+    if not bid:
+        bid = ab_client.get_latest_build_id(args.branch, f"{args.prefix}_linux_x64")
+
+    return bid, build_type
 
 
-def obtain(args, bid: str, target: str, base_dir: Path):
+def obtain(args, bid: str, target: str, base_dir: Path, build_type: str):
     """Obtains a specified target for a given build and integrates it into a Git repository.
 
     Args:
@@ -149,7 +151,7 @@ def obtain(args, bid: str, target: str, base_dir: Path):
         base_dir: The base directory where the netsim prebuilt should live.
     """
     logging.info("Obtaining target %s from build: %s", target, bid)
-    ab_client = AndroidBuildClient(args.token)
+    ab_client = AndroidBuildClient(args.token, build_type)
 
     artifact = args.artifact.format(bid=bid, target=TARGET_MAP[target])
 
@@ -189,6 +191,51 @@ def find_repo_root(start_directory=Path(__file__).resolve()) -> Path:
             return str(current_directory)
 
         current_directory = parent_directory
+
+
+def fetch_and_commit(args, bid, build_type, destination_dir):
+    """Fetches artifacts, commits them, and uploads for review."""
+    successful_obtains = 0
+    targets = [t.strip() for t in args.targets.split(",")]
+    for target in targets:
+        try:
+            obtain(args, bid, target, destination_dir, build_type)
+            successful_obtains += 1
+        except Exception as e:
+            logging.warning(
+                "Failed to obtain target %s for build %s (Error: %s)",
+                target,
+                bid,
+                e,
+            )
+            if build_type == "submitted":
+                raise
+
+    if build_type == "pending" and successful_obtains == 0:
+        raise ValueError(
+            f"Could not obtain any of the targets ({', '.join(targets)}) for presubmit build {bid}"
+        )
+
+    # Only commit and upload if we actually got something.
+    if successful_obtains > 0:
+        git_commit(bid, destination_dir, args)
+
+        logging.info("Created change.. Uploading to gerrit")
+        run(
+            [
+                "repo",
+                "upload",
+                "-y",
+                "--label",
+                "Presubmit-Ready+1",
+                f"--br=netsim-{bid}",
+                f"--re={args.reviewers}",
+                f"--cc={args.cc}",
+                str(destination_dir),
+            ],
+            dry_run=args.dry_run,
+            cwd=destination_dir,
+        )
 
 
 def main():
@@ -233,7 +280,7 @@ def main():
     )
     parser.add_argument(
         "--bid",
-        type=int,
+        type=str,
         help="Starting build id to check, or None to use the latest",
     )
     parser.add_argument(
@@ -312,32 +359,13 @@ def main():
     destination_dir.mkdir(parents=True, exist_ok=True)
     bid = None
     try:
-        bid = get_bid(args)
+        bid, build_type = get_bid(args)
         run(
             ["repo", "start", f"netsim-{bid}"],
             dry_run=args.dry_run,
             cwd=destination_dir,
         )
-        for target in args.targets.split(","):
-            obtain(args, bid, target.strip(), destination_dir)
-        git_commit(bid, destination_dir, args)
-
-        logging.info("Created change.. Uploading to gerrit")
-        run(
-            [
-                "repo",
-                "upload",
-                "-y",
-                "--label",
-                "Presubmit-Ready+1",
-                f"--br=netsim-{bid}",
-                f"--re={args.reviewers}",
-                f"--cc={args.cc}",
-                str(destination_dir),
-            ],
-            dry_run=args.dry_run,
-            cwd=destination_dir,
-        )
+        fetch_and_commit(args, bid, build_type, destination_dir)
     except oauth2client.client.AccessTokenCredentialsError as err:
         logging.fatal(
             "Token failure. You might have to clear your cache with ~/go/bin/oauth2l reset. (%s)",

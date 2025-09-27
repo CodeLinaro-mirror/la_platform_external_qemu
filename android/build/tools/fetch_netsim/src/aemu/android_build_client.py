@@ -35,7 +35,8 @@ def raise_if_none(x, msg):
 class AndroidBuildClient(object):
     """A client to talk to go/ab"""
 
-    def __init__(self, token):
+    def __init__(self, token, build_type="submitted"):
+        self.build_type = build_type
         if not token:
             if platform.system() != "Linux":
                 raise ValueError(
@@ -86,7 +87,7 @@ Pass the generated token in using the --token option.
         request = self.service.build().list(
             branch=branch,
             target=build_target,
-            buildType="submitted",
+            buildType=self.build_type,
             successful=True,
             sortingType="buildId",
             fields="builds/buildId",
@@ -121,35 +122,22 @@ Pass the generated token in using the --token option.
             A build id
         """
         logging.debug(
-            f'Listing submitted builds buildType="submitted", branch={branch}, target={target}, buildId={buildId}, successful={success}, maxResults={results}'
+            f'Listing submitted builds buildType={self.build_type}, branch={branch}, target={target}, buildId={buildId}, successful={success}, maxResults={results}'
         )
+        params = {
+            "buildType": self.build_type,
+            "branch": branch,
+            "target": target,
+            "successful": success,
+            "maxResults": results,
+        }
         if endBuildId:
-            result = (
-                self.service.build()
-                .list(
-                    buildType="submitted",
-                    branch=branch,
-                    target=target,
-                    startBuildId=buildId,
-                    endBuildId=endBuildId,
-                    successful=success,
-                    maxResults=results,
-                )
-                .execute()
-            )
+            params["startBuildId"] = buildId
+            params["endBuildId"] = endBuildId
         else:
-            result = (
-                self.service.build()
-                .list(
-                    buildType="submitted",
-                    branch=branch,
-                    target=target,
-                    buildId=buildId,
-                    successful=success,
-                    maxResults=results,
-                )
-                .execute()
-            )
+            params["buildId"] = buildId
+
+        result = self.service.build().list(**params).execute()
 
         logging.debug("Server response: %s", result)
         builds = result.get("builds", [])
