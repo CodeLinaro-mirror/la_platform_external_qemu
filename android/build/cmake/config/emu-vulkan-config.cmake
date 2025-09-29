@@ -62,6 +62,15 @@ elseif(DARWIN_X86_64 OR DARWIN_AARCH64)
       "${PREBUILT_ROOT}/icds/MoltenVK_icd.json>lib64/vulkan/MoltenVK_icd.json"
       # Shaders
       ${VULKAN_COMMON_DEPENDENCIES})
+  if(DARWIN_AARCH64)
+    # TODO(joshuaduong): Move to above once darwin-x86_64 lavapipe deps are in.
+    list(APPEND VULKAN_DEPENDENCIES
+        # Lavapipe dependencies
+        "${PREBUILT_ROOT}/icds/libLLVM.dylib>lib64/vulkan/libLLVM.dylib"
+        "${PREBUILT_ROOT}/icds/libz3.4.15.dylib>lib64/vulkan/libz3.4.15.dylib"
+        "${PREBUILT_ROOT}/icds/libzstd.1.dylib>lib64/vulkan/libzstd.1.dylib"
+    )
+  endif()
   set(VULKAN_TEST_DEPENDENCIES
       # Loader (for testing)
       "${PREBUILT_ROOT}/libvulkan.dylib>testlib64/libvulkan.dylib"
