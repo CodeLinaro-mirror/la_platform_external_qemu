@@ -3503,6 +3503,8 @@ bool virtio_legacy_allowed(VirtIODevice *vdev)
 {
     switch (vdev->device_id) {
     case VIRTIO_ID_NET:
+    // AEMU:
+    case VIRTIO_ID_MAC80211_HWSIM:
     case VIRTIO_ID_BLOCK:
     case VIRTIO_ID_CONSOLE:
     case VIRTIO_ID_RNG:
