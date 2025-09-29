@@ -25,5 +25,9 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque);
 
 void android_metrics_report_common_info(bool openglAlive);
 
+void android_metrics_fill_vulkan_gpu_info(
+        void* opaque);
+void android_metrics_report_vulkan_gpu_info();
+
 
 ANDROID_END_HEADER

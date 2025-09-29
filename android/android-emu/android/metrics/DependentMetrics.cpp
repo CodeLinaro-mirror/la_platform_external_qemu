@@ -24,6 +24,7 @@
 
 #include "aemu/base/Optional.h"          // for Optional
 #include "aemu/base/StringFormat.h"      // for StringFormat
+#include "aemu/base/logging/Log.h"
 #include "android/CommonReportedInfo.h"  // for setDetails
 #include "android/avd/info.h"            // for avdInfo_getA...
 #include "android/avd/util.h"            // for AVD_ANDROID_...
@@ -57,6 +58,7 @@
 #include "host-common/opengl/emugl_config.h"             // for emuglConfig_...
 #include "host-common/opengles.h"                        // for android_getO...
 #include "android/metrics/studio_stats_wrapper.pb.h"                             // for EmulatorFeat...
+#include "studio_stats.pb.h"
 
 using android::base::Optional;
 using android::base::PathUtils;
@@ -888,11 +890,60 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
             System::get()->envGet("ANDROID_EMULATOR_WRAPPER_PID").c_str()));
     event->mutable_emulator_details()->set_qemu_pid(
             System::get()->getCurrentProcessId());
+}
+
+void android_metrics_fill_vulkan_gpu_info(void* opaque) {
+    android_studio::AndroidStudioEvent* event =
+            static_cast<android_studio::AndroidStudioEvent*>(opaque);
+
+    const gfxstream::RendererPtr& renderer = android_getOpenglesRenderer();
+    if (!renderer) {
+        dwarning(
+                "Couldn't retrieve renderer details. No metrics will be reported.");
+        event->mutable_emulator_details()->set_vulkan_icd(
+                android_studio::EmulatorDetails::DISABLED_VK);
+        return;
+    }
+    char* device_name = nullptr;
+    char* driver_info = nullptr;
+    uint32_t driver_version = 0;
+    uint32_t api_version = 0;
+    uint32_t vendor_id = 0;
+    uint32_t device_id = 0;
+    uint32_t device_type = 0;
+    uint64_t device_memory = 0;
+
+    renderer->getVulkanEmulationDeviceInfo(
+            &device_name, &driver_info, &driver_version, &api_version,
+            &vendor_id, &device_id, &device_type, &device_memory);
+
+    auto vkGPU = event->mutable_emulator_details()
+                            ->mutable_active_vulkan_host_gpu();
+    vkGPU->set_vendor_id(vendor_id);
+    vkGPU->set_device_id(device_id);
+
+    // In order to match the enum values in the proto, we add 1 to the
+    // device_type returned by the vulkan API.
+    vkGPU->set_device_type(
+            static_cast<
+                    android_studio::EmulatorGpuVkInfo_PhysicalDeviceType>(
+                    device_type + 1));
+    vkGPU->set_api_version(api_version);
+    vkGPU->set_driver_version(driver_version);
+    vkGPU->set_gpu_memory(device_memory);
+    if (device_name) {
+        vkGPU->set_device_name(device_name);
+        free(device_name);
+    }
+    if (driver_info) {
+        vkGPU->set_driver_info(driver_info);
+        free(driver_info);
+    }
 
     std::string vk_icd = System::get()->envGet("ANDROID_EMU_VK_ICD");
-    if (vk_icd == "") { // Use hardware when vk_icd is null
+    if (vk_icd == "") {  // Use hardware when vk_icd is null
         event->mutable_emulator_details()->set_vulkan_icd(
-                android_studio::EmulatorDetails::HARDWARE_VK);
+                android_studio::EmulatorDetails::HOST_DEFAULT_VK);
     } else if (vk_icd == "swiftshader") {
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::SWIFTSHADER_VK);
@@ -909,6 +960,13 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::UNKNOWN_VK);
     }
+}
+
+void android_metrics_report_vulkan_gpu_info() {
+    MetricsReporter::get().report(
+            [](android_studio::AndroidStudioEvent* event) {
+                android_metrics_fill_vulkan_gpu_info(event);
+            });
 }
 
 void android_metrics_report_common_info(bool openglAlive) {

@@ -21,6 +21,7 @@
 #include "aemu/base/logging/LogSeverity.h"
 #include "android/base/system/System.h"
 #include "android/console.h"
+#include "android/metrics/DependentMetrics.h"
 #include "android/opengl/GLProcessPipe.h"
 #include "android/snapshot/PathUtils.h"
 #include "android/snapshot/Snapshotter.h"
