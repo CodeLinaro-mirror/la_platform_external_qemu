@@ -973,6 +973,12 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
         case QtUICommand::POWER:
             forwardKeyToEmulator(LINUX_KEY_POWER, down);
             break;
+        case QtUICommand::GLASSES_1:
+            forwardKeyToEmulator(ANDROID_KEY_STEM_1, down);
+            break;
+        case QtUICommand::GLASSES_2:
+            forwardKeyToEmulator(ANDROID_KEY_STEM_2, down);
+            break;
         case QtUICommand::TABLET_MODE:
             if (getConsoleAgents()->settings->hw()->hw_arc) {
                 forwardGenericEventToEmulator(EV_SW, SW_TABLET_MODE, down);
@@ -1902,14 +1908,25 @@ void ToolWindow::on_microphone_button_clicked() {
     handleUICommand(QtUICommand::TOGGLE_MICROPHONE, true);
 }
 
-void ToolWindow::on_glasses_button_1_clicked() {
-    mEmulatorWindow->activateWindow();
+void ToolWindow::on_glasses_button_1_pressed() {
+    mEmulatorWindow->raise();
+
     handleUICommand(QtUICommand::GLASSES_1, true);
 }
 
-void ToolWindow::on_glasses_button_2_clicked() {
+void ToolWindow::on_glasses_button_1_released() {
     mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::GLASSES_1, false);
+}
+
+void ToolWindow::on_glasses_button_2_pressed() {
+    mEmulatorWindow->raise();
     handleUICommand(QtUICommand::GLASSES_2, true);
+}
+
+void ToolWindow::on_glasses_button_2_released() {
+    mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::GLASSES_2, false);
 }
 
 void ToolWindow::on_overview_button_pressed() {
