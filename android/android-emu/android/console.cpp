@@ -4120,6 +4120,13 @@ static const CommandDefRec qemu_commands[] = {
     }
 
 static int do_multi_display_add(ControlClient client, char* args) {
+    const auto avdInfo = getConsoleAgents()->settings->avdInfo();
+    if (avdInfo_getAvdFlavor(avdInfo) == AVD_XR) {
+        control_write(
+                client,
+                "KO: multidisplay is not supported on XR devices\r\n");
+        return -1;
+    }
     if (!args) {
         control_write(client, "KO: not enough arguments\r\n");
         return -1;
@@ -4348,6 +4355,11 @@ static int do_debug(ControlClient client, char* args) {
 }
 
 static int do_rotate_90_clockwise(ControlClient client, char* args) {
+    AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
+    if (avdInfo && avdInfo_getAvdFlavor(avdInfo) == AVD_XR) {
+        control_write(client, "KO: rotation is not supported for XR devices.\r\n");
+        return -1;
+    }
     if (client->global->emu_agent->rotate90Clockwise()) {
         return 0;
     }

@@ -90,7 +90,8 @@ typedef enum {
  */
 typedef struct AvdInfo  AvdInfo;
 
-
+// function used to mock AvdInfo on Test
+AvdInfo* avdInfo_new_for_testing(AvdFlavor flavor);
 
 /* various flags used when creating an AvdInfo object */
 typedef enum {
