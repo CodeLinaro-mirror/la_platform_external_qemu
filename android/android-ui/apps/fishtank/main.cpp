@@ -26,6 +26,7 @@
 #include "android/emulation/control/utils/EmulatorControlClient.h"
 #include "android/emulation/control/utils/EmulatorGrcpClient.h"
 #include "android/emulator-window.h"
+#include "android/files/TemporaryFile.h"
 #include "android/main-common-ui.h"
 #include "android/main-common.h"
 #include "android/opengl/gpuinfo.h"
@@ -218,8 +219,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    android::files::TemporaryFile pixels;
+    LOG(INFO) << "Sharing pixels at: " << pixels.path();
     EmulatorQtWindow* window = EmulatorQtWindow::getInstance();
-    window->initializeStreamer("file:///tmp/emu_pixels.raw");
+    window->initializeStreamer("file:///" +  pixels.path());
 
     LOG(INFO) << "Setting up window";
     emulator_window_setup(emulator_window_get());
