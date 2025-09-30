@@ -257,6 +257,7 @@ virtio_gpu_base_device_realize(DeviceState *qdev,
     for (i = 0; i < g->conf.max_outputs; i++) {
         g->scanout[i].con =
             graphic_console_init(DEVICE(g), i, &virtio_gpu_ops, g);
+        qemu_console_resize(g->scanout[i].con, g->conf.xres, g->conf.yres);
     }
 
     return true;
