@@ -53,7 +53,8 @@ if(ANDROID_EMULATOR_BUILD)
         android/utils/aconfig-file_unittest.cpp
         android/utils/file_data_unittest.cpp
         android/utils/filelock_unittest.cpp
-        android/utils/property_file_unittest.cpp)
+        android/utils/property_file_unittest.cpp
+        android/files/TemporaryFile_unittest.cpp)
 
   target_compile_options(android-emu-files_unittests PRIVATE -O0)
   target_include_directories(android-emu-files_unittests PRIVATE src)
