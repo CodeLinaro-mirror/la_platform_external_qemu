@@ -38,6 +38,7 @@
     }
   ],
   "external_deps": {
+    "alsa": ["@gcc_lib//:libasound"],
     // For some reason Qemu doesn't ask for libpulse. So we add it manually above.
     "libpulse": ["@gcc_lib//:libpulse"],
     "libvhost-user": ["//third_party/qemu/subprojects/libvhost-user:vhost-user"],

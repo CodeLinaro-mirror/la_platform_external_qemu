@@ -25,7 +25,7 @@ cc_interface_binary(
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
    local_defines = ['BUILDING_QEMU_BINARY'],
    name = 'qemu-system-x86_64',
-   srcs = ['google/system/aemu_main.cpp', 'google/system/aemu_func_defs.h'],
+   srcs = ['google/system/aemu_main.c', 'google/system/aemu_func_defs.h'],
    visibility = ['//visibility:public'],
    win_def_file = 'platform/windows-amd64/qemu-system-x86_64.def',
 )

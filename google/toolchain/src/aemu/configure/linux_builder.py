@@ -23,7 +23,8 @@ class LinuxBuilder(QemuBuilder):
     def meson_config(self):
         features = super().meson_config()
 
-        features["-Daudio_drv_list"] = "pa"
+        features["-Dalsa"] = "enabled"
+        features["-Daudio_drv_list"] = "pa,alsa"
         features["-Davx2"] = "enabled"
         features["-Davx512bw"] = "enabled"
         features["-Db_pie"] = "true"

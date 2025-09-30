@@ -1,4 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
 
 cc_library(
@@ -158,7 +160,6 @@ cc_library(
         "ui/input-keymap-xorgxwin-to-qcode.c.inc",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:file.h",
             "platform/windows-amd64/aarch64-softmmu-config-devices.h",
             "platform/windows-amd64/aarch64-softmmu-config-target.h",
             "platform/windows-amd64/config-host.h",
@@ -166,6 +167,7 @@ cc_library(
             "platform/windows-amd64/riscv64-softmmu-config-target.h",
             "platform/windows-amd64/x86_64-softmmu-config-devices.h",
             "platform/windows-amd64/x86_64-softmmu-config-target.h",
+            "//third_party/qemu/google/compat/windows:file.h",
         ],
         "@platforms//os:macos": [
             "platform/darwin-arm64/aarch64-softmmu-config-devices.h",
@@ -203,8 +205,8 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "@glib//:glib-static",
-        "@glib//:gmodule-static",
+        "@glib//glib",
+        "@glib//gmodule",
     ],
 )
 

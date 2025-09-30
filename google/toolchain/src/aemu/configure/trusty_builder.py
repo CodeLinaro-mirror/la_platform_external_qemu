@@ -21,6 +21,8 @@ class TrustyBuilder(LinuxBuilder):
     def meson_config(self):
         linux = super().meson_config()
 
+        # TODO(whollins): Stop inheriting from Linux builder.
+        linux["-Dalsa"] = "disabled"
         linux["-Daudio_drv_list"] = "default"
         linux["-Db_pie"] = "false"
         linux["-Dhexagon_idef_parser"] = "true"

@@ -29,11 +29,11 @@
 
 #undef CONFIG_ATTR
 
-#undef CONFIG_AUDIO_ALSA
+#define CONFIG_AUDIO_ALSA
 
 #undef CONFIG_AUDIO_COREAUDIO
 
-#define CONFIG_AUDIO_DRIVERS "pa", 
+#define CONFIG_AUDIO_DRIVERS "pa", "alsa", 
 
 #undef CONFIG_AUDIO_DSOUND
 
