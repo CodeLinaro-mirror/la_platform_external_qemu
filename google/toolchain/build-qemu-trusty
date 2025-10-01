@@ -32,23 +32,12 @@ absolute_aosp=$(readlink -f "$aosp_dir" 2>/dev/null || realpath "$aosp_dir")
 PATH="$absolute_aosp/prebuilts/build-tools/path/linux-x86:$PATH"
 PATH="$absolute_aosp/prebuilts/python/linux-x86/bin:$PATH"
 
+
 # Assign parameters to variables
 destination="$1"
 distribution="$2"
 
-echo "-- Creating a virtual environment in $destination"
-python3 -m venv "$destination/venv"
-
-echo "-- Activating the virtual environment"
-VIRTUAL_ENV="$destination/venv"
-PATH="$VIRTUAL_ENV/bin:$PATH"
-
-PYTHONPATH="$script_dir/src:$PYTHONPATH"
-
-export PATH PYTHONPATH VIRTUAL_ENV
-
 echo "-- Launching qemu configuration, build"
-python3 -m aemu.toolchain setup --force --target trusty --aosp $absolute_aosp  $destination/qemu-bld
-python3 -m aemu.toolchain compile $destination/qemu-bld
-# python3 -m aemu.toolchain test $destination/qemu-bld
-python3 -m aemu.toolchain release $destination/qemu-bld $distribution
+$absolute_aosp/prebuilts/bazel/linux-x86_64/bazel run //third_party/qemu/google/toolchain:amc -- setup --force --target trusty --aosp $absolute_aosp  $destination/qemu-bld
+$absolute_aosp/prebuilts/bazel/linux-x86_64/bazel run //third_party/qemu/google/toolchain:amc -- compile $destination/qemu-bld
+$absolute_aosp/prebuilts/bazel/linux-x86_64/bazel run //third_party/qemu/google/toolchain:amc -- release $destination/qemu-bld $distribution

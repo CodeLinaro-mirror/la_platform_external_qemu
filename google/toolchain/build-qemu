@@ -46,10 +46,8 @@ VIRTUAL_ENV="$destination/venv"
 PATH="$VIRTUAL_ENV/bin:$PATH"
 
 echo "-- Installing the package for building"
-pip install $script_dir
-
 echo "-- Launching qemu configuration, build"
-python3 -m aemu.toolchain setup --force --aosp $absolute_aosp  $destination/qemu-bld
-python3 -m aemu.toolchain compile $destination/qemu-bld
-# python3 -m aemu.toolchain test $destination/qemu-bld
-python3 -m aemu.toolchain release $destination/qemu-bld $distribution
+bazel run //third_party/qemu/google/toolchain:amc setup --force --aosp $absolute_aosp  $destination/qemu-bld
+bazel run //third_party/qemu/google/toolchain:amc compile $destination/qemu-bld
+# bazel run //third_party/qemu/google/toolchain:amc test $destination/qemu-bld
+bazel run //third_party/qemu/google/toolchain:amc release $destination/qemu-bld $distribution
