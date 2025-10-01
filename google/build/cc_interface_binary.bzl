@@ -61,7 +61,8 @@ def cc_interface_binary(
             "@platforms//os:windows": ["/DEF:$(location " + win_def_file + ")"] if win_def_file else [],
             "//conditions:default": [],
         }),
-        data = (data or []) + ([win_def_file] if win_def_file else []),
+        data = data,
+        additional_linker_inputs = ([win_def_file] if win_def_file else []),
         **kwargs
     )
 

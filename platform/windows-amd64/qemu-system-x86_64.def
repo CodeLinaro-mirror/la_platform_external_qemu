@@ -182,18 +182,28 @@ EXPORTS
     qemu_cpu_list_lock
     qemu_create
     qemu_create_displaysurface_pixman
+    qemu_del_net_client
+    qemu_del_nic
     qemu_del_polling_cb
     qemu_del_wait_object
     qemu_display_register
     qemu_displaysurface_set_share_handle
     qemu_edid_generate
     qemu_event_set
+    qemu_find_net_clients_except
+    qemu_find_netdev
     qemu_find_opts
+    qemu_flush_or_purge_queued_packets
+    qemu_flush_queued_packets
+    qemu_format_nic_info_str
     qemu_get_aio_context
     qemu_get_be32
     qemu_get_be64
     qemu_get_buffer
     qemu_get_byte
+    qemu_get_nic_opaque
+    qemu_get_queue
+    qemu_get_subqueue
     qemu_get_thread_id
     qemu_guest_random_seed_thread_part2
     qemu_in_coroutine
@@ -204,11 +214,14 @@ EXPORTS
     qemu_input_update_buttons
     qemu_log
     qemu_loglevel
+    qemu_macaddr_default_if_unset
     qemu_mutex_destroy
     qemu_mutex_init
     qemu_mutex_lock_func
     qemu_mutex_unlock_impl
     qemu_mutex_unlock_impl
+    qemu_new_net_client
+    qemu_new_nic
     qemu_notify_event
     qemu_opt_find
     qemu_opt_get
@@ -229,6 +242,8 @@ EXPORTS
     qemu_put_byte
     qemu_register_reset
     qemu_register_shutdown_notifier
+    qemu_send_packet_async
+    qemu_sendv_packet_async
     qemu_set_cloexec
     qemu_set_fd_handler
     qemu_set_irq
@@ -278,12 +293,15 @@ EXPORTS
     qmp_quit
     qobject_destroy
     rcu_add_force_rcu_notifier
+    rcu_gp_ctr
+    rcu_gp_event
     rcu_register_thread
     rcu_remove_force_rcu_notifier
     rcu_unregister_thread
     register_displaychangelistener
     register_dso_module_init
     register_module_init
+    register_savevm_live
     replay_account_executed_instructions
     replay_char_read_all_load
     replay_char_read_all_save_buf
@@ -322,7 +340,10 @@ EXPORTS
     virtio_bh_new_guarded_full
     virtio_cleanup
     virtio_del_queue
+    virtio_delete_queue
+    virtio_error
     virtio_get_queue
+    virtio_get_queue_index
     virtio_init
     virtio_input_add_config
     virtio_input_init_config
@@ -332,8 +353,13 @@ EXPORTS
     virtio_notify_config
     virtio_pci_add_shm_cap
     virtio_pci_types_register
+    virtio_queue_empty
+    virtio_queue_enable_notification_and_check
     virtio_queue_ready
+    virtio_queue_set_notification
     virtio_vmstate_info
+    virtqueue_drop_all
+    virtqueue_get_avail_bytes
     virtqueue_pop
     virtqueue_push
     visit_check_list
