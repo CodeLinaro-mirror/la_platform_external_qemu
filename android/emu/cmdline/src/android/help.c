@@ -2339,8 +2339,8 @@ static void help_systemui_renderer(stralloc_t* out) {
     PRINTF("  Set guest side renderer backend. Available options: skiagl, skiavk\n");
 }
 
-static void help_is_ost(stralloc_t* out){
-    PRINTF(" Determine if XR device uses OST Behaviors");
+static void help_display_modality(stralloc_t* out){
+    PRINTF("  Set display modality. Available options: ost, vst\n");
 }
 
 #define  help_no_skin   NULL
