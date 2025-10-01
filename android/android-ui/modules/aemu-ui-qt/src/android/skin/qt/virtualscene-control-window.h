@@ -61,7 +61,7 @@ public:
                                        ToolWindow* toolWindow);
     virtual ~VirtualSceneControlWindow();
 
-    void dockMainWindow();
+    void dockMainWindow(QPoint offset = QPoint());
     bool handleQtKeyEvent(const QKeyEvent& event, QtKeyEventSource source);
     void updateTheme(const QString& styleSheet);
 

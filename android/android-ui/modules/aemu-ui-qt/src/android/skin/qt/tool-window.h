@@ -41,6 +41,7 @@
 #include "android/skin/qt/resizable-dialog.h"
 #include "android/skin/qt/right-hand-dialog.h"
 #include "android/skin/qt/shortcut-key-store.h"
+#include "android/skin/qt/touchpad-window.h"
 #include "android/skin/qt/ui-event-recorder.h"
 #include "android/skin/qt/user-actions-counter.h"
 #include "android/skin/qt/virtualscene-control-window.h"
@@ -170,6 +171,7 @@ private:
     void onExtendedWindowCreated(ExtendedBaseWindow* extendedWindow);
     void onVirtualSceneWindowCreated(
             VirtualSceneControlWindow* virtualSceneWindow);
+    void onTouchpadWindowCreated(TouchpadWindow* touchpadWindow);
     void setupSubwindow(QWidget* window);
 
     bool isExiting() const { return mIsExiting; }
@@ -206,6 +208,10 @@ private:
                                    void (ToolWindow::*)(
                                            VirtualSceneControlWindow*)>
             mVirtualSceneControlWindow;
+    android::base::MemberOnDemandT<WindowHolder<TouchpadWindow>,
+                                   ToolWindow*,
+                                   void (ToolWindow::*)(TouchpadWindow*)>
+            mTouchpadWindow;
     std::unique_ptr<Ui::ToolControls> mToolsUi;
     bool mStartedAdbStopProcess = false;
     ShortcutKeyStore<QtUICommand> mShortcutKeyStore;

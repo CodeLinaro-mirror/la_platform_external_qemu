@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <QCloseEvent>
 #include <QEvent>
 #include <QObject>      // for Q_OBJECT, slots
 #include <QSpacerItem>  // for QSpacerItem
@@ -18,7 +19,9 @@
 #include <QWidget>      // for QWidget
 #include <memory>       // for shared_ptr, unique_ptr
 
-#include "ui_touchpad-page.h"  // for TouchpadPage
+#include "android/skin/qt/qt-ui-commands.h"
+#include "android/skin/qt/touchpad-holder.h"
+#include "android/skin/qt/touchpad-window.h"
 
 namespace android {
 namespace metrics {
@@ -28,16 +31,23 @@ class UiEventTracker;
 
 class QObject;
 class EmulatorQtWindow;
+class ToolWindow;
 
-class TouchpadPage : public QWidget {
+class TouchpadWindow : public TouchpadHolder {
     Q_OBJECT
 
 public:
-    explicit TouchpadPage(QWidget* parent = 0);
+    explicit TouchpadWindow(QWidget* parent = nullptr);
+    TouchpadWindow(EmulatorQtWindow* emulatorWindow,
+                   ToolWindow* toolWindow,
+                   QWidget* parent = nullptr);
 
-private slots:
-    void on_tp_addSecondFinger_toggled(bool checked);
+    void closeEvent(QCloseEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
+    void dockMainWindow();
 
 private:
-    std::unique_ptr<Ui::TouchpadPage> mUi;
+    EmulatorQtWindow* mEmulatorWindow;
+    ToolWindow* mToolWindow;
 };

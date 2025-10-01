@@ -9,7 +9,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#include "android/skin/qt/touchpadwidget.h"
+#include "android/skin/qt/touchpad-widget.h"
 
 #include "aemu/base/Log.h"
 #include "android-qemu2-glue/emulation/virtio-input-multi-touch.h"
@@ -35,13 +35,33 @@ TouchpadWidget::TouchpadWidget(QWidget* parent) : QWidget(parent) {
         mTracking.append(false);
         mTrailPoints.append(QList<QPointF>());
     }
-    mScale = 1;
+    mTouchpadWidth = 100;
+    mTouchpadHeight = 100;
 }
 
 TouchpadWidget::~TouchpadWidget() {}
 
-void TouchpadWidget::setScale(float scale) {
-    mScale = scale;
+void TouchpadWidget::setTouchpadDimensions(int width, int height) {
+    mTouchpadWidth = width;
+    mTouchpadHeight = height;
+}
+
+float TouchpadWidget::getScale() const {
+    return static_cast<float>(this->width()) /
+           static_cast<float>(mTouchpadWidth);
+}
+
+int TouchpadWidget::heightForWidth(int width) const {
+    return width * mTouchpadHeight / mTouchpadWidth;
+}
+
+bool TouchpadWidget::hasHeightForWidth() const {
+    return true;
+}
+
+// Apparently the QT layout is not set up to respect heightForWidth
+void TouchpadWidget::resizeEvent(QResizeEvent* event) {
+    this->setFixedHeight(heightForWidth(this->width()));
 }
 
 void TouchpadWidget::setMultiFinger(int num_fingers) {
@@ -60,11 +80,16 @@ void TouchpadWidget::setMultiFinger(int num_fingers) {
     mNumFingers = num_fingers;
 }
 
+int TouchpadWidget::getMultiFinger() const {
+    return mNumFingers;
+}
+
 void TouchpadWidget::mousePressEvent(QMouseEvent* event) {
     for (int i = 0; i < mNumFingers; i++) {
         if (!mTracking[i]) {
             mTracking[i] = true;
-            doTouchBegin(event->position() + mFingerSeperation * i, i);
+            doTouchBegin(event->position() + getScale() * mFingerSeperation * i,
+                         i);
         }
     }
 }
@@ -80,7 +105,8 @@ void TouchpadWidget::mouseReleaseEvent(QMouseEvent* event) {
 
 void TouchpadWidget::mouseMoveEvent(QMouseEvent* event) {
     for (int i = 0; i < mNumFingers; i++) {
-        QPointF current_finger_pos = event->position() + i * mFingerSeperation;
+        QPointF current_finger_pos =
+                event->position() + i * getScale() * mFingerSeperation;
         if (this->rect().contains(current_finger_pos.toPoint())) {
             if (!mTracking[i]) {
                 mTracking[i] = true;
@@ -143,24 +169,26 @@ void TouchpadWidget::paintEvent(QPaintEvent* event) {
         // Draw Current touch location
         auto current_loc = mTrailPoints[i][mTrailPoints[i].size() - 1];
 
-        QRadialGradient gradient(current_loc, mScale * mFingerGlow);
+        QRadialGradient gradient(current_loc, getScale() * mFingerGlow);
         gradient.setColorAt(0, fingerColor);
         gradient.setColorAt(1.0, Qt::transparent);
         painter.setBrush(QBrush(gradient));
         painter.setPen(Qt::NoPen);
 
-        painter.drawEllipse(current_loc, mScale * mFingerGlow, mScale * mFingerGlow);
+        painter.drawEllipse(current_loc, getScale() * mFingerGlow,
+                            getScale() * mFingerGlow);
 
         if (mTrailPoints[i].size() < 2) {
             painter.setBrush(QBrush(fingerColor));
-            painter.drawEllipse(current_loc, mScale * mFingerWidth * 0.5, mScale * mFingerWidth * 0.5);
+            painter.drawEllipse(current_loc, getScale() * mFingerWidth * 0.5,
+                                getScale() * mFingerWidth * 0.5);
             continue;
         }
 
         // Draw touch trail
         QPen pen;
         pen.setColor(fingerColor);
-        pen.setWidth(mScale * mFingerWidth);
+        pen.setWidth(getScale() * mFingerWidth);
         pen.capStyle();
         pen.setCapStyle(Qt::RoundCap);
         pen.setJoinStyle(Qt::RoundJoin);
@@ -188,8 +216,12 @@ void TouchpadWidget::doTouchEnd(int i) {
 }
 
 void TouchpadWidget::doTouch(QPointF p, int i, SkinEventType type) {
-    int x = p.x() / mScale;
-    int y = (this->rect().height() - p.y()) / mScale;
+    int x = p.x() / getScale();
+    int y = (this->rect().height() - p.y()) / getScale();
+
+    // Adjust for any rounding issue for touchpad dimensions
+    x = std::min(x, mTouchpadWidth);
+    y = std::min(y, mTouchpadHeight);
     SkinEvent skin_event = createSkinEvent(type);
 
     skin_event.u.multi_touch_point.id = i + 1;

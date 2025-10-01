@@ -189,7 +189,7 @@ VirtualSceneControlWindow::~VirtualSceneControlWindow() {
     QApplication::instance()->removeEventFilter(this);
 }
 
-void VirtualSceneControlWindow::dockMainWindow() {
+void VirtualSceneControlWindow::dockMainWindow(QPoint offset) {
     // Align vertically relative to the main window's frame.
     // Align horizontally relative to its contents.
     // If we're frameless, adjust for a transparent border
@@ -203,10 +203,10 @@ void VirtualSceneControlWindow::dockMainWindow() {
     setWidth(virtualSceneWidgetWidth);
     move(parentWidget()->frameGeometry().left() +
                  mEmulatorWindow->getLeftTransparency() +
-                 (parentWidgetWidth - virtualSceneWidgetWidth) / 2,
+                 (parentWidgetWidth - virtualSceneWidgetWidth) / 2 + offset.x(),
          parentWidget()->geometry().bottom() -
                  mEmulatorWindow->getBottomTransparency() +
-                 kVirtualSceneControlWindowOffset);
+                 kVirtualSceneControlWindowOffset + offset.y());
 }
 
 bool VirtualSceneControlWindow::handleQtKeyEvent(const QKeyEvent& event,

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>TouchpadPage</class>
- <widget class="QWidget" name="TouchpadPage">
+ <class>TouchpadHolder</class>
+ <widget class="QWidget" name="TouchpadHolder">
   <layout class="QGridLayout" name="gridLayout">
    <property name="alignment">
     <set>Qt::AlignHCenter</set>
@@ -11,18 +11,12 @@
      <property name="orientation">
       <enum>Qt::Vertical</enum>
      </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Expanding</enum>
-     </property>
     </spacer>
    </item>
    <item row="3" column="0">
     <spacer name="verticalSpacerBottom">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Expanding</enum>
      </property>
     </spacer>
    </item>
@@ -31,9 +25,6 @@
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Expanding</enum>
-     </property>
     </spacer>
    </item>
    <item row="1" column="4">
@@ -41,13 +32,17 @@
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Expanding</enum>
-     </property>
     </spacer>
    </item>
    <item row="1" column="1" colspan="3">
-    <widget class="TouchpadWidget" name="touchpadBox"/>
+    <widget class="TouchpadWidget" name="touchpadBox">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
    </item>
    <item row="2" column="1">
     <widget class="QGroupBox" name="tp_twoFingerLabel">
@@ -89,7 +84,7 @@
   <customwidget>
    <class>TouchpadWidget</class>
    <extends>QWidget</extends>
-   <header>android/skin/qt/touchpadwidget.h</header>
+   <header>android/skin/qt/touchpad-widget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

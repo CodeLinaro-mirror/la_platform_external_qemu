@@ -27,7 +27,9 @@ public:
     ~TouchpadWidget() override;
 
     void setScale(float scale);
+    void setTouchpadDimensions(int width, int height);
     void setMultiFinger(int num_fingers);
+    int getMultiFinger() const;
 
     void doTouchBegin(QPointF p, int i);
     void doTouchEnd(int i);
@@ -42,20 +44,27 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
 
+    void resizeEvent(QResizeEvent* event) override;
+
     // This event is called whenever the widget needs to be repainted.
     void paintEvent(QPaintEvent* event) override;
 
+    int heightForWidth(int width) const override;
+    bool hasHeightForWidth() const override;
+
 private:
     void doTouch(QPointF p, int i, SkinEventType type);
+    float getScale() const;
 
     int mNumFingers;
-    float mScale;
+    int mTouchpadWidth;
+    int mTouchpadHeight;
 
     QList<bool> mTracking;
     QList<QList<QPointF>> mTrailPoints;
 
     // When duplicating fingers, they will be separated by this amount
-    static constexpr QPointF mFingerSeperation = QPointF(200, 0);
+    static constexpr QPointF mFingerSeperation = QPointF(520, 0);
 
     // How many points to store for the trail
     static constexpr int mMaxTrailPoints = 30;
