@@ -1,16 +1,7 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-
-package(default_visibility = ["//visibility:public"])
-
-py_library(
-    name = "amc_lib",
-    srcs = glob(["src/aemu/**/*.py"]),
-    imports = ["src"],
-)
-
-py_binary(
+# This has moved to //hardware/generic/goldfish/development/tools/toolchain
+# as the toolchain generator is used by other projects as well.
+alias(
     name = "amc",
-    srcs = ["src/amc.py"],
-    main = "src/amc.py",
-    deps = [":amc_lib"],
+    actual = "//hardware/generic/goldfish/development/tools/toolchain:amc",
+    visibility = ["//visibility:public"],
 )
