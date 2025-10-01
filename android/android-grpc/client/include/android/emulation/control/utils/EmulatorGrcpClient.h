@@ -45,7 +45,7 @@ public:
     class Builder;
     friend class Builder;
 
-    virtual ~EmulatorGrpcClient() = default;
+    virtual ~EmulatorGrpcClient();
 
     template <class T>
     auto stub() {
@@ -82,8 +82,8 @@ protected:
 
 private:
     Endpoint mEndpoint;
-    Library<::grpc::ClientContext> mActiveContexts;
     std::shared_ptr<::grpc::Channel> mChannel;
+    Library<::grpc::ClientContext> mActiveContexts;
     std::shared_ptr<grpc::CallCredentials> mCredentials;
 
 };

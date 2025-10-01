@@ -47,6 +47,7 @@ android_qt_lib(
       android/skin/qt/right-hand-dialog.cpp
       android/skin/qt/right-hand-dialog.ui
       android/skin/qt/screen-mask.cpp
+      android/skin/qt/SharedMemoryRenderer.cpp
       android/skin/qt/static_resources.qrc
       android/skin/qt/stylesheet.cpp
       android/skin/qt/surface-qt.cpp
@@ -107,6 +108,8 @@ android_qt_lib(
        Qt${QT_VERSION_MAJOR}::Core
        Qt${QT_VERSION_MAJOR}::Gui
        Qt${QT_VERSION_MAJOR}::Svg
+       ui-shared-stream
+       ui-shared-stream
        ui::common
        ui::gl-qt-bridge
        ui::widgets
@@ -150,3 +153,28 @@ android_target_compile_options(
   PRIVATE "-Wno-reserved-user-defined-literal" "-Wno-pointer-bool-conversion"
           "-Wno-deprecated-declarations" "-Wno-inconsistent-missing-override"
           "-Wno-return-type-c-linkage" "-Wno-invalid-constexpr")
+
+android_add_library(
+  TARGET ui-shared-stream
+  LICENSE Apache-2.0
+  SOURCE_DIR
+  src
+  INCLUDES
+  src
+  SRC android/skin/qt/SharedStreamEmulator.cpp
+  DEPS android-emu-agents android-emu-base-headers android-emu-base-memory
+       android-hw-config emulator_controller-service-client)
+
+android_add_test(
+  TARGET ui-shared-stream_unittest
+  SOURCE_DIR test
+  SRC SharedStreamEmulatorTest.cpp
+  DEPS android-emu-base
+       android-emu-base-headers
+       android-emu-base-memory
+       android-grpc-client
+       emulator_controller-service-client
+       gmock_main
+       ui-shared-stream)
+
+target_include_directories(ui-shared-stream_unittest PRIVATE src test)

@@ -23,7 +23,6 @@
 #include "emulator_controller.grpc.pb.h"
 #include "emulator_controller.pb.h"
 #include "google/protobuf/empty.pb.h"
-
 namespace android {
 namespace emulation {
 namespace control {
@@ -41,12 +40,8 @@ class EmulatorControlClient {
 public:
     explicit EmulatorControlClient(
             std::shared_ptr<EmulatorGrpcClient> client,
-            EmulatorController::StubInterface* service = nullptr)
-        : mClient(client), mService(service) {
-        if (!service) {
-            mService = client->stub<EmulatorController>();
-        }
-    }
+            EmulatorController::StubInterface* service = nullptr);
+    ~EmulatorControlClient();
 
     /**
      * @brief Asynchronously sets the battery state of the emulator.
@@ -54,7 +49,8 @@ public:
      * @param state The battery state to set.
      * @param onDone The callback to be invoked when the operation completes.
      */
-    void setBatteryAsync(BatteryState state, OnCompleted<Empty> onDone = nothing);
+    void setBatteryAsync(BatteryState state,
+                         OnCompleted<Empty> onDone = nothing);
 
     /**
      * @brief Asynchronously gets an individual screenshot in the desired
@@ -79,14 +75,15 @@ public:
      * @param onDone The callback to be invoked when the operation completes.
      */
     void sendFingerprintAsync(Fingerprint finger,
-                         OnCompleted<Empty> onDone = nothing);
+                              OnCompleted<Empty> onDone = nothing);
 
     /**
      * @brief Asynchronously gets the display configuration of the emulator.
      *
      * @param onDone The callback to be invoked when the operation completes.
      */
-    void getDisplayConfigurationsAsync(OnCompleted<DisplayConfigurations> onDone);
+    void getDisplayConfigurationsAsync(
+            OnCompleted<DisplayConfigurations> onDone);
 
     /**
      * @brief Asynchronously sets the display configuration of the emulator.
@@ -94,14 +91,16 @@ public:
      * @param state The display configuration to set.
      * @param onDone The callback to be invoked when the operation completes.
      */
-    void setDisplayConfigurationsAsync(DisplayConfigurations state,
-                                  OnCompleted<DisplayConfigurations> onDone);
+    void setDisplayConfigurationsAsync(
+            DisplayConfigurations state,
+            OnCompleted<DisplayConfigurations> onDone);
     /**
      * @brief Asynchronously sets the clipboard of the emulator
      * @param clip The clipboard data
      * @param onDone The callback to be invoked when the operation completes.
      */
-    void setClipboardAsync(std::string clip, OnCompleted<Empty> onDone = nothing);
+    void setClipboardAsync(std::string clip,
+                           OnCompleted<Empty> onDone = nothing);
 
     /**
      * @brief Asynchronously sets the virtual machine state of the emulator
@@ -116,7 +115,7 @@ public:
      * @param onDone The callback to be invoked when the operation completes.
      */
     void setBrightnessAsync(BrightnessValue brightness,
-                       OnCompleted<Empty> onDone = nothing);
+                            OnCompleted<Empty> onDone = nothing);
 
     /**
      * @brief Asynchronously sets the gps state of the emulator
@@ -144,9 +143,15 @@ public:
     std::shared_ptr<SimpleClientWriter<InputEvent>> asyncInputEventWriter();
 
 private:
+    std::unique_ptr<EmulatorController::StubInterface> mService;
     std::shared_ptr<EmulatorGrpcClient> mClient;
     std::shared_ptr<SimpleClientWriter<InputEvent>> mInputEventWriter;
-    std::unique_ptr<EmulatorController::StubInterface> mService;
+
+    // Synchronization primitives for clean shutdown
+    std::atomic<int> mOutstandingRpcs{0};
+    std::mutex mOutstandingMutex;
+    std::condition_variable mOutstandingCondition;
+    OnFinally mOnFinally;
 
     std::mutex mInputWriterAccess;
 };
