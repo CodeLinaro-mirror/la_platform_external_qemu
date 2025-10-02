@@ -816,9 +816,18 @@ prepare_build_for_darwin_aarch64() {
 
     GNU_CONFIG_HOST=
 
+    CLANG_BINDIR=$AOSP_DIR/$(aosp_prebuilt_clang_dir_for ${BUILD_HOST})
+    CLANG_DIR=$CLANG_BINDIR/..
+
     common_FLAGS="-arch arm64"
     var_append common_FLAGS " -isysroot $OSX_SDK_ROOT"
     var_append common_FLAGS " -mmacosx-version-min=$OSX_DEPLOYMENT_TARGET"
+    var_append common_FLAGS " -isystem $OSX_SDK_ROOT/usr/include/c++/v1"
+    var_append common_FLAGS " -isystem $CLANG_DIR/lib/clang/21/include"
+    var_append common_FLAGS " -F $OSX_SDK_ROOT/System/Library/Frameworks"
+    var_append common_FLAGS " --target=arm64-apple-darwin-macho"
+    var_append common_FLAGS " -no-canonical-prefixes -nostdinc++"
+
 
     EXTRA_CFLAGS="$common_FLAGS -B/usr/bin"
     EXTRA_CXXFLAGS="$common_FLAGS -B/usr/bin"

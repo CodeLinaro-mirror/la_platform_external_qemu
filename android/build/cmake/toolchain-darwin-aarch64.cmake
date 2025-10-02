@@ -65,6 +65,8 @@ get_rust_version(RUST_VER)
 
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-w -Wno-error=unused-command-line-argument")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-parameter -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter -Wno-unknown-warning-option")
 
 # TODO(jansene): Uncomment the line below once we have a rust compiler
 # with an arm backend, otherwise you will see a lot of:

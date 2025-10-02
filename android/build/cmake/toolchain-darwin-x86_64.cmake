@@ -62,6 +62,9 @@ endif()
 
 # Always consider the source to be darwin.
 add_definitions(-D_DARWIN_C_SOURCE=1)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-parameter -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter -Wno-unknown-warning-option")
+
 
 # Next we configure rust.
 get_rust_version(RUST_VER)
