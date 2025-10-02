@@ -25,6 +25,7 @@ from aemu.platform.log_configuration import configure_logging
 from aemu.platform.toolchains import Toolchain
 from aemu.tasks.build_task import BuildTask
 from aemu.tasks.clean import CleanTask
+from aemu.tasks.remove_leftovers import RemoveLeftoverTask
 from aemu.tasks.compile import CompileTask
 from aemu.tasks.configure import ConfigureTask
 from aemu.tasks.distribution import DistributionTask
@@ -50,6 +51,7 @@ def get_tasks(args) -> List[BuildTask]:
     tasks = [
         # A task can be disabled, or explicitly enabled by calling
         # .enable(False) <- Disable the task
+        RemoveLeftoverTask(args.target, args.out),
         CleanTask(destination=args.out, aosp=args.aosp),
         PrebuiltsTask(args, is_emulator_build=True),
         ConfigureTask(
@@ -111,6 +113,7 @@ def get_tasks(args) -> List[BuildTask]:
             IntegrationTestTask(args.aosp, args.target, args.out, args.dist).enable(
                 False
             ),
+            RemoveLeftoverTask(args.target, args.out),
         ]
     return tasks
 
