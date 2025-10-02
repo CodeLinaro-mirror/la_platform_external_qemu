@@ -15,15 +15,48 @@
 
 #include <string.h>   // for memcpy
 #include <algorithm>  // for max, min
+#include <cstdint>
 
 namespace android {
 namespace base {
 namespace streams {
 
-// See https://jameshfisher.com/2018/03/30/round-up-power-2 for details
+/**
+ * Finds the smallest power of two that is greater than or equal to x.
+ * This implementation avoids using compiler built-in functions like
+ * __builtin_clzl.
+ * @param x The input unsigned 64-bit integer.
+ * @return The smallest power of two >= x. Returns 1 for x=0 or x=1.
+ */
 static uint64_t next_pow2(uint64_t x) {
-    return x == 1 ? 1 : 1 << (64 - __builtin_clzl(x - 1));
+    // Handle the edge cases for 0 and 1.
+    if (x <= 1) {
+        return 1;
+    }
+
+    // Decrement x by 1.
+    // This is crucial: if x is already a power of 2 (e.g., 8), x-1 (7) will
+    // have all bits set below the most significant bit.
+    x--;
+
+    // The series of OR and shift operations propagates the most significant
+    // set bit all the way to the right. This turns the number into the
+    // form 2^n - 1.
+
+    // For a 64-bit integer, we need shifts of 1, 2, 4, 8, 16, and 32.
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    x |= x >> 32;
+
+    // Now, x has the form 2^n - 1.
+    // Adding 1 gives us the smallest power of 2 greater than or equal to the
+    // original x.
+    return x + 1;
 }
+
 RingStreambuf::RingStreambuf(uint32_t capacity, milliseconds timeout)
     : mTimeout(timeout) {
     uint64_t cap = next_pow2(capacity + 1);
@@ -76,7 +109,9 @@ std::streamsize RingStreambuf::xsputn(const char* s, std::streamsize n) {
         memcpy(mRingbuffer.data() + mHead, s, bytesUntilTheEnd);
 
         // Write he remaining bytes from the start of the buffer.
+
         memcpy(mRingbuffer.data(), s + bytesUntilTheEnd, n - bytesUntilTheEnd);
+
         mHead = n - bytesUntilTheEnd;
 
         // We are checking the case where the tail got overwritten from the
@@ -90,8 +125,9 @@ std::streamsize RingStreambuf::xsputn(const char* s, std::streamsize n) {
         // Check the corner case where we flipped to pos 0.
         updateTail |= mHead == mTail;
     }
-    if (updateTail)
+    if (updateTail) {
         mTail = (mHead + 1) & (capacity - 1);
+    }
     mHeadOffset += n;
     mLock.unlock();
     mCanRead.notify_all();

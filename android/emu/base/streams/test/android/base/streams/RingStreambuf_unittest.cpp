@@ -29,17 +29,17 @@ using namespace std::chrono_literals;
 TEST(RingStreambuf, basic_stream_avail) {
     RingStreambuf buf(4);
     std::ostream stream(&buf);
-    stream << "hi";
+    stream << "hi" << std::flush;
     EXPECT_EQ(2, buf.in_avail());
 }
 
 TEST(RingStreambuf, no_write_after_close) {
     RingStreambuf buf(8);
     std::ostream stream(&buf);
-    stream << "hi";
+    stream << "hi" << std::flush;
     EXPECT_EQ(2, buf.in_avail());
     buf.close();
-    stream << "there";
+    stream << "there" << std::flush;
     EXPECT_EQ(2, buf.in_avail());
 }
 
@@ -52,6 +52,7 @@ TEST(RingStreambuf, stream_can_read_after_close) {
     stream << "hi\n";
     buf.close();
     stream << "there\n";
+    stream << std::flush;
     in >> read;
     EXPECT_EQ(read, "hi");
 }

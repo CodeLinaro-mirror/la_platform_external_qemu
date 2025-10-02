@@ -282,6 +282,7 @@ struct WindwsPipe {
             write += toWrite;
             left -= toWrite;
         }
+        buffer->pubsync();
         fPendingIO = false;
     }
 
