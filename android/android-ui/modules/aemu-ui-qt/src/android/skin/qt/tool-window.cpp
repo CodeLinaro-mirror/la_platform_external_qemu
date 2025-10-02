@@ -539,7 +539,6 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     updateXrButtonsVisibility();
 
     if (avdFlavor == AVD_GLASSES) {
-        mToolsUi->power_button->setHidden(true);
         mToolsUi->zoom_button->setHidden(true);
         mToolsUi->prev_layout_button->setHidden(true);
         mToolsUi->next_layout_button->setHidden(true);
@@ -1796,12 +1795,24 @@ void ToolWindow::on_minimize_button_clicked() {
 
 void ToolWindow::on_power_button_pressed() {
     mEmulatorWindow->raise();
-    handleUICommand(QtUICommand::POWER, true);
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
+        AVD_GLASSES) {
+        handleUICommand(QtUICommand::GLASSES_2, true);
+    }
+    else {
+        handleUICommand(QtUICommand::POWER, true);
+    }
 }
 
 void ToolWindow::on_power_button_released() {
     mEmulatorWindow->activateWindow();
-    handleUICommand(QtUICommand::POWER, false);
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
+        AVD_GLASSES) {
+        handleUICommand(QtUICommand::GLASSES_2, false);
+    }
+    else {
+        handleUICommand(QtUICommand::POWER, false);
+    }
 }
 
 void ToolWindow::on_tablet_mode_button_clicked() {
