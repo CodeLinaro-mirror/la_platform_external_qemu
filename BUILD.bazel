@@ -149,13 +149,10 @@ cc_interface_binary(
     }),
     linkopts = select({
         "@platforms//os:macos": [
-            "-framework Cocoa",
             "-framework CoreAudio",
             "-framework CoreFoundation",
-            "-framework CoreVideo",
             "-framework Hypervisor",
             "-framework IOKit",
-            "-framework QuartzCore",
             "-framework vmnet",
             "-Wl,-export_dynamic",
         ],
@@ -242,12 +239,9 @@ cc_interface_binary(
     }),
     linkopts = select({
         "@platforms//os:macos": [
-            "-framework Cocoa",
             "-framework CoreAudio",
             "-framework CoreFoundation",
-            "-framework CoreVideo",
             "-framework IOKit",
-            "-framework QuartzCore",
             "-framework vmnet",
             "-Wl,-export_dynamic",
         ],
@@ -358,12 +352,9 @@ cc_interface_binary(
     linkopts = select({
         "@platforms//os:windows": ["-Wl,/SUBSYSTEM:CONSOLE"],
         "@platforms//os:macos": [
-            "-framework Cocoa",
             "-framework CoreAudio",
             "-framework CoreFoundation",
-            "-framework CoreVideo",
             "-framework IOKit",
-            "-framework QuartzCore",
             "-framework vmnet",
             "-Wl,-export_dynamic",
         ],
@@ -2104,12 +2095,9 @@ cc_library(
     }) + ["host/include/generic"],
     linkopts = select({
         "@platforms//os:macos": [
-            "-framework Cocoa",
             "-framework CoreAudio",
             "-framework CoreFoundation",
-            "-framework CoreVideo",
             "-framework IOKit",
-            "-framework QuartzCore",
             "-framework vmnet",
         ],
         "//conditions:default": [],
@@ -2955,12 +2943,9 @@ cc_library(
     }) + ["host/include/generic"],
     linkopts = select({
         "@platforms//os:macos": [
-            "-framework Cocoa",
             "-framework CoreAudio",
             "-framework CoreFoundation",
-            "-framework CoreVideo",
             "-framework IOKit",
-            "-framework QuartzCore",
             "-framework vmnet",
         ],
         "//conditions:default": [],
@@ -3931,12 +3916,9 @@ cc_library(
     }) + ["host/include/generic"],
     linkopts = select({
         "@platforms//os:macos": [
-            "-framework Cocoa",
             "-framework CoreAudio",
             "-framework CoreFoundation",
-            "-framework CoreVideo",
             "-framework IOKit",
-            "-framework QuartzCore",
             "-framework vmnet",
         ],
         "//conditions:default": [],
@@ -10439,7 +10421,6 @@ objc_library(
         "audio/coreaudio.m",
         "net/vmnet-bridged.m",
         "net/vmnet-common.m",
-        "ui/cocoa.m",
     ],
     hdrs = [
         "audio/audio.h",
@@ -10448,7 +10429,6 @@ objc_library(
         "config-poison.h",
         "net/clients.h",
         "net/vmnet_int.h",
-        "qemu-version.h",
     ],
     copts = [
         "-fwrapv",
@@ -10464,12 +10444,9 @@ objc_library(
     # buildifier: leave-alone
     includes = ["."],
     linkopts = [
-        "-framework Cocoa",
         "-framework CoreAudio",
         "-framework CoreFoundation",
-        "-framework CoreVideo",
         "-framework IOKit",
-        "-framework QuartzCore",
         "-framework vmnet",
     ],
     visibility = ["//visibility:public"],
@@ -10483,6 +10460,7 @@ objc_library(
         "@pixman//:pixman_simd",
         "@zlib",
     ],
+    alwayslink = 1,
 )
 
 objc_library(
@@ -10491,7 +10469,6 @@ objc_library(
         "audio/coreaudio.m",
         "net/vmnet-bridged.m",
         "net/vmnet-common.m",
-        "ui/cocoa.m",
     ],
     hdrs = [
         "audio/audio.h",
@@ -10500,7 +10477,6 @@ objc_library(
         "config-poison.h",
         "net/clients.h",
         "net/vmnet_int.h",
-        "qemu-version.h",
     ],
     copts = [
         "-fwrapv",
@@ -10516,12 +10492,9 @@ objc_library(
     # buildifier: leave-alone
     includes = ["."],
     linkopts = [
-        "-framework Cocoa",
         "-framework CoreAudio",
         "-framework CoreFoundation",
-        "-framework CoreVideo",
         "-framework IOKit",
-        "-framework QuartzCore",
         "-framework vmnet",
     ],
     visibility = ["//visibility:public"],
@@ -10535,6 +10508,7 @@ objc_library(
         "@pixman//:pixman_simd",
         "@zlib",
     ],
+    alwayslink = 1,
 )
 
 objc_library(
@@ -10543,7 +10517,6 @@ objc_library(
         "audio/coreaudio.m",
         "net/vmnet-bridged.m",
         "net/vmnet-common.m",
-        "ui/cocoa.m",
     ],
     hdrs = [
         "audio/audio.h",
@@ -10552,7 +10525,6 @@ objc_library(
         "config-poison.h",
         "net/clients.h",
         "net/vmnet_int.h",
-        "qemu-version.h",
     ],
     copts = [
         "-fwrapv",
@@ -10568,12 +10540,9 @@ objc_library(
     # buildifier: leave-alone
     includes = ["."],
     linkopts = [
-        "-framework Cocoa",
         "-framework CoreAudio",
         "-framework CoreFoundation",
-        "-framework CoreVideo",
         "-framework IOKit",
-        "-framework QuartzCore",
         "-framework vmnet",
     ],
     visibility = ["//visibility:public"],
@@ -10587,6 +10556,7 @@ objc_library(
         "@pixman//:pixman_simd",
         "@zlib",
     ],
+    alwayslink = 1,
 )
 
 py_binary(

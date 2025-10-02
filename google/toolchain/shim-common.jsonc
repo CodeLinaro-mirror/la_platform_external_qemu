@@ -56,7 +56,7 @@
     {
       "target": ".*",
       "shims": {
-        "restrict_to": "cc_library",
+        "restrict_to": "cc_library|objc_library",
         "alwayslink": 1
       }
     },

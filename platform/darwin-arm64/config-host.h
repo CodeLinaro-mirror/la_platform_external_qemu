@@ -77,7 +77,7 @@
 
 #undef CONFIG_CLOSE_RANGE
 
-#define CONFIG_COCOA
+#undef CONFIG_COCOA
 
 #define CONFIG_COROUTINE_POOL
 
