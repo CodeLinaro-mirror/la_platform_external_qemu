@@ -667,39 +667,6 @@ static char* _avdInfo_getContentFilePath(const AvdInfo* i,
     return ASTRDUP(temp);
 }
 
-/* Set AVD_GLASSES specific flags for the config.ini if they aren't set.
- * b/447641900 We should remove this code once Studio can set these.
- */
-static void avdInfo_forceGlassesConfig(AvdInfo* i, const char* iniPath) {
-    bool write = false;
-
-    if (!i || !i->configIni) {
-        return;
-    }
-
-    if (avdInfo_getAvdFlavor(i) == AVD_GLASSES) {
-        if (!iniFile_hasKey(i->configIni, "hw.touchpad0")) {
-            write = true;
-            iniFile_setBoolean(i->configIni, "hw.touchpad0", true);
-        }
-        if (!iniFile_hasKey(i->configIni, "hw.touchpad0.width")) {
-            write = true;
-            iniFile_setInteger(i->configIni, "hw.touchpad0.width", 1543);
-        }
-        if (!iniFile_hasKey(i->configIni, "hw.touchpad0.height")) {
-            write = true;
-            iniFile_setInteger(i->configIni, "hw.touchpad0.height", 297);
-        }
-        if (!iniFile_hasKey(i->configIni, "hw.screen")) {
-            write = true;
-            iniFile_setString(i->configIni, "hw.screen", "no-touch");
-        }
-        if (write) {
-            iniFile_saveToFile(i->configIni, iniPath);
-        }
-    }
-}
-
 /* find and parse the config.ini file from the content directory */
 int _avdInfo_getConfigIni(AvdInfo* i) {
     char* iniPath = _avdInfo_getContentFilePath(i, CORE_CONFIG_INI);
@@ -712,7 +679,6 @@ int _avdInfo_getConfigIni(AvdInfo* i) {
 
     D("virtual device config file: %s", iniPath);
     i->configIni = iniFile_newFromFile(iniPath);
-    avdInfo_forceGlassesConfig(i, iniPath);
 
     AFREE(iniPath);
 
@@ -937,6 +903,43 @@ static void _avdInfo_getPropertyFile(AvdInfo* i,
     free(filePath);
 }
 
+/* Set AVD_GLASSES specific flags for the config.ini if they aren't set.
+ * b/447641900 We should remove this code once Studio can set these.
+ */
+static void _avdInfo_forceGlassesConfig(AvdInfo* i) {
+    bool write = false;
+
+    if (!i || !i->configIni) {
+        return;
+    }
+
+    if (avdInfo_getAvdFlavor(i) == AVD_GLASSES) {
+        if (!iniFile_hasKey(i->configIni, "hw.touchpad0")) {
+            write = true;
+            iniFile_setBoolean(i->configIni, "hw.touchpad0", true);
+        }
+        if (!iniFile_hasKey(i->configIni, "hw.touchpad0.width")) {
+            write = true;
+            iniFile_setInteger(i->configIni, "hw.touchpad0.width", 1543);
+        }
+        if (!iniFile_hasKey(i->configIni, "hw.touchpad0.height")) {
+            write = true;
+            iniFile_setInteger(i->configIni, "hw.touchpad0.height", 297);
+        }
+        if (!iniFile_hasKey(i->configIni, "hw.screen")) {
+            write = true;
+            iniFile_setString(i->configIni, "hw.screen", "no-touch");
+        }
+        if (write) {
+            char* iniPath = _avdInfo_getContentFilePath(i, CORE_CONFIG_INI);
+            if (iniPath) {
+                iniFile_saveToFile(i->configIni, iniPath);
+                AFREE(iniPath);
+            }
+        }
+    }
+}
+
 AvdInfo* avdInfo_new(const char* name, AvdInfoParams* __unused_params, const char* sysdir) {
     AvdInfo* i;
 
@@ -977,6 +980,8 @@ AvdInfo* avdInfo_new(const char* name, AvdInfoParams* __unused_params, const cha
     _avdInfo_getPropertyFile(i, "boot.prop", i->bootProperties);
 
     _avdInfo_extractBuildProperties(i);
+
+    _avdInfo_forceGlassesConfig(i);
 
     /* don't need this anymore */
     iniFile_free(i->rootIni);
