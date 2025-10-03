@@ -12,6 +12,7 @@ if(WINDOWS_MSVC_X86_64)
     TARGET android-emu-protos
     PROTOS automation.proto
            crash_info.proto
+           display_configuration.proto
            emulator_feature_patterns.proto
            emulator_features.proto
            emulator_compatible.proto
@@ -39,6 +40,7 @@ else()
     TARGET android-emu-protos
     PROTOS automation.proto
            crash_info.proto
+           display_configuration.proto
            emulator_feature_patterns.proto
            emulator_features.proto
            emulator_compatible.proto
