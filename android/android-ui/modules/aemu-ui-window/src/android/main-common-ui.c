@@ -525,9 +525,7 @@ bool startRenderer(RendererConfig* config_inout) {
         return false;
     }
 
-    if (feature_is_enabled(kFeature_Vulkan)) {
-        android_metrics_report_vulkan_gpu_info();
-    }
+    android_metrics_report_vulkan_gpu_info();
 
     VERBOSE_INFO(init, "Setting vsync to %d hz", hw->hw_lcd_vsync);
     android_setVsyncHz(hw->hw_lcd_vsync);
