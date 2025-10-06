@@ -545,15 +545,11 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         mToolsUi->home_button->setHidden(true);
         mToolsUi->overview_button->setHidden(true);
         mToolsUi->glasses_button_1->setEnabled(true);
-        mToolsUi->glasses_button_2->setEnabled(true);
-        mToolsUi->zoom_generic_button->setEnabled(true);
         if (getConsoleAgents()->settings->hw()->hw_touchpad0) {
             mTouchpadWindow->get();
         }
     } else {
         mToolsUi->glasses_button_1->setVisible(false);
-        mToolsUi->glasses_button_2->setVisible(false);
-        mToolsUi->zoom_generic_button->setVisible(false);
     }
 
     connect(mPostureSelectionDialog, SIGNAL(newPostureRequested(int)), this,
@@ -1023,13 +1019,16 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             setMicrophoneEnabled(!getMicrophoneEnabled());
             break;
         case QtUICommand::POWER:
-            forwardKeyToEmulator(LINUX_KEY_POWER, down);
+            if (avdInfo_getAvdFlavor(
+                        getConsoleAgents()->settings->avdInfo()) ==
+                AVD_GLASSES) {
+                forwardKeyToEmulator(ANDROID_KEY_STEM_2, down);
+            } else {
+                forwardKeyToEmulator(LINUX_KEY_POWER, down);
+            }
             break;
         case QtUICommand::GLASSES_1:
             forwardKeyToEmulator(ANDROID_KEY_STEM_1, down);
-            break;
-        case QtUICommand::GLASSES_2:
-            forwardKeyToEmulator(ANDROID_KEY_STEM_2, down);
             break;
         case QtUICommand::TABLET_MODE:
             if (getConsoleAgents()->settings->hw()->hw_arc) {
@@ -1795,24 +1794,12 @@ void ToolWindow::on_minimize_button_clicked() {
 
 void ToolWindow::on_power_button_pressed() {
     mEmulatorWindow->raise();
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-        AVD_GLASSES) {
-        handleUICommand(QtUICommand::GLASSES_2, true);
-    }
-    else {
-        handleUICommand(QtUICommand::POWER, true);
-    }
+    handleUICommand(QtUICommand::POWER, true);
 }
 
 void ToolWindow::on_power_button_released() {
     mEmulatorWindow->activateWindow();
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-        AVD_GLASSES) {
-        handleUICommand(QtUICommand::GLASSES_2, false);
-    }
-    else {
-        handleUICommand(QtUICommand::POWER, false);
-    }
+    handleUICommand(QtUICommand::POWER, false);
 }
 
 void ToolWindow::on_tablet_mode_button_clicked() {
@@ -1995,16 +1982,6 @@ void ToolWindow::on_glasses_button_1_pressed() {
 void ToolWindow::on_glasses_button_1_released() {
     mEmulatorWindow->activateWindow();
     handleUICommand(QtUICommand::GLASSES_1, false);
-}
-
-void ToolWindow::on_glasses_button_2_pressed() {
-    mEmulatorWindow->raise();
-    handleUICommand(QtUICommand::GLASSES_2, true);
-}
-
-void ToolWindow::on_glasses_button_2_released() {
-    mEmulatorWindow->activateWindow();
-    handleUICommand(QtUICommand::GLASSES_2, false);
 }
 
 void ToolWindow::on_overview_button_pressed() {

@@ -352,8 +352,6 @@ private slots:
     void on_xr_viewport_rotate_button_clicked();
     void on_glasses_button_1_pressed();
     void on_glasses_button_1_released();
-    void on_glasses_button_2_pressed();
-    void on_glasses_button_2_released();
 
     void onSleepTimerDone();
     void onUnfoldTimerDone();

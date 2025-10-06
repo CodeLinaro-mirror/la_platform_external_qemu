@@ -75,7 +75,6 @@
         <file alias="volume_down">images/light/ic_volume_down_678_48px.svg</file>
         <file alias="volume_up">images/light/ic_volume_up_678_48px.svg</file>
         <file alias="glasses_button_1">images/light/ic_glasses_button_1.svg</file>
-        <file alias="glasses_button_2">images/light/ic_glasses_button_2.svg</file>
         <file alias="mic_enabled">images/light/ic_mic_on.svg</file>
         <file alias="mic_disabled">images/light/ic_mic_off.svg</file>
         <file alias="xr_input_eye_tacking">images/light/ic_xr_eye_tacking.svg</file>
@@ -97,7 +96,6 @@
         <file alias="xr_right_hand_reset">images/light/ic_xr_right_hand_reset.svg</file>
         <file alias="xr_right_hand_poke">images/light/ic_xr_right_hand_poke.svg</file>
         <file alias="zoom">images/light/ic_zoom_in_678_48dp.svg</file>
-        <file alias="zoom_generic">images/light/ic_zoom_light.svg</file>
 
         <!-- Used in the "extended" window -->
         <file alias="add">images/light/ic_add_0BA_48dp.svg</file>
@@ -288,7 +286,6 @@
         <file alias="volume_down">images/dark/ic_volume_down_48px.svg</file>
         <file alias="volume_up">images/dark/ic_volume_up_48px.svg</file>
         <file alias="glasses_button_1">images/dark/ic_glasses_button_1.svg</file>
-        <file alias="glasses_button_2">images/dark/ic_glasses_button_2.svg</file>
         <file alias="mic_enabled">images/dark/ic_mic_on.svg</file>
         <file alias="mic_disabled">images/dark/ic_mic_off.svg</file>
         <file alias="xr_input_eye_tacking">images/dark/ic_xr_eye_tacking.svg</file>
@@ -310,7 +307,6 @@
         <file alias="xr_right_hand_reset">images/dark/ic_xr_right_hand_reset.svg</file>
         <file alias="xr_right_hand_poke">images/dark/ic_xr_right_hand_poke.svg</file>
         <file alias="zoom">images/dark/ic_zoom_in_white_48dp.svg</file>
-        <file alias="zoom_generic">images/dark/ic_zoom_dark.svg</file>
 
         <!-- Used in the "extended" window -->
         <file alias="add">images/dark/ic_add_0BA_48dp.svg</file>

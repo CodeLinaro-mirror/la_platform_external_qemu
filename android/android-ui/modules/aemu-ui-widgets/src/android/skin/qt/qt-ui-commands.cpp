@@ -104,8 +104,6 @@ constexpr CommandInfo kCommands[] = {
                      "Drag mouse to dolly backwards/forwards"),
         INIT_COMMAND(XR_VIEWPORT_CONTROL_MODE_ROTATE, "Drag mouse to rotate"),
         INIT_COMMAND(GLASSES_1, "Glasses Button 1"),
-        INIT_COMMAND(GLASSES_2, "Glasses Button 2"),
-        INIT_COMMAND(ZOOM_GENERIC, "Zoom"),
 };
 
 bool parseQtUICommand(const QString& string, QtUICommand* command) {

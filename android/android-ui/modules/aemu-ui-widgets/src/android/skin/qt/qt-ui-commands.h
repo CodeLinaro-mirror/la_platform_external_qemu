@@ -82,8 +82,6 @@ enum class QtUICommand {
     XR_LEFT_HAND,
     XR_RIGHT_HAND,
     GLASSES_1,
-    GLASSES_2,
-    ZOOM_GENERIC,
 };
 
 enum class QtKeyEventSource {
