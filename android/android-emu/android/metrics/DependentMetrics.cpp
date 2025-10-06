@@ -897,9 +897,9 @@ void android_metrics_fill_vulkan_gpu_info(void* opaque) {
             static_cast<android_studio::AndroidStudioEvent*>(opaque);
 
     const gfxstream::RendererPtr& renderer = android_getOpenglesRenderer();
-    if (!renderer) {
+    if (!renderer || !android::featurecontrol::isEnabled(android::featurecontrol::Vulkan)) {
         dwarning(
-                "Couldn't retrieve renderer details. No metrics will be reported.");
+                "Couldn't retrieve Vulkan renderer details. No Vulkan metrics will be reported.");
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::DISABLED_VK);
         return;
