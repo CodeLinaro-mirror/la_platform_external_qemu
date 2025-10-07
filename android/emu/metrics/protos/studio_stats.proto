@@ -2847,10 +2847,10 @@ message EmulatorGpuVkInfo {
     PHYSICAL_DEVICE_TYPE_CPU = 5;
   }
 
-  optional int32 api_version = 1;
-  optional int32 driver_version = 2;
-  optional int32 vendor_id = 3;
-  optional int32 device_id = 4;
+  optional uint32 api_version = 1;
+  optional uint32 driver_version = 2;
+  optional uint32 vendor_id = 3;
+  optional uint32 device_id = 4;
   // The type of the GPU device. Matches VkPhysicalDeviceType.
   optional PhysicalDeviceType device_type = 5;
   optional string device_name = 6;
@@ -16173,6 +16173,28 @@ message SmlChatBotEvent {
     optional ToolCallResponseStatus response_status = 2;
     optional SmlResponseMetadata metadata = 3 [lazy = true];
     optional string tool_call_id = 4;
+    oneof result {
+      UpdateDepsRefactoringToolResult update_deps_refactoring_tool_result = 5;
+    }
+  }
+
+  // The result of the update dependencies tool which indicates the
+  // suggested dependency updates. Also contains information if the user
+  // accepted/rejected the suggestions.
+  message UpdateDepsRefactoringToolResult {
+    repeated DependencySuggestion dependency_suggestions = 1;
+
+    // The dependency suggestion made by the tool.
+    message DependencySuggestion {
+      // The artifact ID of the dependency.
+      optional string artifact = 1;
+      // The current version of the dependency.
+      optional string from_version = 2;
+      // The target version of the dependency.
+      optional string to_version = 3;
+      // Whether the dependency suggestion was accepted by the user.
+      optional bool accepted = 4;
+    }
   }
 
   message DeprecationShown {
@@ -17933,6 +17955,8 @@ message MarketingEmailEvent {
     UNKNOWN = 0;
     // The marketing dialog which is shown after the sign-in flow.
     MARKETING_DIALOG = 1;
+    // Checkbox in settings.
+    SETTINGS = 2;
   }
 
   // Users opt in status to marketing emails.
