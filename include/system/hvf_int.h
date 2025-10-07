@@ -42,7 +42,7 @@ typedef struct hvf_vcpu_caps {
 
 struct HVFState {
     AccelState parent;
-    hvf_slot slots[32];
+    hvf_slot slots[512];
     int num_slots;
 
     hvf_vcpu_caps *hvf_caps;
