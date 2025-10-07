@@ -74,7 +74,7 @@
         <file alias="tablet_mode">images/light/tablet_mode.svg</file>
         <file alias="volume_down">images/light/ic_volume_down_678_48px.svg</file>
         <file alias="volume_up">images/light/ic_volume_up_678_48px.svg</file>
-        <file alias="glasses_button_1">images/light/ic_glasses_button_1.svg</file>
+        <file alias="glasses_button">images/light/ic_glasses_button.svg</file>
         <file alias="mic_enabled">images/light/ic_mic_on.svg</file>
         <file alias="mic_disabled">images/light/ic_mic_off.svg</file>
         <file alias="xr_input_eye_tacking">images/light/ic_xr_eye_tacking.svg</file>
@@ -285,7 +285,7 @@
         <file alias="tablet_mode">images/dark/tablet_mode_dark.svg</file>
         <file alias="volume_down">images/dark/ic_volume_down_48px.svg</file>
         <file alias="volume_up">images/dark/ic_volume_up_48px.svg</file>
-        <file alias="glasses_button_1">images/dark/ic_glasses_button_1.svg</file>
+        <file alias="glasses_button">images/dark/ic_glasses_button.svg</file>
         <file alias="mic_enabled">images/dark/ic_mic_on.svg</file>
         <file alias="mic_disabled">images/dark/ic_mic_off.svg</file>
         <file alias="xr_input_eye_tacking">images/dark/ic_xr_eye_tacking.svg</file>

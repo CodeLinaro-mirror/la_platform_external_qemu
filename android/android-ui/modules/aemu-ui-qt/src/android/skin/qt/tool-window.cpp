@@ -544,12 +544,12 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         mToolsUi->next_layout_button->setHidden(true);
         mToolsUi->home_button->setHidden(true);
         mToolsUi->overview_button->setHidden(true);
-        mToolsUi->glasses_button_1->setEnabled(true);
+        mToolsUi->glasses_button->setEnabled(true);
         if (getConsoleAgents()->settings->hw()->hw_touchpad0) {
             mTouchpadWindow->get();
         }
     } else {
-        mToolsUi->glasses_button_1->setVisible(false);
+        mToolsUi->glasses_button->setVisible(false);
     }
 
     connect(mPostureSelectionDialog, SIGNAL(newPostureRequested(int)), this,
@@ -1027,7 +1027,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
                 forwardKeyToEmulator(LINUX_KEY_POWER, down);
             }
             break;
-        case QtUICommand::GLASSES_1:
+        case QtUICommand::GLASSES:
             forwardKeyToEmulator(ANDROID_KEY_STEM_1, down);
             break;
         case QtUICommand::TABLET_MODE:
@@ -1973,15 +1973,15 @@ void ToolWindow::on_microphone_button_clicked() {
     handleUICommand(QtUICommand::TOGGLE_MICROPHONE, true);
 }
 
-void ToolWindow::on_glasses_button_1_pressed() {
+void ToolWindow::on_glasses_button_pressed() {
     mEmulatorWindow->raise();
 
-    handleUICommand(QtUICommand::GLASSES_1, true);
+    handleUICommand(QtUICommand::GLASSES, true);
 }
 
-void ToolWindow::on_glasses_button_1_released() {
+void ToolWindow::on_glasses_button_released() {
     mEmulatorWindow->activateWindow();
-    handleUICommand(QtUICommand::GLASSES_1, false);
+    handleUICommand(QtUICommand::GLASSES, false);
 }
 
 void ToolWindow::on_overview_button_pressed() {

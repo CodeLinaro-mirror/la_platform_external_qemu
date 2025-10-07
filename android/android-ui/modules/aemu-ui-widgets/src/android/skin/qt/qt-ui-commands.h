@@ -81,7 +81,7 @@ enum class QtUICommand {
     XR_VIEWPORT_CONTROL_MODE_ROTATE,
     XR_LEFT_HAND,
     XR_RIGHT_HAND,
-    GLASSES_1,
+    GLASSES,
 };
 
 enum class QtKeyEventSource {

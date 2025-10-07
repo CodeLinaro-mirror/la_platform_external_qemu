@@ -925,7 +925,7 @@ color: #f0f0f0</string>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="glasses_button_1">
+      <widget class="QPushButton" name="glasses_button">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -939,14 +939,14 @@ color: #f0f0f0</string>
         </size>
        </property>
        <property name="toolTip">
-        <string>Glasses Button 1</string>
+        <string>Glasses Button</string>
        </property>
        <property name="text">
         <string notr="true"/>
        </property>
        <property name="icon">
         <iconset resource="resources.qrc">
-         <normaloff>:/light/glasses_button_1</normaloff>:/light/glasses_button_1</iconset>
+         <normaloff>:/light/glasses_button</normaloff>:/light/glasses_button</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -961,10 +961,10 @@ color: #f0f0f0</string>
         <bool>false</bool>
        </property>
        <property name="themeIconName" stdset="0">
-        <string notr="true">glasses_button_1</string>
+        <string notr="true">glasses_button</string>
        </property>
        <property name="uiCommand" stdset="0">
-        <string>GLASSES_1</string>
+        <string>GLASSES</string>
        </property>
        <property name="ToolWindowButton" stdset="0">
         <bool>true</bool>
