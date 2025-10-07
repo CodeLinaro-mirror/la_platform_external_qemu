@@ -18,9 +18,10 @@ import platform
 import os
 import zipfile
 import aemu.prebuilts.angle as angle
-import aemu.prebuilts.qt as qt
-import aemu.prebuilts.moltenvk as moltenvk
 import aemu.prebuilts.lavapipe as lavapipe
+import aemu.prebuilts.moltenvk as moltenvk
+import aemu.prebuilts.qt as qt
+import aemu.prebuilts.vulkan_loader as vulkan_loader
 
 HOST_OS = platform.system().lower()
 HOST_ARCH = platform.machine().lower()
@@ -30,6 +31,7 @@ _prebuilts_zip_name = "PREBUILT-{prebuilt_name}-{build_number}.zip"
 _prebuilt_funcs = {
     'qt': qt.buildPrebuilt,
     'angle': angle.buildPrebuilt,
+    'vulkan_loader': vulkan_loader.buildPrebuilt,
     # Add more prebuilts here
 }
 
@@ -39,10 +41,12 @@ if HOST_OS == "linux":
     })
 
 if HOST_OS == "darwin":
-    _prebuilt_funcs.update({
-        'moltenvk': moltenvk.buildPrebuilt,
-        'lavapipe': lavapipe.buildPrebuilt,
-    })
+    _prebuilt_funcs.update(
+        {
+            "moltenvk": moltenvk.buildPrebuilt,
+            "lavapipe": lavapipe.buildPrebuilt,
+        }
+    )
 
 def buildPrebuilts(args, is_emulator_build):
     build_if_sha1_changed = False
@@ -56,7 +60,8 @@ def buildPrebuilts(args, is_emulator_build):
         # Continue to add support for more platforms/prebuilts in emulator build.
         if HOST_OS == "darwin":
             _prebuilt_funcs = {
-                'moltenvk': moltenvk.buildPrebuilt,
+                "moltenvk": moltenvk.buildPrebuilt,
+                "vulkan_loader": vulkan_loader.buildPrebuilt,
             }
         else:
             logging.info("Prebuilts compilation in emulator build is not supported yet for "
