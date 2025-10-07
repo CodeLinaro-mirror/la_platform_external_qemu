@@ -298,6 +298,7 @@ qos_test_ss.add(
   'ad5321-test.c',
   'adm1272-test.c',
   'adm1266-test.c',
+  'adt7475-test.c',
   'ds1338-test.c',
   'e1000-test.c',
   'eepro100-test.c',
