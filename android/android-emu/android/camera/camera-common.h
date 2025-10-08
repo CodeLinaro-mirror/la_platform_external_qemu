@@ -164,6 +164,8 @@ typedef enum CameraSourceType {
     kVideoPlayback,
     /* A video playback camera, feeds in frames from a video file. */
     kVideofile,
+    /* An image playback camera, feeds in a static image. */
+    kImagefile,
 } CameraSourceType;
 
 typedef struct CameraInfoVtbl {

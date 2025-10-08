@@ -164,6 +164,7 @@ set(android_emu_dependent_src
     android/automation/AutomationEventSink.cpp
     android/camera/camera-common.cpp
     android/camera/camera-format-converters.c
+    android/camera/camera-imagefile.cpp
     android/camera/camera-list.cpp
     android/camera/camera-metrics.cpp
     android/camera/camera-service.cpp
