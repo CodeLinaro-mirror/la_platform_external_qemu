@@ -731,6 +731,10 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::VULKAN_VIRTUAL_QUEUE;
         case android::featurecontrol::VulkanRobustness:
             return android_studio::EmulatorFeatureFlagState::VULKAN_ROBUSTNESS;
+        case android::featurecontrol::ForceLavapipe:
+            return android_studio::EmulatorFeatureFlagState::FORCE_LAVAPIPE;
+        case android::featurecontrol::ForceLavapipeForSoftwareRendering:
+            return android_studio::EmulatorFeatureFlagState::FORCE_LAVAPIPE_FOR_SOFTWARE_RENDERING;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;
