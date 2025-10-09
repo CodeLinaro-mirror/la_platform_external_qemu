@@ -807,6 +807,8 @@ bool ToolWindow::needExtendedWindow(QtUICommand cmd) const {
         case QtUICommand::TAKE_SCREENSHOT:
         case QtUICommand::VOLUME_DOWN:
         case QtUICommand::VOLUME_UP:
+        case QtUICommand::GLASSES:
+        case QtUICommand::TOGGLE_MICROPHONE:
             return false;
         default:
             return true;
