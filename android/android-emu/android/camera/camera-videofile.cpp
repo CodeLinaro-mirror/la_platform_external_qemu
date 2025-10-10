@@ -16,6 +16,8 @@
 
 #include "android/camera/camera-videofile.h"
 
+#include "android/camera/camera-sws-format-converter.h"
+
 #include <cstring>
 #include <memory>
 #include <optional>
@@ -143,8 +145,29 @@ std::optional<VideoFile> openVideoFile(const char* filename) {
     return videoFile;
 }
 
+#define getAVFrame(field)                                            \
+    getAVFame_##field(const void* frame) {                           \
+        const AVFrame* avFrame = static_cast<const AVFrame*>(frame); \
+        return avFrame->field;                                       \
+    }
+
+int getAVFrame(format);
+int getAVFrame(width);
+int getAVFrame(height);
+const uint8_t* const* getAVFrame(data);
+const int* getAVFrame(linesize);
+
+const CameraFrameInfoVtbl av_frame_info_ops = {
+    .getWidth = &getAVFame_width,
+    .getHeight = &getAVFame_height,
+    .getAVPixelFormat = &getAVFame_format,
+    .getSlice= &getAVFame_data,
+    .getStride= &getAVFame_linesize
+};
+
 struct VideofileCameraDevice {
-    VideofileCameraDevice(VideoFile videoFile) : mVideoFile(std::move(videoFile)) {
+    VideofileCameraDevice(VideoFile videoFile)
+        : mVideoFile(std::move(videoFile)), mConverter(av_frame_info_ops) {
         mHeader.opaque = this;
     }
 
@@ -180,7 +203,7 @@ private:
     int startCapturing() {
         const int err = ::av_seek_frame(mVideoFile.formatCtx.get(), -1, 0, AVSEEK_FLAG_BACKWARD);
         if (err >= 0) {
-            mConverterCache.clear();
+            mConverter.ClearConverterCache();
             mFrameCache.reset(::av_frame_alloc());
             return mFrameCache ? 0 : -1;
         } else {
@@ -196,7 +219,8 @@ private:
             const bool backFacing = !strcmp(direction, "back");
 
             for (uint32_t i = 0; i < cframe.framebuffers_count; ++i) {
-                if (const int err = fillCFB(cframe.framebuffers[i], *avFrame, backFacing)) {
+                if (const int err = mConverter.fillCFB(cframe.framebuffers[i],
+                                                       avFrame, backFacing)) {
                     return err;
                 }
             }
@@ -210,7 +234,7 @@ private:
 
     int stopCapturing() {
         mFrameCache.reset();
-        mConverterCache.clear();
+        mConverter.ClearConverterCache();
         return 0;
     }
 
@@ -219,70 +243,6 @@ private:
         int strides[3];
         AVPixelFormat format;
     };
-
-    static FrameBufferInfo getFrameBufferInfo(const ClientFrameBuffer& cfb) {
-        const size_t w = cfb.width;
-        const size_t h = cfb.height;
-
-        FrameBufferInfo fbi = {};
-        fbi.planes[0] = static_cast<uint8_t*>(cfb.framebuffer);
-
-        switch (cfb.pixel_format) {
-        case V4L2_PIX_FMT_RGB32:
-            fbi.strides[0] = w * 4U;
-            fbi.format = AV_PIX_FMT_RGBA;
-            break;
-
-        case V4L2_PIX_FMT_YUV420:
-            fbi.planes[1] = fbi.planes[0] + (w * h);
-            fbi.planes[2] = fbi.planes[1] + (w * h) / 4;
-            fbi.strides[0] = w;
-            fbi.strides[1] = w / 2;
-            fbi.strides[2] = w / 2;
-            fbi.format = AV_PIX_FMT_YUV420P;
-            break;
-
-        case V4L2_PIX_FMT_NV12:
-            fbi.planes[1] = fbi.planes[0] + (w * h);
-            fbi.strides[0] = w;
-            fbi.strides[1] = w;
-            fbi.format = AV_PIX_FMT_NV12;
-            break;
-
-        default:
-            fbi.format = AV_PIX_FMT_NONE;
-            break;
-        }
-
-        return fbi;
-    }
-
-    int fillCFB(const ClientFrameBuffer& cfb, const AVFrame& avFrame,
-                const bool backFacing) {
-        const FrameBufferInfo fbi = getFrameBufferInfo(cfb);
-        if (fbi.format == AV_PIX_FMT_NONE) {
-            const uint32_t fmt = cfb.pixel_format;
-            derror("Unexpected format: %c%c%c%c",
-                (fmt & 0xFF), ((fmt >> 8) & 0xFF),
-                ((fmt >> 16) & 0xFF), ((fmt >> 24) & 0xFF));
-            return -1;
-        }
-
-        SwsContext* swsCtx = getSwsContext(
-                avFrame.width, avFrame.height, static_cast<AVPixelFormat>(avFrame.format),
-                cfb.width, cfb.height, fbi.format);
-        if (swsCtx) {
-            ::sws_scale(swsCtx, avFrame.data, avFrame.linesize, 0, avFrame.height,
-                        fbi.planes, fbi.strides);
-            return 0;
-        } else {
-            derror("Could not allocate SwsContext for src={ %dx%d, fmt=%d }, "
-                   "dst={ %dx%d, fmt=%d }",
-                   avFrame.width, avFrame.height, avFrame.format,
-                   cfb.width, cfb.height, fbi.format);
-            return -1;
-        }
-    }
 
     const AVFrame* decodeNextFrame() {
         AVPacket packet;
@@ -333,53 +293,6 @@ private:
         return nullptr;
     }
 
-    struct ConversionKey {
-        int srcWidth;
-        int srcHeight;
-        AVPixelFormat srcFmt;
-        int dstWidth;
-        int dstHeight;
-        AVPixelFormat dstFmt;
-
-        bool operator==(const ConversionKey& rhs) const {
-            return (srcWidth == rhs.srcWidth) &&
-                   (srcHeight == rhs.srcHeight) &&
-                   (srcFmt == rhs.srcFmt) &&
-                   (dstWidth == rhs.dstWidth) &&
-                   (dstHeight == rhs.dstHeight) &&
-                   (dstFmt == rhs.dstFmt);
-        }
-    };
-
-    SwsContext* getSwsContext(const int srcWidth, const int srcHeight, const AVPixelFormat srcFmt,
-                              const int dstWidth, const int dstHeight, const AVPixelFormat dstFmt) {
-        ConversionKey conv = {
-            .srcWidth = srcWidth,
-            .srcHeight = srcHeight,
-            .srcFmt = srcFmt,
-            .dstWidth = dstWidth,
-            .dstHeight = dstHeight,
-            .dstFmt = dstFmt,
-        };
-
-        const auto i = std::find_if(mConverterCache.begin(), mConverterCache.end(),
-                                    [&conv](const std::pair<ConversionKey, SwsContextPtr>& kv) {
-                                        return conv == kv.first;
-                                    });
-        if (i != mConverterCache.end()) {
-            return i->second.get();
-        }
-
-        SwsContext* ctx = ::sws_getContext(srcWidth, srcHeight, srcFmt,
-                                           dstWidth, dstHeight, dstFmt,
-                                           SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
-        if (ctx) {
-            mConverterCache.push_back({std::move(conv), SwsContextPtr(ctx)});
-        }
-
-        return ctx;
-    }
-
     static VideofileCameraDevice* myselfFrom(CameraDevice* c) {
         return static_cast<VideofileCameraDevice*>(c->opaque);
     }
@@ -387,7 +300,7 @@ private:
     CameraDevice mHeader;
     VideoFile mVideoFile;
     AVFramePtr mFrameCache;
-    std::vector<std::pair<ConversionKey, SwsContextPtr>> mConverterCache;
+    SwsFormatConverter mConverter;
 };
 
 }  // namespace
