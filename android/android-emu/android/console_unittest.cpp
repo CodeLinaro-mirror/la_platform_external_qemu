@@ -118,6 +118,7 @@ TEST(Console, multidisplay_add_xr_fails) {
     test_control_client_close(opaque);
     socketClose(sock[1]);
     socketClose(sock[0]);
+    getConsoleAgents()->settings->inject_AvdInfo(NULL);
     avdInfo_free(avdInfo);
 }
 
@@ -146,6 +147,7 @@ TEST(Console, rotate_xr_fails) {
     test_control_client_close(opaque);
     socketClose(sock[1]);
     socketClose(sock[0]);
+    getConsoleAgents()->settings->inject_AvdInfo(NULL);
     avdInfo_free(avdInfo);
 }
 
