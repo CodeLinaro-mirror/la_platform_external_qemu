@@ -41,6 +41,7 @@ EXPORTS
     cpu_watchpoint_remove_all
     cpu_work_list_empty
     cpus_count
+    current_accel_name
     cursor_alloc
     device_class_set_props_n
     dpy_cursor_define
