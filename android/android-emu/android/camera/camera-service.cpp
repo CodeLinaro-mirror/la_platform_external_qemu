@@ -26,25 +26,25 @@
 
 #include "android/camera/camera-service.h"
 
+#include "android/avd/info.h"
 #include "android/boot-properties.h"
 #include "android/camera/camera-capture.h"
 #include "android/camera/camera-format-converters.h"
+#include "android/camera/camera-imagefile.h"
 #include "android/camera/camera-metrics.h"
 #include "android/camera/camera-videofile.h"
 #include "android/camera/camera-videoplayback.h"
 #include "android/camera/camera-virtualscene.h"
-#include "host-common/address_space_device.h"
-#include "android/emulation/android_qemud.h"
-#include "host-common/feature_control.h"
-#include "host-common/hw-config.h"
-#include "host-common/hw-config-helper.h"
-#include "android/avd/info.h"
 #include "android/console.h" /* for android_hw */
+#include "android/emulation/android_qemud.h"
 #include "android/hw-sensors.h"
 #include "android/utils/debug.h"
 #include "android/utils/looper.h"
 #include "android/utils/misc.h"
 #include "android/utils/system.h"
+#include "host-common/address_space_device.h"
+#include "host-common/feature_control.h"
+#include "host-common/hw-config-helper.h"
 #include "host-common/hw-config.h"
 
 #include <gfxstream/virtio-gpu-gfxstream-renderer.h>
@@ -478,16 +478,27 @@ struct CameraService {
             virtualscenecameraSetup();
         }
 
+        constexpr size_t kImagefileCamPrefixSize = 10;
+
+        static const auto isImagefileCam = [](const char* name) {
+            return !strncmp(name, "imagefile:", kImagefileCamPrefixSize);
+        };
+
         if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
             videoplaybackcameraSetup("back");
         } else if (isVideofileCam(cameraBack)) {
             videofilecameraSetup("back", cameraBack + kVideofileCamPrefixSize);
+        } else if (isImagefileCam(cameraBack)) {
+            imagefilecameraSetup("back", cameraBack + kImagefileCamPrefixSize);
         }
 
         if (androidHwConfig_hasVideoPlaybackFrontCamera(hwCfg)) {
             videoplaybackcameraSetup("front");
         } else if (isVideofileCam(cameraFront)) {
             videofilecameraSetup("front", cameraFront + kVideofileCamPrefixSize);
+        } else if (isImagefileCam(cameraFront)) {
+            imagefilecameraSetup("front",
+                                 cameraFront + kImagefileCamPrefixSize);
         }
 
         /* Lets see if HW config uses emulated cameras. */
@@ -724,6 +735,14 @@ private:
         ci.direction = ASTRDUP(dir);
         ci.in_use = 0;
 
+        addCameraInfo(std::move(ci));
+    }
+
+    void imagefilecameraSetup(const char* dir, const char* args) {
+        CameraInfo ci;
+        if (camera_imagefile_init_CameraInfo(&ci, dir, args)) {
+            return;
+        }
         addCameraInfo(std::move(ci));
     }
 

@@ -2163,10 +2163,12 @@ bool emulator_parseFeatureCommandLineOptions(AndroidOptions* opts,
             strcmp(opts->camera_back, "emulated") &&
             strcmp(opts->camera_back, "virtualscene") &&
             strncmp(opts->camera_back, "videofile", 9) &&
+            strncmp(opts->camera_back, "imagefile", 9) &&
             strcmp(opts->camera_back, "none")) {
             derror("Invalid value for -camera-back <mode> parameter: %s\n"
-                   "Valid values are: 'emulated', 'virtualscene', "
-                   "'videofile:options', 'webcam<N>' or 'none'\n",
+                   "Valid values are: 'emulated', 'imagefile:options', "
+                   "'virtualscene', 'videofile:options', 'webcam<N>' or "
+                   "'none'\n",
                    opts->camera_back);
             return false;
         }
