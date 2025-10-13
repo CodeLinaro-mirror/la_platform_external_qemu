@@ -251,9 +251,9 @@ static void raw_probe_alignment(BlockDriverState *bs, Error **errp)
     }
 
     if (s->drive_path[0]) {
-        aemu_GetDiskFreeSpace(s->drive_path, &sectorsPerCluster,
-                         &dg.Geometry.BytesPerSector,
-                         &freeClusters, &totalClusters);
+        GetDiskFreeSpaceA(s->drive_path, &sectorsPerCluster,
+                          &dg.Geometry.BytesPerSector,
+                          &freeClusters, &totalClusters);
         bs->bl.request_alignment = dg.Geometry.BytesPerSector;
         return;
     }
@@ -389,9 +389,12 @@ static int raw_open(BlockDriverState *bs, QDict *options, int flags,
     } else if (filename[0] == '\\' && filename[1] == '\\') {
         s->drive_path[0] = 0;
     } else {
-        /* Relative path.  */
+        /*
+         * Relative path. We are interested in the drive letter only,
+         * it will be correct even on Unicode paths.
+         */
         char buf[MAX_PATH];
-        aemu_GetCurrentDirectory(MAX_PATH, buf);
+        GetCurrentDirectoryA(MAX_PATH, buf);
         snprintf(s->drive_path, sizeof(s->drive_path), "%c:\\", buf[0]);
     }
 
@@ -541,7 +544,7 @@ static int64_t coroutine_fn raw_co_getlength(BlockDriverState *bs)
             return -EIO;
         break;
     case FTYPE_CD:
-        if (!GetDiskFreeSpaceEx(s->drive_path, &available, &total, &total_free))
+        if (!GetDiskFreeSpaceExA(s->drive_path, &available, &total, &total_free))
             return -EIO;
         l.QuadPart = total.QuadPart;
         break;
@@ -778,16 +781,16 @@ static int find_cdrom(char *cdrom_name, int cdrom_name_size)
     UINT type;
 
     memset(drives, 0, sizeof(drives));
-    GetLogicalDriveStrings(sizeof(drives), drives);
+    GetLogicalDriveStringsA(sizeof(drives), drives);
     while(pdrv[0] != '\0') {
-        type = GetDriveType(pdrv);
+        type = GetDriveTypeA(pdrv);
         switch(type) {
         case DRIVE_CDROM:
             snprintf(cdrom_name, cdrom_name_size, "\\\\.\\%c:", pdrv[0]);
             return 0;
             break;
         }
-        pdrv += lstrlen(pdrv) + 1;
+        pdrv += strlen(pdrv) + 1;
     }
     return -1;
 }
@@ -803,7 +806,7 @@ static int find_device_type(BlockDriverState *bs, const char *filename)
         if (stristart(p, "PhysicalDrive", NULL))
             return FTYPE_HARDDISK;
         snprintf(s->drive_path, sizeof(s->drive_path), "%c:\\", p[0]);
-        type = GetDriveType(s->drive_path);
+        type = GetDriveTypeA(s->drive_path);
         switch (type) {
         case DRIVE_REMOVABLE:
         case DRIVE_FIXED:
