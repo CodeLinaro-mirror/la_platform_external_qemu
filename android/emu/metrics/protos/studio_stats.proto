@@ -2847,10 +2847,10 @@ message EmulatorGpuVkInfo {
     PHYSICAL_DEVICE_TYPE_CPU = 5;
   }
 
-  optional uint32 api_version = 1;
-  optional uint32 driver_version = 2;
-  optional uint32 vendor_id = 3;
-  optional uint32 device_id = 4;
+  optional int32 api_version = 1;
+  optional int32 driver_version = 2;
+  optional int32 vendor_id = 3;
+  optional int32 device_id = 4;
   // The type of the GPU device. Matches VkPhysicalDeviceType.
   optional PhysicalDeviceType device_type = 5;
   optional string device_name = 6;
@@ -16202,6 +16202,15 @@ message SmlChatBotEvent {
         [lazy = true];
   }
 
+  // The details about the error that occurred during bot conversation.
+  message BotResponseError {
+    // Metadata about a Bot conversation.
+    optional SmlResponseMetadata metadata = 1 [lazy = true];
+    // The exception that caused the error. This is a fully qualified class
+    // name.
+    optional string exception_type = 2;
+  }
+
   oneof content {
     BotResponse response = 1 [lazy = true];
     UserFeedback user_feedback = 2 [lazy = true];
@@ -16218,6 +16227,7 @@ message SmlChatBotEvent {
     ToolCallFollowUpEvent tool_call_follow_up_event = 13 [lazy = true];
     ToolCallResponse tool_call_response = 14 [lazy = true];
     DeprecationShown deprecation_shown = 15 [lazy = true];
+    BotResponseError bot_response_error = 16 [lazy = true];
   }
 }
 
@@ -16870,6 +16880,8 @@ message ScreenshotTestComposePreviewEvent {
     TYPE_UNKNOWN = 0;
     PREVIEW_DISCOVERY = 1;
     PREVIEW_RENDERING = 2;
+    VALIDATE_CLICKED = 3;
+    UPDATE_CLICKED = 4;
   }
 
   optional Type type = 1;
