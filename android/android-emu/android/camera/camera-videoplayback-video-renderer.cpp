@@ -20,7 +20,7 @@
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/videoplayback/VideoplaybackRenderTarget.h"
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 
 namespace android {
 namespace videoplayback {

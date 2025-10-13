@@ -31,7 +31,7 @@
 
 #define VIRTUALSCENE_PIXEL_FORMAT V4L2_PIX_FMT_RGB32
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 
 namespace android {
 namespace virtualscene {

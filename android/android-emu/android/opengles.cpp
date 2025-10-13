@@ -30,7 +30,7 @@
 #include "android/utils/dll.h"
 #include "android/utils/path.h"
 #include "config-host.h"
-#include "gfxstream/host/Features.h"
+#include "gfxstream/host/features.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/GfxstreamFatalError.h"
 #include "host-common/GoldfishDma.h"
@@ -55,7 +55,7 @@
 
 #include <optional>
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 using android::base::pj;
 using android::base::System;
 using android::emulation::asg::AddressSpaceGraphicsContext;

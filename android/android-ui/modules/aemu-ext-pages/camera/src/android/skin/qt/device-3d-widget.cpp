@@ -46,7 +46,7 @@
 #include "host-common/hw-config.h"
 #include "host-common/opengles.h"
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 using android::base::System;
 
 class QMouseEvent;

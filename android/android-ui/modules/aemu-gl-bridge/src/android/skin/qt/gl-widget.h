@@ -28,10 +28,12 @@ class TextureDraw;
 struct EGLState;
 
 namespace gfxstream {
+namespace host {
 namespace gl {
 struct EGLDispatch;
 struct GLESv2Dispatch;
 }  // namespace gl
+}  // namespace host
 }  // namespace gfxstream
 
 // Helper class used to perform EGL/GLESv2 rendering inside a Qt widget.
@@ -61,8 +63,8 @@ private slots:
 protected:
     // Dispatch tables for EGL and GLESv2 APIs. Note that these will be nullptr
     // if there was a problem when loading the host libraries.
-    const gfxstream::gl::EGLDispatch* mEGL;
-    const gfxstream::gl::GLESv2Dispatch* mGLES2;
+    const gfxstream::host::gl::EGLDispatch* mEGL;
+    const gfxstream::host::gl::GLESv2Dispatch* mGLES2;
 
     // Called the first time a frame needs to be rendered by the widget.
     // This will always happen before the first repaintGL() or resizeGL()

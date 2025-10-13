@@ -20,7 +20,7 @@
 #include "OpenGLESDispatch/gles_functions.h"
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 
 static const GLESv2Dispatch* s_gles2;
 static int s_gles2_version;

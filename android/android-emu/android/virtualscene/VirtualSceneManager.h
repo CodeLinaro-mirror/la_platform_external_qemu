@@ -26,9 +26,11 @@
 #include "android/utils/compiler.h"
 
 namespace gfxstream {
+namespace host {
 namespace gl {
 class GLESv2Dispatch;
 }  // namespace gl
+}  // namespace host
 }  // namespace gfxstream
 
 
@@ -48,7 +50,7 @@ public:
     // |gles2| - Pointer to GLESv2Dispatch, must be non-null.
     //
     // Returns true if initialization succeeded.
-    static bool initialize(const gfxstream::gl::GLESv2Dispatch* gles2, int width, int height);
+    static bool initialize(const gfxstream::host::gl::GLESv2Dispatch* gles2, int width, int height);
 
     // Uninitialize virtual scene rendering, may be called on any thread, but
     // the same EGL context that was active when initialize() was called must be

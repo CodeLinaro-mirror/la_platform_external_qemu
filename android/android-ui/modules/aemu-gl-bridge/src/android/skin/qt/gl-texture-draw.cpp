@@ -15,7 +15,7 @@
 #include "OpenGLESDispatch/GLESv2Dispatch.h"  // for GLESv2Dispatch
 #include "android/skin/qt/gl-common.h"        // for CHECK_GL_ERROR, createS...
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 
 // Vertex shader for anti-aliasing - doesn't do anything special.
 static const char VertexShaderSource[] = R"(
