@@ -13,9 +13,11 @@
 #include "GLES3/gl3.h"  // for GLuint
 
 namespace gfxstream {
+namespace host {
 namespace gl {
 struct GLESv2Dispatch;
 }  // namespace gl
+}  // namespace host
 }  // namespace gfxstream
 
 // This class encapsulates the logic necessary to draw the
@@ -23,7 +25,7 @@ struct GLESv2Dispatch;
 class TextureDraw {
 public:
     // |gl_dispatch| is the GL ES 2 dispatch table.
-    explicit TextureDraw(const gfxstream::gl::GLESv2Dispatch* gl_dispatch);
+    explicit TextureDraw(const gfxstream::host::gl::GLESv2Dispatch* gl_dispatch);
 
     // Frees the resources associated with this instance.
     ~TextureDraw();
@@ -33,7 +35,7 @@ public:
     void draw(GLuint input_texture, int width, int height);
 
 private:
-    const gfxstream::gl::GLESv2Dispatch* mGLES2;
+    const gfxstream::host::gl::GLESv2Dispatch* mGLES2;
     GLuint mProgram;
     GLuint mVertexBuffer;
     GLuint mInputUniformLocation;

@@ -40,9 +40,11 @@
 #include "offworld.pb.h"
 
 namespace gfxstream {
+namespace host {
 namespace gl {
 struct GLESv2Dispatch;
 }  // namespace gl
+}  // namespace host
 }  // namespace gfxstream
 
 using namespace android::base;
@@ -60,7 +62,7 @@ class RenderMultiplexer : public virtualscene::CameraRenderer {
 public:
     RenderMultiplexer() = default;
     ~RenderMultiplexer() = default;
-    bool initialize(const gfxstream::gl::GLESv2Dispatch* gles2,
+    bool initialize(const gfxstream::host::gl::GLESv2Dispatch* gles2,
                     int width,
                     int height) override;
     void uninitialize() override;

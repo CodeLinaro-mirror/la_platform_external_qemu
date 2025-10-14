@@ -30,7 +30,7 @@ constexpr size_t kNumTextures = 2;
 constexpr size_t kVideoFrameTextureIdx = 0;
 constexpr size_t kEmptyFrameTextureIdx = 1;
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 
 namespace android {
 namespace videoplayback {

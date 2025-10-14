@@ -29,7 +29,7 @@
 #include "android/utils/debug.h"
 #include "emugl/common/OpenGLDispatchLoader.h"  // for LazyLoadedEGLDispatch
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 
 class QPaintEvent;
 class QResizeEvent;

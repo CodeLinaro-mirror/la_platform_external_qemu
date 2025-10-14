@@ -22,7 +22,7 @@
 #undef ERROR
 #endif
 
-using namespace gfxstream::gl;
+using namespace gfxstream::host::gl;
 
 namespace android {
 namespace virtualscene {
