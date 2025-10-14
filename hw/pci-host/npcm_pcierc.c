@@ -539,6 +539,7 @@ static void npcm_pcie_root_port_realize(DeviceState *dev, Error **errp)
 {
     PCIERootPortClass *rpc = PCIE_ROOT_PORT_GET_CLASS(dev);
     Error *local_err = NULL;
+    dev->id = g_strdup(TYPE_NPCM_PCIE_ROOT_PORT);
 
     rpc->parent_realize(dev, &local_err);
     if (local_err) {
