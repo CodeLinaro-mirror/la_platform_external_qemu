@@ -28,6 +28,7 @@ vcruntime140_1.dll
 set(MSVC_DEPENDENCIES "")
 foreach(DEP ${MSVC_REDIST_DLL})
     list(APPEND MSVC_DEPENDENCIES "${PREBUILT_ROOT}/2019/${DEP}>./${DEP}")
+    list(APPEND MSVC_DEPENDENCIES "${PREBUILT_ROOT}/2019/${DEP}>./qemu/windows-x86_64/${DEP}")
 endforeach()
 set(PACKAGE_EXPORT "MSVC_DEPENDENCIES;MSVC_FOUND")
 android_license(
