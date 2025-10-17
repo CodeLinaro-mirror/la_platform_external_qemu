@@ -1,0 +1,461 @@
+{
+  // This file configures the build for a Meson-based project. It is used by the
+  // generic MesonProjectBuilder to generate toolchains, dependencies, and other
+  // necessary build files.
+  //
+  // The structure is composed of two main sections:
+  // 1. "common": Holds configurations that are shared across all target platforms.
+  // 2. "platforms": Contains platform-specific configurations that can override
+  //    or extend the common settings.
+  //
+  // The builder merges these sections based on the target platform. For example,
+  // when building for "linux-x64", the builder will merge the settings from
+  // "common" and "platforms.linux-x64".
+  "project_name": "qemu",
+  "source_path": "third_party/qemu",
+
+  "common": {
+    // "dependencies": A dictionary of libraries required for the build. These
+    // are used to generate pkg-config (.pc) files, which Meson uses to find
+    // libraries and their headers.
+    "dependencies": {
+      "rutabaga_gfx_ffi": {
+        "lib_type": "bazel",
+        "bazel_target": "@crosvm//:rutabaga_c_ffi",
+        "version": "0.1.2",
+        "shim": {
+          "name": "rutabaga_gfx_ffi",
+          "archive_target": "@crosvm//:rutabaga_ffi"
+        }
+      },
+      "libfdt": {
+        "lib_type": "bazel",
+        "bazel_target": "@dtc//:libfdt",
+        "version": "1.6.0"
+      },
+      "gmodule": {
+        "lib_type": "bazel",
+        "bazel_target": "@glib//gmodule",
+        "version": "2.77.2",
+        "shim": {
+          "name": "gmodule-export-2.0",
+          "link_flags": "-pthread",
+          "Requires": "pcre2"
+        }
+      },
+      "zlib": {
+        "lib_type": "bazel",
+        "bazel_target": "@zlib//:zlib",
+        "version": "1.2.10"
+      },
+      "glib": {
+        "lib_type": "bazel",
+        "bazel_target": "@glib//glib",
+        "version": "2.77.2",
+        "shim": {
+          "name": "glib-2.0",
+          "Requires": "pcre2, gmodule-export-2.0",
+          "link_flags": "-pthread"
+        }
+      },
+      "pixman": {
+        "lib_type": "bazel",
+        "bazel_target": "@pixman//:pixman-1",
+        "version": "0.42.3",
+        "shim": {
+          "Requires": "pixman_simd"
+        }
+      },
+      "pixman_simd": {
+        "lib_type": "bazel",
+        "bazel_target": "@pixman//:pixman_simd",
+        "version": "0.42.3"
+      },
+      "pcre2": {
+        "lib_type": "bazel",
+        "bazel_target": "@pcre2//:pcre2",
+        "version": "10.42"
+      }
+    },
+    // "meson_options": A dictionary of Meson feature flags and settings.
+    // These are passed to the `meson setup` command.
+    "meson_options": {
+      "-Daf_xdp": "disabled",
+      "-Dalsa": "disabled",
+      "-Dandroid": "enabled",
+      "-Dasan": "false",
+      "-Dattr": "disabled",
+      "-Daudio_drv_list": "default",
+      "-Dauth_pam": "disabled",
+      "-Dauto_features": "disabled",
+      "-Davx2": "disabled",
+      "-Davx512bw": "disabled",
+      "-Db_coverage": "false",
+      "-Db_lto": "false",
+      "-Db_pie": "false",
+      "-Dblkio": "disabled",
+      "-Dbochs": "disabled",
+      "-Dbpf": "disabled",
+      "-Dbrlapi": "disabled",
+      "-Dbzip2": "disabled",
+      "-Dcanokey": "disabled",
+      "-Dcap_ng": "disabled",
+      "-Dcapstone": "disabled",
+      "-Dcfi": "false",
+      "-Dcfi_debug": "false",
+      "-Dcloop": "disabled",
+      "-Dcocoa": "disabled",
+      "-Dcolo_proxy": "disabled",
+      "-Dcoreaudio": "disabled",
+      "-Dcoroutine_pool": "true",
+      "-Dcrypto_afalg": "disabled",
+      "-Dcurl": "disabled",
+      "-Dcurses": "disabled",
+      "-Ddbus_display": "disabled",
+      "-Ddebug_graph_lock": "false",
+      "-Ddebug_mutex": "false",
+      "-Ddebug_remap": "false",
+      "-Ddebug_stack_usage": "false",
+      "-Ddebug_tcg": "false",
+      "-Ddefault_devices": "true",
+      "-Ddmg": "disabled",
+      "-Ddocs": "disabled",
+      "-Ddsound": "disabled",
+      "-Dfdt": "enabled",
+      "-Dfuse": "disabled",
+      "-Dfuse_lseek": "disabled",
+      "-Dfuzzing": "false",
+      "-Dgcrypt": "disabled",
+      "-Dgettext": "disabled",
+      "-Dgio": "disabled",
+      "-Dglusterfs": "disabled",
+      "-Dgnutls": "disabled",
+      "-Dgtk": "disabled",
+      "-Dgtk_clipboard": "disabled",
+      "-Dguest_agent": "disabled",
+      "-Dguest_agent_msi": "disabled",
+      "-Dhexagon_idef_parser": "false",
+      "-Dhv_balloon": "disabled",
+      "-Dhvf": "disabled",
+      "-Diconv": "disabled",
+      "-Dinstall_blobs": "false",
+      "-Djack": "disabled",
+      "-Dkeyring": "disabled",
+      "-Dkvm": "disabled",
+      "-Dl2tpv3": "disabled",
+      "-Dlibcbor": "disabled",
+      "-Dlibdaxctl": "disabled",
+      "-Dlibdw": "disabled",
+      "-Dlibiscsi": "disabled",
+      "-Dlibkeyutils": "disabled",
+      "-Dlibnfs": "disabled",
+      "-Dlibpmem": "disabled",
+      "-Dlibssh": "disabled",
+      "-Dlibudev": "disabled",
+      "-Dlibusb": "disabled",
+      "-Dlibvduse": "disabled",
+      "-Dlinux_aio": "disabled",
+      "-Dlinux_io_uring": "disabled",
+      "-Dlzfse": "disabled",
+      "-Dlzo": "disabled",
+      "-Dmalloc_trim": "disabled",
+      "-Dmembarrier": "disabled",
+      "-Dmodule_upgrades": "false",
+      "-Dmodules": "disabled",
+      "-Dmpath": "disabled",
+      "-Dmultiprocess": "disabled",
+      "-Dnetmap": "disabled",
+      "-Dnettle": "disabled",
+      "-Dnuma": "disabled",
+      "-Dnvmm": "disabled",
+      "-Dopengl": "disabled",
+      "-Doss": "disabled",
+      "-Dpa": "disabled",
+      "-Dparallels": "disabled",
+      "-Dpipewire": "disabled",
+      "-Dpixman": "enabled",
+      "-Dplugins": "false",
+      "-Dpng": "disabled",
+      "-Dprefer_static": "false",
+      "-Dpvg": "disabled",
+      "-Dqatzip": "disabled",
+      "-Dqcow1": "disabled",
+      "-Dqed": "disabled",
+      "-Dqga_vss": "disabled",
+      "-Dqom_cast_debug": "false",
+      "-Dqpl": "disabled",
+      "-Drbd": "disabled",
+      "-Drdma": "disabled",
+      "-Drelocatable": "true",
+      "-Dreplication": "disabled",
+      "-Drng_none": "false",
+      "-Drust": "disabled",
+      "-Drutabaga_gfx": "enabled",
+      "-Dsafe_stack": "false",
+      "-Dsdl": "disabled",
+      "-Dsdl_image": "disabled",
+      "-Dseccomp": "disabled",
+      "-Dselinux": "disabled",
+      "-Dslirp": "disabled",
+      "-Dslirp_smbd": "disabled",
+      "-Dsmartcard": "disabled",
+      "-Dsnappy": "disabled",
+      "-Dsndio": "disabled",
+      "-Dsparse": "disabled",
+      "-Dspice": "disabled",
+      "-Dspice_protocol": "disabled",
+      "-Dstack_protector": "disabled",
+      "-Dstrict_rust_lints": "false",
+      "-Dtcg": "enabled",
+      "-Dtcg_interpreter": "false",
+      "-Dtools": "enabled",
+      "-Dtpm": "disabled",
+      "-Dtsan": "false",
+      "-Du2f": "disabled",
+      "-Duadk": "disabled",
+      "-Dubsan": "false",
+      "-Dusb_redir": "disabled",
+      "-Dvde": "disabled",
+      "-Dvdi": "disabled",
+      "-Dvduse_blk_export": "disabled",
+      "-Dvfio_user_server": "disabled",
+      "-Dvhdx": "disabled",
+      "-Dvhost_crypto": "disabled",
+      "-Dvhost_kernel": "disabled",
+      "-Dvhost_net": "disabled",
+      "-Dvhost_user": "disabled",
+      "-Dvhost_user_blk_server": "disabled",
+      "-Dvhost_vdpa": "disabled",
+      "-Dvirglrenderer": "disabled",
+      "-Dvirtfs": "disabled",
+      "-Dvmdk": "disabled",
+      "-Dvmnet": "disabled",
+      "-Dvnc": "enabled",
+      "-Dvnc_jpeg": "disabled",
+      "-Dvnc_sasl": "disabled",
+      "-Dvpc": "disabled",
+      "-Dvte": "disabled",
+      "-Dvvfat": "disabled",
+      "-Dwerror": "false",
+      "-Dwhpx": "disabled",
+      "-Dxen": "disabled",
+      "-Dxen_pci_passthrough": "disabled",
+      "-Dxkbcommon": "disabled",
+      "-Dzstd": "disabled"
+    },
+    // "generated_files": A list of files to be generated by the build script.
+    "generated_files": [
+      {
+        "filename": "config-host.mak",
+        "content": {
+          "common": {
+            "GENISOIMAGE": "False",
+            "TARGET_DIRS": "aarch64-softmmu riscv64-softmmu x86_64-softmmu",
+            "CONFIG_DEFAULT_TARGETS": "y"
+          }
+        }
+      }
+    ]
+  },
+  "platforms": {
+    "linux-x64": {
+      "dependencies": {
+        "libpulse": {
+          "lib_type": "bazel",
+          "bazel_target": "@gcc_lib//:libpulse",
+          "version": "3.0",
+          "shim": {
+            "Libs": "-lpulse"
+          }
+        },
+        "alsa": {
+          "lib_type": "bazel",
+          "bazel_target": "@gcc_lib//:libasound",
+          "version": "1.0.25",
+          "shim": {
+            "name": "alsa",
+            "Libs": "-lasound"
+          }
+        },
+        "gmodule": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//gmodule",
+          "version": "2.77.2",
+          "shim": {
+            "name": "gmodule-export-2.0",
+            "link_flags": "-pthread",
+            "Requires": "pcre2"
+          }
+        }
+      },
+      "meson_options": {
+        "-Dandroid": "enabled",
+        "-Dalsa": "enabled",
+        "-Daudio_drv_list": "pa,alsa",
+        "-Davx2": "enabled",
+        "-Davx512bw": "enabled",
+        "-Db_pie": "true",
+        "-Dcrypto_afalg": "enabled",
+        "-Dkvm": "enabled",
+        "-Dmalloc_trim": "enabled",
+        "-Dpa": "enabled",
+        "-Dvhost_crypto": "enabled",
+        "-Dvhost_kernel": "enabled",
+        "-Dvhost_net": "enabled",
+        "-Dvhost_user": "enabled",
+        "-Dvhost_user_blk_server": "enabled"
+      }
+    },
+    "linux-aarch64": {
+      "dependencies": {
+        "libpulse": {
+          "lib_type": "bazel",
+          "bazel_target": "@gcc_lib//:libpulse",
+          "version": "3.0",
+          "shim": {
+            "Libs": "-lpulse"
+          }
+        },
+        "alsa": {
+          "lib_type": "bazel",
+          "bazel_target": "@gcc_lib//:libasound",
+          "version": "1.0.25",
+          "shim": {
+            "name": "alsa",
+            "Libs": "-lasound"
+          }
+        },
+        "gmodule": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//gmodule",
+          "version": "2.77.2",
+          "shim": {
+            "name": "gmodule-export-2.0",
+            "link_flags": "-pthread",
+            "Requires": "pcre2"
+          }
+        }
+      }
+    },
+    "mac-aarch64": {
+      "dependencies": {
+        "gmodule": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//gmodule",
+          "version": "2.77.2",
+          "shim": {
+            "name": "gmodule-export-2.0",
+            "link_flags": "-pthread",
+            "Requires": "pcre2"
+          }
+        },
+        "glib": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib",
+          "version": "2.77.2",
+          "shim": {
+            "name": "glib-2.0",
+            "Requires": "pcre2, gmodule-export-2.0",
+            "link_flags": "-liconv"
+          }
+        }
+      },
+      "meson_options": {
+        "-Daudio_drv_list": "coreaudio",
+        "-Db_pie": "true",
+        "-Dcoreaudio": "enabled",
+        "-Dhvf": "enabled",
+        "-Dvmnet": "enabled"
+      }
+    },
+    "mac-x64": {
+      "dependencies": {
+        "gmodule": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//gmodule",
+          "version": "2.77.2",
+          "shim": {
+            "name": "gmodule-export-2.0",
+            "link_flags": "-pthread",
+            "Requires": "pcre2"
+          }
+        },
+        "glib": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib",
+          "version": "2.77.2",
+          "shim": {
+            "name": "glib-2.0",
+            "Requires": "pcre2, gmodule-export-2.0",
+            "link_flags": "-liconv"
+          }
+        }
+      },
+      "meson_options": {
+        "-Daudio_drv_list": "coreaudio",
+        "-Db_pie": "true",
+        "-Dcoreaudio": "enabled",
+        "-Dhvf": "enabled",
+        "-Dvmnet": "enabled"
+      }
+    },
+    "windows-x64": {
+      "dependencies": {
+        "gmodule": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//gmodule",
+          "version": "2.77.2",
+          "shim": {
+            "name": "gmodule-export-2.0",
+            "cflags": "-DGMODULE_STATIC_COMPILATION",
+            "Requires": "pcre2"
+          }
+        },
+        "glib": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib",
+          "version": "2.77.2",
+          "shim": {
+            "name": "glib-2.0",
+            "Requires": "pcre2, zlib, gmodule-export-2.0, gnulib, dirent",
+            "link_name": "glib-2.0.lib",
+            "cflags": "-DGLIB_STATIC_COMPILATION",
+            "dll_ext": ""
+          }
+        },
+        "gnulib": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib:gnulib",
+          "version": "2.77.2"
+        },
+        "dirent": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib/dirent",
+          "version": "2.77.2",
+          "shim": {
+            "name": "dirent"
+          }
+        }
+      },
+      "meson_options": {
+        "--vsenv": null,
+        "-Daudio_drv_list": "dsound",
+        "-Davx2": "auto",
+        "-Davx512bw": "auto",
+        "-Ddsound": "enabled",
+        "-Dvhost_net": "enabled",
+        "-Dwhpx": "enabled"
+      },
+      "generated_files": [
+        {
+          "filename": "config-host.mak",
+          "content": {
+            "windows-x64": {
+              "EXESUF": ".exe"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

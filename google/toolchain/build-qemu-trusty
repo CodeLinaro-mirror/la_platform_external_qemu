@@ -38,6 +38,6 @@ destination="$1"
 distribution="$2"
 
 echo "-- Launching qemu configuration, build"
-$absolute_aosp/prebuilts/bazel/linux-x86_64/bazel run //third_party/qemu/google/toolchain:amc -- setup --force --target trusty --aosp $absolute_aosp  $destination/qemu-bld
+$absolute_aosp/prebuilts/bazel/linux-x86_64/bazel run //third_party/qemu/google/toolchain:amc -- setup --config $absolute_aosp/third_party/qemu/google/toolchain/qemu-trusty-build-config.jsonc --force --target linux --aosp $absolute_aosp  $destination/qemu-bld
 $absolute_aosp/prebuilts/bazel/linux-x86_64/bazel run //third_party/qemu/google/toolchain:amc -- compile $destination/qemu-bld
 $absolute_aosp/prebuilts/bazel/linux-x86_64/bazel run //third_party/qemu/google/toolchain:amc -- release $destination/qemu-bld $distribution
