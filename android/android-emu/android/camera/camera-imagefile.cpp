@@ -166,7 +166,7 @@ std::optional<ImageData> loadPNGImage(const char* filename) {
     img.data_ptr = &img.data[0];
     img.width = width;
     img.height = height;
-    img.num_components = PNG_COLOR_TYPE_RGB ? 3 : 4;
+    img.num_components = (newColorType == PNG_COLOR_TYPE_RGB) ? 3 : 4;
     img.line_size = img.width * img.num_components;
 
     return img;
@@ -226,7 +226,6 @@ std::optional<ImageData> loadImageFromFile(const char* filename) {
     const std::string filename_str{filename};
     const std::string_view extension{PathUtils::extension(filename_str)};
 
-    derror("loadImageFromFile: %s", filename);
     if (strncasecmp(extension.data(), ".png", extension.size()) == 0) {
         return loadPNGImage(filename);
     } else if (strncasecmp(extension.data(), ".jpg", extension.size()) == 0 ||
@@ -292,7 +291,6 @@ struct ImagefileCameraDevice {
                                     uint32_t /*pixelFormat*/,
                                     int width,
                                     int height) {
-        derror("Requesting capture with %dx%d", width, height);
         return myselfFrom(cd)->startCapturing();
     }
 
