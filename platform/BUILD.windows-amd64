@@ -3,7 +3,7 @@
 # Using the experimental bazel build plugin.
 # It targets windows-amd64
 
-load("@//build/bazel/rules:windows_resources.bzl", "windows_resources")
+load("@goldfish_build//rules:windows_resources.bzl", "windows_resources")
 cc_binary(
    copts = ['-Wno-constant-conversion', '-Wno-macro-redefined', '-Wno-invalid-noreturn', '-Wno-bitfield-constant-conversion', '-Wno-int-to-void-pointer-cast', '-Wno-unused-command-line-argument', '-Wno-undef', '-Wno-microsoft-enum-forward-reference', '-Wno-microsoft-include', '-Wno-deprecated-declarations', '-fms-extensions', '-march=native', '-UNDEBUG'],
    defines = ['GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
