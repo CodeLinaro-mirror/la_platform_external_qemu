@@ -318,6 +318,18 @@ static android_studio::EmulatorAvdInfo::EmulatorDeviceName getDeviceName() {
     if (0 == strcmp(id, "pixel_9_pro_fold")) {
         return android_studio::EmulatorAvdInfo::PIXEL_9_PRO_FOLD;
     }
+    if (0 == strcmp(id, "pixel_10")) {
+        return android_studio::EmulatorAvdInfo::PIXEL_10;
+    }
+    if (0 == strcmp(id, "pixel_10_pro")) {
+        return android_studio::EmulatorAvdInfo::PIXEL_10_PRO;
+    }
+    if (0 == strcmp(id, "pixel_10_pro_xl")) {
+        return android_studio::EmulatorAvdInfo::PIXEL_10_PRO_XL;
+    }
+    if (0 == strcmp(id, "pixel_10_pro_fold")) {
+        return android_studio::EmulatorAvdInfo::PIXEL_10_PRO_FOLD;
+    }
     if (0 == strcmp(id, "pixel_fold")) {
         return android_studio::EmulatorAvdInfo::PIXEL_FOLD;
     }
