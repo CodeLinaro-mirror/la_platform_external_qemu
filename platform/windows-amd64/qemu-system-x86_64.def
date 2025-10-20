@@ -64,6 +64,7 @@ EXPORTS
     error_setg_errno_internal
     error_setg_internal
     error_setg_win32_internal
+    error_set_log_info
     error_warn
     freq_to_str
     get_ptr_rcu_reader
