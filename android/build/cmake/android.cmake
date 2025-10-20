@@ -858,8 +858,14 @@ function(android_add_default_test_properties name)
    # Setup QT search paths, so we can use QT in our tests.
   if(APPLE)
     # macOS (Darwin) uses DYLD_LIBRARY_PATH
-    set_property(TEST ${NAME} APPEND PROPERTY ENVIRONMENT
-                 "DYLD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib64/qt/lib")
+    set_property(
+    TEST ${name} APPEND
+    PROPERTY ENVIRONMENT
+    "DYLD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib64/qt/lib")
+    set_property(
+    TEST ${name} APPEND
+    PROPERTY ENVIRONMENT
+    "QT_QPA_PLATFORM_PLUGIN_PATH=${CMAKE_BINARY_DIR}/lib64/qt/plugins")
   elseif(LINUX)
     # Unix uses LD_LIBRARY_PATH
     set_property(
@@ -869,7 +875,7 @@ function(android_add_default_test_properties name)
     set_property(
     TEST ${name} APPEND
     PROPERTY ENVIRONMENT
-    "LQT_QPA_PLATFORM_PLUGIN_PATH=${CMAKE_BINARY_DIR}/lib64/qt/plugins")
+    "QT_QPA_PLATFORM_PLUGIN_PATH=${CMAKE_BINARY_DIR}/lib64/qt/plugins")
   endif()
 
   if(WINDOWS_MSVC_X86_64)

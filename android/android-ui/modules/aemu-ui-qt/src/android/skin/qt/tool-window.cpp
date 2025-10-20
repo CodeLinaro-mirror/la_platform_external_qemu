@@ -204,13 +204,7 @@ ToolWindow::WindowHolder<T>::~WindowHolder() {
 ToolWindow::ExtendedWindowHolder::ExtendedWindowHolder(
         ToolWindow* tw,
         OnCreatedCallback onCreated) {
-    bool grpc = getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui;
-    if (grpc) {
-        dwarning("Using experimental gRPC UI, not yet stable!");
-        mWindow = new ExtendedWindowGrpc(tw->mEmulatorWindow, tw);
-    } else {
-        mWindow = new ExtendedWindow(tw->mEmulatorWindow, tw);
-    }
+    mWindow = new ExtendedWindow(tw->mEmulatorWindow, tw);
     (tw->*onCreated)(mWindow);
 }
 
