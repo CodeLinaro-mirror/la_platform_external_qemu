@@ -48,6 +48,8 @@ bool warn_report_once_cond(bool *printed, const char *fmt, ...)
 
 void error_init(const char *argv0);
 
+void error_set_log_info(bool log_info);
+
 /*
  * Similar to error_report(), except it prints the message just once.
  * Return true when it prints, false otherwise.

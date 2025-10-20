@@ -14,6 +14,8 @@
 #include "monitor/monitor.h"
 #include "qemu/error-report.h"
 
+static bool log_info = true;
+
 /*
  * @report_type is the type of message: error, warning or
  * informational.
@@ -248,7 +250,10 @@ void warn_vreport(const char *fmt, va_list ap)
  */
 void info_vreport(const char *fmt, va_list ap)
 {
-    vreport(REPORT_TYPE_INFO, fmt, ap);
+    if (log_info)
+    {
+        vreport(REPORT_TYPE_INFO, fmt, ap);
+    }
 }
 
 /*
@@ -291,11 +296,14 @@ void warn_report(const char *fmt, ...)
  */
 void info_report(const char *fmt, ...)
 {
-    va_list ap;
+    if (log_info)
+    {
+        va_list ap;
 
-    va_start(ap, fmt);
-    vreport(REPORT_TYPE_INFO, fmt, ap);
-    va_end(ap);
+        va_start(ap, fmt);
+        vreport(REPORT_TYPE_INFO, fmt, ap);
+        va_end(ap);
+    }
 }
 
 /*
@@ -391,4 +399,9 @@ void error_init(const char *argv0)
     g_log_set_default_handler(qemu_log_func, NULL);
     g_warn_if_fail(qemu_glog_domains == NULL);
     qemu_glog_domains = g_strdup(g_getenv("G_MESSAGES_DEBUG"));
+}
+
+void error_set_log_info(bool should_log)
+{
+    log_info = should_log;
 }
