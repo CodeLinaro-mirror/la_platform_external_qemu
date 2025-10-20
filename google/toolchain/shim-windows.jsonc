@@ -1,6 +1,6 @@
 {
   // This will be at the start of the bazel file.
-  "bazel_prefix": "load(\"@//build/bazel/rules:windows_resources.bzl\", \"windows_resources\")",
+  "bazel_prefix": "load(\"@goldfish_build//rules:windows_resources.bzl\", \"windows_resources\")",
   "shims": [
     {
       "target": "qemu-system-aarch64",
