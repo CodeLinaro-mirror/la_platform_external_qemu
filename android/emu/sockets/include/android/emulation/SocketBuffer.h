@@ -91,8 +91,6 @@ struct SocketBuffer {
         assert(size <= mSize);
 
         if (mCapacity) {
-            assert(mConsume < mCapacity);
-
             if (mSize == size) {
                 clear(mCapacity >= (1U << 20));  // make more contiguous space for the next `append`
             } else {
