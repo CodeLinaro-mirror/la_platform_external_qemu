@@ -77,7 +77,6 @@ static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func,
       return false;
     }
 
-    printf("loading %s\n", full_path);
     GModule *g_module;
     int flags;
 
@@ -87,7 +86,7 @@ static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func,
     }
     g_module = g_module_open(full_path, (GModuleFlags)flags);
     if (!g_module) {
-        fprintf(stderr, "error, failed to load goldfish module - %s\n", g_module_error());
+        fprintf(stderr, "error, failed to load goldfish module - %s: %s\n", full_path, g_module_error());
         return false;
     }
 
