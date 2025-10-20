@@ -48,6 +48,9 @@ bool warn_report_once_cond(bool *printed, const char *fmt, ...)
 
 void error_init(const char *argv0);
 
+typedef void(*logger)(int severity, const char *file, int line, const char *fmt, va_list ap);
+void set_logger(logger logger);
+
 /*
  * Similar to error_report(), except it prints the message just once.
  * Return true when it prints, false otherwise.
