@@ -19,9 +19,11 @@ namespace android {
 namespace emulation {
 
 struct SocketBuffer {
+    constexpr static size_t kLargeCapacityReleaseIfEmpty = size_t(4) << 20;  // 4M
+
     bool isEmpty() const { return mSize == 0; }
 
-    void append(const void* const appendData, const size_t appendSize) {
+    size_t append(const void* const appendData, const size_t appendSize) {
         assert(mSize <= mCapacity);
 
         const size_t newSize = mSize + appendSize;
@@ -71,6 +73,7 @@ struct SocketBuffer {
         }
 
         mSize = newSize;
+        return newSize;
     }
 
     // Returns the contiguous portion of the buffer, it could be shorter than the whole buffer.
@@ -92,7 +95,8 @@ struct SocketBuffer {
 
         if (mCapacity) {
             if (mSize == size) {
-                clear(mCapacity >= (1U << 20));  // make more contiguous space for the next `append`
+                // make more contiguous space for the next `append`
+                clear(mCapacity >= kLargeCapacityReleaseIfEmpty);
             } else {
                 mSize -= size;
                 mConsume = (mConsume + size) % mCapacity;
