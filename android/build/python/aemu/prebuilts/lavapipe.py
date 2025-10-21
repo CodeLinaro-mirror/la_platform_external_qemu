@@ -31,11 +31,16 @@ AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
 HOST_ARCH = platform.machine().lower()
 PREBUILTS_ARCH = "x86_64" if HOST_ARCH == "x86_64" else "aarch64"
+PLATFORM_NAME = f"{HOST_OS}-{PREBUILTS_ARCH}"
 
 AOSP_MESA_SRC_PATH = os.path.join(AOSP_ROOT, "external", "mesa3d")
-AOSP_LAVAPIPE_PREBUILTS_PATH =  AOSP_ROOT / "prebuilts" / "android-emulator-build" / "common" \
-        / "vulkan" / f"{HOST_OS}-{PREBUILTS_ARCH}" / "icds"
+PREBUILTS_PATH = os.path.join(AOSP_ROOT, "prebuilts")
+
+AOSP_LAVAPIPE_PREBUILTS_PATH = os.path.join(PREBUILTS_PATH, "android-emulator-build", "common", "vulkan", PLATFORM_NAME, "icds")
 LAVAPIPE_SHA1_FILE = "lavapipe.sha1"
+
+NINJA_PATH = os.path.join(PREBUILTS_PATH, "ninja", HOST_OS + "-x86")
+GLSLANG_PATH = os.path.join(PREBUILTS_PATH, "android-emulator-build", "common", "vulkan", PLATFORM_NAME)
 
 def checkDependencies():
     logging.info("Checking for required build dependencies..")
@@ -60,7 +65,6 @@ def checkDependencies():
 def configureLavapipeBuild(srcdir, builddir):
     # TODO(b/446627550): Use ninja and meson prebuilts from prebuilts by making them
     # compatible for building lavapipe and add into search path instead
-    # deps_common.addToSearchPath(NINJA_PATH)
     if not shutil.which("ninja"):
         raise Exception(f"'ninja' is not available!")
     if not shutil.which("meson"):
@@ -176,6 +180,10 @@ def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
                 logging.info("Different Lavapipe sha1 detected. Rebuilding Lavapipe.")
         except Exception as e:
             logging.fatal(e)
+
+    # Use our prebuilts
+    deps_common.addToSearchPath(NINJA_PATH)
+    deps_common.addToSearchPath(GLSLANG_PATH)
 
     logging.info(os.environ)
 
