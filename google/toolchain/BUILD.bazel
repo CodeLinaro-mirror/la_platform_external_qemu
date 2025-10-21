@@ -1,7 +1,7 @@
-# This has moved to //hardware/generic/goldfish/development/tools/toolchain
-# as the toolchain generator is used by other projects as well.
+# This has moved to //hardware/google/aemu/tools/toolchain
+# as the toolchain generator is now a generic toolchain configurator
 alias(
     name = "amc",
-    actual = "//hardware/generic/goldfish/development/tools/toolchain:amc",
+    actual = "@aemu//tools/toolchain:amc",
     visibility = ["//visibility:public"],
 )
