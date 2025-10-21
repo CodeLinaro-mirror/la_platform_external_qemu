@@ -36,4 +36,35 @@ typedef struct HVFState HVFState;
 DECLARE_INSTANCE_CHECKER(HVFState, HVF_STATE,
                          TYPE_HVF_ACCEL)
 
+#if defined(__APPLE__) && defined(__MACH__)
+//todo: revert the CL intrducing the following function
+//      after we don't support MacOS 12 or lower, as we
+//      don't want to diverge from the upstream QEMU.
+static int isMacOS13orAbove(void)
+{
+    size_t buf_len = 0;
+    char *osVersion = NULL;
+    int ret = 0;
+
+    if (sysctlbyname("kern.osproductversion", NULL,
+                     &buf_len, NULL, 0) != 0) {
+        return 0;
+    }
+
+    osVersion = malloc(buf_len);
+    if (!osVersion) {
+        return 0;
+    }
+
+    if (sysctlbyname("kern.osproductversion", osVersion,
+                      &buf_len, NULL, 0) != 0) {
+        return 0;
+    }
+
+    ret = strcmp(osVersion, "13") >= 0;
+    free(osVersion);
+    return ret;
+}
+#endif
+
 #endif

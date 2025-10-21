@@ -153,7 +153,14 @@ static void arm_virt_compat_default_set(MachineClass *mc)
 #define PLATFORM_BUS_NUM_IRQS 64
 
 /* Legacy RAM limit in GB (< version 4.0) */
+#if defined(__APPLE__) && defined(__MACH__)
+//todo: revert the CL intrducing the following definition of 31
+//      after we don't support MacOS 12 or lower, as we don't want
+//      to diverge from the upstream QEMU.
+#define LEGACY_RAMLIMIT_GB 31
+#else
 #define LEGACY_RAMLIMIT_GB 255
+#endif
 #define LEGACY_RAMLIMIT_BYTES (LEGACY_RAMLIMIT_GB * GiB)
 
 /* MMIO region size for SMMUv3 */
@@ -226,7 +233,14 @@ static const MemMapEntry base_memmap[] = {
 };
 
 /* Update the docs for highmem-mmio-size when changing this default */
+#if defined(__APPLE__) && defined(__MACH__)
+//todo: revert the CL intrducing the following definition of 31
+//      after we don't support MacOS 12 or lower, as we don't want
+//      to diverge from the upstream QEMU.
+#define DEFAULT_HIGH_PCIE_MMIO_SIZE_GB 31
+#else
 #define DEFAULT_HIGH_PCIE_MMIO_SIZE_GB 512
+#endif
 #define DEFAULT_HIGH_PCIE_MMIO_SIZE (DEFAULT_HIGH_PCIE_MMIO_SIZE_GB * GiB)
 
 /*
@@ -2018,6 +2032,12 @@ static void virt_set_memmap(VirtMachineState *vms, int pa_bits)
         pa_bits = 32;
     }
 
+#if defined(__APPLE__) && defined(__MACH__)
+    if (!isMacOS13orAbove()) {
+       pa_bits = 36;
+    }
+#endif
+
     /*
      * We compute the base of the high IO region depending on the
      * amount of initial and device memory. The device memory start/size
@@ -3563,7 +3583,10 @@ static void virt_machine_class_init(ObjectClass *oc, const void *data)
     mc->get_valid_cpu_types = virt_get_valid_cpu_types;
     mc->get_default_cpu_node_id = virt_get_default_cpu_node_id;
     mc->kvm_type = virt_kvm_type;
-    mc->get_physical_address_range = virt_get_physical_address_range;
+#if defined(__APPLE__) && defined(__MACH__)
+    if (isMacOS13orAbove())
+        mc->get_physical_address_range = virt_get_physical_address_range;
+#endif
     assert(!mc->get_hotplug_handler);
     mc->get_hotplug_handler = virt_machine_get_hotplug_handler;
     hc->pre_plug = virt_machine_device_pre_plug_cb;
