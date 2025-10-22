@@ -291,7 +291,7 @@ using discovery_dir = struct discovery_dir {
 #if defined(_WIN32)
 discovery_dir discovery{"LOCALAPPDATA", "Temp"};
 #elif defined(__linux__)
-discovery_dir discovery{"XDG_RUNTIME_DIR", ""};
+discovery_dir discovery{"ANDROID_EMULATOR_DISCOVERY_DIR", ""};
 #elif defined(__APPLE__)
 discovery_dir discovery{"HOME", "Library/Caches/TemporaryItems"};
 #else

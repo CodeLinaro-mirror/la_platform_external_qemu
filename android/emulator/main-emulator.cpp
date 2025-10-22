@@ -86,6 +86,7 @@
 
 using android::ConfigDirs;
 using android::base::PathUtils;
+using android::base::pj;
 using android::base::RunOptions;
 using android::base::ScopedCPtr;
 using android::base::System;
@@ -486,7 +487,16 @@ int main(int argc, char** argv) {
 #endif
         dprint("XDG_RUNTIME_DIR is not defined, default to %s",
                  default_runtime_dir);
-        System::get()->envSet(kXDG_RUNTIME_DIR_NAME, "/tmp");
+        System::get()->envSet(kXDG_RUNTIME_DIR_NAME, default_runtime_dir);
+        xdg_runtime_dir_val = default_runtime_dir;
+    } else {
+#if defined(__linux__)
+        // Bug: 454403989
+        // when systme has XDG_RUNTIME_DIR set, we need to pass it
+        // to ANDROID_EMULATOR_DISCOVERY_DIR; do nothing otherwise
+        System::get()->envSet("ANDROID_EMULATOR_DISCOVERY_DIR",
+                              xdg_runtime_dir_val);
+#endif
     }
 #endif
 
