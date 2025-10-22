@@ -186,8 +186,8 @@ struct VSockStream {
         return true;
     }
 
-    void hostToGuestBufAppend(const void* data, size_t size) {
-        mHostToGuestBuf.append(data, size);
+    size_t hostToGuestBufAppend(const void* data, size_t size) {
+        return mHostToGuestBuf.append(data, size);
     }
 
     std::tuple<const void*, size_t> hostToGuestBufPeek() const {
@@ -426,14 +426,14 @@ struct VirtIOVSockDev {
         }
     }
 
-    size_t hostToGuestSend(const uint64_t key, const void* data, size_t size) {
+    size_t hostToGuestSend(const uint64_t key, const void* data, const size_t dataSize) {
         android::RecursiveScopedVmLock lock;
 
         const auto stream = findStreamLocked(key);
         if (stream) {
-            stream->hostToGuestBufAppend(data, size);
+            const size_t bufferSize = stream->hostToGuestBufAppend(data, dataSize);
             vqWriteHostToGuestExternalLocked();
-            return size;
+            return bufferSize;
         } else {
             return 0;
         }

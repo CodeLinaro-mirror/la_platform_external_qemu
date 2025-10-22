@@ -95,8 +95,17 @@ struct VsockAdbProxy : public AdbVsockPipe::Proxy {
 
                 logToAdbSniffer(mReceivedMesg.get(), buf, received);
 
-                const size_t sent = (*g_vsock_ops->send)(guestKey, buf, received);
-                if (sent != received) {
+                // Some arbitrary large enough (64M) buffer size.
+                constexpr size_t kLargeBuffer = size_t(64) << 20;
+
+                const size_t bufSize = (*g_vsock_ops->send)(guestKey, buf, received);
+                if (bufSize >= kLargeBuffer) {
+                    // A hacky flow control (b/452843321) to prevent unbounded buffer growth.
+                    // This callback is level-sensitive: the remaining of the data will
+                    // arrive in the next call. This does mean that this function might
+                    // be called in a busy loop.
+                    break;
+                } else if (bufSize == 0) {
                     result |= EventBits::GuestClosed;
                     break;
                 }
