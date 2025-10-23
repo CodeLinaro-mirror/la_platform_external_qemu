@@ -726,6 +726,14 @@ bool emuglConfig_init(EmuglConfig* config,
     bool has_auto_no_window = false;
     bool hasUiPreference = (enum WinsysPreferredGlesBackend)uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO;
 
+    const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
+    const char* lavapipe_gl_mode = "swangle_indirect";
+    if (android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
+        lavapipe_gl_mode = "swiftshader_indirect";
+        dinfo("'%s' envvar is set, using %s for GL", EnvVarSelectGL,
+              lavapipe_gl_mode);
+    }
+
     // The value of '-gpu <mode>' overrides both the hardware properties
     // and the UI setting, except if <mode> is 'auto'.
     if (gpu_option) {
@@ -750,14 +758,6 @@ bool emuglConfig_init(EmuglConfig* config,
         } else {
             gpu_enabled = true;
             if (!strcmp(gpu_option, "lavapipe")) {
-                const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
-                bool use_swiftshader = (android::base::getEnvironmentVariable(EnvVarSelectGL) == "1");
-
-                const char* lavapipe_gl_mode = "swangle_indirect";
-                if (use_swiftshader) {
-                    lavapipe_gl_mode = "swiftshader_indirect";
-                    dinfo("'%s' envvar is set, using %s for GL", EnvVarSelectGL, lavapipe_gl_mode);
-                }
                 gpu_mode = lavapipe_gl_mode;
             } else {
                 gpu_mode = gpu_option;
@@ -914,8 +914,6 @@ bool emuglConfig_init(EmuglConfig* config,
     }
 #endif
 
-    config->use_host_vulkan = use_host_vulkan;
-
     // b/328275986: Turn off ANGLE because it breaks.
     bool force_swiftshader = (!strcmp("angle", gpu_mode) ||
                               !strcmp("angle_indirect", gpu_mode) ||
@@ -971,6 +969,24 @@ bool emuglConfig_init(EmuglConfig* config,
         config->enabled = true;
     }
 
+    bool force_lavapipe = fc::isEnabled(fc::ForceLavapipe);
+    if (fc::isEnabled(fc::ForceLavapipeForSoftwareRendering)) {
+        const bool using_other_software = strstr(gpu_mode, "swiftshader") ||
+                                          strstr(gpu_mode, "swangle");
+        if (using_other_software) {
+            force_lavapipe = true;
+        }
+    }
+
+    if (force_lavapipe) {
+        sGpuOption = "lavapipe";
+        gpu_mode = lavapipe_gl_mode;
+        use_host_vulkan = false;
+    }
+
+    config->use_host_vulkan = use_host_vulkan;
+
+    // GPU mode should not change after this point
     snprintf(config->backend, sizeof(config->backend), "%s", gpu_mode);
     snprintf(config->status, sizeof(config->status),
              "GPU emulation enabled using '%s' mode", gpu_mode);
