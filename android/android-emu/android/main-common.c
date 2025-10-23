@@ -377,7 +377,7 @@ static void sanitizeOptions(AndroidOptions* opts) {
     }
 }
 
-static AvdInfo* createAVD(AndroidOptions* opts, int* inAndroidBuild) {
+AvdInfo* createAVD(AndroidOptions* opts, int* inAndroidBuild) {
     AvdInfo* ret = NULL;
     char tmp[MAX_PATH];
     char* tmpend = tmp + sizeof(tmp);

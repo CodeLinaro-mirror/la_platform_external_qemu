@@ -381,6 +381,8 @@ OPT_PARAM(display_modality,
           "<modality>",
           "Set display modality. Available options: ost, vst")
 
+OPT_PARAM(fishtank, "<discovery_file>", "The fishtank ui for emulator <discovery_file>")
+
 #undef CFG_FLAG
 #undef CFG_PARAM
 #undef OPT_FLAG
