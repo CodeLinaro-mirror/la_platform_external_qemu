@@ -454,6 +454,9 @@ static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
     case SBRMI_REG_STATUS:
         *data = s->sbrmi_status;
         break;
+    case SBRMI_REG_CONTROL:
+        *data = s->sbrmi_control;
+        break;
     case SBRMI_REG_OUTBNDMSG_INST0:
         *data = s->mailbox_command;
         break;
@@ -554,6 +557,9 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
                                         SBRMI_BIT_HW_ALERT_STATUS,
                                         SBRMI_BIT_HW_ALERT_STATUS_LEN, 0);
         }
+        break;
+    case SBRMI_REG_CONTROL:
+        s->sbrmi_control = *data;
         break;
     case SBRMI_REG_INBNDMSG_INST0:
         /* sbrmi mailbox command start */
