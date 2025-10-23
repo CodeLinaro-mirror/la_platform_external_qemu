@@ -54,7 +54,6 @@ EmulatorControlClient::~EmulatorControlClient() {
         std::unique_lock<std::mutex> lock(mOutstandingMutex);
         mOutstandingCondition.wait(lock,
                                    [this] { return mOutstandingRpcs == 0; });
-
     }
     mInputEventWriter.reset();
     mService.reset();
@@ -102,6 +101,17 @@ void EmulatorControlClient::getDisplayConfigurationsAsync(
             createGrpcRequestContext<Empty, DisplayConfigurations>(mClient);
     mOutstandingRpcs++;
     mService->async()->getDisplayConfigurations(
+            context.get(), request, response,
+            grpcCallCompletionHandler(context, request, response, onDone,
+                                      mOnFinally));
+}
+
+void EmulatorControlClient::getEmulatorStatusAsync(
+        OnCompleted<EmulatorStatus> onDone) {
+    auto [request, response, context] =
+            createGrpcRequestContext<Empty, EmulatorStatus>(mClient);
+    mOutstandingRpcs++;
+    mService->async()->getStatus(
             context.get(), request, response,
             grpcCallCompletionHandler(context, request, response, onDone,
                                       mOnFinally));
