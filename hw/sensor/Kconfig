@@ -117,3 +117,8 @@ config TPS25990
     bool
     depends on I2C
     default y if I2C_DEVICES
+
+config TPS546D24
+    bool
+    depends on I2C
+    default y if I2C_DEVICES

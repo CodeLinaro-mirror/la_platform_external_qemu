@@ -44,3 +44,7 @@ sbtsi_read(uint8_t addr, uint8_t value) "SBTSI read addr:0x%02x data: 0x%02x"
 ltc2991_event(const char *id, const char *event) "%s: %s"
 ltc2991_recv(const char *id, uint8_t reg, uint8_t data) "%s reg 0x%02x data: 0x%02x"
 ltc2991_send(const char *id, uint8_t reg, uint8_t data) "%s reg: 0x%02x data: 0x%02x"
+
+# tps546d24.c
+tps546d24_read(const char *id, uint8_t cmd) "%s cmd: 0x%" PRIx8
+tps546d24_write(const char *id, uint8_t cmd, uint8_t len) "%s cmd: 0x%" PRIx8 " len %" PRIu8
