@@ -127,8 +127,8 @@ private:
     std::vector<uint8_t> mSPS;  // sps NALU
     std::vector<uint8_t> mPPS;  // pps NALU
 
-    // turn on gpu texture mode
-    bool mUseGpuTexture = true;
+    // turn off gpu texture mode by default
+    bool mUseGpuTexture = false;
     MediaTexturePool* mTexturePool = nullptr;
 
     uint64_t mNumInputFrame{0};
