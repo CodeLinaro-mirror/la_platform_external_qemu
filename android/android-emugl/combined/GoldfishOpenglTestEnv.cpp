@@ -464,7 +464,6 @@ GoldfishOpenglTestEnv::GoldfishOpenglTestEnv() {
     emuglConfig_init(
             &config, true /* gpu enabled */, "auto",
             useHostGpu ? "host" : "swiftshader_indirect", /* gpu mode, option */
-            64,                                           /* bitness */
             true,                                         /* no window */
             false,                                        /* denylisted */
             false, /* has guest renderer */

@@ -113,7 +113,7 @@ protected:
             mAutomationController.get(), mVideoInjectionController.get());
 
         EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(&config, true, "host", "off", 0, false,
+        EXPECT_TRUE(emuglConfig_init(&config, true, "host", "off", false,
                                      false, false,
                                      WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
     }

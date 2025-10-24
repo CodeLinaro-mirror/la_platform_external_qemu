@@ -322,7 +322,7 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 
     if (!androidEmuglConfigInit(
                 &config, opts->avd, api_arch, api_level, isGoogle, opts->gpu,
-                &hw->hw_gpu_mode, 0,
+                &hw->hw_gpu_mode,
                 getConsoleAgents()->settings->host_emulator_is_headless(),
                 uiPreferredBackend, &hostGpuVulkanDenylisted,
                 opts->use_host_vulkan)) {

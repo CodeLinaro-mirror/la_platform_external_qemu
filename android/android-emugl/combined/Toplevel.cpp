@@ -655,7 +655,6 @@ private:
         emuglConfig_init(
                 &config, true /* gpu enabled */, "auto",
                 mUseHostGpu ? "host" : "swiftshader_indirect", /* gpu option */
-                64,                                            /* bitness */
                 mUseWindow, false,                             /* denylisted */
                 false, /* has guest renderer */
                 WINSYS_GLESBACKEND_PREFERENCE_AUTO, false);

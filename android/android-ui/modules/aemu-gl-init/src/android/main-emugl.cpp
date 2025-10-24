@@ -35,7 +35,6 @@ bool androidEmuglConfigInit(EmuglConfig* config,
                             bool hasGoogleApis,
                             const char* gpuOption,
                             char** hwGpuModePtr,
-                            int wantedBitness,
                             bool noWindow,
                             enum WinsysPreferredGlesBackend uiPreferredBackend,
                             bool* hostGpuVulkanDenylisted,
@@ -150,7 +149,7 @@ bool androidEmuglConfigInit(EmuglConfig* config,
     }
 
     bool result = emuglConfig_init(
-            config, gpuEnabled, *hwGpuModePtr, gpuOption, wantedBitness,
+            config, gpuEnabled, *hwGpuModePtr, gpuOption,
             noWindow, hostGpuDenylisted, hasGuestRenderer, uiPreferredBackend,
             forceUseHostGpuVulkan);
 

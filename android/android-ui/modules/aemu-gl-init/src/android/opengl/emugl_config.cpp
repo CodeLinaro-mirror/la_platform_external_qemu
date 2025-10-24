@@ -697,7 +697,6 @@ bool emuglConfig_init(EmuglConfig* config,
                       bool gpu_enabled,
                       const char* gpu_mode,
                       const char* gpu_option,
-                      int bitness,
                       bool no_window,
                       bool denylisted,
                       bool has_guest_renderer,
@@ -711,16 +710,6 @@ bool emuglConfig_init(EmuglConfig* config,
 
     // zero all fields first.
     memset(config, 0, sizeof(*config));
-
-    // Only 64-bit bitness is supported
-    if (bitness == 0) {
-        bitness = System::get()->getProgramBitness();
-    }
-    if (bitness != 64) {
-        derror("%s: Unsupported bitness type: %d\n", __func__, bitness);
-        return false;
-    }
-    config->bitness = bitness;
 
     bool host_set_in_hwconfig = false;
     bool has_auto_no_window = false;
