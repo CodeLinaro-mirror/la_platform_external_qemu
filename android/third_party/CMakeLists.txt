@@ -365,6 +365,8 @@ add_subdirectory(${GFXSTREAM_REPO_ROOT}/common
                  ${GFXSTREAM_PREFIX}-common)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/stb
                  ${GFXSTREAM_PREFIX}-third-party-stb)
+add_subdirectory(${GFXSTREAM_REPO_ROOT}/third_party/xcb
+                 ${GFXSTREAM_PREFIX}-third-party-xcb)
 # Include hardware/google/aemu project
 set(AEMU_COMMON_BUILD_CONFIG "qemu-android" CACHE STRING "")
 set(GFXSTREAM_REPO_ROOT
@@ -417,3 +419,5 @@ android_license(
 # Used by gfxstream but has different license.
 android_license(TARGET "libdrm_headers" LIBNAME None SPDX MIT LICENSE "MIT"
                 LOCAL "${ANDROID_QEMU2_TOP_DIR}/../libdrm/LICENSE")
+android_license(TARGET "gfxstream_xcb_headers" LIBNAME None SPDX X11 LICENSE "X11"
+                LOCAL "${GFXSTREAM_REPO_ROOT}/third_party/xcb/LICENSE")
