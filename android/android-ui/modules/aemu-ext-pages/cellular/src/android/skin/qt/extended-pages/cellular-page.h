@@ -11,34 +11,34 @@
 
 #pragma once
 
-#include <qobjectdefs.h>       // for Q_OBJECT, slots
-#include <QString>             // for QString
-#include <QWidget>             // for QWidget
-#include <memory>              // for unique_ptr
+#include <QWidget>
+#include <memory>
 
-#include "ui_cellular-page.h"  // for CellularPage
+#include "android/skin/qt/extended-pages/cellular-controller.h"
+#include "android/metrics/UiEventTracker.h"
 
-class QObject;
-class QWidget;
-struct QAndroidCellularAgent;
-
-namespace android {
-namespace metrics {
-class UiEventTracker;
-}  // namespace metrics
-}  // namespace android
+namespace Ui {
+class CellularPage;
+}
+namespace android_studio {
+class EmulatorUiEvent;
+}
 
 using android::metrics::UiEventTracker;
+struct QAndroidCellularAgent;
 
-class CellularPage : public QWidget
-{
+class CellularPage : public QWidget {
     Q_OBJECT
 
 public:
-    explicit CellularPage(QWidget *parent = nullptr);
-    static bool simIsPresent(); // Returns true if the user wants a SIM present,
-                                // considering both command line and UI.
-    static void setCellularAgent(const QAndroidCellularAgent* agent);
+    explicit CellularPage(QWidget* parent = nullptr);
+    ~CellularPage();
+
+    void setCellularAgent(const QAndroidCellularAgent* agent);
+    void setControllerForTest(std::unique_ptr<CellularController> controller);
+
+protected:
+    void showEvent(QShowEvent* event) override;
 
 private slots:
     void on_cell_dataStatusBox_currentIndexChanged(int index);
@@ -47,10 +47,25 @@ private slots:
     void on_cell_signalStatusBox_currentIndexChanged(int index);
     void on_cell_meterStatusBox_currentIndexChanged(int index);
 
-    // TODO: Implement Network delay setting
-    // http://developer.android.com/tools/devices/emulator.html#netdelay
 private:
+    void saveAndSendState();
+    void updateUiFromState();
+    void initializeController(const QAndroidCellularAgent* agent);
+
+    void saveDataStatus(int status);
+    void saveNetworkType(int type);
+    void saveSignalStrength(int strength);
+    void saveVoiceStatus(int status);
+    void saveMeterStatus(int status);
+    int getSavedDataStatus();
+    int getSavedMeterStatus();
+    int getSavedNetworkType();
+    int getSavedSignalStrength();
+    int getSavedVoiceStatus();
 
     std::unique_ptr<Ui::CellularPage> mUi;
     std::shared_ptr<UiEventTracker> mDropDownTracker;
+    std::unique_ptr<CellularController> mController;
+    CellularState mState;
+    bool mInitialized = false;
 };

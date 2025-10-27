@@ -464,7 +464,6 @@ void ExtendedWindow::setAgent(const UiEmuAgent* agentPtr) {
     if (agentPtr) {
         // Warning! This can be very expensive operations as some of these
         // calls have very expensive side effects!
-        CellularPage::setCellularAgent(agentPtr->cellular);
         if (!getConsoleAgents()
                      ->settings->android_cmdLineOptions()
                      ->no_location_ui) {

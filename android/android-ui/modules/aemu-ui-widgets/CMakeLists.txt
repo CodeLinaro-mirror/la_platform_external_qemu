@@ -35,7 +35,8 @@ android_qt_lib(
        Qt${QT_VERSION_MAJOR}::Core
        Qt${QT_VERSION_MAJOR}::Gui
        Qt${QT_VERSION_MAJOR}::Widgets
-       webrtc-yuv)
+       webrtc-yuv
+       glib2)
 
 set_target_properties(aemu-ui-widgets PROPERTIES AUTOMOC TRUE)
 target_include_directories(
