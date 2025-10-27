@@ -10,49 +10,52 @@
 // GNU General Public License for more details.
 #pragma once
 
-#include <qobjectdefs.h>      // for Q_OBJECT, slots
-#include <QString>            // for QString
-#include <QWidget>            // for QWidget
-#include <initializer_list>   // for initializer_list
-#include <memory>             // for unique_ptr
-#include <utility>            // for pair
+#include <QWidget>
+#include <memory>
 
-#include "ui_battery-page.h"  // for BatteryPage
+#include "android/skin/qt/extended-pages/battery-controller.h"
+#include "android/metrics/UiEventTracker.h"
 
-
-namespace android {
-namespace metrics {
-class UiEventTracker;
-}  // namespace metrics
-}  // namespace android
+namespace Ui {
+class BatteryPage;
+}
+namespace android_studio {
+class EmulatorUiEvent;
+}
 
 using android::metrics::UiEventTracker;
-
-class QComboBox;
-class QObject;
-class QWidget;
 struct QAndroidBatteryAgent;
 
 class BatteryPage : public QWidget {
     Q_OBJECT
-
 public:
-    explicit BatteryPage(QWidget *parent = 0);
+    explicit BatteryPage(QWidget* parent = nullptr);
+    ~BatteryPage();
 
-    static void setBatteryAgent(const QAndroidBatteryAgent* agent);
+    // The battery agent is now passed in, not set statically.
+    void setBatteryAgent(const QAndroidBatteryAgent* agent);
+    void setControllerForTest(std::unique_ptr<BatteryController> controller);
+
+protected:
+    void showEvent(QShowEvent* event) override;
 
 private slots:
-    void on_bat_chargerBox_activated(int value);
-    void on_bat_healthBox_activated(int index);
+    void on_bat_chargerBox_activated(int index);
     void on_bat_levelSlider_valueChanged(int value);
+    void on_bat_healthBox_activated(int index);
     void on_bat_statusBox_activated(int index);
 
 private:
     void populateListBox(
-            QComboBox* list,
+            class QComboBox* list,
             std::initializer_list<std::pair<int, const char*>> associations);
+    void saveAndSendState();
+    void updateUiFromState();
+    void initializeController(const QAndroidBatteryAgent* agent);
 
-private:
     std::unique_ptr<Ui::BatteryPage> mUi;
     std::shared_ptr<UiEventTracker> mDropDownTracker;
+    std::unique_ptr<BatteryController> mController;
+    BatteryState mState;
+    bool mInitialized = false;
 };
