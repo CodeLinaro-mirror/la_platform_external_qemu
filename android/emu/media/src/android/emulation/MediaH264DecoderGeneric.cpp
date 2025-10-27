@@ -17,6 +17,7 @@
 #include "host-common/H264PingInfoParser.h"
 #include "host-common/MediaFfmpegVideoHelper.h"
 #include "host-common/opengl/emugl_config.h"
+#include "host-common/FeatureControl.h"
 
 #ifndef __APPLE__
 // for Linux and Window, Cuvid is available
@@ -42,6 +43,8 @@
 #else
 #define H264_DPRINT(fmt, ...)
 #endif
+
+namespace fc = android::featurecontrol;
 
 namespace android {
 namespace emulation {
@@ -75,6 +78,12 @@ bool canUseCudaDecoder() {
 }
 
 bool canDecodeToGpuTexture(int w, int h) {
+    if (fc::isEnabled(fc::VulkanNativeSwapchain)) {
+        // TODO(b/454881204): YUV conversion requires OpenGL and won't work in
+        // vulkan-only mode
+        return false;
+    }
+
     if (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST) {
         int64_t ww = w;
         int64_t hh = h;
