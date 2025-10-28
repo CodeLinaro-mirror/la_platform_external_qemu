@@ -754,7 +754,7 @@ get_osx_sysroot() {
     OSX_VERSION=$(sw_vers -productVersion)
     OSX_REQUIRED=13.3
     MIN_XCODE=10
-    OSX_SDK_SUPPORTED="13.3 15.5"
+    OSX_SDK_SUPPORTED="13.3 15.5 26.0"
     OSX_XCODE=$(xcodebuild -version | tr '\n' ' ')
     OSX_SDK_INSTALLED_LIST=$(xcodebuild -showsdks 2>/dev/null | \
             egrep --color=never -o " macosx\d+.\d+$" | sed -e "s/.*macosx//g" | sort -n | \
@@ -815,6 +815,9 @@ prepare_build_for_darwin_aarch64() {
     common_FLAGS="-arch arm64"
     var_append common_FLAGS " -isysroot $OSX_SDK_ROOT"
     var_append common_FLAGS " -mmacosx-version-min=$OSX_DEPLOYMENT_TARGET"
+
+    # We have a lot of linker warnings due to our prebuilts.
+    var_append common_FLAGS " -Wl,-w"
 
     EXTRA_CFLAGS="$common_FLAGS -B/usr/bin"
     EXTRA_CXXFLAGS="$common_FLAGS -B/usr/bin"
