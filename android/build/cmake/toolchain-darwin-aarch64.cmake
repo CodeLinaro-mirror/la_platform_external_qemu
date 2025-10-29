@@ -63,6 +63,9 @@ add_definitions(-D_DARWIN_C_SOURCE=1)
 # Next we configure rust.
 get_rust_version(RUST_VER)
 
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-w -Wno-error=unused-command-line-argument")
+
 # TODO(jansene): Uncomment the line below once we have a rust compiler
 # with an arm backend, otherwise you will see a lot of:
 # error[E0463]: can't find crate for `std`
