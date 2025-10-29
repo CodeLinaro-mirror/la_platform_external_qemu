@@ -56,7 +56,7 @@ message(
 include(android)
 include(prebuilts)
 include(qemu2-src-gen)
-
+set(ENABLE_QT_TESTS FALSE CACHE BOOL "Enable QT tests.")
 set(OPTION_BAZEL TRUE CACHE BOOL "Enable bazel compilation (Linux only).")
 set(OPTION_CRASHUPLOAD "NONE" CACHE STRING "Destination of crash reports.")
 set(OPTION_TRACE

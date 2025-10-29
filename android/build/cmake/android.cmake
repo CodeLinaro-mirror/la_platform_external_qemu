@@ -912,6 +912,15 @@ function(android_add_test)
   cmake_parse_arguments(build "${options}" "${oneValueArgs}"
                         "${multiValueArgs}" ${ARGN})
 
+  if(NOT ENABLE_QT_TESTS)
+    foreach(lib ${build_DEPS})
+        if("${lib}" MATCHES "Qt")
+            message(STATUS "Skipping Qt test: ${build_TARGET}, run with -DENABLE_QT_TESTS=ON to enable.")
+            return()
+        endif()
+    endforeach()
+  endif()
+
   android_add_executable(
     TARGET ${build_TARGET} SOURCE_DIR ${build_SOURCE_DIR} SRC ${build_SRC}
     LINUX ${build_LINUX} DARWIN ${build_DARWIN} WINDOWS ${build_WINDOWS}
