@@ -54,6 +54,11 @@ using namespace std::literals;
 
 constexpr uint32_t kPixelFormat_RGBA_8888 = 0x1;
 constexpr uint32_t kPixelFormat_YCBCR_420_888 = 0x23;
+#ifdef _WIN32
+constexpr char kPathSeparator = '\\';
+#else
+constexpr char kPathSeparator = '/';
+#endif
 
 // TODO(b/173651912): remove this thing and call the callback from
 // camera_XYZ_(start|stop)_capturing instead.
@@ -447,6 +452,39 @@ cameraClientGetMaxResolution(const CameraInfo& info) {
     return getMaxResolution(maxDim, maxDim + frameSizesNum);
 }
 
+bool getEnvironmentBackground(const AndroidHwConfig* hwCfg,
+                              char environmentImageFullPath[1024]) {
+    // TODO(b/446687857): make a new camera mode, called 'environment' and
+    // only replace the back camera image if it's set to that. Currently
+    // this requires extra changes on the AVD flow side, so we enforce the
+    // background based on the transparency property of the AVD instead.
+    if (!hwCfg->hw_lcd_transparent) {
+        return false;
+    }
+    const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
+    CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
+    if (!environmentIni) {
+        // no environment.ini is given
+        return false;
+    }
+
+    const char* environmentImagePath =
+            iniFile_getString(environmentIni, "background.image.filename", 0);
+
+    // Environment settings are local to the AVD folder
+    snprintf(environmentImageFullPath, sizeof(environmentImageFullPath),
+             "%s%c%s", avdInfo_getContentPath(avdInfo), kPathSeparator,
+             environmentImagePath);
+    if (!android::base::System::get()->pathExists(environmentImageFullPath)) {
+        derror("%s: Invalid environment settings for the camera", __func__);
+        return false;
+    }
+
+    dinfo("%s: Camera will use environment settings: %s", __func__,
+          environmentImagePath);
+    return true;
+}
+
 struct ICppQemudClient {
     virtual ~ICppQemudClient() = default;
     virtual void recv(QemudClient* qc, const uint8_t* data, size_t size) = 0;
@@ -461,6 +499,11 @@ struct CameraService {
 
         // TODO: `hwCfg` should be `const AndroidHwConfig*`
         AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
+
+        char environmentImageFullPath[1024];
+        bool useEnvironmentForBackCamera =
+                getEnvironmentBackground(hwCfg, environmentImageFullPath);
+
         const char* const cameraBack = hwCfg->hw_camera_back;
         const char* const cameraFront = hwCfg->hw_camera_front;
 
@@ -484,7 +527,9 @@ struct CameraService {
             return !strncmp(name, "imagefile:", kImagefileCamPrefixSize);
         };
 
-        if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
+        if (useEnvironmentForBackCamera) {
+            imagefilecameraSetup("back", environmentImageFullPath);
+        } else if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
             videoplaybackcameraSetup("back");
         } else if (isVideofileCam(cameraBack)) {
             videofilecameraSetup("back", cameraBack + kVideofileCamPrefixSize);
