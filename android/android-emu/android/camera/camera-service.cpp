@@ -500,10 +500,6 @@ struct CameraService {
         // TODO: `hwCfg` should be `const AndroidHwConfig*`
         AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
 
-        char environmentImageFullPath[1024];
-        bool useEnvironmentForBackCamera =
-                getEnvironmentBackground(hwCfg, environmentImageFullPath);
-
         const char* const cameraBack = hwCfg->hw_camera_back;
         const char* const cameraFront = hwCfg->hw_camera_front;
 
@@ -512,23 +508,24 @@ struct CameraService {
         };
 
         constexpr size_t kVideofileCamPrefixSize = 10;
-
         static const auto isVideofileCam = [](const char* name){
             return !strncmp(name, "videofile:", kVideofileCamPrefixSize);
         };
 
-        if (androidHwConfig_hasVirtualSceneCamera(hwCfg)) {
-            virtualscenecameraSetup();
-        }
-
         constexpr size_t kImagefileCamPrefixSize = 10;
-
         static const auto isImagefileCam = [](const char* name) {
             return !strncmp(name, "imagefile:", kImagefileCamPrefixSize);
         };
 
-        if (useEnvironmentForBackCamera) {
-            imagefilecameraSetup("back", environmentImageFullPath);
+        if (androidHwConfig_hasVirtualSceneCamera(hwCfg)) {
+            char environmentImageFullPath[1024];
+            bool useEnvironmentForBackCamera =
+                    getEnvironmentBackground(hwCfg, environmentImageFullPath);
+            if (useEnvironmentForBackCamera) {
+                imagefilecameraSetup("back", environmentImageFullPath);
+            } else {
+                virtualscenecameraSetup();
+            }
         } else if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
             videoplaybackcameraSetup("back");
         } else if (isVideofileCam(cameraBack)) {
