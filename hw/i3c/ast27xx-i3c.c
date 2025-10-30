@@ -346,17 +346,18 @@ static uint8_t ast27xx_i3c_get_next_dynamic_addr(MIPIHCIState *hci,
                                                  uint8_t dat_index)
 {
     AST27xxI3CState *s = container_of(hci, AST27xxI3CState, parent);
+
     /*
      * These registers aren't documented, but they're bitfields, and the offset
      * of the set bit is the address to use.
      * We're going to assume that it will use use the first set bit, so iterate
      * through each one until we find one that's set.
      */
-    uint32_t reg = R_I3C_DAA_INDEX_0;
-    for (reg = R_I3C_DAA_INDEX_0; reg <= R_I3C_DAA_INDEX_3; reg++) {
+    for (uint32_t reg_offset = 0; reg_offset <=
+        (R_I3C_DAA_INDEX_0 - R_I3C_DAA_INDEX_3); reg_offset++) {
         for (uint32_t i = 0; i < sizeof(uint32_t) * 8; i++) {
-            if (s->ctrl_regs[reg] & (1UL << i)) {
-                return i;
+            if (s->ctrl_regs[R_I3C_DAA_INDEX_0 + reg_offset] & (1UL << i)) {
+                return i + (reg_offset * sizeof(uint32_t) * 8);
             }
         }
     }
