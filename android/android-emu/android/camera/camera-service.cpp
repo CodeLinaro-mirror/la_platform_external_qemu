@@ -26,6 +26,7 @@
 
 #include "android/camera/camera-service.h"
 
+#include "aemu/base/files/PathUtils.h"
 #include "android/avd/info.h"
 #include "android/boot-properties.h"
 #include "android/camera/camera-capture.h"
@@ -48,6 +49,8 @@
 #include "host-common/hw-config.h"
 
 #include <gfxstream/virtio-gpu-gfxstream-renderer.h>
+
+using android::base::PathUtils;
 
 namespace {
 using namespace std::literals;
@@ -452,37 +455,36 @@ cameraClientGetMaxResolution(const CameraInfo& info) {
     return getMaxResolution(maxDim, maxDim + frameSizesNum);
 }
 
-bool getEnvironmentBackground(const AndroidHwConfig* hwCfg,
-                              char environmentImageFullPath[1024]) {
+std::optional<std::string> getEnvironmentBackground(const AndroidHwConfig* hwCfg) {
     // TODO(b/446687857): make a new camera mode, called 'environment' and
     // only replace the back camera image if it's set to that. Currently
     // this requires extra changes on the AVD flow side, so we enforce the
     // background based on the transparency property of the AVD instead.
     if (!hwCfg->hw_lcd_transparent) {
-        return false;
+        return std::nullopt;
     }
     const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
     CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
     if (!environmentIni) {
         // no environment.ini is given
-        return false;
+        return std::nullopt;
     }
 
     const char* environmentImagePath =
             iniFile_getString(environmentIni, "background.image.filename", 0);
 
     // Environment settings are local to the AVD folder
-    snprintf(environmentImageFullPath, sizeof(environmentImageFullPath),
-             "%s%c%s", avdInfo_getContentPath(avdInfo), kPathSeparator,
-             environmentImagePath);
+    std::string environmentImageFullPath = PathUtils::join(
+            avdInfo_getContentPath(avdInfo), environmentImagePath);
     if (!android::base::System::get()->pathExists(environmentImageFullPath)) {
-        derror("%s: Invalid environment settings for the camera", __func__);
-        return false;
+        derror("%s: Invalid environment settings for the camera. Source not found: %s",
+               __func__, environmentImageFullPath.c_str());
+        return std::nullopt;
     }
 
     dinfo("%s: Camera will use environment settings: %s", __func__,
           environmentImagePath);
-    return true;
+    return environmentImageFullPath;
 }
 
 struct ICppQemudClient {
@@ -518,11 +520,11 @@ struct CameraService {
         };
 
         if (androidHwConfig_hasVirtualSceneCamera(hwCfg)) {
-            char environmentImageFullPath[1024];
-            bool useEnvironmentForBackCamera =
-                    getEnvironmentBackground(hwCfg, environmentImageFullPath);
-            if (useEnvironmentForBackCamera) {
-                imagefilecameraSetup("back", environmentImageFullPath);
+            // If we are loading the virtual scene, check if we have an environment background.
+            // If so, use the environment background as the virutal environment.
+            std::optional<std::string> environmentImageFullPath = getEnvironmentBackground(hwCfg);
+            if (environmentImageFullPath.has_value()) {
+                imagefilecameraSetup("back", environmentImageFullPath->c_str());
             } else {
                 virtualscenecameraSetup();
             }
