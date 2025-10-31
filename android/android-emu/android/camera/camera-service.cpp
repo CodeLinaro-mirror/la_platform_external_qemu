@@ -57,11 +57,6 @@ using namespace std::literals;
 
 constexpr uint32_t kPixelFormat_RGBA_8888 = 0x1;
 constexpr uint32_t kPixelFormat_YCBCR_420_888 = 0x23;
-#ifdef _WIN32
-constexpr char kPathSeparator = '\\';
-#else
-constexpr char kPathSeparator = '/';
-#endif
 
 // TODO(b/173651912): remove this thing and call the callback from
 // camera_XYZ_(start|stop)_capturing instead.
