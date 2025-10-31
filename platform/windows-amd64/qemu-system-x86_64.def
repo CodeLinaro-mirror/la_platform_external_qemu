@@ -257,6 +257,7 @@ EXPORTS
     qemu_system_shutdown_request
     qemu_thread_create
     qemu_thread_get_self
+    qemu_unregister_reset
     qemu_wait_io_event
     qemu_wait_io_event_common
     qemu_win32_map_alloc
