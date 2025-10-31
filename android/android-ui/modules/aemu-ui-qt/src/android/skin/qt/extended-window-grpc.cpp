@@ -224,6 +224,8 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
                 AVD_WEAR &&
         avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
                 AVD_XR &&
+        avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
+                AVD_GLASSES &&
         (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
                  AVD_ANDROID_AUTO ||
          android::automotive::isMultiDisplaySupported(
@@ -234,8 +236,8 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->displaysButton->setVisible(false);
     }
 
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
-                AVD_XR) {
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) != AVD_XR &&
+        avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) != AVD_GLASSES) {
         mSidebarButtons.addButton(mExtendedUi->cellularButton);
         mSidebarButtons.addButton(mExtendedUi->telephoneButton);
         mSidebarButtons.addButton(mExtendedUi->dpadButton);
@@ -254,23 +256,26 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
 
     // Currently, the camera page only contains options for the virtual scene
     // camera.  Hide the button if the virtual scene camera is not enabled, or
-    // if we are using an Android Auto or XR image because that does not have
-    // camera support at the moment.
+    // if we are using an Android Auto image because that does not have
+    // camera support at the moment. Or XR and Glasses images because
+    // those images are not using VirtualScene.
     if (androidHwConfig_hasVirtualSceneCamera(
                 getConsoleAgents()->settings->hw()) &&
         (!getConsoleAgents()->settings->avdInfo() ||
          (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
                 AVD_ANDROID_AUTO &&
           avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
-                AVD_XR))) {
+                AVD_XR &&
+          avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
+                AVD_GLASSES))) {
         mSidebarButtons.addButton(mExtendedUi->cameraButton);
         mExtendedUi->cameraButton->setVisible(true);
     } else {
         mExtendedUi->cameraButton->setVisible(false);
     }
 
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=
-                AVD_XR) {
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=AVD_XR &&
+        avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) !=AVD_GLASSES) {
         mSidebarButtons.addButton(mExtendedUi->virtSensorsButton);
     }
 
@@ -353,8 +358,8 @@ ExtendedWindowGrpc::ExtendedWindowGrpc(EmulatorQtWindow* eW, ToolWindow* tW)
         }
     }
 
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-                AVD_XR) {
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_XR ||
+        avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_GLASSES) {
         mExtendedUi->locationButton->setVisible(false);
         mExtendedUi->cellularButton->setVisible(false);
         mExtendedUi->dpadButton->setVisible(false);
