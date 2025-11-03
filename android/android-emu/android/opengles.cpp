@@ -880,6 +880,10 @@ static bool prepare_epoxy(void) {
         LOG(ERROR) << "Options not available";
         return false;
     }
+    if (!sEgl) {
+        derror("%s: invalid call, EGL emulation is not enabled", __func__);
+        return false;
+    }
     int major, minor;
     sRenderLib->getGlesVersion(&major, &minor);
     EGLint attr[] = {EGL_CONTEXT_CLIENT_VERSION, major,
@@ -917,7 +921,6 @@ void* android_gl_create_context(DisplayChangeListener* unuse1,
                                 QEMUGLParams* unuse2) {
     static bool ok = prepare_epoxy();
     if (!ok) {
-
         return nullptr;
     }
     sEgl->eglMakeCurrent(sOpt.display, sSurface, sSurface, sContext);
@@ -926,10 +929,20 @@ void* android_gl_create_context(DisplayChangeListener* unuse1,
 }
 
 void android_gl_destroy_context(DisplayChangeListener* unused, void* ctx) {
+    if (!sEgl) {
+        derror("%s: invalid call, EGL emulation is not enabled", __func__);
+        return;
+    }
     sEgl->eglDestroyContext(sOpt.display, ctx);
 }
 
 int android_gl_make_context_current(DisplayChangeListener* unused, void* ctx) {
+    if (!sEgl) {
+        // Note that this won't set an error code, but since there is no sEgl object,
+        // calling eglGetError won't be possible as well.
+        derror("%s: invalid call, EGL emulation is not enabled", __func__);
+        return EGL_FALSE;
+    }
     return sEgl->eglMakeCurrent(sOpt.display, sSurface, sSurface, ctx);
 }
 
@@ -947,6 +960,10 @@ void android_gl_scanout_texture(DisplayChangeListener* unuse,
                                 uint32_t y,
                                 uint32_t w,
                                 uint32_t h) {
+    if (!sEgl || !sGlesv2) {
+        derror("%s: invalid call, GLES emulation is not enabled", __func__);
+        return;
+    }
     s_tex_id = backing_id;
     s_gfx_h = h;
     s_gfx_w = w;
@@ -974,6 +991,10 @@ void android_gl_scanout_flush(DisplayChangeListener* unuse,
                               uint32_t w,
                               uint32_t h) {
     if (!s_fbo_id) {
+        return;
+    }
+    if (!sEgl || !sGlesv2) {
+        derror("%s: invalid call, GLES emulation is not enabled", __func__);
         return;
     }
     sEgl->eglMakeCurrent(sOpt.display, sOpt.surface, sOpt.surface,
