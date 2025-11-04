@@ -43,7 +43,21 @@ VULKAN_LOADER_PREBUILTS_PATH = (
 VULKAN_LOADER_SHA1_FILE = "vulkan_loader.sha1"
 
 
-def _build_linux():
+def installVulkanLoader(builddir, installdir):
+    """Installs the output files from `builddir` to `installdir`."""
+    logging.info("Installing Vulkan-Loader from %s to %s", builddir, installdir)
+    if installdir.exists():
+        shutil.rmtree(installdir)
+    shutil.copytree(builddir, installdir, symlinks=True)
+
+    # Create the SHA1 file in the target directory.
+    with open(installdir / VULKAN_LOADER_SHA1_FILE, "w") as f:
+        f.write(VULKAN_LOADER_GIT_SHA)
+
+    logging.info("Installed Vulkan-Loader files to %s", installdir)
+
+
+def _build_linux(args, prebuilts_out_dir):
     """Builds Vulkan-Loader from source using a self-contained Dockerfile for Linux."""
     docker_image_name = "vulkan-builder-glibc2.27:latest"
     dockerfile_name = "Dockerfile.vulkan_loader"
@@ -94,14 +108,16 @@ def _build_linux():
         logging.error(f"Stderr: {e.stderr}")
         sys.exit(1)
 
+    build_dir = Path(prebuilts_out_dir) / "vulkan-loader-build"
+    artifacts_dir = build_dir / "artifacts"
+    os.makedirs(artifacts_dir, exist_ok=True)
+
     try:
         # 3. Copy the built library and its symlinks from the container.
         container_lib_dir = "/opt/vulkan_loader/lib"
-        os.makedirs(VULKAN_LOADER_PREBUILTS_PATH, exist_ok=True)
-
-        logging.info(f"Copying {container_lib_dir} from container to {VULKAN_LOADER_PREBUILTS_PATH}")
+        logging.info(f"Copying {container_lib_dir} from container to {artifacts_dir}")
         subprocess.run(
-            ["podman", "cp", f"{container_name}:{container_lib_dir}/.", str(VULKAN_LOADER_PREBUILTS_PATH)],
+            ["podman", "cp", f"{container_name}:{container_lib_dir}/.", str(artifacts_dir)],
             check=True,
         )
     finally:
@@ -109,36 +125,13 @@ def _build_linux():
         logging.info(f"Removing temporary container: {container_name}")
         subprocess.run(["podman", "rm", container_name], check=True, capture_output=True)
 
-    # 5. Create the SHA1 file on the host.
-    with open(VULKAN_LOADER_PREBUILTS_PATH / VULKAN_LOADER_SHA1_FILE, "w") as f:
-        f.write(VULKAN_LOADER_GIT_SHA)
-
+    # 5. Return the artifacts directory.
     logging.info("Successfully extracted Vulkan-Loader from Docker.")
+    return artifacts_dir
 
 
 def _build_native(args, prebuilts_out_dir):
     """Builds Vulkan-Loader from source natively for non-Linux hosts."""
-    VULKAN_LOADER_OUT_FILES = [VULKAN_LOADER_SHA1_FILE]
-    if HOST_OS == "darwin":
-        VULKAN_LOADER_OUT_FILES.append("libvulkan.dylib")
-    elif HOST_OS == "windows":
-        VULKAN_LOADER_OUT_FILES.append("vulkan-1.dll")
-
-    def installVulkanLoader(builddir, installdir):
-        """Installs the output files from `builddir` to `installdir`."""
-        logging.info("Installing Vulkan-Loader to %s", installdir)
-        os.makedirs(installdir, exist_ok=True)
-
-        for f in VULKAN_LOADER_OUT_FILES:
-            src_file = builddir / f
-            dst_file = installdir / f
-            logging.info("Copy %s => %s", str(src_file), str(dst_file))
-            if os.path.exists(dst_file):
-                logging.info("Target file '%s' exists, deleting.", str(dst_file))
-                os.remove(dst_file)
-            shutil.copyfile(src_file, dst_file)
-        logging.info("Installed Vulkan-Loader files to %s", installdir)
-
     # Determine which cmake executable to use.
     cmake_executable = None
     prebuilt_cmake_bin_path = Path(CMAKE_PATH)
@@ -180,6 +173,7 @@ def _build_native(args, prebuilts_out_dir):
 
     logging.info("Configuring Vulkan-Loader with CMake...")
     cmake_build_dir = clone_dir / "build"
+    install_dir = clone_dir / "install"
     os.makedirs(cmake_build_dir, exist_ok=True)
 
     build_config = args.config.capitalize()
@@ -193,27 +187,23 @@ def _build_native(args, prebuilts_out_dir):
         "-D",
         "UPDATE_DEPS=On",
         f"-DCMAKE_BUILD_TYPE={build_config}",
+        f"-DCMAKE_INSTALL_PREFIX={install_dir}",
     ]
 
     subprocess.run(cmake_cmd, cwd=clone_dir, check=True, env=env)
 
     logging.info("Building Vulkan-Loader...")
-    subprocess.run(["cmake", "--build", "build", "--config", build_config], cwd=clone_dir, check=True, env=env)
+    subprocess.run([str(cmake_executable), "--build", "build", "--config", build_config], cwd=clone_dir, check=True, env=env)
 
-    artifacts_dir = cmake_build_dir / "loader"
+    logging.info("Installing Vulkan-Loader...")
+    subprocess.run([str(cmake_executable), "--install", "build", "--config", build_config], cwd=clone_dir, check=True, env=env)
+
+    artifacts_dir = install_dir / "lib"
     if HOST_OS == "windows":
-        artifacts_dir = artifacts_dir / build_config
-
-    with open(artifacts_dir / VULKAN_LOADER_SHA1_FILE, "w") as f:
-        f.write(VULKAN_LOADER_GIT_SHA)
-
-    installVulkanLoader(artifacts_dir, VULKAN_LOADER_PREBUILTS_PATH)
-
-    if args.dist:
-        vulkan_loader_install_dir = Path(prebuilts_out_dir) / "vulkan_loader"
-        installVulkanLoader(artifacts_dir, vulkan_loader_install_dir)
+        artifacts_dir = install_dir / "bin"
 
     logging.info("Successfully built Vulkan-Loader!")
+    return artifacts_dir
 
 
 def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
@@ -232,7 +222,15 @@ def buildPrebuilt(args, prebuilts_out_dir, check_sha1=False):
             return
 
     # 2. Delegate to the appropriate build function based on the host OS.
+    artifacts_dir = None
     if HOST_OS == "linux":
-        _build_linux()
+        artifacts_dir = _build_linux(args, prebuilts_out_dir)
     else:
-        _build_native(args, prebuilts_out_dir)
+        artifacts_dir = _build_native(args, prebuilts_out_dir)
+
+    if artifacts_dir:
+        installVulkanLoader(artifacts_dir, VULKAN_LOADER_PREBUILTS_PATH)
+
+        if args.dist:
+            vulkan_loader_install_dir = Path(prebuilts_out_dir) / "vulkan_loader"
+            installVulkanLoader(artifacts_dir, vulkan_loader_install_dir)
