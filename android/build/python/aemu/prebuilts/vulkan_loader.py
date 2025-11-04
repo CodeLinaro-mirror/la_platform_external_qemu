@@ -31,7 +31,8 @@ HOST_ARCH = platform.machine().lower()
 VULKAN_LOADER_REPO_URL = "https://github.com/KhronosGroup/Vulkan-Loader.git"
 VULKAN_LOADER_GIT_SHA = "0a278cc725089cb67bf6027076e5d72f97c04d86"
 CMAKE_PATH = os.path.join(AOSP_ROOT, "prebuilts", "cmake", HOST_OS + "-x86", "bin")
-VULKAN_LOADER_PREBUILTS_ARCH = "x86_64" if HOST_ARCH == "x86_64" else "aarch64"
+VULKAN_LOADER_PREBUILTS_ARCH = "aarch64" if HOST_ARCH == "aarch64" else "x86_64"
+
 VULKAN_LOADER_PREBUILTS_PATH = (
     AOSP_ROOT
     / "prebuilts"
