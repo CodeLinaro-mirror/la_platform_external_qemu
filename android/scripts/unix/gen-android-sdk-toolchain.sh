@@ -732,7 +732,11 @@ get_osx_sysroot() {
     local VERSION_SORT
     local XCODE_PATH
     # local OSX_SDK_ROOT # Internal variable for the path
-    OSX_DEPLOYMENT_TARGET=10.14
+
+    # Minimum requirement for android studio is now 12
+    # We target 10.15 (Catalina, no longer supported) as this
+    # gives us a C++20 support.
+    OSX_DEPLOYMENT_TARGET=10.15
 
     # Inner function for error reporting, specific to GET_OSX_SYSROOT logic
     _GET_OSX_SYSROOT_please_install_proper_sdk_error() {
