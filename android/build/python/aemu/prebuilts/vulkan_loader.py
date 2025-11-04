@@ -46,9 +46,18 @@ VULKAN_LOADER_SHA1_FILE = "vulkan_loader.sha1"
 def installVulkanLoader(builddir, installdir):
     """Installs the output files from `builddir` to `installdir`."""
     logging.info("Installing Vulkan-Loader from %s to %s", builddir, installdir)
+    # Before installing, remove any existing files that are part of this prebuilt.
+    # This is to avoid having stale files around, but don't remove the dir because
+    # other prebuilts might be available.
     if installdir.exists():
-        shutil.rmtree(installdir)
-    shutil.copytree(builddir, installdir, symlinks=True)
+        for item in os.listdir(builddir):
+            path = os.path.join(installdir, item)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            elif os.path.isfile(path):
+                os.remove(path)
+
+    shutil.copytree(builddir, installdir, symlinks=True, dirs_exist_ok=True)
 
     # Create the SHA1 file in the target directory.
     with open(installdir / VULKAN_LOADER_SHA1_FILE, "w") as f:

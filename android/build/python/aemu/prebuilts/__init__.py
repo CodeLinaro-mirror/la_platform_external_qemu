@@ -63,6 +63,10 @@ def buildPrebuilts(args, is_emulator_build):
                 "moltenvk": moltenvk.buildPrebuilt,
                 "vulkan_loader": vulkan_loader.buildPrebuilt,
             }
+        elif HOST_OS == "linux":
+            _prebuilt_funcs = {
+                'vulkan_loader': vulkan_loader.buildPrebuilt,
+            }
         else:
             logging.info("Prebuilts compilation in emulator build is not supported yet for "
                          + f"{HOST_OS}-{HOST_ARCH}. Skipping.")
