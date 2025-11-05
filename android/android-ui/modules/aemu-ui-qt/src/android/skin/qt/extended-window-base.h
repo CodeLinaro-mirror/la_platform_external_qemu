@@ -14,6 +14,7 @@
 #pragma once
 
 #include <QFrame>  // for QFrame
+#include "android/ui-emu-agent.h"
 #include "host-common/qt_ui_defs.h"
 
 class VirtualSceneControlWindow;
@@ -39,4 +40,6 @@ public:
 
     // TODO(jansene): This needs to be generalized to handle gRPC
     virtual VirtualSensorsPage* getVirtualSensorsPage() = 0;
+
+    virtual void injectAgents(const UiEmuAgent* agentPtr) {};
 };

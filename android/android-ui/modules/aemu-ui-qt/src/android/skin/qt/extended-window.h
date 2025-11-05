@@ -69,6 +69,7 @@ public:
     void connectVirtualSceneWindow(
             VirtualSceneControlWindow* virtualSceneWindow) override;
 
+    void injectAgents(const UiEmuAgent* agentPtr) override;;
     VirtualSensorsPage* getVirtualSensorsPage() override;
 private slots:
     void switchFrameAlways(bool showFrame);

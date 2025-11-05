@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <cassert>
+#include <chrono>
 #include <istream>
 #include <memory>
 #include <string>
@@ -52,9 +53,12 @@
 #include <QWidget>
 #include <QWindow>
 #include <QtCore>
+#include <thread>
 
+#include "absl/time/time.h"
 #include "aemu/base/logging/Log.h"
 #include "aemu/base/logging/LogSeverity.h"
+#include "aemu/base/Stopwatch.h"
 #include "android/avd/info.h"
 #include "android/avd/util.h"
 #include "android/base/system/System.h"
@@ -246,7 +250,6 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 #endif
     setWindowFlags(flag | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
     mToolsUi->setupUi(this);
-
     const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
     const AvdFlavor avdFlavor = avdInfo ? avdInfo_getAvdFlavor(avdInfo) : AVD_OTHER;
 
@@ -2458,4 +2461,18 @@ void ToolWindow::onRightHandGestureChanged(const QString& gesture) {
     updateRightHandButton(gesture);
 
     notifyGuestOnRightHandGesture(gesture);
+}
+
+void ToolWindow::injectAgents(const UiEmuAgent* agentPtr) {
+    const auto win = EmulatorQtWindow::getInstance();
+    win->runOnUiThread(
+            [this, agentPtr] {
+                int elapsedUs = 0;
+                android::base::measure(elapsedUs, [this, agentPtr] {
+                    mExtendedWindow.get()->injectAgents(agentPtr);
+                });
+                LOG(INFO) << "Created extended window in "
+                          << absl::FromChrono(
+                                     std::chrono::microseconds(elapsedUs));
+            });
 }

@@ -98,7 +98,6 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
     // A Dialog works for Windows and Mac
     setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint);
 #endif
-
     QSettings settings;
 
     const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
@@ -455,6 +454,11 @@ void ExtendedWindow::sendMetricsOnShutDown() {
     mExtendedUi->multiDisplayPage->sendMetrics();
 }
 
+void ExtendedWindow::injectAgents(const UiEmuAgent* agent) {
+    mExtendedUi->batteryPage->setBatteryAgent(agent->battery);
+}
+
+
 // static
 void ExtendedWindow::setAgent(const UiEmuAgent* agentPtr) {
     if (agentPtr) {
@@ -478,6 +482,8 @@ void ExtendedWindow::setAgent(const UiEmuAgent* agentPtr) {
             SensorReplayPage::setAgent(agentPtr->car, agentPtr->location,
                                        agentPtr->sensors);
         }
+
+        EmulatorQtWindow::getInstance()->toolWindow()->injectAgents(agentPtr);
     }
 }
 

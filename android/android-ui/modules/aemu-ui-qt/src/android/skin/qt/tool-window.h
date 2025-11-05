@@ -150,6 +150,7 @@ public:
 
     void waitForExtendedWindowVisibility(bool visible);
     void presetSizeAdvance(PresetEmulatorSizeType newSize);
+    void injectAgents(const UiEmuAgent* agentPtr);
 
 signals:
     void guestClipboardChanged(QString text);

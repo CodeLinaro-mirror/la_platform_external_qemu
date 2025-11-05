@@ -4,7 +4,7 @@
 #include "aemu/base/async/ThreadLooper.h"
 #include "android/emulation/control/battery_agent.h"
 
-#define DEBUG 2
+#define DEBUG 0
 /* set  >1 for very verbose debugging */
 #if DEBUG <= 1
 #define DD(...) (void)0
