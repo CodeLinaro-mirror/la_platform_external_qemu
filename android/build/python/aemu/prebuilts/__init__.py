@@ -67,6 +67,10 @@ def buildPrebuilts(args, is_emulator_build):
             _prebuilt_funcs = {
                 'vulkan_loader': vulkan_loader.buildPrebuilt,
             }
+        elif HOST_OS == "windows":
+            _prebuilt_funcs = {
+                'vulkan_loader': vulkan_loader.buildPrebuilt,
+            }
         else:
             logging.info("Prebuilts compilation in emulator build is not supported yet for "
                          + f"{HOST_OS}-{HOST_ARCH}. Skipping.")
