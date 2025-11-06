@@ -72,7 +72,6 @@ add_subdirectory(modules/aemu-ui-widgets)
 add_subdirectory(modules/aemu-ui-window)
 add_subdirectory(modules/aemu-ui-qt)
 add_subdirectory(modules/aemu-ext-pages)
-add_subdirectory(modules/aemu-ext-pages-grpc)
 
 list(APPEND android-libui-testdata testdata/mp4/video.mp4)
 

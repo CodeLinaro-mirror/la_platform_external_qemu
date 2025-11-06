@@ -13,3 +13,5 @@ android_qt_lib(
        ui::common
        ui::gl-qt-bridge
        ui::widgets)
+
+message(FATAL_ERROR "Please do not use this component, it is deprecated.")

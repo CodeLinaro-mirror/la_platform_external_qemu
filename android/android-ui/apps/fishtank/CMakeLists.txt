@@ -48,15 +48,9 @@ target_link_libraries(
           android-emu-curl
           android-hw-config
           ext-page-battery
-          ext-page-battery-grpc
           ext-page-bugreport
-          ext-page-bugreport-grpc
-          ext-page-camera-grpc
           ext-page-car
-          ext-page-cellular-grpc
-          ext-page-display-grpc
           ext-page-dpad
-          ext-page-finger-grpc
           ext-page-google-play
           ext-page-help
           ext-page-location-ui
@@ -65,8 +59,6 @@ target_link_libraries(
           ext-page-rotary
           ext-page-sensor-replay
           ext-page-settings
-          ext-page-snapshot-grpc
-          ext-page-telephony-grpc
           ext-page-tv-remote
           FFMPEG::FFMPEG
           protobuf::libprotobuf
