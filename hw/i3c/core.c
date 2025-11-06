@@ -312,6 +312,32 @@ static int i3c_target_handle_ccc_write(I3CTarget *t, const uint8_t *data,
             ++*num_sent;
         }
         break;
+    case I3C_CCC_SETMWL:
+    case I3C_CCCD_SETMWL:
+        while (*num_sent < num_to_send) {
+            /* MSB first. */
+            t->mwl <<= 8;
+            t->mwl |= data[*num_sent];
+            ++*num_sent;
+        }
+        break;
+    case I3C_CCC_SETMRL:
+    case I3C_CCCD_SETMRL:
+        while (*num_sent < num_to_send) {
+            /*
+             * If a device supports IBI payloads, its payload length can be
+             * optionally set by GETMRL.
+             */
+            if (*num_sent == 2 && (t->bcr & BCR_IBI_PAYLOAD_MASK)) {
+                t->max_ibi_payload = data[*num_sent];
+            } else {
+                /* MSB first. */
+                t->mrl <<= 8;
+                t->mrl |= data[*num_sent];
+                ++*num_sent;
+            }
+        }
+        break;
     /* Ignore other CCCs it's better to handle on a device-by-device basis. */
     default:
         break;
@@ -431,6 +457,40 @@ static int i3c_target_handle_ccc_read(I3CTarget *t, uint8_t *data,
     case I3C_CCCD_GETDCR:
         *data = t->dcr;
         *num_read = 1;
+        break;
+    case I3C_CCCD_GETMWL:
+        while (t->ccc_byte_offset < 2) {
+            if (read_count >= num_to_read) {
+                break;
+            }
+            /* MSB first. */
+            data[read_count] = (t->mwl >> ((1 - t->ccc_byte_offset) * 8)) &
+                               0xff;
+            t->ccc_byte_offset++;
+            read_count++;
+        }
+        *num_read = read_count;
+        break;
+    case I3C_CCCD_GETMRL:
+        while (t->ccc_byte_offset < 2) {
+            if (read_count >= num_to_read) {
+                break;
+            }
+            /*
+             * If a device supports IBI payloads, its payload length can be
+             * optionally retrieved by GETMRL.
+             */
+            if (read_count == 2 && (t->bcr & BCR_IBI_PAYLOAD_MASK)) {
+                data[read_count] = t->max_ibi_payload;
+            } else {
+                /* MSB first. */
+                data[read_count] = (t->mrl >> ((1 - t->ccc_byte_offset) * 8)) &
+                                  0xff;
+            }
+            t->ccc_byte_offset++;
+            read_count++;
+        }
+        *num_read = read_count;
         break;
     default:
         /* Unhandled on the I3CTarget class level. */

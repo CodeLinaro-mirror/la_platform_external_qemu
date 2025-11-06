@@ -90,6 +90,8 @@ typedef enum I3CCCC {
 #define I3C_HJ_ADDR 0x02
 #define I3C_ENTDAA_SIZE 8
 
+#define BCR_IBI_PAYLOAD_MASK     (1 << 2)
+
 struct I3CTargetClass {
     DeviceClass parent_class;
 
@@ -139,6 +141,9 @@ struct I3CTarget {
     uint8_t dcr;
     uint8_t bcr;
     uint64_t pid;
+    uint16_t mrl;
+    uint8_t max_ibi_payload;
+    uint16_t mwl;
 
     /* CCC State tracking. */
     I3CCCC curr_ccc;
