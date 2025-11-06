@@ -1,73 +1,78 @@
-// Copyright (C) 2018 The Android Open Source Project
-//
-// This software is licensed under the terms of the GNU General Public
-// License version 2, as published by the Free Software Foundation, and
-// may be copied, distributed, and modified under those terms.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+/*
+ * Copyright (C) 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #pragma once
+#include <QCloseEvent>
+#include <QGraphicsScene>
+#include <QRect>
+#include <QShowEvent>
+#include <QString>
+#include <QTreeWidget>
+#include <QWidget>
+#include <QtCore>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include <qglobal.h>                      // for qint64, qreal
-#include <qobjectdefs.h>                  // for slots, Q_OBJECT, signals
-#include <QGraphicsScene>                 // for QGraphicsScene
-#include <QRect>                          // for QRect
-#include <QString>                        // for QString
-#include <QStringList>                    // for QStringList
-#include <QWidget>                        // for QWidget
-#include <memory>                         // for unique_ptr
-
-#include "android/skin/qt/qt-settings.h"  // for SaveSnapshotOnExit
-#include "android/skin/qt/common_settings.h"
-#include "ui_snapshot-page.h"             // for SnapshotPage
+#include "absl/status/statusor.h"
+#include "android/skin/qt/extended-pages/snapshot_controller.h"
+#include "android/skin/qt/qt-settings.h"
+#include "ui_snapshot-page.h"
 
 namespace android {
+
 namespace metrics {
 class UiEventTracker;
 }  // namespace metrics
 }  // namespace android
 
+using android::emulation::control::SnapshotController;
+using android::emulation::control::SnapshotInfo;
 using android::metrics::UiEventTracker;
-class QCloseEvent;
-class QObject;
-class QShowEvent;
-class QString;
-class QTreeWidget;
-class QWidget;
-namespace emulator_snapshot {
-class Snapshot;
-}  // namespace emulator_snapshot
+using PackageData = absl::StatusOr<std::string>;
 
-class SnapshotPage : public QWidget
-{
+class SnapshotPage : public QWidget {
     Q_OBJECT
-
 public:
     explicit SnapshotPage(QWidget* parent = 0, bool standAlone = false);
-
     static SnapshotPage* get();
+    void setOperationInProgress(bool inProgress);
+    enum class SelectionStatus { NoSelection, Valid, Invalid };
 
-    void    setOperationInProgress(bool inProgress);
-
+    void enableConnections();
 public slots:
-    void slot_snapshotLoadCompleted(int status, const QString& name);
-    void slot_snapshotSaveCompleted(int status, const QString& name);
+    void slot_snapshotLoadCompleted(PackageData);
+    void slot_snapshotSaveCompleted(PackageData);
     void slot_snapshotDeleteCompleted();
-    void slot_askAboutInvalidSnapshots(QStringList names);
+    void slot_askAboutInvalidSnapshots(
+            std::vector<android::emulation::control::SnapshotInfo> names);
     void slot_confirmAutosaveChoiceAndRestart(
-             Ui::Settings::SaveSnapshotOnExit previousSetting,
-             Ui::Settings::SaveSnapshotOnExit nextSetting);
-
+            Ui::Settings::SaveSnapshotOnExit previousSetting,
+            Ui::Settings::SaveSnapshotOnExit nextSetting);
 signals:
-    void loadCompleted(int status, const QString& name);
-    void saveCompleted(int status, const QString& name);
+    void loadCompleted(PackageData);
+    void saveCompleted(PackageData);
+    void screenshotLoaded(std::string pixels, SelectionStatus itemStatus);
     void deleteCompleted();
-    void askAboutInvalidSnapshots(QStringList names);
+    void askAboutInvalidSnapshots(
+            std::vector<android::emulation::control::SnapshotInfo> names);
     void confirmAutosaveChoiceAndRestart(
-             Ui::Settings::SaveSnapshotOnExit previousSetting,
-             Ui::Settings::SaveSnapshotOnExit nextSetting);
+            Ui::Settings::SaveSnapshotOnExit previousSetting,
+            Ui::Settings::SaveSnapshotOnExit nextSetting);
+    void snapshotsList(std::vector<SnapshotInfo> snapshots);
 
 private slots:
     void on_defaultSnapshotDisplay_itemSelectionChanged();
@@ -83,49 +88,32 @@ private slots:
     void on_snapshotDisplay_itemSelectionChanged();
     void on_tabWidget_currentChanged(int index);
     void on_takeSnapshotButton_clicked();
-
+    void on_screenshotLoaded(std::string pixels, SelectionStatus itemStatus);
+    void on_snapshotsList(std::vector<SnapshotInfo> snapshots);
+    
 private:
-
-    enum class SelectionStatus {
-        NoSelection, Valid, Invalid
-    };
-
     class WidgetSnapshotItem;
 
     static constexpr int COLUMN_ICON = 0;
     static constexpr int COLUMN_NAME = 1;
-
-    void    showEvent(QShowEvent* ee) override;
-
-    void    clearSnapshotDisplay();
-    void    setShowSnapshotDisplay(bool show);
-
-    void    populateSnapshotDisplay();
-    void    populateSnapshotDisplay_flat();
-
+    void showEvent(QShowEvent* ee) override;
+    void clearSnapshotDisplay();
+    void setShowSnapshotDisplay(bool show);
+    void populateSnapshotDisplay();
     QString formattedSize(qint64 theSize);
-    QString getDescription(const QString& fileName);
-
-    void    adjustIcons(QTreeWidget* theDisplayList);
-    void    closeEvent(QCloseEvent* closeEvent) override;
-    void    deleteSnapshot(const WidgetSnapshotItem* theItem);
-    void    disableActions();
-    void    editSnapshot(const WidgetSnapshotItem* theItem);
+    void adjustIcons(QTreeWidget* theDisplayList);
+    void closeEvent(QCloseEvent* closeEvent) override;
+    void deleteSnapshot(const WidgetSnapshotItem* theItem);
+    void disableActions();
+    void editSnapshot(const WidgetSnapshotItem* theItem);
     QString elideSnapshotInfo(QString fullString);
-    void    enableActions();
-    void    getOutputFileName();
-    void    highlightItemWithFilename(const QString& fileName);
-    void    showPreviewImage(const QString& snapshotName, SelectionStatus itemStatus);
-    void    updateAfterSelectionChanged();
-    void    writeLogicalNameToProtobuf(const QString& fileName, const QString& logicalName);
-    void    writeParentToProtobuf(const QString& fileName, const QString& parentName);
-    void    writeLogicalNameAndParentToProtobuf(const QString& fileName,
-                                                const QString& logicalName,
-                                                const QString& parentName);
-    void    changeUiFromSaveOnExitSetting(Ui::Settings::SaveSnapshotOnExit choice);
-
+    void enableActions();
+    void highlightItemWithFilename(const QString& fileName);
+    void showPreviewImage(const absl::StatusOr<std::string> image,
+                          SelectionStatus itemStatus);
+    void updateAfterSelectionChanged();
+    void changeUiFromSaveOnExitSetting(Ui::Settings::SaveSnapshotOnExit choice);
     const WidgetSnapshotItem* getSelectedSnapshot();
-
     bool mIsStandAlone = false;
     bool mAllowEdit = false;
     bool mAllowLoad = false;
@@ -134,21 +122,16 @@ private:
     bool mMadeSelection = false;
     bool mInfoWindowIsBig = false;
     bool mDidInitialInvalidCheck = false;
-
-    qreal mSmallInfoRegionSize = 0.0; // The size that fits in the small snashot-info region
-
-    QRect mInfoPanelSmallGeo; // Location and size of the info panel when it is small
-    QRect mInfoPanelLargeGeo; // Location and size of the info panel when it is big
-
-    QString mOutputFileName = ""; // Used to provide our output in stand-alone mode
-
-    std::unique_ptr<emulator_snapshot::Snapshot> loadProtobuf(const QString& fileName);
-
-    void writeProtobuf(const QString& fileName,
-                       const std::unique_ptr<emulator_snapshot::Snapshot>& protobuf);
-
+    qreal mSmallInfoRegionSize =
+            0.0;  // The size that fits in the small snashot-info region
+    QRect mInfoPanelSmallGeo;  // Location and size of the info panel when it is
+                               // small
+    QRect mInfoPanelLargeGeo;  // Location and size of the info panel when it is
+                               // big
+    QString mOutputFileName =
+            "";  // Used to provide our output in stand-alone mode
     std::unique_ptr<Ui::SnapshotPage> mUi;
     std::shared_ptr<UiEventTracker> mSnapshotTracker;
-
-    QGraphicsScene mPreviewScene;     // Used to render the preview screenshot
+    std::unique_ptr<SnapshotController> mSnapshotService;
+    QGraphicsScene mPreviewScene;  // Used to render the preview screenshot
 };
