@@ -17,6 +17,7 @@
 #include <memory>            // for shared_ptr, unique_ptr
 
 #include "ui_finger-page.h"  // for FingerPage
+#include "android/skin/qt/extended-pages/finger-controller.h"
 
 namespace android {
 namespace metrics {
@@ -26,7 +27,7 @@ class UiEventTracker;
 
 using android::metrics::UiEventTracker;
 class QObject;
-struct QAndroidFingerAgent;
+struct QAndroidFingerAgent; // Keep for LegacyFingerController constructor
 
 class FingerPage : public QWidget
 {
@@ -34,13 +35,16 @@ class FingerPage : public QWidget
 
 public:
     explicit FingerPage(QWidget *parent = 0);
-    static void setFingerAgent(const QAndroidFingerAgent* agent);
+    ~FingerPage(); // Add destructor to properly manage unique_ptr
 
 private slots:
     void on_finger_touchButton_pressed();
     void on_finger_touchButton_released();
 
 private:
+    void initializeController(); // Factory method for controller
+
     std::unique_ptr<Ui::FingerPage> mUi;
     std::shared_ptr<UiEventTracker> mFingerTracker;
+    std::unique_ptr<FingerController> mController;
 };
