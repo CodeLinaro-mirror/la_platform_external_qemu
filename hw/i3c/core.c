@@ -113,6 +113,7 @@ bool i3c_scan_bus(I3CBus *bus, uint8_t address, enum I3CEvent event)
 {
     BusChild *child;
     I3CNode *node, *next;
+    bool found = false;
 
     /* Clear out any devices from a previous (re-)START. */
     QLIST_FOREACH_SAFE(node, &bus->current_devs, next, next) {
@@ -125,12 +126,11 @@ bool i3c_scan_bus(I3CBus *bus, uint8_t address, enum I3CEvent event)
         I3CTarget *target = I3C_TARGET(qdev);
 
         if (i3c_target_match_and_add(bus, target, address, event)) {
-            return true;
+            found = true;
         }
     }
 
-    /* No one on the bus could respond. */
-    return false;
+    return found;
 }
 
 /* Class-level event handling, since we do some CCCs at the class level. */
