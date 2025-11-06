@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "android/emulation/control/EmulatorService.h"
+#include "android/avd/BugreportInfo.h"
 
 #ifdef _MSC_VER
 #include "msvc-posix.h"
@@ -572,11 +573,14 @@ public:
             response_entry->set_value(entry.second);
         };
 
-        (*reply->mutable_guestconfig())
-        ["multidisplay"] =
+        avd::BugreportInfo bugreport;
+        auto guestConfig = (*reply->mutable_guestconfig());
+        guestConfig["multidisplay"] =
                 MultiDisplay::getInstance()->isDisplayPipeReady()
                         ? "available"
                         : "unavailable";
+        guestConfig["androidVersion"] = bugreport.androidVer;
+        guestConfig["hypervisorVersion"] = bugreport.hypervisorVer;
         return Status::OK;
     }
 

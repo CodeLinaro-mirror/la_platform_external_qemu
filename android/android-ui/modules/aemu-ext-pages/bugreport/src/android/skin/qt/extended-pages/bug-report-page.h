@@ -18,7 +18,7 @@
 #include <string_view>
 
 #include "aemu/base/async/RecurrentTask.h"
-#include "android/avd/BugreportInfo.h"
+#include "android/skin/qt/extended-pages/bugreport-controller.h"
 #include "android/emulation/control/adb/AdbInterface.h"
 #include "android/skin/qt/themed-widget.h"
 #include "host-common/qt_ui_defs.h"
@@ -42,9 +42,15 @@ class BugreportPage : public ThemedWidget {
 public:
     explicit BugreportPage(QWidget* parent = 0);
     ~BugreportPage();
+    BugreportPage(const BugreportPage&) = delete;
+    BugreportPage& operator=(const BugreportPage&) = delete;
+
     void setAdbInterface(android::emulation::AdbInterface* adb);
     void showEvent(QShowEvent* event) override;
     void updateTheme() override;
+
+    // For testing purposes
+    void setControllerForTest(std::unique_ptr<BugreportController> controller);
 
     struct SavingStates {
         std::string saveLocation;
@@ -62,6 +68,7 @@ private slots:
     void on_bug_bugReportCheckBox_clicked();
 
 private:
+    void initializeController();
     void refreshContents();
     void loadAdbBugreport();
     void loadAdbLogcat();
@@ -81,9 +88,10 @@ private:
     std::unique_ptr<Ui::BugreportPage> mUi;
     std::shared_ptr<UiEventTracker> mBugTracker;
     SavingStates mSavingStates;
-    android::avd::BugreportInfo mReportingFields;
+    BugreportInfo mReportingFields;
     std::string mReproSteps;
     android::emulation::AdbCommandPtr mAdbBugreport;
     android::emulation::AdbCommandPtr mAdbLogcat;
     android::base::RecurrentTask mTask;
+    std::unique_ptr<BugreportController> mController;
 };

@@ -86,6 +86,13 @@ public:
             OnCompleted<DisplayConfigurations> onDone);
 
     /**
+     * @brief Asynchronously gets the status of the emulator.
+     *
+     * @param onDone The callback to be invoked when the operation completes.
+     */
+    void getEmulatorStatusAsync(OnCompleted<EmulatorStatus> onDone);
+
+    /**
      * @brief Asynchronously sets the display configuration of the emulator.
      *
      * @param state The display configuration to set.
@@ -142,6 +149,9 @@ public:
      */
     std::shared_ptr<SimpleClientWriter<InputEvent>> asyncInputEventWriter();
 
+    EmulatorController::StubInterface* service() { return mService.get(); }
+
+    std::shared_ptr<EmulatorGrpcClient> client() { return mClient; }
 private:
     std::unique_ptr<EmulatorController::StubInterface> mService;
     std::shared_ptr<EmulatorGrpcClient> mClient;
