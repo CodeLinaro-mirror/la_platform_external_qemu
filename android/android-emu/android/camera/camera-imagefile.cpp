@@ -27,14 +27,9 @@ extern "C" {
 #include <jpeglib.h>
 }
 
-extern "C" {
-#include <libavformat/avformat.h>
-#include <libswscale/swscale.h>
-}  // extern "C"
-
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/ScopedStdioFile.h"
-#include "android/camera/camera-sws-format-converter.h"
+#include "android/camera/camera-format-converters.h"
 #include "android/utils/debug.h"
 #include "android/utils/file_io.h"
 
@@ -238,42 +233,9 @@ std::optional<ImageData> loadImageFromFile(const char* filename) {
     }
 }
 
-#define getImageData_field(field)                                      \
-    getImageData_##field(const void* frame) {                          \
-        const ImageData* image = static_cast<const ImageData*>(frame); \
-        return image->field;                                           \
-    }
-
-int getImageData_field(width);
-int getImageData_field(height);
-
-int getImageData_format(const void* frame) {
-    const ImageData* image = static_cast<const ImageData*>(frame);
-
-    return image->num_components == 3 ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_RGBA;
-}
-
-const uint8_t* const* getImageData_slice(const void* frame) {
-    const ImageData* image = static_cast<const ImageData*>(frame);
-    return &image->data_ptr;
-}
-
-const int* getImageData_stride(const void* frame) {
-    const ImageData* image = static_cast<const ImageData*>(frame);
-    return &image->line_size;
-}
-
-const CameraFrameInfoVtbl image_data_info_ops = {
-    .getWidth = &getImageData_width,
-    .getHeight = &getImageData_height,
-    .getAVPixelFormat = &getImageData_format,
-    .getSlice = &getImageData_slice,
-    .getStride = &getImageData_stride
-};
-
 struct ImagefileCameraDevice {
     explicit ImagefileCameraDevice(ImageData image)
-        : mImage(std::move(image)), mConverter(image_data_info_ops) {
+        : mImage(std::move(image)) {
         mHeader.opaque = this;
     }
 
@@ -323,8 +285,13 @@ private:
         const bool backFacing = !strcmp(direction, "back");
 
         for (uint32_t i = 0; i < cframe.framebuffers_count; ++i) {
-            if (const int err = mConverter.fillCFB(cframe.framebuffers[i],
-                                                   &mImage, backFacing)) {
+            if (const int err = convert_frame(mImage.data_ptr,
+                            mImage.num_components == 3 ? V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_ARGB32,
+                            mImage.line_size * mImage.height,
+                            mImage.width,
+                            mImage.height, &cframe,
+                            rScale, gScale, bScale, expComp, direction,
+                            get_coarse_orientation())) {
                 return err;
             }
         }
@@ -333,7 +300,6 @@ private:
     }
 
     int stopCapturing() {
-        mConverter.ClearConverterCache();
         return 0;
     }
 
@@ -343,7 +309,6 @@ private:
 
     CameraDevice mHeader;
     ImageData mImage;
-    SwsFormatConverter mConverter;
 };
 
 int camera_imagefile_init_CameraInfo(CameraInfo* ci,
