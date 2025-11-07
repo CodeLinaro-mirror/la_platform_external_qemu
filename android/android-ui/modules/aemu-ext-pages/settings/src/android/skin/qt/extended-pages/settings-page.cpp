@@ -329,9 +329,7 @@ SettingsPage::SettingsPage(QWidget* parent)
         mUi->set_glesBackendPrefComboBox->setItemData(i, QVariant(i));
     }
 
-#ifndef _WIN32
     mDisableANGLE = true;
-#endif
 
     if (mDisableANGLE) {
         for (int i = 0; i < mUi->set_glesBackendPrefComboBox->count();) {

@@ -116,26 +116,12 @@ SelectedRenderer emuglConfig_get_renderer(const char* gpu_mode) {
     } else if (!strcmp(gpu_mode, "host") ||
         !strcmp(gpu_mode, "on")) {
         return SELECTED_RENDERER_HOST;
-    } else if (!strcmp(gpu_mode, "off")) {
-        return SELECTED_RENDERER_OFF;
-    } else if (!strcmp(gpu_mode, "guest")) {
-        return SELECTED_RENDERER_GUEST;
-    } else if (!strcmp(gpu_mode, "mesa")) {
-        return SELECTED_RENDERER_MESA;
     } else if (!strcmp(gpu_mode, "swiftshader")) {
-        return SELECTED_RENDERER_SWIFTSHADER;
-    } else if (!strcmp(gpu_mode, "angle")
-            || !strcmp(gpu_mode, "swangle")) {
-        return SELECTED_RENDERER_ANGLE;
-    } else if (!strcmp(gpu_mode, "angle9")) {
-        return SELECTED_RENDERER_ANGLE9;
-    } else if (!strcmp(gpu_mode, "swiftshader_indirect")) {
         return SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
-    } else if (!strcmp(gpu_mode, "angle_indirect")
-            || !strcmp(gpu_mode, "swangle_indirect")) {
+    } else if (!strcmp(gpu_mode, "swangle")) {
         return SELECTED_RENDERER_ANGLE_INDIRECT;
-    } else if (!strcmp(gpu_mode, "angle9_indirect")) {
-        return SELECTED_RENDERER_ANGLE9_INDIRECT;
+    } else if (!strcmp(gpu_mode, "lavapipe")) {
+        return SELECTED_RENDERER_LAVAPIPE;
     } else if (!strcmp(gpu_mode, "error")) {
         return SELECTED_RENDERER_ERROR;
     } else {
@@ -166,24 +152,12 @@ const char* emuglConfig_renderer_to_string(SelectedRenderer renderer) {
             return "(Unknown)";
         case SELECTED_RENDERER_HOST:
             return "Host";
-        case SELECTED_RENDERER_OFF:
-            return "Off";
-        case SELECTED_RENDERER_GUEST:
-            return "Guest";
-        case SELECTED_RENDERER_MESA:
-            return "Mesa";
-        case SELECTED_RENDERER_SWIFTSHADER:
-            return "Swiftshader";
-        case SELECTED_RENDERER_ANGLE:
-            return "Angle";
-        case SELECTED_RENDERER_ANGLE9:
-            return "Angle9";
         case SELECTED_RENDERER_SWIFTSHADER_INDIRECT:
             return "Swiftshader Indirect";
         case SELECTED_RENDERER_ANGLE_INDIRECT:
             return "Angle Indirect";
-        case SELECTED_RENDERER_ANGLE9_INDIRECT:
-            return "Angle9 Indirect";
+        case SELECTED_RENDERER_LAVAPIPE:
+            return "Lavapipe";
         case SELECTED_RENDERER_ERROR:
             return "(Error)";
     }
@@ -192,14 +166,9 @@ const char* emuglConfig_renderer_to_string(SelectedRenderer renderer) {
 
 bool emuglConfig_current_renderer_supports_snapshot() {
     const SelectedRenderer renderer = emuglConfig_get_current_renderer();
-    if (getConsoleAgents()->settings->hw()->hw_arc) {
-        return renderer == SELECTED_RENDERER_OFF ||
-               renderer == SELECTED_RENDERER_GUEST;
-    }
     return renderer == SELECTED_RENDERER_HOST ||
-           renderer == SELECTED_RENDERER_OFF ||
-           renderer == SELECTED_RENDERER_GUEST ||
            renderer == SELECTED_RENDERER_ANGLE_INDIRECT ||
+           renderer == SELECTED_RENDERER_LAVAPIPE ||
            renderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
 }
 
@@ -694,247 +663,140 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
 }
 
 bool emuglConfig_init(EmuglConfig* config,
-                      bool gpu_enabled,
-                      const char* gpu_mode,
-                      const char* gpu_option,
-                      bool no_window,
-                      bool denylisted,
-                      bool has_guest_renderer,
-                      int uiPreferredBackend,
-                      bool use_host_vulkan) {
-    D("%s: denylisted=%d has_guest_renderer=%d, mode: %s, option: %s\n",
-      __FUNCTION__,
-      denylisted,
-      has_guest_renderer,
-      gpu_mode, gpu_option);
+                      const char* gpu_mode_requested,
+                      bool no_window) {
+    D("%s: gpu_mode_requested: %s, no_window: %d\n", __FUNCTION__, gpu_mode_requested, no_window);
 
     // zero all fields first.
     memset(config, 0, sizeof(*config));
 
-    bool host_set_in_hwconfig = false;
-    bool has_auto_no_window = false;
-    bool hasUiPreference = (enum WinsysPreferredGlesBackend)uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO;
-
-    const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
-    const char* lavapipe_gl_mode = "swangle_indirect";
-    if (android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
-        lavapipe_gl_mode = "swiftshader_indirect";
-        dinfo("'%s' envvar is set, using %s for GL", EnvVarSelectGL,
-              lavapipe_gl_mode);
-    }
-
-    // The value of '-gpu <mode>' overrides both the hardware properties
-    // and the UI setting, except if <mode> is 'auto'.
-    if (gpu_option) {
-        sGpuOption = gpu_option;
-        if (!strcmp(gpu_option, "on") || !strcmp(gpu_option, "enable")) {
-            gpu_enabled = true;
-            if (!gpu_mode || !strcmp(gpu_mode, "auto")) {
-                gpu_mode = "host";
-            }
-        } else if (!strcmp(gpu_option, "off") ||
-                   !strcmp(gpu_option, "disable") ||
-                   !strcmp(gpu_option, "guest")) {
-            gpu_mode = gpu_option;
-            gpu_enabled = false;
-        } else if (!strcmp(gpu_option, "auto")){
-            // Nothing to do, use gpu_mode set from
-            // hardware properties instead.
-        } else if  (!strcmp(gpu_option, "auto-no-window")) {
-            // Nothing to do, use gpu_mode set from
-            // hardware properties instead.
-            has_auto_no_window = true;
-        } else {
-            gpu_enabled = true;
-            if (!strcmp(gpu_option, "lavapipe")) {
-                gpu_mode = lavapipe_gl_mode;
-            } else {
-                gpu_mode = gpu_option;
-            }
-        }
-    } else {
-        // Support "hw.gpu.mode=on" in config.ini
-        if (gpu_enabled && gpu_mode && (
-            !strcmp(gpu_mode, "on") ||
-            !strcmp(gpu_mode, "enable") ||
-            !strcmp(gpu_mode, "host"))) {
-            gpu_enabled = true;
-            gpu_mode = "host";
-            host_set_in_hwconfig = true;
-        }
-        sGpuOption = gpu_mode;
-    }
-
-    if (gpu_mode &&
-        (!strcmp(gpu_mode, "guest") ||
-         !strcmp(gpu_mode, "off"))) {
-        gpu_enabled = false;
-    }
-
-    if (!gpu_option && hasUiPreference) {
-        gpu_enabled = true;
-        gpu_mode = "auto";
-    }
-
-    if (!gpu_enabled) {
-        config->enabled = false;
-        snprintf(config->backend, sizeof(config->backend), "%s", gpu_mode);
-        snprintf(config->status, sizeof(config->status),
-                 "GPU emulation is disabled");
-        setCurrentRenderer(gpu_mode);
-        return true;
-    }
-
-    if (!strcmp("swiftshader", gpu_mode)) {
-        gpu_mode = "swiftshader_indirect";
-    }
-
-    if (!strcmp("swangle", gpu_mode)) {
-        gpu_mode = "swangle_indirect";
-    }
-
-#if defined(__APPLE__) && defined(__arm64__)
-    if (!strcmp("host", gpu_mode)) {
-        use_host_vulkan = true;
-    }
-#endif
-
-    resetBackendList();
-
-    // For GPU mode in software rendering:
-    // On Mac, both swiftshader and swangle will redirect to swangle.
-    // On Linux, swiftshader will go to the old swiftshader, while swangle will
-    // go to swangle.
-    // On Windows, swiftshader will go to the old swiftshader, swangle is not
-    // supported yet.
-    bool force_swiftshader_to_swangle = false;
-    const char* swiftshader_backend_name = "swiftshader";
-    const char* swangle_backend_name = "angle";
-#ifdef __APPLE__
-    force_swiftshader_to_swangle = true;
-#endif
-#ifdef _WIN32
-    swangle_backend_name = nullptr;
-#endif
-
-    // Check that the GPU mode is a valid value. 'auto' means determine
-    // the best mode depending on the environment.
-    if (!strcmp(gpu_mode, "auto") || host_set_in_hwconfig) {
-        const bool switch_to_software = (no_window && !has_auto_no_window) ||
-                                        (denylisted && !hasUiPreference);
-        if (switch_to_software) {
-            if (swangle_backend_name && stringVectorContains(sBackendList->names(),
-                    swangle_backend_name)) {
-                D("%s: Headless mode or denylisted GPU driver, "
-                  "using SwANGLE backend\n",
-                  __FUNCTION__);
-                gpu_mode = "swangle_indirect";
-            } else if (stringVectorContains(sBackendList->names(),
-                    swiftshader_backend_name)) {
-                D("%s: Headless mode or denylisted GPU driver, "
-                  "using Swiftshader backend\n",
-                  __FUNCTION__);
-                gpu_mode = "swiftshader_indirect";
-            } else if (!has_guest_renderer) {
-                D("%s: Headless (-no-window) mode (or denylisted GPU driver)"
-                  " without Swiftshader, forcing '-gpu off'\n",
-                  __FUNCTION__);
-                config->enabled = false;
-                gpu_mode = "off";
-                snprintf(config->backend, sizeof(config->backend), "%s", gpu_mode);
-                snprintf(config->status, sizeof(config->status),
-                        "GPU emulation is disabled (-no-window without Swiftshader)");
-                setCurrentRenderer(gpu_mode);
-                return true;
-            } else {
-                D("%s: Headless (-no-window) mode (or denylisted GPU driver)"
-                  ", using guest GPU backend\n",
-                  __FUNCTION__);
-                config->enabled = false;
-                gpu_mode = "off";
-                snprintf(config->backend, sizeof(config->backend), "%s", gpu_mode);
-                snprintf(config->status, sizeof(config->status),
-                        "GPU emulation is in the guest");
-                gpu_mode = "guest";
-                setCurrentRenderer(gpu_mode);
-                return true;
-            }
-        } else {
-            switch (uiPreferredBackend) {
-                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
-                    gpu_mode = "angle_indirect";
-                    break;
-                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9:
-                    gpu_mode = "angle_indirect";
-                    break;
-                case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
-                    if (force_swiftshader_to_swangle) {
-                        gpu_mode = "swangle_indirect";
-                    } else {
-                        gpu_mode = "swiftshader_indirect";
-                    }
-                    break;
-                case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
-                    gpu_mode = "host";
-#if defined(__APPLE__) && defined(__arm64__)
-                    use_host_vulkan = true;
-#endif
-                    break;
-                default:
-                    gpu_mode = "host";
-                    break;
-            }
-            D("%s: auto-selected %s based on conditions and UI preference %d\n",
-              __func__, gpu_mode, uiPreferredBackend);
+    std::vector<std::string> allowedOptions = {
+        "auto",
+        "host",
+        "lavapipe",
+        "swiftshader",
+        "swangle",
+    };
+    bool isValid = false;
+    for (auto& option : allowedOptions) {
+        if (option == gpu_mode_requested) {
+            isValid = true;
+            break;
         }
     }
 
-#if defined(__APPLE__) && defined(__arm64__)
-    // Also force MoltenVK with 'auto' modes on XR
-    // TODO(b/367273570): fix the test runner to remove agentsAvailable() call
+    if (!isValid) {
+        // At this point we should have fixed the arguments
+        std::string error = StringFormat(
+                "Invalid GPU mode '%s', use one of: 'auto', 'host', "
+                "'lavapipe', 'swiftshader' or 'swangle'",
+                gpu_mode_requested);
+
+        D("%s: Error: [%s]\n", __func__, error.c_str());
+        derror("%s: %s", __func__, error);
+
+        const char* gpu_mode_out = "error";
+        snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s", gpu_mode_out);
+        snprintf(config->gles_backend, sizeof(config->gles_backend), "%s", gpu_mode_out);
+        snprintf(config->status, sizeof(config->status), "%s",
+                    error.c_str());
+        setCurrentRenderer(gpu_mode_out);
+        return false;
+    }
+
+    sGpuOption = gpu_mode_requested;
+
+    // Select Vulkan mode
+    std::string vulkan_mode_selected = gpu_mode_requested;
+
+    // TODO(b/367273570): fix the test runner to remove
+    // agentsAvailable() call
     const bool is_xr_mode =
             agentsAvailable() && getConsoleAgents() &&
             getConsoleAgents()->settings &&
             getConsoleAgents()->settings->avdInfo() &&
             (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
              AVD_XR);
-    if (is_xr_mode && !strcmp("host", gpu_mode)) {
-        use_host_vulkan = true;
-    }
-#endif
 
-    // b/328275986: Turn off ANGLE because it breaks.
-    bool force_swiftshader = (!strcmp("angle", gpu_mode) ||
-                              !strcmp("angle_indirect", gpu_mode) ||
-                              !strcmp("angle9", gpu_mode) ||
-                              !strcmp("angle9_indirect", gpu_mode));
+    // If nothing is enforced so far, and we're using 'auto' mode, decide
+    // based on some other parameters and prefer host
+    if (vulkan_mode_selected == "auto") {
+        if (no_window) {
+            vulkan_mode_selected = "lavapipe";
+        } else {
+            // Enable MoltenVK for XR
+#if defined(__APPLE__)
+            // Force MoltenVK with 'auto' modes on XR, but otherwise use swiftshader
+            if (is_xr_mode) {
+                vulkan_mode_selected = "host";
+            } else {
+                vulkan_mode_selected = "swiftshader";
+            }
+#else
+            vulkan_mode_selected = "host";
+#endif
+        }
+    }
+
+    if (vulkan_mode_selected == "swangle") {
+        // No 'swangle' for vulkan mode, use swiftshader
+        vulkan_mode_selected = "swiftshader";
+    }
+
+    // Select GLES mode
+    std::string gles_mode_selected = gpu_mode_requested;
+    if (gles_mode_selected == "lavapipe") {
+        // There is no 'lavapipe' gles mode, use swangle by default
+        gles_mode_selected = "swangle";
+        const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
+        if (android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
+            gles_mode_selected = "swiftshader";
+            dinfo("'%s' envvar is set, using %s for GL", EnvVarSelectGL,
+                  gles_mode_selected.c_str());
+        }
+    }
+
+    // If nothing is enforced so far, and we're using 'auto' mode, decide
+    // based on some other parameters and prefer host
+    if (gles_mode_selected == "auto") {
+        if (no_window) {
+            gles_mode_selected = "swangle";
+        } else {
+            gles_mode_selected = "host";
+        }
+    }
+
 #ifdef _WIN32
-    // Also turn off swangle_indirect mode on Windows
-    force_swiftshader =
-            force_swiftshader || (!strcmp("swangle_indirect", gpu_mode));
+    // swangle is not supported on Windows
+    if (gles_mode_selected == "swangle") {
+        gles_mode_selected = "swiftshader";
+    }
+#elif defined(__APPLE__)
+    // swiftshader is not supported on macOS
+    if (gles_mode_selected == "swiftshader") {
+        gles_mode_selected = "swangle";
+    }
 #endif
-    if (force_swiftshader) {
-        gpu_mode = "swiftshader_indirect";
-    }
 
-    const char* library_mode = gpu_mode;
-    printf("library_mode %s gpu mode %s\n", library_mode, gpu_mode);
-    if ((force_swiftshader_to_swangle && strstr(library_mode, "swiftshader"))
-            || strstr(library_mode, "swangle")) {
-        library_mode = "angle";
-    }
+    dinfo("%s: vulkan_mode_selected:%s gles_mode_selected:%s", __func__,
+          vulkan_mode_selected.c_str(), gles_mode_selected.c_str());
+
+    resetBackendList();
 
     // 'host' is a special value corresponding to the default translation
-    // to desktop GL, 'guest' does not use host-side emulation,
-    // anything else must be checked against existing host-side backends.
-    if (strcmp(gpu_mode, "host") != 0 && strcmp(gpu_mode, "guest") != 0) {
+    // to desktop GL, anything else must be checked against existing host-side
+    // backends.
+    if (gles_mode_selected != "host") {
+        std::string gles_library_name = gles_mode_selected;
+        if (gles_library_name == "swangle") {
+            // library path uses gles_angle as the folder name
+            gles_library_name = "angle";
+        }
         const std::vector<std::string>& backends = sBackendList->names();
-        if (!stringVectorContains(backends, library_mode)) {
+        if (!stringVectorContains(backends, gles_library_name.c_str())) {
             std::string error = StringFormat(
-                "Invalid GPU mode '%s', use one of: host swiftshader_indirect. "
-                "If you're already using one of those modes, "
-                "the emulator installation may be corrupt. "
-                "Please re-install the emulator.", gpu_mode);
+                    "Invalid GLES library mode '%s' for GLES. Backends available: ",
+                    gles_library_name.c_str());
 
             for (size_t n = 0; n < backends.size(); ++n) {
                 error += " ";
@@ -944,45 +806,26 @@ bool emuglConfig_init(EmuglConfig* config,
             D("%s: Error: [%s]\n", __func__, error.c_str());
             derror("%s: %s", __func__, error);
 
-            config->enabled = false;
-            gpu_mode = "error";
-            snprintf(config->backend, sizeof(config->backend), "%s", gpu_mode);
+            const char* gpu_mode_out = "error";
+            snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s",
+                     gpu_mode_out);
+            snprintf(config->gles_backend, sizeof(config->gles_backend), "%s",
+                     gpu_mode_out);
             snprintf(config->status, sizeof(config->status), "%s",
                      error.c_str());
-            setCurrentRenderer(gpu_mode);
+            setCurrentRenderer(gpu_mode_out);
             return false;
         }
     }
 
-    if (strcmp(gpu_mode, "guest")) {
-        config->enabled = true;
-    }
-
-    bool force_lavapipe = fc::isEnabled(fc::ForceLavapipe);
-    if (fc::isEnabled(fc::ForceLavapipeForSoftwareRendering)) {
-        const bool using_other_software = strstr(gpu_mode, "swiftshader") ||
-                                          strstr(gpu_mode, "swangle");
-        if (using_other_software) {
-            force_lavapipe = true;
-        }
-    }
-
-    if (force_lavapipe) {
-        sGpuOption = "lavapipe";
-        gpu_mode = lavapipe_gl_mode;
-        use_host_vulkan = false;
-    }
-
-    config->use_host_vulkan = use_host_vulkan;
-
     // GPU mode should not change after this point
-    snprintf(config->backend, sizeof(config->backend), "%s", gpu_mode);
+    snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s", vulkan_mode_selected.c_str());
+    snprintf(config->gles_backend, sizeof(config->gles_backend), "%s", gles_mode_selected.c_str());
     snprintf(config->status, sizeof(config->status),
-             "GPU emulation enabled using '%s' mode", gpu_mode);
-    setCurrentRenderer(gpu_mode);
+             "GPU emulation enabled using Vulkan:'%s' GLES:'%s' modes", vulkan_mode_selected.c_str(), gles_mode_selected.c_str());
+    setCurrentRenderer(vulkan_mode_selected.c_str());
 
 #if defined(__linux__) || defined(_WIN32)
-    // todo: add the amd/intel gpu quirks
     const bool hwGpuRequested =
             (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST);
     const bool vulkanIsNotDisabled =
@@ -1051,7 +894,9 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
 
     const SelectedRenderer renderer = emuglConfig_get_current_renderer();
 
-    if (config->use_host_vulkan) {
+    // Setup Vulkan
+    const bool use_host_vulkan = (strcmp(config->vulkan_backend, "host") == 0);
+    if (use_host_vulkan) {
 #ifdef __APPLE__
         // TODO(b/433496880) temprary way of enabling kosmickrisp ICD.
         // Ideally, we should instead just respect user's VK_DRIVER_FILES
@@ -1063,66 +908,45 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
             selectedICDStr = "moltenvk";
         } else {
             dinfo("%s: Setting ICD from envvar %s, to '%s'", __func__,
-                 EnvVarSelectICD, selectedICDStr.c_str());
+                  EnvVarSelectICD, selectedICDStr.c_str());
         }
         system->envSet("ANDROID_EMU_VK_ICD", selectedICDStr);
 #else
         system->envSet("ANDROID_EMU_VK_ICD", NULL);
 #endif
-    } else if (sGpuOption == "lavapipe") {
+    } else if ((strcmp(config->vulkan_backend, "lavapipe") == 0)) {
         system->envSet("ANDROID_EMU_VK_ICD", "lavapipe");
-    } else
-#ifndef __APPLE__
-    // Default to swiftshader vk on mac
-    if  (renderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT
-            || renderer == SELECTED_RENDERER_SWIFTSHADER
-            || strstr(config->backend, "swangle"))
-#endif
-    {
+    } else {
         // Use Swiftshader vk icd if using swiftshader_indirect
         system->envSet("ANDROID_EMU_VK_ICD", "swiftshader");
     }
 
-    bool use_swangle = strstr(config->backend, "swangle");
-#ifdef __APPLE__
-    use_swangle |= strstr(config->backend, "swiftshader") != nullptr;
-#endif
+    // Setup GLES
+    bool use_swangle = strstr(config->gles_backend, "angle");
     // $EXEC_DIR/<lib>/ is already added to the library search path by default,
     // since generic libraries are bundled there. We may need more though:
     resetBackendList();
-    if (strcmp(config->backend, "host") != 0) {
+    if (strcmp(config->gles_backend, "host") != 0) {
         // If the backend is not 'host', we also need to add the
         // backend directory.
-        std::string dir = sBackendList->getLibDirPath(
-                use_swangle ? "angle" : config->backend);
+        std::string dir = sBackendList->getLibDirPath(config->gles_backend);
         if (dir.size()) {
             D("Adding to the library search path: %s\n", dir.c_str());
             system->addLibrarySearchDir(dir);
         }
     }
 
-    if (!strcmp(config->backend, "host")) {
+    if (!strcmp(config->gles_backend, "host")) {
         // Nothing more to do for the 'host' backend.
         return;
     }
 
-    // Set ANGLE backend. This has no effect when not using ANGLE.
-#if defined(__APPLE__)
-    if (strstr(config->backend, "angle")) {
-        system->envSet("ANGLE_DEFAULT_PLATFORM", "metal");
-    }
-#elif defined(__linux__)
-    if (strstr(config->backend, "angle")) {
-        system->envSet("ANGLE_DEFAULT_PLATFORM", "vulkan");
-    }
-#endif
     if (use_swangle) {
         system->envSet("ANGLE_DEFAULT_PLATFORM", "swiftshader");
     }
 
-    if (!strcmp(config->backend, "angle_indirect")
-            || !strcmp(config->backend, "swiftshader_indirect")
-            || !strcmp(config->backend, "swangle_indirect")) {
+    if (!strcmp(config->gles_backend, "swiftshader") ||
+        !strcmp(config->gles_backend, "swangle")) {
         system->envSet("ANDROID_EGL_ON_EGL", "1");
         return;
     }
@@ -1135,31 +959,25 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
     //    ANDROID_GLESv2_LIB
     //
     // If a backend provides one of these libraries, use it.
+    const char* gles_library = (strcmp(config->gles_backend, "swangle")==0) ? "angle" : config->gles_backend;
     std::string lib;
     if (sBackendList->getBackendLibPath(
-            config->backend, EmuglBackendList::LIBRARY_EGL, &lib)) {
+            gles_library, EmuglBackendList::LIBRARY_EGL, &lib)) {
         system->envSet("ANDROID_EGL_LIB", lib);
     }
     if (sBackendList->getBackendLibPath(
-            config->backend, EmuglBackendList::LIBRARY_GLESv1, &lib)) {
+            gles_library, EmuglBackendList::LIBRARY_GLESv1, &lib)) {
         system->envSet("ANDROID_GLESv1_LIB", lib);
-    } else if (strcmp(config->backend, "mesa")) {
+    } else {
         derror("OpenGL backend '%s' without OpenGL ES 1.x library detected. "
                         "Using GLESv2 only.",
-                        config->backend);
+                        gles_library);
         // A GLESv1 lib is optional---we can deal with a GLESv2 only
         // backend by using CoreProfileEngine in the Translator.
     }
 
     if (sBackendList->getBackendLibPath(
-            config->backend, EmuglBackendList::LIBRARY_GLESv2, &lib)) {
+            gles_library, EmuglBackendList::LIBRARY_GLESv2, &lib)) {
         system->envSet("ANDROID_GLESv2_LIB", lib);
-    }
-
-    if (!strcmp(config->backend, "mesa")) {
-        dwarning("The Mesa software renderer is deprecated. ")
-        dwarning("Use Swiftshader (-gpu swiftshader) for software rendering.");
-        system->envSet("ANDROID_GL_LIB", "mesa");
-        system->envSet("ANDROID_GL_SOFTWARE_RENDERER", "1");
     }
 }

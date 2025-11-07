@@ -532,9 +532,17 @@ void skin_winsys_set_preferred_gles_driver(WinsysGuestGlesDriverPreference rende
 extern WinsysPreferredGlesBackend skin_winsys_get_preferred_gles_backend() {
     D("skin_winsys_get_preferred_gles_backend");
     QSettings settings;
-    return (WinsysPreferredGlesBackend)settings
+    WinsysPreferredGlesBackend preferredGlesBackend =
+    (WinsysPreferredGlesBackend)settings
             .value(Ui::Settings::GLESBACKEND_PREFERENCE, 0)
             .toInt();
+
+    // Convert unsupported cases to 'auto'
+    if (preferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE ||
+        preferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE9) {
+        preferredGlesBackend = WINSYS_GLESBACKEND_PREFERENCE_AUTO;
+    }
+    return preferredGlesBackend;
 }
 
 void skin_winsys_set_preferred_gles_backend(

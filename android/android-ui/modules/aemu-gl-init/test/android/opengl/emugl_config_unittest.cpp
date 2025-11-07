@@ -27,12 +27,19 @@
 namespace android {
 namespace base {
 
+
 #if defined(_WIN32)
 #  define LIB_NAME(x)  x ".dll"
+#  define SWIFTSHADER_RESULT "swiftshader"
+#  define SWANGLE_RESULT "swiftshader" // Windows redirects swangle to swiftshader
 #elif defined(__APPLE__)
 #  define LIB_NAME(x)  "lib" x ".dylib"
+#  define SWIFTSHADER_RESULT "swangle" // Mac redirects swiftshader to swangle
+#  define SWANGLE_RESULT "swangle"
 #else
 #  define LIB_NAME(x)  "lib" x ".so"
+#  define SWIFTSHADER_RESULT "swiftshader"
+#  define SWANGLE_RESULT "swangle"
 #endif
 
 static std::string makeLibSubPath(const char* name) {
@@ -211,9 +218,6 @@ TEST(EmuglConfig, init) {
     myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
     makeLibSubDir(myDir, "");
 
-    makeLibSubDir(myDir, "gles_mesa");
-    makeLibSubFile(myDir, "gles_mesa/libGLES.so");
-
     makeLibSubDir(myDir, "gles_vendor");
     makeLibSubFile(myDir, "gles_vendor/" LIB_NAME("EGL"));
     makeLibSubFile(myDir, "gles_vendor/" LIB_NAME("GLESv2"));
@@ -224,20 +228,10 @@ TEST(EmuglConfig, init) {
     {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
-                    &config, false, "host", NULL, false, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_FALSE(config.enabled);
-        EXPECT_STREQ("GPU emulation is disabled", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                    &config, true, "host", NULL, false, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("host", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'host' mode", config.status);
+                    &config, "host", false));
+        EXPECT_STREQ("host", config.vulkan_backend);
+        EXPECT_STREQ("host", config.gles_backend);
+        EXPECT_STREQ("GPU emulation enabled using Vulkan:'host' GLES:'host' modes", config.status);
     }
 
     // Check that "host" mode is available with -no-window if explicitly
@@ -245,116 +239,11 @@ TEST(EmuglConfig, init) {
     {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
-                    &config, true, "host", "host", true, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("host", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'host' mode", config.status);
+                    &config, "host", true));
+        EXPECT_STREQ("host", config.vulkan_backend);
+        EXPECT_STREQ("host", config.gles_backend);
+        EXPECT_STREQ("GPU emulation enabled using Vulkan:'host' GLES:'host' modes", config.status);
     }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                    &config, true, "mesa", NULL, false, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("mesa", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'mesa' mode", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                    &config, true, "host", "off", false, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_FALSE(config.enabled);
-        EXPECT_STREQ("GPU emulation is disabled", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, true, "host", "disable", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_FALSE(config.enabled);
-        EXPECT_STREQ("GPU emulation is disabled", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                    &config, false, "host", "on", false, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("host", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'host' mode", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                    &config, false, NULL, "on", false, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("host", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'host' mode", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, false, "mesa", "enable", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("mesa", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'mesa' mode", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, false, "vendor", "auto", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_FALSE(config.enabled);
-        EXPECT_STREQ("GPU emulation is disabled", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, true, "host", "vendor", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("vendor", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'vendor' mode", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, true, "guest", "auto", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_FALSE(config.enabled);
-        EXPECT_STREQ("GPU emulation is disabled", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, false, "guest", "auto", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_FALSE(config.enabled);
-        EXPECT_STREQ("GPU emulation is disabled", config.status);
-    }
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, true, "host", "guest", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_FALSE(config.enabled);
-    }
-
 }
 
 TEST(EmuglConfig, initFromUISetting) {
@@ -363,73 +252,66 @@ TEST(EmuglConfig, initFromUISetting) {
     myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
     makeLibSubDir(myDir, "");
 
-    makeLibSubDir(myDir, "gles_mesa");
-    makeLibSubFile(myDir, "gles_mesa/libGLES.so");
-
     makeLibSubDir(myDir, "gles_angle");
     makeLibSubFile(myDir, "gles_angle/" LIB_NAME("EGL"));
     makeLibSubFile(myDir, "gles_angle/" LIB_NAME("GLESv2"));
-
-    makeLibSubDir(myDir, "gles_angle9");
-    makeLibSubFile(myDir, "gles_angle9/" LIB_NAME("EGL"));
-    makeLibSubFile(myDir, "gles_angle9/" LIB_NAME("GLESv2"));
 
     makeLibSubDir(myDir, "gles_swiftshader");
     makeLibSubFile(myDir, "gles_swiftshader/" LIB_NAME("EGL"));
     makeLibSubFile(myDir, "gles_swiftshader/" LIB_NAME("GLESv2"));
 
-    // If the gpu command line option is specified, the UI setting is overridden.
-    for (int i = 0; i < 10; i++) {
-        {
-            EmuglConfig config;
-            EXPECT_TRUE(emuglConfig_init(
-                        &config, false, "host", "on", false, false, false,
-                        (enum WinsysPreferredGlesBackend)i, false));
-            EXPECT_TRUE(config.enabled);
-            EXPECT_STREQ("host", config.backend);
-            EXPECT_STREQ("GPU emulation enabled using 'host' mode", config.status);
-        }
+    const std::vector<const char*> UiOptionToGpuOption = {
+        "auto",         // WINSYS_GLESBACKEND_PREFERENCE_AUTO = 0,
+        "swangle",      // WINSYS_GLESBACKEND_PREFERENCE_ANGLE = 1,
+        "auto",         // WINSYS_GLESBACKEND_PREFERENCE_ANGLE9 = 2,
+        "swiftshader",  // WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER = 3,
+        "host",         // WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL = 4,
+    };
 
-        {
-            EmuglConfig config;
-            EXPECT_TRUE(emuglConfig_init(
-                        &config, false, "guest", "auto", false, false, false,
-                        WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-            EXPECT_FALSE(config.enabled);
-            EXPECT_STREQ("GPU emulation is disabled", config.status);
-        }
-    }
-
-    // If the UI setting is not "auto", and there is no gpu command line option,
-    // then use the UI setting, regardless of the AVD config.
-    for (int i = 1; i < 5; i++) {
+    for (int i = 1; i < WINSYS_GLESBACKEND_PREFERENCE_NUM; i++) {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
-                    &config, false, "host", NULL, false, false, false,
-                    (enum WinsysPreferredGlesBackend)i, false));
+                    &config, UiOptionToGpuOption[i], false));
 
-        EXPECT_TRUE(config.enabled);
+        emuglConfig_setupEnv(&config);
+
         switch (i) {
-        case 0:
-            EXPECT_STREQ("host", config.backend);
-            break;
-        case 1:
-            // b/328275986: Turn off ANGLE for now.
-            //EXPECT_STREQ("angle_indirect", config.backend);
-            break;
-        case 2:
-            //EXPECT_STREQ("angle_indirect", config.backend);
-            break;
-        case 3:
+        case WINSYS_GLESBACKEND_PREFERENCE_AUTO:
+            EXPECT_STREQ("host", config.gles_backend);
 #ifdef __APPLE__
-            // Mac redirects swiftshader to swangle
-            EXPECT_STREQ("swangle_indirect", config.backend);
+            EXPECT_STREQ("swiftshader", config.vulkan_backend);
 #else
-            EXPECT_STREQ("swiftshader_indirect", config.backend);
+            EXPECT_STREQ("host", config.vulkan_backend);
 #endif
             break;
-        case 4:
-            EXPECT_STREQ("host", config.backend);
+        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
+            // Deprecated, used to test swangle here
+            EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
+            EXPECT_STREQ("swiftshader", config.vulkan_backend);
+            EXPECT_STREQ("swiftshader",
+                         System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
+            break;
+        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9:
+            // Deprecated, same as auto
+            // EXPECT_STREQ("host", config.gles_backend);
+            // EXPECT_STREQ("host", config.vulkan_backend);
+            break;
+        case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
+            EXPECT_STREQ(SWIFTSHADER_RESULT, config.gles_backend);
+            EXPECT_STREQ("swiftshader", config.vulkan_backend);
+            EXPECT_STREQ("swiftshader",
+                         System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
+            break;
+        case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
+            EXPECT_STREQ("host", config.gles_backend);
+            EXPECT_STREQ("host", config.vulkan_backend);
+#if defined(__APPLE__) && defined(__arm64__)
+            EXPECT_STREQ("moltenvk",
+                         System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
+#else
+            EXPECT_STREQ("",
+                         System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
+#endif
             break;
         default:
             break;
@@ -437,129 +319,36 @@ TEST(EmuglConfig, initFromUISetting) {
     }
 }
 
-TEST(EmuglConfig, DISABLED_initGLESv2Only) {
+TEST(EmuglConfig, initNoWindowWithAuto) {
     TestSystem testSys("foo", System::kProgramBitness, "/");
     TestTempDir* myDir = testSys.getTempRoot();
     myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
     makeLibSubDir(myDir, "");
 
-    makeLibSubDir(myDir, "gles_angle");
-
-#ifdef _WIN32
-    const char* kEglLibName = "libEGL.dll";
-    const char* kGLESv1LibName = "libGLES_CM.dll";
-    const char* kGLESv2LibName = "libGLESv2.dll";
-#elif defined(__APPLE__)
-    const char* kEglLibName = "libEGL.dylib";
-    const char* kGLESv1LibName = "libGLES_CM.dylib";
-    const char* kGLESv2LibName = "libGLESv2.dylib";
-#else
-    const char* kEglLibName = "libEGL.so";
-    const char* kGLESv1LibName = "libGLES_CM.so";
-    const char* kGLESv2LibName = "libGLESv2.so";
-#endif
-
-    std::string eglLibPath = StringFormat("gles_angle/%s", kEglLibName);
-    std::string GLESv1LibPath = StringFormat("gles_angle/%s", kGLESv1LibName);
-    std::string GLESv2LibPath = StringFormat("gles_angle/%s", kGLESv2LibName);
-
-    makeLibSubFile(myDir, eglLibPath.c_str());
-    makeLibSubFile(myDir, GLESv2LibPath.c_str());
-
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                &config, true, "angle", "auto", false, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        EXPECT_TRUE(config.enabled);
-        EXPECT_STREQ("angle_indirect", config.backend);
-        EXPECT_STREQ("GPU emulation enabled using 'angle_indirect' mode",
-                     config.status);
-        emuglConfig_setupEnv(&config);
-    }
-}
-
-TEST(EmuglConfig, initNoWindowWithSwiftshader) {
-    TestSystem testSys("foo", System::kProgramBitness, "/");
-    TestTempDir* myDir = testSys.getTempRoot();
-    myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
-    makeLibSubDir(myDir, "");
-
-#ifdef __APPLE__
     makeSwAngleSubDirAndFiles(myDir);
-#else
     makeSwiftshaderSubDirAndFiles(myDir);
-#endif
 
     EmuglConfig config;
     EXPECT_TRUE(emuglConfig_init(
-                &config, true, "auto", NULL, true, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-    EXPECT_TRUE(config.enabled);
-#ifdef __APPLE__
-    EXPECT_STREQ("swangle_indirect", config.backend);
-    EXPECT_STREQ("GPU emulation enabled using 'swangle_indirect' mode",
-            config.status);
-#else
-    EXPECT_STREQ("swiftshader_indirect", config.backend);
-    EXPECT_STREQ("GPU emulation enabled using 'swiftshader_indirect' mode",
-            config.status);
-#endif
+                &config, "auto", true));
+    EXPECT_STREQ("lavapipe", config.vulkan_backend);
+    EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
 }
 
-TEST(EmuglConfig, initWithSwiftshaderCheckVulkanEnvVar) {
+TEST(EmuglConfig, initNoWindowWithLavapipe) {
     TestSystem testSys("foo", System::kProgramBitness, "/");
     TestTempDir* myDir = testSys.getTempRoot();
     myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
     makeLibSubDir(myDir, "");
 
-#ifdef __APPLE__
     makeSwAngleSubDirAndFiles(myDir);
-#else
     makeSwiftshaderSubDirAndFiles(myDir);
-#endif
-
-    // Do not force use host vulkan
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                    &config, true, "auto", NULL, true, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-        emuglConfig_setupEnv(&config);
-        EXPECT_STREQ("swiftshader",
-                System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
-    }
-
-    // Force use host vulkan
-    {
-        EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(
-                    &config, true, "auto", NULL, true, false, false,
-                    WINSYS_GLESBACKEND_PREFERENCE_AUTO, true));
-        emuglConfig_setupEnv(&config);
-#ifdef __APPLE__
-        EXPECT_STREQ("moltenvk",
-                System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
-#else
-        EXPECT_STREQ("",
-                System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
-#endif
-    }
-}
-
-TEST(EmuglConfig, initNoWindowWithoutSwiftshader) {
-    TestSystem testSys("foo", System::kProgramBitness, "/");
-    TestTempDir* myDir = testSys.getTempRoot();
-    myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
-    makeLibSubDir(myDir, "");
 
     EmuglConfig config;
     EXPECT_TRUE(emuglConfig_init(
-                &config, true, "auto", NULL, true, false, false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false));
-    EXPECT_FALSE(config.enabled);
-    EXPECT_STREQ("GPU emulation is disabled (-no-window without Swiftshader)",
-                 config.status);
+                &config, "lavapipe", true));
+    EXPECT_STREQ("lavapipe", config.vulkan_backend);
+    EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
 }
 
 TEST(EmuglConfig, setupEnv) {

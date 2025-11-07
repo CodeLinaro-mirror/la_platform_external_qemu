@@ -1228,21 +1228,6 @@ static int startEmulatorWithMinConfig(int argc,
     WinsysPreferredGlesBackend uiPreferredGlesBackend =
             skin_winsys_get_preferred_gles_backend();
 
-#ifndef _WIN32
-    if (uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE ||
-        uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE9) {
-        uiPreferredGlesBackend = WINSYS_GLESBACKEND_PREFERENCE_AUTO;
-        skin_winsys_set_preferred_gles_backend(uiPreferredGlesBackend);
-    }
-#endif
-
-    // BUG: 148804702: angle9 has been removed
-    // BUG: 156911788: potential other way to end up with gl config failure
-    if (uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE9) {
-        skin_winsys_set_preferred_gles_backend(
-                WINSYS_GLESBACKEND_PREFERENCE_ANGLE);
-    }
-
     char* accel_status = NULL;
     CpuAccelMode accel_mode = ACCEL_AUTO;
 
@@ -1321,12 +1306,8 @@ static int startEmulatorWithMinConfig(int argc,
 
     /* Disable the GLAsyncSwap for ANGLE so far */
     bool shouldDisableAsyncSwap =
-            rendererConfig.selectedRenderer == SELECTED_RENDERER_ANGLE ||
-            rendererConfig.selectedRenderer == SELECTED_RENDERER_ANGLE9 ||
             rendererConfig.selectedRenderer ==
-                    SELECTED_RENDERER_ANGLE_INDIRECT ||
-            rendererConfig.selectedRenderer ==
-                    SELECTED_RENDERER_ANGLE9_INDIRECT;
+                    SELECTED_RENDERER_ANGLE_INDIRECT;
     // Features to disable or enable depending on rendering backend
     // and gpu make/model/version
 #if defined(__APPLE__) && defined(__aarch64__)
@@ -1846,13 +1827,6 @@ extern "C" int main(int argc, char** argv) {
     // selected in UI that the preferred renderer is "autoselected".
     WinsysPreferredGlesBackend uiPreferredGlesBackend =
             skin_winsys_get_preferred_gles_backend();
-#ifndef _WIN32
-    if (uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE ||
-        uiPreferredGlesBackend == WINSYS_GLESBACKEND_PREFERENCE_ANGLE9) {
-        uiPreferredGlesBackend = WINSYS_GLESBACKEND_PREFERENCE_AUTO;
-        skin_winsys_set_preferred_gles_backend(uiPreferredGlesBackend);
-    }
-#endif
 
     RendererConfig rendererConfig;
     if (fc::isEnabled(fc::ForceANGLE)) {
@@ -1871,6 +1845,7 @@ extern "C" int main(int argc, char** argv) {
     // if hw gpu is going to be used
     if (!configureRenderer(uiPreferredGlesBackend, &rendererConfig)) {
         derror("Error: could not configure renderer!");
+        return 1;
     }
 
     // Check compatibility and exit in case of failure, reporting metrics if
@@ -3390,6 +3365,7 @@ extern "C" int main(int argc, char** argv) {
 
         if (!startRenderer(&rendererConfig)) {
             derror("Could not start renderer");
+            return 1;
         }
 
         // Gpu configuration is set, now initialize the multi display, screen
@@ -3409,12 +3385,8 @@ extern "C" int main(int argc, char** argv) {
 
         /* Disable the GLAsyncSwap for ANGLE so far */
         bool shouldDisableAsyncSwap =
-                rendererConfig.selectedRenderer == SELECTED_RENDERER_ANGLE ||
-                rendererConfig.selectedRenderer == SELECTED_RENDERER_ANGLE9 ||
                 rendererConfig.selectedRenderer ==
-                        SELECTED_RENDERER_ANGLE_INDIRECT ||
-                rendererConfig.selectedRenderer ==
-                        SELECTED_RENDERER_ANGLE9_INDIRECT;
+                        SELECTED_RENDERER_ANGLE_INDIRECT;
         // Features to disable or enable depending on rendering backend
         // and gpu make/model/version
 #if defined(__APPLE__) && defined(__aarch64__)
