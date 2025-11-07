@@ -33,6 +33,10 @@
  * - 1-byte target address
  * - 1-byte RnW boolean
  * - 1-byte bus in ENTDAA boolean
+ *
+ * CCC is supported request (controller -> target)
+ * - 1 byte opcode
+ * - 1 byte CCC
  */
 
 #ifndef REMOTE_I3C_H_
@@ -57,6 +61,7 @@ typedef enum {
     REMOTE_I3C_HANDLE_CCC_READ = 8,
     REMOTE_I3C_IBI = 9,
     REMOTE_I3C_TARGET_MATCH = 10,
+    REMOTE_I3C_CCC_IS_SUPPORTED = 11,
     /* Sent from remote target to us. */
     REMOTE_I3C_IBI_ACK = 0xc0,
     REMOTE_I3C_IBI_NACK = 0xc1,

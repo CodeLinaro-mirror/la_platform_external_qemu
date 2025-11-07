@@ -94,12 +94,40 @@ static bool i3c_target_match(I3CTarget *candidate, uint8_t address,
     return targ_addr == address || broadcast;
 }
 
+static bool i3c_target_ccc_is_supported(I3CTarget *s, I3CCCC ccc)
+{
+    switch (ccc) {
+    case I3C_CCC_ENTDAA:
+    case I3C_CCC_ENTTM:
+    case I3C_CCC_RSTDAA:
+    case I3C_CCC_SETAASA:
+    case I3C_CCCD_SETDASA:
+    case I3C_CCC_SETMWL:
+    case I3C_CCC_SETMRL:
+    case I3C_CCCD_SETNEWDA:
+    case I3C_CCCD_SETMWL:
+    case I3C_CCCD_SETMRL:
+    case I3C_CCCD_GETMWL:
+    case I3C_CCCD_GETMRL:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool i3c_target_match_and_add(I3CBus *bus, I3CTarget *target, uint8_t address,
                               enum I3CEvent event)
 {
     I3CTargetClass *tc = I3C_TARGET_GET_CLASS(target);
     bool matched = tc->target_match(target, address, event == I3C_START_RECV,
                                     bus->broadcast, bus->in_entdaa);
+    /*
+     * If we're in the middle of a CCC, this is a direct CCC and the target
+     * should only ACK if it supports it.
+     */
+    if (matched && bus->in_ccc) {
+        matched = tc->ccc_is_supported(target, bus->ccc);
+    }
 
     if (matched) {
         I3CNode *node = g_new(struct I3CNode, 1);
@@ -269,6 +297,10 @@ static int i3c_target_handle_ccc_write(I3CTarget *t, const uint8_t *data,
         t->in_ccc = true;
         *num_sent = 1;
         trace_i3c_target_handle_ccc(t->address, t->curr_ccc);
+
+        if (CCC_IS_DIRECT(t->curr_ccc)) {
+            return 0;
+        }
     }
 
     switch (t->curr_ccc) {
@@ -697,6 +729,7 @@ static void i3c_target_class_init(ObjectClass *klass, const void *data)
     k->bus_type = TYPE_I3C_BUS;
     device_class_set_props(k, i3c_props);
     sc->target_match = i3c_target_match;
+    sc->ccc_is_supported = i3c_target_ccc_is_supported;
 }
 
 static const TypeInfo i3c_types[] = {

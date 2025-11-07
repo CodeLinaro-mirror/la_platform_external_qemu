@@ -326,6 +326,25 @@ static bool remote_i3c_target_match(I3CTarget *t, uint8_t address,
     return remote_i3c_read_target_match(i3c);
 }
 
+static bool remote_i3c_ccc_is_supported(I3CTarget *t, I3CCCC ccc)
+{
+    RemoteI3C *i3c = REMOTE_I3C(t);
+    uint8_t request[2];
+
+    /*
+     * Request format is 2 bytes:
+     * - byte 0 is the request type
+     * - byte 1 is the CCC
+     */
+    request[0] = REMOTE_I3C_CCC_IS_SUPPORTED;
+    request[1] = ccc;
+    qemu_chr_fe_write_all(&i3c->chr, request, sizeof(request));
+
+    uint8_t response;
+    qemu_chr_fe_read_all(&i3c->chr, &response, sizeof(response));
+    return response;
+}
+
 static int remote_i3c_event(I3CTarget *t, enum I3CEvent event)
 {
     RemoteI3C *i3c = REMOTE_I3C(t);
@@ -499,6 +518,7 @@ static void remote_i3c_class_init(ObjectClass *klass, const void *data)
     k->handle_ccc_read = &remote_i3c_handle_ccc_read;
     k->handle_ccc_write = &remote_i3c_handle_ccc_write;
     k->target_match = &remote_i3c_target_match;
+    k->ccc_is_supported = &remote_i3c_ccc_is_supported;
     device_class_set_props(dc, remote_i3c_props);
     dc->realize = remote_i3c_realize;
 }

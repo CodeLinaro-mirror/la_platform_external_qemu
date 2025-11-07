@@ -131,6 +131,8 @@ struct I3CTargetClass {
      */
     bool (*target_match)(I3CTarget *candidate, uint8_t address, bool is_read,
                          bool broadcast, bool in_entdaa);
+    /* Returns if the CCC is supported by the target. */
+    bool (*ccc_is_supported)(I3CTarget *s, I3CCCC ccc);
 };
 
 struct I3CTarget {
