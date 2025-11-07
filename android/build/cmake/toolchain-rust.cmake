@@ -90,12 +90,16 @@ function(create_windows_linker_script)
       COMMAND
         python
         "${ANDROID_QEMU2_TOP_DIR}/android/build/python/aemu/util/mingw_to_msvc_lib.py"
+        "--llvm-root" 
+        ${CLANG_DIR}/bin
         ${MINGW_DIR}/lib/gcc/x86_64-w64-mingw32/4.8.3/libgcc_eh.a
         ${TOOLCHAIN}/lib/gcc_eh.lib)
     execute_process(
       COMMAND
         python
         "${ANDROID_QEMU2_TOP_DIR}/android/build/python/aemu/util/mingw_to_msvc_lib.py"
+        "--llvm-root" 
+        ${CLANG_DIR}/bin
         ${MINGW_DIR}/x86_64-w64-mingw32/lib64/libpthread.a
         ${TOOLCHAIN}/lib/pthread.lib)
 
