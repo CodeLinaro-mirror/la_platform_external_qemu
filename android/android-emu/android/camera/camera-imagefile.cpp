@@ -286,7 +286,7 @@ private:
 
         for (uint32_t i = 0; i < cframe.framebuffers_count; ++i) {
             if (const int err = convert_frame(mImage.data_ptr,
-                            mImage.num_components == 3 ? V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_ARGB32,
+                            mImage.num_components == 3 ? V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB32,
                             mImage.line_size * mImage.height,
                             mImage.width,
                             mImage.height, &cframe,
