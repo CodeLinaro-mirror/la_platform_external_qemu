@@ -1041,5 +1041,6 @@ void qemu_cleanup(int status)
     monitor_cleanup();
     qemu_chr_cleanup();
     user_creatable_cleanup();
+    deletable_cleanup();
     /* TODO: unref root container, check all devices are ok */
 }

@@ -1240,6 +1240,24 @@ void object_unref(void *objptr)
     }
 }
 
+static GSList *deletable_objects_list = NULL;
+
+int add_deletable_object(Object *obj) {
+    if (!obj) return 0;
+
+    deletable_objects_list = g_slist_prepend(deletable_objects_list, obj);
+    return 0;
+}
+
+static void object_delete(void *obj, void *opaque) {
+    object_unparent(obj);
+}
+
+void deletable_cleanup(void) {
+    g_slist_foreach(deletable_objects_list, object_delete, NULL);
+    g_slist_free(deletable_objects_list);
+}
+
 ObjectProperty *
 object_property_try_add(Object *obj, const char *name, const char *type,
                         ObjectPropertyAccessor *get,
