@@ -4,6 +4,7 @@
 
 LIBRARY qemu-system-x86_64.exe
 EXPORTS
+    add_deletable_object
     address_space_map
     address_space_unmap
     aio_bh_call
