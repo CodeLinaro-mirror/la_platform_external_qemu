@@ -692,7 +692,7 @@ static const HMPCommand *monitor_parse_command(MonitorHMP *hmp_mon,
     Monitor *mon = &hmp_mon->common;
     const char *p;
     const HMPCommand *cmd;
-    char cmdname[256];
+    char cmdname[256] = {0};
 
     /* extract the command name */
     p = get_command_name(*cmdp, cmdname, sizeof(cmdname));
