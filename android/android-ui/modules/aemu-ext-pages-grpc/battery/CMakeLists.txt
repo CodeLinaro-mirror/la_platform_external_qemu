@@ -7,3 +7,4 @@ android_qt_lib(
        Qt${QT_VERSION_MAJOR}::Widgets ui::gl-qt-bridge ui::widgets)
 target_link_libraries(ext-page-battery-grpc
                       PUBLIC emulator_controller-service-client)
+message(FATAL_ERROR "Please do not use this component, it is deprecated.")

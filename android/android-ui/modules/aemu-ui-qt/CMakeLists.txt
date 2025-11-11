@@ -24,8 +24,6 @@ android_qt_lib(
       android/skin/qt/emulator-overlay.cpp
       android/skin/qt/emulator-qt-window.cpp
       android/skin/qt/event-qt.cpp
-      android/skin/qt/extended-window-grpc.cpp
-      android/skin/qt/extended-window-grpc.ui
       android/skin/qt/extended-window.cpp
       android/skin/qt/extended.ui
       android/skin/qt/FramelessDetector.cpp
@@ -74,21 +72,17 @@ android_qt_lib(
        android-emu-curl
        android-emu-location
        android-emu-protobuf
+       android-grpc-client
        android-hw-config
+       emulator_controller-service-client
        ext-page-battery
-       ext-page-battery-grpc
        ext-page-bugreport
-       ext-page-bugreport-grpc
        ext-page-camera
-       ext-page-camera-grpc
        ext-page-car
        ext-page-cellular
-       ext-page-cellular-grpc
        ext-page-display
-       ext-page-display-grpc
        ext-page-dpad
        ext-page-finger
-       ext-page-finger-grpc
        ext-page-google-play
        ext-page-help
        ext-page-location-ui
@@ -98,9 +92,7 @@ android_qt_lib(
        ext-page-sensor-replay
        ext-page-settings
        ext-page-snapshot
-       ext-page-snapshot-grpc
        ext-page-telephony
-       ext-page-telephony-grpc
        ext-page-tv-remote
        FFMPEG::FFMPEG
        protobuf::libprotobuf
@@ -163,7 +155,7 @@ android_add_library(
   src
   SRC android/skin/qt/SharedStreamEmulator.cpp
   DEPS android-emu-agents android-emu-base-headers android-emu-base-memory
-       android-hw-config emulator_controller-service-client)
+       android-grpc-client android-hw-config emulator_controller-service-client)
 
 android_add_test(
   TARGET ui-shared-stream_unittest

@@ -11,3 +11,4 @@ android_qt_lib(
        ui::gl-qt-bridge
        ui::widgets)
 target_link_libraries(ext-page-snapshot-grpc PUBLIC snapshot-service-client)
+message(FATAL_ERROR "Please do not use this component, it is deprecated.")

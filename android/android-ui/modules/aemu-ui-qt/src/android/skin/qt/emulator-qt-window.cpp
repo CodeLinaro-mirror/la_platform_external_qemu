@@ -52,7 +52,6 @@
 #include "android/skin/qt/extended-pages/microphone-page.h"
 #include "android/skin/qt/extended-pages/multi-display-page.h"
 #include "android/skin/qt/extended-pages/settings-page.h"
-#include "android/skin/qt/extended-pages/snapshot-page-grpc.h"
 #include "android/skin/qt/extended-pages/snapshot-page.h"
 #include "android/skin/qt/extended-pages/telephony-page.h"
 #include "android/skin/qt/multi-display-widget.h"
@@ -874,17 +873,10 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
                     mCarClusterWindow->setEnabled(false);
                 }
 
-                if (getConsoleAgents()
-                            ->settings->android_cmdLineOptions()
-                            ->grpc_ui) {
-                    if (SnapshotPageGrpc::get()) {
-                        SnapshotPageGrpc::get()->setOperationInProgress(true);
-                    }
-                } else {
-                    if (SnapshotPage::get()) {
-                        SnapshotPage::get()->setOperationInProgress(true);
-                    }
+                if (SnapshotPage::get()) {
+                    SnapshotPage::get()->setOperationInProgress(true);
                 }
+
             });
         } else if (stage == Snapshotter::Stage::End) {
             runOnUiThread([this, op]() {
@@ -897,17 +889,10 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
                 if (mCarClusterWindow) {
                     mCarClusterWindow->setEnabled(true);
                 }
-                if (getConsoleAgents()
-                            ->settings->android_cmdLineOptions()
-                            ->grpc_ui) {
-                    if (SnapshotPageGrpc::get()) {
-                        SnapshotPageGrpc::get()->setOperationInProgress(false);
-                    }
-                } else {
-                    if (SnapshotPage::get()) {
-                        SnapshotPage::get()->setOperationInProgress(false);
-                    }
+                if (SnapshotPage::get()) {
+                    SnapshotPage::get()->setOperationInProgress(false);
                 }
+
             });
         }
     });

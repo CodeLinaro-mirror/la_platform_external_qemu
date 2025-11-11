@@ -80,7 +80,6 @@
 #include "android/skin/qt/emulator-qt-window.h"
 #include "android/skin/qt/extended-pages/common.h"
 #include "android/skin/qt/extended-pages/virtual-sensors-page.h"
-#include "android/skin/qt/extended-window-grpc.h"
 #include "android/skin/qt/extended-window.h"
 #include "android/skin/qt/posture-selection-dialog.h"
 #include "android/skin/qt/qt-settings.h"
