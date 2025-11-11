@@ -141,6 +141,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         const AndroidGlesEmulationMode glesMode,
         const int bootPropOpenglesVersion,
         const int apiLevel,
+        AvdFlavor avdFlavor,
         const char* kernelSerialPrefix,
         const std::vector<std::string>* verifiedBootParameters,
         const AndroidHwConfig* hw) {
@@ -567,8 +568,9 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         // hwui and renderengine backends, which is only guaranteed to be
         // supported on XR and API level 36+ AVD images. Some AVD images with
         // API level 34 will also support it.
+        const bool isXR = (avdFlavor == AVD_XR);
         const bool avdSupportsSkiaVk =
-                ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle)) ||
+                ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle) && isXR) ||
                  apiLevel >= 36);
         const bool gpuSupportsSkiaVk = fc::isEnabled(fc::Vulkan);
         // TODO(b/394566319): InternalEmulationFailure errors when skiavk is
