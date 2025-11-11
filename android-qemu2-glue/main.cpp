@@ -2486,10 +2486,9 @@ extern "C" int main(int argc, char** argv) {
             getConsoleAgents()->settings->hw()->disk_dataPartition_size =
                     kMinPlaystoreImageSize;
             // Write it to config.ini as well, or we get all sorts of problems.
-            if (getConsoleAgents()->settings->avdInfo()) {
+            if (avd) {
                 avdInfo_replaceDataPartitionSizeInConfigIni(
-                        getConsoleAgents()->settings->avdInfo(),
-                        kMinPlaystoreImageSize);
+                        avd, kMinPlaystoreImageSize);
             }
         }
     }
@@ -2792,9 +2791,8 @@ extern "C" int main(int argc, char** argv) {
     }
 
     // XR specific feature overrides
-    const bool isXrAvd =
-            avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-            AVD_XR;
+    const AvdFlavor avdFlavor = avdInfo_getAvdFlavor(avd);
+    const bool isXrAvd = (avdFlavor == AVD_XR);
     if (isXrAvd) {
         // XR image needs this feature to pass modifier keys to the guest.
         fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
@@ -2911,8 +2909,7 @@ extern "C" int main(int argc, char** argv) {
     }
 
     // Network
-    bool isATV = avdInfo_getAvdFlavor(
-                         getConsoleAgents()->settings->avdInfo()) == AVD_TV;
+    bool isATV = avdInfo_getAvdFlavor(avd) == AVD_TV;
     if (isATV && feature_is_enabled(kFeature_VirtioWifi) && opts->no_ethernet) {
         dinfo("Do not initialize netdev virtio-net for Android TV virtual "
               "device"
@@ -3481,7 +3478,8 @@ extern "C" int main(int argc, char** argv) {
                         opts, kTarget.androidArch, myserialno.c_str(),
                         rendererConfig.glesMode,
                         getBootPropOpenglesVersion(&rendererConfig), apiLevel,
-                        real_console_tty_prefix, &verified_boot_params, hw);
+                        avdFlavor, real_console_tty_prefix,
+                        &verified_boot_params, hw);
 
         std::vector<std::string> kernelCmdLineUserspaceBootOpts;
         if (fc::isEnabled(fc::AndroidbootProps) ||

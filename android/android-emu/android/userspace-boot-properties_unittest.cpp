@@ -77,6 +77,7 @@ TEST(getUserspaceBootProperties, BootconfigOff) {
             kAndroidGlesEmulationHost,  // glesMode
             123,                        // bootPropOpenglesVersion
             29,                         // apiLevel
+            AVD_PHONE,                  // avdFlavor
             "kernelSerialPrefix",       // kernelSerialPrefix
             &verifiedBootParameters,    // verifiedBootParameters
             &hw);                       // hwConfig
@@ -136,6 +137,7 @@ TEST(getUserspaceBootProperties, BootconfigOn) {
             kAndroidGlesEmulationHost,  // glesMode
             123,                        // bootPropOpenglesVersion
             29,                         // apiLevel
+            AVD_PHONE,                  // avdFlavor
             "kernelSerialPrefix",       // kernelSerialPrefix
             &verifiedBootParameters,    // verifiedBootParameters
             &hw);                       // hwConfig
@@ -210,6 +212,7 @@ TEST(getUserspaceBootProperties, Bootconfig2On) {
             kAndroidGlesEmulationHost,  // glesMode
             123,                        // bootPropOpenglesVersion
             29,                         // apiLevel
+            AVD_PHONE,                  // avdFlavor
             "kernelSerialPrefix",       // kernelSerialPrefix
             &verifiedBootParameters,    // verifiedBootParameters
             &hw);                       // hwConfig
