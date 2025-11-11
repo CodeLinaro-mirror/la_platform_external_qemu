@@ -43,9 +43,6 @@ public:
     bool handleQtKeyEvent(const QKeyEvent& event, QtKeyEventSource source);
     void setWidth(int width);
 
-private slots:
-    void on_tp_addSecondFinger_toggled(bool checked);
-
 protected:
     std::unique_ptr<Ui::TouchpadHolder> mUi;
 

@@ -44,36 +44,18 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="1">
-    <widget class="QGroupBox" name="tp_twoFingerLabel">
-     <property name="styleSheet">
-      <string notr="true">border: 0px;</string>
-     </property>
-     <property name="title">
-      <string>Two Finger</string>
-     </property>
-     <property name="ColorGroup" stdset="0">
-      <string notr="true">Title</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="2">
-    <widget class="QCheckBox" name="tp_addSecondFinger">
-     <property name="accessibleDescription">
-      <string>Add Second Finger</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-     <property name="ColorGroup" stdset="0">
-      <string>Toggle</string>
-     </property>
-     <property name="report_metrics" stdset="0">
-      <bool>false</bool>
-     </property>
-    </widget>
-   </item>
   </layout>
+  <widget class="QGroupBox" name="tp_twoFingerLabel">
+   <property name="styleSheet">
+    <string notr="true">border: 0px;</string>
+   </property>
+   <property name="title">
+    <string>Hold shift for two fingers</string>
+   </property>
+   <property name="ColorGroup" stdset="0">
+    <string notr="true">Title</string>
+   </property>
+  </widget>
  </widget>
  <customwidgets>
   <customwidget>
@@ -88,9 +70,6 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
- <tabstops>
-  <tabstop>tp_addSecondFinger</tabstop>
- </tabstops>
  <resources>
   <include location="../resources.qrc"/>
  </resources>

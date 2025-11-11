@@ -30,10 +30,6 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
       mUi(new Ui::TouchpadHolder()) {
     mUi->setupUi(this);
 
-    // For some reason without this, the label rendering cuts off the bottom of the text
-    // if I don't do this.
-    mUi->tp_twoFingerLabel->setMinimumHeight(mUi->tp_twoFingerLabel->height());
-
     mTouchpadWidth = getConsoleAgents()->settings->hw()->hw_touchpad0_width;
     mTouchpadHeight = getConsoleAgents()->settings->hw()->hw_touchpad0_height;
 
@@ -65,6 +61,13 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
     mUi->touchpadBox->setTouchpadDimensions(mTouchpadWidth, mTouchpadHeight);
     mUi->touchpadBox->installEventFilter(this);
 
+    mUi->tp_twoFingerLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    mUi->tp_twoFingerLabel->setAlignment(Qt::AlignCenter);
+    mUi->tp_twoFingerLabel->lower();
+    mUi->tp_twoFingerLabel->setGeometry(
+            mUi->touchpadBox->pos().x(), mUi->touchpadBox->pos().y(),
+            mUi->touchpadBox->width(), mUi->touchpadBox->height());
+
     // This will force the buttons to the left
     mUi->gridLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding), 2, 3);
 }
@@ -73,8 +76,10 @@ void TouchpadHolder::setWidth(int width) {
     // Setting the width will resize the touchpad
     this->setFixedWidth(width);
     // Use the new touchpad height to set the window height
-    this->setFixedHeight(mMargin * 5 + 2 * mUi->tp_addSecondFinger->height() +
-                         mUi->touchpadBox->height());
+    this->setFixedHeight(mMargin * 5 + mUi->touchpadBox->height());
+    mUi->tp_twoFingerLabel->setGeometry(
+            mUi->touchpadBox->pos().x(), mUi->touchpadBox->pos().y(),
+            mUi->touchpadBox->width(), mUi->touchpadBox->height());
 }
 
 bool TouchpadHolder::handleQtKeyEvent(const QKeyEvent& event,
@@ -85,9 +90,9 @@ bool TouchpadHolder::handleQtKeyEvent(const QKeyEvent& event,
     if (event.key() == Qt::Key_Shift) {
         if (down && mUi->touchpadBox->getMultiFinger() != 2 &&
             event.modifiers() == Qt::ShiftModifier) {
-            mUi->tp_addSecondFinger->setChecked(true);
+            mUi->touchpadBox->setMultiFinger(2);
         } else if (!down && mUi->touchpadBox->getMultiFinger() == 2) {
-            mUi->tp_addSecondFinger->setChecked(false);
+            mUi->touchpadBox->setMultiFinger(1);
         }
         return true;
     }
@@ -95,7 +100,7 @@ bool TouchpadHolder::handleQtKeyEvent(const QKeyEvent& event,
     // Look out for other modifier presses and cancel the capture.
     if (mUi->touchpadBox->getMultiFinger() == 2 && down &&
         event.modifiers() != Qt::ShiftModifier) {
-        mUi->tp_addSecondFinger->setChecked(false);
+        mUi->touchpadBox->setMultiFinger(1);
     }
 
     return false;
@@ -107,12 +112,4 @@ void TouchpadHolder::keyPressEvent(QKeyEvent* e) {
 
 void TouchpadHolder::keyReleaseEvent(QKeyEvent* e) {
     TouchpadHolder::handleQtKeyEvent(*e, QtKeyEventSource::TouchpadWindow);
-}
-
-void TouchpadHolder::on_tp_addSecondFinger_toggled(bool checked) {
-    if (checked) {
-        mUi->touchpadBox->setMultiFinger(2);
-    } else {
-        mUi->touchpadBox->setMultiFinger(1);
-    }
 }
