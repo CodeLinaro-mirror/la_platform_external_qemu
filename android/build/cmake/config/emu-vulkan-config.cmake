@@ -27,8 +27,10 @@ if(LINUX_X86_64)
       # Lavapipe
       "${PREBUILT_ROOT}/icds/libvulkan_lvp.so>lib64/vulkan/libvulkan_lvp.so"
       "${PREBUILT_ROOT}/icds/lvp_icd.json>lib64/vulkan/lvp_icd.json"
-      "${PREBUILT_ROOT}/icds/libzstd.so>lib64/libzstd.so"
-      "${PREBUILT_ROOT}/icds/libdrm.so>lib64/libdrm.so"
+      "${PREBUILT_ROOT}/icds/libxml2.so.2>lib64/vulkan/libxml2.so.2"
+      "${PREBUILT_ROOT}/icds/libedit.so.0>lib64/vulkan/libedit.so.0"
+      "${PREBUILT_ROOT}/icds/libLLVM.so>lib64/vulkan/libLLVM.so"
+      "${PREBUILT_ROOT}/icds/libncurses.so.6>lib64/vulkan/libncurses.so.6"
       # for translating shaders to SPIRV
       "${PREBUILT_ROOT}/glslangValidator>lib64/vulkan/glslangValidator"
       ${VULKAN_COMMON_DEPENDENCIES})
