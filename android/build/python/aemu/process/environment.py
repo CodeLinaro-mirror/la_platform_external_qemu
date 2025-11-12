@@ -62,6 +62,9 @@ class WindowsEnvironment(BaseEnvironment):
         super().__init__(aosp)
         self.visual_studio_version = visual_studio_version
         for key in os.environ:
+            self[key] = os.environ[key]
+            # Also add the upper case version of the key, as python dicts are
+            # case sensitive, but windows is not.
             self[key.upper()] = os.environ[key]
 
         vs = self._visual_studio()
@@ -72,6 +75,7 @@ class WindowsEnvironment(BaseEnvironment):
             if "=" in line:
                 key, val = line.split("=", 1)
                 # Variables in windows are case insensitive, but not in python dict!
+                self[key] = val
                 self[key.upper()] = val
 
         if not "VSINSTALLDIR" in self:
