@@ -34,6 +34,8 @@ EXPORTS
     cpu_exit
     cpu_handle_guest_debug
     cpu_list_generation_id_get
+    cpu_list_lock
+    cpu_list_unlock
     cpu_thread_signal_created
     cpu_thread_signal_destroyed
     cpu_watchpoint_insert
@@ -205,6 +207,7 @@ EXPORTS
     qemu_get_be64
     qemu_get_buffer
     qemu_get_byte
+    qemu_get_cpu
     qemu_get_nic_opaque
     qemu_get_queue
     qemu_get_subqueue
