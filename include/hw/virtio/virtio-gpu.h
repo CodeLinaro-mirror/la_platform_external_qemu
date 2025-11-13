@@ -62,6 +62,19 @@ struct virtio_gpu_simple_resource {
     QTAILQ_ENTRY(virtio_gpu_simple_resource) next;
 };
 
+
+
+struct virtio_gpu_rutabaga_resource {
+    uint32_t resource_id;
+    QTAILQ_ENTRY(virtio_gpu_rutabaga_resource) next;
+};
+
+struct virtio_gpu_rutabaga_context {
+    uint32_t context_id;
+    QTAILQ_HEAD(, virtio_gpu_rutabaga_resource) reslist;
+    QTAILQ_ENTRY(virtio_gpu_rutabaga_context) next;
+};
+
 struct virtio_gpu_framebuffer {
     pixman_format_code_t format;
     uint32_t bytes_pp;
@@ -267,9 +280,10 @@ struct VhostUserGPU {
 #define MAX_SLOTS 4096
 
 struct MemoryRegionInfo {
-    int used;
-    MemoryRegion mr;
-    uint32_t resource_id;
+  hwaddr offset;  // Must be tracked to re-map later
+  int used;
+  MemoryRegion mr;
+  uint32_t resource_id;
 };
 
 struct rutabaga;
@@ -277,10 +291,12 @@ struct rutabaga;
 struct VirtIOGPURutabaga {
     VirtIOGPU parent_obj;
     struct MemoryRegionInfo memory_regions[MAX_SLOTS];
+    QTAILQ_HEAD(, virtio_gpu_rutabaga_context) contexts;
     uint64_t capset_mask;
     char *wayland_socket_path;
     char *wsi;
     char *renderer_features;
+    char *snapshot_directory;
     bool headless;
     uint32_t num_capsets;
     struct rutabaga *rutabaga;

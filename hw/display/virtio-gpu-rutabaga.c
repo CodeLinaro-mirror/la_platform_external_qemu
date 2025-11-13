@@ -9,9 +9,13 @@
 #include "hw/virtio/virtio-gpu.h"
 #include "hw/virtio/virtio-gpu-pixman.h"
 #include "hw/virtio/virtio-iommu.h"
+#include "migration/qemu-file-types.h"
+#include "migration/vmstate.h"
 
 #include <glib/gmem.h>
 #include <rutabaga_gfx/rutabaga_gfx_ffi.h>
+
+#define VIRTIO_GPU_RUTABAGA_VM_VERSION 1
 
 #define CHECK(condition, cmd)                                                 \
     do {                                                                      \
@@ -198,12 +202,26 @@ rutabaga_cmd_resource_unref(VirtIOGPU *g,
     CHECK(!result, cmd);
 }
 
+static struct virtio_gpu_rutabaga_context *
+virtio_gpu_rutabaga_find_context(VirtIOGPURutabaga *vr, uint32_t ctx_id)
+{
+    struct virtio_gpu_rutabaga_context *ctx;
+
+    QTAILQ_FOREACH(ctx, &vr->contexts, next) {
+        if (ctx->context_id == ctx_id) {
+            return ctx;
+        }
+    }
+    return NULL;
+}
+
 static void
 rutabaga_cmd_context_create(VirtIOGPU *g,
                             struct virtio_gpu_ctrl_command *cmd)
 {
     int32_t result;
     struct virtio_gpu_ctx_create cc;
+    struct virtio_gpu_rutabaga_context *ctx;
 
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
@@ -214,6 +232,11 @@ rutabaga_cmd_context_create(VirtIOGPU *g,
     result = rutabaga_context_create(vr->rutabaga, cc.hdr.ctx_id,
                                      cc.context_init, cc.debug_name, cc.nlen);
     CHECK(!result, cmd);
+
+    ctx = g_new0(struct virtio_gpu_rutabaga_context, 1);
+    ctx->context_id = cc.hdr.ctx_id;
+    QTAILQ_INIT(&ctx->reslist);
+    QTAILQ_INSERT_TAIL(&vr->contexts, ctx, next);
 }
 
 static void
@@ -222,6 +245,8 @@ rutabaga_cmd_context_destroy(VirtIOGPU *g,
 {
     int32_t result;
     struct virtio_gpu_ctx_destroy cd;
+    struct virtio_gpu_rutabaga_context *ctx;
+    struct virtio_gpu_rutabaga_resource *res, *tmp;
 
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
@@ -230,6 +255,17 @@ rutabaga_cmd_context_destroy(VirtIOGPU *g,
 
     result = rutabaga_context_destroy(vr->rutabaga, cd.hdr.ctx_id);
     CHECK(!result, cmd);
+
+    ctx = virtio_gpu_rutabaga_find_context(vr, cd.hdr.ctx_id);
+    CHECK(ctx, cmd);
+
+    QTAILQ_FOREACH_SAFE(res, &ctx->reslist, next, tmp) {
+        QTAILQ_REMOVE(&ctx->reslist, res, next);
+        g_free(res);
+    }
+
+    QTAILQ_REMOVE(&vr->contexts, ctx, next);
+    g_free(ctx);
 }
 
 static void
@@ -464,8 +500,9 @@ rutabaga_cmd_attach_backing(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
     CHECK(res, cmd);
     CHECK(!res->iov, cmd);
 
-    ret = virtio_gpu_create_mapping_iov(g, att_rb.nr_entries, sizeof(att_rb),
-                                        cmd, NULL, &res->iov, &res->iov_cnt);
+    ret =
+        virtio_gpu_create_mapping_iov(g, att_rb.nr_entries, sizeof(att_rb), cmd,
+                                      &res->addrs, &res->iov, &res->iov_cnt);
     CHECK(!ret, cmd);
 
     vecs.iovecs = res->iov;
@@ -506,6 +543,8 @@ rutabaga_cmd_ctx_attach_resource(VirtIOGPU *g,
 {
     int32_t result;
     struct virtio_gpu_ctx_resource att_res;
+    struct virtio_gpu_rutabaga_context *ctx;
+    struct virtio_gpu_rutabaga_resource *res;
 
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
@@ -516,6 +555,13 @@ rutabaga_cmd_ctx_attach_resource(VirtIOGPU *g,
     result = rutabaga_context_attach_resource(vr->rutabaga, att_res.hdr.ctx_id,
                                               att_res.resource_id);
     CHECK(!result, cmd);
+
+    ctx = virtio_gpu_rutabaga_find_context(vr, att_res.hdr.ctx_id);
+    CHECK(ctx, cmd);
+
+    res = g_new0(struct virtio_gpu_rutabaga_resource, 1);
+    res->resource_id = att_res.resource_id;
+    QTAILQ_INSERT_TAIL(&ctx->reslist, res, next);
 }
 
 static void
@@ -524,6 +570,8 @@ rutabaga_cmd_ctx_detach_resource(VirtIOGPU *g,
 {
     int32_t result;
     struct virtio_gpu_ctx_resource det_res;
+    struct virtio_gpu_rutabaga_context *ctx;
+    struct virtio_gpu_rutabaga_resource *res;
 
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
@@ -534,6 +582,17 @@ rutabaga_cmd_ctx_detach_resource(VirtIOGPU *g,
     result = rutabaga_context_detach_resource(vr->rutabaga, det_res.hdr.ctx_id,
                                               det_res.resource_id);
     CHECK(!result, cmd);
+
+    ctx = virtio_gpu_rutabaga_find_context(vr, det_res.hdr.ctx_id);
+    CHECK(ctx, cmd);
+
+    QTAILQ_FOREACH(res, &ctx->reslist, next) {
+        if (res->resource_id == det_res.resource_id) {
+            QTAILQ_REMOVE(&ctx->reslist, res, next);
+            g_free(res);
+            break;
+        }
+    }
 }
 
 static void
@@ -697,6 +756,7 @@ rutabaga_cmd_resource_map_blob(VirtIOGPU *g,
         memory_region_add_subregion(&vb->hostmem, mblob.offset, mr);
         vr->memory_regions[slot].resource_id = mblob.resource_id;
         vr->memory_regions[slot].used = 1;
+        vr->memory_regions[slot].offset = mblob.offset;
         break;
     }
 
@@ -958,6 +1018,7 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     VirtIOGPUBase *base = VIRTIO_GPU_BASE(g);
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
     vr->rutabaga = NULL;
+    QTAILQ_INIT(&vr->contexts);
 
     builder.wsi = RUTABAGA_WSI_SURFACELESS;
     /*
@@ -1113,6 +1174,451 @@ static const Property virtio_gpu_rutabaga_properties[] = {
                        wayland_socket_path),
     DEFINE_PROP_STRING("wsi", VirtIOGPURutabaga, wsi),
     DEFINE_PROP_STRING("renderer_features", VirtIOGPURutabaga, renderer_features),
+    DEFINE_PROP_STRING("snapshot_directory", VirtIOGPURutabaga, snapshot_directory),
+};
+
+static const VMStateDescription vmstate_virtio_gpu_scanout = {
+    .name = "virtio-gpu-one-scanout",
+    .version_id = 1,
+    .fields =
+        (const VMStateField[]){
+            VMSTATE_UINT32(resource_id, struct virtio_gpu_scanout),
+            VMSTATE_UINT32(width, struct virtio_gpu_scanout),
+            VMSTATE_UINT32(height, struct virtio_gpu_scanout),
+            VMSTATE_INT32(x, struct virtio_gpu_scanout),
+            VMSTATE_INT32(y, struct virtio_gpu_scanout),
+            VMSTATE_UINT32(cursor.resource_id, struct virtio_gpu_scanout),
+            VMSTATE_UINT32(cursor.hot_x, struct virtio_gpu_scanout),
+            VMSTATE_UINT32(cursor.hot_y, struct virtio_gpu_scanout),
+            VMSTATE_UINT32(cursor.pos.x, struct virtio_gpu_scanout),
+            VMSTATE_UINT32(cursor.pos.y, struct virtio_gpu_scanout),
+            VMSTATE_END_OF_LIST()},
+};
+
+static const VMStateDescription vmstate_virtio_gpu_scanouts = {
+    .name = "virtio-gpu-scanouts",
+    .version_id = 1,
+    .fields =
+        (const VMStateField[]){
+            VMSTATE_INT32(parent_obj.enable, struct VirtIOGPU),
+            VMSTATE_UINT32_EQUAL(parent_obj.conf.max_outputs, struct VirtIOGPU,
+                                 NULL),
+            VMSTATE_STRUCT_VARRAY_UINT32(parent_obj.scanout, struct VirtIOGPU,
+                                         parent_obj.conf.max_outputs, 1,
+                                         vmstate_virtio_gpu_scanout,
+                                         struct virtio_gpu_scanout),
+            VMSTATE_END_OF_LIST()},
+};
+
+static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
+                           const VMStateField *field) {
+    VirtIOGPURutabaga *vgr = opaque;
+    VirtIOGPU *g = &(vgr->parent_obj);
+    struct virtio_gpu_simple_resource *res;
+    uint32_t resource_id, pformat;
+    int i;
+    char id_str[256];
+    g_autofree char *full_path = NULL;
+
+    rutabaga_finish(&vgr->rutabaga);
+    Error *local_err = NULL;
+    if (!virtio_gpu_rutabaga_init(g, &local_err)) {
+        error_report_err(local_err);
+        return -EINVAL;
+    }
+
+    qemu_get_counted_string(f, id_str);
+    if (!vgr->snapshot_directory) {
+        error_report("snapshot_directory not configured");
+        return -EINVAL;
+    }
+    full_path = g_build_filename(vgr->snapshot_directory, id_str, NULL);
+
+    rutabaga_restore(vgr->rutabaga, full_path);
+
+    uint32_t ctx_id = qemu_get_be32(f);
+    while (ctx_id != 0) {
+        struct virtio_gpu_rutabaga_context *ctx;
+        ctx = g_new0(struct virtio_gpu_rutabaga_context, 1);
+        ctx->context_id = ctx_id;
+        QTAILQ_INIT(&ctx->reslist);
+
+        uint32_t res_id = qemu_get_be32(f);
+        while (res_id != 0) {
+            struct virtio_gpu_rutabaga_resource *res;
+            res = g_new0(struct virtio_gpu_rutabaga_resource, 1);
+            res->resource_id = res_id;
+            QTAILQ_INSERT_TAIL(&ctx->reslist, res, next);
+            res_id = qemu_get_be32(f);
+        }
+
+        QTAILQ_INSERT_TAIL(&vgr->contexts, ctx, next);
+        ctx_id = qemu_get_be32(f);
+    }
+
+    resource_id = qemu_get_be32(f);
+    while (resource_id != 0) {
+        res = virtio_gpu_find_resource(g, resource_id);
+        if (res) {
+          error_report("duplicate resource 0x%llx",
+                       (unsigned long long)resource_id);
+          return -EINVAL;
+        }
+
+        res = g_new0(struct virtio_gpu_simple_resource, 1);
+        res->resource_id = resource_id;
+        res->width = qemu_get_be32(f);
+        res->height = qemu_get_be32(f);
+        res->format = qemu_get_be32(f);
+        res->blob_size = qemu_get_be32(f);
+        res->iov_cnt = qemu_get_be32(f);
+
+        if (res->iov_cnt > 16384) {
+            error_report("iov_cnt %u exceeds maximum of 16384", res->iov_cnt);
+            g_free(res);
+            return -EINVAL;
+        }
+
+        int has_addrs = qemu_get_be32(f);
+        if (res->iov_cnt) {
+            res->iov = g_new0(struct iovec, res->iov_cnt);
+
+            for (i = 0; i < res->iov_cnt; i++) {
+                res->iov[i].iov_len = qemu_get_be32(f);
+            }
+            if (has_addrs) {
+              res->addrs = g_new0(uint64_t, res->iov_cnt);
+              for (i = 0; i < res->iov_cnt; i++) {
+                res->addrs[i] = qemu_get_be64(f);
+              }
+            }
+        }
+
+        QTAILQ_INSERT_HEAD(&g->reslist, res, next);
+        resource_id = qemu_get_be32(f);
+    }
+    vmstate_load_state(f, &vmstate_virtio_gpu_scanouts, g, 1);
+    return 0;
+}
+
+static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
+                           const VMStateField *field, JSONWriter *vmdesc)
+{
+    VirtIOGPURutabaga *vgr = opaque;
+    VirtIOGPU *g = &(vgr->parent_obj);
+    struct virtio_gpu_simple_resource *res = NULL;
+    int i;
+    g_autofree char *id_str = NULL;
+    g_autofree char *full_path = NULL;
+
+    if (!vgr->snapshot_directory) {
+        error_report("snapshot_directory not configured");
+        return -EINVAL;
+    }
+
+    g_autoptr(GDateTime) now = g_date_time_new_now_local();
+    id_str = g_date_time_format(now, "rutabaga-%Y-%b-%d-%H-%M-%S");
+    qemu_put_counted_string(f, id_str);
+
+    full_path = g_build_filename(vgr->snapshot_directory, id_str, NULL);
+
+    if (g_mkdir_with_parents(full_path, 0755) == -1) {
+        error_report("Failed to create snapshot directory %s", full_path);
+        return -EINVAL;
+    }
+
+    rutabaga_snapshot(vgr->rutabaga, full_path);
+
+    if (!QTAILQ_EMPTY(&g->cmdq)) {
+        error_report("virtio-gpu cmdq not empty; cannot migrate");
+        return -EBUSY;
+    }
+
+    struct virtio_gpu_rutabaga_context *ctx;
+    struct virtio_gpu_rutabaga_resource *ctx_res;
+    QTAILQ_FOREACH(ctx, &vgr->contexts, next) {
+        qemu_put_be32(f, ctx->context_id);
+        QTAILQ_FOREACH(ctx_res, &ctx->reslist, next) {
+            qemu_put_be32(f, ctx_res->resource_id);
+        }
+        qemu_put_be32(f, 0); /* end of resource list */
+    }
+    qemu_put_be32(f, 0); /* end of context list */
+
+    QTAILQ_FOREACH(res, &g->reslist, next) {
+        qemu_put_be32(f, res->resource_id);
+        qemu_put_be32(f, res->width);
+        qemu_put_be32(f, res->height);
+        qemu_put_be32(f, res->format);
+        qemu_put_be32(f, res->blob_size);
+        qemu_put_be32(f, res->iov_cnt);
+        qemu_put_be32(f, res->addrs ? 1 : 0);
+        for (i = 0; i < res->iov_cnt; i++) {
+            qemu_put_be32(f, res->iov[i].iov_len);
+        }
+        if (res->addrs) {
+          for (i = 0; i < res->iov_cnt; i++) {
+            qemu_put_be64(f, res->addrs[i]);
+          }
+        }
+    }
+    qemu_put_be32(f, 0); /* end of list */
+
+    vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL);
+    return 0;
+}
+
+/*
+ * Restore all persistent MemoryRegion mappings (slots) for blob resources.
+ * This must be called AFTER the vmstate for the slots has been loaded and
+ * AFTER the Rutabaga backend has been initialized.
+ */
+static int virtio_gpu_rutabaga_restore_mappings(VirtIOGPU* g) {
+  VirtIOGPUBase* vb = VIRTIO_GPU_BASE(g);
+  VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(g);
+  struct virtio_gpu_simple_resource* res;
+  int slot;
+  int32_t result;
+
+  memory_region_transaction_begin();
+  for (slot = 0; slot < MAX_SLOTS; slot++) {
+    // Skip slots that were not in use during snapshot
+    if (!vr->memory_regions[slot].used) {
+      continue;
+    }
+
+    uint32_t resource_id = vr->memory_regions[slot].resource_id;
+    hwaddr saved_offset = vr->memory_regions[slot].offset;
+
+    // 1. Find the RutabagaResource metadata (must be restored first)
+    res = virtio_gpu_find_resource(g, resource_id);
+    if (!res) {
+      error_report(
+          "Failed to find metadata for mapped resource ID %u at slot %d.",
+          resource_id, slot);
+      // This is a serious error: the MMIO slot points to a resource that
+      // doesn't exist.
+      return -EINVAL;
+    }
+
+    // 2. Request a NEW host pointer from the Rutabaga backend
+    struct rutabaga_mapping mapping = {0};
+    result = rutabaga_resource_map(vr->rutabaga, resource_id, &mapping);
+    if (result != 0) {
+      error_report("Failed to re-map Rutabaga resource %u: %d", resource_id,
+                   result);
+      return -EINVAL;
+    }
+
+    // 3. Re-initialize the MemoryRegion with the NEW pointer
+    MemoryRegion* mr = &(vr->memory_regions[slot].mr);
+
+    // Note: The MR must be re-initialized because the host pointer
+    // (mapping.ptr) and often the size (mapping.size) are unstable across
+    // migration.
+    memory_region_init_ram_ptr(mr, OBJECT(vr), "blob", mapping.size,
+                               mapping.ptr);
+
+    // 4. Re-add the MemoryRegion to the Host Memory BAR at the saved offset
+    // This re-establishes the MMIO path for the guest.
+    memory_region_add_subregion(&vb->hostmem, saved_offset, mr);
+
+    // The slot tracking fields are already correctly loaded by VMState,
+    // so we don't need to rewrite resource_id or used.
+
+  }
+
+  memory_region_transaction_commit();
+  return 0;
+}
+
+/* Helper to perform DMA mapping and Rutabaga attach */
+static int virtio_gpu_rutabaga_load_backing(
+    VirtIOGPU* g, struct virtio_gpu_simple_resource* res) {
+  VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(g);
+  struct rutabaga_iovecs vecs = {0};
+  int i, ret;
+  hwaddr len;
+
+  // 1. Map GPAs to new Host Pointers
+  for (i = 0; i < res->iov_cnt; i++) {
+    len = res->iov[i].iov_len;
+
+    // This call translates the saved GPA (res->addrs[i]) into a new,
+    // valid host pointer (res->iov[i].iov_base).
+    res->iov[i].iov_base =
+        dma_memory_map(VIRTIO_DEVICE(g)->dma_as, res->addrs[i], &len,
+                       DMA_DIRECTION_TO_DEVICE, MEMTXATTRS_UNSPECIFIED);
+
+    if (!res->iov[i].iov_base || len != res->iov[i].iov_len) {
+      error_report("Failed to restore DMA mapping for resource %u",
+                   res->resource_id);
+      // Cleanup partial mappings and fail
+      virtio_gpu_cleanup_mapping(g, res);
+      return -EINVAL;
+    }
+  }
+
+  // 2. Notify Rutabaga Backend
+  vecs.iovecs = res->iov;
+  vecs.num_iovecs = res->iov_cnt;
+
+  // Tell Rutabaga to re-attach the backing using the new host pointers
+  ret = rutabaga_resource_attach_backing(vr->rutabaga, res->resource_id, &vecs);
+  if (ret != 0) {
+    error_report("Rutabaga failed to re-attach backing for resource %u: %d",
+                 res->resource_id, ret);
+    virtio_gpu_cleanup_mapping(g, res);
+    return -EINVAL;
+  }
+
+  return 0;
+}
+
+static int virtio_gpu_pre_load(void* opaque) {
+  VirtIOGPURutabaga* vgr = opaque;
+  VirtIOGPU* g = &(vgr->parent_obj);
+  VirtIOGPUBase* vb = VIRTIO_GPU_BASE(g);
+  VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(g);
+
+  int slot;
+
+  // Use a transaction to bundle the cleanup operations
+  memory_region_transaction_begin();
+
+  for (slot = 0; slot < MAX_SLOTS; slot++) {
+    MemoryRegion* mr = &(vr->memory_regions[slot].mr);
+    if (!vr->memory_regions[slot].used) {
+      continue;
+    }
+
+    // Check if the slot's MemoryRegion is currently attached to the hostmem
+    // container. If it is, delete the subregion to clear the address space.
+    if (mr->container == &vb->hostmem) {
+      memory_region_del_subregion(&vb->hostmem, mr);
+      object_unparent(OBJECT(mr));
+    }
+
+    // Reset local metadata flags to ensure consistency before VMState
+    // overwrites them.
+    vr->memory_regions[slot].used = 0;
+    vr->memory_regions[slot].resource_id = 0;
+    vr->memory_regions[slot].offset = 0;
+  }
+
+  // Commit the changes to update QEMU's internal memory manager tables.
+  memory_region_transaction_commit();
+
+  return 0;  // Signal success
+}
+
+static int virtio_gpu_post_load(void* opaque, int version_id) {
+  VirtIOGPURutabaga* vgr = opaque;
+  VirtIOGPU* g = &(vgr->parent_obj);
+  VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
+  struct virtio_gpu_simple_resource* res = NULL;
+  QTAILQ_FOREACH(res, &g->reslist, next) {
+    if (res->addrs) {
+      int ret = virtio_gpu_rutabaga_load_backing(g, res);
+      if (ret != 0) {
+        return ret;
+      }
+    }
+  }
+  int ret = virtio_gpu_rutabaga_restore_mappings(g);
+  struct virtio_gpu_rutabaga_context *ctx;
+  struct virtio_gpu_rutabaga_resource *res_ctx;
+
+  QTAILQ_FOREACH(ctx, &vr->contexts, next) {
+      QTAILQ_FOREACH(res_ctx, &ctx->reslist, next) {
+          rutabaga_context_attach_resource(vr->rutabaga,
+                  ctx->context_id,
+                  res_ctx->resource_id);
+      }
+  }
+  return ret;
+}
+
+static int virtio_gpu_blob_load(QEMUFile *f, void *opaque, size_t size,
+                                const VMStateField *field) {
+    return 0;
+}
+
+static int virtio_gpu_blob_save(QEMUFile *f, void *opaque, size_t size,
+                                const VMStateField *field, JSONWriter *vmdesc) {
+    return 0;
+}
+
+const VMStateDescription vmstate_virtio_gpu_rutabaga_blob_state = {
+    .name = "virtio-gpu-rutabaga/blob",
+    .minimum_version_id = VIRTIO_GPU_RUTABAGA_VM_VERSION,
+    .version_id = VIRTIO_GPU_RUTABAGA_VM_VERSION,
+    .needed = NULL,
+    .fields = (const VMStateField[]){
+        {
+            .name = "virtio-gpu-rutabaga/blob",
+            .info = &(const VMStateInfo) {
+                .name = "blob",
+                .get = virtio_gpu_blob_load,
+                .put = virtio_gpu_blob_save,
+            },
+            .flags = VMS_SINGLE,
+        } /* device */,
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+/* VMState for a single slot in vr->memory_regions array */
+static const VMStateDescription vmstate_rutabaga_slot_info = {
+    .name = "virtio-gpu-rutabaga/slot",
+    .version_id = 1,
+    .fields = (const VMStateField[]){
+        VMSTATE_UINT32(resource_id, struct MemoryRegionInfo),
+        VMSTATE_INT32(used, struct MemoryRegionInfo),
+        VMSTATE_UINT64(offset,
+                       struct MemoryRegionInfo),  // Assuming hwaddr is 64-bit
+        VMSTATE_END_OF_LIST()}};
+
+static const VMStateDescription vmstate_rutabaga_slots = {
+    .name = "virtio-gpu-rutabaga/slots",
+    .version_id = 1,
+    .fields =
+        (const VMStateField[]){
+            VMSTATE_STRUCT_ARRAY(memory_regions, VirtIOGPURutabaga, MAX_SLOTS,
+                                 0, vmstate_rutabaga_slot_info,
+                                 struct MemoryRegionInfo),
+            VMSTATE_END_OF_LIST()},
+};
+
+/* Step 1: VMState for the array element (virtio_gpu_rutabaga_context) */
+
+static const VMStateDescription vmstate_virtio_gpu_rutabaga = {
+    .name = "virtio-gpu-rutabaga",
+    .minimum_version_id = VIRTIO_GPU_RUTABAGA_VM_VERSION,
+    .version_id = VIRTIO_GPU_RUTABAGA_VM_VERSION,
+    .fields =
+        (const VMStateField[]){
+            VMSTATE_VIRTIO_DEVICE,
+            {
+                                   .name = "virtio-gpu-rutabaga-1",
+                                   .info =
+                                       &(const VMStateInfo){
+                                           .name = "virtio-gpu-rutabaga-2",
+                                           .get = virtio_gpu_rutabaga_load,
+                                           .put = virtio_gpu_rutabaga_save,
+                                       },
+                                   .flags = VMS_SINGLE,
+            } /* device */,
+            VMSTATE_END_OF_LIST()
+        },
+    .subsections =
+        (const VMStateDescription* const[]){
+            &vmstate_rutabaga_slots,  // Pointer to the VMState that defines the
+                                      // slot array
+            NULL                      // Must be NULL-terminated
+        },
+    .post_load = virtio_gpu_post_load,
+    .pre_load = virtio_gpu_pre_load,
 };
 
 static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, void *data)
@@ -1128,6 +1634,7 @@ static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, void *data)
     vgc->update_cursor_data = virtio_gpu_rutabaga_update_cursor;
     vgc->resource_destroy = virtio_gpu_rutabaga_resource_unref;
     vdc->realize = virtio_gpu_rutabaga_realize;
+    dc->vmsd = &vmstate_virtio_gpu_rutabaga;
     device_class_set_props(dc, virtio_gpu_rutabaga_properties);
 }
 
