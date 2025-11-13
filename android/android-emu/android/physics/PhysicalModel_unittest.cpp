@@ -19,6 +19,8 @@
 #include "aemu/base/files/MemStream.h"
 #include "android/base/testing/GlmTestHelpers.h"
 #include "android/base/testing/ProtobufMatchers.h"
+#include "host-common/FeatureControl.h"
+#include "host-common/Features.h"
 #include "host-common/hw-config.h"
 #include "android/console.h"
 #include "android/physics/InertialModel.h"
@@ -1197,6 +1199,7 @@ TEST(PhysicalModel, FoldableInitialize) {
 }
 
 TEST(PhysicalModel, SetXrHeadRotation) {
+    setEnabledOverride(android::featurecontrol::XrModeUI, true);
     TestSystem mTestSystem("/", System::kProgramBitness);
     PhysicalModel* model = physicalModel_new();
     physicalModel_setCurrentTime(model, 0L);
@@ -1231,9 +1234,11 @@ TEST(PhysicalModel, SetXrHeadRotation) {
     EXPECT_TRUE(physicalStateChanging);
 
     physicalModel_free(model);
+    resetEnabledToDefault(android::featurecontrol::XrModeUI);
 }
 
 TEST(PhysicalModel, SetXrHeadMovement) {
+    setEnabledOverride(android::featurecontrol::XrModeUI, true);
     TestSystem mTestSystem("/", System::kProgramBitness);
     PhysicalModel* model = physicalModel_new();
     physicalModel_setCurrentTime(model, 0L);
@@ -1268,9 +1273,11 @@ TEST(PhysicalModel, SetXrHeadMovement) {
     EXPECT_TRUE(physicalStateChanging);
 
     physicalModel_free(model);
+    resetEnabledToDefault(android::featurecontrol::XrModeUI);
 }
 
 TEST(PhysicalModel, SetXrOptions) {
+    setEnabledOverride(android::featurecontrol::XrModeUI, true);
     TestSystem mTestSystem("/", System::kProgramBitness);
     PhysicalModel* model = physicalModel_new();
     physicalModel_setCurrentTime(model, 0L);
@@ -1305,9 +1312,11 @@ TEST(PhysicalModel, SetXrOptions) {
     EXPECT_TRUE(physicalStateChanging);
 
     physicalModel_free(model);
+    resetEnabledToDefault(android::featurecontrol::XrModeUI);
 }
 
 TEST(PhysicalModel, SetXrHeadAngularVelocity) {
+    setEnabledOverride(android::featurecontrol::XrModeUI, true);
     TestSystem mTestSystem("/", System::kProgramBitness);
     PhysicalModel* model = physicalModel_new();
     physicalModel_setCurrentTime(model, 0L);
@@ -1342,9 +1351,11 @@ TEST(PhysicalModel, SetXrHeadAngularVelocity) {
     EXPECT_TRUE(physicalStateChanging);
 
     physicalModel_free(model);
+    resetEnabledToDefault(android::featurecontrol::XrModeUI);
 }
 
 TEST(PhysicalModel, SetXrHeadVelocity) {
+    setEnabledOverride(android::featurecontrol::XrModeUI, true);
     TestSystem mTestSystem("/", System::kProgramBitness);
     PhysicalModel* model = physicalModel_new();
     physicalModel_setCurrentTime(model, 0L);
@@ -1379,4 +1390,5 @@ TEST(PhysicalModel, SetXrHeadVelocity) {
     EXPECT_TRUE(physicalStateChanging);
 
     physicalModel_free(model);
+    resetEnabledToDefault(android::featurecontrol::XrModeUI);
 }

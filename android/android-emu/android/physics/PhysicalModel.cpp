@@ -796,6 +796,7 @@ void PhysicalModelImpl::setTargetInternalAccelerometerUncalibrated(vec3, Physica
 
 void PhysicalModelImpl::setTargetInternalXrInputMode(float value,
                                                     PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -807,6 +808,7 @@ void PhysicalModelImpl::setTargetInternalXrInputMode(float value,
 void PhysicalModelImpl::setTargetInternalXrEnvironmentMode(
         float value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -818,6 +820,7 @@ void PhysicalModelImpl::setTargetInternalXrEnvironmentMode(
 void PhysicalModelImpl::setTargetInternalXrViewportControlMode(
         float value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -829,6 +832,7 @@ void PhysicalModelImpl::setTargetInternalXrViewportControlMode(
 void PhysicalModelImpl::setTargetInternalXrScreenRecenter(
         float value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -840,6 +844,7 @@ void PhysicalModelImpl::setTargetInternalXrScreenRecenter(
 void PhysicalModelImpl::setTargetInternalXrHeadRotation(
         vec3 value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -851,6 +856,7 @@ void PhysicalModelImpl::setTargetInternalXrHeadRotation(
 void PhysicalModelImpl::setTargetInternalXrHeadMovement(
         vec3 value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -862,6 +868,7 @@ void PhysicalModelImpl::setTargetInternalXrHeadMovement(
 void PhysicalModelImpl::setTargetInternalXrHeadAngularVelocity(
         vec3 value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -874,6 +881,7 @@ void PhysicalModelImpl::setTargetInternalXrHeadAngularVelocity(
 void PhysicalModelImpl::setTargetInternalXrHeadVelocity(
         vec3 value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -885,6 +893,7 @@ void PhysicalModelImpl::setTargetInternalXrHeadVelocity(
 void PhysicalModelImpl::setTargetInternalXrOptions(
         vec3 value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -896,6 +905,7 @@ void PhysicalModelImpl::setTargetInternalXrOptions(
 void PhysicalModelImpl::setTargetInternalXrHandGesture(
         float value,
         PhysicalInterpolation mode) {
+    if (!android_is_xr_vst_headset_mode()) return;
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
