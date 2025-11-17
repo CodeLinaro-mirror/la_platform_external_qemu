@@ -26,7 +26,7 @@
                 ],
                 // Compat layer needed for vhost
                 "+deps": [
-                    "//third_party/qemu/google/compat/linux:compat"
+                    "@qemu//google/compat/linux:compat"
                 ]
             }
         }

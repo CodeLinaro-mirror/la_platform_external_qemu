@@ -34,7 +34,7 @@ cc_library(
         "platform/linux",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//third_party/qemu/google/compat/linux:compat"],
+    deps = ["//google/compat/linux:compat"],
     alwayslink = True,
 )
 
@@ -65,7 +65,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "vhost-user",
-        "//third_party/qemu/google/compat/linux:compat",
+        "//google/compat/linux:compat",
         "@glib//glib",
         "@glib//gmodule",
     ],

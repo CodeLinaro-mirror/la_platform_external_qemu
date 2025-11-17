@@ -1,18 +1,3 @@
-# Note that this configuration is incomplete - this module can only be used as a locally improted repo (with local_repo).
-module(
-    name = "qemu",
-    version = "10.0.0",
-)
-
-bazel_dep(name = "glib", version = "2.77.2")
-
-bazel_dep(name = "dtc", version = "0.0.1")
-
-bazel_dep(name = "aemu", version = "0.0.1")
-bazel_dep(name = "gfxstream", version = "0.0.1")
-
-local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
-local_repository(
-    name = "crosvm",
-    path = "../../third_party/crosvm",
-)
+# This file is a placeholder and ignored by Bazel when this module is used via
+# a registry. The "real" file lives at
+# build/bazel/registry/modules/qemu/0.0.1/MODULE.bazel.

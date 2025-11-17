@@ -84,13 +84,13 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
         ],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
         ],
         "//conditions:default": [],
     }) + [
@@ -165,9 +165,9 @@ cc_interface_binary(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
             "@gcc_lib//:libpulse",
         ],
@@ -254,9 +254,9 @@ cc_interface_binary(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
             "@gcc_lib//:libpulse",
         ],
@@ -372,13 +372,13 @@ cc_interface_binary(
     win_def_file = "platform/windows-amd64/qemu-system-x86_64.def",
     deps = select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
         ],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
             "@gcc_lib//:libpulse",
         ],
@@ -488,11 +488,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -665,10 +665,10 @@ cc_library(
         "@zlib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -767,14 +767,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
         ],
         "//conditions:default": [],
     }) + [
@@ -890,11 +890,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -2106,9 +2106,9 @@ cc_library(
     deps = select({
         "@platforms//os:macos": [":internal_common_qemu-system-aarch64-unsigned_darwin"],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
         ],
         "//conditions:default": [],
@@ -2954,9 +2954,9 @@ cc_library(
     deps = select({
         "@platforms//os:macos": [":internal_common_qemu-system-riscv64-unsigned_darwin"],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
         ],
         "//conditions:default": [],
@@ -3930,14 +3930,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
         ],
         "@platforms//os:macos": [":internal_common_qemu-system-x86_64-unsigned_darwin"],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
         ],
         "//conditions:default": [],
@@ -4077,11 +4077,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -4153,11 +4153,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -4242,11 +4242,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -4337,11 +4337,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -4432,14 +4432,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
         ],
         "//conditions:default": [],
     }) + [
@@ -4545,11 +4545,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -4624,11 +4624,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
 )
@@ -5065,9 +5065,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
         ],
         "//conditions:default": [],
@@ -5415,9 +5415,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
         ],
         "//conditions:default": [],
@@ -5896,13 +5896,13 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
         ],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
             "@gcc_lib//:libasound",
         ],
         "//conditions:default": [],
@@ -6647,14 +6647,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
         "@platforms//os:linux": [
-            "//third_party/qemu/google/compat/linux:compat",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user",
-            "//third_party/qemu/subprojects/libvhost-user:vhost-user-glib",
+            "//google/compat/linux:compat",
+            "//subprojects/libvhost-user:vhost-user",
+            "//subprojects/libvhost-user:vhost-user-glib",
         ],
         "//conditions:default": [],
     }) + [
@@ -6742,11 +6742,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -6829,11 +6829,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -6972,11 +6972,11 @@ cc_library(
         "@glib//glib",
     ] + select({
         "@platforms//os:windows": [
-            "//third_party/qemu/google/compat/windows:compat",
+            "//google/compat/windows:compat",
             "@glib//gmodule",
             "@zlib",
         ],
-        "@platforms//os:linux": ["//third_party/qemu/google/compat/linux:compat"],
+        "@platforms//os:linux": ["//google/compat/linux:compat"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -10908,7 +10908,7 @@ cc_library(
             "platform/windows-amd64/riscv64-softmmu-config-target.h",
             "platform/windows-amd64/x86_64-softmmu-config-devices.h",
             "platform/windows-amd64/x86_64-softmmu-config-target.h",
-            "//third_party/qemu/google/compat/windows:file.h",
+            "//google/compat/windows:file.h",
         ],
         "@platforms//os:macos": [
             "platform/darwin-arm64/aarch64-softmmu-config-devices.h",

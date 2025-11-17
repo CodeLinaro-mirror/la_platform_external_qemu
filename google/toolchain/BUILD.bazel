@@ -1,4 +1,4 @@
-# This has moved to //hardware/google/aemu/tools/toolchain
+# This has moved to @aemu//tools/toolchain
 # as the toolchain generator is now a generic toolchain configurator
 alias(
     name = "amc",
