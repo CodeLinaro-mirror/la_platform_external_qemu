@@ -823,7 +823,20 @@ bool emuglConfig_init(EmuglConfig* config,
     snprintf(config->gles_backend, sizeof(config->gles_backend), "%s", gles_mode_selected.c_str());
     snprintf(config->status, sizeof(config->status),
              "GPU emulation enabled using Vulkan:'%s' GLES:'%s' modes", vulkan_mode_selected.c_str(), gles_mode_selected.c_str());
-    setCurrentRenderer(vulkan_mode_selected.c_str());
+
+    // TODO(b/461828541): separate sCurrentRenderer modes for gles and vulkan
+    // Here we still have a single renderer mode selected from vulkan and gles
+    // backends, which can actually have different modes. Since the 'host' mode
+    // checks are done to determine code flow in various places for GLES (e.g.
+    // shouldEnableCoreProfile), we keep checking gles mode first, in case
+    // vulkan is still in software mode. This is a common case with 'auto' mode
+    // on macOS, since moltenVK / KosmicKrisp is not enabled by default for
+    // vulkan and it keeps using software while gles uses 'host'.
+    if (gles_mode_selected == "host") {
+        setCurrentRenderer(gles_mode_selected.c_str());
+    } else {
+        setCurrentRenderer(vulkan_mode_selected.c_str());
+    }
 
 #if defined(__linux__) || defined(_WIN32)
     const bool hwGpuRequested =
