@@ -1802,14 +1802,6 @@ help_gpu(stralloc_t* out)
 }
 
 static void
-help_use_host_vulkan(stralloc_t* out)
-{
-    PRINTF(
-    "  Use '-use-host-vulkan' to force the use of host GPU for vulkan calls.\n\n"
-    );
-}
-
-static void
 help_vsync_rate(stralloc_t* out)
 {
     PRINTF(

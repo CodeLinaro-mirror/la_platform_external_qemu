@@ -462,12 +462,8 @@ GoldfishOpenglTestEnv::GoldfishOpenglTestEnv() {
     EmuglConfig config;
 
     emuglConfig_init(
-            &config, true /* gpu enabled */, "auto",
-            useHostGpu ? "host" : "swiftshader_indirect", /* gpu mode, option */
-            true,                                         /* no window */
-            false,                                        /* denylisted */
-            false, /* has guest renderer */
-            WINSYS_GLESBACKEND_PREFERENCE_AUTO, false);
+            &config, useHostGpu ? "host" : "lavapipe",/* gpu mode, option */
+            true /* no window */);
 
     emuglConfig_setupEnv(&config);
 

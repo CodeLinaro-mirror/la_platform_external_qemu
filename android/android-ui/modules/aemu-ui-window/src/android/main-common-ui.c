@@ -244,7 +244,7 @@ static bool isGuestRendererChoice(const char* choice) {
     return choice && (!strcmp(choice, "off") || !strcmp(choice, "guest"));
 }
 
-static const char DEFAULT_SOFTWARE_GPU_MODE[] = "swiftshader_indirect";
+static const char DEFAULT_SOFTWARE_GPU_MODE[] = "lavapipe";
 
 // Older API, calls configureRenderer and startRenderer
 bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
@@ -305,7 +305,7 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         dwarning(
                 "Your AVD has been configured with an in-guest renderer, "
                 "but the system image does not support guest rendering."
-                "Falling back to 'swiftshader_indirect' mode.");
+                "Falling back to 'lavapipe' mode.");
         if (opts->gpu) {
             str_reset(&opts->gpu, DEFAULT_SOFTWARE_GPU_MODE);
         } else {
@@ -318,14 +318,11 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         str_reset(&hw->hw_gpu_mode, DEFAULT_SOFTWARE_GPU_MODE);
     }
 
-    bool hostGpuVulkanDenylisted = true;
-
     if (!androidEmuglConfigInit(
-                &config, opts->avd, api_arch, api_level, isGoogle, opts->gpu,
+                &config, opts->gpu,
                 &hw->hw_gpu_mode,
                 getConsoleAgents()->settings->host_emulator_is_headless(),
-                uiPreferredBackend, &hostGpuVulkanDenylisted,
-                opts->use_host_vulkan)) {
+                uiPreferredBackend)) {
         derror("%s", config.status);
 
         crashhandler_append_message_format("androidEmuglConfigInit failed.\n");
@@ -341,71 +338,30 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
     // Determine whether to enable Vulkan (if in android qemu mode)
 
     if (getConsoleAgents()->settings->android_qemu_mode()) {
-        // Always enable GLDirectMem for API >= 29
-        bool shouldEnableGLDirectMem = api_level >= 29;
-#if defined(__aarch64__) && defined(__APPLE__)
-        // b/273985153
-        //shouldEnableGLDirectMem = false;
-#endif
-        bool shouldEnableVulkan = true;
-
+        // Always enable GLDirectMem and Vulkan for API >= 29
         crashhandler_append_message_format(
                 "Deciding if GLDirectMem/Vulkan should be enabled. "
                 "Selected renderer: %d "
-                "API level: %d host GPU on the denylist? %d\n",
-                config_out->selectedRenderer, api_level,
-                hostGpuVulkanDenylisted);
-        switch (config_out->selectedRenderer) {
-            // Host gpu: enable as long as not on blacklist
-            // and api >= 29
-            case SELECTED_RENDERER_HOST:
-                shouldEnableVulkan =
-                        (api_level >= 29) && !hostGpuVulkanDenylisted;
-                if (shouldEnableVulkan) {
-                    crashhandler_append_message_format(
-                            "Host GPU selected, enabling Vulkan.\n");
-                } else {
-                    crashhandler_append_message_format(
-                            "Host GPU selected, not enabling Vulkan because "
-                            "either API level is < 29 or host GPU driver is "
-                            "denylisted.\n");
-                }
-                break;
-            // Swiftshader: always enable if api level >= 29
-            case SELECTED_RENDERER_SWIFTSHADER_INDIRECT:
-            case SELECTED_RENDERER_ANGLE_INDIRECT:
-                shouldEnableVulkan = api_level >= 29;
-                if (shouldEnableVulkan) {
-                    crashhandler_append_message_format(
-                            "Swiftshader selected, enabling Vulkan.\n");
-                } else {
-                    crashhandler_append_message_format(
-                            "Swiftshader selected, not enabling Vulkan because "
-                            "API level is < 29.\n");
-                }
-                break;
-            // Other renderers (such as angle, mesa):
-            default:
-                shouldEnableVulkan = false;
-                crashhandler_append_message_format(
-                        "Some other renderer selected, not enabling Vulkan.\n");
-        }
+                "API level: %d \n",
+                config_out->selectedRenderer, api_level);
 
-        if (shouldEnableGLDirectMem) {
-            crashhandler_append_message_format("Enabling GLDirectMem\n");
-            // Do not enable if we did not enable it on the API 29 image itself.
-            feature_set_if_not_overridden_or_guest_disabled(
-                    kFeature_GLDirectMem, true);
-        }
-
+        const bool shouldEnableVulkan = (api_level >= 29);
         if (shouldEnableVulkan) {
             crashhandler_append_message_format("Enabling Vulkan\n");
             feature_set_if_not_overridden(kFeature_Vulkan, true);
             feature_set_if_not_overridden(kFeature_GLDirectMem, true);
         } else {
             crashhandler_append_message_format(
-                    "Not enabling Vulkan here "
-                    "(feature flag may be turned on manually)\n");
+                    "Host GPU selected, not enabling Vulkan because "
+                    "API level is < 29.\n");
+        }
+
+        const bool shouldEnableGLDirectMem = (api_level >= 29);
+        if (shouldEnableGLDirectMem) {
+            crashhandler_append_message_format("Enabling GLDirectMem\n");
+            // Do not enable if we did not enable it on the API 29 image itself.
+            feature_set_if_not_overridden_or_guest_disabled(
+                    kFeature_GLDirectMem, true);
         }
     }
 
@@ -419,51 +375,17 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         hw->hw_lcd_depth = 16;
     }
 
-    hw->hw_gpu_enabled = config.enabled;
+    hw->hw_gpu_enabled = true;
 
     /* Update hw_gpu_mode with the canonical renderer name determined by
-     * emuglConfig_init (host/guest/off/swiftshader etc)
+     * emuglConfig_init (auto/host/lavapipe etc)
      */
-    str_reset(&hw->hw_gpu_mode, config.backend);
+    str_reset(&hw->hw_gpu_mode, config.vulkan_backend);
     D("%s", config.status);
-
-    const char* gpu_mode = opts->gpu ? opts->gpu : hw->hw_gpu_mode;
-
-#ifdef _WIN32
-    // BUG: https://code.google.com/p/android/issues/detail?id=199427
-    // Booting will be severely slowed down, if not disabled outright, when
-    // 1. On Windows
-    // 2. Using an AVD resolution of >= 1080p (can vary across host setups)
-    // 3. -gpu mesa
-    // What happens is that Mesa will hog the CPU, while disallowing
-    // critical boot services from making progress, causing
-    // the services to give up and put the emulator in a reboot loop
-    // until it either fails to boot altogether or gets lucky and
-    // successfully boots.
-    // This workaround disables the boot animation under the above conditions,
-    // which frees up the CPU enough for the device to boot.
-    if (gpu_mode && (!strcmp(gpu_mode, "mesa"))) {
-        opts->no_boot_anim = 1;
-        D("Starting AVD without boot animation.\n");
-    }
-#endif
 
     emuglConfig_setupEnv(&config);
 
     config_out->glesMode = kAndroidGlesEmulationHost;
-    const bool noOpenglesStart = strcmp(gpu_mode, "guest") == 0 ||
-                                 strcmp(gpu_mode, "off") == 0 ||
-                                 !hw->hw_gpu_enabled;
-    if (noOpenglesStart) {
-        // no host emulation needed
-        android_gl_object_counter_get();
-
-        if (avdInfo_isGoogleApis(avd) && avdInfo_getApiLevel(avd) >= 19) {
-            config_out->glesMode = kAndroidGlesEmulationGuest;
-        } else {
-            config_out->glesMode = kAndroidGlesEmulationOff;
-        }
-    }
 
     return true;
 }
@@ -519,8 +441,8 @@ bool startRenderer(RendererConfig* config_inout) {
                 hw->hw_gpu_mode ? hw->hw_gpu_mode : "unknown",
                 renderer_startup_res);
         if (hw->hw_gpu_mode &&
-            strcmp("swiftshader_indirect", hw->hw_gpu_mode)) {
-            str_reset(&hw->hw_gpu_mode, "swiftshader_indirect");
+            strcmp("lavapipe", hw->hw_gpu_mode)) {
+            str_reset(&hw->hw_gpu_mode, "lavapipe");
         }
         return false;
     }

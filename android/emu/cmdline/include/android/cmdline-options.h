@@ -196,7 +196,6 @@ OPT_PARAM( nand_limits, "<nlimits>", "enforce NAND/Flash read/write thresholds" 
 #endif
 
 OPT_PARAM( gpu, "<mode>", "set hardware GPU mode" )
-OPT_FLAG( use_host_vulkan, "use host for vulkan emulation regardless of 'gpu' mode")
 
 OPT_PARAM( vsync_rate, "<rate>", "set the vsync rate (refresh rate) in Hz for the guest display" )
 

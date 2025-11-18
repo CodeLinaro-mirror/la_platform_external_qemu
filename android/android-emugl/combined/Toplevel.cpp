@@ -651,13 +651,10 @@ private:
                 800;
 
         EmuglConfig config;
-
         emuglConfig_init(
-                &config, true /* gpu enabled */, "auto",
-                mUseHostGpu ? "host" : "swiftshader_indirect", /* gpu option */
-                mUseWindow, false,                             /* denylisted */
-                false, /* has guest renderer */
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, false);
+                &config,
+                mUseHostGpu ? "host" : "lavapipe", /* gpu option */
+                mUseWindow);
 
         emugl::vkDispatch(false /* not for test only */);
 

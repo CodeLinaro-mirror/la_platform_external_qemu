@@ -11,8 +11,8 @@
 
 #include "android/main-emugl.h"
 
-#include "android/avd/util.h"
 #include "aemu/base/memory/ScopedPtr.h"
+#include "android/avd/util.h"
 #include "android/console.h"
 #include "android/opengl/gpuinfo.h"
 #include "android/utils/debug.h"
@@ -21,76 +21,86 @@
 #include "host-common/feature_control.h"
 #include "host-common/opengles.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 
 using android::base::ScopedCPtr;
 namespace fc = android::featurecontrol;
 
-bool androidEmuglConfigInit(EmuglConfig* config,
-                            const char* avdName,
-                            const char* avdArch,
-                            int apiLevel,
-                            bool hasGoogleApis,
-                            const char* gpuOption,
-                            char** hwGpuModePtr,
-                            bool noWindow,
-                            enum WinsysPreferredGlesBackend uiPreferredBackend,
-                            bool* hostGpuVulkanDenylisted,
-                            bool forceUseHostGpuVulkan) {
-    bool gpuEnabled = false;
+bool androidEmuglConfigInit(
+        EmuglConfig* config,
+        const char* gpuOption,
+        char** hwGpuModePtr,
+        bool noWindow,
+        enum WinsysPreferredGlesBackend uiPreferredBackend) {
 
-    bool avdManagerHasWrongSetting = apiLevel < 16;
-
-    if (avdManagerHasWrongSetting &&
-        (*hwGpuModePtr) &&
-        !gpuOption &&
-        (!strcmp(*hwGpuModePtr, "off") ||
-         !strcmp(*hwGpuModePtr, "guest"))) {
-        str_reset(hwGpuModePtr, "auto");
+    // Support old style gpu parameters for backwards compatibility
+    if (!strcmp("swiftshader_indirect", gpuOption)) {
+        gpuOption = "swiftshader";
+    }
+    if (!strcmp("swangle_indirect", gpuOption)) {
+        gpuOption = "swangle";
     }
 
-    if (avdName) {
-        gpuEnabled = hwGpuModePtr && (*hwGpuModePtr);
-        // If the user has hw config set to mesa, not-so-silently overrule that.
-        if (!gpuOption && !strcmp(*hwGpuModePtr, "mesa")) {
-            dwarning(
-                    "Your AVD has been configured with the Mesa renderer, "
-                    "which is deprecated. This AVD is being auto-switched to "
-                    "the current and better-supported \'swiftshader\' renderer. "
-                    "Please update your AVD config.ini's hw.gpu.mode to match.");
-            str_reset(hwGpuModePtr, "swiftshader_indirect");
-        }
-    } else if (!gpuOption) {
+    const std::vector<const char*> UiOptionToGpuOption = {
+            "auto",         // WINSYS_GLESBACKEND_PREFERENCE_AUTO = 0,
+            "swangle",      // WINSYS_GLESBACKEND_PREFERENCE_ANGLE = 1,
+            "auto",         // WINSYS_GLESBACKEND_PREFERENCE_ANGLE9 = 2,
+            "swiftshader",  // WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER = 3,
+            "host",         // WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL = 4,
+    };
+
+    std::vector<std::string> allowedOptions = {
+            "auto", "host", "lavapipe", "swiftshader", "swangle",
+    };
+
+    if (!hwGpuModePtr) {
         // In the case of a platform build, use the 'auto' mode by default.
         str_reset(hwGpuModePtr, "auto");
-        gpuEnabled = true;
     }
 
-    // Detect if this is google API's
+    std::string gpuChoice;
+    if (gpuOption) {
+        // It's enforced with -gpu option
+        gpuChoice = gpuOption;
+    } else if (uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO) {
+        // Use UI preference
+        gpuChoice = UiOptionToGpuOption[(int)uiPreferredBackend];
+    } else {
+        // Use hw gpu mode
+        gpuChoice = *hwGpuModePtr;
+    }
 
-    bool hasGuestRenderer = (!strcmp(avdArch, "x86") ||
-                             !strcmp(avdArch, "x86_64")) &&
-                             (apiLevel >= 23) &&
-                             hasGoogleApis;
-
-    const bool vulkanRequired =
-            (!agentsAvailable() || !fc::isOverridden(fc::Vulkan) ||
-             fc::isEnabled(fc::Vulkan));
-    const bool glesRequired = true;
+    bool validOption = false;
+    for (auto& option : allowedOptions) {
+        if (option == gpuChoice) {
+            validOption = true;
+            break;
+        }
+    }
+    if (!validOption) {
+        derror("%s: Selected GPU option '%s' is not valid, switching to "
+               "'auto' mode.",
+               __func__, gpuChoice.c_str());
+        gpuChoice = "auto";
+        str_reset(hwGpuModePtr, "auto");
+    }
 
     bool hostGpuDenylisted = false;
 
-    const char* gpuChoice = gpuOption ? gpuOption : *hwGpuModePtr;
+    if (gpuChoice.empty()) {
+        // logical error..
+        derror("%s: Could not determine a GPU mode", __func__);
+        return false;
+    }
+
     // If the user has specified a renderer
     // that is neither "auto", "host" nor "on",
     // don't check the blacklist.
     // Only check the blacklist for 'auto', 'host' or 'on' mode.
-    bool gpuChoiceAuto = gpuChoice && (!strcmp(gpuChoice, "auto") ||
-                                       !strcmp(gpuChoice, "auto-no-window"));
-    bool gpuChoiceHost = gpuChoice && (!strcmp(gpuChoice, "host") ||
-                                       !strcmp(gpuChoice, "on"));
+    bool gpuChoiceAuto = (gpuChoice == "auto");
+    bool gpuChoiceHost = (gpuChoice == "host");
 
     if (gpuChoiceAuto || gpuChoiceHost) {
         bool switchToSoftware = false;
@@ -99,122 +109,43 @@ bool androidEmuglConfigInit(EmuglConfig* config,
         const bool onDenyList = isHostGpuBlacklisted();
         if (onDenyList) {
             if (gpuChoiceAuto) {
-                // Auto switch to software if denylisted
+                // Auto switch to software if denylisted, give warning
                 dwarning(
                         "Your GPU drivers may have a bug. "
                         "Switching to software rendering.");
                 switchToSoftware = true;
             } else {
-                // Check if things might work in 'host' modes.
-                if (vulkanRequired) {
-                    char* vkVendor = nullptr;
-                    int vkMajor = 0, vkMinor = 0, vkPatch = 0;
-                    emuglConfig_get_vulkan_hardware_gpu(
-                            &vkVendor, &vkMajor, &vkMinor, &vkPatch, nullptr,
-                            nullptr, nullptr);
-                    if (vkVendor) {
-                        // We can create an instance and get driver information,
-                        // maybe it'll work, just warn the user and keep the gpu
-                        // choice unchanged
-                        dwarning(
-                                "Your GPU drivers (%s, Vulkan API version "
-                                "%d.%d.%d) may have a bug. "
-                                "If you experience graphical issues, "
-                                "please consider switching to software "
-                                "rendering mode.",
-                                vkVendor, vkMajor, vkMinor, vkPatch);
-                        free(vkVendor);
-                    } else {
-                        // We cannot use vulkan on this device, it's highly
-                        // likely that it'll crash with host GPU Overwrite
-                        // user's 'host' setting and use software rendering
-                        derror("Your GPU cannot be used for hardware rendering."
-                               " Software rendering will be used.");
-
-                        switchToSoftware = true;
-                    }
-                }
-
-                if (glesRequired) {
-                    // TODO(b/405458902): Also add GLES control here if
-                    // GuestAngle is not in use
-                }
+                // We cannot use vulkan on this device, it's highly
+                // likely that it'll crash with host GPU Overwrite
+                // user's 'host' setting and use software rendering
+                derror("Your GPU cannot be used for hardware rendering."
+                       " Consider using software rendering.");
             }
         }
 
         if (switchToSoftware) {
             hostGpuDenylisted = onDenyList;
             setGpuBlacklistStatus(hostGpuDenylisted);
+            gpuChoice = "lavapipe";
         }
     }
 
-    bool result = emuglConfig_init(
-            config, gpuEnabled, *hwGpuModePtr, gpuOption,
-            noWindow, hostGpuDenylisted, hasGuestRenderer, uiPreferredBackend,
-            forceUseHostGpuVulkan);
+    // when set, 'force' feature flags will overwrite other options
+    const bool force_lavapipe = fc::isEnabled(fc::ForceLavapipe);
+    const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
+    const bool force_swangle = fc::isEnabled(fc::ForceANGLE);
+    const bool force_lavapipe_on_software = fc::isEnabled(fc::ForceLavapipeForSoftwareRendering);
 
-    bool isUnsupportedGpuDriver = false;
-#if defined(_WIN32) || defined(__linux__)
-    const bool hwGpuRequested =
-            (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST);
-    if (hwGpuRequested && vulkanRequired) {
-        char* vkVendor = nullptr;
-        int vkMajor = 0;
-        int vkMinor = 0;
-        int vkPatch = 0;
-        uint64_t vkDeviceMemBytes = 0;
-        emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
-                                            &vkPatch, &vkDeviceMemBytes,
-                                            nullptr, nullptr);
-        const uint64_t deviceMemMB = vkDeviceMemBytes / (1024 * 1024);
-        dinfo("GPU device local memory = %lluMB", deviceMemMB);
-
-        if (vkVendor) {
-#if defined(_WIN32)
-            if (strncmp("AMD", vkVendor, 3) == 0) {
-                if (vkMajor == 1 && vkMinor < 3) {
-                    // on windows, amd gpu with api 1.2.x does not work
-                    // for vulkan, disable it
-                    isUnsupportedGpuDriver = true;
-                }
-            } else if (strncmp("Intel", vkVendor, 5) == 0) {
-                if (vkMajor == 1 &&
-                    ((vkMinor == 3 && vkPatch < 240) || (vkMinor < 3))) {
-                    // intel gpu with api < 1.3.240 does not work
-                    // for vulkan, disable it
-                    isUnsupportedGpuDriver = true;
-                }
-            }
-#endif
-#if defined(__linux__)
-            if (strcmp("AMD Custom GPU 0405 (RADV VANGOGH)", vkVendor) == 0) {
-                // on linux, this specific amd gpu does not work for vulkan
-                // even with VulkanAllocateDeviceMemoryOnly, disable it
-                // (b/225541819)
-                isUnsupportedGpuDriver = true;
-            }
-#endif
-            if (isUnsupportedGpuDriver) {
-                dwarning(
-                        "Your GPU '%s' has Vulkan API version %d.%d.%d,"
-                        " and cannot support Vulkan properly."
-                        " Please try updating your GPU Drivers.",
-                        vkVendor, vkMajor, vkMinor, vkPatch);
-            }
-            free(vkVendor);
-        } else {
-            // Could not properly detect the hardware parameters, disable
-            // Vulkan
-            dwarning(
-                    "Could not detect GPU properly for Vulkan emulation."
-                    " Please try updating your GPU Drivers.");
-            isUnsupportedGpuDriver = true;
-        }
+    // Select Vulkan mode
+    if (force_lavapipe ||
+        (force_lavapipe_on_software && (gpuChoice == "swiftshader" ||
+                                        gpuChoice == "swangle"))) {
+        gpuChoice = "lavapipe";
+    } else if (force_swiftshader) {
+        gpuChoice = "swiftshader";
+    } else if (force_swangle) {
+        gpuChoice = "swangle";
     }
-#endif
 
-    *hostGpuVulkanDenylisted =
-            isUnsupportedGpuDriver || async_query_host_gpu_VulkanBlacklisted();
-
-    return result;
+    return emuglConfig_init(config, gpuChoice.c_str(), noWindow);
 }

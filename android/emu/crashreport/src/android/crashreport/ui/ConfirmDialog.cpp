@@ -202,9 +202,9 @@ void ConfirmDialog::setSwGpu() {
         return;
     }
 
-    // Set hw.gpu.enabled=no and hw.gpu.mode=guest
-    hwQemuIniF.setString("hw.gpu.enabled", "no");
-    hwQemuIniF.setString("hw.gpu.mode", "guest");
+    // Set hw.gpu.enabled=yes and hw.gpu.mode=lavapipe
+    hwQemuIniF.setString("hw.gpu.enabled", "yes");
+    hwQemuIniF.setString("hw.gpu.mode", "lavapipe");
 
     // Write the modified configuration back
     hwQemuIniF.write();
