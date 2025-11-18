@@ -20,17 +20,15 @@ ANDROID_BEGIN_HEADER
 
 // Convenience function used to initialize an EmuglConfig instance |config|
 // with appropriate settings corresponding to an AVD startup configuration.
-// |avdName| is the AVD name, or nullptr to indicate a platform build.
-// |avdArch| is the AVD architecture (e.g. 'arm64')
-// |apiLevel| is the AVD API level.
+// |config| config to be initialized.
 // |gpuOption| is the value of the '-gpu' option, if any.
+// |hwGpuModePtr| hw gpu config value.
 // |noWindow| is true iff the -no-window option was used.
 // |uiPreferredBackend| communicates the preferred GLES backend from the UI.
-// The UI setting can be overridden if the user is logging in through remote desktop.
 // On success, initializes |config| and returns true. Return false on failure.
 bool androidEmuglConfigInit(EmuglConfig* config,
                             const char* gpuOption,
-                            char** hwGpuModePtr,
+                            const char* hwGpuModePtr,
                             bool noWindow,
                             enum WinsysPreferredGlesBackend uiPreferredBackend);
 
