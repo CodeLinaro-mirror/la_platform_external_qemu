@@ -36,10 +36,10 @@ bool androidEmuglConfigInit(
         enum WinsysPreferredGlesBackend uiPreferredBackend) {
 
     // Support old style gpu parameters for backwards compatibility
-    if (!strcmp("swiftshader_indirect", gpuOption)) {
+    if (gpuOption && !strcmp("swiftshader_indirect", gpuOption)) {
         gpuOption = "swiftshader";
     }
-    if (!strcmp("swangle_indirect", gpuOption)) {
+    if (gpuOption && !strcmp("swangle_indirect", gpuOption)) {
         gpuOption = "swangle";
     }
 
