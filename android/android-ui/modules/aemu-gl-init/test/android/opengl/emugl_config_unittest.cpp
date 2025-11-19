@@ -30,14 +30,25 @@ namespace base {
 
 #if defined(_WIN32)
 #  define LIB_NAME(x)  x ".dll"
+#  define LAVAPIPE_RESULT "lavapipe"
+#  define HOST_VULKAN_RESULT "host"
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swiftshader" // Windows redirects swangle to swiftshader
 #elif defined(__APPLE__)
 #  define LIB_NAME(x)  "lib" x ".dylib"
+#if defined(__arm64__)
+#  define LAVAPIPE_RESULT "lavapipe"
+#  define HOST_VULKAN_RESULT "host"
+#else
+#  define LAVAPIPE_RESULT "swiftshader" // TODO(b/462005807)
+#  define HOST_VULKAN_RESULT "swiftshader"
+#endif
 #  define SWIFTSHADER_RESULT "swangle" // Mac redirects swiftshader to swangle
 #  define SWANGLE_RESULT "swangle"
 #else
 #  define LIB_NAME(x)  "lib" x ".so"
+#  define LAVAPIPE_RESULT "lavapipe"
+#  define HOST_VULKAN_RESULT "host"
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swangle"
 #endif
@@ -229,9 +240,8 @@ TEST(EmuglConfig, init) {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
                     &config, "host", false));
-        EXPECT_STREQ("host", config.vulkan_backend);
+        EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
         EXPECT_STREQ("host", config.gles_backend);
-        EXPECT_STREQ("GPU emulation enabled using Vulkan:'host' GLES:'host' modes", config.status);
     }
 
     // Check that "host" mode is available with -no-window if explicitly
@@ -240,9 +250,8 @@ TEST(EmuglConfig, init) {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
                     &config, "host", true));
-        EXPECT_STREQ("host", config.vulkan_backend);
+        EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
         EXPECT_STREQ("host", config.gles_backend);
-        EXPECT_STREQ("GPU emulation enabled using Vulkan:'host' GLES:'host' modes", config.status);
     }
 }
 
@@ -279,6 +288,8 @@ TEST(EmuglConfig, initFromUISetting) {
         case WINSYS_GLESBACKEND_PREFERENCE_AUTO:
             EXPECT_STREQ("host", config.gles_backend);
 #ifdef __APPLE__
+            // When host gpu is not enforced, swiftshader will be used on macOS
+            // for vulkan
             EXPECT_STREQ("swiftshader", config.vulkan_backend);
 #else
             EXPECT_STREQ("host", config.vulkan_backend);
@@ -299,12 +310,20 @@ TEST(EmuglConfig, initFromUISetting) {
         case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
             EXPECT_STREQ(SWIFTSHADER_RESULT, config.gles_backend);
             EXPECT_STREQ("swiftshader", config.vulkan_backend);
-            EXPECT_STREQ("swiftshader",
-                         System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
             break;
         case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
             EXPECT_STREQ("host", config.gles_backend);
-            EXPECT_STREQ("host", config.vulkan_backend);
+            EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
+            break;
+        default:
+            break;
+        }
+
+        // Check if ANDROID_EMU_VK_ICD is set correctly based on the vulkan mode
+        if (strcmp(config.vulkan_backend, "swiftshader") == 0) {
+            EXPECT_STREQ("swiftshader",
+                         System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
+        } else if (strcmp(config.vulkan_backend, "host") == 0) {
 #if defined(__APPLE__) && defined(__arm64__)
             EXPECT_STREQ("moltenvk",
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
@@ -312,9 +331,6 @@ TEST(EmuglConfig, initFromUISetting) {
             EXPECT_STREQ("",
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
 #endif
-            break;
-        default:
-            break;
         }
     }
 }
@@ -331,7 +347,7 @@ TEST(EmuglConfig, initNoWindowWithAuto) {
     EmuglConfig config;
     EXPECT_TRUE(emuglConfig_init(
                 &config, "auto", true));
-    EXPECT_STREQ("lavapipe", config.vulkan_backend);
+    EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
     EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
 }
 
@@ -347,7 +363,7 @@ TEST(EmuglConfig, initNoWindowWithLavapipe) {
     EmuglConfig config;
     EXPECT_TRUE(emuglConfig_init(
                 &config, "lavapipe", true));
-    EXPECT_STREQ("lavapipe", config.vulkan_backend);
+    EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
     EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
 }
 

@@ -738,6 +738,14 @@ bool emuglConfig_init(EmuglConfig* config,
         }
     }
 
+#if defined(__APPLE__) && !defined(__arm64__)
+    // Do not enable host vulkan driver (e.g. moltenvk), or
+    // lavapipe(b/462005807) on mac Intel
+    if (vulkan_mode_selected == "host" || vulkan_mode_selected == "lavapipe") {
+        vulkan_mode_selected = "swiftshader";
+    }
+#endif
+
     if (vulkan_mode_selected == "swangle") {
         // No 'swangle' for vulkan mode, use swiftshader
         vulkan_mode_selected = "swiftshader";
