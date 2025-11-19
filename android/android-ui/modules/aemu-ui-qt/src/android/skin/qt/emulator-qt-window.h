@@ -457,6 +457,7 @@ private:
     void checkVgkAndWarn();
     void checkNestedAndWarn();
     void displayCheckWarnings();
+    void checkAIGlassesWarnings();
 
     bool mouseInside();
     SkinMouseButtonType getSkinMouseButton(const QMouseEvent* event) const;
@@ -577,6 +578,7 @@ private:
     OnDemandMessageBox mAdbWarningBox;
     OnDemandMessageBox mVgkWarningBox;
     OnDemandMessageBox mNestedWarningBox;
+    OnDemandMessageBox mGlassesWarningBox;
 
     // First-show related warning messages state
     bool mGpuBlacklisted = false;
