@@ -267,7 +267,6 @@ bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
                             RendererConfig* config_out) {
     // Set defaults
-    config_out->glesMode = kAndroidGlesEmulationOff;
     config_out->selectedRenderer = SELECTED_RENDERER_UNKNOWN;
     config_out->gles_major_version = 2;
     config_out->gles_minor_version = 0;
@@ -385,20 +384,10 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 
     emuglConfig_setupEnv(&config);
 
-    config_out->glesMode = kAndroidGlesEmulationHost;
-
     return true;
 }
 
 bool startRenderer(RendererConfig* config_inout) {
-    const bool noOpenglesStart =
-            (config_inout->glesMode != kAndroidGlesEmulationHost);
-
-    if (noOpenglesStart) {
-        // no host emulation needed
-        return true;
-    }
-
     AvdInfo* avd = getConsoleAgents()->settings->avdInfo();
     AndroidHwConfig* hw = getConsoleAgents()->settings->hw();
     AndroidOptions* opts =

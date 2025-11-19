@@ -3448,7 +3448,6 @@ extern "C" int main(int argc, char** argv) {
         std::vector<std::pair<std::string, std::string>> userspaceBootOpts =
                 getUserspaceBootProperties(
                         opts, kTarget.androidArch, myserialno.c_str(),
-                        rendererConfig.glesMode,
                         getBootPropOpenglesVersion(&rendererConfig), apiLevel,
                         avdFlavor, real_console_tty_prefix,
                         &verified_boot_params, hw);

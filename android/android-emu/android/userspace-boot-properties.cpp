@@ -138,7 +138,6 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         const AndroidOptions* opts,
         const char* targetArch,
         const char* serialno,
-        const AndroidGlesEmulationMode glesMode,
         const int bootPropOpenglesVersion,
         const int apiLevel,
         AvdFlavor avdFlavor,
@@ -460,21 +459,11 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     // boot property must also be defined for |gles > 0|, but this
     // is not handled here (see vl-android.c for QEMU1).
     if (qemuGlesProp) {
-        int gles;
-        switch (glesMode) {
-            case kAndroidGlesEmulationHost:
-                gles = 1;
-                break;
-            case kAndroidGlesEmulationGuest:
-                gles = 2;
-                break;
-            default:
-                gles = 0;
-        }
+        int gles = 1; // kAndroidGlesEmulationHost
         params.push_back({qemuGlesProp, StringFormat("%d", gles)});
     }
 
-    if (qemuCpuVulkanVersionProp && glesMode == kAndroidGlesEmulationHost) {
+    if (qemuCpuVulkanVersionProp) {
         // Put our swiftshader version string there, which is currently
         // Vulkan 1.1 (0x402000)
         params.push_back(

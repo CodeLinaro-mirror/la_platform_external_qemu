@@ -4734,8 +4734,7 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
             } else {
                 goldfish_fb_set_display_depth(depth);
             }
-            goldfish_fb_set_use_host_gpu(
-                    rendererConfig.glesMode == kAndroidGlesEmulationHost);
+            goldfish_fb_set_use_host_gpu(true);
             is_opengl_alive = rendererConfig.rendererStarted;
 
             char  tmp[64];
@@ -4744,8 +4743,7 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
             boot_property_add("ro.opengles.version", tmp);
 
 #if defined(CONFIG_VNC)
-            if ((rendererConfig.glesMode == kAndroidGlesEmulationHost) &&
-                !QTAILQ_EMPTY(&(qemu_find_opts("vnc")->head))) {
+            if (!QTAILQ_EMPTY(&(qemu_find_opts("vnc")->head))) {
                 error_report("VNC supports only guest GPU, add \"-gpu guest\" option");
                 return 1;
             }

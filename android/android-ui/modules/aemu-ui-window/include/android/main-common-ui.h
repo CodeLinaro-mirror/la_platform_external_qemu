@@ -21,7 +21,7 @@
 #include "android/utils/aconfig-file.h"   // for AConfig
 #include "android/utils/compiler.h"
 #include "host-common/hw-config.h"        // for AndroidHwConfig
-#include "host-common/opengl/emugl_config.h"  // for AndroidGlesEmulationMode
+#include "host-common/opengl/emugl_config.h"
 
 ANDROID_BEGIN_HEADER
 
@@ -47,7 +47,6 @@ void emulator_finiUserInterface(void);
 // First, there is a struct to hold outputs.
 typedef struct {
     // Set with configureRenderer
-    AndroidGlesEmulationMode glesMode;
     SelectedRenderer selectedRenderer;
 
     // Following values can be changed during or

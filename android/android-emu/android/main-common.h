@@ -19,7 +19,7 @@
 #include "android/avd/info.h"             // for AvdInfo
 #include "android/cmdline-definitions.h"  // for AndroidOptions
 #include "android/cpu_accelerator.h"      // for AndroidCpuAccelerator
-#include "host-common/opengl/emugl_config.h"  // for AndroidGlesEmulationMode
+#include "host-common/opengl/emugl_config.h"
 #include "android/skin/winsys.h"          // for WinsysPreferredGlesBackend
 #include "android/utils/compiler.h"       // for ANDROID_BEGIN_HEADER, ANDRO...
 #include "android/main-common-ui.h"       // for backwards compatibility
