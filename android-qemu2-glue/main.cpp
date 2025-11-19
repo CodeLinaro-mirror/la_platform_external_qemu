@@ -1306,7 +1306,7 @@ static int startEmulatorWithMinConfig(int argc,
 
     /* Disable the GLAsyncSwap for ANGLE so far */
     bool shouldDisableAsyncSwap =
-            rendererConfig.selectedRenderer ==
+            rendererConfig.selectedGlesRenderer ==
                     SELECTED_RENDERER_ANGLE_INDIRECT;
     // Features to disable or enable depending on rendering backend
     // and gpu make/model/version
@@ -1317,7 +1317,7 @@ static int startEmulatorWithMinConfig(int argc,
                               System::get()->getProgramBitness() == 32;
 #endif
     shouldDisableAsyncSwap |=
-            rendererConfig.selectedRenderer == SELECTED_RENDERER_HOST &&
+            rendererConfig.selectedGlesRenderer == SELECTED_RENDERER_HOST &&
             async_query_host_gpu_SyncBlacklisted();
 
     if (shouldDisableAsyncSwap) {
@@ -3385,7 +3385,7 @@ extern "C" int main(int argc, char** argv) {
 
         /* Disable the GLAsyncSwap for ANGLE so far */
         bool shouldDisableAsyncSwap =
-                rendererConfig.selectedRenderer ==
+                rendererConfig.selectedGlesRenderer ==
                         SELECTED_RENDERER_ANGLE_INDIRECT;
         // Features to disable or enable depending on rendering backend
         // and gpu make/model/version
@@ -3396,7 +3396,7 @@ extern "C" int main(int argc, char** argv) {
                                   System::get()->getProgramBitness() == 32;
 #endif
         shouldDisableAsyncSwap |=
-                rendererConfig.selectedRenderer == SELECTED_RENDERER_HOST &&
+                rendererConfig.selectedGlesRenderer == SELECTED_RENDERER_HOST &&
                 async_query_host_gpu_SyncBlacklisted();
 
         if (shouldDisableAsyncSwap) {

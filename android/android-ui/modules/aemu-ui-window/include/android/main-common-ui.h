@@ -47,7 +47,8 @@ void emulator_finiUserInterface(void);
 // First, there is a struct to hold outputs.
 typedef struct {
     // Set with configureRenderer
-    SelectedRenderer selectedRenderer;
+    SelectedRenderer selectedGlesRenderer;
+    SelectedRenderer selectedVulkanRenderer;
 
     // Following values can be changed during or
     // after startRenderer
