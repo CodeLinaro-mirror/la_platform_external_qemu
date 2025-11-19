@@ -28,6 +28,8 @@
 using android::base::ScopedCPtr;
 namespace fc = android::featurecontrol;
 
+static const char DEFAULT_SOFTWARE_GPU_MODE[] = "lavapipe";
+
 bool androidEmuglConfigInit(
         EmuglConfig* config,
         const char* gpuOption,
@@ -43,25 +45,25 @@ bool androidEmuglConfigInit(
         gpuOption = "swangle";
     }
 
-    const std::vector<const char*> UiOptionToGpuOption = {
-            "auto",         // WINSYS_GLESBACKEND_PREFERENCE_AUTO = 0,
-            "swangle",      // WINSYS_GLESBACKEND_PREFERENCE_ANGLE = 1,
-            "auto",         // WINSYS_GLESBACKEND_PREFERENCE_ANGLE9 = 2,
-            "swiftshader",  // WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER = 3,
-            "host",         // WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL = 4,
-    };
-
-    std::vector<std::string> allowedOptions = {
-            "auto", "host", "lavapipe", "swiftshader", "swangle",
-    };
-
     std::string gpuChoice;
     if (gpuOption) {
         // It's enforced with -gpu option
         gpuChoice = gpuOption;
     } else if (uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO) {
         // Use UI preference
-        gpuChoice = UiOptionToGpuOption[(int)uiPreferredBackend];
+        switch (uiPreferredBackend) {
+            case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
+                gpuChoice = "swangle";
+                break;
+            case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
+                gpuChoice = "swiftshader";
+                break;
+            case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
+                gpuChoice = "host";
+                break;
+            default:
+                gpuChoice = "auto";
+        }
     } else if (hwGpuModePtr) {
         // Use hw gpu mode
         gpuChoice = hwGpuModePtr;
@@ -69,6 +71,15 @@ bool androidEmuglConfigInit(
         gpuChoice = "auto";
     }
 
+    // "software" is a special term to select best software mode for the
+    // platform/avd and not a real gpu backend mode.
+    if (gpuChoice == "software") {
+        gpuChoice = DEFAULT_SOFTWARE_GPU_MODE;
+    }
+
+    const std::vector<std::string> allowedOptions = {
+            "auto", "host", "lavapipe", "swiftshader", "swangle",
+    };
     bool validOption = false;
     for (auto& option : allowedOptions) {
         if (option == gpuChoice) {
@@ -116,7 +127,7 @@ bool androidEmuglConfigInit(
         if (switchToSoftware) {
             hostGpuDenylisted = onDenyList;
             setGpuBlacklistStatus(hostGpuDenylisted);
-            gpuChoice = "lavapipe";
+            gpuChoice = DEFAULT_SOFTWARE_GPU_MODE;
         }
     }
 

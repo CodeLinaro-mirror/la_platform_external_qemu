@@ -764,11 +764,11 @@ bool emuglConfig_init(EmuglConfig* config,
     if (gles_mode_selected == "lavapipe") {
         // There is no 'lavapipe' gles mode, use swangle by default
         gles_mode_selected = "swangle";
+        const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
         const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
-        if (android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
+        if (force_swiftshader || android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
             gles_mode_selected = "swiftshader";
-            dinfo("'%s' envvar is set, using %s for GL", EnvVarSelectGL,
-                  gles_mode_selected.c_str());
+            dinfo("Forcing 'swiftshader' mode for GLES");
         }
     }
 

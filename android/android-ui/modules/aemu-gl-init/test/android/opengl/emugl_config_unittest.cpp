@@ -343,12 +343,24 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
     myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
     makeLibSubDir(myDir, "");
 
+    makeSwAngleSubDirAndFiles(myDir);
+    makeSwiftshaderSubDirAndFiles(myDir);
+
     {
         // with valid values
         EmuglConfig config;
         EXPECT_TRUE(androidEmuglConfigInit(&config, "host", "host", false,
                                            WINSYS_GLESBACKEND_PREFERENCE_AUTO));
         EXPECT_STREQ("host", config.gles_backend);
+        EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
+    }
+
+    {
+        // with '-gpu software' value
+        EmuglConfig config;
+        EXPECT_TRUE(androidEmuglConfigInit(&config, "software", "auto", false,
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO));
+        EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
     }
 
     {
@@ -358,7 +370,8 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
                                            WINSYS_GLESBACKEND_PREFERENCE_AUTO);
         const bool onDenyList = isHostGpuBlacklisted();
         if (onDenyList) {
-            EXPECT_FALSE(initRes);
+            EXPECT_TRUE(initRes);
+            EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
         }else {
             EXPECT_TRUE(initRes);
             EXPECT_STREQ("host", config.gles_backend);
@@ -372,7 +385,8 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
                                            WINSYS_GLESBACKEND_PREFERENCE_AUTO);
         const bool onDenyList = isHostGpuBlacklisted();
         if (onDenyList) {
-            EXPECT_FALSE(initRes);
+            EXPECT_TRUE(initRes);
+            EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
         }else {
             EXPECT_TRUE(initRes);
             EXPECT_STREQ("host", config.gles_backend);
