@@ -49,8 +49,8 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_XR);
 
     // configureRenderer must have been called before this point
-    const SelectedRenderer renderer = emuglConfig_get_current_renderer();
-    const bool hwGpuRequested = isXrAvd || (renderer == SELECTED_RENDERER_HOST);
+    const SelectedRenderer vulkanRenderer = emuglConfig_get_current_vulkan_renderer();
+    const bool hwGpuRequested = isXrAvd || (vulkanRenderer == SELECTED_RENDERER_HOST);
 
     if (!hwGpuRequested) {
         metrics.set_check(EmulatorCompatibilityInfo::

@@ -292,7 +292,8 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     bool isVkNVIDIA = false;
     if (fc::isEnabled(fc::Vulkan)) {
         const bool hwGpuRequested =
-                (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST);
+                (emuglConfig_get_current_vulkan_renderer() ==
+                 SELECTED_RENDERER_HOST);
         if (!isMac && hwGpuRequested) {
             char* vkVendor = nullptr;
             int vkMajor, vkMinor, vkPatch;

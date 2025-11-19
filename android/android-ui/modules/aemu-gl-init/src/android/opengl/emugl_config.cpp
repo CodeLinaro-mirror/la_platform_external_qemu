@@ -129,15 +129,29 @@ SelectedRenderer emuglConfig_get_renderer(const char* gpu_mode) {
     }
 }
 
-static SelectedRenderer sCurrentRenderer =
+static SelectedRenderer sCurrentGlesRenderer =
+    SELECTED_RENDERER_UNKNOWN;
+static SelectedRenderer sCurrentVulkanRenderer =
     SELECTED_RENDERER_UNKNOWN;
 static bool sCurrentRendererSet = false;
 
-SelectedRenderer emuglConfig_get_current_renderer() {
+SelectedRenderer emuglConfig_get_current_gles_renderer() {
     if (!sCurrentRendererSet) {
         derror("%s called before selecting the renderer!", __func__);
     }
-    return sCurrentRenderer;
+    return sCurrentGlesRenderer;
+}
+
+SelectedRenderer emuglConfig_get_current_vulkan_renderer() {
+    if (!sCurrentRendererSet) {
+        derror("%s called before selecting the renderer!", __func__);
+    }
+    return sCurrentVulkanRenderer;
+}
+
+SelectedRenderer emuglConfig_get_current_renderer() {
+    // deprecated function, only checks gles mode, to be removed
+    return emuglConfig_get_current_gles_renderer();
 }
 
 static std::string sGpuOption;
@@ -176,11 +190,13 @@ void free_emugl_host_gpu_props(emugl_host_gpu_prop_list proplist) {
     delete [] proplist.props;
 }
 
-static void setCurrentRenderer(const char* gpuMode) {
-    sCurrentRenderer = emuglConfig_get_renderer(gpuMode);
+static void setCurrentRenderer(const char* glesMode, const char* vulkanMode) {
+    sCurrentGlesRenderer = emuglConfig_get_renderer(glesMode);
+    sCurrentVulkanRenderer = emuglConfig_get_renderer(vulkanMode);
     sCurrentRendererSet = true;
-    dprint("%s: %s %s", __func__, gpuMode,
-           emuglConfig_renderer_to_string(sCurrentRenderer));
+    dprint("%s: %s %s gles:%s vulkan:%s", __func__, glesMode, vulkanMode,
+           emuglConfig_renderer_to_string(sCurrentGlesRenderer),
+           emuglConfig_renderer_to_string(sCurrentVulkanRenderer));
 }
 
 struct DeviceSupportInfo {
@@ -692,7 +708,7 @@ bool emuglConfig_init(EmuglConfig* config,
         snprintf(config->gles_backend, sizeof(config->gles_backend), "%s", gpu_mode_out);
         snprintf(config->status, sizeof(config->status), "%s",
                     error.c_str());
-        setCurrentRenderer(gpu_mode_out);
+        setCurrentRenderer(gpu_mode_out, gpu_mode_out);
         return false;
     }
 
@@ -805,7 +821,7 @@ bool emuglConfig_init(EmuglConfig* config,
                      gpu_mode_out);
             snprintf(config->status, sizeof(config->status), "%s",
                      error.c_str());
-            setCurrentRenderer(gpu_mode_out);
+            setCurrentRenderer(gpu_mode_out, gpu_mode_out);
             return false;
         }
     }
@@ -815,24 +831,11 @@ bool emuglConfig_init(EmuglConfig* config,
     snprintf(config->gles_backend, sizeof(config->gles_backend), "%s", gles_mode_selected.c_str());
     snprintf(config->status, sizeof(config->status),
              "GPU emulation enabled using Vulkan:'%s' GLES:'%s' modes", vulkan_mode_selected.c_str(), gles_mode_selected.c_str());
-
-    // TODO(b/461828541): separate sCurrentRenderer modes for gles and vulkan
-    // Here we still have a single renderer mode selected from vulkan and gles
-    // backends, which can actually have different modes. Since the 'host' mode
-    // checks are done to determine code flow in various places for GLES (e.g.
-    // shouldEnableCoreProfile), we keep checking gles mode first, in case
-    // vulkan is still in software mode. This is a common case with 'auto' mode
-    // on macOS, since moltenVK / KosmicKrisp is not enabled by default for
-    // vulkan and it keeps using software while gles uses 'host'.
-    if (gles_mode_selected == "host") {
-        setCurrentRenderer(gles_mode_selected.c_str());
-    } else {
-        setCurrentRenderer(vulkan_mode_selected.c_str());
-    }
+    setCurrentRenderer(gles_mode_selected.c_str(), vulkan_mode_selected.c_str());
 
 #if defined(__linux__) || defined(_WIN32)
-    const bool hwGpuRequested =
-            (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST);
+    const bool hwGpuRequested = (emuglConfig_get_current_vulkan_renderer() ==
+                                 SELECTED_RENDERER_HOST);
     const bool vulkanIsNotDisabled =
             (!agentsAvailable() || !fc::isOverridden(fc::Vulkan) ||
              fc::isEnabled(fc::Vulkan));
