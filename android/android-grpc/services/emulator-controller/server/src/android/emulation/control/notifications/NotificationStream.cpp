@@ -42,7 +42,6 @@ NotificationStream::NotificationStream(VirtualSceneCamera* camera,
 
 std::optional<Notification> NotificationStream::getDisplayNotificationEvent() {
     Notification event;
-    event.set_event(Notification::DISPLAY_CONFIGURATIONS_CHANGED_UI);
 
     auto eventDetails =
             event.mutable_displayconfigurationschangednotification();
@@ -99,13 +98,7 @@ std::optional<Notification> NotificationStream::getCameraNotificationEvent() {
 
     // Camera is currently always associated with display 0
     eventDetails->set_display(0);
-    if (mCamera->isConnected()) {
-        event.set_event(Notification::VIRTUAL_SCENE_CAMERA_ACTIVE);
-        eventDetails->set_active(true);
-    } else {
-        event.set_event(Notification::VIRTUAL_SCENE_CAMERA_INACTIVE);
-        eventDetails->set_active(false);
-    }
+    eventDetails->set_active(mCamera->isConnected());
 
     assert(event.has_cameranotification());
 
