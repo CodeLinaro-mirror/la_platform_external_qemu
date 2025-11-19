@@ -1123,8 +1123,7 @@ void EmulatorQtWindow::closeEvent(QCloseEvent* event) {
             // so skip that step when saving vm on exit
             const bool fastSnapshotV1 =
                     android::featurecontrol::isEnabled(
-                            android::featurecontrol::FastSnapshotV1) &&
-                    emuglConfig_current_renderer_supports_snapshot();
+                            android::featurecontrol::FastSnapshotV1);
             if (fastSnapshotV1) {
                 // Tell the system that we are in saving; create a file lock.
                 auto snapshotLockFilePath = avdInfo_getSnapshotLockFilePath(

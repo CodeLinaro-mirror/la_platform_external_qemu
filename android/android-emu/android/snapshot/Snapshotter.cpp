@@ -571,20 +571,6 @@ bool Snapshotter::checkSafeToSave(const char* name, bool reportMetrics) {
         return false;
     }
 
-    if (!emuglConfig_current_renderer_supports_snapshot()) {
-        showError(StringFormat(
-                "Unable to save snapshot: This feature is not currently "
-                "supported with your selected graphics settings. (%s)",
-                emuglConfig_renderer_to_string(
-                        emuglConfig_get_current_renderer())));
-        if (reportMetrics) {
-            appendFailedSave(android_studio::EmulatorSnapshotSaveState::
-                                 EMULATOR_SNAPSHOT_SAVE_SKIPPED_UNSUPPORTED,
-                             FailureReason::SnapshotsNotSupported);
-        }
-        return false;
-    }
-
     // Check the disk capacity.
     // Snapshots vary in size. They can be close to a GB.
     // Rather than taking all the remaining disk space,
@@ -633,20 +619,6 @@ bool Snapshotter::checkSafeToLoad(const char* name, bool reportMetrics) {
         return false;
     }
 
-    if (!emuglConfig_current_renderer_supports_snapshot()) {
-        showError(
-                StringFormat("Unable to load snapshot: Snapshots are not "
-                             "supported with the current graphics settings. "
-                             "(%s)",
-                             emuglConfig_renderer_to_string(
-                                     emuglConfig_get_current_renderer())));
-        if (reportMetrics) {
-            appendFailedLoad(android_studio::EmulatorSnapshotLoadState::
-                                 EMULATOR_SNAPSHOT_LOAD_SKIPPED_UNSUPPORTED,
-                             FailureReason::SnapshotsNotSupported);
-        }
-        return false;
-    }
     return true;
 }
 

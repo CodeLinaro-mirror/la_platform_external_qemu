@@ -164,14 +164,6 @@ const char* emuglConfig_renderer_to_string(SelectedRenderer renderer) {
     return "(Bad value)";
 }
 
-bool emuglConfig_current_renderer_supports_snapshot() {
-    const SelectedRenderer renderer = emuglConfig_get_current_renderer();
-    return renderer == SELECTED_RENDERER_HOST ||
-           renderer == SELECTED_RENDERER_ANGLE_INDIRECT ||
-           renderer == SELECTED_RENDERER_LAVAPIPE ||
-           renderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
-}
-
 void free_emugl_host_gpu_props(emugl_host_gpu_prop_list proplist) {
     for (int i = 0; i < proplist.num_gpus; i++) {
         free(proplist.props[i].make);

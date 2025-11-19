@@ -357,38 +357,6 @@ bool Quickboot::load(const char* name) {
                         : proto::EmulatorQuickbootLoad::
                                   EMULATOR_QUICKBOOT_LOAD_COLD_CMDLINE,
                 FailureReason::Empty);
-    } else if (!emuglConfig_current_renderer_supports_snapshot()) {
-        std::string message;
-
-        if (forceSnapshotLoad) {
-            mWindow.showMessage(
-                    absl::StrFormat(
-                            "Unable to load saved state. Snapshots are "
-                            "incompatible with your current graphics settings "
-                            "(%s). The emulator will now shut down.",
-                            emuglConfig_renderer_to_string(
-                                    emuglConfig_get_current_renderer()))
-                            .c_str(),
-                    WINDOW_MESSAGE_OK, kDefaultMessageTimeoutMs);
-
-        } else {
-            mWindow.showMessage(
-                    absl::StrFormat(
-                            "Saved state could not be loaded. A fresh start is "
-                            "required because snapshots are not supported with "
-                            "your current graphics settings (%s).",
-                            emuglConfig_renderer_to_string(
-                                    emuglConfig_get_current_renderer()))
-                            .c_str(),
-                    WINDOW_MESSAGE_OK, kDefaultMessageTimeoutMs);
-        }
-        reportFailedLoad(proto::EmulatorQuickbootLoad::
-                                 EMULATOR_QUICKBOOT_LOAD_COLD_UNSUPPORTED,
-                         FailureReason::Empty);
-        if (forceSnapshotLoad) {
-            LOG(WARNING) << "Exiting emulator as requested by the user...";
-            mVmOps.vmShutdown();
-        }
     } else if (android::automotive::isDistantDisplaySupported(
                        getConsoleAgents()->settings->avdInfo())) {
         // Applying forced cold boot for automotive distant display emulator
@@ -686,32 +654,6 @@ bool Quickboot::save(std::string_view name) {
     // TODO: when cleaning the current 'default_boot' snapshot, save the reason
     //  of its invalidation in it - this way emulator will be able to give a
     //  better idea on the next clean boot other than "no snapshot".
-
-    if (!emuglConfig_current_renderer_supports_snapshot()) {
-        if (shouldTrySaving && ranLongEnoughForSaving) {
-            // Preserve the state changes - we've ran for a while now
-            // and the AVD state is different from what could be saved in
-            // the default boot snapshot.
-            dwarning(
-                    "Cleaning out the default snapshot to preserve the "
-                    "current session (renderer type '%s' (%d) doesn't support "
-                    "snapshotting).",
-                    emuglConfig_renderer_to_string(
-                            emuglConfig_get_current_renderer()),
-                    int(emuglConfig_get_current_renderer()));
-            Snapshotter::get().deleteSnapshot(c_str(name));
-        } else {
-            dwarning(
-                    "Not saving snapshot (renderer type '%s' (%d) "
-                    "doesn't support snapshotting).",
-                    emuglConfig_renderer_to_string(
-                            emuglConfig_get_current_renderer()),
-                    int(emuglConfig_get_current_renderer()));
-        }
-        reportFailedSave(proto::EmulatorQuickbootSave::
-                                 EMULATOR_QUICKBOOT_SAVE_SKIPPED_UNSUPPORTED);
-        return false;
-    }
 
     if (mShortRunCheck && !ranLongEnoughForSaving) {
         dwarning(
