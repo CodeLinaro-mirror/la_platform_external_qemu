@@ -26,10 +26,14 @@
       }
     },
     {
-      "target": "keymap-gen",
+      "target": "generate_input-keymap.*",
       "shims": {
+        "restrict_to": "genrule",
         "srcs": [
-          "subprojects/keycodemapdb/tools/keymap-gen.py"
+          "@keycodemapdb//:data/keymaps.csv"
+        ],
+        "tools": [
+          "@keycodemapdb//:keymap-gen"
         ]
       }
     },

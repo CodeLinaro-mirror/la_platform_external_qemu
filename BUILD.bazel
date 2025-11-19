@@ -7075,204 +7075,187 @@ genrule(
 genrule(
     name = "generate_input-keymap-atset1-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-atset1-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_atset1_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) atset1 qcode > $(location ui/input-keymap-atset1-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_atset1_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) atset1 qcode > $(location ui/input-keymap-atset1-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_atset1_to_qcode $(location @keycodemapdb//:data/keymaps.csv) atset1 qcode > $(location ui/input-keymap-atset1-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_atset1_to_qcode $(location @keycodemapdb//:data/keymaps.csv) atset1 qcode > $(location ui/input-keymap-atset1-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-linux-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-linux-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_linux_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) linux qcode > $(location ui/input-keymap-linux-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_linux_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) linux qcode > $(location ui/input-keymap-linux-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_linux_to_qcode $(location @keycodemapdb//:data/keymaps.csv) linux qcode > $(location ui/input-keymap-linux-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_linux_to_qcode $(location @keycodemapdb//:data/keymaps.csv) linux qcode > $(location ui/input-keymap-linux-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-osx-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-osx-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_osx_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) osx qcode > $(location ui/input-keymap-osx-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_osx_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) osx qcode > $(location ui/input-keymap-osx-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_osx_to_qcode $(location @keycodemapdb//:data/keymaps.csv) osx qcode > $(location ui/input-keymap-osx-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_osx_to_qcode $(location @keycodemapdb//:data/keymaps.csv) osx qcode > $(location ui/input-keymap-osx-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-qcode-to-atset1_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-qcode-to-atset1.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset1 $(location subprojects/keycodemapdb/data/keymaps.csv) qcode atset1 > $(location ui/input-keymap-qcode-to-atset1.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset1 $(location subprojects/keycodemapdb/data/keymaps.csv) qcode atset1 > $(location ui/input-keymap-qcode-to-atset1.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset1 $(location @keycodemapdb//:data/keymaps.csv) qcode atset1 > $(location ui/input-keymap-qcode-to-atset1.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset1 $(location @keycodemapdb//:data/keymaps.csv) qcode atset1 > $(location ui/input-keymap-qcode-to-atset1.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-qcode-to-atset2_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-qcode-to-atset2.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset2 $(location subprojects/keycodemapdb/data/keymaps.csv) qcode atset2 > $(location ui/input-keymap-qcode-to-atset2.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset2 $(location subprojects/keycodemapdb/data/keymaps.csv) qcode atset2 > $(location ui/input-keymap-qcode-to-atset2.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset2 $(location @keycodemapdb//:data/keymaps.csv) qcode atset2 > $(location ui/input-keymap-qcode-to-atset2.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset2 $(location @keycodemapdb//:data/keymaps.csv) qcode atset2 > $(location ui/input-keymap-qcode-to-atset2.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-qcode-to-atset3_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-qcode-to-atset3.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset3 $(location subprojects/keycodemapdb/data/keymaps.csv) qcode atset3 > $(location ui/input-keymap-qcode-to-atset3.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset3 $(location subprojects/keycodemapdb/data/keymaps.csv) qcode atset3 > $(location ui/input-keymap-qcode-to-atset3.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset3 $(location @keycodemapdb//:data/keymaps.csv) qcode atset3 > $(location ui/input-keymap-qcode-to-atset3.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_atset3 $(location @keycodemapdb//:data/keymaps.csv) qcode atset3 > $(location ui/input-keymap-qcode-to-atset3.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-qcode-to-linux_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-qcode-to-linux.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_linux $(location subprojects/keycodemapdb/data/keymaps.csv) qcode linux > $(location ui/input-keymap-qcode-to-linux.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_linux $(location subprojects/keycodemapdb/data/keymaps.csv) qcode linux > $(location ui/input-keymap-qcode-to-linux.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_linux $(location @keycodemapdb//:data/keymaps.csv) qcode linux > $(location ui/input-keymap-qcode-to-linux.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_linux $(location @keycodemapdb//:data/keymaps.csv) qcode linux > $(location ui/input-keymap-qcode-to-linux.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-qcode-to-qnum_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-qcode-to-qnum.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_qnum $(location subprojects/keycodemapdb/data/keymaps.csv) qcode qnum > $(location ui/input-keymap-qcode-to-qnum.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_qnum $(location subprojects/keycodemapdb/data/keymaps.csv) qcode qnum > $(location ui/input-keymap-qcode-to-qnum.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_qnum $(location @keycodemapdb//:data/keymaps.csv) qcode qnum > $(location ui/input-keymap-qcode-to-qnum.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_qnum $(location @keycodemapdb//:data/keymaps.csv) qcode qnum > $(location ui/input-keymap-qcode-to-qnum.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-qcode-to-sun_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-qcode-to-sun.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_sun $(location subprojects/keycodemapdb/data/keymaps.csv) qcode sun > $(location ui/input-keymap-qcode-to-sun.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_sun $(location subprojects/keycodemapdb/data/keymaps.csv) qcode sun > $(location ui/input-keymap-qcode-to-sun.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_sun $(location @keycodemapdb//:data/keymaps.csv) qcode sun > $(location ui/input-keymap-qcode-to-sun.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qcode_to_sun $(location @keycodemapdb//:data/keymaps.csv) qcode sun > $(location ui/input-keymap-qcode-to-sun.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-qnum-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-qnum-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qnum_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) qnum qcode > $(location ui/input-keymap-qnum-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qnum_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) qnum qcode > $(location ui/input-keymap-qnum-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qnum_to_qcode $(location @keycodemapdb//:data/keymaps.csv) qnum qcode > $(location ui/input-keymap-qnum-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_qnum_to_qcode $(location @keycodemapdb//:data/keymaps.csv) qnum qcode > $(location ui/input-keymap-qnum-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-usb-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-usb-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_usb_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) usb qcode > $(location ui/input-keymap-usb-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_usb_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) usb qcode > $(location ui/input-keymap-usb-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_usb_to_qcode $(location @keycodemapdb//:data/keymaps.csv) usb qcode > $(location ui/input-keymap-usb-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_usb_to_qcode $(location @keycodemapdb//:data/keymaps.csv) usb qcode > $(location ui/input-keymap-usb-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-win32-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-win32-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_win32_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) win32 qcode > $(location ui/input-keymap-win32-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_win32_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) win32 qcode > $(location ui/input-keymap-win32-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_win32_to_qcode $(location @keycodemapdb//:data/keymaps.csv) win32 qcode > $(location ui/input-keymap-win32-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_win32_to_qcode $(location @keycodemapdb//:data/keymaps.csv) win32 qcode > $(location ui/input-keymap-win32-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-x11-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-x11-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_x11_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) x11 qcode > $(location ui/input-keymap-x11-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_x11_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) x11 qcode > $(location ui/input-keymap-x11-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_x11_to_qcode $(location @keycodemapdb//:data/keymaps.csv) x11 qcode > $(location ui/input-keymap-x11-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_x11_to_qcode $(location @keycodemapdb//:data/keymaps.csv) x11 qcode > $(location ui/input-keymap-x11-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-xorgevdev-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-xorgevdev-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgevdev_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgevdev qcode > $(location ui/input-keymap-xorgevdev-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgevdev_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgevdev qcode > $(location ui/input-keymap-xorgevdev-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgevdev_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgevdev qcode > $(location ui/input-keymap-xorgevdev-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgevdev_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgevdev qcode > $(location ui/input-keymap-xorgevdev-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-xorgkbd-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-xorgkbd-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgkbd_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgkbd qcode > $(location ui/input-keymap-xorgkbd-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgkbd_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgkbd qcode > $(location ui/input-keymap-xorgkbd-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgkbd_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgkbd qcode > $(location ui/input-keymap-xorgkbd-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgkbd_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgkbd qcode > $(location ui/input-keymap-xorgkbd-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-xorgxquartz-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-xorgxquartz-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxquartz_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgxquartz qcode > $(location ui/input-keymap-xorgxquartz-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxquartz_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgxquartz qcode > $(location ui/input-keymap-xorgxquartz-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxquartz_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgxquartz qcode > $(location ui/input-keymap-xorgxquartz-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxquartz_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgxquartz qcode > $(location ui/input-keymap-xorgxquartz-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
 genrule(
     name = "generate_input-keymap-xorgxwin-to-qcode_c_inc",
     srcs = [
-        "subprojects/keycodemapdb/data/keymaps.csv",
-        "subprojects/keycodemapdb/tools/keymap-gen",
+        "@keycodemapdb//:data/keymaps.csv",
     ],
     outs = ["ui/input-keymap-xorgxwin-to-qcode.c.inc"],
-    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxwin_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgxwin qcode > $(location ui/input-keymap-xorgxwin-to-qcode.c.inc)",
-    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxwin_to_qcode $(location subprojects/keycodemapdb/data/keymaps.csv) xorgxwin qcode > $(location ui/input-keymap-xorgxwin-to-qcode.c.inc)",
+    cmd = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxwin_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgxwin qcode > $(location ui/input-keymap-xorgxwin-to-qcode.c.inc)",
+    cmd_bat = "$(location :keymap-gen) code-map --lang glib2 --varname qemu_input_map_xorgxwin_to_qcode $(location @keycodemapdb//:data/keymaps.csv) xorgxwin qcode > $(location ui/input-keymap-xorgxwin-to-qcode.c.inc)",
     tools = [":keymap-gen"],
 )
 
@@ -10591,15 +10574,7 @@ py_binary(
     }),
 )
 
-py_binary(
-    name = "keymap-gen",
-    srcs = ["subprojects/keycodemapdb/tools/keymap-gen.py"],
-    data = ["subprojects/keycodemapdb/tools/keymap-gen"],
-    imports = select({
-        "@platforms//os:windows": ["scripts"],
-        "//conditions:default": [],
-    }),
-)
+alias(name="keymap-gen", actual="@keycodemapdb//:keymap-gen")
 
 py_binary(
     name = "make-config-poison",
