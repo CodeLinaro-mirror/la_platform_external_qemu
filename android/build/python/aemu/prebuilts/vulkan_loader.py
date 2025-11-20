@@ -140,6 +140,39 @@ def _build_linux(args, prebuilts_out_dir):
     return artifacts_dir
 
 
+def _build_and_stage_unsafe_windows_variant(cmake_executable, env, clone_dir, build_config, safe_artifacts_dir):
+    """Builds the 'unsafe' variant of the Vulkan loader for Windows."""
+    logging.info("Building Vulkan-Loader (unsafe variant)...")
+    cmake_build_dir_unsafe = clone_dir / "build_unsafe"
+    install_dir_unsafe = clone_dir / "install_unsafe"
+    os.makedirs(cmake_build_dir_unsafe, exist_ok=True)
+
+    cmake_cmd_unsafe = [
+        str(cmake_executable),
+        "-S",
+        ".",
+        "-B",
+        "build_unsafe",
+        "-D",
+        "UPDATE_DEPS=On",
+        f"-DCMAKE_BUILD_TYPE={build_config}",
+        f"-DCMAKE_INSTALL_PREFIX={install_dir_unsafe}",
+        "-DLOADER_USE_UNSAFE_FILE_SEARCH=ON",
+    ]
+    subprocess.run(cmake_cmd_unsafe, cwd=clone_dir, check=True, env=env)
+    subprocess.run([str(cmake_executable), "--build", "build_unsafe", "--config", build_config], cwd=clone_dir, check=True, env=env)
+    subprocess.run([str(cmake_executable), "--install", "build_unsafe", "--config", build_config], cwd=clone_dir, check=True, env=env)
+
+    # Rename and copy the unsafe DLL to the main artifacts directory
+    unsafe_dll_path = install_dir_unsafe / "bin" / "vulkan-1.dll"
+    if unsafe_dll_path.exists():
+        renamed_dll_path = safe_artifacts_dir / "vulkan-1-unsafe.dll"
+        shutil.copy(str(unsafe_dll_path), str(renamed_dll_path))
+        logging.info(f"Created unsafe variant at {renamed_dll_path}")
+    else:
+        logging.warning("Could not find vulkan-1.dll for unsafe variant.")
+
+
 def _build_native(args, prebuilts_out_dir):
     """Builds Vulkan-Loader from source natively for non-Linux hosts."""
     # Determine which cmake executable to use.
@@ -211,6 +244,7 @@ def _build_native(args, prebuilts_out_dir):
     artifacts_dir = install_dir / "lib"
     if HOST_OS == "windows":
         artifacts_dir = install_dir / "bin"
+        _build_and_stage_unsafe_windows_variant(cmake_executable, env, clone_dir, build_config, artifacts_dir)
 
     logging.info("Successfully built Vulkan-Loader!")
     return artifacts_dir
