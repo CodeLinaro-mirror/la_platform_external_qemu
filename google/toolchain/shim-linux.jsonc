@@ -32,7 +32,7 @@
         ],
         // We need a compat layer for our ye olde sysroot.
         "+deps": [
-          "@qemu//google/compat/linux:compat"
+          "//google/compat/linux:compat"
         ]
       }
     }
@@ -41,8 +41,8 @@
     "alsa": ["@gcc_lib//:libasound"],
     // For some reason Qemu doesn't ask for libpulse. So we add it manually above.
     "libpulse": ["@gcc_lib//:libpulse"],
-    "libvhost-user": ["@qemu//subprojects/libvhost-user:vhost-user"],
-    "libvhost-user-glib": ["@qemu//subprojects/libvhost-user:vhost-user-glib"]
+    "libvhost-user": ["//subprojects/libvhost-user:vhost-user"],
+    "libvhost-user-glib": ["//subprojects/libvhost-user:vhost-user-glib"]
   },
   "export": [
     "qemu-system-x86_64",
