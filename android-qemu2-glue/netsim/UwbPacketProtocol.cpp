@@ -68,6 +68,9 @@ public:
         info->set_name(mDeviceInfo->name());
         info->mutable_chip()->set_kind(netsim::common::ChipKind::UWB);
         info->mutable_device_info()->CopyFrom(*mDeviceInfo);
+        if (!mDeviceInfo->avd_path().empty()) {
+            info->mutable_device_info()->set_avd_path(mDeviceInfo->avd_path());
+        }
         return info;
     }
 

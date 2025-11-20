@@ -306,9 +306,12 @@ bool qemu_android_emulation_early_setup() {
 
     auto opts = getConsoleAgents()->settings->android_cmdLineOptions();
     std::string name = get_display_name();
+    auto avdInfo = getConsoleAgents()->settings->avdInfo();
+    auto rootIniPath = avdInfo ? avdInfo_getRootIniPath(avdInfo) : nullptr;
+    std::string avdPath = rootIniPath ? rootIniPath : "";
     register_netsim(to_string(opts->packet_streamer_endpoint), name,
                     to_string(opts->dns_server), to_string(opts->http_proxy),
-                    to_string(opts->netsim_args));
+                    to_string(opts->netsim_args), avdPath);
     return true;
 }
 

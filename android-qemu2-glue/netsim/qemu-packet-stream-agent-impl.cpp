@@ -211,7 +211,8 @@ void register_netsim(const std::string address,
                      const std::string name,
                      const std::string dns_server,
                      const std::string http_proxy,
-                     const std::string netsim_args) {
+                     const std::string netsim_args,
+                     const std::string avd_path) {
     netsim::packet::SetPacketStreamEndpoint(address);
     gNetsimConfiguration.options = {
             .no_cli_ui = !feature_is_enabled(kFeature_NetsimCliUi),
@@ -229,6 +230,9 @@ void register_netsim(const std::string address,
     gNetsimConfiguration.device_info = std::make_shared<DeviceInfo>();
     gNetsimConfiguration.device_info->set_name(name);
     gNetsimConfiguration.device_info->set_kind("EMULATOR");
+    if (!avd_path.empty()) {
+        gNetsimConfiguration.device_info->set_avd_path(avd_path);
+    }
     auto avd_info = getConsoleAgents()->settings->avdInfo();
     gNetsimConfiguration.device_info->set_version(EMULATOR_VERSION_STRING);
     if (auto sdk_version = avdInfo_getBuildPropertyString(

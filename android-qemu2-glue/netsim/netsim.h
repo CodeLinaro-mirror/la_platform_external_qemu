@@ -24,7 +24,8 @@ void register_netsim(const std::string address,
                      const std::string host_id,
                      const std::string dns_server,
                      const std::string http_proxy,
-                     const std::string netsim_args);
+                     const std::string netsim_args,
+                     const std::string avd_path);
 
 netsim::packet::NetsimdOptions get_netsim_options();
 
