@@ -318,9 +318,13 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         str_reset(&hw->hw_gpu_mode, DEFAULT_SOFTWARE_GPU_MODE);
     }
 
+    // Map null or empty gpu mode to 'auto'
+    if (!hw->hw_gpu_mode || !strcmp(hw->hw_gpu_mode, "")) {
+        str_reset(&hw->hw_gpu_mode, "auto");
+    }
+
     if (!androidEmuglConfigInit(
-                &config, opts->gpu,
-                &hw->hw_gpu_mode,
+                &config, opts->gpu, hw->hw_gpu_mode,
                 getConsoleAgents()->settings->host_emulator_is_headless(),
                 uiPreferredBackend)) {
         derror("%s", config.status);

@@ -20,6 +20,7 @@
 #include "android/base/testing/TestSystem.h"
 #include "android/base/testing/TestTempDir.h"
 
+#include "android/main-emugl.h"
 #include "host-common/globals.h"
 
 #include <gtest/gtest.h>
@@ -331,6 +332,50 @@ TEST(EmuglConfig, initFromUISetting) {
             EXPECT_STREQ("",
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
 #endif
+        }
+    }
+}
+
+// Tests to cover usages of higher level function 'androidEmuglConfigInit'
+TEST(EmuglConfig, initWithEmuglConfigInit) {
+    TestSystem testSys("foo", System::kProgramBitness, "/");
+    TestTempDir* myDir = testSys.getTempRoot();
+    myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
+    makeLibSubDir(myDir, "");
+
+    {
+        // with valid values
+        EmuglConfig config;
+        EXPECT_TRUE(androidEmuglConfigInit(&config, "host", "host", false,
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO));
+        EXPECT_STREQ("host", config.gles_backend);
+    }
+
+    {
+        // with null options
+        EmuglConfig config;
+        bool initRes = androidEmuglConfigInit(&config, nullptr, nullptr, false,
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO);
+        const bool onDenyList = isHostGpuBlacklisted();
+        if (onDenyList) {
+            EXPECT_FALSE(initRes);
+        }else {
+            EXPECT_TRUE(initRes);
+            EXPECT_STREQ("host", config.gles_backend);
+        }
+    }
+
+    {
+        // invalid values should fallback to 'auto' and work fine
+        EmuglConfig config;
+        bool initRes = androidEmuglConfigInit(&config, "invalid", "unknown", false,
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO);
+        const bool onDenyList = isHostGpuBlacklisted();
+        if (onDenyList) {
+            EXPECT_FALSE(initRes);
+        }else {
+            EXPECT_TRUE(initRes);
+            EXPECT_STREQ("host", config.gles_backend);
         }
     }
 }

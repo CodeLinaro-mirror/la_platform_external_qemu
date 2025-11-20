@@ -31,7 +31,7 @@ namespace fc = android::featurecontrol;
 bool androidEmuglConfigInit(
         EmuglConfig* config,
         const char* gpuOption,
-        char** hwGpuModePtr,
+        const char* hwGpuModePtr,
         bool noWindow,
         enum WinsysPreferredGlesBackend uiPreferredBackend) {
 
@@ -55,11 +55,6 @@ bool androidEmuglConfigInit(
             "auto", "host", "lavapipe", "swiftshader", "swangle",
     };
 
-    if (!hwGpuModePtr) {
-        // In the case of a platform build, use the 'auto' mode by default.
-        str_reset(hwGpuModePtr, "auto");
-    }
-
     std::string gpuChoice;
     if (gpuOption) {
         // It's enforced with -gpu option
@@ -67,9 +62,11 @@ bool androidEmuglConfigInit(
     } else if (uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO) {
         // Use UI preference
         gpuChoice = UiOptionToGpuOption[(int)uiPreferredBackend];
-    } else {
+    } else if (hwGpuModePtr) {
         // Use hw gpu mode
-        gpuChoice = *hwGpuModePtr;
+        gpuChoice = hwGpuModePtr;
+    } else {
+        gpuChoice = "auto";
     }
 
     bool validOption = false;
@@ -84,16 +81,9 @@ bool androidEmuglConfigInit(
                "'auto' mode.",
                __func__, gpuChoice.c_str());
         gpuChoice = "auto";
-        str_reset(hwGpuModePtr, "auto");
     }
 
     bool hostGpuDenylisted = false;
-
-    if (gpuChoice.empty()) {
-        // logical error..
-        derror("%s: Could not determine a GPU mode", __func__);
-        return false;
-    }
 
     // If the user has specified a renderer
     // that is neither "auto", "host" nor "on",
