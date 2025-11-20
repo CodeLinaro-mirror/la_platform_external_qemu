@@ -96,6 +96,7 @@ public:
             return ReportAction::UNDECIDED_KEEP;
         }
 
+        dinfo("Showing crashdialog to get consent.");
         return processDumpfile(dump_file);
     }
 
