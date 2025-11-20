@@ -187,8 +187,8 @@ struct VideofileCameraDevice {
 
     static int readFrameStatic(CameraDevice* cd, ClientFrame* frame,
                                float rScale, float gScale, float bScale, float expComp,
-                               const char* direction) {
-        return myselfFrom(cd)->readFrame(*frame, rScale, gScale, bScale, expComp, direction);
+                               const char* direction, int sensor_orientation) {
+        return myselfFrom(cd)->readFrame(*frame, rScale, gScale, bScale, expComp, direction, sensor_orientation);
     }
 
     static int stopCapturingStatic(CameraDevice* cd) {
@@ -214,7 +214,7 @@ private:
 
     int readFrame(ClientFrame& cframe,
                   const float rScale, const float gScale, const float bScale,
-                  const float expComp, const char* direction) {
+                  const float expComp, const char* direction, int sensor_orientation) {
         if (const AVFrame* avFrame = decodeNextFrame()) {
             const bool backFacing = !strcmp(direction, "back");
 
