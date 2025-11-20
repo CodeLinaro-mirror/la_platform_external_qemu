@@ -84,7 +84,7 @@ bool canDecodeToGpuTexture(int w, int h) {
         return false;
     }
 
-    if (emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST) {
+    if (emuglConfig_get_current_gles_renderer() == SELECTED_RENDERER_HOST) {
         int64_t ww = w;
         int64_t hh = h;
         constexpr int ONE_MILLION_PIXELS = 1000 * 1000;

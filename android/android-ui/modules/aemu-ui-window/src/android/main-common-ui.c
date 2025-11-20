@@ -267,8 +267,8 @@ bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
                             RendererConfig* config_out) {
     // Set defaults
-    config_out->glesMode = kAndroidGlesEmulationOff;
-    config_out->selectedRenderer = SELECTED_RENDERER_UNKNOWN;
+    config_out->selectedGlesRenderer = SELECTED_RENDERER_UNKNOWN;
+    config_out->selectedVulkanRenderer = SELECTED_RENDERER_UNKNOWN;
     config_out->gles_major_version = 2;
     config_out->gles_minor_version = 0;
     config_out->glFramebufferSizeBytes = 0;
@@ -337,7 +337,8 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
     }
 
     // Also write the selected renderer.
-    config_out->selectedRenderer = emuglConfig_get_current_renderer();
+    config_out->selectedGlesRenderer = emuglConfig_get_current_gles_renderer();
+    config_out->selectedVulkanRenderer = emuglConfig_get_current_vulkan_renderer();
 
     // Determine whether to enable Vulkan (if in android qemu mode)
 
@@ -345,9 +346,12 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
         // Always enable GLDirectMem and Vulkan for API >= 29
         crashhandler_append_message_format(
                 "Deciding if GLDirectMem/Vulkan should be enabled. "
-                "Selected renderer: %d "
+                "Selected GLES renderer: %s "
+                "Selected Vulkan renderer: %s "
                 "API level: %d \n",
-                config_out->selectedRenderer, api_level);
+                emuglConfig_renderer_to_string(config_out->selectedGlesRenderer),
+                emuglConfig_renderer_to_string(config_out->selectedVulkanRenderer),
+                api_level);
 
         const bool shouldEnableVulkan = (api_level >= 29);
         if (shouldEnableVulkan) {
@@ -389,20 +393,10 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 
     emuglConfig_setupEnv(&config);
 
-    config_out->glesMode = kAndroidGlesEmulationHost;
-
     return true;
 }
 
 bool startRenderer(RendererConfig* config_inout) {
-    const bool noOpenglesStart =
-            (config_inout->glesMode != kAndroidGlesEmulationHost);
-
-    if (noOpenglesStart) {
-        // no host emulation needed
-        return true;
-    }
-
     AvdInfo* avd = getConsoleAgents()->settings->avdInfo();
     AndroidHwConfig* hw = getConsoleAgents()->settings->hw();
     AndroidOptions* opts =

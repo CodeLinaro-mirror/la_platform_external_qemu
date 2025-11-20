@@ -92,9 +92,8 @@ bool canDecodeToGpuTexture() {
     }
 
 #ifndef __APPLE__
-
     if (cudaVpxAllowed() &&
-        emuglConfig_get_current_renderer() == SELECTED_RENDERER_HOST) {
+        emuglConfig_get_current_gles_renderer() == SELECTED_RENDERER_HOST) {
         return true;
     } else {
         return false;

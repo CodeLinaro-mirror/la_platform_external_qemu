@@ -126,12 +126,6 @@ namespace android {
 namespace snapshot {
 
 void createCheckpoint(AsyncMessagePipeHandle pipe, std::string_view name) {
-    // BUG: 127849628
-    if (!emuglConfig_current_renderer_supports_snapshot()) {
-        android::offworld::sendResponse(pipe, createErrorResponse());
-        return;
-    }
-
     const std::string snapshotName(name);
 
     sSnapshotCrossSession->mPipesAwaitingResponse[pipe] =
@@ -186,8 +180,7 @@ void gotoCheckpoint(
 void forkReadOnlyInstances(android::AsyncMessagePipeHandle pipe,
                            int forkTotal) {
     if (android::multiinstance::getInstanceShareMode() !=
-        android::base::FileShare::Write ||
-        !emuglConfig_current_renderer_supports_snapshot()) {
+        android::base::FileShare::Write) {
         android::offworld::sendResponse(pipe, createErrorResponse());
         return;
     }

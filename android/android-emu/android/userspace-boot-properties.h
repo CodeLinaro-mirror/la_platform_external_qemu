@@ -17,7 +17,7 @@
 
 #include "host-common/hw-config.h"        // for AndroidHwConfig
 #include "android/cmdline-option.h"       // for AndroidOptions
-#include "host-common/opengl/emugl_config.h"  // for AndroidGlesEmulationMode
+#include "host-common/opengl/emugl_config.h"
 #include "android/utils/compiler.h"       // for ANDROID_BEGIN_HEADER, ANDRO...
 #include "android/avd/util.h"             // for AvdFlavor
 
@@ -27,7 +27,6 @@ std::vector<std::pair<std::string, std::string>>
 getUserspaceBootProperties(const AndroidOptions* opts,
                            const char* targetArch,
                            const char* serialno,
-                           AndroidGlesEmulationMode glesMode,
                            int bootPropOpenglesVersion,
                            int apiLevel,
                            AvdFlavor avdFlavor,
