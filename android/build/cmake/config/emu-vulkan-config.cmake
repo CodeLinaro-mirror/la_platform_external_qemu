@@ -95,8 +95,8 @@ elseif(WINDOWS)
       "${PREBUILT_ROOT}/glslangValidator.exe>lib64/vulkan/glslangValidator.exe"
       ${VULKAN_COMMON_DEPENDENCIES})
   set(VULKAN_TEST_DEPENDENCIES
-      # Loader (for testing)
-      "${PREBUILT_ROOT}/vulkan-1.dll>testlib64/vulkan-1.dll"
+      # Loader (for testing) - Use the unsafe variant to allow ICD changes with admin mode. ref: b/449967039
+      "${PREBUILT_ROOT}/vulkan-1-unsafe.dll>testlib64/vulkan-1.dll"
       # Debug / validation layers
       "${PREBUILT_ROOT}/layers/VkLayer_api_dump.dll>testlib64/layers/VkLayer_api_dump.dll"
       "${PREBUILT_ROOT}/layers/VkLayer_api_dump.json>testlib64/layers/VkLayer_api_dump.json"
