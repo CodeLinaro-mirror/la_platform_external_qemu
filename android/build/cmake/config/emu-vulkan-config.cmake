@@ -84,7 +84,7 @@ elseif(WINDOWS)
     "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/vulkan/windows-x86_64"
     ABSOLUTE)
   set(VULKAN_DEPENDENCIES
-      "${PREBUILT_ROOT}/icds/vk_swiftshader.dll>lib64/vulkan/vulkan-1.dll"
+      "${PREBUILT_ROOT}/vulkan-1.dll>lib64/vulkan/vulkan-1.dll"
       # Lavapipe
       "${PREBUILT_ROOT}/icds/libvulkan_lvp.dll>lib64/vulkan/libvulkan_lvp.dll"
       "${PREBUILT_ROOT}/icds/lvp_icd.json>lib64/vulkan/lvp_icd.json"
