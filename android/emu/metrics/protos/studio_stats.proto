@@ -864,6 +864,12 @@ message AndroidStudioEvent {
   optional NextEditPredictionEvent next_edit_prediction_event = 241
       [lazy = true];
 
+  // set when kind = SML_RAG_EVENT
+  optional SmlRagEvent sml_rag_event = 242 [lazy = true];
+
+  // set when kind = GLASSES_PAIRING_EVENT
+  optional GlassesPairingEvent glasses_pairing_event = 243 [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1849,6 +1855,12 @@ message AndroidStudioEvent {
 
     // Event related to Next Edit Prediction
     NEXT_EDIT_PREDICTION_EVENT = 360;
+
+    // Event related to SML RAG
+    SML_RAG_EVENT = 361;
+
+    // Event related to AI Glasses Pairing
+    GLASSES_PAIRING_EVENT = 362;
   }
 
   // Represents different Performance Monitoring types.
@@ -8580,6 +8592,8 @@ message AndroidProfilerEvent {
     PROFILER_INITIALIZATION_FAILED = 9;
     // Triggered when the transport daemon is started.
     TRANSPORT_DAEMON_STARTED = 10;
+    // Triggered when the profiler tool window is created successfully.
+    PROFILER_TOOL_WINDOW_CREATED = 11;
 
     /// General
 
@@ -9631,6 +9645,8 @@ message DynamicLayoutInspectorSession {
 
   // Indicates whether the session had a fold event
   optional bool has_fold_event = 8;
+  // Session data around state reads
+  optional DynamicLayoutInspectorStateReads state_reads = 9 [lazy = true];
 }
 
 // Session data for dynamic layout inspector (inspector v2) around live mode
@@ -9771,6 +9787,30 @@ message DynamicLayoutInspectorAttachToProcess {
     // Data loaded from a file
     SNAPSHOT_CLIENT = 3;
   }
+}
+
+message DynamicLayoutInspectorStateReads {
+  // The number of times the user selected "Observe All" composable
+  optional uint32 observing_all_selected = 1;
+  // The number of times the user selected "Start/Stop Observing Node"
+  optional uint32 observing_node_by_id_selected = 2;
+  // The number of times the user selected "Start/Stop Observing Subtree"
+  optional uint32 observing_sub_tree_by_id_selected = 3;
+
+  // The state read pages shown while observing all
+  optional uint32 pages_shown_observing_all = 4;
+  // The state read pages shown while observing by id
+  optional uint32 pages_shown_observing_by_id = 5;
+
+  // The number of times the user selected next recomposition
+  optional uint32 next_recomposition_chosen = 6;
+  // The number of times the user selected previous recomposition
+  optional uint32 prev_recomposition_chosen = 7;
+
+  // The number of times the user clicked on a stack trace link
+  optional uint32 stack_trace_links_clicked = 8;
+  // The number of times the user clicked on AI link
+  optional uint32 ai_links_clicked = 9;
 }
 
 // Kotlin support information
@@ -13143,6 +13183,7 @@ message UpgradeAssistantComponentInfo {
     NEWDSL_DEFAULT = 62;
     KOTLIN20_COMPOSE = 63;
     REMOVE_EMULATOR_SNAPSHOTS = 64;
+    DYNAMIC_FEATURE_CONSUMER_PROGUARD_FILES = 65;
   }
 
   message Java8DefaultProcessorSettings {
@@ -13578,6 +13619,47 @@ message DeviceManagerEvent {
 
     // A direct access device was selected
     DIRECT_ACCESS_ADD_DEVICE_ACTION = 18;
+  }
+}
+
+// Event related to Glasses emulator pairing assistant
+message GlassesPairingEvent {
+  // The kind of GlassesPairingEvent
+  optional EventKind kind = 1;
+  // The kind of GlassesPairingEvent
+  enum EventKind {
+    // Default kind
+    UNSPECIFIED = 0;
+    // Pairing assistant was launched
+    PAIRING_ASSISTANT_LAUNCHED = 1;
+    // Failed pairing screen is displayed
+    SHOW_FAILED_PAIRING = 2;
+    // "Successful Pairing" screen is displayed
+    SHOW_SUCCESSFUL_PAIRING = 3;
+    // User selected a device to pair
+    PAIRING_DEVICE_SELECTED = 4;
+    // User clicked "Next" to initiate pairing
+    PAIRING_INITIATED = 5;
+    // Wizard started launching emulators
+    PAIRING_LAUNCH_STARTED = 6;
+    // Wizard is awaiting user authorization on the phone
+    PAIRING_AWAITING_AUTHORIZATION = 7;
+    // Error: Timeout waiting for devices to start
+    PAIRING_ERROR_TIMEOUT = 8;
+    // Error: Device launch failed
+    PAIRING_ERROR_LAUNCH_FAILED = 9;
+    // Error: Glasses are already paired
+    PAIRING_ERROR_ALREADY_PAIRED = 10;
+    // Error: Companion app is missing on the phone
+    PAIRING_ERROR_NO_COMPANION_APP = 11;
+    // Error: Bluetooth address conflict or failure
+    PAIRING_ERROR_BLUETOOTH_ADDRESS = 12;
+    // Error: Pairing bond failed
+    PAIRING_ERROR_BOND_FAILED = 13;
+    // Error: Pairing connection failed
+    PAIRING_ERROR_CONNECTION_FAILED = 14;
+    // Warning: Phone already has paired devices, pairing might fail
+    PAIRING_WARNING_PHONE_ALREADY_PAIRED = 15;
   }
 }
 
@@ -14139,6 +14221,12 @@ message LogcatUsageEvent {
   }
 
   message StackRetraceEvent {
+    enum MappingType {
+      UNKNOWN_MAPPING_TYPE = 0;
+      TEXT = 1;
+      PARTITIONED = 2;
+    }
+
     // A string representing the result of the retrace operation.
     // This can be a constant (SUCCESS, FAIL etc) or a class name of an
     // exception thrown by the code.
@@ -14153,6 +14241,8 @@ message LogcatUsageEvent {
     // true if the mapping file was cached. Implies that retrace_time_ms
     // includes initializing the retrace data structures from the file.
     optional bool is_mapping_cached = 4;
+
+    optional MappingType mapping_type = 5;
   }
 }
 
@@ -15627,6 +15717,10 @@ message SmlResponseMetadata {
 
   // e.g. gemini-2.5-pro, o1, or "default" for the built-in model
   optional string model_id = 5;
+
+  // If the response was generated within the Chat Timeline, the ID of the
+  // thread/session the response was generated for.
+  optional string thread_id = 6;
 }
 
 message SmlCitationInfo {
@@ -16078,6 +16172,63 @@ message SmlChatBotEvent {
     optional ContextDrawerEventType event_type = 1;
   }
 
+  // A "change" is a diff to a file that is put up for review by the user.
+  // A change is made up of one or more diff chunks which can be resolved by
+  // accepting or rejecting them individually, or all at once.
+  // A change is "resolved" when all of the chunks are resolved, and this
+  // event should be logged when that happens.
+  message ChangeResolved {
+    // The total number of chunks that were proposed in this change.
+    // Should be equal to:
+    // total_chunks_accepted + total_chunks_rejected + chunks_iterated
+    optional int32 total_chunks = 1;
+
+    // Chunks can be accepted/rejected either from the editor or from the
+    // drawer UI.
+    optional int32 chunks_rejected_in_editor_count = 2;
+    optional int32 chunks_rejected_in_drawer_count = 3;
+    optional int32 chunks_accepted_in_editor_count = 4;
+    optional int32 chunks_accepted_in_drawer_count = 5;
+
+    // When multiple rounds of changes are made to a file, some chunks may
+    // be overwritten before they can be accepted or rejected. We count those
+    // in this field.
+    optional int32 chunks_iterated = 6;
+
+    // Chunks can be resolved from the drawer UI, either on a file-by-file
+    // basis or en-masse.
+    enum FinalResolutionAction {
+      UNKNOWN = 0;
+      // This change was resolved from the editor.
+      RESOLVED_IN_EDITOR = 1;
+      // This change was resolved by the user clicking the accept button
+      // for this change
+      ACCEPT_INDIVIDUAL = 2;
+      // This change was resolved by the user clicking the accept all button
+      ACCEPT_ALL = 3;
+      // This change was resolved by the user clicking the reject button
+      // for this change
+      REJECT_INDIVIDUAL = 4;
+      // This change was resolved by the user clicking the reject all button
+      // for this change
+      REJECT_ALL = 5;
+      // Switching sessions (threads) will accept all the changes
+      ACCEPT_ALL_SWITCHED_SESSION = 6;
+      // The user closed the IDE, which accepts all the pending changes
+      ACCEPT_ALL_CLOSED_IDE = 7;
+    }
+
+    optional FinalResolutionAction resolution_action = 7;
+
+    // One change might be the result of more than one tool call, and
+    // this is the list of all of them.
+    repeated string tool_call_ids = 8;
+  }
+
+  message ChangesDrawerEvent {
+    optional ChangeResolved change_resolved = 1;
+  }
+
   message ToolCall {
     optional string tool_name = 1;
     optional SmlResponseMetadata metadata = 2 [lazy = true];
@@ -16213,6 +16364,79 @@ message SmlChatBotEvent {
     optional string exception_type = 2;
   }
 
+  message SessionManagerEvent {
+    message ListChats {
+      // Number of chats returned to the Recent Chats UI
+      optional int32 count = 1;
+      // Chat mode within the timeline either Chat or Agent
+      optional ChatMode chat_mode = 2;
+      // Time in milliseconds to fetch the list
+      optional int32 latency_millis = 3;
+    }
+
+    message LoadChat {
+      // Chat mode within the timeline either Chat or Agent
+      optional ChatMode chat_mode = 1;
+      // Time in milliseconds to load the Session from disk (this does not mean
+      // loading the Session into the timeline)
+      optional int32 latency_millis = 2;
+    }
+
+    oneof event {
+      // Event logged when list of Sessions is fetched from SessionManager
+      ListChats list_chats = 1;
+      // Event logged when a Session is loaded from disk
+      LoadChat load_chat = 2;
+    }
+  }
+
+  // Events triggered from the "Recent Chats" Popup associated with the Chat
+  // Timeline experience.
+  message RecentChatsEvent {
+    message ChatSession {
+      // Unique identifier for the Chat Session
+      optional string session_id = 1;
+      // The last time the Chat Session was modified, in milliseconds since the
+      // epoch
+      optional int64 last_modified_timestamp_millis = 2;
+    }
+
+    message SelectChat {
+      // Chat mode within the timeline either Chat or Agent
+      optional ChatMode chat_mode = 1;
+      // The existing session that was selected
+      optional ChatSession selected_session = 2;
+      // The session that was closed to select a different chat Session
+      optional ChatSession closed_session = 3;
+    }
+
+    message DeleteChat {
+      // Chat mode within the timeline either Chat or Agent
+      optional ChatMode chat_mode = 1;
+      // The session that was deleted
+      optional ChatSession deleted_session = 2;
+    }
+
+    message NewChat {
+      // Chat mode within the timeline either Chat or Agent
+      optional ChatMode chat_mode = 1;
+      // The session that was closed to create a new chat Session
+      optional ChatSession closed_session = 2;
+    }
+
+    oneof action {
+      // Event logged when a user selects a Chat Session from the Recent Chats
+      // Popup
+      SelectChat select_chat = 1;
+      // Event logged when a user deletes a Chat Session from the Recent Chats
+      // Popup
+      DeleteChat delete_chat = 2;
+      // Event logged when a user creates a new Chat Session from the Recent
+      // Chats Popup
+      NewChat new_chat = 3;
+    }
+  }
+
   oneof content {
     BotResponse response = 1 [lazy = true];
     UserFeedback user_feedback = 2 [lazy = true];
@@ -16230,6 +16454,9 @@ message SmlChatBotEvent {
     ToolCallResponse tool_call_response = 14 [lazy = true];
     DeprecationShown deprecation_shown = 15 [lazy = true];
     BotResponseError bot_response_error = 16 [lazy = true];
+    SessionManagerEvent session_manager_event = 17 [lazy = true];
+    RecentChatsEvent recent_chats_event = 18 [lazy = true];
+    ChangesDrawerEvent changes_drawer_event = 19 [lazy = true];
   }
 }
 
@@ -16291,6 +16518,86 @@ message SmlGeolocationEvent {
 message SmlCompletionRequestErrorEvent {
   optional string model_id = 1;
   optional int32 grpc_error_response_code = 3;
+}
+
+// Event for metrics related to Retrieval Augmented Generation (RAG).
+message SmlRagEvent {
+  message RagIndexerMetrics {
+    // The type of indexer like "bm25" or "embeddings" and its version.
+    optional string indexer_type = 1;
+    optional int32 index_version = 2;
+    // The exception it encountered during RAG indexing.
+    optional string index_exception = 3;
+    // The number of indexed files.
+    optional int32 indexed_files = 4;
+    // The number of indexed Kotlin/Java files.
+    optional int32 indexed_kt_files = 5;
+    optional int32 indexed_java_files = 6;
+    // The number of indexed files from out/ and builds/.
+    optional int32 generated_files = 7;
+    // The time in milliseconds to index
+    optional int64 indexing_time_ms = 8;
+  }
+
+  message RagToolMetrics {
+    // The exception the code_search encountered.
+    // We will use "IndexerInactive" to indicate the indexer is not active.
+    optional string search_exception = 1;
+    // The number of files in code_search
+    optional int32 result_count = 2;
+    // The number of resource files code_search returned.
+    optional int32 resource_count = 3;
+    // The number of files from out/ and builds/ that code_search returned.
+    optional int32 generated_files = 4;
+    // The time in milliseconds for code_search.
+    optional int64 search_time_ms = 5;
+  }
+
+  // We merged the original find_files with file path search based on BM25.
+  // "find_files result" means the file search result of the original
+  // find_files. "bm25 file search" means the file search result based on BM25.
+  message FindFileMetrics {
+    // Comma separated exceptions from the BM25 find_files tool call like
+    // "java.io.FileNotFoundException,java.io.IOException,IndexerInactive".
+    // We will use "IndexerInactive" to indicate the indexer is not active.
+    optional string find_files_exception = 1;
+    // The number of files in the combined file search result.
+    optional int32 combined_result_count = 2;
+    // The number of files in the bm25 file search result.
+    optional int32 bm25_search_count = 3;
+    // The number of files in the original find_files search result.
+    optional int32 found_files_count = 4;
+  }
+
+  message GrepMetrics {
+    // The number of files in the grep result.
+    optional int32 result_count = 1;
+    // Whether the query contains any regex of ".\*+?^$|(){}" or not.
+    optional bool regex_query = 2;
+    // The number of files in the grep BM25 backend result.
+    optional int32 bm25_result_count = 3;
+    // The number of files in the original grep backend result.
+    optional int32 grep_result_count = 4;
+  }
+
+  message KbRagIndexerMetrics {
+    // The exception that occurred during KB RAG indexing.
+    optional string index_exception = 1;
+
+    // The time in milliseconds to index.
+    optional int64 indexing_time_ms = 2;
+
+    // Whether it indexed the downloaded docs (from Lorry) or not.
+    optional bool index_downloaded_docs = 3;
+  }
+
+  oneof content {
+    RagIndexerMetrics rag_index = 1 [lazy = true];
+    RagToolMetrics rag_tool = 2 [lazy = true];
+    FindFileMetrics find_file = 3 [lazy = true];
+    GrepMetrics grep = 4 [lazy = true];
+    KbRagIndexerMetrics kb_rag = 5 [lazy = true];
+  }
 }
 
 message TestScenarioEvent {
