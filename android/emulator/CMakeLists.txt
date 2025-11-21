@@ -1,5 +1,6 @@
 prebuilt(QT5)
 prebuilt(VIRTUALSCENE)
+prebuilt(SKIN)
 prebuilt(E2FSPROGS)
 prebuilt(MACROS)
 prebuilt(MSVC)
@@ -103,6 +104,7 @@ android_target_dependency(emulator all E2FSPROGS_DEPENDENCIES)
 android_target_dependency(emulator all CERT_DEPEPENDENCIES)
 android_target_dependency(emulator all EMULATOR_HW_DEPENDENCIES)
 android_target_dependency(emulator all VIRTUAL_SCENE_DEPENDENCIES)
+android_target_dependency(emulator all SKIN_DEPENDENCIES)
 android_target_dependency(emulator all EMULATOR_MACROS_DEPENDENCIES)
 android_target_dependency(emulator all VULKAN_DEPENDENCIES)
 android_target_dependency(emulator linux TCMALLOC_OS_DEPENDENCIES)
@@ -130,6 +132,7 @@ android_install_dependency_force_exec(all E2FSPROGS_DEPENDENCIES)
 android_install_dependency(all CERT_DEPEPENDENCIES)
 android_install_dependency(all EMULATOR_HW_DEPENDENCIES)
 android_install_dependency(all VIRTUAL_SCENE_DEPENDENCIES)
+android_install_dependency(all SKIN_DEPENDENCIES)
 android_install_dependency(all EMULATOR_MACROS_DEPENDENCIES)
 android_install_dependency(all VULKAN_DEPENDENCIES)
 android_install_dependency(linux TCMALLOC_OS_DEPENDENCIES)
@@ -137,6 +140,8 @@ android_install_dependency(windows_msvc-x86_64 ANGLE_RENDERER_DEPENDENCIES)
 android_install_dependency(windows_msvc-x86_64 MSVC_DEPENDENCIES)
 
 # Text files have no licenses.
+android_license(TARGET "SKIN_DEPENDENCIES" LIBNAME None SPDX None
+                LICENSE None LOCAL None)
 android_license(TARGET "EMULATOR_KEYMAP_DEPENDENCIES" LIBNAME None SPDX None
                 LICENSE None LOCAL None)
 android_license(TARGET "CERT_DEPEPENDENCIES" LIBNAME None SPDX None LICENSE None

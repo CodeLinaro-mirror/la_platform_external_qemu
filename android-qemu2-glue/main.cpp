@@ -573,6 +573,26 @@ static int createUserData(AvdInfo* avd,
         prepareDataFolder(dataPath, initDir.get());
         prepareDisplaySettingXml(hw, dataPath);
         if (feature_is_enabled(kFeature_SupportPixelFold)) {
+            int apiLevel = avdInfo_getApiLevel(avd);
+            if (apiLevel == 36 &&
+                !strcmp(hw->hw_device_name, "pixel_10_pro_fold")) {
+                // check whether it exists already in the dataPath
+                std::string pixelFoldFullPath =
+                        PathUtils::join(dataPath, "misc", hw->hw_device_name);
+                if (!path_exists(pixelFoldFullPath.c_str())) {
+                    // special handling for pixel 10 pro fold on api 36, if it
+                    // does not ship with that skin
+                    std::string emulator_skin_path = PathUtils::join(
+                            System::get()->getLauncherDirectory(), "resources",
+                            "skins", "android-36", "data", "misc",
+                            hw->hw_device_name);
+                    if (path_exists(emulator_skin_path.c_str())) {
+                        // copy it over
+                        path_copy_dir(pixelFoldFullPath.c_str(),
+                                      emulator_skin_path.c_str());
+                    }
+                }
+            }
             prepareSkinConfig(hw, dataPath);
         }
 
