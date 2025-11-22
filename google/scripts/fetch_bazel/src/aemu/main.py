@@ -201,7 +201,7 @@ def fix_up_prefix(dest_dir: Path):
 
 def fetch_and_merge(args):
     targets = {
-        "emulator_windows_x64": ("windows-amd64", args.win_bid),
+        "emulator_windows_x64": ("windows-x86_64", args.win_bid),
         "emulator_mac_aarch64": ("darwin-arm64", args.mac_bid),
         "emulator_linux_x64": ("linux-x86_64", args.lin_bid),
     }
@@ -221,7 +221,7 @@ def fetch_and_merge(args):
         sys.executable,
         str(merge),
         "--buildfile",
-        str(dest / "platform" / "BUILD.windows-amd64"),
+        str(dest / "platform" / "BUILD.windows-x86_64"),
         "@platforms//os:windows",
         "--buildfile",
         str(dest / "platform" / "BUILD.darwin-arm64"),
@@ -310,7 +310,7 @@ def main():
         "--win-bid",
         type=str,
         required=True,
-        help="Windows build from which we will fetch bazel-windows-amd64-{win-bid}.zip ",
+        help="Windows build from which we will fetch bazel-windows-x86_64-{win-bid}.zip ",
     )
     parser.add_argument(
         "--lin-bid",

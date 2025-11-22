@@ -26,6 +26,13 @@
       }
     },
     {
+      "target": "keymap-gen",
+      "shims": {
+        "restrict_to": "py_binary",
+        "data": []
+      }
+    },
+    {
       "target": "generate_input-keymap.*",
       "shims": {
         "restrict_to": "genrule",
