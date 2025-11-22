@@ -203,107 +203,16 @@ if(LINUX_X86_64)
   target_compile_options(grpc_unsecure PRIVATE -DSO_REUSEPORT=15)
 endif()
 
-if(FEATURE_NETSIM_FROM_SOURCE)
-  message(WARNING "*** NETSIM IS MIGRATING TO PREBUILTS! ***")
-  message(
-    WARNING
-      "*** IF YOU ARE A NETSIM DEVELOPER YOU SHOULD SWITCH TO NETSIM-DEV! ***")
-  set(EXTERNAL_QEMU ${ANDROID_QEMU2_TOP_DIR})
-  if(TARGET Rust::Rustc)
-    add_subdirectory(${AOSP_ROOT}/packages/modules/Bluetooth/tools/rootcanal
-                     rootcanal)
-  endif()
-  add_subdirectory(${AOSP_ROOT}/tools/netsim netsim)
+
   add_subdirectory(mynewt-nimble)
-
-  if(DARWIN_AARCH64 AND NOT TARGET Rust::Rustc AND OPTION_RUST)
-    message(STATUS "Cross compiling netsim to target Rosetta X86_64")
-    include(ExternalProject)
-    set(NETSIM_CROSS_DIR
-        ${ANDROID_CROSS_BUILD_DIRECTORY}/netsim_ext_cross/src/netsim_ext_cross-build/
-    )
-    externalproject_add(
-      netsim_ext_cross
-      PREFIX ${ANDROID_CROSS_BUILD_DIRECTORY}/netsim_ext_cross
-      DOWNLOAD_COMMAND ""
-      SOURCE_DIR ${AOSP_ROOT}/tools/netsim
-      CMAKE_ARGS
-        "-DCMAKE_TOOLCHAIN_FILE=${ANDROID_QEMU2_TOP_DIR}/android/build/cmake/toolchain-darwin-x86_64.cmake"
-        "-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-        "-DBREAKPAD_API_KEY=${BREAKPAD_API_KEY}"
-        "-DBREAKPAD_API_URL=${BREAKPAD_API_URL}"
-        "-DANDROID_SYMBOL_DIR=${ANDROID_SYMBOL_DIR}"
-        "-DOPTION_BAZEL=TRUE"
-        "-DPython_EXECUTABLE=${Python_EXECUTABLE}"
-        "-DNETSIM_EXT=TRUE"
-      BUILD_BYPRODUCTS "${NETSIM_CROSS_DIR}/netsim;${NETSIM_CROSS_DIR}/netsimd"
-      LOG_BUILD TRUE
-      LOG_INSTALL TRUE
-      LOG_OUTPUT_ON_FAILURE TRUE
-      INSTALL_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-      INSTALL_COMMAND "")
-    install(PROGRAMS ${NETSIM_CROSS_DIR}/netsim ${NETSIM_CROSS_DIR}/netsimd
-            DESTINATION .)
-    install(FILES ${NETSIM_CROSS_DIR}/glib2/libglib2_darwin-x86_64.dylib
-            DESTINATION lib64)
-  endif()
-
-  # Add netsim-ui into objs
-  set(NETSIM_UI_DEPENDENCIES
-    ${AOSP_ROOT}/tools/netsim/ui/dist/index.html>netsim-ui/index.html;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/dev.html>netsim-ui/dev.html;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/assets/grid-background.svg>netsim-ui/assets/grid-background.svg;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/assets/hexagonal-background.png>netsim-ui/assets/hexagonal-background.png;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/assets/netsim-logo-b.svg>netsim-ui/assets/netsim-logo-b.svg;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/assets/netsim-logo.svg>netsim-ui/assets/netsim-logo.svg;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/assets/polar-background.svg>netsim-ui/assets/polar-background.svg;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/cube-sprite.js>netsim-ui/js/cube-sprite.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/customize-map-button.js>netsim-ui/js/customize-map-button.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/device-dragzone.js>netsim-ui/js/device-dragzone.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/device-dropzone.js>netsim-ui/js/device-dropzone.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/device-info.js>netsim-ui/js/device-info.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/device-list.js>netsim-ui/js/device-list.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/device-map.js>netsim-ui/js/device-map.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/device-observer.js>netsim-ui/js/device-observer.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/license-info.js>netsim-ui/js/license-info.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/navigation-bar.js>netsim-ui/js/navigation-bar.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/netsim-app.js>netsim-ui/js/netsim-app.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/packet-info.js>netsim-ui/js/packet-info.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/js/pyramid-sprite.js>netsim-ui/js/pyramid-sprite.js;
-    ${AOSP_ROOT}/tools/netsim/ui/dist/node_modules/tslib/tslib.es6.js>netsim-ui/node_modules/tslib/tslib.es6.js;
-    PARENT_SCOPE
-  )
-  android_license(TARGET "NETSIM_UI_DEPENDENCIES" LIBNAME None SPDX None LICENSE None LOCAL None)
-  android_target_dependency(packet-streamer-client-lib all NETSIM_UI_DEPENDENCIES)
-else()
-  add_subdirectory(${AOSP_ROOT}/tools/netsim/proto netsim_proto)
-  add_subdirectory(${AOSP_ROOT}/tools/netsim/src/util netsim_util)
-  add_subdirectory(${AOSP_ROOT}/tools/netsim/src/backend netsim_backend)
-  add_subdirectory(mynewt-nimble)
-
-  if(NOT LINUX_AARCH64)
-    message(STATUS "Using prebuilt netsim binaries")
-    prebuilt(NETSIM)
-
-    # Binplace to objs
-    android_target_dependency(packet-streamer-client-lib all
-                              NETSIM_UI_DEPENDENCIES)
-    android_target_dependency(packet-streamer-client-lib all
-                              NETSIM_DEPENDENCIES)
-
-    # Install ui (Disable this for non canary?)
-    android_install_dependency_force_exec(all NETSIM_UI_DEPENDENCIES)
-  else()
-    message(WARNING "Netsimd is not available for this platform, bluetooth/wifi emulation will require a remote instance.")
-  endif()
-
+add_subdirectory(netsim)
+  
   # Duplicate glib dll for Windows
   # The long term solution should be to figure out linking dll within lib64
   if(WINDOWS_MSVC_X86_64)
     install(TARGETS glib2_${ANDROID_TARGET_TAG} RUNTIME DESTINATION .
             LIBRARY DESTINATION .)
   endif()
-endif()
 
 # gfxstream, aemu-common modules
 set(GFXSTREAM_REPO_ROOT

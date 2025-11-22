@@ -64,7 +64,7 @@ android_license(
   SPDX "Apache-2.0"
   LICENSE
     "https://android.googlesource.com/platform/tools/netsim/+/refs/heads/main/LICENSE"
-  LOCAL ${ANDROID_QEMU2_TOP_DIR}/../../tools/netsim/LICENSE)
+  LOCAL ${ANDROID_QEMU2_TOP_DIR}/LICENSES/NETSIM_LICENSE)
 
 android_license(
   TARGET "NETSIM_UI_DEPENDENCIES"
@@ -72,4 +72,4 @@ android_license(
   SPDX "Apache-2.0"
   LICENSE
     "https://android.googlesource.com/platform/tools/netsim/+/refs/heads/main/LICENSE"
-  LOCAL ${ANDROID_QEMU2_TOP_DIR}/../../tools/netsim/LICENSE)
+  LOCAL ${ANDROID_QEMU2_TOP_DIR}/LICENSES/NETSIM_LICENSE)

@@ -146,36 +146,6 @@ set(OPTION_ENABLE_SYSTEM_RUST
       "Use the system rust compiler, only needed on Mac M1 or Windows."
 )
 
-if (FEATURE_NETSIM_FROM_SOURCE)
-  set(OPTION_RUST TRUE CACHE BOOL "Enable all rust dependencies.")
-endif()
-if(OPTION_RUST)
-  if (DARWIN_AARCH64 AND NOT Rust_COMPILER)
-    message(STATUS "On Apple sillicon attempting to use platform toolchain if available.")
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/android/build/cmake/corrosion/cmake/")
-    find_package(Rust REQUIRED)
-    if (TARGET Rust::Rustc)
-        set(OPTION_ENABLE_SYSTEM_RUST TRUE)
-    else()
-        message(STATUS "Unable to derive local toolchain, using cross compilation.")
-        message(STATUS "If you are a developer you can install rust with `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`")
-    endif()
-  endif()
-
-  if(Rust_COMPILER OR OPTION_ENABLE_SYSTEM_RUST)
-    if(OPTION_ENABLE_SYSTEM_RUST)
-      message(STATUS "Attempting to use the system rust compiler")
-      use_system_rust_toolchain()
-    endif()
-
-    enable_vendorized_crates("${ANDROID_QEMU2_TOP_DIR}/android/third_party/rust/crates")
-    add_subdirectory(android/build/cmake/corrosion)
-    ensure_rust_version_is_compliant()
-  endif()
-  else()
-    message(WARNING "Disabling RUST, you might have reduced functionality.")
-endif()
-
 if(GFXSTREAM_ONLY)
   set(GFXSTREAM TRUE)
 endif()
@@ -220,7 +190,6 @@ if(NOT OPTION_CRASHUPLOAD STREQUAL "NONE")
   message(STATUS "Uploading symbols to ${BREAKPAD_API_URL}")
 endif()
 
-set(FEATURE_NETSIM_FROM_SOURCE FALSE CACHE BOOL "Build the netsim network simulator from source. **DEPRECATED**")
 
 # Make sure targets have complete control of include order.
 set(CMAKE_INCLUDE_CURRENT_DIR OFF)
