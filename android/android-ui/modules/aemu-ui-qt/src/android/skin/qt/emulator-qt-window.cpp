@@ -580,13 +580,6 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
                            "And typically the performance is not quite good."),
                         QMessageBox::Ok,
                         this),
-      mGlassesWarningBox(QMessageBox::Warning,
-                        tr("Incorrect Launch Sequence"),
-                        tr("The Glasses emulator must be the first device launched. "
-                            "Please close all running AVDs, then start the Glasses "
-                            "emulator followed by the companion Phone."),
-                        QMessageBox::Ok,
-                        this),
 
       mEventLogger(
               std::make_shared<UIEventRecorder<android::base::CircularBuffer>>(
@@ -2439,7 +2432,6 @@ void EmulatorQtWindow::slot_showWindow(SkinSurface* surface,
         checkVgkAndWarn();
         checkNestedAndWarn();
         displayCheckWarnings();
-        checkAIGlassesWarnings();
         mFirstShowWindowCall = false;
     }
 }
@@ -3838,20 +3830,6 @@ void EmulatorQtWindow::displayCheckWarnings() {
                              checkbox->deleteLater();
                          });
         nestedGeneralWarningBox->show();
-    }
-}
-
-void EmulatorQtWindow::checkAIGlassesWarnings() {
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) != AVD_GLASSES) return;
-
-    // Detect if the glasses are not the first device.
-    // This is a proxy for detecting that the bluetooth mac address is stable, and the
-    // glasses + phone will recognize each other. Assumes the first launched emulator
-    // instance uses port 5554. Since we don't have an easy way to get the
-    // bluetooth address, we'll use the port number. This
-    // is not an ideal solution, but a stopgap to mitigate this common failure mode.
-    if (android_serial_number_port != 5554) {
-        mGlassesWarningBox->show();
     }
 }
 
