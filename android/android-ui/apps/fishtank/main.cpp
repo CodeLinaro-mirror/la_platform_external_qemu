@@ -21,6 +21,7 @@
 #include "android/cmdline-definitions.h"
 #include "android/console.h"
 #include "android/crashreport/crash-initializer.h"
+#include "android/emulation/control/EmulatorAdvertisement.h"
 #include "android/emulation/control/ScreenCapturer.h"
 #include "android/emulation/control/interceptor/LoggingInterceptor.h"
 #include "android/emulation/control/utils/EmulatorControlClient.h"
@@ -39,7 +40,10 @@
 #include "android/utils/debug.h"
 #include "fishtank_agents.h"
 
+#include <algorithm>
 #include "absl/log/log.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/feature_control.h"
 
@@ -143,7 +147,25 @@ int main(int argc, char* argv[]) {
         builder.withInterceptor(new StdOutLoggingInterceptorFactory());
     }
 
-    auto status = builder.withDiscoveryFile(opts->fishtank).build();
+    std::string discovery = opts->fishtank;
+    if ("default" == discovery) {
+        android::emulation::control::EmulatorAdvertisement adv({});
+        auto emulators = adv.discoverRunningEmulators();
+        std::vector<std::string> discovery_files;
+        std::copy_if(emulators.begin(), emulators.end(),
+                     std::back_inserter(discovery_files),
+                     [](auto str) { return absl::EndsWith(str, ".ini"); });
+
+        if (discovery_files.empty()) {
+            LOG(FATAL) << "No running emulators were found";
+        }
+
+        LOG(INFO) << "Discovered: " << absl::StrJoin(discovery_files, ",");
+        discovery = discovery_files[0];
+    }
+
+    auto status = builder.withDiscoveryFile(discovery).build();
+
     if (!status.ok()) {
         LOG(FATAL) << "Failed to discover emulator due to "
                    << status.status().ToString();
