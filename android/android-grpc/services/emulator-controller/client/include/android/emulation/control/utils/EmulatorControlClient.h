@@ -110,6 +110,12 @@ public:
                            OnCompleted<Empty> onDone = nothing);
 
     /**
+     * @brief Asynchronously streams the clipboard of the emulator
+     * @param cb The callback to be invoked when an clipdata event arrives
+     */
+    void streamClipboardAsync(OnEvent<ClipData> cb, OnFinished finished);
+
+    /**
      * @brief Asynchronously sets the virtual machine state of the emulator
      * @param state A Run State that describes the state of the Virtual Machine.
      * @param onDone The callback to be invoked when the operation completes.
@@ -152,6 +158,7 @@ public:
     EmulatorController::StubInterface* service() { return mService.get(); }
 
     std::shared_ptr<EmulatorGrpcClient> client() { return mClient; }
+
 private:
     std::unique_ptr<EmulatorController::StubInterface> mService;
     std::shared_ptr<EmulatorGrpcClient> mClient;

@@ -59,7 +59,6 @@ extern void myMessageOutput(QtMsgType type,
                             const QString& msg);
 extern "C" void emulator_window_refresh(EmulatorWindow* emulator);
 
-
 using android::control::interceptor::StdOutLoggingInterceptorFactory;
 
 AndroidOptions sOpts[1];
@@ -71,6 +70,14 @@ void messagePump(int, char**) {
         emulator_window_refresh(window);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+}
+
+std::shared_ptr<android::emulation::control::EmulatorControlClient>
+        gControlClient;
+
+std::shared_ptr<android::emulation::control::EmulatorControlClient>
+getGlobalControlClient() {
+    return gControlClient;
 }
 
 int main(int argc, char* argv[]) {
@@ -150,10 +157,10 @@ int main(int argc, char* argv[]) {
         LOG(FATAL) << "Failed to connect to emulator";
     }
 
-    auto controlClient = std::make_unique<
+    gControlClient = std::make_shared<
             android::emulation::control::EmulatorControlClient>(
             android::emulation::control::EmulatorGrpcClient::me());
-    initializeGrpcUserEventAgent(controlClient.get());
+    initializeGrpcUserEventAgent(gControlClient.get());
 
     if (!fc::isOverridden(fc::GuestAngle)) {
         switch (skin_winsys_get_preferred_gles_driver()) {
@@ -215,7 +222,7 @@ int main(int argc, char* argv[]) {
     android::files::TemporaryFile pixels;
     LOG(INFO) << "Sharing pixels at: " << pixels.path();
     EmulatorQtWindow* window = EmulatorQtWindow::getInstance();
-    window->initializeStreamer("file:///" +  pixels.path());
+    window->initializeStreamer("file:///" + pixels.path());
 
     LOG(INFO) << "Setting up window";
     emulator_window_setup(emulator_window_get());

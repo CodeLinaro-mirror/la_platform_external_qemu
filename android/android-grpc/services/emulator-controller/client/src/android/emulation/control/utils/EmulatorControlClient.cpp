@@ -20,6 +20,7 @@
 #include "absl/status/status.h"
 #include "android/emulation/control/utils/GenericCallbackFunctions.h"
 #include "android/grpc/utils/SimpleAsyncGrpc.h"
+#include "emulator_controller.pb.h"
 
 // #define DEBUG 0
 /* set  >1 for very verbose debugging */
@@ -180,6 +181,23 @@ void EmulatorControlClient::setClipboardAsync(std::string state,
             context.get(), request, response,
             grpcCallCompletionHandler(context, request, response, onDone,
                                       mOnFinally));
+}
+
+void EmulatorControlClient::streamClipboardAsync(OnEvent<ClipData> cb,
+                                                 OnFinished finished) {
+    auto [request, response, context] =
+            createGrpcRequestContext<Empty, ClipData>(mClient);
+    mOutstandingRpcs++;
+    auto read = new SimpleClientLambdaReader<ClipData>(
+            context, [cb](auto event) { cb(event); },
+            [response, request, finished](auto status) {
+                finished(ConvertGrpcStatusToAbseilStatus(status));
+                delete response;
+                delete request;
+            });
+    mService->async()->streamClipboard(context.get(), request, read);
+    read->StartRead();
+    read->StartCall();
 }
 
 void EmulatorControlClient::setBrightnessAsync(BrightnessValue bv,
