@@ -1,0 +1,158 @@
+// Copyright 2022 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto2";
+
+package netsim.stats;
+
+// Message for Invalid Packet
+message InvalidPacket {
+  enum Reason {
+    UNKNOWN = 0;
+    PARSE_ERROR = 1;
+    UNSUPPORTED = 2;
+    OTHERS = 3;
+    DELAYED = 4;
+  }
+  optional Reason reason = 1;
+  optional string description = 2;
+  optional bytes packet = 3;
+}
+
+// Radio statistics for a netsim session.
+message NetsimRadioStats {
+  // The kind of radio
+  enum Kind {
+    UNSPECIFIED = 0;
+    BLUETOOTH_LOW_ENERGY = 1;
+    BLUETOOTH_CLASSIC = 2;
+    // built-in BLE beacon
+    BLE_BEACON = 3;
+    WIFI = 4;
+    UWB = 5;
+    NFC = 6;
+  }
+  optional uint32 device_id = 1;
+  optional Kind kind = 2;
+  // The duration of the controller connection
+  optional uint64 duration_secs = 3;
+  // TX/RX messages for phy layer
+  optional int32 tx_count = 4;
+  optional int32 rx_count = 5;
+  // TX/RX bytes for HostController
+  optional int32 tx_bytes = 6;
+  optional int32 rx_bytes = 7;
+  // Recent Invalid Packets
+  repeated InvalidPacket invalid_packets = 8;
+}
+
+// Frontend statistics for a netsim session representing count of API calls
+message NetsimFrontendStats {
+  optional uint32 get_version = 1;
+  optional uint32 create_device = 2;
+  optional uint32 delete_chip = 3;
+  optional uint32 patch_device = 4;
+  optional uint32 reset = 5;
+  optional uint32 list_device = 6;
+  optional uint32 subscribe_device = 7;
+  optional uint32 patch_capture = 8;
+  optional uint32 list_capture = 9;
+  optional uint32 get_capture = 10;
+}
+
+// Detailed stats of a device
+message NetsimDeviceStats {
+  // Netsim assigned unique device id
+  optional uint32 device_id = 1;
+  // Identifier for device kind e.g. EMULATOR, CUTTLEFISH, BUMBLE, etc
+  optional string kind = 2;
+  // Version info as applicable e.g. Android emulator version 34.1.15.0, etc
+  optional string version = 3;
+  // SDK version info as applicable e.g. 33, 34, etc
+  optional string sdk_version = 4;
+  // Build ID e.g. TE1A.220922.034, UQ1A.231205.015, etc
+  optional string build_id = 5;
+  // Model/variant e.g. sdk_gphone_x86_64-userdebug, cf_x86_64_phone-user, etc
+  optional string variant = 6;
+  // CPU architecture e.g. x86_64, arm64-v8a, etc
+  optional string arch = 7;
+}
+
+// Detailed Wi-Fi stats
+message WifiStats {
+  // === Error Counters ===
+  // Errors related to the hostapd.
+  optional int32 hostapd_errors = 1;
+  // Errors related to network connectivity (e.g., Slirp/Tap interface).
+  optional int32 network_errors = 2;
+  // Errors related to client-specific operations or state.
+  optional int32 client_errors = 3;
+  // Errors encountered while parsing, decoding, or handling IEEE 802.11
+  // frames.
+  optional int32 frame_errors = 4;
+  // Errors related to transmission or reception of frame.
+  optional int32 transmission_errors = 5;
+  // Other uncategorized errors.
+  optional int32 other_errors = 6;
+
+  // === Core Traffic Flow & Type Counters ===
+  // 802.11 frames received from clients via Hwsim messages.
+  optional int32 hwsim_frames_rx = 7;
+  // 802.11 frames transmitted to clients via Hwsim messages.
+  optional int32 hwsim_frames_tx = 8;
+  // L3 packets transmitted to external network (e.g., Slirp).
+  optional int32 network_packets_tx = 9;
+  // L3 packets received from external network.
+  optional int32 network_packets_rx = 10;
+  // 802.11 frames transmitted to hostapd process.
+  optional int32 hostapd_frames_tx = 11;
+  // 802.11 frames received from hostapd process.
+  optional int32 hostapd_frames_rx = 12;
+  // Station-to-station 802.11 frames transmitted via medium.
+  optional int32 wmedium_frames_tx = 13;
+  // Unicast 802.11 frames transmitted to another station via medium.
+  optional int32 wmedium_unicast_frames_tx = 14;
+  // 802.11 Management frames received by medium.
+  optional int32 mgmt_frames_rx = 15;
+
+  // === Specific Protocol Counters ===
+  // mDNS frames count.
+  optional int32 mdns_count = 16;
+
+  // === Performance Statistics ===
+  // Max Throughput from Internet to device(s) in Mbits per second
+  optional float max_download_throughput = 17;
+  // Max Throughput from device(s) to Internet in Mbits per second
+  optional float max_upload_throughput = 18;
+}
+
+// Statistics for a netsim session.
+message NetsimStats {
+  // The length of the session in seconds
+  optional uint64 duration_secs = 1;
+  // The total number of devices that connected
+  optional int32 device_count = 2;
+  // The peak number of concurrent devices connected
+  optional int32 peak_concurrent_devices = 3;
+  // Individual chip statistics
+  repeated NetsimRadioStats radio_stats = 4;
+  // The version of netsim daemon
+  optional string version = 5;
+  // Frontend API statistics
+  optional NetsimFrontendStats frontend_stats = 6;
+  // Device statistics
+  repeated NetsimDeviceStats device_stats = 7;
+  // Wi-Fi statistics
+  optional WifiStats wifi_stats = 8;
+}

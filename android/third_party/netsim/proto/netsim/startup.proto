@@ -1,0 +1,113 @@
+// Copyright 2022 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package netsim.startup;
+
+import "netsim/common.proto";
+import "netsim/model.proto";
+import "rootcanal/configuration.proto";
+
+option java_multiple_files = true;
+option java_package = "com.android.emulation.bluetooth";
+
+/**
+ * The startup info proto.
+ *
+ * When netsim is forked from a parent that owns all fds for HAL communication
+ * (like launch_cvd) it uses json format of this proto.
+ *
+ * Example:
+ *
+ * netsim -s '
+ *   {"devices": [
+ *      {serial: "emulator-5554",
+ *       chips: [{kind: "WIFI", fdIn: 1, fdOut: 2},
+ *               {kind: "BLUETOOTH", fdIn: 20, fdOut:21}]
+ *      },
+ *      {serial: "emulator-5555",
+ *       chips: [{kind: "BLUETOOTH", fdIn: 3, fdOut: 4},
+ *               {kind: "UWB", fdIn: 5, fdOut: 6, model: "DW300"}]
+ *      }
+ *    ]
+ *   }'
+ *
+ */
+
+message StartupInfo {
+  message Device {
+    // Deprecated. Field moved into DeviceInfo. Please use device_info instead.
+    string name = 1 [deprecated = true];
+    // list of SoCs associated with device
+    repeated Chip chips = 2;
+    // additional device information
+    DeviceInfo device_info = 3;
+  }
+  repeated Device devices = 1;
+}
+
+// TODO: rename to InitialInfo
+// InitialInfo over gRPC
+message ChipInfo {
+  // Deprecated. Field moved into DeviceInfo. Please use device_info instead.
+  string name = 1 [deprecated = true];
+  // single chip
+  Chip chip = 2;
+  // additional device information
+  DeviceInfo device_info = 3;
+}
+
+message DeviceInfo {
+  // Name of device
+  string name = 1;
+  // Identifier for device kind e.g. EMULATOR, CUTTLEFISH, BUMBLE, etc
+  string kind = 2;
+  // Version info as applicable e.g. Android emulator version 34.1.15.0, etc
+  string version = 3;
+  // SDK version info as applicable e.g. 33, 34, etc
+  string sdk_version = 4;
+  // Build ID e.g. TE1A.220922.034, UQ1A.231205.015, etc
+  string build_id = 5;
+  // Model/variant e.g. sdk_gphone_x86_64-userdebug, cf_x86_64_phone-user, etc
+  string variant = 6;
+  // CPU architecture e.g. x86_64, arm64-v8a, etc
+  string arch = 7;
+  // AVD ini filepath
+  string avd_path = 8;
+}
+
+message Chip {
+  // the kind of chip
+  common.ChipKind kind = 1;
+  // optional like "rear-right"
+  string id = 2;
+  // optional like Quorvo
+  string manufacturer = 3;
+  // optional like DW300
+  string product_name = 4;
+  // optional guest os input
+  int32 fd_in = 5;
+  // optional guest os output
+  int32 fd_out = 6;
+  // optional for testing
+  bool loopback = 7;
+  // optional for bluetooth chipsets
+  rootcanal.configuration.Controller bt_properties = 8;
+  // address in format xx:xx:xx:xx:xx:xx
+  // optional for bluetooth chipsets
+  string address = 9;
+  // Offset of the chip position from center of device
+  optional model.Position offset = 10;
+}
