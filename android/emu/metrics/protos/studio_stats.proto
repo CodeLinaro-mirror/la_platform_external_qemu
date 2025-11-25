@@ -3175,7 +3175,9 @@ message EmulatorFeatureFlagState {
     ALL_APPS_FOR_HOME_TRAY = 133;
     FORCE_LAVAPIPE = 134;
     FORCE_LAVAPIPE_FOR_SOFTWARE_RENDERING = 135;
-    // Next tag: 136
+    FORCE_GPU_HOST = 136;
+    FORCE_GPU_SOFTWARE = 137;
+    // Next tag: 138
   }
   // Which features were enabled by default or through the server-side config.
   repeated EmulatorFeatureFlag attempted_enabled_feature_flags = 1;
@@ -7337,7 +7339,7 @@ message AppLinksAssistantEvent {
       [lazy = true];
 
   // UI event source.
-  // Next ID: 60
+  // Next ID: 61
   // Note: Not a properly sequentially incrementing ID (200 & 201 are used)
   enum EventSource {
     // Will be deprecated and replaced by NEW_LINK_CREATION_SIDE_PANEL.
@@ -7357,7 +7359,6 @@ message AppLinksAssistantEvent {
     CODE_INSERT_DIALOG = 9;
     CODE_INSERT_DIALOG_INSERT_BUTTON = 10;
     CODE_INSERT_DIALOG_LIST_SELECTION = 11;
-    CODE_INSERT_DIALOG_GEMINI_BUTTON = 59;
 
     // UI elements of DAL generation panel.
     DAL_PANEL = 12;
@@ -7433,6 +7434,10 @@ message AppLinksAssistantEvent {
     SERVICES_COMPATIBILITY_WARNING = 56;
     SERVICES_COMPATIBILITY_WARNING_UPDATE_BUTTON = 57;
     SERVICES_COMPATIBILITY_WARNING_MORE_INFO_BUTTON = 58;
+
+    // Deep Link AI
+    CODE_INSERT_DIALOG_GEMINI_BUTTON = 59;
+    DLLA_APP_SCREEN_OPEN_CONFIRMATION = 60;
   }
 
   // The state list of UI event source.
@@ -15702,6 +15707,15 @@ message BuildOutputDownloadsInfoEvent {
   optional uint32 ms_since_build_start = 4;
 }
 
+// The type of agent used to generate an Sml response.
+enum SmlAgentType {
+  AGENT_TYPE_UNSPECIFIED = 0;
+  AGENT_TYPE_GENERIC = 1;
+  AGENT_TYPE_UPGRADE_AGENT = 2;
+  AGENT_TYPE_NEW_PROJECT_AGENT = 3;
+  AGENT_TYPE_DEEP_LINK_LOGIC_AGENT = 4;
+}
+
 message SmlResponseMetadata {
   // Trace id (provided by the server) for this response
   optional int64 rpc_global_id = 1;
@@ -15721,6 +15735,9 @@ message SmlResponseMetadata {
   // If the response was generated within the Chat Timeline, the ID of the
   // thread/session the response was generated for.
   optional string thread_id = 6;
+
+  // The type of the agent that generated the response.
+  optional SmlAgentType agent_type = 7;
 }
 
 message SmlCitationInfo {
@@ -16001,6 +16018,8 @@ message SmlChatBotEvent {
     CRASHLYTICS = 9;
     PLAY_VITALS = 10;
     LOGCAT = 11;
+    REFACTORING_MENU = 12;
+    UPDATE_DEPENDENCY_ACTION = 13;
   }
 
   message BotInvoked {
@@ -16551,6 +16570,9 @@ message SmlRagEvent {
     optional int32 generated_files = 4;
     // The time in milliseconds for code_search.
     optional int64 search_time_ms = 5;
+    // The number of docs (a doc is a file in the current RAG indexer) that are
+    // indexed.
+    optional int32 total_indexed_docs = 6;
   }
 
   // We merged the original find_files with file path search based on BM25.
@@ -16567,6 +16589,9 @@ message SmlRagEvent {
     optional int32 bm25_search_count = 3;
     // The number of files in the original find_files search result.
     optional int32 found_files_count = 4;
+    // The number of docs (a doc is a file in the current RAG indexer) that are
+    // indexed.
+    optional int32 total_indexed_docs = 5;
   }
 
   message GrepMetrics {
@@ -16578,6 +16603,9 @@ message SmlRagEvent {
     optional int32 bm25_result_count = 3;
     // The number of files in the original grep backend result.
     optional int32 grep_result_count = 4;
+    // The number of docs (a doc is a file in the current RAG indexer) that are
+    // indexed.
+    optional int32 total_indexed_docs = 5;
   }
 
   message KbRagIndexerMetrics {
