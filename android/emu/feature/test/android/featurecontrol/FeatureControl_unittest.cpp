@@ -388,6 +388,8 @@ Feature: 'XrModeGlassesUI' (113), value: 0, default: 0, is overridden: 0
 Feature: 'MicrophoneToggleUI' (114), value: 0, default: 0, is overridden: 0
 Feature: 'ForceLavapipe' (115), value: 0, default: 0, is overridden: 0
 Feature: 'ForceLavapipeForSoftwareRendering' (116), value: 0, default: 0, is overridden: 0
+Feature: 'ForceGpuHost' (117), value: 0, default: 0, is overridden: 0
+Feature: 'ForceGpuSoftware' (118), value: 0, default: 0, is overridden: 0
 )#";
     EXPECT_EQ(feature_list, ss.str());
 }

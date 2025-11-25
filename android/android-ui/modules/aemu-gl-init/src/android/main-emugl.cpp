@@ -132,20 +132,29 @@ bool androidEmuglConfigInit(
     }
 
     // when set, 'force' feature flags will overwrite other options
-    const bool force_lavapipe = fc::isEnabled(fc::ForceLavapipe);
-    const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
-    const bool force_swangle = fc::isEnabled(fc::ForceANGLE);
-    const bool force_lavapipe_on_software = fc::isEnabled(fc::ForceLavapipeForSoftwareRendering);
+    const bool force_host = fc::isEnabled(fc::ForceGpuHost);
+    const bool force_software = fc::isEnabled(fc::ForceGpuSoftware);
 
-    // Select Vulkan mode
-    if (force_lavapipe ||
-        (force_lavapipe_on_software && (gpuChoice == "swiftshader" ||
-                                        gpuChoice == "swangle"))) {
-        gpuChoice = "lavapipe";
-    } else if (force_swiftshader) {
-        gpuChoice = "swiftshader";
-    } else if (force_swangle) {
-        gpuChoice = "swangle";
+    // Select GPU mode based on feature flags
+    if (force_host) {
+        gpuChoice = "host";
+    } else if (force_software) {
+        gpuChoice = DEFAULT_SOFTWARE_GPU_MODE;
+    } else {
+        // Finer control feature flags
+        const bool force_lavapipe = fc::isEnabled(fc::ForceLavapipe);
+        const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
+        const bool force_swangle = fc::isEnabled(fc::ForceANGLE);
+        const bool force_lavapipe_on_software = fc::isEnabled(fc::ForceLavapipeForSoftwareRendering);
+        if (force_lavapipe ||
+            (force_lavapipe_on_software && (gpuChoice == "swiftshader" ||
+                                            gpuChoice == "swangle"))) {
+            gpuChoice = "lavapipe";
+        } else if (force_swiftshader) {
+            gpuChoice = "swiftshader";
+        } else if (force_swangle) {
+            gpuChoice = "swangle";
+        }
     }
 
     return emuglConfig_init(config, gpuChoice.c_str(), noWindow);

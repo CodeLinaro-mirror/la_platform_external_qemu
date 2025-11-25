@@ -749,6 +749,10 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::FORCE_LAVAPIPE;
         case android::featurecontrol::ForceLavapipeForSoftwareRendering:
             return android_studio::EmulatorFeatureFlagState::FORCE_LAVAPIPE_FOR_SOFTWARE_RENDERING;
+        case android::featurecontrol::ForceGpuHost:
+            return android_studio::EmulatorFeatureFlagState::FORCE_GPU_HOST;
+        case android::featurecontrol::ForceGpuSoftware:
+            return android_studio::EmulatorFeatureFlagState::FORCE_GPU_SOFTWARE;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;
