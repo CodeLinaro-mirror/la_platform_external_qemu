@@ -574,9 +574,8 @@ static void npcm_pcie_rp_class_init(ObjectClass *klass, const void *data)
                                     npcm_pcie_root_port_realize,
                                     &rpc->parent_realize);
 
-    /* TODO(b/229132071) replace with real values */
-    pk->vendor_id = PCI_VENDOR_ID_QEMU;
-    pk->device_id = 0;
+    pk->vendor_id = NPCM_PCIE_VENDOR_ID;
+    pk->device_id = NPCM_PCIE_DEVICE_ID;
     pk->class_id = PCI_CLASS_BRIDGE_PCI;
 
     rpc->exp_offset = NPCM_PCIE_HEADER_OFFSET; /* Express capabilities offset */

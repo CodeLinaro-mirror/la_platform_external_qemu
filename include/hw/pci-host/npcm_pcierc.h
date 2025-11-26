@@ -93,6 +93,9 @@
 #define NPCM_PCIE_HEADER_OFFSET             0x80
 #define NPCM_PCIE_AER_OFFSET                0x100
 
+#define NPCM_PCIE_DEVICE_ID                 0x1111
+#define NPCM_PCIE_VENDOR_ID                 0x1556
+
 #define TYPE_NPCM_PCIERC "npcm-pcie-root-complex"
 OBJECT_DECLARE_SIMPLE_TYPE(NPCMPCIERCState, NPCM_PCIERC)
 
