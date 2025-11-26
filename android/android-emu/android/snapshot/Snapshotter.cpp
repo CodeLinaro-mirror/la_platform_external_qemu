@@ -825,7 +825,7 @@ bool Snapshotter::stopVulkanAppsIfApplicable() {
         free(names[i]);
         // special handling for chrome, some api such as 35 only reports it
         // as Chromium, so do a name change
-        if ("Chromium" == std::string(names[i])) {
+        if ("Chromium" == appRealName) {
             appRealName = "come.android.chrome";
         }
         LOG(INFO) << "stopping vulkan app '" << appRealName << "'";
