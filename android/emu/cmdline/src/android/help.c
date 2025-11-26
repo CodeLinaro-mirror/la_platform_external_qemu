@@ -2326,6 +2326,11 @@ static void help_display_modality(stralloc_t* out){
     PRINTF("  Set display modality. Available options: ost, vst\n");
 }
 
+static void help_crash_report_mode(stralloc_t* out) {
+    PRINTF("  Override crash reporting mode. Available options: disabled, "
+           "never, always, ask\n");
+}
+
 #define  help_no_skin   NULL
 #define  help_netspeed  help_shaper
 #define  help_netdelay  help_shaper

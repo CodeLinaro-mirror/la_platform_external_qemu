@@ -382,6 +382,11 @@ OPT_PARAM(display_modality,
 
 OPT_PARAM(fishtank, "<discovery_file>", "The fishtank ui for emulator <discovery_file>")
 
+OPT_PARAM(crash_report_mode,
+          "<option list>",
+          "Override crash reporting mode. Available options: disabled, never, "
+          "always, ask")
+
 #undef CFG_FLAG
 #undef CFG_PARAM
 #undef OPT_FLAG
