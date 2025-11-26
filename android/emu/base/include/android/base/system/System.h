@@ -193,14 +193,6 @@ public:
     static const char kDirSeparator = '/';
 #endif
 
-    // The character used to separator directories in path-related
-    // environment variables.
-#ifdef _WIN32
-    static const char kPathSeparator = ';';
-#else
-    static const char kPathSeparator = ':';
-#endif
-
     // Environment variable name corresponding to the library search
     // list for shared libraries.
     static const char* kLibrarySearchListEnvVarName;

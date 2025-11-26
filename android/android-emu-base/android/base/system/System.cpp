@@ -2544,11 +2544,6 @@ const char* System::kBinSubDir = "bin";
 
 const char* System::kBin32SubDir = "bin";
 
-// These need to be defined so one can take an address of them.
-const int System::kProgramBitness;
-const char System::kDirSeparator;
-const char System::kPathSeparator;
-
 #ifdef _WIN32
 // static
 const char* System::kLibrarySearchListEnvVarName = "PATH";
@@ -3136,6 +3131,14 @@ Optional<DiskKind> System::diskKindInternal(int fd) {
 void System::addLibrarySearchDir(std::string_view path) {
     System* system = System::get();
     const char* varName = kLibrarySearchListEnvVarName;
+
+    // The character used to separator directories in path-related
+    // environment variables.
+#ifdef _WIN32
+    static const char kPathSeparator = ';';
+#else
+    static const char kPathSeparator = ':';
+#endif
 
     std::string libSearchPath = system->envGet(varName);
     if (libSearchPath.size()) {
