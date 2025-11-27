@@ -1015,26 +1015,6 @@ function(android_add_executable)
   endif()
 endfunction()
 
-# Adds a protobuf library with the given name. It will export all the needed
-# headers, and libraries You can take a dependency on this by adding:
-# target_link_libraries(my_target ${name}) for your target. The generated
-# library will not use execeptions. Protobuf targets will be licensed under the
-# Apache-2.0 license.
-#
-# name: The name of the generated library. You can take a dependency on this
-# with setting target_linke_libraries(my_target ${name})
-#
-# protofiles: The set of protofiles to be included.
-function(android_add_protobuf name protofiles)
-  message(
-    STATUS
-      "This method is deprecated, please use protobuf_generate_with_plugin instead for target ${name}."
-  )
-  android_add_library(TARGET ${name} LICENSE Apache-2.0)
-  protobuf_generate_with_plugin(TARGET ${name} PROTOS ${protofiles})
-  target_link_libraries(${name} PRIVATE libprotobuf)
-endfunction()
-
 function(protobuf_generate_with_plugin)
   include(CMakeParseArguments)
   set(_options APPEND_PATH)

@@ -1,1 +1,3 @@
-android_add_protobuf(perfetto_trace perfetto_trace.proto)
+android_add_library(TARGET perfetto_trace LICENSE Apache-2.0)
+protobuf_generate_with_plugin(TARGET perfetto_trace PROTOS perfetto_trace.proto)
+target_link_libraries(perfetto_trace PRIVATE libprotobuf)
