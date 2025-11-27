@@ -1782,12 +1782,22 @@ void ToolWindow::on_all_apps_button_released() {
 }
 
 void ToolWindow::on_minimize_button_clicked() {
-#ifdef __linux__
+    // Using hide for MacOS to avoid extra minimized windows showing
+    // up on the toolbar, as well as avoiding positioning issues on
+    // unminimizing
+#if defined (__linux__) || defined(__APPLE__)
     this->hide();
 #else
     this->showMinimized();
 #endif
     mEmulatorWindow->showMinimized();
+    if (mTouchpadWindow.hasInstance()) {
+#if defined (__linux__) || defined(__APPLE__)
+        mTouchpadWindow.get()->hide();
+#else
+        mTouchpadWindow.get()->showMinimized();
+#endif
+    }
 }
 
 void ToolWindow::on_power_button_pressed() {
