@@ -411,9 +411,8 @@ struct {
          avdInfo_getEncryptionKeyImagePath},
 };
 
-#if 1
 // Calculate snapshot version based on a base version plus featurecontrol-derived integer.
-static constexpr int kVersionBase = 82;
+static constexpr int kVersionBase = 83;
 static_assert(kVersionBase < (1 << 20), "Base version number is too high.");
 
 #define FEATURE_CONTROL_ITEM(item, idx) + 1
@@ -429,13 +428,6 @@ static constexpr int kFeatureOffset = 0
 static_assert(kFeatureOffset < 1024, "Too many features to include in the feature "
                                      "offset component of the snapshot version");
 static constexpr int kVersion = (kVersionBase << 10) + kFeatureOffset;
-
-#else
-// We currently hardcode the kVersion as we are in the process of migrating
-// To a different versioning scheme see: b/287119326
-#error Consider updating the line below
-static constexpr int kVersion = 83037;
-#endif
 
 static constexpr int kMaxSaveStatsHistory = 10;
 
@@ -672,6 +664,7 @@ void Snapshot::loadProtobufOnce() {
         return;
     }
     if (!isVersionCompatible()) {
+        dwarning("Snapshot file cannot be used, incompatible version.");
         saveFailure(FailureReason::IncompatibleVersion);
         return;
     }
