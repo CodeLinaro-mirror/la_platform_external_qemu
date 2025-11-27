@@ -67,8 +67,6 @@
 #include "android/utils/system.h"                     // for STRINGIFY
 #include "google/protobuf/stubs/port.h"               // for int32
 
-#define ALLOW_CHANGE_RENDERER
-
 static constexpr bool HAS_GFXSTREAM = true;
 
 using android::base::c_str;
@@ -240,9 +238,11 @@ bool Snapshot::verifyHost(const proto::Host& host, bool writeFailure) {
             return false;
         }
     }
-    // Do not worry about backend if in swiftshader_indirect
-    if (emuglConfig_get_current_renderer() ==
-        SELECTED_RENDERER_SWIFTSHADER_INDIRECT) {
+    // Do not worry about backend if it's in software mode
+    // TODO: this should check the selected driver for info and version instead
+    auto glesRenderer = emuglConfig_get_current_gles_renderer();
+    if ((glesRenderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT ||
+         glesRenderer == SELECTED_RENDERER_ANGLE_INDIRECT)) {
         return true;
     }
     if (auto gpuString = currentGpuDriverString()) {
@@ -356,15 +356,12 @@ bool Snapshot::verifyConfig(const proto::Config& config, bool writeFailure) {
         }
     }
     if (config.has_selected_renderer() &&
-        config.selected_renderer() != int(emuglConfig_get_current_renderer())) {
-#ifdef ALLOW_CHANGE_RENDERER
-        dwarning("change of renderer detected.");
-#else   // ALLOW_CHANGE_RENDERER
+        config.selected_renderer() != int(emuglConfig_get_current_gles_renderer())) {
+        dwarning("Change of GLES renderer detected.");
         if (writeFailure) {
             saveFailure(FailureReason::ConfigMismatchRenderer);
         }
         return false;
-#endif  // ALLOW_CHANGE_RENDERER
     }
 
     if (!verifyFeatureFlags(config)) {
@@ -521,7 +518,7 @@ bool Snapshot::save() {
     mSnapshotPb.mutable_config()->set_cpu_core_count(vmConfig.numberOfCpuCores);
     mSnapshotPb.mutable_config()->set_ram_size_bytes(vmConfig.ramSizeBytes);
     mSnapshotPb.mutable_config()->set_selected_renderer(
-            int(emuglConfig_get_current_renderer()));
+            int(emuglConfig_get_current_gles_renderer()));
     mSnapshotPb.mutable_host()->set_hypervisor(vmConfig.hypervisorType);
     if (auto gpuString = currentGpuDriverString()) {
         mSnapshotPb.mutable_host()->set_gpu_driver(*gpuString);
