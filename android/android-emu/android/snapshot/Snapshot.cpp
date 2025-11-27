@@ -241,8 +241,11 @@ bool Snapshot::verifyHost(const proto::Host& host, bool writeFailure) {
     // Do not worry about backend if it's in software mode
     // TODO: this should check the selected driver for info and version instead
     auto glesRenderer = emuglConfig_get_current_gles_renderer();
-    if ((glesRenderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT ||
-         glesRenderer == SELECTED_RENDERER_ANGLE_INDIRECT)) {
+    auto vulkanRenderer = emuglConfig_get_current_vulkan_renderer();
+    if (((glesRenderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT ||
+          glesRenderer == SELECTED_RENDERER_ANGLE_INDIRECT)) &&
+        (vulkanRenderer == SELECTED_RENDERER_SWIFTSHADER_INDIRECT ||
+         vulkanRenderer == SELECTED_RENDERER_LAVAPIPE)) {
         return true;
     }
     if (auto gpuString = currentGpuDriverString()) {
@@ -355,9 +358,21 @@ bool Snapshot::verifyConfig(const proto::Config& config, bool writeFailure) {
             return false;
         }
     }
-    if (config.has_selected_renderer() &&
-        config.selected_renderer() != int(emuglConfig_get_current_gles_renderer())) {
+    if (!config.has_selected_gles_renderer() || !config.has_selected_vulkan_renderer()) {
+        if (writeFailure) {
+            saveFailure(FailureReason::ConfigMismatchRenderer);
+        }
+        return false;
+    }
+    if (config.selected_gles_renderer() != int(emuglConfig_get_current_gles_renderer())) {
         dwarning("Change of GLES renderer detected.");
+        if (writeFailure) {
+            saveFailure(FailureReason::ConfigMismatchRenderer);
+        }
+        return false;
+    }
+    if (config.selected_vulkan_renderer() != int(emuglConfig_get_current_vulkan_renderer())) {
+        dwarning("Change of Vulkan renderer detected.");
         if (writeFailure) {
             saveFailure(FailureReason::ConfigMismatchRenderer);
         }
@@ -409,7 +424,7 @@ struct {
 };
 
 // Calculate snapshot version based on a base version plus featurecontrol-derived integer.
-static constexpr int kVersionBase = 83;
+static constexpr int kVersionBase = 84;
 static_assert(kVersionBase < (1 << 20), "Base version number is too high.");
 
 #define FEATURE_CONTROL_ITEM(item, idx) + 1
@@ -517,8 +532,10 @@ bool Snapshot::save() {
     Snapshotter::get().vmOperations().getVmConfiguration(&vmConfig);
     mSnapshotPb.mutable_config()->set_cpu_core_count(vmConfig.numberOfCpuCores);
     mSnapshotPb.mutable_config()->set_ram_size_bytes(vmConfig.ramSizeBytes);
-    mSnapshotPb.mutable_config()->set_selected_renderer(
+    mSnapshotPb.mutable_config()->set_selected_gles_renderer(
             int(emuglConfig_get_current_gles_renderer()));
+    mSnapshotPb.mutable_config()->set_selected_vulkan_renderer(
+            int(emuglConfig_get_current_vulkan_renderer()));
     mSnapshotPb.mutable_host()->set_hypervisor(vmConfig.hypervisorType);
     if (auto gpuString = currentGpuDriverString()) {
         mSnapshotPb.mutable_host()->set_gpu_driver(*gpuString);
