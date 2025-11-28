@@ -249,7 +249,23 @@ extern "C" {
 using android::crashreport::CrashSystem;
 
 bool crashhandler_init(int argc, char** argv) {
-    if (!System::get()->getEnableCrashReporting()) {
+    bool enableCrashReporting = System::get()->getEnableCrashReporting();
+
+    // Parse command line manually as this can be called early in the process.
+    static constexpr std::string_view crashReportModeArg = "-crash-report-mode";
+    for (int i = 1; i < argc-1; ++i) {
+        if (crashReportModeArg == argv[i]) {
+            // '-crash-report-mode disabled' works similar to
+            // ANDROID_EMU_ENABLE_CRASH_REPORTING=NO
+            const std::string crashReportMode = argv[i+1];
+            if (crashReportMode == "disabled") {
+                enableCrashReporting = false;
+            }
+            break;
+        }
+    }
+
+    if (!enableCrashReporting) {
         dinfo("Crashreporting disabled, not reporting crashes.");
         return false;
     }

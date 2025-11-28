@@ -63,10 +63,30 @@ public:
 
             auto options =
                     getConsoleAgents()->settings->android_cmdLineOptions();
-            if (options && options->metrics_collection) {
-                dinfo("Metrics collection flag is present, enabling crash "
-                      "uploads.");
-                return Consent::ALWAYS;
+            if (options) {
+                if (options->crash_report_mode) {
+                    const std::string crashReportMode =
+                            options->crash_report_mode;
+                    dinfo("Crash report mode parameter is set to '%s'",
+                          crashReportMode.c_str());
+
+                    if (crashReportMode == "ask") {
+                        return Consent::ASK;
+                    } else if (crashReportMode == "always") {
+                        return Consent::ALWAYS;
+                    } else if (crashReportMode == "never") {
+                        return Consent::NEVER;
+                    } else {
+                        // Error, it should not ask for consent in 'disabled' mode
+                        derror("Invalid crash reporting mode!");
+                    }
+                }
+
+                if (options->metrics_collection) {
+                    dinfo("Metrics collection flag is present, enabling crash "
+                          "uploads.");
+                    return Consent::ALWAYS;
+                }
             }
         }
 
