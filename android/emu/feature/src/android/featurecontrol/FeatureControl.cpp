@@ -25,7 +25,7 @@ void setFeatureEnabledCallback(std::function<bool(Feature)> cb) {
 
 bool isEnabled(Feature feature) {
     return sFeatureEnabledCb ? sFeatureEnabledCb(feature)
-        : FeatureControlImpl::get().isEnabled(feature);
+                             : FeatureControlImpl::get().isEnabled(feature);
 }
 
 bool isEnabledLocal(Feature feature) {
@@ -67,6 +67,10 @@ void setIfNotOverridenOrGuestDisabled(Feature feature, bool isEnabled) {
 
 Feature stringToFeature(const std::string& str) {
     return FeatureControlImpl::fromString(str);
+}
+
+std::string_view featureToString(Feature feature) {
+    return FeatureControlImpl::toString(feature);
 }
 
 std::vector<Feature> getEnabledNonOverride() {
