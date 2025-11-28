@@ -30,13 +30,12 @@ namespace fc = android::featurecontrol;
 
 static const char DEFAULT_SOFTWARE_GPU_MODE[] = "lavapipe";
 
-bool androidEmuglConfigInit(
-        EmuglConfig* config,
+// Calculates gpu mode to be used based on -gpu command line option, avd config
+// or the ui option
+std::string gpuChoiceBasedOnGpuOptions(
         const char* gpuOption,
         const char* hwGpuModePtr,
-        bool noWindow,
         enum WinsysPreferredGlesBackend uiPreferredBackend) {
-
     // Support old style gpu parameters for backwards compatibility
     if (gpuOption && !strcmp("swiftshader_indirect", gpuOption)) {
         gpuOption = "swiftshader";
@@ -71,15 +70,8 @@ bool androidEmuglConfigInit(
         gpuChoice = "auto";
     }
 
-    // "software" is a special term to select best software mode for the
-    // platform/avd and not a real gpu backend mode.
-    if (gpuChoice == "software") {
-        gpuChoice = DEFAULT_SOFTWARE_GPU_MODE;
-    }
-
     const std::vector<std::string> allowedOptions = {
-            "auto", "host", "lavapipe", "swiftshader", "swangle",
-    };
+            "auto", "host", "lavapipe", "swiftshader", "swangle", "software"};
     bool validOption = false;
     for (auto& option : allowedOptions) {
         if (option == gpuChoice) {
@@ -94,14 +86,103 @@ bool androidEmuglConfigInit(
         gpuChoice = "auto";
     }
 
+    return gpuChoice;
+}
+
+// Converts selected gpu mode string to feature flags and overrides them if
+// not already overwritten.
+void convertGpuOptionsToFeatureFlags(
+        const char* gpuOption,
+        const char* hwGpuModePtr,
+        enum WinsysPreferredGlesBackend uiPreferredBackend) {
+    const std::string gpuChoice = gpuChoiceBasedOnGpuOptions(
+            gpuOption, hwGpuModePtr, uiPreferredBackend);
+
+    // Lavapipe has a special feature flag, which would result usage
+    // of lavapipe even when swiftshader/swange was requested. This
+    // is mainly to migrate old scripts to lavapipe automatically.
+    const bool force_lavapipe_on_software =
+            fc::isEnabled(fc::ForceLavapipeForSoftwareRendering);
+    if (gpuChoice == "host") {
+        feature_set_if_not_overridden(kFeature_ForceGpuHost, true);
+    } else if (gpuChoice == "software") {
+        // "software" is a special term to select best software mode for the
+        // platform/avd and not a real gpu backend mode.
+        feature_set_if_not_overridden(kFeature_ForceGpuSoftware, true);
+    } else if ((gpuChoice == "lavapipe") ||
+               (force_lavapipe_on_software &&
+                (gpuChoice == "swiftshader" || gpuChoice == "swangle"))) {
+        feature_set_if_not_overridden(kFeature_ForceLavapipe, true);
+    } else if (gpuChoice == "swiftshader") {
+        feature_set_if_not_overridden(kFeature_ForceSwiftshader, true);
+    } else if (gpuChoice == "swangle") {
+        feature_set_if_not_overridden(kFeature_ForceANGLE, true);
+    } else {
+        // Auto mode, no need to set any feature flags
+    }
+}
+
+bool androidEmuglConfigInit(
+        EmuglConfig* config,
+        const char* gpuOption,
+        const char* hwGpuModePtr,
+        bool noWindow,
+        enum WinsysPreferredGlesBackend uiPreferredBackend) {
+    // Check gpu selection control flags, if any of them is set, other options
+    // will be overwritten.
+    const std::vector<fc::Feature> gpuControlFeatures = {
+            fc::ForceGpuHost,     fc::ForceGpuSoftware, fc::ForceLavapipe,
+            fc::ForceSwiftshader, fc::ForceANGLE,
+    };
+    bool anyFeatureControlIsSet = false;
+    for (fc::Feature feature : gpuControlFeatures) {
+        if (fc::isEnabled(feature)) {
+            dinfo("GPU mode control feature flag '%s' is set",
+                  fc::featureToString(feature));
+            anyFeatureControlIsSet = true;
+        }
+    }
+
+    if (anyFeatureControlIsSet) {
+        // Gpu selection will be done based on user provided feature flags
+        dinfo("GPU mode selection will be done based on user provided feature "
+              "flags");
+    } else {
+        // Set feature flags based on the options provided and only use feature
+        // flags to determine the gpu mode.
+        convertGpuOptionsToFeatureFlags(gpuOption, hwGpuModePtr,
+                                        uiPreferredBackend);
+    }
+
+    // when set, 'force' feature flags will overwrite other options
+    const bool force_host = fc::isEnabled(fc::ForceGpuHost);
+    const bool force_software = fc::isEnabled(fc::ForceGpuSoftware);
+
+    // Select GPU mode based on feature flags
+    std::string gpuChoice = "auto";
+    if (force_host) {
+        gpuChoice = "host";
+    } else if (force_software) {
+        gpuChoice = DEFAULT_SOFTWARE_GPU_MODE;
+    } else {
+        // Finer control feature flags
+        const bool force_lavapipe = fc::isEnabled(fc::ForceLavapipe);
+        const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
+        const bool force_swangle = fc::isEnabled(fc::ForceANGLE);
+        if (force_lavapipe) {
+            gpuChoice = "lavapipe";
+        } else if (force_swiftshader) {
+            gpuChoice = "swiftshader";
+        } else if (force_swangle) {
+            gpuChoice = "swangle";
+        }
+    }
+
     bool hostGpuDenylisted = false;
 
-    // If the user has specified a renderer
-    // that is neither "auto", "host" nor "on",
-    // don't check the blacklist.
-    // Only check the blacklist for 'auto', 'host' or 'on' mode.
-    bool gpuChoiceAuto = (gpuChoice == "auto");
-    bool gpuChoiceHost = (gpuChoice == "host");
+    // Only check the blacklist for 'auto' and 'host' modes.
+    const bool gpuChoiceAuto = (gpuChoice == "auto");
+    const bool gpuChoiceHost = (gpuChoice == "host");
 
     if (gpuChoiceAuto || gpuChoiceHost) {
         bool switchToSoftware = false;
@@ -128,32 +209,6 @@ bool androidEmuglConfigInit(
             hostGpuDenylisted = onDenyList;
             setGpuBlacklistStatus(hostGpuDenylisted);
             gpuChoice = DEFAULT_SOFTWARE_GPU_MODE;
-        }
-    }
-
-    // when set, 'force' feature flags will overwrite other options
-    const bool force_host = fc::isEnabled(fc::ForceGpuHost);
-    const bool force_software = fc::isEnabled(fc::ForceGpuSoftware);
-
-    // Select GPU mode based on feature flags
-    if (force_host) {
-        gpuChoice = "host";
-    } else if (force_software) {
-        gpuChoice = DEFAULT_SOFTWARE_GPU_MODE;
-    } else {
-        // Finer control feature flags
-        const bool force_lavapipe = fc::isEnabled(fc::ForceLavapipe);
-        const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
-        const bool force_swangle = fc::isEnabled(fc::ForceANGLE);
-        const bool force_lavapipe_on_software = fc::isEnabled(fc::ForceLavapipeForSoftwareRendering);
-        if (force_lavapipe ||
-            (force_lavapipe_on_software && (gpuChoice == "swiftshader" ||
-                                            gpuChoice == "swangle"))) {
-            gpuChoice = "lavapipe";
-        } else if (force_swiftshader) {
-            gpuChoice = "swiftshader";
-        } else if (force_swangle) {
-            gpuChoice = "swangle";
         }
     }
 
