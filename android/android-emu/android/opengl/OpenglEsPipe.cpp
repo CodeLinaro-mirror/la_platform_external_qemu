@@ -56,7 +56,11 @@ using IoResult = gfxstream::RenderChannel::IoResult;
 using android::base::Stopwatch;
 using android::snapshot::Snapshotter;
 
-#define OPENGL_SAVE_VERSION 1
+// Note: this is only used for a validation check, and mismatches would
+// crash the emulator with a fatal error. For updating the snapshot file
+// versions, make sure 'kVersion' in Snapshot.cpp is updated as that will
+// be used to check if a snapshot file can be loaded safely.
+#define OPENGL_SAVE_VERSION 2
 
 namespace android {
 namespace opengl {
@@ -102,8 +106,10 @@ public:
             if (!hasRenderer) {
                 return;
             }
-            int version = stream->getBe32();
-            (void)version;
+            const int version = stream->getBe32();
+            if (version != OPENGL_SAVE_VERSION) {
+                dfatal("Snapshot file version is not compatible!");
+            }
             android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
             renderer->load(&gfxstreamStream, Snapshotter::get().loader().textureLoader());
 #ifdef SNAPSHOT_PROFILE
@@ -128,7 +134,7 @@ public:
 #endif
             if (const auto& renderer = android_getOpenglesRenderer()) {
                 renderer->pauseAllPreSave();
-                stream->putByte(1);
+                stream->putByte(1); // hasRenderer
                 stream->putBe32(OPENGL_SAVE_VERSION);
 
                 android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
