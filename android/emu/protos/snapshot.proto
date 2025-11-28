@@ -63,10 +63,14 @@ message Config {
     repeated int32 enabled_features = 1;
 
     // This holds the renderer; int32 for the same reason as |enabled_features|.
-    optional int32 selected_renderer = 2;
+    // Deprecated, use gles/vulkan renderer fields separately
+    optional int32 selected_renderer = 2 [deprecated = true];
 
     optional int32 cpu_core_count = 3;
     optional int64 ram_size_bytes = 4;
+
+    optional int32 selected_gles_renderer = 5;
+    optional int32 selected_vulkan_renderer = 6;
 }
 
 message SaveStats {

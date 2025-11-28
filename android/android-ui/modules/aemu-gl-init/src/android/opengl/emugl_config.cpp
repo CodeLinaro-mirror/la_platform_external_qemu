@@ -908,8 +908,6 @@ bool emuglConfig_init(EmuglConfig* config,
 void emuglConfig_setupEnv(const EmuglConfig* config) {
     System* system = System::get();
 
-    const SelectedRenderer renderer = emuglConfig_get_current_renderer();
-
     // Setup Vulkan
     const bool use_host_vulkan = (strcmp(config->vulkan_backend, "host") == 0);
     if (use_host_vulkan) {
