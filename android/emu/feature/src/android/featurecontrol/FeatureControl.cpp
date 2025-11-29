@@ -97,5 +97,9 @@ void initialize() {
     FeatureControlImpl::create();
 }
 
+void reset() {
+    FeatureControlImpl::get().resetAll();
+}
+
 }  // namespace featurecontrol
 }  // namespace android

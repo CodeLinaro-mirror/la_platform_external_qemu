@@ -22,6 +22,10 @@ void feature_initialize() {
     android::featurecontrol::initialize();
 }
 
+void feature_reset() {
+    android::featurecontrol::reset();
+}
+
 bool feature_is_enabled(Feature feature) {
     auto value = static_cast<android::featurecontrol::Feature>(feature);
     return android::featurecontrol::isEnabled(value);

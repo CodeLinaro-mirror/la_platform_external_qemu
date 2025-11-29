@@ -384,6 +384,17 @@ void FeatureControlImpl::resetEnabledToDefault(Feature feature) {
     }
 }
 
+void FeatureControlImpl::resetAll() {
+    for (auto& [key, currFeature] : mFeatures) {
+        currFeature.setCurrentVal(currFeature.defaultVal);
+        if (currFeature.isOverridden) {
+            currFeature.isOverridden = false;
+            dprint("Feature '%s' override is reset",
+                   toString(currFeature.name).data());
+        }
+    }
+}
+
 bool FeatureControlImpl::isOverridden(Feature feature) const {
     const auto it = mFeatures.find(feature);
     if (it == mFeatures.end()) {

@@ -84,6 +84,7 @@ public:
     void setIfNotOverriden(Feature feature, bool isEnabled);
     void setIfNotOverridenOrGuestDisabled(Feature feature, bool isEnabled);
     void makeReadOnly(Feature feature);
+    void resetAll();
 
     static Feature fromString(std::string_view str);
     static std::string_view toString(Feature feature);
