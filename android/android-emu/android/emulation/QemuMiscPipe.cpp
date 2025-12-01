@@ -235,6 +235,52 @@ static void miscPipeSetPaddingAndCutout(emulation::AdbInterface* adbInterface, A
     }
 }
 
+static void tryToInstallOverlay(std::string overlayName) {
+    auto hw = getConsoleAgents()->settings->hw();
+    std::string sysimg_dir(path_dirname(hw->disk_ramdisk_path));
+    std::string pixel_10_pro_fold_dir = PathUtils::join(
+            sysimg_dir.c_str(), "data", "misc", "pixel_10_pro_fold");
+    if (path_exists(pixel_10_pro_fold_dir.c_str())) {
+        // this image has the skins already, do nothing
+        // this is valid assumption as pixel_10_pro_fold is indicative
+        // of the availability of other pixel_10 skins
+        return;
+    }
+    using Apks = std::vector<std::string>;
+    using MapType = std::unordered_map<std::string, Apks>;
+    MapType overlayToApks{
+            {"pixel_10",
+             {"EmulationPixel10Overlay.apk",
+              "SystemUIEmulationPixel10Overlay.apk"}},
+            {"pixel_10_pro",
+             {"EmulationPixel10ProOverlay.apk",
+              "SystemUIEmulationPixel10ProOverlay.apk"}},
+            {"pixel_10_pro_fold",
+             {"EmulationPixel10ProFoldOverlay.apk",
+              "SystemUIEmulationPixel10ProFoldOverlay.apk"}},
+            {"pixel_10_pro_xl",
+             {"EmulationPixel10ProXLOverlay.apk",
+              "SystemUIEmulationPixel10ProXLOverlay.apk"}},
+    };
+
+    const std::string build_type =
+            fc::isEnabled(fc::PlayStoreImage) ? "user" : "userdebug";
+    auto adbInterfaceInCallback = emulation::AdbInterface::getGlobal();
+    for (auto apk : overlayToApks[overlayName]) {
+        const std::string filePath = PathUtils::join(
+                base::System::get()->getLauncherDirectory(), "resources",
+                "skins", "android-36", build_type, overlayName, apk);
+        if (path_exists(filePath.c_str())) {
+            adbInterfaceInCallback->runAdbCommand(
+                    {"install", filePath.c_str()},
+                    [](const android::emulation::OptionalAdbCommandResult&) {
+                        ;
+                    },
+                    5000);
+        }
+    }
+}
+
 void miscPipeSetAndroidOverlay(emulation::AdbInterface* adbInterface) {
     // overlay for pixels with system after O
     if (fc::isEnabled(fc::DeviceSkinOverlay) &&
@@ -246,9 +292,20 @@ void miscPipeSetAndroidOverlay(emulation::AdbInterface* adbInterface) {
         const char* overlayName = avdInfo_skinHasOverlay(skinName)
                                           ? skinName
                                           : myhw->hw_device_name;
+
         if (resizableEnabled34()) {
             overlayName = getResizableOverlayName();
         }
+
+        // hacky: api 36 system images do not ship with pixel 10 skin apks,
+        // install them from emualtor's resource/skins/android-36/user or
+        // userdebug/folder
+        if ((avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) ==
+             36) &&
+            strncmp(overlayName, "pixel_10", strlen("pixel_10")) == 0) {
+            tryToInstallOverlay(overlayName);
+        }
+
         if (avdInfo_skinHasOverlay(overlayName)) {
             std::string overlayNameString(overlayName);
 
