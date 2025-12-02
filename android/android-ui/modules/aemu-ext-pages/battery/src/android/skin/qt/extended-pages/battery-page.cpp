@@ -51,7 +51,7 @@ static void saveCharger(BatteryCharger charger);
 static void saveHealth(BatteryHealth health);
 static void saveStatus(BatteryStatus status);
 
-static int getSavedChargeLevel();
+static int getSavedChargeLevel(bool allow_zero);
 static BatteryCharger getSavedCharger();
 static BatteryHealth getSavedHealth();
 static BatteryStatus getSavedStatus();
@@ -63,11 +63,11 @@ static void saveBatteryState(const BatteryState& state) {
     saveStatus(state.status);
 }
 
-static BatteryState loadBatteryState() {
+static BatteryState loadBatteryState(bool allow_zero) {
     BatteryState state;
     state.hasBattery = true;
     state.isPresent = true;
-    state.chargeLevel = getSavedChargeLevel();
+    state.chargeLevel = getSavedChargeLevel(allow_zero);
     state.charger = getSavedCharger();
     state.health = getSavedHealth();
     state.status = getSavedStatus();
@@ -152,7 +152,7 @@ BatteryPage::BatteryPage(QWidget* parent)
                     });
 
     if (getConsoleAgents()->settings->hw()->hw_battery) {
-        mState = loadBatteryState();
+        mState = loadBatteryState(false);
         mUi->bat_noBat_mask->hide();
         mUi->bat_noBat_message->hide();
     } else {
@@ -175,7 +175,7 @@ void BatteryPage::showEvent(QShowEvent* event) {
     if (getConsoleAgents()->settings->hw()->hw_battery) {
         DD("Battery present!");
         setBatteryAgent(getConsoleAgents()->battery);
-        mState = loadBatteryState();
+        mState = loadBatteryState(true);
         updateUiFromState();
     }
 }
@@ -287,7 +287,7 @@ void BatteryPage::on_bat_statusBox_activated(int index) {
 
 // QSettings implementation
 static void saveChargeLevel(int chargeLevel) {
-    int level = std::max<int>(1, chargeLevel);
+    int level = chargeLevel;
     const char* avdPath = path_getAvdContentPath(
             getConsoleAgents()->settings->hw()->avd_name);
     if (avdPath) {
@@ -347,24 +347,32 @@ static void saveStatus(BatteryStatus status) {
     }
 }
 
-static int getSavedChargeLevel() {
+static int getSavedChargeLevel(bool allow_zero) {
     const char* avdPath = path_getAvdContentPath(
             getConsoleAgents()->settings->hw()->avd_name);
+    int value;
+
     if (avdPath) {
         QString avdSettingsFile =
                 avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
         QSettings avdSpecificSettings(avdSettingsFile, QSettings::IniFormat);
-        return std::max<int>(
+        value = std::max<int>(
                 avdSpecificSettings
                         .value(Ui::Settings::PER_AVD_BATTERY_CHARGE_LEVEL, 100)
                         .toInt(),
-                1);
+                0);
     } else {
         QSettings settings;
-        return std::max<int>(
+        value = std::max<int>(
                 settings.value(Ui::Settings::BATTERY_CHARGE_LEVEL, 100).toInt(),
-                1);
+                0);
     }
+    if (value == 0 && !allow_zero) {
+        value = 1;
+        // We always re-read the saved value, so we must save the adjusted value
+        saveChargeLevel(value);
+    }
+    return value;
 }
 
 static BatteryCharger getSavedCharger() {
