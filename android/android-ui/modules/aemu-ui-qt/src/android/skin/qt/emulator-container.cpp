@@ -371,6 +371,7 @@ void EmulatorContainer::showEvent(QShowEvent* event) {
     tool_wid = (WId)getNSWindow((void*)tool_wid);
     if (wid && tool_wid) {
         nsWindowAdopt((void*)wid, (void*)tool_wid);
+        mEmulatorWindow->toolWindow()->setTouchpadWindowMacParent(wid);
     }
 #endif  // __APPLE__
 

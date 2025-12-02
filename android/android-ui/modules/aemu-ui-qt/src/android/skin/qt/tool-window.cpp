@@ -102,6 +102,10 @@
 #include "ui_tools.h"
 #include "xr_emulator_conn.pb.h"
 
+#ifdef __APPLE__
+#include "android/skin/qt/mac-native-window.h"  // for getNSWindow, nsW...
+#endif
+
 namespace {
 
 struct GestureData {
@@ -655,6 +659,19 @@ void ToolWindow::updateXrButtonsVisibility() {
     }
     updateXrNavigationButtonsChecked(mXrLastMouseKeyboardModeCommand);
 }
+
+#ifdef __APPLE__
+void ToolWindow::setTouchpadWindowMacParent(WId wid) {
+    if (!mTouchpadWindow.hasInstance())
+        return;
+    mTouchpadWindow.get()->showNormal();  // force creation of native window id
+    WId tp_wid = mTouchpadWindow.get()->effectiveWinId();
+    tp_wid = (WId)getNSWindow((void*)tp_wid);
+    if (wid && tp_wid) {
+        nsWindowAdopt((void*)wid, (void*)tp_wid);
+    }
+}
+#endif
 
 void ToolWindow::updateButtonUiCommand(QPushButton* button,
                                        const char* uiCommand) {
