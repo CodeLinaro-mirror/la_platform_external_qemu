@@ -102,6 +102,10 @@
 #include "ui_tools.h"
 #include "xr_emulator_conn.pb.h"
 
+#ifdef __APPLE__
+#include "android/skin/qt/mac-native-window.h"  // for getNSWindow, nsW...
+#endif
+
 namespace {
 
 struct GestureData {
@@ -655,6 +659,19 @@ void ToolWindow::updateXrButtonsVisibility() {
     }
     updateXrNavigationButtonsChecked(mXrLastMouseKeyboardModeCommand);
 }
+
+#ifdef __APPLE__
+void ToolWindow::setTouchpadWindowMacParent(WId wid) {
+    if (!mTouchpadWindow.hasInstance())
+        return;
+    mTouchpadWindow.get()->showNormal();  // force creation of native window id
+    WId tp_wid = mTouchpadWindow.get()->effectiveWinId();
+    tp_wid = (WId)getNSWindow((void*)tp_wid);
+    if (wid && tp_wid) {
+        nsWindowAdopt((void*)wid, (void*)tp_wid);
+    }
+}
+#endif
 
 void ToolWindow::updateButtonUiCommand(QPushButton* button,
                                        const char* uiCommand) {
@@ -1782,12 +1799,22 @@ void ToolWindow::on_all_apps_button_released() {
 }
 
 void ToolWindow::on_minimize_button_clicked() {
-#ifdef __linux__
+    // Using hide for MacOS to avoid extra minimized windows showing
+    // up on the toolbar, as well as avoiding positioning issues on
+    // unminimizing
+#if defined (__linux__) || defined(__APPLE__)
     this->hide();
 #else
     this->showMinimized();
 #endif
     mEmulatorWindow->showMinimized();
+    if (mTouchpadWindow.hasInstance()) {
+#if defined (__linux__) || defined(__APPLE__)
+        mTouchpadWindow.get()->hide();
+#else
+        mTouchpadWindow.get()->showMinimized();
+#endif
+    }
 }
 
 void ToolWindow::on_power_button_pressed() {

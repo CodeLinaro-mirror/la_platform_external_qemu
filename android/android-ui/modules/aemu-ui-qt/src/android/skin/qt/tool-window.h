@@ -118,6 +118,9 @@ public:
     void enableCloseButton();
     void updateFoldableButtonVisibility();
     void updateXrButtonsVisibility();
+#ifdef __APPLE__
+    void setTouchpadWindowMacParent(WId wid);
+#endif
 
     // Observed only on Windows:
     // Whenever we set the window flags for the EmulatorContainer,
