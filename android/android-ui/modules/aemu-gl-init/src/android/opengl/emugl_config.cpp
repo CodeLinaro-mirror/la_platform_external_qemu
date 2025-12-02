@@ -928,11 +928,12 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
 #else
         system->envSet("ANDROID_EMU_VK_ICD", NULL);
 #endif
-    } else if ((strcmp(config->vulkan_backend, "lavapipe") == 0)) {
-        system->envSet("ANDROID_EMU_VK_ICD", "lavapipe");
-    } else {
+    } else if ((strcmp(config->vulkan_backend, "swiftshader") == 0)) {
         // Use Swiftshader vk icd if using swiftshader_indirect
         system->envSet("ANDROID_EMU_VK_ICD", "swiftshader");
+    } else {
+        // Use lavapipe vk icd by default
+        system->envSet("ANDROID_EMU_VK_ICD", "lavapipe");
     }
 
     // Setup GLES

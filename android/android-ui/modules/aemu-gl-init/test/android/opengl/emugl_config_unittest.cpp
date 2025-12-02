@@ -10,6 +10,7 @@
 // GNU General Public License for more details.
 
 #include "host-common/opengl/emugl_config.h"
+#include "host-common/feature_control.h"
 #include "android/opengl/EmuglBackendList.h"
 #include "android/opengl/gpuinfo.h"
 #include "aemu/base/Optional.h"
@@ -347,6 +348,9 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
     makeSwiftshaderSubDirAndFiles(myDir);
 
     {
+        // Reset feature flags
+        feature_reset();
+
         // with valid values
         EmuglConfig config;
         EXPECT_TRUE(androidEmuglConfigInit(&config, "host", "host", false,
@@ -356,6 +360,9 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
     }
 
     {
+        // Reset feature flags
+        feature_reset();
+
         // with '-gpu software' value
         EmuglConfig config;
         EXPECT_TRUE(androidEmuglConfigInit(&config, "software", "auto", false,
@@ -364,6 +371,9 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
     }
 
     {
+        // Reset feature flags
+        feature_reset();
+
         // with null options
         EmuglConfig config;
         bool initRes = androidEmuglConfigInit(&config, nullptr, nullptr, false,
@@ -379,6 +389,9 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
     }
 
     {
+        // Reset feature flags
+        feature_reset();
+
         // invalid values should fallback to 'auto' and work fine
         EmuglConfig config;
         bool initRes = androidEmuglConfigInit(&config, "invalid", "unknown", false,
