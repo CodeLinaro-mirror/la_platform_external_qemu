@@ -13,16 +13,27 @@
 // limitations under the License.
 #include "fishtank_agents.h"
 
+#include <string>
 #include "android/emulation/control/clipboard_agent.h"
 
+bool sEnabled = true;
+
 const QAndroidClipboardAgent sFishtankQAndroidClipboardAgent = {
-        .setEnabled = [](bool enabled) { NOT_IMPLEMENTED("QAndroidClipboardAgent.setEnabled(enabled: %d)", enabled); },
+        .setEnabled = [](bool enabled) { sEnabled = enabled; },
         .registerGuestClipboardCallback =
                 [](void (*cb)(void*, const uint8_t*, size_t), void* opaque) {
-                    NOT_IMPLEMENTED("QAndroidClipboardAgent.registerGuestClipboardCallback(cb: %p, opaque: %p)", cb, opaque);
+                    getGlobalControlClient()->streamClipboardAsync(
+                            [cb, opaque](auto clipdata) {
+                                auto text = clipdata->text();
+                                cb(opaque, (uint8_t*)text.c_str(), text.size());
+                            },
+                            [](auto status) {
+                                LOG(INFO) << "Clipboard closed: " << status;
+                            });
                 },
         .setGuestClipboardContents =
                 [](const uint8_t* data, size_t size) {
-                    NOT_IMPLEMENTED("QAndroidClipboardAgent.setGuestClipboardContents(data: %p, size: %zu)", data, size);
+                    getGlobalControlClient()->setClipboardAsync(
+                            std::string((char*)data, size));
                 },
 };

@@ -15,11 +15,8 @@
 #include "aemu/base/logging/CLog.h"
 #include "android/cmdline-definitions.h"
 #include "host-common/window_agent.h"
-
-// Forward declarations
-namespace android { namespace emulation { namespace control {
-    class EmulatorControlClient;
-}}}
+#include <memory>
+#include "android/emulation/control/utils/EmulatorControlClient.h"
 
 // clang-format off
 struct QAndroidAutomationAgent;
@@ -76,6 +73,9 @@ extern const QAndroidUserEventAgent sFishtankQAndroidUserEventAgent;
 extern const QAndroidVirtualSceneAgent sFishtankQAndroidVirtualSceneAgent;
 extern const QAndroidVmOperations sFishtankQAndroidVmOperations;
 extern "C" const QAndroidSurfaceAgent* const gQAndroidSurfaceAgent;
+
+
+std::shared_ptr<android::emulation::control::EmulatorControlClient> getGlobalControlClient();
 
 void initializeGrpcUserEventAgent(
         android::emulation::control::EmulatorControlClient* client);

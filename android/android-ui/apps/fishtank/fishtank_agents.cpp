@@ -31,6 +31,7 @@
 #include "android/emulation/control/surface_agent.h"
 #include "android/emulation/control/telephony_agent.h"
 #include "android/emulation/control/user_event_agent.h"
+#include "android/emulation/control/utils/EmulatorControlClient.h"
 #include "android/emulation/control/virtual_scene_agent.h"
 #include "host-common/display_agent.h"
 #include "host-common/multi_display_agent.h"

@@ -21,6 +21,7 @@
 #include "android/cmdline-definitions.h"
 #include "android/console.h"
 #include "android/crashreport/crash-initializer.h"
+#include "android/emulation/control/EmulatorAdvertisement.h"
 #include "android/emulation/control/ScreenCapturer.h"
 #include "android/emulation/control/interceptor/LoggingInterceptor.h"
 #include "android/emulation/control/utils/EmulatorControlClient.h"
@@ -39,7 +40,10 @@
 #include "android/utils/debug.h"
 #include "fishtank_agents.h"
 
+#include <algorithm>
 #include "absl/log/log.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/feature_control.h"
 
@@ -59,7 +63,6 @@ extern void myMessageOutput(QtMsgType type,
                             const QString& msg);
 extern "C" void emulator_window_refresh(EmulatorWindow* emulator);
 
-
 using android::control::interceptor::StdOutLoggingInterceptorFactory;
 
 AndroidOptions sOpts[1];
@@ -71,6 +74,14 @@ void messagePump(int, char**) {
         emulator_window_refresh(window);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+}
+
+std::shared_ptr<android::emulation::control::EmulatorControlClient>
+        gControlClient;
+
+std::shared_ptr<android::emulation::control::EmulatorControlClient>
+getGlobalControlClient() {
+    return gControlClient;
 }
 
 int main(int argc, char* argv[]) {
@@ -136,7 +147,25 @@ int main(int argc, char* argv[]) {
         builder.withInterceptor(new StdOutLoggingInterceptorFactory());
     }
 
-    auto status = builder.withDiscoveryFile(opts->fishtank).build();
+    std::string discovery = opts->fishtank;
+    if ("default" == discovery) {
+        android::emulation::control::EmulatorAdvertisement adv({});
+        auto emulators = adv.discoverRunningEmulators();
+        std::vector<std::string> discovery_files;
+        std::copy_if(emulators.begin(), emulators.end(),
+                     std::back_inserter(discovery_files),
+                     [](auto str) { return absl::EndsWith(str, ".ini"); });
+
+        if (discovery_files.empty()) {
+            LOG(FATAL) << "No running emulators were found";
+        }
+
+        LOG(INFO) << "Discovered: " << absl::StrJoin(discovery_files, ",");
+        discovery = discovery_files[0];
+    }
+
+    auto status = builder.withDiscoveryFile(discovery).build();
+
     if (!status.ok()) {
         LOG(FATAL) << "Failed to discover emulator due to "
                    << status.status().ToString();
@@ -150,10 +179,10 @@ int main(int argc, char* argv[]) {
         LOG(FATAL) << "Failed to connect to emulator";
     }
 
-    auto controlClient = std::make_unique<
+    gControlClient = std::make_shared<
             android::emulation::control::EmulatorControlClient>(
             android::emulation::control::EmulatorGrpcClient::me());
-    initializeGrpcUserEventAgent(controlClient.get());
+    initializeGrpcUserEventAgent(gControlClient.get());
 
     if (!fc::isOverridden(fc::GuestAngle)) {
         switch (skin_winsys_get_preferred_gles_driver()) {
@@ -215,7 +244,7 @@ int main(int argc, char* argv[]) {
     android::files::TemporaryFile pixels;
     LOG(INFO) << "Sharing pixels at: " << pixels.path();
     EmulatorQtWindow* window = EmulatorQtWindow::getInstance();
-    window->initializeStreamer("file:///" +  pixels.path());
+    window->initializeStreamer("file:///" + pixels.path());
 
     LOG(INFO) << "Setting up window";
     emulator_window_setup(emulator_window_get());
