@@ -333,8 +333,6 @@ int android_startOpenglesRenderer(
                      &gfxstream::host::FeatureSet::NativeTextureDecompression},
                     {android::featurecontrol::NoDelayCloseColorBuffer,
                      &gfxstream::host::FeatureSet::NoDelayCloseColorBuffer},
-                    {android::featurecontrol::PlayStoreImage,
-                     &gfxstream::host::FeatureSet::PlayStoreImage},
                     {android::featurecontrol::RefCountPipe,
                      &gfxstream::host::FeatureSet::RefCountPipe},
                     {android::featurecontrol::SystemBlob,
