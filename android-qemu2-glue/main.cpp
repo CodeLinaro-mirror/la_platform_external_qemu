@@ -1340,6 +1340,10 @@ static int startEmulatorWithMinConfig(int argc,
             rendererConfig.selectedGlesRenderer == SELECTED_RENDERER_HOST &&
             async_query_host_gpu_SyncBlacklisted();
 
+    if (fc::isEnabled(fc::VulkanNativeSwapchain)) {
+        shouldDisableAsyncSwap = true;
+    }
+
     if (shouldDisableAsyncSwap) {
         fc::setEnabledOverride(fc::GLAsyncSwap, false);
     }
