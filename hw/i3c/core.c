@@ -244,40 +244,26 @@ int i3c_start_send(I3CBus *bus, uint8_t address)
 void i3c_end_transfer(I3CBus *bus)
 {
     I3CTargetClass *tc;
-    I3CNode *node, *next;
 
     trace_i3c_end_transfer();
 
     /*
-     * If we're in ENTDAA, we need to notify all devices when ENTDAA is done.
-     * This is because everyone initially participates due to the broadcast,
-     * but gradually drops out as they get assigned addresses.
-     * Since the current_devs list only stores who's currently participating,
-     * and not everyone who previously participated, we send the STOP to all
-     * children.
+     * We need to send STOPs to all devices, since it's possible for devices to
+     * ACK and initially participate on the bus, such as with ENTDAA and direct
+     * CCCs, but then no longer participate on the bus, such as ENTDAA after
+     * being assigned an address, or if the CCC is a direct CCC and the target
+     * isn't addressed.
      */
-    if (bus->in_entdaa) {
-        BusChild *child;
-
-        QTAILQ_FOREACH(child, &bus->parent_obj.children, sibling) {
-            DeviceState *qdev = child->child;
-            I3CTarget *t = I3C_TARGET(qdev);
-            tc = I3C_TARGET_GET_CLASS(t);
-            if (tc->event) {
-                i3c_target_event(t, I3C_STOP);
-            }
-        }
-    } else {
-        QLIST_FOREACH_SAFE(node, &bus->current_devs, next, next) {
-            I3CTarget *t = node->target;
-            tc = I3C_TARGET_GET_CLASS(t);
-            if (tc->event) {
-                i3c_target_event(t, I3C_STOP);
-            }
-            QLIST_REMOVE(node, next);
-            g_free(node);
+    BusChild *child;
+    QTAILQ_FOREACH(child, &bus->parent_obj.children, sibling) {
+        DeviceState *qdev = child->child;
+        I3CTarget *t = I3C_TARGET(qdev);
+        tc = I3C_TARGET_GET_CLASS(t);
+        if (tc->event) {
+            i3c_target_event(t, I3C_STOP);
         }
     }
+
     bus->broadcast = false;
     bus->in_entdaa = false;
     bus->in_ccc = false;
