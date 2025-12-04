@@ -321,7 +321,9 @@ static int i3c_target_handle_ccc_write(I3CTarget *t, const uint8_t *data,
         }
         break;
     case I3C_CCCD_SETDASA:
-        t->address = t->static_address;
+        /* The address will come in shifted to the left by 1, so undo that. */
+        t->address = *data >> 1;
+        ++*num_sent;
         break;
     case I3C_CCC_SETAASA:
         t->address = t->static_address;
