@@ -1256,18 +1256,19 @@ static int startEmulatorWithMinConfig(int argc,
     // Feature flags-related last-microsecond renderer changes
     {
         // Should enable OpenGL ES 3.x?
-        if (skin_winsys_get_preferred_gles_apilevel() ==
+        WinsysPreferredGlesApiLevel preferredGlesApiLlevel = skin_winsys_get_preferred_gles_apilevel();
+        if (preferredGlesApiLlevel ==
             WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT) {
             fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion, false);
         }
 
-        if (skin_winsys_get_preferred_gles_apilevel() ==
+        if (preferredGlesApiLlevel ==
             WINSYS_GLESAPILEVEL_PREFERENCE_MAX) {
             fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion, true);
         }
 
         if (apiLevel >= 31) {
-            if (skin_winsys_get_preferred_gles_apilevel() ==
+            if (preferredGlesApiLlevel ==
                 WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT) {
                 dwarning(
                         "API level %d requires OpenGL ES 3.0+, attempting to"
@@ -3313,6 +3314,7 @@ extern "C" int main(int argc, char** argv) {
 
         // Feature flags-related last-microsecond renderer changes
         {
+            WinsysPreferredGlesApiLevel preferredGlesApiLlevel = skin_winsys_get_preferred_gles_apilevel();
             // b/147241060
             // Chrome on R requires GLAsyncSwap, otherwise it will spam logcat
             if (avdInfo_getApiLevel(avd) >= 30) {
@@ -3320,13 +3322,13 @@ extern "C" int main(int argc, char** argv) {
             }
 
             // Should enable OpenGL ES 3.x?
-            if (skin_winsys_get_preferred_gles_apilevel() ==
+            if (preferredGlesApiLlevel ==
                 WINSYS_GLESAPILEVEL_PREFERENCE_MAX) {
                 fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion,
                                                      true);
             }
 
-            if (skin_winsys_get_preferred_gles_apilevel() ==
+            if (preferredGlesApiLlevel ==
                         WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT ||
                 System::get()->getProgramBitness() == 32) {
                 fc::setIfNotOverridenOrGuestDisabled(fc::GLESDynamicVersion,
@@ -3341,7 +3343,7 @@ extern "C" int main(int argc, char** argv) {
 
             // API 31 needs GLES 3.0+ to boot
             if (apiLevel >= 31) {
-                if (skin_winsys_get_preferred_gles_apilevel() ==
+                if (preferredGlesApiLlevel ==
                     WINSYS_GLESAPILEVEL_PREFERENCE_COMPAT) {
                     dwarning(
                             "API level %d requires OpenGL ES 3.0+, attempting "

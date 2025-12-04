@@ -854,25 +854,33 @@ static SaveSnapshotOnExit getSaveOnExitChoice() {
 }
 #endif
 
-static void set_guestGlesDriver_to(WinsysGuestGlesDriverPreference v) {
-    const char* avdPath = avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo());
+template <typename T>
+static void set_per_avd_setting_to(const char* key, T value) {
+    const char* avdPath =
+            (getConsoleAgents() && getConsoleAgents()->settings)
+                    ? avdInfo_getContentPath(
+                              getConsoleAgents()->settings->avdInfo())
+                    : nullptr;
     if (avdPath) {
-        QString avdSettingsFile = avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
+        QString avdSettingsFile =
+                avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
         QSettings avdSpecificSettings(avdSettingsFile, QSettings::IniFormat);
-        avdSpecificSettings.setValue(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, v);
+        avdSpecificSettings.setValue(key, value);
     } else {
         dwarning("Avd path could not be resolved. Settings will not be saved.");
     }
 }
 
 static void set_glesBackend_to(WinsysPreferredGlesBackend v) {
-    QSettings settings;
-    settings.setValue(Ui::Settings::GLESBACKEND_PREFERENCE, v);
+    set_per_avd_setting_to(Ui::Settings::GLESBACKEND_PREFERENCE, v);
+}
+
+static void set_guestGlesDriver_to(WinsysGuestGlesDriverPreference v) {
+    set_per_avd_setting_to(Ui::Settings::GUEST_GLES_DRIVER_PREFERENCE, v);
 }
 
 static void set_glesApiLevel_to(WinsysPreferredGlesApiLevel v) {
-    QSettings settings;
-    settings.setValue(Ui::Settings::GLESAPILEVEL_PREFERENCE, v);
+    set_per_avd_setting_to(Ui::Settings::GLESAPILEVEL_PREFERENCE, v);
 }
 
 void SettingsPage::on_set_glesBackendPrefComboBox_currentIndexChanged(

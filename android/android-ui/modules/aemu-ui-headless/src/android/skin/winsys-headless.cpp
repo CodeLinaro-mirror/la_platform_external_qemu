@@ -274,12 +274,6 @@ extern WinsysPreferredGlesBackend skin_winsys_get_preferred_gles_backend() {
     return WINSYS_GLESBACKEND_PREFERENCE_AUTO;
 }
 
-void skin_winsys_set_preferred_gles_backend(
-        WinsysPreferredGlesBackend backend) {
-    D("skin_winsys_set_preferred_gles_backend");
-    (void)backend;
-}
-
 extern WinsysPreferredGlesApiLevel skin_winsys_get_preferred_gles_apilevel() {
     D("skin_winsys_get_preferred_gles_apilevel");
     return WINSYS_GLESAPILEVEL_PREFERENCE_AUTO;
