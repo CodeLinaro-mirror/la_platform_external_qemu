@@ -1279,7 +1279,7 @@ static int startEmulatorWithMinConfig(int argc,
         }
 
         if (!fc::isOverridden(fc::GuestAngle)) {
-            switch (skin_winsys_get_preferred_gles_driver()) {
+            switch (skin_winsys_get_preferred_guest_gles_driver()) {
                 case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
                     fc::setEnabledOverride(fc::GuestAngle, false);
                     dinfo("Guest Driver: Native (ext controls)");
@@ -1829,7 +1829,7 @@ extern "C" int main(int argc, char** argv) {
     }
 
     if (!fc::isOverridden(fc::GuestAngle)) {
-        switch (skin_winsys_get_preferred_gles_driver()) {
+        switch (skin_winsys_get_preferred_guest_gles_driver()) {
             case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
                 fc::setEnabledOverride(fc::GuestAngle, false);
                 dinfo("Guest GLES Driver: Native (ext controls)");
