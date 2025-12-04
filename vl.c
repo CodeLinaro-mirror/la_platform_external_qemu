@@ -3338,8 +3338,8 @@ static const char gpuEmulationInitFailureMessage[] =
     "1. Make sure your GPU drivers are up to date.\n\n"
     "2. Erase and re-download the emulator ($ANDROID_SDK_ROOT/emulator).\n\n"
     "3. Try software rendering: Go to Extended Controls > Settings > Advanced tab and change "
-    "\"OpenGL ES renderer (requires restart)\" to \"Swiftshader\".\n\n"
-    "Or, run emulator from command line with \"-gpu swiftshader_indirect\". "
+    "\"Graphics Acceleration\" to \"Software\".\n\n"
+    "Or, run emulator from command line with \"-gpu software\". "
     "4. Please file an issue to https://issuetracker.google.com/issues?q=componentid:192727 "
     "and provide your complete CPU/GPU info plus OS and display setup.\n";
 
