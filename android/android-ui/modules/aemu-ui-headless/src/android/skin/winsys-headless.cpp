@@ -259,13 +259,13 @@ WinsysPreferredGlesBackend skin_winsys_override_glesbackend_if_auto(
     return currentPreferred;
 }
 
-extern WinsysGuestGlesDriverPreference skin_winsys_get_preferred_gles_driver() {
-    D("skin_winsys_get_preferred_gles_driver");
+extern WinsysGuestGlesDriverPreference skin_winsys_get_preferred_guest_gles_driver() {
+    D("skin_winsys_get_preferred_guest_gles_driver");
     return WINSYS_GUEST_GLES_DRIVER_PREFERENCE_AUTO;
 }
 
-void skin_winsys_set_preferred_gles_driver(WinsysGuestGlesDriverPreference renderer) {
-    D("skin_winsys_set_preferred_gles_driver");
+void skin_winsys_set_preferred_guest_gles_driver(WinsysGuestGlesDriverPreference renderer) {
+    D("skin_winsys_set_preferred_guest_gles_driver");
     (void)renderer;
 }
 

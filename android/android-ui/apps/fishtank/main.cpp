@@ -185,7 +185,7 @@ int main(int argc, char* argv[]) {
     initializeGrpcUserEventAgent(gControlClient.get());
 
     if (!fc::isOverridden(fc::GuestAngle)) {
-        switch (skin_winsys_get_preferred_gles_driver()) {
+        switch (skin_winsys_get_preferred_guest_gles_driver()) {
             case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
                 fc::setEnabledOverride(fc::GuestAngle, false);
                 dinfo("Guest GLES Driver: Native (ext controls)");
@@ -204,20 +204,10 @@ int main(int argc, char* argv[]) {
     WinsysPreferredGlesBackend uiPreferredGlesBackend =
             skin_winsys_get_preferred_gles_backend();
 
-    RendererConfig rendererConfig;
-    if (fc::isEnabled(fc::ForceANGLE)) {
-        uiPreferredGlesBackend = skin_winsys_override_glesbackend_if_auto(
-                WINSYS_GLESBACKEND_PREFERENCE_ANGLE);
-    }
-
-    if (fc::isEnabled(fc::ForceSwiftshader)) {
-        uiPreferredGlesBackend = skin_winsys_override_glesbackend_if_auto(
-                WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER);
-    }
-
     android_set_external_renderer_active(true);
     // Needs to be called before compatibility checks to correctly control
     // if hw gpu is going to be used
+    RendererConfig rendererConfig;
     if (!configureRenderer(uiPreferredGlesBackend, &rendererConfig)) {
         derror("Error: could not configure renderer!");
     }

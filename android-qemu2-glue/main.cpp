@@ -1279,7 +1279,7 @@ static int startEmulatorWithMinConfig(int argc,
         }
 
         if (!fc::isOverridden(fc::GuestAngle)) {
-            switch (skin_winsys_get_preferred_gles_driver()) {
+            switch (skin_winsys_get_preferred_guest_gles_driver()) {
                 case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
                     fc::setEnabledOverride(fc::GuestAngle, false);
                     dinfo("Guest Driver: Native (ext controls)");
@@ -1291,16 +1291,6 @@ static int startEmulatorWithMinConfig(int argc,
                 default:
                     dinfo("Guest Driver: Auto (ext controls)");
             }
-        }
-
-        if (fc::isEnabled(fc::ForceANGLE)) {
-            uiPreferredGlesBackend = skin_winsys_override_glesbackend_if_auto(
-                    WINSYS_GLESBACKEND_PREFERENCE_ANGLE);
-        }
-
-        if (fc::isEnabled(fc::ForceSwiftshader)) {
-            uiPreferredGlesBackend = skin_winsys_override_glesbackend_if_auto(
-                    WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER);
         }
     }
     android_init_multi_display(getConsoleAgents()->emu,
@@ -1833,7 +1823,7 @@ extern "C" int main(int argc, char** argv) {
     }
 
     if (!fc::isOverridden(fc::GuestAngle)) {
-        switch (skin_winsys_get_preferred_gles_driver()) {
+        switch (skin_winsys_get_preferred_guest_gles_driver()) {
             case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
                 fc::setEnabledOverride(fc::GuestAngle, false);
                 dinfo("Guest GLES Driver: Native (ext controls)");
@@ -1852,21 +1842,9 @@ extern "C" int main(int argc, char** argv) {
     WinsysPreferredGlesBackend uiPreferredGlesBackend =
             skin_winsys_get_preferred_gles_backend();
 
-    RendererConfig rendererConfig;
-    if (fc::isEnabled(fc::ForceANGLE)) {
-        uiPreferredGlesBackend =
-                skin_winsys_override_glesbackend_if_auto(
-                        WINSYS_GLESBACKEND_PREFERENCE_ANGLE);
-    }
-
-    if (fc::isEnabled(fc::ForceSwiftshader)) {
-        uiPreferredGlesBackend =
-                skin_winsys_override_glesbackend_if_auto(
-                        WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER);
-    }
-
     // Needs to be called before compatibility checks to correctly control
     // if hw gpu is going to be used
+    RendererConfig rendererConfig;
     if (!configureRenderer(uiPreferredGlesBackend, &rendererConfig)) {
         derror("Error: could not configure renderer!");
         return 1;
