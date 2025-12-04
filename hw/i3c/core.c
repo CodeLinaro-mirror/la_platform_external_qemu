@@ -109,6 +109,9 @@ static bool i3c_target_ccc_is_supported(I3CTarget *s, I3CCCC ccc)
     case I3C_CCCD_SETMRL:
     case I3C_CCCD_GETMWL:
     case I3C_CCCD_GETMRL:
+    case I3C_CCCD_GETPID:
+    case I3C_CCCD_GETBCR:
+    case I3C_CCCD_GETDCR:
         return true;
     default:
         return false;
