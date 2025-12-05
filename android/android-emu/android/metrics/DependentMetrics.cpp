@@ -395,6 +395,15 @@ static android_studio::EmulatorAvdInfo::EmulatorDeviceName getDeviceName() {
     if (0 == strcmp(id, "wearos_square")) {
         return android_studio::EmulatorAvdInfo::WEAROS_SQUARE;
     }
+    if (0 == strcmp(id, "xr_headset_device")) {
+        return android_studio::EmulatorAvdInfo::XR_HEADSET_DEVICE;
+    }
+    if (0 == strcmp(id, "xr_glasses_device")) {
+        return android_studio::EmulatorAvdInfo::XR_GLASSES_DEVICE;
+    }
+    if (0 == strcmp(id, "ai_glasses_device")) {
+        return android_studio::EmulatorAvdInfo::AI_GLASSES_DEVICE;
+    }
     return android_studio::EmulatorAvdInfo::UNKNOWN_EMULATOR_DEVICE_NAME;
 }
 

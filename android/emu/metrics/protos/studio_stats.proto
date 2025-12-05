@@ -3015,6 +3015,9 @@ message EmulatorAvdInfo {
     PIXEL_10_PRO = 55;
     PIXEL_10_PRO_XL = 56;
     PIXEL_10_PRO_FOLD = 57;
+    XR_HEADSET_DEVICE = 58;
+    XR_GLASSES_DEVICE = 59;
+    AI_GLASSES_DEVICE = 60;
   }
   // Name of the AVD. Deprecated as it could potentially contain PII.
   optional string name = 1 [deprecated = true];
@@ -18128,6 +18131,20 @@ message JourneyEngineErrorEvent {
     AUTHENTICATION_FAILED = 6;
     // The engine failed to determine the error
     UNKNOWN_ERROR = 7;
+    // The crawler ran out of time before exploring all actions
+    CRAWLER_TIMED_OUT = 8;
+    // The app terminated during the crawl
+    APP_TERMINATED = 9;
+    // The crawler service was terminated unexepectedly (e.g. OOM)
+    CRAWLER_TERMINATED = 10;
+    // The crawl was canceled by the user
+    CRAWLER_CANCELLED = 11;
+    // The agent timed out
+    AGENT_TIMED_OUT = 12;
+    // The agent returned a RESOURCE_EXHAUSTED error
+    AGENT_RESOURCE_EXHAUSTED = 13;
+    // The app failed to launch
+    LAUNCH_APP_FAILED = 14;
   }
 
   optional ErrorType error_type = 1;
