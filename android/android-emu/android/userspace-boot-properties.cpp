@@ -172,6 +172,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     const char* qemuDrawFlushIntervalProp;
     const char* qemuOpenglesVersionProp;
     const char* qemuUirendererProp;
+    const char* qemuHardwareGralloc;
     const char* qemuRenderengineProp;
     const char* dalvikVmHeapsizeProp;
     const char* qemuLegacyFakeCameraProp;
@@ -214,6 +215,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
                 "androidboot.qemu.gltransport.drawFlushInterval";
         qemuOpenglesVersionProp = "androidboot.opengles.version";
         qemuUirendererProp = "androidboot.debug.hwui.renderer";
+        qemuHardwareGralloc = "androidboot.hardware.gralloc";
         qemuRenderengineProp = "androidboot.debug.renderengine.backend";
         dalvikVmHeapsizeProp = "androidboot.dalvik.vm.heapsize";
         qemuLegacyFakeCameraProp = "androidboot.qemu.legacy_fake_camera";
@@ -252,6 +254,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         qemuDrawFlushIntervalProp = "qemu.gltransport.drawFlushInterval";
         qemuOpenglesVersionProp = "qemu.opengles.version";
         qemuUirendererProp = "qemu.uirenderer";
+        qemuHardwareGralloc = "qemu.hardware.gralloc";
         qemuRenderengineProp = nullptr;
         dalvikVmHeapsizeProp = "qemu.dalvik.vm.heapsize";
         qemuLegacyFakeCameraProp = "qemu.legacy_fake_camera";
@@ -585,6 +588,11 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     if (qemuUirendererPropValue) {
         params.push_back({qemuUirendererProp, qemuUirendererPropValue});
     }
+
+    if(fc::isEnabled(fc::Minigbm)) {
+        params.push_back({qemuHardwareGralloc, "minigbm"});
+    }
+
     if (qemuRenderengineProp && qemuRenderenginePropValue) {
         params.push_back({qemuRenderengineProp, qemuRenderenginePropValue});
     }
