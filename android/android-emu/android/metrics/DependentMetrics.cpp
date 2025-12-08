@@ -128,9 +128,38 @@ toClearcutLogUpdateChannel(android::studio::UpdateChannel channel) {
 
 static android_studio::EmulatorDetails::EmulatorRenderer
 toClearcutLogEmulatorRenderer(SelectedRenderer renderer) {
-    // As of now, the enum values are exactly the same. Watch out for changes!
-    return static_cast<android_studio::EmulatorDetails::EmulatorRenderer>(
-            static_cast<int>(renderer));
+
+    // Do no static cast to avoid a hidden dependency to gfxstream internals
+    switch(renderer) {
+        case SELECTED_RENDERER_UNKNOWN:
+            return android_studio::EmulatorDetails::UNKNOWN_EMULATOR_RENDERER;
+        case SELECTED_RENDERER_HOST:
+            return android_studio::EmulatorDetails::HOST;
+        case SELECTED_RENDERER_OFF_DEPRECATED:
+            return android_studio::EmulatorDetails::OFF;
+        case SELECTED_RENDERER_GUEST_DEPRECATED:
+            return android_studio::EmulatorDetails::GUEST;
+        case SELECTED_RENDERER_MESA_DEPRECATED:
+            return android_studio::EmulatorDetails::MESA;
+        case SELECTED_RENDERER_SWIFTSHADER_DEPRECATED:
+            return android_studio::EmulatorDetails::SWIFTSHADER;
+        case SELECTED_RENDERER_ANGLE_DEPRECATED:
+            return android_studio::EmulatorDetails::ANGLE;
+        case SELECTED_RENDERER_ANGLE9_DEPRECATED:
+            return android_studio::EmulatorDetails::ANGLE9;
+        case SELECTED_RENDERER_SWIFTSHADER_INDIRECT:
+            return android_studio::EmulatorDetails::SWIFTSHADER_INDIRECT;
+        case SELECTED_RENDERER_ANGLE_INDIRECT:
+            return android_studio::EmulatorDetails::ANGLE_INDIRECT;
+        case SELECTED_RENDERER_ANGLE9_INDIRECT_DEPRECATED:
+            return android_studio::EmulatorDetails::ANGLE9_INDIRECT;
+        case SELECTED_RENDERER_LAVAPIPE:
+            return android_studio::EmulatorDetails::LAVAPIPE;
+        case SELECTED_RENDERER_ERROR:
+            return android_studio::EmulatorDetails::ERROR_IN_EMULATOR_RENDERER;
+    }
+    dwarning("%s: Unknown renderer mode: %d", __func__, (int)renderer);
+    return android_studio::EmulatorDetails::UNKNOWN_EMULATOR_RENDERER;
 }
 
 static void fillGuestGlMetrics(android_studio::AndroidStudioEvent* event) {
