@@ -170,10 +170,13 @@ bool ScreenshotUtils::getScreenshot(int displayId,
     if (renderer.get() &&
         (format == ImageFormat::RGB888 || format == ImageFormat::RGBA8888)) {
         unsigned int bpp = (format == ImageFormat::RGB888 ? 3 : 4);
-        return renderer.get()->getScreenshot(
+        int ret = renderer.get()->getScreenshot(
                        bpp, finalWidth, finalHeight, pixels, cPixels, displayId,
                        desiredWidth, desiredHeight, desiredRotation,
-                       {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}}) == 0;
+                       {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
+        if (ret != 0) {
+            return false;
+        }
     } else {
         // oh, oh slow path.
         android::emulation::Image img = android::emulation::takeScreenshot(

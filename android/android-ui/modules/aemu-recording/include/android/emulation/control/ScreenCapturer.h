@@ -47,12 +47,13 @@ public:
           m_Format(format),
           m_Pixels(std::move(pixels)) {}
 
+    AEMU_EXPORT const uint8_t* getPixelBuf() const { return m_Pixels.data(); }
     AEMU_EXPORT uint8_t* getPixelBuf() { return m_Pixels.data(); }
-    AEMU_EXPORT uint64_t getPixelCount() { return m_Pixels.size(); }
-    AEMU_EXPORT uint16_t getWidth() { return m_Width; }
-    AEMU_EXPORT uint16_t getHeight() { return m_Height; }
-    AEMU_EXPORT uint8_t getChannels() { return m_NChannels; }
-    AEMU_EXPORT ImageFormat getImageFormat() { return m_Format; }
+    AEMU_EXPORT uint64_t getPixelCount() const { return m_Pixels.size(); }
+    AEMU_EXPORT uint16_t getWidth() const { return m_Width; }
+    AEMU_EXPORT uint16_t getHeight() const { return m_Height; }
+    AEMU_EXPORT uint8_t getChannels() const { return m_NChannels; }
+    AEMU_EXPORT ImageFormat getImageFormat() const { return m_Format; }
 
     // Converts Image from RGBA8888 -> RGB888 if needed and possible.
     AEMU_EXPORT Image& asRGB888();
