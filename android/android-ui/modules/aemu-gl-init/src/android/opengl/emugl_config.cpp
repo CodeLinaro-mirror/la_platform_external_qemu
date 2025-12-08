@@ -678,6 +678,8 @@ bool emuglConfig_init(EmuglConfig* config,
     // zero all fields first.
     memset(config, 0, sizeof(*config));
 
+    const char DEFAULT_SOFTWARE_VULKAN_MODE[] = "lavapipe";
+
     std::vector<std::string> allowedOptions = {
         "auto",
         "host",
@@ -729,20 +731,17 @@ bool emuglConfig_init(EmuglConfig* config,
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
     if (vulkan_mode_selected == "auto") {
-        if (no_window) {
-            vulkan_mode_selected = "lavapipe";
-        } else {
-            // Enable MoltenVK for XR
+        bool switchToSoftwareVulkan = no_window;
 #if defined(__APPLE__)
-            // Force MoltenVK with 'auto' modes on XR, but otherwise use swiftshader
-            if (is_xr_mode) {
-                vulkan_mode_selected = "host";
-            } else {
-                vulkan_mode_selected = "swiftshader";
-            }
-#else
-            vulkan_mode_selected = "host";
+        // Force MoltenVK with 'auto' modes on XR, but otherwise use software
+        if (!is_xr_mode) {
+            switchToSoftwareVulkan = true;
+        }
 #endif
+        if (switchToSoftwareVulkan) {
+            vulkan_mode_selected = DEFAULT_SOFTWARE_VULKAN_MODE;
+        } else {
+            vulkan_mode_selected = "host";
         }
     }
 
