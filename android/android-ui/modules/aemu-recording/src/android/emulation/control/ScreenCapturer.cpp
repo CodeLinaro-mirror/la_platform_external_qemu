@@ -21,6 +21,7 @@
 
 #include <fstream>  // for ofstream, basic...
 #include <memory>   // for shared_ptr
+#include <optional>
 #include <string_view>
 #include <vector>   // for vector
 
@@ -44,6 +45,11 @@ using android::base::PathUtils;
 namespace android {
 namespace emulation {
 
+// Global background image data to be applied on the CPU side when taking
+// screenshots on transparent displays
+static std::mutex sBackgroundImageMutex;
+static std::optional<Image> sBackgroundImage;
+
 bool captureScreenshot(const char* outputDirectoryPath,
                        std::string* pOutputFilepath,
                        uint32_t displayId) {
@@ -61,6 +67,115 @@ bool captureScreenshot(const char* outputDirectoryPath,
         return captureScreenshot(
                 nullptr, getConsoleAgents()->display->getFrameBuffer, rotation,
                 outputDirectoryPath, pOutputFilepath);
+    }
+}
+
+struct RgbColor {
+    uint8_t r, g, b;
+};
+
+RgbColor bilinearSample(const Image& img,
+                        const float u,
+                        const float v) {
+    auto getPixelSafe = [](const Image& img, int x, int y) {
+        x = std::max(0, std::min(img.getWidth() - 1, x));
+        y = std::max(0, std::min(img.getHeight() - 1, y));
+        const uint32_t pixelIndex =
+                (y * img.getWidth() + x) * img.getChannels();
+        return RgbColor{img.getPixelBuf()[pixelIndex + 0],
+                        img.getPixelBuf()[pixelIndex + 1],
+                        img.getPixelBuf()[pixelIndex + 2]};
+    };
+
+    auto lerpComponent = [](uint8_t a, uint8_t b, float t) {
+        return static_cast<uint8_t>(a + t * (b - a));
+    };
+
+    const float x = u * img.getWidth();
+    const float y = v * img.getHeight();
+    int x0 = static_cast<int>(std::floor(x));
+    int y0 = static_cast<int>(std::floor(y));
+    int x1 = x0 + 1;
+    int y1 = y0 + 1;
+
+    float tx = x - x0;
+    float ty = y - y0;
+
+    RgbColor p00 = getPixelSafe(img, x0, y0);
+    RgbColor p10 = getPixelSafe(img, x1, y0);
+    RgbColor p01 = getPixelSafe(img, x0, y1);
+    RgbColor p11 = getPixelSafe(img, x1, y1);
+
+    uint8_t rTop = lerpComponent(p00.r, p10.r, tx);
+    uint8_t gTop = lerpComponent(p00.g, p10.g, tx);
+    uint8_t bTop = lerpComponent(p00.b, p10.b, tx);
+
+    uint8_t rBottom = lerpComponent(p01.r, p11.r, tx);
+    uint8_t gBottom = lerpComponent(p01.g, p11.g, tx);
+    uint8_t bBottom = lerpComponent(p01.b, p11.b, tx);
+
+    RgbColor result;
+    result.r = lerpComponent(rTop, rBottom, ty);
+    result.g = lerpComponent(gTop, gBottom, ty);
+    result.b = lerpComponent(bTop, bBottom, ty);
+
+    return result;
+}
+
+AEMU_EXPORT bool setScreenshotBackground(const int width,
+                                         const int height,
+                                         const int numChannels,
+                                         const uint8_t* pixelData) {
+    std::lock_guard<std::mutex> guard(sBackgroundImageMutex);
+    if (width == 0 || height == 0 ||
+        ((numChannels != 3) && (numChannels != 4))) {
+        // Can be used to reset
+        sBackgroundImage = std::nullopt;
+        return false;
+    }
+
+    const ImageFormat format =
+            (numChannels == 3) ? ImageFormat::RGB888 : ImageFormat::RGBA8888;
+    std::vector<uint8_t> pixels(width * height * numChannels);
+    memcpy(pixels.data(), pixelData, pixels.size());
+    sBackgroundImage =
+            Image(width, height, numChannels, format, std::move(pixels));
+
+    return true;
+}
+
+AEMU_EXPORT void applyScreenshotBackground(const int width,
+                                           const int height,
+                                           const int numChannels,
+                                           uint8_t* pixelDataInOut) {
+    auto screenBlendComponent = [](uint8_t sourceComponent,
+                                   uint8_t backgroundComponent) {
+        const int s = static_cast<int>(sourceComponent);
+        const int b = static_cast<int>(backgroundComponent);
+        const int invertedProduct = (255 - s) * (255 - b);
+        const int roundedProduct = (invertedProduct + 127) / 255;
+        return static_cast<uint8_t>(255 - roundedProduct);
+    };
+
+    std::lock_guard<std::mutex> guard(sBackgroundImageMutex);
+    if (sBackgroundImage.has_value()) {
+        for (int y = 0; y < width; ++y) {
+            for (int x = 0; x < height; ++x) {
+                // Provide normalized coords as the background may have a
+                // different resolution
+                const RgbColor backgroundSampled = bilinearSample(
+                        *sBackgroundImage, ((float)x + 0.5f) / width,
+                        ((float)y + 0.5f) / height);
+
+                const int inputIndex = (y * width + x) * numChannels;
+                pixelDataInOut[inputIndex + 0] = screenBlendComponent(
+                        pixelDataInOut[inputIndex + 0], backgroundSampled.r);
+                pixelDataInOut[inputIndex + 1] = screenBlendComponent(
+                        pixelDataInOut[inputIndex + 1], backgroundSampled.g);
+                pixelDataInOut[inputIndex + 2] = screenBlendComponent(
+                        pixelDataInOut[inputIndex + 2], backgroundSampled.b);
+            }
+        }
     }
 }
 
@@ -108,6 +223,10 @@ Image takeScreenshot(
         return Image(0, 0, 0, ImageFormat::RGB888, {});
     }
 
+    // Apply background blending for the environment
+    android::emulation::applyScreenshotBackground(width, height, nChannels,
+                                                  pixelBuffer.data());
+
     // We only convert png/ RGBA8888 -> RBG888 at this time..
     switch (desiredFormat) {
         case ImageFormat::PNG: {
@@ -124,12 +243,19 @@ Image takeScreenshot(
                         vec->insert(vec->end(), &data[0], &data[length]);
                     },
                     [](png_structp png_ptr) {});
+#if defined(__linux__) && defined(__aarch64__)
+            // TODO(b/468252386): fix linux-arm linker settings for png
+            // functions
+            derror("Cannot use write_png_user_function on linux_aarch64");
+            return Image(0, 0, 0, ImageFormat::RGB888, {});
+#else
             // already rotated through rendering
-            write_png_user_function(p, pi, nChannels, width, height, SKIN_ROTATION_0,
-                                    pixelBuffer.data());
+            write_png_user_function(p, pi, nChannels, width, height,
+                                    SKIN_ROTATION_0, pixelBuffer.data());
             png_destroy_write_struct(&p, &pi);
             return Image((uint16_t)width, (uint16_t)height, nChannels,
                          ImageFormat::PNG, std::move(pngData));
+#endif
         }
         case ImageFormat::RGB888: {
             auto img = Image((uint16_t)width, (uint16_t)height, nChannels,
@@ -212,12 +338,18 @@ bool captureScreenshot(
         *pOutputFilepath = outputFilePath;
     }
 
+#if defined(__linux__) && defined(__aarch64__)
+    // TODO(b/468252386): fix linux-arm linker settings for png functions
+    derror("Cannot use savepng on linux_aarch64");
+    return false;
+#else
     dprint("Saving screenshot to file: %s", outputFilePath.c_str());
     // already rotated through rendering
     rotation = renderer ? SKIN_ROTATION_0 : rotation;
     savepng(outputFilePath.c_str(), img.getChannels(), img.getWidth(),
             img.getHeight(), rotation, img.getPixelBuf());
     return true;
+#endif
 }
 
 // True if we are on a big endian system
