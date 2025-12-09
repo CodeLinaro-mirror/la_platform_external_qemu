@@ -81,101 +81,33 @@ Image takeScreenshot(
     unsigned int width;
     unsigned int height;
     ImageFormat outputFormat = ImageFormat::RGBA8888;
-    std::vector<unsigned char> pixelBuffer(0);
-    if (renderer) {
-        if (desiredFormat == ImageFormat::RGB888) {
-            nChannels = 3;
-            outputFormat = ImageFormat::RGB888;
-        }
-        size_t cPixels = 0;
-        int screenshotRes = renderer->getScreenshot(
+    if (!renderer) {
+        derror("Could not take screenshot: no renderer");
+        return Image(0, 0, 0, ImageFormat::RGB888, {});
+    }
+
+    if (desiredFormat == ImageFormat::RGB888) {
+        nChannels = 3;
+        outputFormat = ImageFormat::RGB888;
+    }
+    size_t cPixels = 0;
+    int screenshotRes = renderer->getScreenshot(
+            nChannels, &width, &height, nullptr, &cPixels,
+            displayId, desiredWidth, desiredHeight, rotation,
+            {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
+    std::vector<uint8_t> pixelBuffer(0);
+    if (screenshotRes == -2) { // -2 is special return code to get pixel count value
+        pixelBuffer.resize(cPixels);
+        screenshotRes = renderer->getScreenshot(
                 nChannels, &width, &height, pixelBuffer.data(), &cPixels,
                 displayId, desiredWidth, desiredHeight, rotation,
                 {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
-        if (screenshotRes != 0) {
-            pixelBuffer.resize(cPixels);
-            screenshotRes = renderer->getScreenshot(
-                    nChannels, &width, &height, pixelBuffer.data(), &cPixels,
-                    displayId, desiredWidth, desiredHeight, rotation,
-                    {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
-        }
-        if (screenshotRes != 0) {
-            derror("Could not take screenshot, error: %d", screenshotRes);
-            return Image(0, 0, 0, ImageFormat::RGB888, {});
-        }
-    } else {  // when -gpu guest is used.
-        unsigned char* pixels = nullptr;
-        int bpp = 4;
-        int lineSize = 0;
-        getFrameBuffer((int*)&width, (int*)&height, &lineSize, &bpp, &pixels);
-        if (bpp < 1 || bpp > 4) {
-            // unknown pixel buffer format
-            return Image(0, 0, 0, ImageFormat::RGB888, {});
-        }
-
-        // -gpu guest usually gives us bpp=2
-        // bpp=2 infers we are using rgb565
-        // convert it to rgb888
-        nChannels = bpp == 2 ? 3 : bpp;
-        outputFormat = ImageFormat::RGB888;
-
-        bool useSnipping = rect.size.w != 0 && rect.size.h != 0;
-        if (useSnipping) {
-            if (desiredWidth != width) {
-                rect.size.w = rect.size.w * width / desiredWidth;
-                rect.pos.x = rect.pos.x * width / desiredWidth;
-            }
-            if (desiredHeight != height) {
-                rect.size.h = rect.size.h * height / desiredHeight;
-                rect.pos.y = rect.pos.y * height / desiredHeight;
-            }
-            width = rect.size.w;
-            height = rect.size.h;
-        }
-
-        // Need to handle padding if lineSize != width * nChannels
-        if ((lineSize != 0 && lineSize != width * nChannels) || bpp == 2) {
-            pixelBuffer.resize(width * height * nChannels);
-            unsigned char* src = pixels;
-            unsigned char* dst = pixelBuffer.data();
-            for (int h = rect.pos.y; h < rect.pos.y + height; h++) {
-                if (bpp != 2) {
-                    memcpy(dst, src + rect.pos.x, width * nChannels);
-                    dst += width * nChannels;
-                } else {
-                    // rgb565, need convertion
-                    for (int w = rect.pos.x; w < rect.pos.x + width; w++) {
-                        unsigned char r = src[w * 2 + 1] >> 3;
-                        unsigned char g =
-                                (src[w * 2 + 1] & 7) << 3 | src[w * 2] >> 5;
-                        unsigned char b = src[w * 2] & 63;
-                        r = r << 3 | r >> 2;
-                        g = g << 2 | g >> 4;
-                        b = b << 3 | b >> 2;
-                        *(dst++) = r;
-                        *(dst++) = g;
-                        *(dst++) = b;
-                    }
-                }
-                src += lineSize;
-            }
-            pixels = pixelBuffer.data();
-        } else {
-            if (useSnipping) {
-                unsigned char* src = pixels;
-                unsigned char* dst = pixelBuffer.data();
-                for (int h = rect.pos.y; h < rect.pos.y + height; h++) {
-                    memcpy(dst, src + rect.pos.x, width * nChannels);
-                    dst += width * nChannels;
-                    src += lineSize;
-                }
-            } else {
-                // Just copy the pixels to our buffer.
-                pixelBuffer.insert(pixelBuffer.end(), &pixels[0],
-                                   &pixels[width * height * nChannels]);
-            }
-        }
     }
+    if (screenshotRes != 0) {
+        derror("Could not take screenshot, error: %d", screenshotRes);
+        return Image(0, 0, 0, ImageFormat::RGB888, {});
+    }
+
     // We only convert png/ RGBA8888 -> RBG888 at this time..
     switch (desiredFormat) {
         case ImageFormat::PNG: {
@@ -193,17 +125,13 @@ Image takeScreenshot(
                     },
                     [](png_structp png_ptr) {});
             // already rotated through rendering
-            rotation = renderer ? SKIN_ROTATION_0 : rotation;
-            write_png_user_function(p, pi, nChannels, width, height, rotation,
+            write_png_user_function(p, pi, nChannels, width, height, SKIN_ROTATION_0,
                                     pixelBuffer.data());
             png_destroy_write_struct(&p, &pi);
             return Image((uint16_t)width, (uint16_t)height, nChannels,
                          ImageFormat::PNG, std::move(pngData));
         }
         case ImageFormat::RGB888: {
-            if (nChannels == 4) {
-                outputFormat = ImageFormat::RGBA8888;
-            }
             auto img = Image((uint16_t)width, (uint16_t)height, nChannels,
                              outputFormat, std::move(pixelBuffer));
             return img.asRGB888();
