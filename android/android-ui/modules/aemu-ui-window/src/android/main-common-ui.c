@@ -245,6 +245,7 @@ static bool isGuestRendererChoice(const char* choice) {
 }
 
 static const char DEFAULT_SOFTWARE_GPU_MODE[] = "lavapipe";
+static const char ALTERNATIVE_SOFTWARE_GPU_MODE[] = "swiftshader_indirect";
 
 // Older API, calls configureRenderer and startRenderer
 bool configAndStartRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
@@ -439,8 +440,13 @@ bool startRenderer(RendererConfig* config_inout) {
                 hw->hw_gpu_mode ? hw->hw_gpu_mode : "unknown",
                 renderer_startup_res);
         if (hw->hw_gpu_mode &&
-            strcmp("lavapipe", hw->hw_gpu_mode)) {
-            str_reset(&hw->hw_gpu_mode, "lavapipe");
+            strcmp(DEFAULT_SOFTWARE_GPU_MODE, hw->hw_gpu_mode)) {
+            str_reset(&hw->hw_gpu_mode, DEFAULT_SOFTWARE_GPU_MODE);
+        }
+        else if (hw->hw_gpu_mode &&
+            strcmp(ALTERNATIVE_SOFTWARE_GPU_MODE, hw->hw_gpu_mode)) {
+            // if default gpu mode has also failed, try alternative
+            str_reset(&hw->hw_gpu_mode, ALTERNATIVE_SOFTWARE_GPU_MODE);
         }
         return false;
     }
