@@ -3876,15 +3876,16 @@ message EmulatorDetails {
   enum EmulatorRenderer {
     UNKNOWN_EMULATOR_RENDERER = 0;
     HOST = 1;
-    OFF = 2;
-    GUEST = 3;
-    MESA = 4;
-    SWIFTSHADER = 5;
-    ANGLE = 6;
-    ANGLE9 = 7;
+    OFF = 2 [deprecated = true];
+    GUEST = 3 [deprecated = true];
+    MESA = 4 [deprecated = true];
+    SWIFTSHADER = 5 [deprecated = true];
+    ANGLE = 6 [deprecated = true];
+    ANGLE9 = 7 [deprecated = true];
     SWIFTSHADER_INDIRECT = 8;
     ANGLE_INDIRECT = 9;
-    ANGLE9_INDIRECT = 10;
+    ANGLE9_INDIRECT = 10 [deprecated = true];
+    LAVAPIPE = 11;
     ERROR_IN_EMULATOR_RENDERER = 255;
   }
 
