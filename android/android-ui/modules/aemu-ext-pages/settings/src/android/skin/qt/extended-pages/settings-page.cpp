@@ -324,28 +324,27 @@ SettingsPage::SettingsPage(QWidget* parent)
     }
 
 #endif
-    // OpenGL ES renderer
+    // Graphics Acceleration
     for (int i = 0; i < mUi->set_glesBackendPrefComboBox->count(); i++) {
         mUi->set_glesBackendPrefComboBox->setItemData(i, QVariant(i));
     }
 
-    mDisableANGLE = true;
-
-    if (mDisableANGLE) {
-        for (int i = 0; i < mUi->set_glesBackendPrefComboBox->count();) {
-            WinsysPreferredGlesBackend backendPreference =
-                    (WinsysPreferredGlesBackend)(mUi->set_glesBackendPrefComboBox
-                                                         ->itemData(i)
-                                                         .toInt());
-            switch (backendPreference) {
-                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
-                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9:
-                    mUi->set_glesBackendPrefComboBox->removeItem(i);
-                    break;
-                default:
-                    ++i;
-                    break;
-            }
+    // Remove deprecated UI options
+    for (int i = 0; i < mUi->set_glesBackendPrefComboBox->count();) {
+        WinsysPreferredGlesBackend backendPreference =
+                (WinsysPreferredGlesBackend)(mUi->set_glesBackendPrefComboBox
+                                                        ->itemData(i)
+                                                        .toInt());
+        switch (backendPreference) {
+            case WINSYS_GLESBACKEND_PREFERENCE_ANGLE_DEPRECATED:
+            case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9_DEPRECATED:
+            case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED:
+            case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL_DEPRECATED:
+                mUi->set_glesBackendPrefComboBox->removeItem(i);
+                break;
+            default:
+                ++i;
+                break;
         }
     }
 
@@ -463,13 +462,14 @@ SettingsPage::SettingsPage(QWidget* parent)
 
         if ((int)settings_glesbackend_pref == backendPreference) {
             switch (settings_glesbackend_pref) {
-                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
-                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9:
-                    if (mDisableANGLE)
-                        break;
+                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE_DEPRECATED:
+                case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9_DEPRECATED:
+                case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED:
+                case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL_DEPRECATED:
+                    break;
                 case WINSYS_GLESBACKEND_PREFERENCE_AUTO:
-                case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
-                case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
+                case WINSYS_GLESBACKEND_PREFERENCE_SOFTWARE:
+                case WINSYS_GLESBACKEND_PREFERENCE_HARDWARE:
                     mUi->set_glesBackendPrefComboBox->setCurrentIndex(i);
                     break;
                 default:
@@ -882,13 +882,14 @@ void SettingsPage::on_set_glesBackendPrefComboBox_currentIndexChanged(
                                                  ->itemData(index)
                                                  .toInt());
     switch (backendPreference) {
-        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
-        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9:
-            if (mDisableANGLE)
-                break;
+        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE_DEPRECATED:
+        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9_DEPRECATED:
+        case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED:
+        case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL_DEPRECATED:
+            break;
         case WINSYS_GLESBACKEND_PREFERENCE_AUTO:
-        case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
-        case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
+        case WINSYS_GLESBACKEND_PREFERENCE_SOFTWARE:
+        case WINSYS_GLESBACKEND_PREFERENCE_HARDWARE:
             set_glesBackend_to((WinsysPreferredGlesBackend)backendPreference);
             break;
         default:

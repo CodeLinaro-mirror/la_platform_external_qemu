@@ -120,5 +120,4 @@ private:
     std::unique_ptr<Ui::SettingsPage> mUi;
     std::unique_ptr<PerfStatsPage> mPerfStatsPage;
     std::shared_ptr<UiEventTracker> mSettingsTracker;
-    bool mDisableANGLE = false;
 };

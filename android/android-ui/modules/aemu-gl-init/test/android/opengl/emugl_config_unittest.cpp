@@ -273,10 +273,12 @@ TEST(EmuglConfig, initFromUISetting) {
 
     const std::vector<const char*> UiOptionToGpuOption = {
         "auto",         // WINSYS_GLESBACKEND_PREFERENCE_AUTO = 0,
-        "swangle",      // WINSYS_GLESBACKEND_PREFERENCE_ANGLE = 1,
-        "auto",         // WINSYS_GLESBACKEND_PREFERENCE_ANGLE9 = 2,
-        "swiftshader",  // WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER = 3,
-        "host",         // WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL = 4,
+        "swangle",      // WINSYS_GLESBACKEND_PREFERENCE_ANGLE_DEPRECATED = 1,
+        "auto",         // WINSYS_GLESBACKEND_PREFERENCE_ANGLE9_DEPRECATED = 2,
+        "swiftshader",  // WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED = 3,
+        "host",         // WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL_DEPRECATED = 4,
+        "lavapipe",     // WINSYS_GLESBACKEND_PREFERENCE_SOFTWARE = 5,
+        "host",         // WINSYS_GLESBACKEND_PREFERENCE_HARDWARE = 6,
     };
 
     for (int i = 1; i < WINSYS_GLESBACKEND_PREFERENCE_NUM; i++) {
@@ -297,25 +299,30 @@ TEST(EmuglConfig, initFromUISetting) {
             EXPECT_STREQ("host", config.vulkan_backend);
 #endif
             break;
-        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
+        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE_DEPRECATED:
             // Deprecated, used to test swangle here
             EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
             EXPECT_STREQ("swiftshader", config.vulkan_backend);
             EXPECT_STREQ("swiftshader",
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
             break;
-        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9:
+        case WINSYS_GLESBACKEND_PREFERENCE_ANGLE9_DEPRECATED:
             // Deprecated, same as auto
             // EXPECT_STREQ("host", config.gles_backend);
             // EXPECT_STREQ("host", config.vulkan_backend);
             break;
-        case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
+        case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED:
             EXPECT_STREQ(SWIFTSHADER_RESULT, config.gles_backend);
             EXPECT_STREQ("swiftshader", config.vulkan_backend);
             break;
-        case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
+        case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL_DEPRECATED:
+        case WINSYS_GLESBACKEND_PREFERENCE_HARDWARE:
             EXPECT_STREQ("host", config.gles_backend);
             EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
+            break;
+        case WINSYS_GLESBACKEND_PREFERENCE_SOFTWARE:
+            EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
+            EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
             break;
         default:
             break;
@@ -324,6 +331,9 @@ TEST(EmuglConfig, initFromUISetting) {
         // Check if ANDROID_EMU_VK_ICD is set correctly based on the vulkan mode
         if (strcmp(config.vulkan_backend, "swiftshader") == 0) {
             EXPECT_STREQ("swiftshader",
+                         System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
+        } else if (strcmp(config.vulkan_backend, "lavapipe") == 0) {
+            EXPECT_STREQ("lavapipe",
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
         } else if (strcmp(config.vulkan_backend, "host") == 0) {
 #if defined(__APPLE__) && defined(__arm64__)

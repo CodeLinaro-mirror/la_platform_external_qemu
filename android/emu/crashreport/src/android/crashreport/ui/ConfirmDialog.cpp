@@ -108,8 +108,8 @@ ConfirmDialog::ConfirmDialog(QWidget* parent,
                        "in your app."
                        "To enable software rendering, go to:\n\n"
                        "Extended Controls > Settings > Advanced tab\n\n"
-                       "and change \"OpenGL ES renderer (requires restart)\""
-                       "to \"Swiftshader.\""));
+                       "and change \"Graphics Acceleration (requires restart)\""
+                       "to \"Software.\""));
         }
     }
 

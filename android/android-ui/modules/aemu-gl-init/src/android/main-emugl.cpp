@@ -51,13 +51,18 @@ std::string gpuChoiceBasedOnGpuOptions(
     } else if (uiPreferredBackend != WINSYS_GLESBACKEND_PREFERENCE_AUTO) {
         // Use UI preference
         switch (uiPreferredBackend) {
-            case WINSYS_GLESBACKEND_PREFERENCE_ANGLE:
+            // Keep deprecated swangle and swiftshader UI modes for tests
+            case WINSYS_GLESBACKEND_PREFERENCE_ANGLE_DEPRECATED:
                 gpuChoice = "swangle";
                 break;
-            case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER:
+            case WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED:
                 gpuChoice = "swiftshader";
                 break;
-            case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL:
+            case WINSYS_GLESBACKEND_PREFERENCE_SOFTWARE:
+                gpuChoice = "software";
+                break;
+            case WINSYS_GLESBACKEND_PREFERENCE_NATIVEGL_DEPRECATED:
+            case WINSYS_GLESBACKEND_PREFERENCE_HARDWARE:
                 gpuChoice = "host";
                 break;
             default:

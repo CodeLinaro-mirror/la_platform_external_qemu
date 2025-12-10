@@ -1255,7 +1255,7 @@
       <string notr="true">border: 0px;</string>
      </property>
      <property name="title">
-      <string>OpenGL ES renderer (requires restart)</string>
+      <string>Graphics Acceleration (requires restart)</string>
      </property>
      <property name="ColorGroup" stdset="0">
       <string>Title</string>
@@ -1330,14 +1330,14 @@
       <bool>false</bool>
      </property>
      <property name="currentText">
-      <string>Autodetect based on host (default)</string>
+      <string>Autoselect</string>
      </property>
      <property name="report_metrics" stdset="0">
       <bool>false</bool>
      </property>
      <item>
       <property name="text">
-       <string>Autodetect based on host (default)</string>
+       <string>Autoselect</string>
       </property>
      </item>
      <item>
@@ -1358,6 +1358,16 @@
      <item>
       <property name="text">
        <string>Desktop native OpenGL</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Software</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Hardware</string>
       </property>
      </item>
     </widget>
