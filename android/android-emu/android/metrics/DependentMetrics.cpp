@@ -10,6 +10,13 @@
 // GNU General Public License for more details.
 #include "android/metrics/DependentMetrics.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/types.h>
+#include <unistd.h>
+#endif
+
 #include <stdlib.h>    // for free
 #include <sys/stat.h>  // for stat, st_mtime
 #include <cstdint>     // for int64_t, uin...
@@ -62,6 +69,26 @@
 
 using android::base::Optional;
 using android::base::PathUtils;
+
+static bool hasElevatedPrivileges() {
+#ifdef _WIN32
+    HANDLE token;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        return false;
+    }
+    TOKEN_ELEVATION elevation;
+    DWORD size;
+    if (!GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size)) {
+        CloseHandle(token);
+        return false;
+    }
+    CloseHandle(token);
+    return elevation.TokenIsElevated;
+#else
+    return geteuid() == 0;
+#endif
+}
+
 using android::base::ScopedCPtr;
 using android::base::System;
 using android::metrics::MetricsEngine;
@@ -950,6 +977,7 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
             System::get()->envGet("ANDROID_EMULATOR_WRAPPER_PID").c_str()));
     event->mutable_emulator_details()->set_qemu_pid(
             System::get()->getCurrentProcessId());
+    event->mutable_emulator_details()->set_has_elevated_privileges(hasElevatedPrivileges());
 }
 
 void android_metrics_fill_vulkan_gpu_info(void* opaque) {
