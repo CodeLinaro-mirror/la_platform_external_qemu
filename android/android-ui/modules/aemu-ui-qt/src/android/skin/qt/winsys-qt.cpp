@@ -529,14 +529,28 @@ void skin_winsys_set_preferred_guest_gles_driver(WinsysGuestGlesDriverPreference
     }
 }
 
+template <typename T>
+static T get_per_avd_setting(const char* key, T defaultValue) {
+    const char* avdPath =
+            (getConsoleAgents() && getConsoleAgents()->settings)
+                    ? avdInfo_getContentPath(
+                              getConsoleAgents()->settings->avdInfo())
+                    : nullptr;
+    if (!avdPath) {
+        D("Could not retrieve avd path, using default settings.");
+        return defaultValue;
+    }
+    QString avdSettingsFile =
+            avdPath + QString(Ui::Settings::PER_AVD_SETTINGS_NAME);
+    QSettings avdSpecificSettings(avdSettingsFile, QSettings::IniFormat);
+    return (T)avdSpecificSettings.value(key, (int)defaultValue).toInt();
+}
+
 extern WinsysPreferredGlesBackend skin_winsys_get_preferred_gles_backend() {
     D("skin_winsys_get_preferred_gles_backend");
-    QSettings settings;
     WinsysPreferredGlesBackend gpuOption =
-    (WinsysPreferredGlesBackend)settings
-            .value(Ui::Settings::GLESBACKEND_PREFERENCE, 0)
-            .toInt();
-
+            get_per_avd_setting(Ui::Settings::GLESBACKEND_PREFERENCE,
+                                WINSYS_GLESBACKEND_PREFERENCE_AUTO);
     // Convert unsupported/deprecated cases to 'auto'
     if (gpuOption == WINSYS_GLESBACKEND_PREFERENCE_ANGLE_DEPRECATED ||
         gpuOption == WINSYS_GLESBACKEND_PREFERENCE_ANGLE9_DEPRECATED ||
@@ -547,19 +561,10 @@ extern WinsysPreferredGlesBackend skin_winsys_get_preferred_gles_backend() {
     return gpuOption;
 }
 
-void skin_winsys_set_preferred_gles_backend(
-        WinsysPreferredGlesBackend backend) {
-    D("skin_winsys_set_preferred_gles_backend");
-    QSettings settings;
-    settings.setValue(Ui::Settings::GLESBACKEND_PREFERENCE, backend);
-}
-
 extern WinsysPreferredGlesApiLevel skin_winsys_get_preferred_gles_apilevel() {
     D("skin_winsys_get_preferred_gles_apilevel");
-    QSettings settings;
-    return (WinsysPreferredGlesApiLevel)settings
-            .value(Ui::Settings::GLESAPILEVEL_PREFERENCE, 0)
-            .toInt();
+    return get_per_avd_setting(Ui::Settings::GLESAPILEVEL_PREFERENCE,
+                               WINSYS_GLESAPILEVEL_PREFERENCE_AUTO);
 }
 
 extern void skin_winsys_quit_request() {
