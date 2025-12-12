@@ -127,10 +127,14 @@ AEMU_EXPORT bool setScreenshotBackground(const int width,
                                          const int numChannels,
                                          const uint8_t* pixelData) {
     std::lock_guard<std::mutex> guard(sBackgroundImageMutex);
-    if (width == 0 || height == 0 ||
-        ((numChannels != 3) && (numChannels != 4))) {
+    if (pixelData == nullptr) {
         // Can be used to reset
         sBackgroundImage = std::nullopt;
+        return true;
+    }
+    if (width == 0 || height == 0 ||
+        ((numChannels != 3) && (numChannels != 4))) {
+        // Invalid input
         return false;
     }
 

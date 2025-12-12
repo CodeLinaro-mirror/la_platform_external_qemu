@@ -732,7 +732,10 @@ void android_setOpenglesScreenBackground(int width,
         sRenderer->setScreenBackground(width, height, rgbaData);
     }
 
-    android::emulation::setScreenshotBackground(width, height, 4, rgbaData);
+    if (!android::emulation::setScreenshotBackground(width, height, 4,
+                                                     rgbaData)) {
+        derror("Cannot set background data for screenshots");
+    }
 }
 
 int android_hideOpenglesWindow(void) {
