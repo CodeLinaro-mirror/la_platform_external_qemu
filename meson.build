@@ -313,6 +313,7 @@ elif cpu == 'x86_64'
   accelerator_targets += {
     'CONFIG_HVF': ['x86_64-softmmu'],
     'CONFIG_NITRO': ['x86_64-softmmu'],
+    'CONFIG_AEHD': ['i386-softmmu', 'x86_64-softmmu'],
     'CONFIG_NVMM': ['i386-softmmu', 'x86_64-softmmu'],
     'CONFIG_WHPX': ['x86_64-softmmu'],
     'CONFIG_MSHV': ['x86_64-softmmu'],
@@ -862,6 +863,14 @@ if get_option('kvm').allowed() and host_os == 'linux'
   accelerators += 'CONFIG_KVM'
 endif
 
+if get_option('aehd').allowed() and host_os == 'windows'
+  if get_option('aehd').enabled() and host_machine.cpu() != 'x86_64'
+    error('AEHD requires 64-bit host')
+  else
+    accelerators += 'CONFIG_AEHD'
+  endif
+endif
+
 if get_option('mshv').allowed() and host_os == 'linux'
   if get_option('mshv').enabled() and host_machine.cpu() != 'x86_64'
     error('mshv accelerator requires x64_64 host')
@@ -933,6 +942,9 @@ endif
 
 if 'CONFIG_KVM' not in accelerators and get_option('kvm').enabled()
   error('KVM not available on this platform')
+endif
+if 'CONFIG_AEHD' not in accelerators and get_option('aehd').enabled()
+  error('AEHD not available on this platform')
 endif
 if 'CONFIG_HVF' not in accelerators and get_option('hvf').enabled()
   error('HVF not available on this platform')
@@ -4838,6 +4850,7 @@ summary_info = {}
 if have_system
   summary_info += {'KVM support':       config_all_accel.has_key('CONFIG_KVM')}
   summary_info += {'Nitro support':     config_all_accel.has_key('CONFIG_NITRO')}
+  summary_info += {'AEHD support':      config_all_accel.has_key('CONFIG_AEHD')}
   summary_info += {'HVF support':       config_all_accel.has_key('CONFIG_HVF')}
   summary_info += {'WHPX support':      config_all_accel.has_key('CONFIG_WHPX')}
   summary_info += {'NVMM support':      config_all_accel.has_key('CONFIG_NVMM')}

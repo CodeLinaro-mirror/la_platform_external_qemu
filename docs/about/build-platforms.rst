@@ -53,7 +53,7 @@ Those hosts are officially supported, with various accelerators:
    * - SPARC
      - tcg
    * - x86
-     - hvf, mshv, kvm, nvmm, tcg, whpx, xen
+     - aehd, hvf, mshv, kvm, nvmm, tcg, whpx, xen
 
 Other host architectures are not supported. It is possible to build QEMU system
 emulation on an unsupported host architecture using the configure

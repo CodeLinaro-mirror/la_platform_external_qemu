@@ -29,6 +29,7 @@
 #include "system/memory.h"
 #include "monitor/monitor.h"
 #include "kvm/kvm_i386.h"
+#include "aehd/aehd_i386.h"
 #endif
 #include "qemu/log.h"
 #ifdef CONFIG_TCG
@@ -624,6 +625,8 @@ void do_cpu_init(X86CPU *cpu)
 
     if (kvm_enabled()) {
         kvm_arch_do_init_vcpu(cpu);
+    } else if (aehd_enabled()) {
+        aehd_arch_do_init_vcpu(cpu);
     }
     apic_init_reset(cpu->apic_state);
 #endif /* CONFIG_USER_ONLY */

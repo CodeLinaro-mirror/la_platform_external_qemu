@@ -13,6 +13,7 @@
 
 #include "hw/core/cpu.h"
 #include "system/kvm.h"
+#include "system/aehd.h"
 #include "system/hvf.h"
 #include "system/mshv.h"
 #include "system/whpx.h"
