@@ -67,11 +67,15 @@ elseif(DARWIN_X86_64 OR DARWIN_AARCH64)
       # MoltenVK
       "${PREBUILT_ROOT}/icds/libMoltenVK.dylib>lib64/vulkan/libMoltenVK.dylib"
       "${PREBUILT_ROOT}/icds/MoltenVK_icd.json>lib64/vulkan/MoltenVK_icd.json"
-      # KosmicKrisp
-      "${PREBUILT_ROOT}/icds/libvulkan_kosmickrisp.dylib>lib64/vulkan/libvulkan_kosmickrisp.dylib"
-      "${PREBUILT_ROOT}/icds/libkosmickrisp_icd.json>lib64/vulkan/libkosmickrisp_icd.json"
       # Shaders
       ${VULKAN_COMMON_DEPENDENCIES})
+      # KosmicKrisp is only necessary for mac_aarch64
+      if(DARWIN_AARCH64)
+        list(APPEND VULKAN_DEPENDENCIES
+          "${PREBUILT_ROOT}/icds/libvulkan_kosmickrisp.dylib>lib64/vulkan/libvulkan_kosmickrisp.dylib"
+          "${PREBUILT_ROOT}/icds/libkosmickrisp_icd.json>lib64/vulkan/libkosmickrisp_icd.json"
+        )
+      endif()
   set(VULKAN_TEST_DEPENDENCIES
       # Loader (for testing)
       "${PREBUILT_ROOT}/libvulkan.dylib>testlib64/libvulkan.dylib"
