@@ -68,6 +68,20 @@ private:
     std::vector<uint8_t> m_Pixels;
 };
 
+// Set background image data for the screenshots, use 0x0 data to
+// remove the background.
+AEMU_EXPORT bool setScreenshotBackground(const int width,
+                                         const int height,
+                                         const int numChannels,
+                                         const uint8_t* pixelData);
+
+// Applies blending of the background image data for the screenshots
+// pixelDataInOut should have width*height*numChannels number of elements
+AEMU_EXPORT void applyScreenshotBackground(const int width,
+                                           const int height,
+                                           const int numChannels,
+                                           uint8_t* pixelDataInOut);
+
 // Capture a screenshot using the Render (if set) or framebuffer callback.
 // if desiredWidth and desiredHeight are 0, the wide and height of the
 // screen colorbuffer will be used.

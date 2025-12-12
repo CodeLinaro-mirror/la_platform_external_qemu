@@ -177,6 +177,10 @@ bool ScreenshotUtils::getScreenshot(int displayId,
         if (ret != 0) {
             return false;
         }
+
+        // Apply background blending for the environment
+        android::emulation::applyScreenshotBackground(*finalWidth, *finalHeight,
+                                                    bpp, pixels);
     } else {
         // oh, oh slow path.
         android::emulation::Image img = android::emulation::takeScreenshot(

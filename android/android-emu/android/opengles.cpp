@@ -49,6 +49,7 @@
 #include "render-utils/logging_operations.h"
 #include "render-utils/render_api_functions.h"
 #include "aemu/base/Log.h"
+#include "android/emulation/control/ScreenCapturer.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -730,6 +731,8 @@ void android_setOpenglesScreenBackground(int width,
     if (sRenderer) {
         sRenderer->setScreenBackground(width, height, rgbaData);
     }
+
+    android::emulation::setScreenshotBackground(width, height, 4, rgbaData);
 }
 
 int android_hideOpenglesWindow(void) {
