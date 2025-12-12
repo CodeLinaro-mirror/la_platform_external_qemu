@@ -37,3 +37,4 @@
 ./sign-vm-entitlement.sh objs/lib64/vulkan/libvk_swiftshader.dylib
 ./sign-vm-entitlement.sh objs/lib64/vulkan/libvulkan.dylib
 ./sign-vm-entitlement.sh objs/lib64/vulkan/libMoltenVK.dylib
+./sign-vm-entitlement.sh objs/lib64/vulkan/libvulkan_kosmickrisp.dylib
