@@ -50,6 +50,8 @@ if(LINUX_X86_64)
       ${VULKAN_COMMON_DEPENDENCIES})
 elseif(DARWIN_X86_64 OR DARWIN_AARCH64)
   set(VULKAN_DEPENDENCIES
+      # Vulkan Loader
+      "${PREBUILT_ROOT}/libvulkan.dylib>lib64/vulkan/libvulkan.dylib"
       # Swiftshader
       "${PREBUILT_ROOT}/icds/libvk_swiftshader.dylib>lib64/vulkan/libvk_swiftshader.dylib"
       "${PREBUILT_ROOT}/icds/vk_swiftshader_icd.json>lib64/vulkan/vk_swiftshader_icd.json"
@@ -62,10 +64,12 @@ elseif(DARWIN_X86_64 OR DARWIN_AARCH64)
       "${PREBUILT_ROOT}/icds/libzstd.1.dylib>lib64/vulkan/libzstd.1.dylib"
       # for translating shaders to SPIRV
       "${PREBUILT_ROOT}/glslangValidator>lib64/vulkan/glslangValidator"
-      # On mac we need these on our load path MoltenVK
-      "${PREBUILT_ROOT}/libvulkan.dylib>lib64/vulkan/libvulkan.dylib"
+      # MoltenVK
       "${PREBUILT_ROOT}/icds/libMoltenVK.dylib>lib64/vulkan/libMoltenVK.dylib"
       "${PREBUILT_ROOT}/icds/MoltenVK_icd.json>lib64/vulkan/MoltenVK_icd.json"
+      # KosmicKrisp
+      "${PREBUILT_ROOT}/icds/libvulkan_kosmickrisp.dylib>lib64/vulkan/libvulkan_kosmickrisp.dylib"
+      "${PREBUILT_ROOT}/icds/libkosmickrisp_icd.json>lib64/vulkan/libkosmickrisp_icd.json"
       # Shaders
       ${VULKAN_COMMON_DEPENDENCIES})
   set(VULKAN_TEST_DEPENDENCIES
