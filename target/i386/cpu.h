@@ -2086,7 +2086,7 @@ typedef struct CPUArchState {
     int64_t user_tsc_khz; /* for sanity check only */
     uint64_t apic_bus_freq;
     uint64_t tsc;
-#if defined(CONFIG_KVM) || defined(CONFIG_HVF)
+#if defined(CONFIG_KVM) || defined(CONFIG_AEHD) || defined(CONFIG_HVF)
     void *xsave_buf;
     uint32_t xsave_buf_len;
 #endif
@@ -2135,6 +2135,7 @@ typedef struct CPUArchState {
 } CPUX86State;
 
 struct kvm_msrs;
+struct aehd_msrs;
 
 /**
  * X86CPU:
@@ -2293,6 +2294,8 @@ struct ArchCPU {
     Notifier machine_done;
 
     struct kvm_msrs *kvm_msr_buf;
+
+    struct aehd_msrs *aehd_msr_buf;
 
     int32_t node_id; /* NUMA node this CPU belongs to */
     int32_t socket_id;

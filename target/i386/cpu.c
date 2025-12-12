@@ -28,6 +28,7 @@
 #include "system/hvf.h"
 #include "hvf/hvf-i386.h"
 #include "kvm/kvm_i386.h"
+#include "aehd/aehd_i386.h"
 #include "sev.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
@@ -1899,7 +1900,7 @@ uint32_t xsave_area_size(uint64_t mask, bool compacted)
 
 static inline bool accel_uses_host_cpuid(void)
 {
-    return kvm_enabled() || hvf_enabled();
+    return kvm_enabled() || hvf_enabled() || aehd_enabled();
 }
 
 static inline uint64_t x86_cpu_xsave_xcr0_components(X86CPU *cpu)
@@ -6430,6 +6431,13 @@ uint64_t x86_cpu_get_supported_feature_word(X86CPU *cpu, FeatureWord w)
                         wi->msr.index);
             break;
         }
+    } else if (aehd_enabled()) {
+        if (wi->type != CPUID_FEATURE_WORD) {
+            return 0;
+        }
+        r = aehd_arch_get_supported_cpuid(aehd_state, wi->cpuid.eax,
+                                                    wi->cpuid.ecx,
+                                                    wi->cpuid.reg);
     } else if (hvf_enabled()) {
         if (wi->type != CPUID_FEATURE_WORD) {
             return 0;
@@ -7601,6 +7609,8 @@ static void x86_cpu_reset_hold(Object *obj, ResetType type)
 
     if (kvm_enabled()) {
         kvm_arch_reset_vcpu(cpu);
+    } else if (aehd_enabled()) {
+        aehd_arch_reset_vcpu(cpu);
     }
 
     x86_cpu_set_sgxlepubkeyhash(env);
