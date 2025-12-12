@@ -130,16 +130,19 @@ void LegacySnapshotController::saveSnapshot(
             return;
         }
 
-        using android::snapshot::Snapshotter;
-        Snapshotter::get().stopVulkanAppsIfApplicable();
-
-        LineConsumer slc;
         bool snapshot_success = false;
-        snapshot_success = getConsoleAgents()->vm->snapshotSave(
-                id.c_str(), slc.opaque(), LineConsumer::Callback);
+        std::string error;
+        using android::snapshot::Snapshotter;
+        if (Snapshotter::get().stopVulkanAppsIfApplicable()) {
+            LineConsumer slc;
+            snapshot_success = getConsoleAgents()->vm->snapshotSave(
+                    id.c_str(), slc.opaque(), LineConsumer::Callback);
+            error = absl::StrJoin(slc.lines(), "\n");
+        } else {
+            error = "Cannot stop Vulkan apps.";
+        }
 
         if (!snapshot_success) {
-            std::string error = absl::StrJoin(slc.lines(), "\n");
             callback(absl::InternalError(
                     absl::StrCat("Failed to save snapshot due to: ", error)));
         } else {

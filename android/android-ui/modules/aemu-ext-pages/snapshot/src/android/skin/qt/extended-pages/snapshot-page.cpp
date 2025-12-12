@@ -606,6 +606,8 @@ void SnapshotPage::slot_snapshotLoadCompleted(PackageData status) {
     setOperationInProgress(false);
     setEnabled(true);
     if (!status.ok()) {
+        std::string errorMessage = std::string(status.status().message());
+        derror("Snapshot load failed: '%s'", errorMessage.c_str());
         enableActions();
         QApplication::restoreOverrideCursor();
         showErrorDialog(tr("Snapshot did not load"), tr("Load snapshot"));
@@ -1051,6 +1053,8 @@ void SnapshotPage::slot_snapshotSaveCompleted(PackageData status) {
     setOperationInProgress(false);
     setEnabled(true);
     if (!status.ok()) {
+        std::string errorMessage = std::string(status.status().message());
+        derror("Snapshot save failed: '%s'", errorMessage.c_str());
         enableActions();
         QApplication::restoreOverrideCursor();
         showErrorDialog(tr("Could not save snapshot"), tr("Take snapshot"));
