@@ -15,8 +15,32 @@
 
 #include <QColor>
 #include <QList>
+#include <QPixmap>
 #include <QPointF>
 #include <QWidget>
+
+// A ring buffer for the pointer trails.
+// Nearby points are collapsed together when added to save on the path
+// complexity.
+class TrailRingBuffer {
+public:
+    explicit TrailRingBuffer(size_t maxSize);
+    bool append(const QPointF& point);
+    void clear();
+    QPointF get(size_t index) const;
+    QPointF last() const;
+    size_t size() const;
+    size_t adjustedSize() const;
+
+private:
+    QList<QPointF> mBuffer;
+    QList<size_t> mWeights;
+    size_t mAdjustedSize;
+    size_t mMaxSize;
+    size_t mStartIndex = 0;
+    size_t mCurrentSize = 0;
+    qreal mMinDiffSq;
+};
 
 class TouchpadWidget : public QWidget {
     Q_OBJECT
@@ -61,7 +85,19 @@ private:
     int mTouchpadHeight;
 
     QList<bool> mTracking;
-    QList<QList<QPointF>> mTrailPoints;
+    QList<TrailRingBuffer> mTrailPoints;
+
+    float mCachedScale = 1.0f;
+    int mCachedTheme = -1;
+
+    QPixmap mGlowPixmap;
+    QPixmap mFingerPixmap;
+    void updatePixmaps();
+    void drawPixmapAt(QPainter& painter,
+                      const QPixmap& pixmap,
+                      const QPointF& center);
+    void drawGlowAt(QPainter& painter, const QPointF& center);
+    void drawFingerAt(QPainter& painter, const QPointF& center);
 
     // When duplicating fingers, they will be separated by this amount
     static constexpr QPointF mFingerSeperation = QPointF(520, 0);
