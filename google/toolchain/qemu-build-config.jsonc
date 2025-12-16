@@ -278,6 +278,7 @@
       "-Dvvfat": "disabled",
       "-Dwerror": "false",
       "-Dwhpx": "disabled",
+      "-Daehd": "disabled",
       "-Dxen": "disabled",
       "-Dxen_pci_passthrough": "disabled",
       "-Dxkbcommon": "disabled",
@@ -485,7 +486,8 @@
         "-Davx512bw": "auto",
         "-Ddsound": "enabled",
         "-Dvhost_net": "enabled",
-        "-Dwhpx": "enabled"
+        "-Dwhpx": "enabled",
+        "-Daehd": "enabled"
       },
       "generated_files": [
         {
