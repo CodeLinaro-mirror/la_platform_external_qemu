@@ -1402,24 +1402,26 @@ static void updateLibrarySearchPath(bool isHeadless,
     bool forceSwAngle = false;
 #if defined(__APPLE__)
     forceSwAngle = true;
+#else
+    if (gpu) {
+        if (strcmp(gpu, "lavapipe") == 0) {
+            // Using env var to select gles mode with '-gpu lavapipe'
+            const char* selectSws =
+                    getenv("ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER");
+            bool force_swiftshader = (selectSws && strcmp(selectSws, "1") == 0);
+            if (!force_swiftshader) {
+                forceSwAngle = true;
+            }
+        } else {
+            forceSwAngle = strstr(gpu, "angle") != NULL;
+        }
+    }
 #endif
 
-    if ((gpu && strstr(gpu, "angle") != NULL) || forceSwAngle) {
+    if (forceSwAngle) {
         bufprint(fullPath, fullPath + sizeof(fullPath),
                  "%s" PATH_SEP "%s" PATH_SEP "%s", launcherDir, libSubDir,
                  "gles_angle");
-        D("Adding library search path: '%s'", fullPath);
-        add_library_search_dir(fullPath);
-
-        bufprint(fullPath, fullPath + sizeof(fullPath),
-                 "%s" PATH_SEP "%s" PATH_SEP "%s", launcherDir, libSubDir,
-                 "gles_angle9");
-        D("Adding library search path: '%s'", fullPath);
-        add_library_search_dir(fullPath);
-
-        bufprint(fullPath, fullPath + sizeof(fullPath),
-                 "%s" PATH_SEP "%s" PATH_SEP "%s", launcherDir, libSubDir,
-                 "gles_angle11");
         D("Adding library search path: '%s'", fullPath);
         add_library_search_dir(fullPath);
     } else {
