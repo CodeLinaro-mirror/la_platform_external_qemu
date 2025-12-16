@@ -603,4 +603,10 @@ USB_KEYMAP_DECLARATION {
 
   // TODO(jansene): Kernel excavation needed for others.
   // USB_KEYMAP(0x0c0193, 0x00d4, 0x00d4, 0x0000, 0xffff, "Camera", CAMERA), // AL A/V Capture
+
+  // EVDEV Codes for AI Glasses
+  // These USB codes are meaningless and can be freely changed
+  USB_KEYMAP(0x999901, 0x0246, 0x0000, 0x0000, 0xffff, "Stem1", STEM1),
+  USB_KEYMAP(0x999902, 0x0247, 0x0000, 0x0000, 0xffff, "Stem2", STEM2),
+  USB_KEYMAP(0x999903, 0x0248, 0x0000, 0x0000, 0xffff, "Stem3", STEM3),
 };

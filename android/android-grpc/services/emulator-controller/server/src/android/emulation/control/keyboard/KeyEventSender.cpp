@@ -218,6 +218,10 @@ const struct NonPrintableCodeEntry {
         {DomCode::SLEEP, DomKey::STANDBY},  // Sleep
         // AndroidXR specific events.
         {DomCode::ALL_APPS, DomKey::ALL_APPS},  // All_Apps
+        // Android AI Glasses events
+        {DomCode::STEM1, DomKey::STEM1},  // ANDROID_KEY_STEM_1 (Camera on AI Glasses)
+        {DomCode::STEM2, DomKey::STEM2},  // ANDROID_KEY_STEM_2 (Sreen On/Off on AI Glasses)
+        {DomCode::STEM3, DomKey::STEM3},  // ANDROID_KEY_STEM_3
 };
 
 const size_t kDomKeyMapEntries = ARRAY_SIZE(dom_key_map);

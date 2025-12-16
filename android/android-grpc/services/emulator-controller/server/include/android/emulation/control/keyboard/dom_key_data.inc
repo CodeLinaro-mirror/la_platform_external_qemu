@@ -423,6 +423,17 @@ DOM_KEY_MAP_DECLARATION {
   DOM_KEY_MAP("AllApps",              ALL_APPS,                 0x0D60),
 
   // =========================================================
+  // Android AI Glasses Keys
+  // =========================================================
+
+  // Note: For Glasses emulator, Stem1 is camera and Stem2 key is used
+  // to toggle display. The "Unicode code point" values are arbitrary and
+  // can be freely replaced
+  DOM_KEY_MAP("Stem1",                STEM1,                 0x1011),
+  DOM_KEY_MAP("Stem2",                STEM2,                 0x1012),
+  DOM_KEY_MAP("Stem3",                STEM3,                 0x1013),
+
+  // =========================================================
   // TV Keys
   // http://www.w3.org/TR/uievents-key/#keys-tv
   // =========================================================
