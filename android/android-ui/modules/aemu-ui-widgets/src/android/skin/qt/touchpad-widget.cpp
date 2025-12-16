@@ -27,13 +27,81 @@
 #include <QPen>
 #include <QWidget>
 
+TrailRingBuffer::TrailRingBuffer(size_t maxSize)
+    : mMaxSize(maxSize), mMinDiffSq(4), mBuffer(maxSize), mWeights(maxSize) {}
+
+QPointF TrailRingBuffer::get(size_t index) const {
+    Q_ASSERT(index < mMaxSize);
+    size_t realIndex = (mStartIndex + index) % mMaxSize;
+    return mBuffer[realIndex];
+}
+
+QPointF TrailRingBuffer::last() const {
+    Q_ASSERT(mCurrentSize > 0);
+    size_t lastIndex = (mStartIndex + mCurrentSize - 1) % mMaxSize;
+    return mBuffer[lastIndex];
+}
+
+bool TrailRingBuffer::append(const QPointF& point) {
+    size_t nextIndex = (mStartIndex + mCurrentSize) % mMaxSize;
+    size_t lastIndex = (mStartIndex + mCurrentSize - 1) % mMaxSize;
+
+    // Make room for the new point
+    if (mCurrentSize == mMaxSize) {
+        // Buffer is full, advance start index
+        mAdjustedSize -= mWeights[mStartIndex];
+        mStartIndex = (mStartIndex + 1) % mMaxSize;
+        mCurrentSize--;
+    }
+    if (mAdjustedSize == mMaxSize) {
+        mWeights[mStartIndex]--;
+        mAdjustedSize--;
+        if (mWeights[mStartIndex] == 0) {
+            mStartIndex = (mStartIndex + 1) % mMaxSize;
+            mCurrentSize--;
+        }
+    }
+
+    if (mCurrentSize > 0 && mMinDiffSq > 0) {
+        // If the new point is close to the last point, skip adding it
+        QPointF lastPoint = mBuffer[lastIndex];
+        QPointF diff = point - lastPoint;
+
+        qreal distSq = diff.x() * diff.x() + diff.y() * diff.y();
+        if (distSq < mMinDiffSq) {
+            mWeights[lastIndex]++;
+            mAdjustedSize++;
+            return false;
+        }
+    }
+    mBuffer[nextIndex] = point;
+    mWeights[nextIndex] = 1;
+    mCurrentSize++;
+    mAdjustedSize++;
+    return true;
+}
+
+void TrailRingBuffer::clear() {
+    mAdjustedSize = 0;
+    mStartIndex = 0;
+    mCurrentSize = 0;
+}
+
+size_t TrailRingBuffer::size() const {
+    return mCurrentSize;
+}
+
+size_t TrailRingBuffer::adjustedSize() const {
+    return mAdjustedSize;
+}
+
 TouchpadWidget::TouchpadWidget(QWidget* parent) : QWidget(parent) {
     setMinimumSize(50, 50);
 
     mNumFingers = 1;
     for (int i = 0; i < mMaxFingers; i++) {
         mTracking.append(false);
-        mTrailPoints.append(QList<QPointF>());
+        mTrailPoints.append(TrailRingBuffer(mMaxTrailPoints));
     }
     mTouchpadWidth = 100;
     mTouchpadHeight = 100;
@@ -62,6 +130,7 @@ bool TouchpadWidget::hasHeightForWidth() const {
 // Apparently the QT layout is not set up to respect heightForWidth
 void TouchpadWidget::resizeEvent(QResizeEvent* event) {
     this->setFixedHeight(heightForWidth(this->width()));
+    updatePixmaps();
 }
 
 void TouchpadWidget::setMultiFinger(int num_fingers) {
@@ -77,6 +146,19 @@ void TouchpadWidget::setMultiFinger(int num_fingers) {
             doTouchEnd(i);
         }
     }
+
+    // add new fingers
+    for (int i = mNumFingers; i < num_fingers; i++) {
+        if (i > 0 && mTracking[i - 1]) {
+            QPointF last_pos = mTrailPoints[i - 1].last();
+            QPointF new_finger_pos =
+                    last_pos + getScale() * mFingerSeperation * i;
+
+            if (this->rect().contains(new_finger_pos.toPoint())) {
+                doTouchBegin(new_finger_pos, i);
+            }
+        }
+    }
     mNumFingers = num_fingers;
 }
 
@@ -86,10 +168,12 @@ int TouchpadWidget::getMultiFinger() const {
 
 void TouchpadWidget::mousePressEvent(QMouseEvent* event) {
     for (int i = 0; i < mNumFingers; i++) {
+        QPointF current_finger_pos =
+                event->position() + getScale() * mFingerSeperation * i;
         if (!mTracking[i]) {
-            mTracking[i] = true;
-            doTouchBegin(event->position() + getScale() * mFingerSeperation * i,
-                         i);
+            if (this->rect().contains(current_finger_pos.toPoint())) {
+                doTouchBegin(current_finger_pos, i);
+            }
         }
     }
 }
@@ -97,7 +181,6 @@ void TouchpadWidget::mousePressEvent(QMouseEvent* event) {
 void TouchpadWidget::mouseReleaseEvent(QMouseEvent* event) {
     for (int i = 0; i < mNumFingers; i++) {
         if (mTracking[i]) {
-            mTracking[i] = false;
             doTouchEnd(i);
         }
     }
@@ -109,14 +192,11 @@ void TouchpadWidget::mouseMoveEvent(QMouseEvent* event) {
                 event->position() + i * getScale() * mFingerSeperation;
         if (this->rect().contains(current_finger_pos.toPoint())) {
             if (!mTracking[i]) {
-                mTracking[i] = true;
                 doTouchBegin(current_finger_pos, i);
-                return;
+            } else {
+                doTouchUpdate(current_finger_pos, i);
             }
-            doTouchUpdate(current_finger_pos, i);
-        } else if (!this->rect().contains(current_finger_pos.toPoint()) &&
-                   mTracking[i]) {
-            mTracking[i] = false;
+        } else if (mTracking[i]) {
             doTouchEnd(i);
             return;
         }
@@ -124,11 +204,9 @@ void TouchpadWidget::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void TouchpadWidget::addTrailPoint(QPointF p, int i) {
-    mTrailPoints[i].append(p);
-    if (mTrailPoints[i].size() > mMaxTrailPoints) {
-        mTrailPoints[i].pop_front();
+    if (mTrailPoints[i].append(p)) {
+        update();
     }
-    update();
 }
 
 void TouchpadWidget::clearTrailPoints(int i) {
@@ -136,9 +214,76 @@ void TouchpadWidget::clearTrailPoints(int i) {
     update();
 }
 
+void TouchpadWidget::updatePixmaps() {
+    mCachedScale = getScale();
+    mCachedTheme = getSelectedTheme();
+
+    // Determine color
+    QColor fingerColor;
+    switch (mCachedTheme) {
+        case SETTINGS_THEME_DARK:
+        case SETTINGS_THEME_STUDIO_DARK:
+            fingerColor = mFingerColorDark;
+            break;
+        case SETTINGS_THEME_LIGHT:
+        case SETTINGS_THEME_STUDIO_LIGHT:
+        default:
+            fingerColor = mFingerColorLight;
+            break;
+    }
+
+    // Draw Glow Pixmap
+    float radius = mCachedScale * mFingerGlow;
+    int side = qCeil(radius * 2);
+    mGlowPixmap = QPixmap(side, side);
+    mGlowPixmap.fill(Qt::transparent);
+
+    QPainter p(&mGlowPixmap);
+    p.setRenderHint(QPainter::Antialiasing);
+    QRadialGradient gradient(side / 2.0, side / 2.0, radius);
+    gradient.setColorAt(0, fingerColor);
+    gradient.setColorAt(1.0, Qt::transparent);
+    p.setBrush(QBrush(gradient));
+    p.setPen(Qt::NoPen);
+    p.drawEllipse(0, 0, side, side);
+
+    // Draw Finger Pixmap
+    radius = getScale() * mFingerWidth * 0.5;
+    side = qCeil(radius * 2);
+    mFingerPixmap = QPixmap(side, side);
+    mFingerPixmap.fill(Qt::transparent);
+
+    QPainter p2(&mFingerPixmap);
+    p2.setRenderHint(QPainter::Antialiasing);
+    p2.setBrush(QBrush(fingerColor));
+    p2.setPen(Qt::NoPen);
+    p2.drawEllipse(0, 0, side, side);
+}
+
+void TouchpadWidget::drawPixmapAt(QPainter& painter,
+                                  const QPixmap& pixmap,
+                                  const QPointF& center) {
+    if (pixmap.isNull()) {
+        updatePixmaps();
+    }
+    QPointF drawPos =
+            center - QPointF(pixmap.width() / 2.0, pixmap.height() / 2.0);
+    painter.drawPixmap(drawPos, pixmap);
+}
+
+void TouchpadWidget::drawGlowAt(QPainter& painter, const QPointF& center) {
+    drawPixmapAt(painter, mGlowPixmap, center);
+}
+
+void TouchpadWidget::drawFingerAt(QPainter& painter, const QPointF& center) {
+    drawPixmapAt(painter, mFingerPixmap, center);
+}
+
 void TouchpadWidget::paintEvent(QPaintEvent* event) {
+    if (mCachedScale != getScale() || mCachedTheme != getSelectedTheme()) {
+        updatePixmaps();
+    }
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
 
     QPen borderPen;
     QColor fingerColor;
@@ -167,21 +312,12 @@ void TouchpadWidget::paintEvent(QPaintEvent* event) {
         }
 
         // Draw Current touch location
-        auto current_loc = mTrailPoints[i][mTrailPoints[i].size() - 1];
+        auto current_loc = mTrailPoints[i].last();
 
-        QRadialGradient gradient(current_loc, getScale() * mFingerGlow);
-        gradient.setColorAt(0, fingerColor);
-        gradient.setColorAt(1.0, Qt::transparent);
-        painter.setBrush(QBrush(gradient));
-        painter.setPen(Qt::NoPen);
-
-        painter.drawEllipse(current_loc, getScale() * mFingerGlow,
-                            getScale() * mFingerGlow);
+        drawGlowAt(painter, current_loc);
 
         if (mTrailPoints[i].size() < 2) {
-            painter.setBrush(QBrush(fingerColor));
-            painter.drawEllipse(current_loc, getScale() * mFingerWidth * 0.5,
-                                getScale() * mFingerWidth * 0.5);
+            drawFingerAt(painter, current_loc);
             continue;
         }
 
@@ -189,15 +325,14 @@ void TouchpadWidget::paintEvent(QPaintEvent* event) {
         QPen pen;
         pen.setColor(fingerColor);
         pen.setWidth(getScale() * mFingerWidth);
-        pen.capStyle();
         pen.setCapStyle(Qt::RoundCap);
         pen.setJoinStyle(Qt::RoundJoin);
         painter.setPen(pen);
         painter.setBrush(Qt::NoBrush);
 
         QPainterPath p(current_loc);
-        for (int j = 1; j <= mTrailPoints[i].size(); ++j) {
-            p.lineTo(mTrailPoints[i][mTrailPoints[i].size() - j]);
+        for (size_t j = 1; j <= mTrailPoints[i].size(); ++j) {
+            p.lineTo(mTrailPoints[i].get(mTrailPoints[i].size() - j));
         }
         painter.drawPath(p);
     }
@@ -205,6 +340,7 @@ void TouchpadWidget::paintEvent(QPaintEvent* event) {
 
 void TouchpadWidget::doTouchBegin(QPointF p, int i) {
     doTouch(p, i, kEventTouchBegin);
+    mTracking[i] = true;
 }
 
 void TouchpadWidget::doTouchUpdate(QPointF p, int i) {
@@ -213,6 +349,7 @@ void TouchpadWidget::doTouchUpdate(QPointF p, int i) {
 
 void TouchpadWidget::doTouchEnd(int i) {
     doTouch(QPointF(0, 0), i, kEventTouchEnd);
+    mTracking[i] = false;
 }
 
 void TouchpadWidget::doTouch(QPointF p, int i, SkinEventType type) {
@@ -227,13 +364,14 @@ void TouchpadWidget::doTouch(QPointF p, int i, SkinEventType type) {
     skin_event.u.multi_touch_point.id = i + 1;
     skin_event.u.multi_touch_point.x = x;
     skin_event.u.multi_touch_point.y = y;
+    if (type == kEventTouchBegin || type == kEventTouchUpdate)
+        skin_event.u.multi_touch_point.pressure = 0x400;
+
+    android_virtio_touchpad_event(&skin_event, 0);
 
     if (type == kEventTouchBegin || type == kEventTouchUpdate) {
         addTrailPoint(p, i);
-        skin_event.u.multi_touch_point.pressure = 0x400;
     } else {  // kEventTouchEnd
         clearTrailPoints(i);
     }
-
-    android_virtio_touchpad_event(&skin_event, 0);
 }
