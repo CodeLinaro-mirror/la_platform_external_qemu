@@ -29,6 +29,7 @@ using android::emulation::control::KeyboardEvent;
 using android::emulation::control::MouseEvent;
 using android::emulation::control::Touch;
 using android::emulation::control::TouchEvent;
+using android::emulation::control::TouchpadEvent;
 using android::emulation::control::WheelEvent;
 
 static std::shared_ptr<SimpleClientWriter<InputEvent>> sInputEventWriter;
@@ -86,6 +87,16 @@ static void grpc_sendKeyCodes(int* keycodes, int count) {
     }
 }
 
+static void setupTouch(Touch* touch,
+                       const SkinEvent* const ev) {
+    touch->set_x(ev->u.multi_touch_point.x);
+    touch->set_y(ev->u.multi_touch_point.y);
+    touch->set_identifier(ev->u.multi_touch_point.id);
+    touch->set_pressure(ev->u.multi_touch_point.pressure);
+    touch->set_touch_major(ev->u.multi_touch_point.touch_major);
+    touch->set_touch_minor(ev->u.multi_touch_point.touch_minor);
+}
+
 static void grpc_sendTouchEvents(const SkinEvent* const events, int count) {
     if (!sInputEventWriter)
         return;
@@ -94,18 +105,31 @@ static void grpc_sendTouchEvents(const SkinEvent* const events, int count) {
     for (int i = 0; i < count; ++i) {
         const auto* ev = &events[i];
         Touch* touch = touchEvent->add_touches();
-        touch->set_x(ev->u.multi_touch_point.x);
-        touch->set_y(ev->u.multi_touch_point.y);
-        touch->set_identifier(ev->u.multi_touch_point.id);
-        touch->set_pressure(ev->u.multi_touch_point.pressure);
-        touch->set_touch_major(ev->u.multi_touch_point.touch_major);
-        touch->set_touch_minor(ev->u.multi_touch_point.touch_minor);
+        setupTouch(touch, ev);
         if (VERBOSE_CHECK(keys))
             LOG(INFO) << "Touch: " << touch->ShortDebugString();
     }
 
     auto inputEvent = std::make_unique<InputEvent>();
     inputEvent->set_allocated_touch_event(touchEvent.release());
+    sInputEventWriter->Write(*inputEvent);
+}
+
+static void grpc_sendTouchpadEvents(const SkinEvent* const events, int count) {
+    if (!sInputEventWriter)
+        return;
+
+    auto touchpadEvent = std::make_unique<TouchpadEvent>();
+    for (int i = 0; i < count; ++i) {
+        const auto* ev = &events[i];
+        Touch* touch = touchpadEvent->add_touches();
+        setupTouch(touch, ev);
+        if (VERBOSE_CHECK(keys))
+            LOG(INFO) << "Touchpad: " << touch->ShortDebugString();
+    }
+
+    auto inputEvent = std::make_unique<InputEvent>();
+    inputEvent->set_allocated_touchpad_event(touchpadEvent.release());
     sInputEventWriter->Write(*inputEvent);
 }
 
@@ -178,8 +202,7 @@ const QAndroidUserEventAgent sFishtankQAndroidUserEventAgent = {
         .sendKeyCode = grpc_sendKeyCode,
         .sendKeyCodes = grpc_sendKeyCodes,
         .sendTouchEvents = grpc_sendTouchEvents,
-        .sendTouchpadEvents =
-                grpc_sendTouchEvents,  // Can reuse touch for touchpad
+        .sendTouchpadEvents = grpc_sendTouchpadEvents,
         .sendMouseEvent = grpc_sendMouseEvent,
         .sendPenEvent =
                 [](int displayId,
