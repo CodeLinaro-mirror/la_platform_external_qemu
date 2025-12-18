@@ -51,8 +51,8 @@ def get_tasks(args) -> List[BuildTask]:
     tasks = [
         # A task can be disabled, or explicitly enabled by calling
         # .enable(False) <- Disable the task
-        RemoveLeftoverTask(args.target, args.out),
         CleanTask(destination=args.out, aosp=args.aosp),
+        RemoveLeftoverTask(args.target, args.out),
         PrebuiltsTask(args, is_emulator_build=True),
         ConfigureTask(
             aosp=args.aosp,

@@ -14,6 +14,7 @@
 import csv
 import io
 import logging
+import os
 import subprocess
 from pathlib import Path
 
@@ -32,9 +33,10 @@ class RemoveLeftoverTask(BuildTask):
         """Runs the task to remove leftover processes if the target is Windows."""
         if self.target != "windows":
             return
-        if not self.destination.exists():
+        has_contents = self.destination.exists() and (len(os.listdir(self.destination)) > 0)
+        if not has_contents:
             logging.info(
-                "Destination directory %s does not exist, nothing to do.",
+                "No contents at the destination directory %s, nothing to do.",
                 self.destination,
             )
             return
