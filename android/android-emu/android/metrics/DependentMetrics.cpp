@@ -64,6 +64,7 @@
 #include "host-common/Features.h"                        // for Feature, Pla...
 #include "host-common/opengl/emugl_config.h"             // for emuglConfig_...
 #include "host-common/opengles.h"                        // for android_getO...
+#include "host-common/crash-handler.h"
 #include "android/metrics/studio_stats_wrapper.pb.h"                             // for EmulatorFeat...
 #include "studio_stats.pb.h"
 
@@ -985,9 +986,14 @@ void android_metrics_fill_vulkan_gpu_info(void* opaque) {
             static_cast<android_studio::AndroidStudioEvent*>(opaque);
 
     const gfxstream::RendererPtr& renderer = android_getOpenglesRenderer();
-    if (!renderer || !android::featurecontrol::isEnabled(android::featurecontrol::Vulkan)) {
-        dwarning(
-                "Couldn't retrieve Vulkan renderer details. No Vulkan metrics will be reported.");
+    if (!renderer) {
+        derror("%s: Couldn't retrieve Vulkan renderer details.", __func__);
+        event->mutable_emulator_details()->set_vulkan_icd(
+                android_studio::EmulatorDetails::DISABLED_VK);
+        return;
+    }
+    if (!android::featurecontrol::isEnabled(android::featurecontrol::Vulkan)) {
+        crashhandler_append_message("Vulkan feature disabled");
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::DISABLED_VK);
         return;
@@ -1005,28 +1011,32 @@ void android_metrics_fill_vulkan_gpu_info(void* opaque) {
             &device_name, &driver_info, &driver_version, &api_version,
             &vendor_id, &device_id, &device_type, &device_memory);
 
-    auto vkGPU = event->mutable_emulator_details()
-                            ->mutable_active_vulkan_host_gpu();
+    std::string device_name_str;
+    std::string driver_info_str;
+    if (device_name) {
+        device_name_str = device_name;
+        free(device_name);
+    }
+    if (driver_info) {
+        driver_info_str = driver_info;
+        free(driver_info);
+    }
+
+    auto vkGPU =
+            event->mutable_emulator_details()->mutable_active_vulkan_host_gpu();
     vkGPU->set_vendor_id(vendor_id);
     vkGPU->set_device_id(device_id);
 
     // In order to match the enum values in the proto, we add 1 to the
     // device_type returned by the vulkan API.
     vkGPU->set_device_type(
-            static_cast<
-                    android_studio::EmulatorGpuVkInfo_PhysicalDeviceType>(
+            static_cast<android_studio::EmulatorGpuVkInfo_PhysicalDeviceType>(
                     device_type + 1));
     vkGPU->set_api_version(api_version);
     vkGPU->set_driver_version(driver_version);
     vkGPU->set_gpu_memory(device_memory);
-    if (device_name) {
-        vkGPU->set_device_name(device_name);
-        free(device_name);
-    }
-    if (driver_info) {
-        vkGPU->set_driver_info(driver_info);
-        free(driver_info);
-    }
+    vkGPU->set_device_name(device_name_str);
+    vkGPU->set_driver_info(driver_info_str);
 
     std::string vk_icd = System::get()->envGet("ANDROID_EMU_VK_ICD");
     if (vk_icd == "") {  // Use hardware when vk_icd is null
@@ -1048,6 +1058,64 @@ void android_metrics_fill_vulkan_gpu_info(void* opaque) {
         event->mutable_emulator_details()->set_vulkan_icd(
                 android_studio::EmulatorDetails::UNKNOWN_VK);
     }
+
+    // Also add vulkan info to crash reports
+#define VERSION_MAJOR(version) (((uint32_t)(version) >> 22U) & 0x7FU)
+#define VERSION_MINOR(version) (((uint32_t)(version) >> 12U) & 0x3FFU)
+#define VERSION_PATCH(version) ((uint32_t)(version) & 0xFFFU)
+
+    auto getDriverVersionString = [](uint32_t vkVendorId,
+                                     uint32_t vkDriverVersion) {
+        // Use regular VK_API_VERSION encoding to print the version by
+        // default.
+        uint32_t driverVersionMajor = VERSION_MAJOR(vkDriverVersion);
+        uint32_t driverVersionMinor = VERSION_MINOR(vkDriverVersion);
+        uint32_t driverVersionPatch = VERSION_PATCH(vkDriverVersion);
+        if (vkVendorId == 0x10DE) {
+            // NVIDIA
+            driverVersionMajor = (vkDriverVersion >> 22) & 0x3ff;
+            driverVersionMinor = (vkDriverVersion >> 14) & 0x0ff;
+            driverVersionPatch = (vkDriverVersion >> 6) & 0x0ff;
+        }
+
+        return std::to_string(driverVersionMajor) + "." +
+               std::to_string(driverVersionMinor) + "." +
+               std::to_string(driverVersionPatch);
+    };
+    auto getVendorIdString = [](uint32_t vkVendorId) {
+        if (vkVendorId == 0x10DE)
+            return std::string("NVIDIA");
+        if (vkVendorId == 0x1002)
+            return std::string("AMD");
+        if (vkVendorId == 0x8086)
+            return std::string("Intel");
+        if (vkVendorId == 0x10005)
+            return std::string("Mesa");
+        if (vkVendorId == 0x10006)
+            return std::string("Google");
+
+        char temp[20];
+        std::snprintf(temp, sizeof(temp), "0x%x", vkVendorId);
+        return std::string(temp);
+    };
+
+    char crash_handler_message[1024];
+    std::snprintf(crash_handler_message, sizeof(crash_handler_message),
+                  "VulkanEmulationDeviceInfo: deviceName=%s, driverInfo=%s, "
+                  "vendorID=%s, deviceID=0x%x, driver=%s, "
+                  "api=%d.%d.%d, type=%d, memory=%llu, "
+                  "ICD=%s",
+                  device_name_str.c_str(), driver_info_str.c_str(),
+                  getVendorIdString(vendor_id).c_str(), device_id,
+                  getDriverVersionString(vendor_id, driver_version).c_str(),
+                  VERSION_MAJOR(api_version), VERSION_MINOR(api_version),
+                  VERSION_PATCH(api_version), device_type, device_memory,
+                  vk_icd.c_str());
+    dprint("%s: %s", __func__, crash_handler_message);
+    crashhandler_append_message(crash_handler_message);
+#undef VERSION_MAJOR
+#undef VERSION_MINOR
+#undef VERSION_PATCH
 }
 
 void android_metrics_report_vulkan_gpu_info() {
