@@ -504,8 +504,10 @@ struct CameraService {
         const char* const cameraBack = hwCfg->hw_camera_back;
         const char* const cameraFront = hwCfg->hw_camera_front;
 
-        const int cameraBackOrientation = hwCfg->hw_camera_back_orientation;
-        const int cameraFrontOrientation = hwCfg->hw_camera_front_orientation;
+        const bool uses_orientation = feature_is_enabled(kFeature_QemuCameraSensorOrientation);
+
+        const int cameraBackOrientation = uses_orientation ? hwCfg->hw_camera_back_orientation : 90;
+        const int cameraFrontOrientation = uses_orientation ? hwCfg->hw_camera_front_orientation : 90;
 
         static const auto isWebcam = [](const char* name){
             return !strncmp(name, "webcam", 6);
