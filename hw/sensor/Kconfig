@@ -112,3 +112,8 @@ config LTC2991
     bool
     depends on I2C
     default y if I2C_DEVICES
+
+config TPS25990
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
