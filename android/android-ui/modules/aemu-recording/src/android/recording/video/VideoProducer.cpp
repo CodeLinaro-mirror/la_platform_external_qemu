@@ -112,7 +112,7 @@ bool getDisplayWidthHeightRotation(int displayId, uint32_t* displayWidth, uint32
                        bpp, &finalWidth, &finalHeight, pixels, &cPixels, displayId,
                        desiredWidth, desiredHeight, *rotation, rect);
 
-        if (ret == -2) {
+        if (ret == gfxstream::Renderer::GET_SCREENSHOT_RESULT_PIXELS_SIZE) {
             *displayWidth = finalWidth;
             *displayHeight = finalHeight;
         }
@@ -180,7 +180,7 @@ bool getDisplayWidthHeightRotation(int displayId, uint32_t* displayWidth, uint32
                        {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
         if (ret == 0) {
             return true;
-        } else if (ret == -2) {
+        } else if (ret == gfxstream::Renderer::GET_SCREENSHOT_RESULT_PIXELS_SIZE) {
             // need to allocate more memory, this should not happen
             return false;
         }
