@@ -265,7 +265,7 @@ public:
             size_t needed = *width * *height * nChannels;
             if (*cPixels < needed) {
                 *cPixels = needed;
-                return -2;
+                return GET_SCREENSHOT_RESULT_PIXELS_SIZE;
             }
             *cPixels = needed;
             memset(pixels, 0, *cPixels);

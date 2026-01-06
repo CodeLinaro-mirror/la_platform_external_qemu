@@ -215,7 +215,7 @@ Image takeScreenshot(
             displayId, desiredWidth, desiredHeight, rotation,
             {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
     std::vector<uint8_t> pixelBuffer(0);
-    if (screenshotRes == -2) { // -2 is special return code to get pixel count value
+    if (screenshotRes == gfxstream::Renderer::GET_SCREENSHOT_RESULT_PIXELS_SIZE) {
         pixelBuffer.resize(cPixels);
         screenshotRes = renderer->getScreenshot(
                 nChannels, &width, &height, pixelBuffer.data(), &cPixels,
