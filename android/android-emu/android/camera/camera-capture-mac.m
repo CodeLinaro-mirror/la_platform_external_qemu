@@ -112,7 +112,8 @@ typedef enum {
 
   // processCameraFrame state
   vImage_Buffer inputFrame_;
-  vImage_Buffer rotateBuffer_;
+  vImage_Buffer portraitBuffer_;
+  vImage_Buffer landscapeBuffer_;
   vImage_Buffer outputFrame_;
   void* scaleTempBuffer_;
 }
@@ -351,7 +352,8 @@ static vImage_Buffer shallowCropToAspectRatio(const vImage_Buffer* src,
   free(readFrameShadowBuffer_.data);
 
   free(inputFrame_.data);
-  free(rotateBuffer_.data);
+  free(portraitBuffer_.data);
+  free(landscapeBuffer_.data);
   free(outputFrame_.data);
   free(scaleTempBuffer_);
 
@@ -404,41 +406,47 @@ static BOOL copyImageFromCamera(CGColorSpaceRef colorSpace,
   vImage_Error error;
   vImage_Buffer* rotatedFrame;
 
+  vImagePixelCount rotatedWidth;
+  vImagePixelCount rotatedHeight;
+
   if (orientation == ANDROID_COARSE_PORTRAIT ||
       orientation == ANDROID_COARSE_REVERSE_PORTRAIT) {
-    if (rotateBuffer_.width != inputFrame_.height ||
-        rotateBuffer_.height != inputFrame_.width) {
-      free(rotateBuffer_.data);
-      rotateBuffer_.data = NULL;
-      rotateBuffer_.height = 0;
-      free(scaleTempBuffer_);
-      scaleTempBuffer_ = NULL;
-    }
+    rotatedWidth = inputFrame_.height;
+    rotatedHeight = inputFrame_.width;
+    rotatedFrame = &portraitBuffer_;
+  } else {
+    rotatedWidth = inputFrame_.width;
+    rotatedHeight = inputFrame_.height;
+    rotatedFrame = &landscapeBuffer_;
+  }
+  if (rotatedFrame->width != rotatedWidth ||
+      rotatedFrame->height != rotatedHeight) {
+    free(rotatedFrame->data);
+    rotatedFrame->data = NULL;
+    rotatedFrame->height = 0;
+    free(scaleTempBuffer_);
+    scaleTempBuffer_ = NULL;
+  }
 
-    if (!rotateBuffer_.data) {
-      error = vImageBuffer_Init(&rotateBuffer_, inputFrame_.width, inputFrame_.height,
-                                32, kvImageNoFlags);
-      if (error != kvImageNoError) {
-        E("%s: error in vImageBuffer_Init rotateBuffer=%p, height=%d, width=%d: %ld\n",
-          __func__, &rotateBuffer_, inputFrame_.width, inputFrame_.height, error);
-        return;
-      }
-    }
-
-    const Pixel_8888 backColor = {0, 0, 0, 0};
-    const int rotation = (cameraDirection_ ==  kMacCameraBackward ?
-                    (1 + orientation) % 4 :
-                    (5 - orientation) % 4);
-    error = vImageRotate90_ARGB8888(&inputFrame_, &rotateBuffer_,
-                                    rotation, backColor, kvImageNoFlags);
+  if (!rotatedFrame->data) {
+    error = vImageBuffer_Init(rotatedFrame, rotatedHeight, rotatedWidth,
+                              32, kvImageNoFlags);
     if (error != kvImageNoError) {
-      E("%s: error in vImageRotate90_ARGB8888: %ld\n", __func__, error);
+      E("%s: error in vImageBuffer_Init rotatedFrame=%p, height=%d, width=%d: %ld\n",
+        __func__, rotatedFrame, rotatedHeight, rotatedWidth, error);
       return;
     }
+  }
 
-    rotatedFrame = &rotateBuffer_;
-  } else {
-    rotatedFrame = &inputFrame_;
+  const Pixel_8888 backColor = {0, 0, 0, 0};
+  const int rotation = (cameraDirection_ ==  kMacCameraBackward ?
+                  (1 + orientation) % 4 :
+                  (5 - orientation) % 4);
+  error = vImageRotate90_ARGB8888(&inputFrame_, rotatedFrame,
+                                  rotation, backColor, kvImageNoFlags);
+  if (error != kvImageNoError) {
+    E("%s: error in vImageRotate90_ARGB8888: %ld\n", __func__, error);
+    return;
   }
 
   const vImage_Buffer cropped =
