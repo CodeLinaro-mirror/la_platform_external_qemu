@@ -1,6 +1,6 @@
 {
-    "clang": "clang-r563880",
-    "clang_emu_prebuilts": "clang-r487747c",
-    "rust": "1.73.0",
-    "visual_studio_version": "[16, )"
+  "clang": "clang-r563880c",
+  "clang_emu_prebuilts": "clang-r487747c",
+  "rust": "1.73.0",
+  "visual_studio_version": "[16, )"
 }
