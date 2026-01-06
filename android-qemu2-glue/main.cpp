@@ -2770,13 +2770,8 @@ extern "C" int main(int argc, char** argv) {
 
 #if defined(__APPLE__) && defined(__aarch64__)
     const bool isAppleArm = true;
-    const bool isWindows = false;
-#elif defined(_WIN32)
-    const bool isAppleArm = false;
-    const bool isWindows = true;
 #else
     const bool isAppleArm = false;
-    const bool isWindows = false;
 #endif
 
     // XR specific feature overrides
@@ -2801,16 +2796,10 @@ extern "C" int main(int argc, char** argv) {
                                       ->settings->android_cmdLineOptions()
                                       ->qt_hide_window;
     if (!embeddedMode && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
-        bool autoEnableVulkanComposition = false;
+        // This will auto enable on XR where we use GuestAngle by default.
+        // For gphone images, GuestAngle will become default with minigbm later.
+        // Use '-feature -VulkanNativeSwapchain' to disable this behavior.
         if (fc::isEnabled(fc::GuestAngle)) {
-            // Only auto enable on XR for now, as some features like display
-            // rotations or screen masking are not supported yet for gphones.
-            // TODO(b/442398020): increase auto enablement range to other
-            // platforms and devices
-            autoEnableVulkanComposition = isXrAvd && (isAppleArm || isWindows);
-        }
-
-        if (autoEnableVulkanComposition) {
             fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
         }
     }
