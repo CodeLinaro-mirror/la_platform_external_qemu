@@ -268,7 +268,6 @@ bool x86_is_long64_mode(CPUState *cpu);
 bool x86_is_paging_mode(CPUState *cpu);
 bool x86_is_pae_enabled(CPUState *cpu);
 
-enum X86Seg;
 target_ulong linear_addr(CPUState *cpu, target_ulong addr, enum X86Seg seg);
 target_ulong linear_addr_size(CPUState *cpu, target_ulong addr, int size,
                               enum X86Seg seg);
