@@ -97,36 +97,31 @@ static void setupTouch(Touch* touch,
     touch->set_touch_minor(ev->u.multi_touch_point.touch_minor);
 }
 
-static void grpc_sendTouchEvents(const SkinEvent* const events, int count) {
+static void grpc_sendTouchEvents(const SkinEvent* const event, int displayId) {
     if (!sInputEventWriter)
         return;
 
     auto touchEvent = std::make_unique<TouchEvent>();
-    for (int i = 0; i < count; ++i) {
-        const auto* ev = &events[i];
-        Touch* touch = touchEvent->add_touches();
-        setupTouch(touch, ev);
-        if (VERBOSE_CHECK(keys))
-            LOG(INFO) << "Touch: " << touch->ShortDebugString();
-    }
+    Touch* touch = touchEvent->add_touches();
+    setupTouch(touch, event);
+    if (VERBOSE_CHECK(keys))
+        LOG(INFO) << "Touch: " << touch->ShortDebugString();
 
     auto inputEvent = std::make_unique<InputEvent>();
     inputEvent->set_allocated_touch_event(touchEvent.release());
     sInputEventWriter->Write(*inputEvent);
 }
 
-static void grpc_sendTouchpadEvents(const SkinEvent* const events, int count) {
+static void grpc_sendTouchpadEvents(const SkinEvent* const event, int touchpadId) {
     if (!sInputEventWriter)
         return;
 
     auto touchpadEvent = std::make_unique<TouchpadEvent>();
-    for (int i = 0; i < count; ++i) {
-        const auto* ev = &events[i];
-        Touch* touch = touchpadEvent->add_touches();
-        setupTouch(touch, ev);
-        if (VERBOSE_CHECK(keys))
-            LOG(INFO) << "Touchpad: " << touch->ShortDebugString();
-    }
+    Touch* touch = touchpadEvent->add_touches();
+    touchpadEvent->set_touchpad(touchpadId);
+    setupTouch(touch, event);
+    if (VERBOSE_CHECK(keys))
+        LOG(INFO) << "Touchpad: " << touch->ShortDebugString();
 
     auto inputEvent = std::make_unique<InputEvent>();
     inputEvent->set_allocated_touchpad_event(touchpadEvent.release());
@@ -190,11 +185,6 @@ static void grpc_sendGenericEvent(SkinGenericEventCode code) {
     auto inputEvent = std::make_unique<InputEvent>();
     inputEvent->set_allocated_key_event(keyEvent.release());
     sInputEventWriter->Write(*inputEvent);
-}
-
-extern "C" void android_virtio_touchpad_event(const SkinEvent* const data,
-                                              int touchpadId) {
-    // TODO(jansene): Which gRPC call?
 }
 
 const QAndroidUserEventAgent sFishtankQAndroidUserEventAgent = {
