@@ -271,9 +271,22 @@ function(android_install_dependency_force_exec TARGET_TAG INSTALL_DEPENDENCIES)
   endif()
 endfunction()
 
+
+#  Generates a globally unique, auto-incrementing integer identifier.
+function(get_unique_id output_variable)
+    get_property(current_counter GLOBAL PROPERTY "GLOBAL_COUNTER")
+    if(NOT current_counter)
+        set(current_counter 0)
+    endif()
+    math(EXPR next_counter "${current_counter} + 1")
+    set_property(GLOBAL PROPERTY "GLOBAL_COUNTER" ${next_counter})
+    set(${output_variable} "${next_counter}" PARENT_SCOPE)
+endfunction()
+
+#
 # Binplaces the given source file to the given destination as part of the target
 #
-# It will be registered as a generated source.
+# It will be registered as a generated source so it can be tracked within cmake
 function(android_binplace TARGET SRC_FILE DEST_FILE)
   if(NOT EXISTS ${SRC_FILE})
     message(
@@ -281,12 +294,20 @@ function(android_binplace TARGET SRC_FILE DEST_FILE)
         "The target ${TARGET} depends on a dependency: ${SRC_FILE} that does not exist!"
     )
   endif()
+  add_custom_command(
+    OUTPUT "${DEST_FILE}" 
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${SRC_FILE}" "${DEST_FILE}" 
+    DEPENDS ${SRC_FILE}
+    COMMENT "Copying ${SRC_FILE} -> ${DEST_FILE}")
+
+  # Mark the destination as source so we can track it within cmake.
   target_sources(${TARGET} PRIVATE ${DEST_FILE})
   # Make sure this does not end up in the linked library. (b/137137125)
   set_source_files_properties(${DEST_FILE} PROPERTIES HEADER_FILE_ONLY TRUE)
-  add_custom_command(
-    OUTPUT "${DEST_FILE}" COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                  "${SRC_FILE}" "${DEST_FILE}")
+  get_unique_id(COUNTER)
+  set(UNIQUE_TARGET_NAME "FILE_COPY_${COUNTER}")
+  add_custom_target(${UNIQUE_TARGET_NAME} DEPENDS "${DEST_FILE}")
+  add_dependencies(${TARGET} ${UNIQUE_TARGET_NAME})
 endfunction()
 
 # Links the destination to the source file.
