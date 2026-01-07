@@ -508,7 +508,9 @@ static void npcm_pcierc_realize(DeviceState *dev, Error **errp)
                           &npcm_pcie_cfg_space_ops, s, "npcm-pcie-config",
                           4 * KiB);
 
-    /* realize the root port */
+    /* Setting this early since the root port reads it */
+    phs->bus->flags |= PCI_BUS_EXTENDED_CONFIG_SPACE;
+    /* Initialize the Root Port */
     pci_realize_and_unref(root, phs->bus, &error_fatal);
     /* enable MSI (non-X) in root port config space */
     msi_nonbroken = true;
