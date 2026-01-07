@@ -2790,17 +2790,13 @@ extern "C" int main(int argc, char** argv) {
 
     // When GuestAngle is used, Vulkan host composition can be automatically
     // enabled on currently supported platforms and device types to get better
-    // performance.
-    // TODO(b/447601952): Support vulkan composition in embedded emulator mode
-    const bool embeddedMode = getConsoleAgents()
-                                      ->settings->android_cmdLineOptions()
-                                      ->qt_hide_window;
-    if (!embeddedMode && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
+    // performance. Use '-feature -VulkanNativeSwapchain' to disable this behavior.
+    if (fc::isEnabled(fc::GuestAngle) && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
         // This will auto enable on XR where we use GuestAngle by default.
         // For gphone images, GuestAngle will become default with minigbm later.
-        // Use '-feature -VulkanNativeSwapchain' to disable this behavior.
-        if (fc::isEnabled(fc::GuestAngle)) {
-            fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
+        fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
+        if (fc::isEnabled(fc::VulkanNativeSwapchain)) {
+            dprint("Auto-enabled VulkanNativeSwapchain feature");
         }
     }
 
