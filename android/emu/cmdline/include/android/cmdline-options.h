@@ -127,7 +127,6 @@ OPT_FLAG( log_nofilter, "Disable the duplicate log filter (DEPRECATED)")
 OPT_FLAG( log_detailed, "Enable detailed logging info" )
 
 #ifdef __linux__
-OPT_FLAG ( use_system_libs, "Use system libstdc++ instead of bundled one" )
 CFG_PARAM( stdouterr_file, "<file-name>", "redirect stdout/stderr to a specific file" )
 OPT_FLAG ( no_qt, "disable qt windowing system" )
 #endif  // __linux__
