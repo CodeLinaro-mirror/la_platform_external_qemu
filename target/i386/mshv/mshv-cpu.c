@@ -28,7 +28,7 @@
 #include "emulate/x86_emu.h"
 #include "emulate/x86_flags.h"
 
-#include "trace-accel_mshv.h"
+#include "accel/mshv/trace.h"
 #include "trace.h"
 
 #include <sys/ioctl.h>
