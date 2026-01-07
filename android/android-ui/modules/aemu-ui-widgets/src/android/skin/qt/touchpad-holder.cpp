@@ -30,6 +30,8 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
       mUi(new Ui::TouchpadHolder()) {
     mUi->setupUi(this);
 
+    this->setFocusPolicy(Qt::StrongFocus);
+
     mTouchpadWidth = getConsoleAgents()->settings->hw()->hw_touchpad0_width;
     mTouchpadHeight = getConsoleAgents()->settings->hw()->hw_touchpad0_height;
 
