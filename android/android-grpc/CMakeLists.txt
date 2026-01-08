@@ -7,6 +7,8 @@ function(android_grpc_service_lib)
                         ${ARGN})
 
   if(NOT grpc_SOURCE_DIR)
+    message(
+      FATAL_ERROR "No source directory definied in ${CMAKE_CURRENT_LIST_DIR}")
     set(grpc_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
   endif()
   protobuf_generate_grpc_cpp(
