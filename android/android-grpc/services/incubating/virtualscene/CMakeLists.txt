@@ -1,5 +1,6 @@
 android_grpc_service_lib(
-  TARGET virtual-scene-service SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/proto
+  TARGET virtual-scene-service SOURCE_DIR
+         ${AEMU_PROTO_DIR}/services/incubating/virtualscene
   SOURCES virtual_scene_service.proto)
 
 target_link_libraries(virtual-scene-service PUBLIC android-emu-protos)
