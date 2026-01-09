@@ -569,6 +569,10 @@ const char* avdInfo_getTarget(const AvdInfo* i) {
     return i->target;
 }
 
+bool avdInfo_isDesktopApi36OrHigher(const AvdInfo* i) {
+    return i->flavor == AVD_DESKTOP && i->apiLevel >= 36;
+}
+
 // This information was taken from the SDK Manager:
 // Appearances & Behavior > System Settings > Android SDK > SDK Platforms
 static const struct {
