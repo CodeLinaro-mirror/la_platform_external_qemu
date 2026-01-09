@@ -234,7 +234,7 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->displaysButton->setVisible(false);
     }
 
-    if (avdFlavor != AVD_XR ||  avdFlavor != AVD_GLASSES) {
+    if (avdFlavor != AVD_XR || avdFlavor != AVD_GLASSES || avdFlavor != AVD_ANDROID_AUTO) {
         mSidebarButtons.addButton(mExtendedUi->cellularButton);
         mSidebarButtons.addButton(mExtendedUi->telephoneButton);
         mSidebarButtons.addButton(mExtendedUi->dpadButton);
@@ -344,6 +344,7 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->batteryButton->setVisible(false);
         mExtendedUi->dpadButton->setVisible(false);
         mExtendedUi->telephoneButton->setVisible(false);
+        mExtendedUi->cellularButton->setVisible(false);
 
         if (android::featurecontrol::isEnabled(
                     android::featurecontrol::CarVhalReplay)) {
