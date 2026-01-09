@@ -306,6 +306,8 @@ bool crashhandler_init(int argc, char** argv) {
     const std::vector<std::string_view> envExcludes = {
         "ANDROID_EMULATOR_WRAPPER_PID",
         "ANDROID_EMULATOR_LAUNCHER_DIR",
+        "ANDROID_EMULATOR_PREBUILTS_DIR",
+        "ANDROID_EMULATOR_DISCOVERY_DIR",
     };
     const auto allEnv = System::get()->envGetAll();
     arguments.clear();
