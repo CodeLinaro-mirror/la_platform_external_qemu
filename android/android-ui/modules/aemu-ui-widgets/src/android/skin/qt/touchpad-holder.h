@@ -49,5 +49,5 @@ protected:
 private:
     int mTouchpadWidth;
     int mTouchpadHeight;
-    static constexpr int mMargin = 5;
+    static constexpr int mMargin = 10;
 };
