@@ -76,8 +76,12 @@ crashinfo collectCrashInfo(AvdInfo* avd, const std::string& sessionId) {
     }
 
     IniFile buildprop(reinterpret_cast<char*>(data->data), data->size);
-    info["ro.build.fingerprint"] =
-            buildprop.getString("ro.build.fingerprint", "??");
+    std::string fingerPrint = buildprop.getString("ro.system.build.fingerprint", "??");
+    if (fingerPrint == "??") {
+        // Try old method
+        fingerPrint = buildprop.getString("ro.build.fingerprint", "??");
+    }
+    info["ro.build.fingerprint"] = std::move(fingerPrint);
 
     // The emulator sessionId that crashed.
     info["sessionId"] = sessionId;
