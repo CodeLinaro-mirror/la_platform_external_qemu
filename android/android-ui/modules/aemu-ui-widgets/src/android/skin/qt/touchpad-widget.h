@@ -61,6 +61,7 @@ public:
 
     void addTrailPoint(QPointF p, int i);
     void clearTrailPoints(int i);
+    int heightForWidth(int width) const override;
 
 protected:
     // This event is called whenever the mouse moves over the widget.
@@ -72,8 +73,6 @@ protected:
 
     // This event is called whenever the widget needs to be repainted.
     void paintEvent(QPaintEvent* event) override;
-
-    int heightForWidth(int width) const override;
     bool hasHeightForWidth() const override;
 
 private:
