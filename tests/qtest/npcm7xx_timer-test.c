@@ -472,6 +472,10 @@ static void test_periodic_interrupt(gconstpointer test_data)
     for (i = 0; i < 4; i++) {
         clock_step_next();
 
+        /* Add clock steps to ensure the timer callback fully executes when */
+        /* the interrupt event is fired. */
+        clock_step(tim_calculate_step(count, ps) - 1);
+
         g_assert_cmphex(tim_read(td, TISR), ==, tim_timer_bit(td));
         g_assert_true(qtest_get_irq(global_qtest, tim_timer_irq(td)));
 
