@@ -250,6 +250,19 @@ void crashhandler_add_string(const char* name, const char* string) {
     }
 }
 
+void crashhandler_add_string_format_v(const char* name, const char* format, va_list args) {
+    char message[2048] = {};
+    vsnprintf(message, sizeof(message) - 1, format, args);
+    crashhandler_add_string(name, message);
+}
+
+void crashhandler_add_string_format(const char* name, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    crashhandler_add_string_format_v(name, format, args);
+    va_end(args);
+}
+
 void crashhandler_exitmode(const char* message) {
     const auto reporter = CrashReporter::get();
     if (reporter && reporter->active()) {
