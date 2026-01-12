@@ -102,7 +102,8 @@ int camera_virtualscene_read_frame(CameraDevice* cd,
                                    float g_scale,
                                    float b_scale,
                                    float exp_comp,
-                                   const char* direction);
+                                   const char* direction,
+                                   int sensor_orientation);
 
 // Closes the camera device, which was opened from the camera_virtualscene_open
 // API.

@@ -152,7 +152,8 @@ typedef enum {
           rScale:(float)rScale
           gScale:(float)gScale
           bScale:(float)bScale
-         expComp:(float)expComp;
+         expComp:(float)expComp
+         sensorOrientation:(int)sensorOrientation;
 
 @end
 
@@ -502,7 +503,7 @@ static BOOL copyImageFromCamera(CGColorSpaceRef colorSpace,
 didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection {
   CFRetain(sampleBuffer);
-  const AndroidCoarseOrientation orientation = get_coarse_orientation();
+  const AndroidCoarseOrientation orientation = get_coarse_orientation(90);
 
   dispatch_async(outputQueue_, ^(void){
       [self processCameraFrame:sampleBuffer orientation:orientation];
@@ -513,7 +514,8 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
           rScale:(float)rScale
           gScale:(float)gScale
           bScale:(float)bScale
-         expComp:(float)expComp {
+         expComp:(float)expComp
+         sensorOrientation:(int)sensorOrientation {
   os_unfair_lock_lock(&outputBufferLock_);
   if (outputFrameUpdated_) {
     swapImages(&readFrameBuffer_, &readFrameShadowBuffer_);
@@ -525,7 +527,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     return convert_frame(readFrameShadowBuffer_.data, V4L2_PIX_FMT_ARGB32,
                          readFrameShadowBuffer_.rowBytes * readFrameShadowBuffer_.height,
                          readFrameShadowBuffer_.width, readFrameShadowBuffer_.height, resultFrame,
-                         rScale, gScale, bScale, expComp, "front", 1);
+                         rScale, gScale, bScale, expComp, "front", sensorOrientation / 90);
   } else {
     return 1;
   }
@@ -665,7 +667,8 @@ int camera_device_read_frame(CameraDevice* cd,
                              float g_scale,
                              float b_scale,
                              float exp_comp,
-                             const char* direction) {
+                             const char* direction,
+                             int sensor_orientation) {
   MacCameraDevice* mcd;
 
   /* Sanity checks. */
@@ -691,7 +694,8 @@ int camera_device_read_frame(CameraDevice* cd,
                          rScale:r_scale
                          gScale:g_scale
                          bScale:b_scale
-                        expComp:exp_comp];
+                        expComp:exp_comp
+                        sensorOrientation:sensor_orientation];
 }
 
 void

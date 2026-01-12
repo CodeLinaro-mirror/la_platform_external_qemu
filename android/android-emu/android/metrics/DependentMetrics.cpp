@@ -820,6 +820,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::FORCE_GPU_HOST;
         case android::featurecontrol::ForceGpuSoftware:
             return android_studio::EmulatorFeatureFlagState::FORCE_GPU_SOFTWARE;
+        case android::featurecontrol::QemuCameraSensorOrientation:
+            return android_studio::EmulatorFeatureFlagState::QEMU_CAMERA_SENSOR_ORIENTATION;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;

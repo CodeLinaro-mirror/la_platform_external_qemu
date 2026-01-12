@@ -1270,7 +1270,8 @@ int camera_device_read_frame(CameraDevice* ccd,
                              float g_scale,
                              float b_scale,
                              float exp_comp,
-                             const char* direction) {
+                             const char* direction,
+                             int sensor_orientation) {
     MediaFoundationCameraDevice* cd = toMediaFoundationCameraDevice(ccd);
     if (!cd) {
         LOG(ERROR) << "Invalid camera descriptor.";
@@ -1278,7 +1279,7 @@ int camera_device_read_frame(CameraDevice* ccd,
     }
 
     return cd->readFrame(result_frame, r_scale, g_scale, b_scale, exp_comp,
-                         direction, get_coarse_orientation());
+                         direction, get_coarse_orientation(sensor_orientation));
 }
 
 void camera_device_close(CameraDevice* ccd) {

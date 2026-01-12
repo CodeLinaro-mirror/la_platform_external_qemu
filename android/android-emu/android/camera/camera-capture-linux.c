@@ -994,7 +994,8 @@ int camera_device_read_frame(CameraDevice* ccd,
                              float g_scale,
                              float b_scale,
                              float exp_comp,
-                             const char* direction) {
+                             const char* direction,
+                             int sensor_orientation) {
     LinuxCameraDevice* cd;
 
     /* Sanity checks. */
@@ -1036,7 +1037,7 @@ int camera_device_read_frame(CameraDevice* ccd,
                              cd->actual_pixel_format.width,
                              cd->actual_pixel_format.height, result_frame,
                              r_scale, g_scale, b_scale, exp_comp, direction,
-                             get_coarse_orientation());
+                             get_coarse_orientation(sensor_orientation));
     } else {
         /* Dequeue next buffer from the device. */
         struct v4l2_buffer buf;
@@ -1065,7 +1066,7 @@ int camera_device_read_frame(CameraDevice* ccd,
                             cd->actual_pixel_format.width,
                             cd->actual_pixel_format.height, result_frame,
                             r_scale, g_scale, b_scale, exp_comp, direction,
-                            get_coarse_orientation());
+                            get_coarse_orientation(sensor_orientation));
 
         /* Requeue the buffer back to the device. */
         if (_xioctl(cd->handle, VIDIOC_QBUF, &buf) < 0) {

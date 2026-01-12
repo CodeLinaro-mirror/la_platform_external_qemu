@@ -79,7 +79,9 @@ void generateAvd(const AvdGenerateInfo& genInfo) {
     configIni.setString("hw.audioOutput", genInfo.hwAudioOutput);
     configIni.setString("hw.battery", genInfo.hwBattery);
     configIni.setString("hw.camera.back", genInfo.hwCameraBack);
+    configIni.setInt("hw.camera.back.orientation", genInfo.hwCameraBackOrientation);
     configIni.setString("hw.camera.front", genInfo.hwCameraFront);
+    configIni.setInt("hw.camera.front.orientation", genInfo.hwCameraFrontOrientation);
     configIni.setString("hw.cpu.arch", genInfo.hwCpuArch);
     configIni.setString("hw.cpu.model", genInfo.hwCpuModel);
     configIni.setInt("hw.cpu.ncore", genInfo.hwCpuNcore);
@@ -178,7 +180,9 @@ void generateAvdWithDefaults(std::string_view avdName,
         /* hw.audioOutput */ "yes",
         /* hw.battery */ "yes",
         /* hw.camera.back */ "virtualscene",
+        /* hw.camera.back.orientation */ 90,
         /* hw.camera.front */ "emulated",
+        /* hw.camera.front.orientation */ 90,
         /* hw.cpu.arch */ cpuArch.c_str(),
         /* hw.cpu.model */ cpuModel.c_str(),
         /* hw.cpu.ncore */ 4,

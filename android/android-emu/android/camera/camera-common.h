@@ -180,7 +180,8 @@ typedef struct CameraInfoVtbl {
                       float g_scale,
                       float b_scale,
                       float exp_comp,
-                      const char* direction);
+                      const char* direction,
+                      int sensor_orientation);
     int (*stop_capturing)(CameraDevice* cd);
     void (*close)(CameraDevice* cd);
 
@@ -208,6 +209,8 @@ typedef struct CameraInfo {
     uint32_t            pixel_format;
     /* Direction the camera is facing: 'front', or 'back' */
     char*               direction;
+    /* The angle the camera sensor is mounted at */
+    int                 orientation;
     /* Array of frame sizes supported for the pixel format chosen for the camera.
      * The size of the array is defined by the frame_sizes_num field of this
      * structure. */
@@ -245,7 +248,7 @@ typedef enum ClientStartResult ClientStartResult;
 // 1:     ANDROID_COARSE_REVERSE_LANDSCAPE, 90 degrees
 // 2:     ANDROID_COARSE_REVERSE_PORTRAIT, 180 degrees
 // 3:     ANDROID_COARSE_LANDSCAPE, 270 degrees
-typedef int (*GetCoarseOrientation)();
+typedef int (*GetCoarseOrientation)(int sensor_orientation);
 
 // Pass the function pointer to get coarse orientation.
 // Because of build dependency issue we need to set the function pointer here.
@@ -253,6 +256,6 @@ void set_coarse_orientation_getter(GetCoarseOrientation getCoarseOrientation);
 
 // Return the coarse orientation of the device, using the
 // coarse orientation getter that was previously set.
-int get_coarse_orientation();
+int get_coarse_orientation(int sensor_orientation);
 
 ANDROID_END_HEADER

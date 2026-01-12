@@ -262,9 +262,10 @@ struct ImagefileCameraDevice {
                                float gScale,
                                float bScale,
                                float expComp,
-                               const char* direction) {
+                               const char* direction,
+                               int sensor_orientation) {
         return myselfFrom(cd)->readFrame(*frame, rScale, gScale, bScale,
-                                         expComp, direction);
+                                         expComp, direction, sensor_orientation);
     }
 
     static int stopCapturingStatic(CameraDevice* cd) {
@@ -281,7 +282,8 @@ private:
                   const float gScale,
                   const float bScale,
                   const float expComp,
-                  const char* direction) {
+                  const char* direction,
+                  const int sensor_orientation) {
         const bool backFacing = !strcmp(direction, "back");
 
         for (uint32_t i = 0; i < cframe.framebuffers_count; ++i) {
@@ -291,7 +293,7 @@ private:
                             mImage.width,
                             mImage.height, &cframe,
                             rScale, gScale, bScale, expComp, direction,
-                            get_coarse_orientation())) {
+                            get_coarse_orientation(sensor_orientation))) {
                 return err;
             }
         }

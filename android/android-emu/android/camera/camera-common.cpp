@@ -72,10 +72,10 @@ void set_coarse_orientation_getter(GetCoarseOrientation getCoarseOrientation) {
     sGetCoarseOrientation = getCoarseOrientation;
 }
 
-int get_coarse_orientation() {
+int get_coarse_orientation(int sensor_orientation) {
     if (!sGetCoarseOrientation) {
         VERBOSE_PRINT(camera, "WARNING: getCoarseOrientation not set");
         return 0;
     }
-    return sGetCoarseOrientation();
+    return sGetCoarseOrientation(sensor_orientation);
 }
