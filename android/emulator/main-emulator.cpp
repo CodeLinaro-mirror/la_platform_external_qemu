@@ -1426,7 +1426,8 @@ static void updateLibrarySearchPath(bool isHeadless,
 
 #ifdef __linux__
     // (TODO b/417138854): workaround to get away from bad fde: FDE is really a CIE errors
-    if (gpu && strstr(gpu, "lavapipe") != nullptr) {
+    const bool preload_libgcc_s = (System::get()->envGet("ANDROID_EMU_PRELOAD_LIBGCC") != "0");
+    if (preload_libgcc_s) {
         const char* libgcc_path = "/lib/x86_64-linux-gnu/libgcc_s.so.1";
         if (path_exists(libgcc_path)) {
             D("Preload libgcc with path %s", libgcc_path);
