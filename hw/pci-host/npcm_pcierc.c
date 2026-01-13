@@ -101,8 +101,8 @@ static void npcm_pcierc_map_enabled(NPCMPCIERCState *s, NPCMPCIEWindow *w)
     } else if (w->type == PCIE2AXI) {
         snprintf(name, sizeof(name), "npcm-pcie2axi-window-%d", w->id);
         memory_region_init_alias(&w->mem, OBJECT(s), name,
-                                 system, src_ba, size);
-        memory_region_add_subregion(&s->pcie_memory, dest_ba, &w->mem);
+                                 system, dest_ba, size);
+        memory_region_add_subregion(&s->pcie_memory, src_ba, &w->mem);
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
                       "%s: unable to map uninitialized PCIe window",
