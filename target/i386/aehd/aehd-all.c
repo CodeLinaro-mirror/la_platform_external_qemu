@@ -896,7 +896,7 @@ static HANDLE aehd_open_device(void)
 {
     HANDLE hDevice;
 
-    hDevice = CreateFile("\\\\.\\aehd", GENERIC_READ | GENERIC_WRITE, 0, NULL,
+    hDevice = CreateFileA("\\\\.\\aehd", GENERIC_READ | GENERIC_WRITE, 0, NULL,
         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (hDevice == INVALID_HANDLE_VALUE)
