@@ -1426,7 +1426,24 @@ static void updateLibrarySearchPath(bool isHeadless,
 
 #ifdef __linux__
     // (TODO b/417138854): workaround to get away from bad fde: FDE is really a CIE errors
-    const bool preload_libgcc_s = (System::get()->envGet("ANDROID_EMU_PRELOAD_LIBGCC") != "0");
+    const std::string preloadOption =
+            System::get()->envGet("ANDROID_EMU_PRELOAD_LIBGCC");
+    bool preload_libgcc_s = false;
+    if (preloadOption == "0") {
+        preload_libgcc_s = false;  // force off
+    } else if (preloadOption == "1") {
+        preload_libgcc_s = true;  // force on
+    } else {
+        // Decide if lavapipe (system or bundled) might be in use
+        if (gpu) {
+            preload_libgcc_s = strstr(gpu, "lavapipe") != nullptr ||
+                               strstr(gpu, "auto") != nullptr ||
+                               strstr(gpu, "software") != nullptr ||
+                               strstr(gpu, "host") != nullptr;
+        } else {
+            preload_libgcc_s = true;
+        }
+    }
     if (preload_libgcc_s) {
         const char* libgcc_path = "/lib/x86_64-linux-gnu/libgcc_s.so.1";
         if (path_exists(libgcc_path)) {
