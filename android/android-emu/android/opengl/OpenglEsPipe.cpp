@@ -235,10 +235,6 @@ public:
                 derror("Could not take screenshot, error: %d", screenshotRes);
                 width = 0;
                 height = 0;
-            } else {
-                // Apply background blending for the environment
-                android::emulation::applyScreenshotBackground(
-                        width, height, nChannels, pixels.data());
             }
 
 #if SNAPSHOT_PROFILE > 1

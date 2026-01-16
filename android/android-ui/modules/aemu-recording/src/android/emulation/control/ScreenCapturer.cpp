@@ -227,10 +227,6 @@ Image takeScreenshot(
         return Image(0, 0, 0, ImageFormat::RGB888, {});
     }
 
-    // Apply background blending for the environment
-    android::emulation::applyScreenshotBackground(width, height, nChannels,
-                                                  pixelBuffer.data());
-
     // We only convert png/ RGBA8888 -> RBG888 at this time..
     switch (desiredFormat) {
         case ImageFormat::PNG: {
