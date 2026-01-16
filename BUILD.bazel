@@ -2,7 +2,6 @@
 # /usr/local/google/home/hshan/qn/third_party/qemu/google/scripts/merge_bazel.py --buildfile /usr/local/google/home/hshan/qn/third_party/qemu/platform/BUILD.windows-x86_64 @platforms//os:windows --buildfile /usr/local/google/home/hshan/qn/third_party/qemu/platform/BUILD.darwin-arm64 @platforms//os:macos --buildfile /usr/local/google/home/hshan/qn/third_party/qemu/platform/BUILD.linux-x86_64 @platforms//os:linux --verbatim-buildfile /usr/local/google/home/hshan/qn/third_party/qemu/google/build/BUILD.common --unique win_def_file -o /usr/local/google/home/hshan/qn/third_party/qemu/BUILD.bazel
 load("@goldfish_build//rules:windows_resources.bzl", "windows_resources")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
 
@@ -10929,7 +10928,7 @@ cc_library(
 
 # Set of common build rules that we want to merge in
 # This makes sure we have all we need available.
-pkg_files(
+filegroup(
     name = "qemu-roms",
     srcs = [
         "pc-bios/bios.bin",
@@ -10945,12 +10944,10 @@ pkg_files(
         "pc-bios/vgabios-stdvga.bin",
         "pc-bios/vgabios-virtio.bin",
     ],
-    # Where it should be in the final package
-    prefix = "share/qemu",
     visibility = ["//visibility:public"],
 )
 
-pkg_files(
+filegroup(
     name = "qemu-keymaps",
     srcs = [
         "pc-bios/keymaps/ar",
@@ -10988,7 +10985,5 @@ pkg_files(
         "pc-bios/keymaps/th",
         "pc-bios/keymaps/tr",
     ],
-    # Where it should be in the final package
-    prefix = "share/qemu/keymaps/",
     visibility = ["//visibility:public"],
 )

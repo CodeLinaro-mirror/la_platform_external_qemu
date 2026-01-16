@@ -1,5 +1,4 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
 
@@ -212,7 +211,7 @@ cc_library(
 
 # Set of common build rules that we want to merge in
 # This makes sure we have all we need available.
-pkg_files(
+filegroup(
     name = "qemu-roms",
     srcs = [
         "pc-bios/bios.bin",
@@ -228,12 +227,10 @@ pkg_files(
         "pc-bios/vgabios-stdvga.bin",
         "pc-bios/vgabios-virtio.bin",
     ],
-    # Where it should be in the final package
-    prefix = "share/qemu",
     visibility = ["//visibility:public"],
 )
 
-pkg_files(
+filegroup(
     name = "qemu-keymaps",
     srcs = [
         "pc-bios/keymaps/ar",
@@ -271,7 +268,5 @@ pkg_files(
         "pc-bios/keymaps/th",
         "pc-bios/keymaps/tr",
     ],
-    # Where it should be in the final package
-    prefix = "share/qemu/keymaps/",
     visibility = ["//visibility:public"],
 )
