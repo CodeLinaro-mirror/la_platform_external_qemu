@@ -148,41 +148,6 @@ AEMU_EXPORT bool setScreenshotBackground(const int width,
     return true;
 }
 
-AEMU_EXPORT void applyScreenshotBackground(const int width,
-                                           const int height,
-                                           const int numChannels,
-                                           uint8_t* pixelDataInOut) {
-    auto screenBlendComponent = [](uint8_t sourceComponent,
-                                   uint8_t backgroundComponent) {
-        const int s = static_cast<int>(sourceComponent);
-        const int b = static_cast<int>(backgroundComponent);
-        const int invertedProduct = (255 - s) * (255 - b);
-        const int roundedProduct = (invertedProduct + 127) / 255;
-        return static_cast<uint8_t>(255 - roundedProduct);
-    };
-
-    std::lock_guard<std::mutex> guard(sBackgroundImageMutex);
-    if (sBackgroundImage.has_value()) {
-        for (int y = 0; y < width; ++y) {
-            for (int x = 0; x < height; ++x) {
-                // Provide normalized coords as the background may have a
-                // different resolution
-                const RgbColor backgroundSampled = bilinearSample(
-                        *sBackgroundImage, ((float)x + 0.5f) / width,
-                        ((float)y + 0.5f) / height);
-
-                const int inputIndex = (y * width + x) * numChannels;
-                pixelDataInOut[inputIndex + 0] = screenBlendComponent(
-                        pixelDataInOut[inputIndex + 0], backgroundSampled.r);
-                pixelDataInOut[inputIndex + 1] = screenBlendComponent(
-                        pixelDataInOut[inputIndex + 1], backgroundSampled.g);
-                pixelDataInOut[inputIndex + 2] = screenBlendComponent(
-                        pixelDataInOut[inputIndex + 2], backgroundSampled.b);
-            }
-        }
-    }
-}
-
 Image takeScreenshot(
         ImageFormat desiredFormat,
         SkinRotation rotation,
