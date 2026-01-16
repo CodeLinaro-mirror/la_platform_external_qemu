@@ -133,6 +133,14 @@ int MultiDisplay::setMultiDisplay(uint32_t id,
                 flag = automotive::getDefaultFlagsForDisplay(id);
                 LOG(DEBUG) << "Setting flags " << flag << " for display id "
                            << id;
+            } else if (avdInfo_isDesktopApi36OrHigher(avd)) {
+                const int DEFAULT_FLAGS_DESKTOP =
+                        DisplayManager::VIRTUAL_DISPLAY_FLAG_PUBLIC |
+                        DisplayManager::VIRTUAL_DISPLAY_FLAG_TRUSTED |
+                        DisplayManager::VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH |
+                        DisplayManager::VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH |
+                        DisplayManager::VIRTUAL_DISPLAY_FLAG_PRESENTATION;
+                flag = DEFAULT_FLAGS_DESKTOP;
             } else if (avdInfo_getApiLevel(avd) >= 31) {
                 // bug: 227218392
                 // starting from S (android 11, api 31), this flag is

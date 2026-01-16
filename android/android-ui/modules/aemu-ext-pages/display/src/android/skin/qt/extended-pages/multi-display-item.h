@@ -57,6 +57,7 @@ private:
     static std::vector<displayType> sDisplayTypes;
     static std::vector<displayType> sDisplayTypesAutoCluster;
     static std::vector<displayType> sDisplayTypesAutoSecondary;
+    static std::vector<displayType> sDisplayTypesDesktop;
     std::shared_ptr<UiEventTracker> mDropDownTracker;
     int mId;
     int mCurrentIndex;
