@@ -224,7 +224,8 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         !android_foldable_any_folded_area_configured() &&
         !android_foldable_hinge_configured() &&
         !android_foldable_rollable_configured() && !resizableEnabled() &&
-        avdFlavor != AVD_DESKTOP && avdFlavor != AVD_TV &&
+        (avdFlavor != AVD_DESKTOP || avdInfo_isDesktopApi36OrHigher(avdInfo)) &&
+        avdFlavor != AVD_TV &&
         avdFlavor != AVD_WEAR && avdFlavor != AVD_XR && avdFlavor != AVD_GLASSES &&
         (avdFlavor != AVD_ANDROID_AUTO ||
          android::automotive::isMultiDisplaySupported(avdInfo))) {
