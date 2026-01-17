@@ -11,6 +11,17 @@ android_add_library(
 target_include_directories(android-grpc-services-stack PRIVATE src
                            PUBLIC include)
 
+
+android_add_library(
+  TARGET android-grpc-certificate-factory
+  LICENSE Apache-2.0
+  SOURCE_DIR src
+  SRC android/emulation/control/CertificateFactory.cpp
+  DEPS android-emu-base android-emu)
+
+target_include_directories(android-grpc-certificate-factory PRIVATE src
+                           PUBLIC include)
+
 android_link_complete_archive(TARGET grpc++_reflection AS
                               grpc++_reflection_whole)
 target_link_libraries(
@@ -59,12 +70,11 @@ android_add_library(
   TARGET android-grpc-test-services
   NODISTRIBUTE
   SOURCE_DIR test
-  SRC android/emulation/control/test/CertificateFactory.cpp
-      android/emulation/control/test/HeartbeatService.cpp
+  SRC android/emulation/control/test/HeartbeatService.cpp
       android/emulation/control/test/TestEchoService.cpp)
 target_link_libraries(
   android-grpc-test-services
-  PUBLIC android-grpc-services-stack grpc++ android-grpc-utils
+  PUBLIC android-grpc-services-stack grpc++ android-grpc-utils android-grpc-certificate-factory
          android-grpc-event-waiter android-grpc-testing-services android-emu)
 target_include_directories(android-grpc-test-services PUBLIC test)
 
