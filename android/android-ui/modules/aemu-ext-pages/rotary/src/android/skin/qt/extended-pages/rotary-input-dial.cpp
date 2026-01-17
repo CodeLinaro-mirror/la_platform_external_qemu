@@ -30,8 +30,27 @@ RotaryInputDial::RotaryInputDial(QWidget* parent)
 }
 
 void RotaryInputDial::setImage(const QString& file) {
-    mSvgRenderer.load(file);
-    update();
+    if (mSvgRenderer.load(file)) {
+        updateCachedPixmap();
+        update();
+    }
+}
+
+void RotaryInputDial::updateCachedPixmap() {
+    if (width() <= 0 || height() <= 0 || !mSvgRenderer.isValid()) {
+        return;
+    }
+
+    mCachedSvgPixmap = QPixmap(size());
+    mCachedSvgPixmap.fill(Qt::transparent);
+
+    QPainter painter(&mCachedSvgPixmap);
+    mSvgRenderer.render(&painter);
+}
+
+void RotaryInputDial::resizeEvent(QResizeEvent* event) {
+    QDial::resizeEvent(event);
+    updateCachedPixmap();
 }
 
 void RotaryInputDial::setImageAngleOffset(int angle) {
@@ -43,7 +62,8 @@ void RotaryInputDial::paintEvent(QPaintEvent*)
 {
     QPainter painter(this);
     painter.setBackgroundMode(Qt::TransparentMode);
-    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+
     // Get ratio between current value and maximum to calculate angle
     double ratio = static_cast<double>(QDial::value()) / QDial::maximum();
     double angle = ratio * 360;
@@ -53,5 +73,7 @@ void RotaryInputDial::paintEvent(QPaintEvent*)
     painter.translate(centerX, centerY);
     painter.rotate(angle + mImageAngleOffset);
     painter.translate(-centerX, -centerY);
-    mSvgRenderer.render(&painter);
+    if (!mCachedSvgPixmap.isNull()) {
+        painter.drawPixmap(0, 0, mCachedSvgPixmap);
+    }
 }
