@@ -172,6 +172,9 @@ int    avdInfo_getApiLevel( const AvdInfo*  i );
 /* Return the target string originated from rootIni. */
 const char* avdInfo_getTarget(const AvdInfo* i);
 
+/* Returns true if the AVD is AVD_DESKTOP and its API level is 36 or higher. */
+bool avdInfo_isDesktopApi36OrHigher(const AvdInfo* i);
+
 /* Return the "dessert name" associated with the
  * API level
  */

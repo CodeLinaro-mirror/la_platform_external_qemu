@@ -240,7 +240,7 @@ AvdFlavor propertyFile_getAvdFlavor(const FileData* data) {
     const char* tv_names[] = {"atv"};
     const char* wear_names[] = {"aw", "wear"};
     const char* car_names[] = {"car"};
-    const char* desktop_names[] = {"pc"};
+    const char* desktop_names[] = {"pc", "desktop"};
     const char* xr_names[] = {"xr"};
     const char* glasses_names[] = {"glasses"};
 
