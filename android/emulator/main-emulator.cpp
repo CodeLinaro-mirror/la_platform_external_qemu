@@ -1425,6 +1425,20 @@ static void updateLibrarySearchPath(bool isHeadless,
     add_library_search_dir(fullPath);
 
 #ifdef __linux__
+    // b/417138854: workaround to get away from bad fde: FDE is really a CIE errors.
+    //
+    // The bug is in libLLVM, a depencency of libvulkan_lvp.so. If a user chooses (-gpu host/auto),
+    // then it's possible they load their system's libvulkan_lvp.so, and we don't know whether it
+    // has this bug or not.
+    const std::string preloadOption =
+            System::get()->envGet("ANDROID_EMU_PRELOAD_LIBGCC");
+    if (preloadOption == "1") {
+        const char* libgcc_path = "/lib/x86_64-linux-gnu/libgcc_s.so.1";
+        if (path_exists(libgcc_path)) {
+            D("Preload libgcc with path %s", libgcc_path);
+            appendPreloadLib(libgcc_path);
+        }
+    }
 #if defined(__aarch64__)
     if (isHeadless) {
         // for headless mode on linux, uses stub xlib
