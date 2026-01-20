@@ -461,6 +461,7 @@ private:
     bool mouseInside();
     SkinMouseButtonType getSkinMouseButton(const QMouseEvent* event) const;
 
+    int generateModData(const Qt::KeyboardModifiers& eventModifiers);
     void forwardKeyEventToEmulator(SkinEventType type, const QKeyEvent& event);
     void forwardGenericEventToEmulator(int type, int code, int value);
 
