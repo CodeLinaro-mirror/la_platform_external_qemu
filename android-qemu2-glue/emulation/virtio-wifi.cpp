@@ -224,6 +224,7 @@ static bool virtio_wifi_flush_tx(VirtIOWifiQueue* q) {
         ++num_packets;
     }
 
+    virtio_notify(vdev, vq);
     return false;
 }
 
