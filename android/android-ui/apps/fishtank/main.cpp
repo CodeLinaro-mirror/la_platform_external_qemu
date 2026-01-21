@@ -39,6 +39,7 @@
 #include "android/skin/qt/init-qt.h"
 #include "android/utils/debug.h"
 #include "fishtank_agents.h"
+#include "grpc/FishtankGrpcServer.h"
 
 #include <algorithm>
 #include "absl/log/log.h"
@@ -229,6 +230,28 @@ int main(int argc, char* argv[]) {
     if (!emulator_initUserInterface(opts, &uiEmuAgent)) {
         dwarning("%s: user interface init failed", __func__);
         return 1;
+    }
+
+    // Start gRPC service for UI controller
+    android::fishtank::FishtankGrpcServer fishtankGrpc;
+    int preferredPort = 0;
+    if (opts->grpc) {
+        if (!absl::SimpleAtoi(opts->grpc, &preferredPort)) {
+            LOG(WARNING) << "Invalid gRPC port specified: " << opts->grpc
+                         << ". Using default: " << 8554;
+        }
+    }
+
+    absl::Status grpcStatus = fishtankGrpc.setup(preferredPort);
+    if (grpcStatus.ok()) {
+        auto registerStatus = fishtankGrpc.registerUiController(
+                android::emulation::control::EmulatorGrpcClient::me().get());
+        if (!registerStatus.ok()) {
+            LOG(ERROR) << "Failed to register UI controller with emulator: "
+                       << registerStatus;
+        }
+    } else {
+        LOG(ERROR) << "Failed to start gRPC server: " << grpcStatus;
     }
 
     android::files::TemporaryFile pixels;
