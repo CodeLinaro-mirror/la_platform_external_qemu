@@ -97,6 +97,8 @@ target_link_libraries(
 # Include the current directory for headers
 target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank)
+
 android_add_test(
   TARGET fishtank_unittests
   SRC grpc/FishtankGrpcServer_unittest.cpp grpc/FishtankGrpcServer.cpp)
