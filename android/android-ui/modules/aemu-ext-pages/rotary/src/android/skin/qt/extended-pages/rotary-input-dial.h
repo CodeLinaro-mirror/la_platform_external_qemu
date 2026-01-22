@@ -32,9 +32,12 @@ public:
     void setImage(const QString& file);
     // Rotates the image set by setImage by 'angle' degrees clockwise.
     void setImageAngleOffset(int angle);
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
-    virtual void paintEvent(QPaintEvent*) override;
+    void paintEvent(QPaintEvent*) override;
+    void updateCachedPixmap();
+    QPixmap mCachedSvgPixmap;
     QSvgRenderer mSvgRenderer;
     int mImageAngleOffset;
 };

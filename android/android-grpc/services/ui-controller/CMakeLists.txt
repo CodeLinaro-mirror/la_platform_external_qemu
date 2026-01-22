@@ -1,8 +1,11 @@
 android_grpc_service_lib(
-  TARGET ui-controller-service SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/proto
+  TARGET ui-controller-service SOURCE_DIR
+         ${AEMU_PROTO_DIR}/services/ui-controller
   SOURCES ui_controller_service.proto)
 
 # Lets distribute the proto file
-install(FILES proto/ui_controller_service.proto DESTINATION lib)
+install(
+  FILES ${AEMU_PROTO_DIR}/services/ui-controller/ui_controller_service.proto
+  DESTINATION lib)
 
 add_subdirectory(server)

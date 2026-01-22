@@ -25,7 +25,25 @@ android_add_executable(
       agents/vm_operations.cpp
       fishtank_agents.cpp
       fishtank_window_agent.cpp
+      grpc/FishtankGrpcServer.cpp
       main.cpp)
+
+protobuf_generate_grpc_cpp(
+  SOURCE_DIR ${AEMU_PROTO_DIR}
+  SOURCES services/forwarder/service_forwarder.proto
+  OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}
+  INCLUDES ${AEMU_PROTO_DIR}/client ${AEMU_PROTO_DIR}/services/forwarder
+  GENERATED FORWARDER_PROTO_SRC)
+
+android_add_library(
+  TARGET service_forwarder_client LICENSE Apache-2.0 SRC ${FORWARDER_PROTO_SRC}
+  DEPS grpc++ protobuf::libprotobuf)
+
+target_include_directories(
+  service_forwarder_client PRIVATE ${PROTOBUF_INCLUDE_DIR}
+  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(service_forwarder_client PRIVATE ${PROTOBUF_LIBRARIES}
+                      PUBLIC android-grpc-endpoint)
 
 # Link against the necessary libraries
 target_link_libraries(
@@ -44,6 +62,9 @@ target_link_libraries(
           android-emu
           android-grpc-client
           android-grpc-interceptors
+          android-grpc-services-stack
+          android-grpc-certificate-factory
+          service_forwarder_client
           emulator_controller-service-client
           android-emu-curl
           android-hw-config
@@ -75,3 +96,21 @@ target_link_libraries(
 
 # Include the current directory for headers
 target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+android_add_test(
+  TARGET fishtank_unittests
+  SRC grpc/FishtankGrpcServer_unittest.cpp grpc/FishtankGrpcServer.cpp)
+
+target_link_libraries(
+  fishtank_unittests
+  PRIVATE android-emu
+          android-grpc-client
+          android-grpc-services-stack
+          android-grpc-certificate-factory
+          service_forwarder_client
+          emulator_controller-service-client
+          gmock
+          android-emu-test-launcher)
+
+target_include_directories(fishtank_unittests
+                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

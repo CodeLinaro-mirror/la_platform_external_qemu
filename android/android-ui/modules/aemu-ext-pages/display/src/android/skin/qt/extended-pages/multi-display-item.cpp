@@ -56,6 +56,10 @@ std::vector<MultiDisplayItem::displayType> MultiDisplayItem::sDisplayTypesAutoSe
         {"custom", "custom", 1080, 720, 213},
 };
 
+std::vector<MultiDisplayItem::displayType> MultiDisplayItem::sDisplayTypesDesktop = {
+        {"1080p(1920x1080)", "1080p", 1080, 1920, 160},
+};
+
 MultiDisplayItem::MultiDisplayItem(int id, QWidget* parent)
     : QWidget(parent),
       mMultiDisplayPage(reinterpret_cast<MultiDisplayPage*>(parent)),
@@ -78,7 +82,9 @@ MultiDisplayItem::MultiDisplayItem(int id, QWidget* parent)
     mUi->dpi->setMinValue(120);
     mUi->dpi->setMaxValue(640);
 
-    mCurrentIndex = 1; /* 720p as default */
+    if (getDisplayTypes().size() > 1) {
+        mCurrentIndex = 1; /* 720p as default */
+    }
     mUi->selectDisplayType->setCurrentIndex(mCurrentIndex);
     setValues(mCurrentIndex);
     connect(mUi->selectDisplayType, SIGNAL(currentIndexChanged(int)), this,
@@ -225,6 +231,8 @@ std::vector<MultiDisplayItem::displayType> const& MultiDisplayItem::getDisplayTy
         } else {
             return sDisplayTypesAutoSecondary;
         }
+    } else if (avdInfo_isDesktopApi36OrHigher(getConsoleAgents()->settings->avdInfo())) {
+        return sDisplayTypesDesktop;
     } else {
         return sDisplayTypes;
     }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "android/emulation/control/test/CertificateFactory.h"
+#include "android/emulation/control/CertificateFactory.h"
 
 #include <openssl/evp.h>                   // for EVP_PKEY_assign_RSA, EVP_P...
 #include <openssl/pem.h>                   // for PEM_write_X509, PEM_write_...

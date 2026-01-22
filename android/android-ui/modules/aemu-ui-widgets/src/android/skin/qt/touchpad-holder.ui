@@ -7,55 +7,29 @@
     <set>Qt::AlignHCenter</set>
    </property>
    <item row="0" column="0">
-    <spacer name="verticalSpacerTop">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-    </spacer>
-   </item>
-   <item row="3" column="0">
-    <spacer name="verticalSpacerBottom">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-    </spacer>
-   </item>
-   <item row="1" column="0">
-    <spacer name="horizontalSpacerLeft">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </spacer>
-   </item>
-   <item row="1" column="4">
-    <spacer name="horizontalSpacerRight">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </spacer>
-   </item>
-   <item row="1" column="1" colspan="3">
     <widget class="TouchpadWidget" name="touchpadBox">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
       </sizepolicy>
      </property>
     </widget>
    </item>
+   <item row="0" column="0">
+    <widget class="QGroupBox" name="tp_twoFingerLabel">
+     <property name="styleSheet">
+      <string notr="true">border: 0px;</string>
+     </property>
+     <property name="title">
+      <string>Hold shift for two fingers</string>
+     </property>
+     <property name="ColorGroup" stdset="0">
+      <string notr="true">Title</string>
+     </property>
+    </widget>
+   </item>
   </layout>
-  <widget class="QGroupBox" name="tp_twoFingerLabel">
-   <property name="styleSheet">
-    <string notr="true">border: 0px;</string>
-   </property>
-   <property name="title">
-    <string>Hold shift for two fingers</string>
-   </property>
-   <property name="ColorGroup" stdset="0">
-    <string notr="true">Title</string>
-   </property>
-  </widget>
  </widget>
  <customwidgets>
   <customwidget>

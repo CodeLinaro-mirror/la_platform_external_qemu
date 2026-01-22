@@ -13,6 +13,7 @@
 
 #include "aemu/base/Log.h"
 #include "android-qemu2-glue/emulation/virtio-input-multi-touch.h"
+#include "android/console.h"
 #include "android/skin/event.h"
 #include "android/skin/qt/extended-pages/common.h"
 
@@ -367,7 +368,7 @@ void TouchpadWidget::doTouch(QPointF p, int i, SkinEventType type) {
     if (type == kEventTouchBegin || type == kEventTouchUpdate)
         skin_event.u.multi_touch_point.pressure = 0x400;
 
-    android_virtio_touchpad_event(&skin_event, 0);
+    getConsoleAgents()->user_event->sendTouchpadEvents(&skin_event, 0);
 
     if (type == kEventTouchBegin || type == kEventTouchUpdate) {
         addTrailPoint(p, i);

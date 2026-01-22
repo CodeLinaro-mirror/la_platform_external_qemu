@@ -70,7 +70,6 @@ CarRotaryPage::CarRotaryPage(QWidget* parent)
     mUi->setupUi(this);
 
     mAdbExecuteIsActive = false;
-    mSupportsActionArg = false;
 
     // Temporarily hide mouse wheel widgets until mouse wheel scroll is implemented.
     // TODO(agathaman): renable widgets when mouse wheel scroll is implemented.
@@ -81,10 +80,6 @@ CarRotaryPage::CarRotaryPage(QWidget* parent)
     // Start a timer to check whether car rotary service is running.
     // Timer will stop when detected that rotary service is running.
     checkRotaryControllerServiceTimer();
-
-    // Start a timer to determine whether the inject-key supports the -a flag.
-    // Timer will stop when boot completes.
-    startSupportsActionTimer();
 
     const struct {
         QPushButton* button;
@@ -134,9 +129,8 @@ void CarRotaryPage::toggleButtonPressed(
     D("%s button pressed", label.c_str());
     toggleIconTheme(button, /* pressed= */ true);
 
-    // Inject an ACTION_DOWN event if requested and supported. Otherwise, we'll inject ACTION_DOWN
-    // and ACTION_UP in toggleButtonReleased().
-    if (useActionArg && mSupportsActionArg) {
+    // Inject an ACTION_DOWN event if requested.
+    if (useActionArg) {
         executeCmd(cmd, "-a down");
     }
 
@@ -174,7 +168,7 @@ void CarRotaryPage::toggleButtonReleased(
 
     // Inject an ACTION_UP event if requested and supported. Otherwise, inject ACTION_DOWN followed
     // by ACTION_UP.
-    executeCmd(cmd, useActionArg && mSupportsActionArg ? "-a up" : "");
+    executeCmd(cmd, useActionArg ? "-a up" : "");
 }
 
 void CarRotaryPage::toggleIconTheme(QPushButton* button, const bool pressed) {
@@ -286,38 +280,6 @@ void CarRotaryPage::checkRotaryControllerService() {
                 kAdbCommandTimeoutMs,
                 true);
     }
-}
-
-void CarRotaryPage::startSupportsActionTimer() {
-    QObject::connect(&mSupportsActionTimer, &QTimer::timeout, this,
-            &CarRotaryPage::determineWhetherInjectKeySupportsActionArg);
-    mSupportsActionTimer.setSingleShot(false);
-    mSupportsActionTimer.setInterval(kSupportsActionTimerIntervalMs);
-    mSupportsActionTimer.start();
-}
-
-void CarRotaryPage::determineWhetherInjectKeySupportsActionArg() {
-    if (!mAdb) {
-        D("ADB interface unavailable");
-        return;
-    }
-    if (!isBootCompleted()) {
-        return;
-    }
-    mAdb->runAdbCommand(
-            {"shell", "cmd car_service -h | grep \"inject-key\""},
-            [this](const android::emulation::OptionalAdbCommandResult& result) {
-                string line;
-                mSupportsActionArg = false;
-                if (result && result->exit_code == 0 && result->output &&
-                        getline(*(result->output), line)) {
-                    mSupportsActionArg = line.find("-a") != std::string::npos;
-                    D("inject-key %s -a", mSupportsActionArg ? "supports" : "doesn't support");
-                    mSupportsActionTimer.stop();
-                }
-            },
-            kAdbCommandTimeoutMs,
-            true);
 }
 
 bool CarRotaryPage::isBootCompleted() {

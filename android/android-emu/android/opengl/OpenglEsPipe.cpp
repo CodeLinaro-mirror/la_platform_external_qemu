@@ -26,6 +26,7 @@
 #include "android/snapshot/Saver.h"
 #include "android/snapshot/Snapshotter.h"
 #include "android/snapshot/GfxstreamStreamAdapter.h"
+#include "android/emulation/control/ScreenCapturer.h"
 
 #include <atomic>
 
@@ -211,18 +212,31 @@ public:
             // always do 4 channel screenshot because swiftshader_indirect
             // has issues with 3 channels
             const unsigned int nChannels = 4;
-            unsigned int width;
-            unsigned int height;
+            unsigned int width = 0;
+            unsigned int height = 0;
             size_t cPixels = 0;
+            std::vector<unsigned char> pixels;
 
             int displayId = 0;
             if (android_foldable_is_pixel_fold() && android_foldable_is_folded()) {
                 displayId = android_foldable_pixel_fold_second_display_id();
             }
             // Fetch size of buffer.
-            renderer.getScreenshot(nChannels, &width, &height, nullptr, &cPixels, displayId);
-            std::vector<unsigned char> pixels(cPixels);
-            renderer.getScreenshot(nChannels, &width, &height, pixels.data(), &cPixels, displayId);
+            int screenshotRes = renderer.getScreenshot(
+                    nChannels, &width, &height, nullptr, &cPixels, displayId);
+            if (screenshotRes ==
+                gfxstream::Renderer::GET_SCREENSHOT_RESULT_PIXELS_SIZE) {
+                pixels.resize(cPixels);
+                screenshotRes = renderer.getScreenshot(nChannels, &width,
+                                                       &height, pixels.data(),
+                                                       &cPixels, displayId);
+            }
+            if (screenshotRes != 0) {
+                derror("Could not take screenshot, error: %d", screenshotRes);
+                width = 0;
+                height = 0;
+            }
+
 #if SNAPSHOT_PROFILE > 1
             printf("Screenshot load texture time %lld ms\n",
                    (long long)(sw.elapsedUs() / 1000));

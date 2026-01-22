@@ -17,6 +17,7 @@
 #include <unistd.h>
 #endif
 
+#include <inttypes.h>
 #include <stdlib.h>    // for free
 #include <sys/stat.h>  // for stat, st_mtime
 #include <cstdint>     // for int64_t, uin...
@@ -819,6 +820,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::FORCE_GPU_HOST;
         case android::featurecontrol::ForceGpuSoftware:
             return android_studio::EmulatorFeatureFlagState::FORCE_GPU_SOFTWARE;
+        case android::featurecontrol::QemuCameraSensorOrientation:
+            return android_studio::EmulatorFeatureFlagState::QEMU_CAMERA_SENSOR_ORIENTATION;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;
@@ -1099,20 +1102,40 @@ void android_metrics_fill_vulkan_gpu_info(void* opaque) {
         return std::string(temp);
     };
 
-    char crash_handler_message[1024];
-    std::snprintf(crash_handler_message, sizeof(crash_handler_message),
-                  "VulkanEmulationDeviceInfo: deviceName=%s, driverInfo=%s, "
-                  "vendorID=%s, deviceID=0x%x, driver=%s, "
-                  "api=%d.%d.%d, type=%d, memory=%llu, "
-                  "ICD=%s",
-                  device_name_str.c_str(), driver_info_str.c_str(),
-                  getVendorIdString(vendor_id).c_str(), device_id,
-                  getDriverVersionString(vendor_id, driver_version).c_str(),
-                  VERSION_MAJOR(api_version), VERSION_MINOR(api_version),
-                  VERSION_PATCH(api_version), device_type, device_memory,
-                  vk_icd.c_str());
-    dprint("%s: %s", __func__, crash_handler_message);
-    crashhandler_append_message(crash_handler_message);
+    auto getDeviceTypeString = [](int type_value) -> const char* {
+        switch (type_value) {
+            case 0:  // VK_PHYSICAL_DEVICE_TYPE_OTHER:
+                return "Other";
+            case 1:  // VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                return "Integrated";
+            case 2:  // VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                return "Discrete";
+            case 3:  // VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                return "Virtual";
+            case 4:  // VK_PHYSICAL_DEVICE_TYPE_CPU:
+                return "CPU";
+            default:
+                return "Unknown";
+        }
+    };
+
+    crashhandler_add_string("vulkan.deviceName", device_name_str.c_str());
+    crashhandler_add_string("vulkan.driverInfo", driver_info_str.c_str());
+    crashhandler_add_string("vulkan.vendorID",
+                            getVendorIdString(vendor_id).c_str());
+    crashhandler_add_string_format("vulkan.deviceID", "0x%" PRIX32 "",
+                                   device_id);
+    crashhandler_add_string(
+            "vulkan.driverVersion",
+            getDriverVersionString(vendor_id, driver_version).c_str());
+    crashhandler_add_string_format(
+            "vulkan.apiVersion", "%d.%d.%d", VERSION_MAJOR(api_version),
+            VERSION_MINOR(api_version), VERSION_PATCH(api_version));
+    crashhandler_add_string("vulkan.type", getDeviceTypeString(device_type));
+    crashhandler_add_string_format("vulkan.memory", "% MiB" PRIu64,
+                                   uint64_t(device_memory / (1024 * 1024)));
+    crashhandler_add_string("vulkan.ICD", vk_icd.c_str());
+
 #undef VERSION_MAJOR
 #undef VERSION_MINOR
 #undef VERSION_PATCH

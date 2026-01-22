@@ -132,7 +132,6 @@ static char* getQemuExecutablePath(const char* programPath,
 
 static void updateLibrarySearchPath(bool isHeadless,
                                     int wantedBitness,
-                                    bool useSystemLibs,
                                     const char* launcherDir,
                                     const char* gpu);
 
@@ -399,7 +398,6 @@ int main(int argc, char** argv) {
     bool doListUSB = false;
     bool isHeadless = false;
     bool isFishtank = false;
-    bool useSystemLibs = false;
     bool forceEngineLaunch = false;
     bool isFuchsia = false;
     bool queryVersion = false;
@@ -557,13 +555,6 @@ int main(int argc, char** argv) {
     }
 
 #ifdef __linux__
-    /* Define ANDROID_EMULATOR_USE_SYSTEM_LIBS to 1 in your environment if you
-     * want the effect of -use-system-libs to be permanent.
-     */
-    const char* system_libs = getenv("ANDROID_EMULATOR_USE_SYSTEM_LIBS");
-    if (system_libs && system_libs[0] && system_libs[0] != '0') {
-        useSystemLibs = true;
-    }
     const char* stdouterr_file = nullptr;
 
 #if defined(__aarch64__)
@@ -698,13 +689,6 @@ int main(int argc, char** argv) {
             isHeadless = true;
             continue;
         }
-
-#ifdef __linux__
-        if (!strcmp(opt, "-use-system-libs")) {
-            useSystemLibs = true;
-            continue;
-        }
-#endif  // __linux__
 
         if (!strcmp(opt, "-list-avds")) {
             doListAvds = true;
@@ -1159,7 +1143,7 @@ int main(int argc, char** argv) {
     /* Setup library paths so that bundled standard shared libraries are picked
      * up by the re-exec'ed emulator
      */
-    updateLibrarySearchPath(isHeadless, wantedBitness, useSystemLibs,
+    updateLibrarySearchPath(isHeadless, wantedBitness,
                             progDir.data(), gpu);
 
     /* We need to find the location of the GLES emulation shared libraries
@@ -1380,7 +1364,6 @@ static void appendPreloadLib(const char* fullLibPath) {
 
 static void updateLibrarySearchPath(bool isHeadless,
                                     int wantedBitness,
-                                    bool useSystemLibs,
                                     const char* launcherDir,
                                     const char* gpu) {
     const char* libSubDir = (wantedBitness == 64) ? "lib64" : "lib";
@@ -1442,22 +1425,14 @@ static void updateLibrarySearchPath(bool isHeadless,
     add_library_search_dir(fullPath);
 
 #ifdef __linux__
-    if (!useSystemLibs) {
-        // Use bundled libstdc++
-        tail = bufprint(fullPath, fullPath + sizeof(fullPath),
-                        "%s/%s/libstdc++", launcherDir, libSubDir);
-
-        if (tail >= fullPath + sizeof(fullPath)) {
-            APANIC("Custom library path too long (clipped) [%s]. "
-                   "Can not use bundled libraries. ",
-                   fullPath);
-        }
-
-        D("Adding library search path: '%s'", fullPath);
-        add_library_search_dir(fullPath);
-    }
-    // (TODO b/417138854): workaround to get away from bad fde: FDE is really a CIE errors
-    if (gpu && strstr(gpu, "lavapipe") != nullptr) {
+    // b/417138854: workaround to get away from bad fde: FDE is really a CIE errors.
+    //
+    // The bug is in libLLVM, a depencency of libvulkan_lvp.so. If a user chooses (-gpu host/auto),
+    // then it's possible they load their system's libvulkan_lvp.so, and we don't know whether it
+    // has this bug or not.
+    const std::string preloadOption =
+            System::get()->envGet("ANDROID_EMU_PRELOAD_LIBGCC");
+    if (preloadOption == "1") {
         const char* libgcc_path = "/lib/x86_64-linux-gnu/libgcc_s.so.1";
         if (path_exists(libgcc_path)) {
             D("Preload libgcc with path %s", libgcc_path);
@@ -1485,9 +1460,6 @@ static void updateLibrarySearchPath(bool isHeadless,
 #else   // !__linux__
     (void)isHeadless;
 #endif  // !__linux__
-
-#else   // !__linux__
-    (void)useSystemLibs;
 #endif  // !__linux__
 }
 

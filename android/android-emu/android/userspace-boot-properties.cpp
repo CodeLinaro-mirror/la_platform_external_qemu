@@ -21,6 +21,7 @@
 #include "aemu/base/Log.h"                      // for LOG, LogMessage
 #include "aemu/base/StringFormat.h"             // for StringFormat
 #include "android/base/system/System.h"        // for System
+#include "android/console.h"
 #include "aemu/base/misc/StringUtils.h"         // for splitTokens
 #include "android/emulation/control/adb/adbkey.h"  // for getPrivateAdbKeyPath
 #include "android/emulation/resizable_display_config.h"
@@ -173,6 +174,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     const char* qemuOpenglesVersionProp;
     const char* qemuUirendererProp;
     const char* qemuHardwareGralloc;
+    const char* qemuSkin;
     const char* qemuRenderengineProp;
     const char* dalvikVmHeapsizeProp;
     const char* qemuLegacyFakeCameraProp;
@@ -216,6 +218,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         qemuOpenglesVersionProp = "androidboot.opengles.version";
         qemuUirendererProp = "androidboot.debug.hwui.renderer";
         qemuHardwareGralloc = "androidboot.hardware.gralloc";
+        qemuSkin = "androidboot.qemu.skin";
         qemuRenderengineProp = "androidboot.debug.renderengine.backend";
         dalvikVmHeapsizeProp = "androidboot.dalvik.vm.heapsize";
         qemuLegacyFakeCameraProp = "androidboot.qemu.legacy_fake_camera";
@@ -255,6 +258,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         qemuOpenglesVersionProp = "qemu.opengles.version";
         qemuUirendererProp = "qemu.uirenderer";
         qemuHardwareGralloc = "qemu.hardware.gralloc";
+        qemuSkin = "qemu.skin";
         qemuRenderengineProp = nullptr;
         dalvikVmHeapsizeProp = "qemu.dalvik.vm.heapsize";
         qemuLegacyFakeCameraProp = "qemu.legacy_fake_camera";
@@ -591,6 +595,17 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
 
     if(fc::isEnabled(fc::Minigbm)) {
         params.push_back({qemuHardwareGralloc, "minigbm"});
+    }
+
+    if (auto* avdInfo = getConsoleAgents()->settings->avdInfo()){
+        char* skinName = nullptr;
+        char* skinDir = nullptr;
+        avdInfo_getSkinInfo(avdInfo, &skinName, &skinDir);
+        if (skinName) {
+            params.push_back({qemuSkin, skinName});
+        }
+        free(skinName);
+        free(skinDir);
     }
 
     if (qemuRenderengineProp && qemuRenderenginePropValue) {

@@ -411,8 +411,8 @@ std::string cameraInfoToString(const CameraInfo& ci) {
 
     char buf[256];
     int len = ::snprintf(buf, sizeof(buf), "name=%s channel=%u pix=%u "
-                         "dir=%s framedims=%ux%u", ci.device_name,
-                         ci.inp_channel, ci.pixel_format, ci.direction,
+                         "dir=%s sensor_orientation=%u framedims=%ux%u", ci.device_name,
+                         ci.inp_channel, ci.pixel_format, ci.direction, ci.orientation,
                          ci.frame_sizes[0].width, ci.frame_sizes[0].height);
 
     std::string info(buf, len);
@@ -489,16 +489,25 @@ struct ICppQemudClient {
     virtual int load(Stream* f) = 0;
 };
 
+int android_camera_sensors_get_coarse_orientation(int orientation) {
+    int coarse_base_orientation = orientation/90 - 1;
+
+    return (static_cast<int>(android_sensors_get_coarse_orientation()) + coarse_base_orientation) % 4;
+}
 struct CameraService {
     CameraService() {
-        set_coarse_orientation_getter(
-            (GetCoarseOrientation)android_sensors_get_coarse_orientation);
+        set_coarse_orientation_getter(android_camera_sensors_get_coarse_orientation);
 
         // TODO: `hwCfg` should be `const AndroidHwConfig*`
         AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
 
         const char* const cameraBack = hwCfg->hw_camera_back;
         const char* const cameraFront = hwCfg->hw_camera_front;
+
+        const bool uses_orientation = feature_is_enabled(kFeature_QemuCameraSensorOrientation);
+
+        const int cameraBackOrientation = uses_orientation ? hwCfg->hw_camera_back_orientation : 90;
+        const int cameraFrontOrientation = uses_orientation ? hwCfg->hw_camera_front_orientation : 90;
 
         static const auto isWebcam = [](const char* name){
             return !strncmp(name, "webcam", 6);
@@ -519,24 +528,24 @@ struct CameraService {
             // If so, use the environment background as the virutal environment.
             std::optional<std::string> environmentImageFullPath = getEnvironmentBackground(hwCfg);
             if (environmentImageFullPath.has_value()) {
-                imagefilecameraSetup("back", environmentImageFullPath->c_str());
+                imagefilecameraSetup("back", cameraBackOrientation, environmentImageFullPath->c_str());
             } else {
-                virtualscenecameraSetup();
+                virtualscenecameraSetup(cameraBackOrientation);
             }
         } else if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
-            videoplaybackcameraSetup("back");
+            videoplaybackcameraSetup("back", cameraBackOrientation);
         } else if (isVideofileCam(cameraBack)) {
-            videofilecameraSetup("back", cameraBack + kVideofileCamPrefixSize);
+            videofilecameraSetup("back", cameraBackOrientation, cameraBack + kVideofileCamPrefixSize);
         } else if (isImagefileCam(cameraBack)) {
-            imagefilecameraSetup("back", cameraBack + kImagefileCamPrefixSize);
+            imagefilecameraSetup("back", cameraBackOrientation, cameraBack + kImagefileCamPrefixSize);
         }
 
         if (androidHwConfig_hasVideoPlaybackFrontCamera(hwCfg)) {
-            videoplaybackcameraSetup("front");
+            videoplaybackcameraSetup("front", cameraFrontOrientation);
         } else if (isVideofileCam(cameraFront)) {
-            videofilecameraSetup("front", cameraFront + kVideofileCamPrefixSize);
+            videofilecameraSetup("front", cameraFrontOrientation, cameraFront + kVideofileCamPrefixSize);
         } else if (isImagefileCam(cameraFront)) {
-            imagefilecameraSetup("front",
+            imagefilecameraSetup("front", cameraFrontOrientation,
                                  cameraFront + kImagefileCamPrefixSize);
         }
 
@@ -549,9 +558,9 @@ struct CameraService {
             if (connectedCnt > 0) {
                 /* Set up back camera emulation. */
                 if (isWebcam(cameraBack)) {
-                    webcamSetup(cameraBack, "back", ci, connectedCnt);
+                    webcamSetup(cameraBack, "back", cameraBackOrientation, ci, connectedCnt);
                 } else if (isWebcam(cameraFront)) {
-                    webcamSetup(cameraFront, "front", ci, connectedCnt);
+                    webcamSetup(cameraFront, "front", cameraFrontOrientation, ci, connectedCnt);
                 }
 
                 for (int i = 0; i < connectedCnt; ++i) {
@@ -700,7 +709,7 @@ private:
                                                           clientParams);
     }
 
-    void virtualscenecameraSetup() {
+    void virtualscenecameraSetup(int sensor_orientation) {
         static const CameraInfoVtbl vtbl = {
             .open = &camera_virtualscene_open,
             .start_capturing = &camera_virtualscene_start_capturing,
@@ -735,12 +744,13 @@ private:
         ci.inp_channel = 0;
         ci.pixel_format = camera_virtualscene_preferred_format();
         ci.direction = ASTRDUP("back");
+        ci.orientation = sensor_orientation;
         ci.in_use = 0;
 
         addCameraInfo(std::move(ci));
     }
 
-    void videoplaybackcameraSetup(const char* dir) {
+    void videoplaybackcameraSetup(const char* dir, int sensor_orientation) {
         static const CameraInfoVtbl vtbl = {
             .open = &camera_videoplayback_open,
             .start_capturing = &camera_videoplayback_start_capturing,
@@ -772,28 +782,32 @@ private:
         ci.inp_channel = 0;
         ci.pixel_format = camera_videoplayback_preferred_format();
         ci.direction = ASTRDUP(dir);
+        ci.orientation = sensor_orientation;
         ci.in_use = 0;
 
         addCameraInfo(std::move(ci));
     }
 
-    void imagefilecameraSetup(const char* dir, const char* args) {
+    void imagefilecameraSetup(const char* dir, int orientation, const char* args) {
         CameraInfo ci;
         if (camera_imagefile_init_CameraInfo(&ci, dir, args)) {
             return;
         }
+        ci.orientation = orientation;
         addCameraInfo(std::move(ci));
     }
 
-    void videofilecameraSetup(const char* dir, const char* args) {
+    void videofilecameraSetup(const char* dir, int orientation, const char* args) {
         CameraInfo ci;
         if (camera_videofile_init_CameraInfo(&ci, dir, args)) {
             return;
         }
+        ci.orientation = orientation;
         addCameraInfo(std::move(ci));
     }
 
     void webcamSetup(const char* dispName, const char* dir,
+                     int sensor_orientation,
                      CameraInfo* webcams, int webcamsCnt) {
         static const CameraInfoVtbl vtbl = {
             .open = &camera_device_open,
@@ -826,6 +840,7 @@ private:
         dstCi.vtbl = &vtbl;
         free(dstCi.direction);
         dstCi.direction = ASTRDUP(dir);
+        dstCi.orientation = sensor_orientation;
 
         addCameraInfo(std::move(dstCi));
     }
@@ -965,7 +980,7 @@ protected:
 
         int retry = readFrame(&mCameraDevice, &frame,
                               wb.red, wb.green, wb.blue,
-                              expComp, mCameraInfo.direction);
+                              expComp, mCameraInfo.direction, mCameraInfo.orientation);
         if (!retry) {
             return 0;
         }
@@ -976,7 +991,7 @@ protected:
 
             retry = readFrame(&mCameraDevice, &frame,
                               wb.red, wb.green, wb.blue,
-                              expComp, mCameraInfo.direction);
+                              expComp, mCameraInfo.direction, mCameraInfo.orientation);
         } while ((retry > 0) && (getTimestamp() < timeout));
 
         if (retry > 0) {

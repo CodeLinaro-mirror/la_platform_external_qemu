@@ -1883,19 +1883,6 @@ help_selinux(stralloc_t* out)
 
 #ifdef __linux__
 static void
-help_use_system_libs(stralloc_t* out)
-{
-    PRINTF(
-    "  (DEPRECATED)\n\n"
-    "  The emulator now uses libc++ and is no longer relying on libstdc++.\n"
-    "  This parameter no longer has any effect and might be removed in future versions.\n\n"
-    "  NOTE2: For now, it's not possible to use system Qt libraries as the ones\n"
-    "  shipped with the emulator are compiled against libc++.\n"
-    "\n"
-    );
-}
-
-static void
 help_stdouterr_file(stralloc_t*  out)
 {
     PRINTF(

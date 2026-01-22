@@ -284,7 +284,8 @@ void skin_keyboard_process_event(SkinKeyboard* kb, SkinEvent* ev, int down) {
             mod = sync_modifier_key(LINUX_KEY_LEFTSHIFT, kb, 0, 0, 1);
         }
 
-        if (!getConsoleAgents()->settings->use_keycode_forwarding()) {
+        if (!getConsoleAgents()->settings->use_keycode_forwarding() &&
+            ev->u.text.mod == 0) {
             // TODO(digit): For each Unicode value in the input text.
             const uint8_t* text = ev->u.text.text;
             const uint8_t* end = text + sizeof(ev->u.text.text);

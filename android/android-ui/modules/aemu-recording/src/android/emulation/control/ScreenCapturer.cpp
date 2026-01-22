@@ -148,41 +148,6 @@ AEMU_EXPORT bool setScreenshotBackground(const int width,
     return true;
 }
 
-AEMU_EXPORT void applyScreenshotBackground(const int width,
-                                           const int height,
-                                           const int numChannels,
-                                           uint8_t* pixelDataInOut) {
-    auto screenBlendComponent = [](uint8_t sourceComponent,
-                                   uint8_t backgroundComponent) {
-        const int s = static_cast<int>(sourceComponent);
-        const int b = static_cast<int>(backgroundComponent);
-        const int invertedProduct = (255 - s) * (255 - b);
-        const int roundedProduct = (invertedProduct + 127) / 255;
-        return static_cast<uint8_t>(255 - roundedProduct);
-    };
-
-    std::lock_guard<std::mutex> guard(sBackgroundImageMutex);
-    if (sBackgroundImage.has_value()) {
-        for (int y = 0; y < width; ++y) {
-            for (int x = 0; x < height; ++x) {
-                // Provide normalized coords as the background may have a
-                // different resolution
-                const RgbColor backgroundSampled = bilinearSample(
-                        *sBackgroundImage, ((float)x + 0.5f) / width,
-                        ((float)y + 0.5f) / height);
-
-                const int inputIndex = (y * width + x) * numChannels;
-                pixelDataInOut[inputIndex + 0] = screenBlendComponent(
-                        pixelDataInOut[inputIndex + 0], backgroundSampled.r);
-                pixelDataInOut[inputIndex + 1] = screenBlendComponent(
-                        pixelDataInOut[inputIndex + 1], backgroundSampled.g);
-                pixelDataInOut[inputIndex + 2] = screenBlendComponent(
-                        pixelDataInOut[inputIndex + 2], backgroundSampled.b);
-            }
-        }
-    }
-}
-
 Image takeScreenshot(
         ImageFormat desiredFormat,
         SkinRotation rotation,
@@ -215,7 +180,7 @@ Image takeScreenshot(
             displayId, desiredWidth, desiredHeight, rotation,
             {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
     std::vector<uint8_t> pixelBuffer(0);
-    if (screenshotRes == -2) { // -2 is special return code to get pixel count value
+    if (screenshotRes == gfxstream::Renderer::GET_SCREENSHOT_RESULT_PIXELS_SIZE) {
         pixelBuffer.resize(cPixels);
         screenshotRes = renderer->getScreenshot(
                 nChannels, &width, &height, pixelBuffer.data(), &cPixels,
@@ -226,10 +191,6 @@ Image takeScreenshot(
         derror("Could not take screenshot, error: %d", screenshotRes);
         return Image(0, 0, 0, ImageFormat::RGB888, {});
     }
-
-    // Apply background blending for the environment
-    android::emulation::applyScreenshotBackground(width, height, nChannels,
-                                                  pixelBuffer.data());
 
     // We only convert png/ RGBA8888 -> RBG888 at this time..
     switch (desiredFormat) {

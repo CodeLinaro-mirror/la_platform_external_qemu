@@ -1,19 +1,20 @@
-protobuf_generate_grpc_cpp(
-  SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
-  SOURCES ice_config.proto rtc_service.proto rtc_service_v2.proto
-  OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR} GENERATED EMULATOR_WEBRTC_GRPC_SRC)
+
+
+android_grpc_service_lib(
+  TARGET webrtc-service SOURCE_DIR ${AEMU_PROTO_DIR}/services/webrtc
+  SOURCES ice_config.proto rtc_service.proto rtc_service_v2.proto)
 
 # Lets distribute the proto file
-install(FILES rtc_service.proto DESTINATION lib)
-install(FILES rtc_service_v2.proto DESTINATION lib)
-install(FILES ice_config.proto DESTINATION lib)
+install(FILES ${AEMU_PROTO_DIR}/services/webrtc/rtc_service.proto DESTINATION lib)
+install(FILES ${AEMU_PROTO_DIR}/services/webrtc/rtc_service_v2.proto DESTINATION lib)
+install(FILES ${AEMU_PROTO_DIR}/services/webrtc/ice_config.proto DESTINATION lib)
 
 # Let's add in the library
 android_add_library(
   TARGET android-webrtc
   SHARED
   LICENSE Apache-2.0
-  SRC ${EMULATOR_WEBRTC_GRPC_SRC}
+  SRC 
       android/emulation/control/RtcService.cpp
       android/emulation/control/RtcServiceV2.cpp
       android/emulation/control/TurnConfig.cpp
@@ -40,6 +41,7 @@ target_link_libraries(
   PUBLIC nlohmann_json::nlohmann_json android-emu
   PRIVATE protobuf::libprotobuf
           grpc++
+          webrtc-service
           emulator_controller-server-impl
           android-grpc-event-waiter
           qemu-host-common-headers

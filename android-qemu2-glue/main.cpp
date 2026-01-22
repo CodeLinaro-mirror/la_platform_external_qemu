@@ -2768,6 +2768,12 @@ extern "C" int main(int argc, char** argv) {
         fc::setIfNotOverriden(fc::VsockSnapshotLoadFixed_b231345789, true);
     }
 
+#if defined(__APPLE__) && defined(__aarch64__)
+    const bool isAppleArm = true;
+#else
+    const bool isAppleArm = false;
+#endif
+
     // XR specific feature overrides
     const AvdFlavor avdFlavor = avdInfo_getAvdFlavor(avd);
     const bool isXrAvd = (avdFlavor == AVD_XR);
@@ -2775,33 +2781,22 @@ extern "C" int main(int argc, char** argv) {
         // XR image needs this feature to pass modifier keys to the guest.
         fc::setIfNotOverriden(fc::QtRawKeyboardInput, true);
 
-#if defined(__APPLE__) && defined(__aarch64__)
-        // TODO(b/404619245): XR emulator restarts at login screen when
-        // VulkanVirtualQueue is enabled on Mac.
-        fc::setIfNotOverriden(fc::VulkanVirtualQueue, false);
-#endif
+        if (isAppleArm) {
+            // TODO(b/404619245): XR emulator restarts at login screen when
+            // VulkanVirtualQueue is enabled on Mac.
+            fc::setIfNotOverriden(fc::VulkanVirtualQueue, false);
+        }
     }
 
     // When GuestAngle is used, Vulkan host composition can be automatically
     // enabled on currently supported platforms and device types to get better
-    // performance.
-    // TODO(b/447601952): Support vulkan composition in embedded emulator mode
-    const bool embeddedMode = getConsoleAgents()
-                                      ->settings->android_cmdLineOptions()
-                                      ->qt_hide_window;
-    if (!embeddedMode && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
-        bool autoEnableVulkanComposition = false;
-        if (fc::isEnabled(fc::GuestAngle)) {
-#if defined(__APPLE__) && defined(__aarch64__)
-            // Only auto enable on XR for now, as some features like display
-            // rotations or screen masking are not supported yet for gphones.
-            // TODO(b/442398020): increase auto enablement range to other
-            // platforms and devices
-            autoEnableVulkanComposition = isXrAvd;
-#endif
-        }
-        if (autoEnableVulkanComposition) {
-            fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
+    // performance. Use '-feature -VulkanNativeSwapchain' to disable this behavior.
+    if (fc::isEnabled(fc::GuestAngle) && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
+        // This will auto enable on XR where we use GuestAngle by default.
+        // For gphone images, GuestAngle will become default with minigbm later.
+        fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
+        if (fc::isEnabled(fc::VulkanNativeSwapchain)) {
+            dprint("Auto-enabled VulkanNativeSwapchain feature");
         }
     }
 

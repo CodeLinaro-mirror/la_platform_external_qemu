@@ -431,7 +431,6 @@ android_add_library(
       android/snapshot/Snapshotter.cpp
       android/snapshot/TextureLoader.cpp
       android/snapshot/TextureSaver.cpp
-      stubs/gfxstream-stubs.cpp
       stubs/stubs.cpp
   WINDOWS android/snapshot/MemoryWatch_windows.cpp
   LINUX android/snapshot/MemoryWatch_linux.cpp

@@ -15,9 +15,12 @@
 #include <map>     // for map
 #include <memory>  // for unique_ptr
 #include <string>  // for basic_string, operator<
+#include <string_view>
 #include <thread>
 #include <vector>  // for vector<>::iterator
 
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "aemu/base/Compiler.h"  // for DISALLOW_COPY_AND_ASSIGN
 #include "aemu/base/async/RecurrentTask.h"
 #include "aemu/base/async/ThreadLooper.h"
@@ -37,7 +40,7 @@
 #include "client/settings.h"                     // for Settings
 #include "mini_chromium/base/files/file_path.h"  // for FilePath
 #include "util/misc/uuid.h"                      // for UUID
-                                                 //
+
 #ifdef _WIN32
 #include <io.h>
 #endif
@@ -277,21 +280,56 @@ bool crashhandler_init(int argc, char** argv) {
         return false;
     }
 
-    std::string arguments = "===== Command-line arguments =====\n";
-    for (int i = 0; i < argc; i++) {
-        arguments += argv[i];
-        arguments += ' ';
-    }
-    arguments += "\n===== Environment =====\n";
-    const auto allEnv = System::get()->envGetAll();
-    for (const std::string& env : allEnv) {
-        arguments += env;
-        arguments += '\n';
-    }
+    const auto reporter = android::crashreport::CrashReporter::get();
 
     // Make sure we don't report any hangs until all related loopers
     // actually get started.
-    android::crashreport::CrashReporter::get()->hangDetector().pause(true);
+    reporter->hangDetector().pause(true);
+
+    std::string arguments;
+    arguments.reserve(1024);
+
+    // Add command line arguments to the crash reports. Skip the first
+    // one to not add user path to the qemu binary and improve readability
+    for (int i = 1; i < argc; i++) {
+        absl::StrAppend(&arguments, argv[i]);
+        absl::StrAppend(&arguments, " ");
+    }
+    reporter->attachData("command_line", arguments);
+
+    // Add important environment variables to the crash reports
+    // Do not add all of them to reduce possible PII exposure
+    const std::vector<std::string_view> envPrefixes = {
+        "ANDROID_EMU", // covers both ANDROID_EMU_ and ANDROID_EMULATOR_
+        "GFXSTREAM_",
+    };
+    const std::vector<std::string_view> envExcludes = {
+        "ANDROID_EMULATOR_WRAPPER_PID",
+        "ANDROID_EMULATOR_LAUNCHER_DIR",
+        "ANDROID_EMULATOR_PREBUILTS_DIR",
+        "ANDROID_EMULATOR_DISCOVERY_DIR",
+    };
+    const auto allEnv = System::get()->envGetAll();
+    arguments.clear();
+    for (const std::string& env : allEnv) {
+        const bool shouldReport =
+                std::any_of(envPrefixes.begin(), envPrefixes.end(),
+                            [&](std::string_view p) {
+                                return absl::StartsWith(env, p);
+                            }) &&
+                std::none_of(envExcludes.begin(), envExcludes.end(),
+                             [&](std::string_view p) {
+                                 return absl::StartsWith(env, p);
+                             });
+
+        if (shouldReport) {
+            absl::StrAppend(&arguments, env);
+            absl::StrAppend(&arguments, "\n");
+        }
+    }
+
+    reporter->attachData("environment_vars", arguments);
+
     return true;
 }
 

@@ -30,27 +30,11 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
       mUi(new Ui::TouchpadHolder()) {
     mUi->setupUi(this);
 
+    this->setFocusPolicy(Qt::StrongFocus);
+
     mTouchpadWidth = getConsoleAgents()->settings->hw()->hw_touchpad0_width;
     mTouchpadHeight = getConsoleAgents()->settings->hw()->hw_touchpad0_height;
-
-    if (mTouchpadWidth > mTouchpadHeight) {
-        mUi->horizontalSpacerLeft->changeSize(mMargin, 0, QSizePolicy::Minimum);
-        mUi->horizontalSpacerRight->changeSize(mMargin, 0,
-                                               QSizePolicy::Minimum);
-        mUi->verticalSpacerTop->changeSize(0, mMargin, QSizePolicy::Minimum,
-                                           QSizePolicy::Expanding);
-        mUi->verticalSpacerBottom->changeSize(0, mMargin, QSizePolicy::Minimum,
-                                              QSizePolicy::Expanding);
-    } else {
-        mUi->horizontalSpacerLeft->changeSize(mMargin, 0,
-                                              QSizePolicy::Expanding);
-        mUi->horizontalSpacerRight->changeSize(mMargin, 0,
-                                               QSizePolicy::Expanding);
-        mUi->verticalSpacerTop->changeSize(0, mMargin, QSizePolicy::Minimum,
-                                           QSizePolicy::Expanding);
-        mUi->verticalSpacerBottom->changeSize(0, mMargin, QSizePolicy::Minimum,
-                                              QSizePolicy::Expanding);
-    }
+    mUi->gridLayout->setContentsMargins(mMargin, mMargin, mMargin, mMargin);
 
     auto policy = mUi->touchpadBox->sizePolicy();
     policy.setHorizontalPolicy(QSizePolicy::Expanding);
@@ -67,19 +51,13 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
     mUi->tp_twoFingerLabel->setGeometry(
             mUi->touchpadBox->pos().x(), mUi->touchpadBox->pos().y(),
             mUi->touchpadBox->width(), mUi->touchpadBox->height());
-
-    // This will force the buttons to the left
-    mUi->gridLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding), 2, 3);
 }
 
 void TouchpadHolder::setWidth(int width) {
-    // Setting the width will resize the touchpad
-    this->setFixedWidth(width);
-    // Use the new touchpad height to set the window height
-    this->setFixedHeight(mMargin * 5 + mUi->touchpadBox->height());
-    mUi->tp_twoFingerLabel->setGeometry(
-            mUi->touchpadBox->pos().x(), mUi->touchpadBox->pos().y(),
-            mUi->touchpadBox->width(), mUi->touchpadBox->height());
+    int touchpadWidth = width - 2 * mMargin;
+    int touchpadHeight = mUi->touchpadBox->heightForWidth(touchpadWidth);
+    mUi->touchpadBox->setFixedWidth(touchpadWidth);
+    this->setFixedSize(width, 2 * mMargin + touchpadHeight);
 }
 
 bool TouchpadHolder::handleQtKeyEvent(const QKeyEvent& event,

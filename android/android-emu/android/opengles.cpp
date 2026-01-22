@@ -50,6 +50,7 @@
 #include "render-utils/render_api_functions.h"
 #include "aemu/base/Log.h"
 #include "android/emulation/control/ScreenCapturer.h"
+#include "absl/strings/str_cat.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -382,6 +383,9 @@ int android_startOpenglesRenderer(
                     {android::featurecontrol::VulkanRobustness,
                      &gfxstream::host::FeatureSet::VulkanRobustness},
             };
+
+    std::string reportGfxstreamFeatures;
+    reportGfxstreamFeatures.reserve(1024);
     for (const auto& [aemuFeature, gfxstreamFeaturePtr] :
          kAemuToGfxstreamFeatureMap) {
         (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled =
@@ -400,15 +404,20 @@ int android_startOpenglesRenderer(
                             android::featurecontrol::VulkanNativeSwapchain);
         }
 
-        dprint("gfxstreamFeature:%s = %d",
-               (gfxstreamFeatures.*gfxstreamFeaturePtr).name.c_str(),
-               (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled);
+        const std::string& featureName = (gfxstreamFeatures.*gfxstreamFeaturePtr).name;
+        const bool featureEnabled = (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled;
+        dprint("gfxstreamFeature:%s = %d", featureName.c_str(), featureEnabled);
+        if (featureEnabled) {
+            absl::StrAppend(&reportGfxstreamFeatures, featureName);
+            absl::StrAppend(&reportGfxstreamFeatures, ", ");
+        }
 
         // These flags should not be changed anymore, as that won't be
         // reflected on the gfxstream side.
         android::featurecontrol::makeReadOnly(aemuFeature);
     }
     gfxstreamFeatures.EglOnEgl.enabled = sEgl2egl;
+    crashhandler_add_string("gfxstream_features", reportGfxstreamFeatures.c_str());
 
     sRenderLib->setSyncDevice(
             goldfish_sync_create_timeline, goldfish_sync_create_fence,

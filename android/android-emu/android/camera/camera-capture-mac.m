@@ -112,7 +112,8 @@ typedef enum {
 
   // processCameraFrame state
   vImage_Buffer inputFrame_;
-  vImage_Buffer rotateBuffer_;
+  vImage_Buffer portraitBuffer_;
+  vImage_Buffer landscapeBuffer_;
   vImage_Buffer outputFrame_;
   void* scaleTempBuffer_;
 }
@@ -151,7 +152,8 @@ typedef enum {
           rScale:(float)rScale
           gScale:(float)gScale
           bScale:(float)bScale
-         expComp:(float)expComp;
+         expComp:(float)expComp
+         sensorOrientation:(int)sensorOrientation;
 
 @end
 
@@ -351,7 +353,8 @@ static vImage_Buffer shallowCropToAspectRatio(const vImage_Buffer* src,
   free(readFrameShadowBuffer_.data);
 
   free(inputFrame_.data);
-  free(rotateBuffer_.data);
+  free(portraitBuffer_.data);
+  free(landscapeBuffer_.data);
   free(outputFrame_.data);
   free(scaleTempBuffer_);
 
@@ -404,41 +407,47 @@ static BOOL copyImageFromCamera(CGColorSpaceRef colorSpace,
   vImage_Error error;
   vImage_Buffer* rotatedFrame;
 
+  vImagePixelCount rotatedWidth;
+  vImagePixelCount rotatedHeight;
+
   if (orientation == ANDROID_COARSE_PORTRAIT ||
       orientation == ANDROID_COARSE_REVERSE_PORTRAIT) {
-    if (rotateBuffer_.width != inputFrame_.height ||
-        rotateBuffer_.height != inputFrame_.width) {
-      free(rotateBuffer_.data);
-      rotateBuffer_.data = NULL;
-      rotateBuffer_.height = 0;
-      free(scaleTempBuffer_);
-      scaleTempBuffer_ = NULL;
-    }
+    rotatedWidth = inputFrame_.height;
+    rotatedHeight = inputFrame_.width;
+    rotatedFrame = &portraitBuffer_;
+  } else {
+    rotatedWidth = inputFrame_.width;
+    rotatedHeight = inputFrame_.height;
+    rotatedFrame = &landscapeBuffer_;
+  }
+  if (rotatedFrame->width != rotatedWidth ||
+      rotatedFrame->height != rotatedHeight) {
+    free(rotatedFrame->data);
+    rotatedFrame->data = NULL;
+    rotatedFrame->height = 0;
+    free(scaleTempBuffer_);
+    scaleTempBuffer_ = NULL;
+  }
 
-    if (!rotateBuffer_.data) {
-      error = vImageBuffer_Init(&rotateBuffer_, inputFrame_.width, inputFrame_.height,
-                                32, kvImageNoFlags);
-      if (error != kvImageNoError) {
-        E("%s: error in vImageBuffer_Init rotateBuffer=%p, height=%d, width=%d: %ld\n",
-          __func__, &rotateBuffer_, inputFrame_.width, inputFrame_.height, error);
-        return;
-      }
-    }
-
-    const Pixel_8888 backColor = {0, 0, 0, 0};
-    const int rotation = (cameraDirection_ ==  kMacCameraBackward ?
-                    (1 + orientation) % 4 :
-                    (5 - orientation) % 4);
-    error = vImageRotate90_ARGB8888(&inputFrame_, &rotateBuffer_,
-                                    rotation, backColor, kvImageNoFlags);
+  if (!rotatedFrame->data) {
+    error = vImageBuffer_Init(rotatedFrame, rotatedHeight, rotatedWidth,
+                              32, kvImageNoFlags);
     if (error != kvImageNoError) {
-      E("%s: error in vImageRotate90_ARGB8888: %ld\n", __func__, error);
+      E("%s: error in vImageBuffer_Init rotatedFrame=%p, height=%d, width=%d: %ld\n",
+        __func__, rotatedFrame, rotatedHeight, rotatedWidth, error);
       return;
     }
+  }
 
-    rotatedFrame = &rotateBuffer_;
-  } else {
-    rotatedFrame = &inputFrame_;
+  const Pixel_8888 backColor = {0, 0, 0, 0};
+  const int rotation = (cameraDirection_ ==  kMacCameraBackward ?
+                  (1 + orientation) % 4 :
+                  (5 - orientation) % 4);
+  error = vImageRotate90_ARGB8888(&inputFrame_, rotatedFrame,
+                                  rotation, backColor, kvImageNoFlags);
+  if (error != kvImageNoError) {
+    E("%s: error in vImageRotate90_ARGB8888: %ld\n", __func__, error);
+    return;
   }
 
   const vImage_Buffer cropped =
@@ -494,7 +503,7 @@ static BOOL copyImageFromCamera(CGColorSpaceRef colorSpace,
 didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection {
   CFRetain(sampleBuffer);
-  const AndroidCoarseOrientation orientation = get_coarse_orientation();
+  const AndroidCoarseOrientation orientation = get_coarse_orientation(90);
 
   dispatch_async(outputQueue_, ^(void){
       [self processCameraFrame:sampleBuffer orientation:orientation];
@@ -505,7 +514,8 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
           rScale:(float)rScale
           gScale:(float)gScale
           bScale:(float)bScale
-         expComp:(float)expComp {
+         expComp:(float)expComp
+         sensorOrientation:(int)sensorOrientation {
   os_unfair_lock_lock(&outputBufferLock_);
   if (outputFrameUpdated_) {
     swapImages(&readFrameBuffer_, &readFrameShadowBuffer_);
@@ -517,7 +527,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     return convert_frame(readFrameShadowBuffer_.data, V4L2_PIX_FMT_ARGB32,
                          readFrameShadowBuffer_.rowBytes * readFrameShadowBuffer_.height,
                          readFrameShadowBuffer_.width, readFrameShadowBuffer_.height, resultFrame,
-                         rScale, gScale, bScale, expComp, "front", 1);
+                         rScale, gScale, bScale, expComp, "front", sensorOrientation / 90);
   } else {
     return 1;
   }
@@ -657,7 +667,8 @@ int camera_device_read_frame(CameraDevice* cd,
                              float g_scale,
                              float b_scale,
                              float exp_comp,
-                             const char* direction) {
+                             const char* direction,
+                             int sensor_orientation) {
   MacCameraDevice* mcd;
 
   /* Sanity checks. */
@@ -683,7 +694,8 @@ int camera_device_read_frame(CameraDevice* cd,
                          rScale:r_scale
                          gScale:g_scale
                          bScale:b_scale
-                        expComp:exp_comp];
+                        expComp:exp_comp
+                        sensorOrientation:sensor_orientation];
 }
 
 void

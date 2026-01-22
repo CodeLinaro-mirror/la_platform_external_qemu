@@ -224,7 +224,8 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         !android_foldable_any_folded_area_configured() &&
         !android_foldable_hinge_configured() &&
         !android_foldable_rollable_configured() && !resizableEnabled() &&
-        avdFlavor != AVD_DESKTOP && avdFlavor != AVD_TV &&
+        (avdFlavor != AVD_DESKTOP || avdInfo_isDesktopApi36OrHigher(avdInfo)) &&
+        avdFlavor != AVD_TV &&
         avdFlavor != AVD_WEAR && avdFlavor != AVD_XR && avdFlavor != AVD_GLASSES &&
         (avdFlavor != AVD_ANDROID_AUTO ||
          android::automotive::isMultiDisplaySupported(avdInfo))) {
@@ -234,7 +235,7 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->displaysButton->setVisible(false);
     }
 
-    if (avdFlavor != AVD_XR ||  avdFlavor != AVD_GLASSES) {
+    if (avdFlavor != AVD_XR || avdFlavor != AVD_GLASSES || avdFlavor != AVD_ANDROID_AUTO) {
         mSidebarButtons.addButton(mExtendedUi->cellularButton);
         mSidebarButtons.addButton(mExtendedUi->telephoneButton);
         mSidebarButtons.addButton(mExtendedUi->dpadButton);
@@ -344,6 +345,7 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->batteryButton->setVisible(false);
         mExtendedUi->dpadButton->setVisible(false);
         mExtendedUi->telephoneButton->setVisible(false);
+        mExtendedUi->cellularButton->setVisible(false);
 
         if (android::featurecontrol::isEnabled(
                     android::featurecontrol::CarVhalReplay)) {

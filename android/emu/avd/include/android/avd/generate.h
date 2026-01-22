@@ -39,7 +39,9 @@ struct AvdGenerateInfo {
     const char* hwAudioOutput; // hw.audioOutput=yes
     const char* hwBattery; // hw.battery=yes
     const char* hwCameraBack; // hw.camera.back=virtualscene
+    int hwCameraBackOrientation; // hw.camera.back.orientation=90
     const char* hwCameraFront; // hw.camera.front=emulated
+    int hwCameraFrontOrientation; // hwe.camera.front.orientation=90
     const char* hwCpuArch; // hw.cpu.arch=x86
     const char* hwCpuModel; // hw.cpu.model=???
     int hwCpuNcore; // hw.cpu.ncore=4

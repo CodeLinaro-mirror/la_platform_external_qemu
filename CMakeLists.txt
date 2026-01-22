@@ -484,6 +484,8 @@ set(EMULATOR_FEATURE_DEPENDENCIES
     "${ANDROID_QEMU2_TOP_DIR}/android/data/emu-original-feature-flags.protobuf>lib/emu-original-feature-flags.protobuf"
     "${ANDROID_QEMU2_TOP_DIR}/android/data/hostapd.conf>lib/hostapd.conf")
 
+  set(AEMU_PROTO_DIR "${ANDROID_QEMU2_TOP_DIR}/../../hardware/google/aemu/protos")
+
 if(BUILDING_FOR_AARCH64)
   set(ANDROID_TARGET_ARCH "aarch64")
 else()
