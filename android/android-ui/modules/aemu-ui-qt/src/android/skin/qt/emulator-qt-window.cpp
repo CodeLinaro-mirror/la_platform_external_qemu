@@ -2940,6 +2940,23 @@ void EmulatorQtWindow::handleMouseWheelEvent(int delta,
     queueSkinEvent(std::move(skin_event));
 }
 
+int EmulatorQtWindow::generateModData(
+        const Qt::KeyboardModifiers& eventModifiers) {
+    int mod = 0;
+
+    if (eventModifiers & Qt::ShiftModifier) {
+        mod |= kKeyModLShift;
+    }
+    if (eventModifiers & Qt::ControlModifier) {
+        mod |= kKeyModLCtrl;
+    }
+    if (eventModifiers & Qt::AltModifier) {
+        mod |= kKeyModLAlt;
+    }
+
+    return mod;
+}
+
 void EmulatorQtWindow::forwardKeyEventToEmulator(SkinEventType type,
                                                  const QKeyEvent& event) {
     SkinEvent skin_event = createSkinEvent(type);
@@ -2969,12 +2986,7 @@ void EmulatorQtWindow::forwardKeyEventToEmulator(SkinEventType type,
     }
 
     Qt::KeyboardModifiers modifiers = event.modifiers();
-    if (modifiers & Qt::ShiftModifier)
-        keyData.mod |= kKeyModLShift;
-    if (modifiers & Qt::ControlModifier)
-        keyData.mod |= kKeyModLCtrl;
-    if (modifiers & Qt::AltModifier)
-        keyData.mod |= kKeyModLAlt;
+    keyData.mod = generateModData(modifiers);
 
     queueSkinEvent(std::move(skin_event));
 }
@@ -3080,8 +3092,9 @@ void EmulatorQtWindow::handleKeyEvent(SkinEventType type,
         forwardKeyEventToEmulator(type, event);
         if (type == kEventKeyDown && event.text().length() > 0) {
             Qt::KeyboardModifiers mods = event.modifiers();
-            mods &= ~(Qt::ShiftModifier | Qt::KeypadModifier);
-            if (mods == 0) {
+            Qt::KeyboardModifiers modsWithoutShiftAndKeypad =
+                    mods & ~(Qt::ShiftModifier | Qt::KeypadModifier);
+            if (modsWithoutShiftAndKeypad == 0) {
                 // The key event generated text without Ctrl, Alt, etc.
                 // Send an additional TextInput event to the emulator.
                 SkinEvent skin_event = createSkinEvent(kEventTextInput);
@@ -3091,6 +3104,25 @@ void EmulatorQtWindow::handleKeyEvent(SkinEventType type,
                         sizeof(skin_event.u.text.text) - 1);
                 // Ensure the event's text is 0-terminated
                 skin_event.u.text.text[sizeof(skin_event.u.text.text) - 1] = 0;
+                queueSkinEvent(std::move(skin_event));
+            } else {
+                // It handles key combination inputs with Ctrl, Alt, etc.
+                // In this case, event.text() doesn't contain printable
+                // character.
+                // Send a keycode and modifiers as TextInput event.
+                SkinEvent skin_event = createSkinEvent(kEventTextInput);
+                skin_event.u.text.down = false;
+                SkinEventTextInputData& textData = skin_event.u.text;
+
+                bool isModifier = false;
+                textData.keycode = convertKeyCode(event.key(), isModifier);
+                if (textData.keycode == -1) {
+                    D("Failed to convert key for event key %d", event.key());
+                    return;
+                }
+
+                textData.mod = generateModData(mods);
+
                 queueSkinEvent(std::move(skin_event));
             }
         }
