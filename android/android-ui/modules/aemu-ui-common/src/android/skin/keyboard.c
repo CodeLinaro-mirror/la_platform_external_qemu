@@ -363,6 +363,8 @@ void skin_keyboard_process_event(SkinKeyboard* kb, SkinEvent* ev, int down) {
         case kKeyCodeAltRight:
         case kKeyCodeCapLeft:
         case kKeyCodeCapRight:
+        case kKeyCodeMetaLeft:
+        case kKeyCodeMetaRight:
         case kKeyCodeSym:
         case LINUX_KEY_PLAYPAUSE:
         case LINUX_KEY_BACK:
