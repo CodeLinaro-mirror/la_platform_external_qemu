@@ -255,9 +255,15 @@ int main(int argc, char* argv[]) {
     }
 
     android::files::TemporaryFile pixels;
-    LOG(INFO) << "Sharing pixels at: " << pixels.path();
     EmulatorQtWindow* window = EmulatorQtWindow::getInstance();
-    window->initializeStreamer("file:///" + pixels.path());
+
+    if (!opts->qt_hide_window) {
+        LOG(INFO) << "Visible ui, initializng pixel streamer at: "
+                  << pixels.path();
+        window->initializeStreamer("file:///" + pixels.path());
+    } else {
+        LOG(INFO) << "No visible ui, not initializing pixel streamer";
+    }
 
     LOG(INFO) << "Setting up window";
     emulator_window_setup(emulator_window_get());
