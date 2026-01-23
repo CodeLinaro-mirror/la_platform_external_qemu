@@ -1069,7 +1069,11 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             forwardKeyToEmulator(LINUX_KEY_BACK, down);
             break;
         case QtUICommand::OVERVIEW:
-            forwardKeyToEmulator(ANDROID_KEY_APPSWITCH, down);
+            if (avdInfo_isDesktopApi36OrHigher(getConsoleAgents()->settings->avdInfo())) {
+                forwardKeyToEmulator(LINUX_KEY_SCALE, down);
+            } else {
+                forwardKeyToEmulator(ANDROID_KEY_APPSWITCH, down);
+            }
             break;
         case QtUICommand::META:
             forwardKeyToEmulator(LINUX_KEY_LEFTMETA, down);

@@ -134,6 +134,7 @@ typedef enum {
     kKeyCodeChannelUp = LINUX_KEY_CHANNELUP,
     kKeyCodeChannelDown = LINUX_KEY_CHANNELDOWN,
     kKeyCodeSleep = LINUX_KEY_SLEEP,
+    kKeyCodeScale = LINUX_KEY_SCALE,
     kKeyCodeStemPrimary = ANDROID_KEY_STEM_PRIMARY,
     kKeyCodeStem1 = ANDROID_KEY_STEM_1,
     kKeyCodeStem2 = ANDROID_KEY_STEM_2,

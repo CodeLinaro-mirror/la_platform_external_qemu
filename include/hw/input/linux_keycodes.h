@@ -135,7 +135,7 @@
 #define LINUX_KEY_KPEQUAL               117
 #define LINUX_KEY_KPPLUSMINUS           118
 #define LINUX_KEY_PAUSE                 119
-
+#define LINUX_KEY_SCALE                 120
 #define LINUX_KEY_KPCOMMA               121
 #define LINUX_KEY_HANGEUL               122
 #define LINUX_KEY_HANGUEL               KEY_HANGEUL
