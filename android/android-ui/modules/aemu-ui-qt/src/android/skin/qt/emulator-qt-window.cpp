@@ -1278,6 +1278,28 @@ void EmulatorQtWindow::setRelativeMouseCoordMode(bool state) {
     mRelativeMouseCoordMode = state;
 }
 
+#ifdef __APPLE__
+
+void EmulatorQtWindow::grabMouse(const QCursor& cursor) {
+    QFrame::grabMouse(cursor);
+    // b/476267783: On Mac, setting a blank cursor does not necessarily hide
+    // the cursor. We also invoke the native API to hide the cursor.
+    if (cursor == Qt::BlankCursor) {
+        mac_hide_cursor();
+        mIsCursorHidden = true;
+    }
+}
+
+void EmulatorQtWindow::releaseMouse() {
+    QFrame::releaseMouse();
+    if (mIsCursorHidden) {
+        mac_show_cursor();
+        mIsCursorHidden = false;
+    }
+}
+
+#endif  // __APPLE__
+
 void EmulatorQtWindow::mouseMoveEvent(QMouseEvent* event) {
     // The motion event will interfere with the swipe gesture being synthesized.
     if (mWheelScrollTimer.isActive())
