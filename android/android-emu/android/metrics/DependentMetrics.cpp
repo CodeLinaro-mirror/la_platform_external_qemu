@@ -1132,7 +1132,7 @@ void android_metrics_fill_vulkan_gpu_info(void* opaque) {
             "vulkan.apiVersion", "%d.%d.%d", VERSION_MAJOR(api_version),
             VERSION_MINOR(api_version), VERSION_PATCH(api_version));
     crashhandler_add_string("vulkan.type", getDeviceTypeString(device_type));
-    crashhandler_add_string_format("vulkan.memory", "% MiB" PRIu64,
+    crashhandler_add_string_format("vulkan.memory", "%" PRIu64 " MiB",
                                    uint64_t(device_memory / (1024 * 1024)));
     crashhandler_add_string("vulkan.ICD", vk_icd.c_str());
 
