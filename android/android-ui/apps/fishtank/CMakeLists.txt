@@ -101,6 +101,50 @@ prebuilt(QT5)
 android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 
 install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank)
+
+if(LINUX_X86_64)
+  set(FISHTANK_ADDITIONAL_SHARED_LIBS
+      emugl_common
+      android-emu-tracing
+      android-emu-metrics
+      android-emu-curl
+      android-emu-agents
+      android-emu-protos
+      android-emu-base-logging
+  )
+
+  foreach(dep ${FISHTANK_ADDITIONAL_SHARED_LIBS})
+    install(TARGETS ${dep} RUNTIME DESTINATION fishtank/lib64 LIBRARY DESTINATION fishtank/lib64 COMPONENT fishtank)
+  endforeach()
+
+  # Install prebuilt shared libraries that are not targets
+  set(FISHTANK_PREBUILT_SHARED_LIBS
+      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libglib2_linux-x86_64.so"
+      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libprotobuf.so"
+      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libprotobuf.so.28.4.0"
+      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libabseil_dll.so"
+  )
+
+  foreach(lib ${FISHTANK_PREBUILT_SHARED_LIBS})
+    if(EXISTS ${lib})
+      get_filename_component(REAL_LIB ${lib} REALPATH)
+      get_filename_component(LIB_NAME ${lib} NAME)
+      install(FILES ${REAL_LIB} DESTINATION fishtank/lib64 RENAME ${LIB_NAME} COMPONENT fishtank)
+    endif()
+  endforeach()
+
+  # Install RUNTIME_OS_DEPENDENCIES (like libc++.so)
+  foreach(dep ${RUNTIME_OS_DEPENDENCIES})
+    string(REPLACE ">" ";" SRC_DST ${dep})
+    list(GET SRC_DST 0 SRC)
+    list(GET SRC_DST 1 DST)
+    get_filename_component(DST_DIR ${DST} DIRECTORY)
+    get_filename_component(REAL_SRC ${SRC} REALPATH)
+    get_filename_component(DST_NAME ${DST} NAME)
+    install(FILES ${REAL_SRC} DESTINATION fishtank/${DST_DIR} RENAME ${DST_NAME} COMPONENT fishtank)
+  endforeach()
+endif()
+
 foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
   if(qt_dep MATCHES ".*>>.*")
     string(REPLACE ">>" ";" SRC_DST ${qt_dep})
