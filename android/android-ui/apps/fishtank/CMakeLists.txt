@@ -99,6 +99,27 @@ target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank)
 
+prebuilt(QT5)
+foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
+  if(qt_dep MATCHES ".*>>.*")
+    string(REPLACE ">>" ";" SRC_DST ${qt_dep})
+    list(GET SRC_DST 0 SRC)
+    list(GET SRC_DST 1 DST)
+    if (SRC MATCHES ".*\\*.*")
+      file(GLOB GLOBBED_FILES ${SRC})
+      install(FILES ${GLOBBED_FILES} DESTINATION fishtank/${DST} COMPONENT fishtank)
+    else()
+      install(DIRECTORY ${SRC} DESTINATION fishtank/${DST} COMPONENT fishtank)
+    endif()
+  else()
+    string(REPLACE ">" ";" SRC_DST ${qt_dep})
+    list(GET SRC_DST 0 SRC)
+    list(GET SRC_DST 1 DST)
+    get_filename_component(DST_DIR ${DST} DIRECTORY)
+    install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank)
+  endif()
+endforeach()
+
 android_add_test(
   TARGET fishtank_unittests
   SRC grpc/FishtankGrpcServer_unittest.cpp grpc/FishtankGrpcServer.cpp)
