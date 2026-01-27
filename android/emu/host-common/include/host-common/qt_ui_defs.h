@@ -57,6 +57,7 @@ typedef enum {
     PANE_IDX_CAR,
     PANE_IDX_CAR_ROTARY,
     PANE_IDX_SENSOR_REPLAY,
+    PANE_IDX_KEYBOARD,
 } ExtendedWindowPane;
 
 typedef enum {

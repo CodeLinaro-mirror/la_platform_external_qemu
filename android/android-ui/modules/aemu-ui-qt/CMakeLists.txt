@@ -85,6 +85,7 @@ android_qt_lib(
        ext-page-finger
        ext-page-google-play
        ext-page-help
+       ext-page-keyboard
        ext-page-location-ui
        ext-page-microphone
        ext-page-recording
