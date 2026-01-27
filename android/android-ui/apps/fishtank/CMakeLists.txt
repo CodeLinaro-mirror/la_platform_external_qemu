@@ -97,9 +97,10 @@ target_link_libraries(
 # Include the current directory for headers
 target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank)
-
 prebuilt(QT5)
+android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
+
+install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank)
 foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
   if(qt_dep MATCHES ".*>>.*")
     string(REPLACE ">>" ";" SRC_DST ${qt_dep})
