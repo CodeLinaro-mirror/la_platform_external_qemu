@@ -116,7 +116,7 @@ android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 # directory (objs/distribution-fishtank) during the specialized build phase.
 install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
 
-if(LINUX_X86_64)
+if(LINUX_X86_64 OR APPLE)
   set(FISHTANK_ADDITIONAL_SHARED_LIBS
       emugl_common
       android-emu-tracing
@@ -125,7 +125,7 @@ if(LINUX_X86_64)
       android-emu-agents
       android-emu-protos
       android-emu-base-logging
-      glib2_linux-x86_64
+      glib2_${ANDROID_TARGET_TAG}
       libprotobuf
       abseil_dll
   )
