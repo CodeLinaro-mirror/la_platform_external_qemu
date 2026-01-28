@@ -62,6 +62,25 @@ class CompileTask(BuildTask):
             "--prefix",
             unstripped_dist_dir,
         ]
+        # We also want to install the fishtank binary in its own distribution directory.
+        # Since it is excluded from the default 'all' target, we must build it explicitly.
+        self.cmake_cmd_fishtank_build = [
+            shutil.which("cmake", path=str(cmake_dir)),
+            "--build",
+            destination,
+            "--target",
+            "fishtank",
+        ]
+        fishtank_dist_dir = Path(destination) / "distribution-fishtank"
+        self.cmake_cmd_fishtank = [
+            shutil.which("cmake", path=str(cmake_dir)),
+            "--install",
+            destination,
+            "--component",
+            "fishtank",
+            "--prefix",
+            fishtank_dist_dir,
+        ]
         self.env = get_default_environment(aosp, self.toolchain.visual_studio_version())
 
     def filter_ninja_error(self, logline: str):
@@ -80,6 +99,13 @@ class CompileTask(BuildTask):
         Command(self.cmake_cmd).with_environment(self.env).with_log_handler(
             ninja_err_filter
         ).run()
+        if self.target != "linux_aarch64":
+            Command(self.cmake_cmd_fishtank_build).with_environment(self.env).with_log_handler(
+                ninja_err_filter
+            ).run()
+            Command(self.cmake_cmd_fishtank).with_environment(self.env).with_log_handler(
+                ninja_err_filter
+            ).run()
         if self.target == "linux":
             Command(self.cmake_cmd_unstripped).with_environment(self.env).with_log_handler(
                 ninja_err_filter
