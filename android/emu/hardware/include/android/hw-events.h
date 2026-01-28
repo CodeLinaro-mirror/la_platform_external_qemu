@@ -297,6 +297,7 @@ typedef enum {
    KEY_CODE(FOCUS       ,242)   \
    KEY_CODE(PLUS        ,243)   \
    KEY_CODE(NOTIFICATION,244)   \
+   KEY_CODE(MICMUTE     ,248)   \
    KEY_CODE(OK          ,0x160)  \
    KEY_CODE(SELECT      ,0x161)  \
    KEY_CODE(GOTO        ,0x162)  \
@@ -395,6 +396,7 @@ typedef enum {
    KEY_CODE(BRL_DOT7    ,0x1f7)  \
    KEY_CODE(BRL_DOT8    ,0x1f8)  \
    KEY_CODE(VOICECOMMAND,0x246)  \
+   KEY_CODE(SELECTIVE_SCREENSHOT,0x27a)  \
 
 #undef  KEY_CODE
 #define KEY_CODE(n,v)   GLUE(KEY_,n) = v,

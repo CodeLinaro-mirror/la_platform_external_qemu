@@ -15,8 +15,46 @@
 KeyboardPage::KeyboardPage(QWidget* parent)
     : QWidget(parent), mUi(new Ui::KeyboardPage) {
     mUi->setupUi(this);
+
+    const struct {
+        QPushButton* keyButton;
+        SkinKeyCode key_code;
+    } keyButtons[] = {
+            {mUi->forwardButton, kKeyCodeForward},
+            {mUi->refreshButton, kKeyCodeRefresh},
+            {mUi->fullScreenButton, kKeyCodeFullScreen},
+            {mUi->screenCaptureButton, kKeyCodeSelectiveScreenshot},
+            {mUi->brightnessDownButton, kKeyCodeBrightnessDown},
+            {mUi->brightnessUpButton, kKeyCodeBrightnessUp},
+            {mUi->mediaPreviousButton, kKeyCodePreviousSong},
+            {mUi->mediaPlayPauseButton, kKeyCodePlaypause},
+            {mUi->mediaNextButton, kKeyCodeNextSong},
+            {mUi->micMuteButton, kKeyCodeMicMute},
+            {mUi->volumeMuteButton, kKeyCodeMute},
+            {mUi->screenLockButton, kKeyCodeScreenLock},
+    };
+
+    for (const auto& button_info : keyButtons) {
+        QPushButton* button = button_info.keyButton;
+        const SkinKeyCode key_code = button_info.key_code;
+        connect(button, &QPushButton::pressed,
+                [key_code, this]() { toggleKeyButtonDown(key_code, true); });
+        connect(button, &QPushButton::released,
+                [key_code, this]() { toggleKeyButtonDown(key_code, false); });
+    }
 }
 
 void KeyboardPage::setEmulatorWindow(EmulatorQtWindow* eW) {
     mEmulatorWindow = eW;
+}
+
+void KeyboardPage::toggleKeyButtonDown(const SkinKeyCode key_code,
+                                       const bool down) {
+    if (mEmulatorWindow) {
+        SkinEvent skin_event =
+                createSkinEvent(down ? kEventKeyDown : kEventKeyUp);
+        skin_event.u.key.keycode = key_code;
+        skin_event.u.key.mod = 0;
+        mEmulatorWindow->queueSkinEvent(skin_event);
+    }
 }

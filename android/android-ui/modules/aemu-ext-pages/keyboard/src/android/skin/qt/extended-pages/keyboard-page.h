@@ -11,9 +11,11 @@
 
 #pragma once
 
+#include <QPushButton>
 #include <QWidget>
 #include <memory>
 
+#include "android/skin/keycode.h"
 #include "ui_keyboard-page.h"
 
 class EmulatorQtWindow;
@@ -26,6 +28,8 @@ public:
     void setEmulatorWindow(EmulatorQtWindow* eW);
 
 private:
+    void toggleKeyButtonDown(const SkinKeyCode key_code, const bool down);
+
     std::unique_ptr<Ui::KeyboardPage> mUi;
     EmulatorQtWindow* mEmulatorWindow;
 };
