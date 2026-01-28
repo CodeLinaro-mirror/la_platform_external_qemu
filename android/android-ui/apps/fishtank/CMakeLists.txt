@@ -100,7 +100,11 @@ target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 prebuilt(QT5)
 android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 
-install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank)
+# We use EXCLUDE_FROM_ALL on these install rules to ensure that fishtank and its
+# dependencies are NOT included in the default emulator distribution.
+# This allows fishtank to be deployed exclusively to its isolated standalone
+# directory (objs/distribution-fishtank) during the specialized build phase.
+install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
 
 if(LINUX_X86_64)
   set(FISHTANK_ADDITIONAL_SHARED_LIBS
@@ -114,7 +118,7 @@ if(LINUX_X86_64)
   )
 
   foreach(dep ${FISHTANK_ADDITIONAL_SHARED_LIBS})
-    install(TARGETS ${dep} RUNTIME DESTINATION fishtank/lib64 LIBRARY DESTINATION fishtank/lib64 COMPONENT fishtank)
+    install(TARGETS ${dep} RUNTIME DESTINATION fishtank/lib64 LIBRARY DESTINATION fishtank/lib64 COMPONENT fishtank EXCLUDE_FROM_ALL)
   endforeach()
 
   # Install prebuilt shared libraries that are not targets
@@ -129,7 +133,7 @@ if(LINUX_X86_64)
     if(EXISTS ${lib})
       get_filename_component(REAL_LIB ${lib} REALPATH)
       get_filename_component(LIB_NAME ${lib} NAME)
-      install(FILES ${REAL_LIB} DESTINATION fishtank/lib64 RENAME ${LIB_NAME} COMPONENT fishtank)
+      install(FILES ${REAL_LIB} DESTINATION fishtank/lib64 RENAME ${LIB_NAME} COMPONENT fishtank EXCLUDE_FROM_ALL)
     endif()
   endforeach()
 
@@ -141,7 +145,7 @@ if(LINUX_X86_64)
     get_filename_component(DST_DIR ${DST} DIRECTORY)
     get_filename_component(REAL_SRC ${SRC} REALPATH)
     get_filename_component(DST_NAME ${DST} NAME)
-    install(FILES ${REAL_SRC} DESTINATION fishtank/${DST_DIR} RENAME ${DST_NAME} COMPONENT fishtank)
+    install(FILES ${REAL_SRC} DESTINATION fishtank/${DST_DIR} RENAME ${DST_NAME} COMPONENT fishtank EXCLUDE_FROM_ALL)
   endforeach()
 endif()
 
@@ -152,16 +156,16 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
     list(GET SRC_DST 1 DST)
     if (SRC MATCHES ".*\\*.*")
       file(GLOB GLOBBED_FILES ${SRC})
-      install(FILES ${GLOBBED_FILES} DESTINATION fishtank/${DST} COMPONENT fishtank)
+      install(FILES ${GLOBBED_FILES} DESTINATION fishtank/${DST} COMPONENT fishtank EXCLUDE_FROM_ALL)
     else()
-      install(DIRECTORY ${SRC} DESTINATION fishtank/${DST} COMPONENT fishtank)
+      install(DIRECTORY ${SRC} DESTINATION fishtank/${DST} COMPONENT fishtank EXCLUDE_FROM_ALL)
     endif()
   else()
     string(REPLACE ">" ";" SRC_DST ${qt_dep})
     list(GET SRC_DST 0 SRC)
     list(GET SRC_DST 1 DST)
     get_filename_component(DST_DIR ${DST} DIRECTORY)
-    install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank)
+    install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
   endif()
 endforeach()
 
