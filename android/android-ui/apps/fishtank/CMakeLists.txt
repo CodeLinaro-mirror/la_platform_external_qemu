@@ -28,6 +28,16 @@ android_add_executable(
       grpc/FishtankGrpcServer.cpp
       main.cpp)
 
+if(APPLE)
+  # Override the default RPATH to match the standalone distribution layout
+  android_target_properties(fishtank all "INSTALL_RPATH=@executable_path/lib64")
+  android_target_properties(fishtank all "INSTALL_RPATH>=@executable_path/lib64/qt/lib")
+  android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path")
+  android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path/lib64")
+  android_target_properties(fishtank all "BUILD_WITH_INSTALL_RPATH=ON")
+  android_target_properties(fishtank all "INSTALL_RPATH_USE_LINK_PATH=ON")
+endif()
+
 protobuf_generate_grpc_cpp(
   SOURCE_DIR ${AEMU_PROTO_DIR}
   SOURCES services/forwarder/service_forwarder.proto
