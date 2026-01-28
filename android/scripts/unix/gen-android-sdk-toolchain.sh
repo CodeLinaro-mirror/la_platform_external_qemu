@@ -758,7 +758,7 @@ get_osx_sysroot() {
     OSX_VERSION=$(sw_vers -productVersion)
     OSX_REQUIRED=13.3
     MIN_XCODE=10
-    OSX_SDK_SUPPORTED="13.3 15.5 26.0 26.2"
+    OSX_SDK_SUPPORTED="13.3 15.2 15.5 26.0 26.2"
     OSX_XCODE=$(xcodebuild -version | tr '\n' ' ')
     OSX_SDK_INSTALLED_LIST=$(xcodebuild -showsdks 2>/dev/null | \
             egrep --color=never -o " macosx\d+.\d+$" | sed -e "s/.*macosx//g" | sort -n | \
