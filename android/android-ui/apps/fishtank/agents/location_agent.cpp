@@ -13,14 +13,17 @@
 // limitations under the License.
 #include "fishtank_agents.h"
 
+#include <cstddef>
+#include "android/console.h"
 #include "android/emulation/control/location_agent.h"
+#include "host-common/hw-config.h"
+
+static android::emulation::control::GpsState gGpsState;
 
 const QAndroidLocationAgent sFishtankQAndroidLocationAgent = {
-        .gpsIsSupported =
-                []() {
-                    NOT_IMPLEMENTED("QAndroidLocationAgent.gpsIsSupported()");
-                    return false;
-                },
+        .gpsIsSupported = []() -> bool {
+            return (bool)getConsoleAgents()->settings->hw()->hw_gps;
+        },
         .gpsSendLoc =
                 [](double lat,
                    double lon,
@@ -29,26 +32,91 @@ const QAndroidLocationAgent sFishtankQAndroidLocationAgent = {
                    double bearing,
                    int n_sv,
                    const struct timeval* tv) {
-                    NOT_IMPLEMENTED("QAndroidLocationAgent.gpsSendLoc(lat: %f, lon: %f, alt: %f, speed: %f, bearing: %f, n_sv: %d, tv: %p)", lat, lon, alt, speed, bearing, n_sv, tv);
+                    gGpsState.set_latitude(lat);
+                    gGpsState.set_longitude(lon);
+                    gGpsState.set_altitude(alt);
+                    gGpsState.set_speed(speed);
+                    gGpsState.set_bearing(bearing);
+                    gGpsState.set_satellites(n_sv);
+                    getGlobalControlClient()->setGpsAsync(gGpsState);
                 },
         .gpsGetLoc =
-                [](double* lat, double* lon, double* alt, double* speed, double* bearing, int* n_sv) {
-                    NOT_IMPLEMENTED("QAndroidLocationAgent.gpsGetLoc(lat: %p, lon: %p, alt: %p, speed: %p, bearing: %p, n_sv: %p)", lat, lon, alt, speed, bearing, n_sv);
+                [](double* lat,
+                   double* lon,
+                   double* alt,
+                   double* speed,
+                   double* bearing,
+                   int* n_sv) {
+                    auto gps = getGlobalControlClient()->getGps();
+                    if (!gps.ok()) {
+                        return -1;
+                    }
+                    if (lat) {
+                        *lat = gps->latitude();
+                    }
+                    if (lon) {
+                        *lon = gps->longitude();
+                    }
+                    if (alt) {
+                        *alt = gps->altitude();
+                    }
+                    if (speed) {
+                        *speed = gps->speed();
+                    }
+                    if (bearing) {
+                        *bearing = gps->bearing();
+                    }
+                    if (n_sv) {
+                        *n_sv = gps->satellites();
+                    }
                     return 0;
                 },
-        .gpsSendNmea = [](const char* nmea) { NOT_IMPLEMENTED("QAndroidLocationAgent.gpsSendNmea(nmea: %s)", nmea); },
-        .gpsSendGnss = [](const char* gnss) { NOT_IMPLEMENTED("QAndroidLocationAgent.gpsSendGnss(gnss: %s)", gnss); },
-        .gpsSetPassiveUpdate = [](bool passive) { NOT_IMPLEMENTED("QAndroidLocationAgent.gpsSetPassiveUpdate(passive: %d)", passive); },
+        .gpsSendNmea =
+                [](const char* nmea) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidLocationAgent.gpsSendNmea(nmea: "
+                            "%s)",
+                            nmea);
+                },
+        .gpsSendGnss =
+                [](const char* gnss) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidLocationAgent.gpsSendGnss(gnss: "
+                            "%s)",
+                            gnss);
+                },
+        .gpsSetPassiveUpdate =
+                [](bool passive) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidLocationAgent.gpsSetPassiveUpdate("
+                            "passive:"
+                            " %d)",
+                            passive);
+                },
         .gpsGetPassiveUpdate =
                 []() {
-                    NOT_IMPLEMENTED("QAndroidLocationAgent.gpsGetPassiveUpdate");
+                    NOT_IMPLEMENTED(
+                            "QAndroidLocationAgent."
+                            "gpsGetPassiveUpdate");
                     return false;
                 },
-        .gpsEnableGnssGrpcV1 = []() { NOT_IMPLEMENTED("QAndroidLocationAgent.gpsEnableGnssGrpcV1"); },
+        .gpsEnableGnssGrpcV1 =
+                []() {
+                    NOT_IMPLEMENTED(
+                            "QAndroidLocationAgent."
+                            "gpsEnableGnssGrpcV1");
+                },
         .gpsGetGpsSignal =
                 []() {
                     NOT_IMPLEMENTED("QAndroidLocationAgent.gpsGetGpsSignal");
                     return false;
                 },
-        .gpsSetGpsSignal = [](bool has_signal) { NOT_IMPLEMENTED("QAndroidLocationAgent.gpsSetGpsSignal(has_signal: %d)", has_signal); },
+        .gpsSetGpsSignal =
+                [](bool has_signal) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidLocationAgent.gpsSetGpsSignal(has_"
+                            "signal: "
+                            "%d)",
+                            has_signal);
+                },
 };
