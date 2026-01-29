@@ -115,26 +115,13 @@ if(LINUX_X86_64)
       android-emu-agents
       android-emu-protos
       android-emu-base-logging
+      glib2_linux-x86_64
+      libprotobuf
+      abseil_dll
   )
 
   foreach(dep ${FISHTANK_ADDITIONAL_SHARED_LIBS})
     install(TARGETS ${dep} RUNTIME DESTINATION fishtank/lib64 LIBRARY DESTINATION fishtank/lib64 COMPONENT fishtank EXCLUDE_FROM_ALL)
-  endforeach()
-
-  # Install prebuilt shared libraries that are not targets
-  set(FISHTANK_PREBUILT_SHARED_LIBS
-      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libglib2_linux-x86_64.so"
-      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libprotobuf.so"
-      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libprotobuf.so.28.4.0"
-      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libabseil_dll.so"
-  )
-
-  foreach(lib ${FISHTANK_PREBUILT_SHARED_LIBS})
-    if(EXISTS ${lib})
-      get_filename_component(REAL_LIB ${lib} REALPATH)
-      get_filename_component(LIB_NAME ${lib} NAME)
-      install(FILES ${REAL_LIB} DESTINATION fishtank/lib64 RENAME ${LIB_NAME} COMPONENT fishtank EXCLUDE_FROM_ALL)
-    endif()
   endforeach()
 
   # Install RUNTIME_OS_DEPENDENCIES (like libc++.so)
