@@ -186,46 +186,10 @@ static void virtio_consume_vqelem(VirtQueue* vq, VirtQueueElement* elem, size_t 
     g_free(elem);
 }
 
-// If the vq is tx_p2p, then it is destined for remote VM.
-static bool virtio_wifi_flush_tx(VirtIOWifiQueue* q) {
-    GlobalState& state = *globalState();
-    VirtIOWifi* n = state.wifi;
-    VirtIODevice* vdev = VIRTIO_DEVICE(n);
-    VirtQueue* vq = q->tx;
-    const size_t tx_burst = n->tx_burst;
-    size_t num_packets = 0;
-
-    if (q->async_tx.elem) {
-        virtio_consume_vqelem(vq, q->async_tx.elem, 0);
-        q->async_tx.elem = nullptr;
-        ++num_packets;
-    }
-
-    while (num_packets < tx_burst) {
-        VirtQueueElement* elem = static_cast<VirtQueueElement*>(
-                virtqueue_pop(vq, sizeof(VirtQueueElement)));
-        if (!elem) {
-            if (num_packets > 0) {
-                virtio_notify(vdev, vq);
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        IOVector iovec(elem->out_sg, elem->out_sg + elem->out_num);
-        const int sendResult = state.wifiService->send(iovec);
-        if (sendResult == -EBUSY) {
-            q->async_tx.elem = elem;
-            return false;
-        }
-
-        virtio_consume_vqelem(vq, elem, 0);
-        ++num_packets;
-    }
-
-    virtio_notify(vdev, vq);
-    return false;
+static bool send_wifi_packet(GlobalState& state, VirtQueueElement* elem) {
+    IOVector iovec(elem->out_sg, elem->out_sg + elem->out_num);
+    const int sendResult = state.wifiService->send(iovec);
+    return sendResult != -EBUSY;
 }
 
 // This function will only be called when the frame is sent to qemu networking.
@@ -233,9 +197,8 @@ static bool virtio_wifi_flush_tx(VirtIOWifiQueue* q) {
 static void virtio_wifi_tx_complete(size_t queue_index) {
     VirtIOWifi* n = globalState()->wifi;
     VirtIOWifiQueue* q = &n->vqs[queue_index];
-    VirtIODevice* vdev = VIRTIO_DEVICE(n);
 
-    virtio_wifi_flush_tx(q);
+    qemu_bh_schedule(q->tx_bh);
 }
 
 // set virtio-wifi link status according to netclientstate
@@ -326,21 +289,19 @@ static void virtio_wifi_handle_tx(VirtIODevice* vdev, VirtQueue* vq) {
         // TODO (wdu@) Need to drop all data in queue
         return;
     }
-    if (unlikely(q->tx_waiting)) {
-        return;
-    }
-    q->tx_waiting = 1;
     // This happens when device was stopped but VCPU wasn't.
     if (!vdev->vm_running) {
         return;
     }
+
+    // Pass processing to the BH
+    virtio_queue_set_notification(vq, 0);
     qemu_bh_schedule(q->tx_bh);
 }
 
 static void virtio_wifi_tx_bh(void* opaque) {
+    GlobalState& state = *globalState();
     VirtIOWifi* n = globalState()->wifi;
-    VirtIOWifiQueue* q = static_cast<VirtIOWifiQueue*>(opaque);
-    VirtQueue* vq = q->tx;
     VirtIODevice* vdev = VIRTIO_DEVICE(n);
 
     /* This happens when device was stopped but BH wasn't. */
@@ -350,16 +311,66 @@ static void virtio_wifi_tx_bh(void* opaque) {
         return;
     }
 
-    if (q->async_tx.elem) {
-        /* Notification re-enable handled by tx_complete or device broken */
-        return;
+    VirtIOWifiQueue* q = static_cast<VirtIOWifiQueue*>(opaque);
+    VirtQueue* vq = q->tx;
+    size_t num_packets = 0;
+    bool need_notify = false;
+
+    if (q->unsent_tx) {
+        if (!send_wifi_packet(state, q->unsent_tx)) {
+            // if sendWifiPacket fails we need to wait for
+            // virtio_wifi_tx_complete to notify us that the
+            // queue in unclogged to avoid the infinite loop
+            // of scheduling BH.
+            return;
+        }
+
+        virtio_consume_vqelem(vq, q->unsent_tx, 0);
+        q->unsent_tx = nullptr;
+        ++num_packets;
+        need_notify = true;
     }
 
-    if (virtio_wifi_flush_tx(q)) {
+    const size_t tx_burst = n->tx_burst;
+
+process_vq_again:
+    bool vq_empty = false;
+    while (num_packets < tx_burst) {
+        VirtQueueElement* elem = static_cast<VirtQueueElement*>(
+                virtqueue_pop(vq, sizeof(VirtQueueElement)));
+        if (!elem) {
+            vq_empty = true;
+            break;
+        }
+
+        if (send_wifi_packet(state, elem)) {
+            virtio_consume_vqelem(vq, elem, 0);
+            ++num_packets;
+            need_notify = true;
+        } else {
+            // we will have to retry once the queue is unclogged
+            q->unsent_tx = elem;
+            break;
+        }
+    }
+
+    if (need_notify) {
+        virtio_notify(vdev, vq);
+        need_notify = false;
+    }
+
+    if (vq_empty) {
+        // If the vq is exhausted - enable the vq notifications back
+        virtio_queue_set_notification(vq, 1);
+        if (!virtio_queue_empty(vq)) {
+            virtio_queue_set_notification(vq, 0);
+            goto process_vq_again;
+        }
+    } else if (!q->unsent_tx) {
+        // Schedule another burst
         qemu_bh_schedule(q->tx_bh);
-        q->tx_waiting = 1;
     } else {
-        q->tx_waiting = 0;
+        // do nothing and wait for virtio_wifi_tx_complete
     }
 }
 
@@ -393,8 +404,7 @@ static void virtio_wifi_device_realize(DeviceState* dev, Error** errp) {
         n->vqs[index].tx_bh = qemu_bh_new(virtio_wifi_tx_bh, &n->vqs[index]);
         n->vqs[index].rx = virtio_add_queue(
                 vdev, VIRTIO_WIFI_RX_QUEUE_DEFAULT_SIZE, virtio_wifi_handle_rx);
-        n->vqs[index].tx_waiting = 0;
-        n->vqs[index].async_tx.elem = nullptr;
+        n->vqs[index].unsent_tx = nullptr;
     }
     n->tx_burst = kTXBurst;
 
@@ -411,6 +421,11 @@ static void virtio_wifi_device_unrealize(DeviceState* dev, Error** errp) {
     VirtIODevice* vdev = VIRTIO_DEVICE(dev);
     VirtIOWifi* n = VIRTIO_WIFI(dev);
     for (size_t index = 0; index < kQueueSize; index++) {
+        if (n->vqs[index].unsent_tx) {
+            virtio_consume_vqelem(n->vqs[index].tx,
+                                  n->vqs[index].unsent_tx, 0);
+        }
+
         virtio_del_queue(vdev, index * 2 + 0);
         virtio_del_queue(vdev, index * 2 + 1);
         qemu_bh_delete(n->vqs[index].tx_bh);
@@ -455,9 +470,10 @@ static void virtio_wifi_set_status(VirtIODevice* vdev, uint8_t status) {
         VirtIOWifiQueue* q = &n->vqs[i];
         if (virtio_wifi_started(n, status)) {
             qemu_bh_schedule(q->tx_bh);
-        }
-        else {
+        } else {
             qemu_bh_cancel(q->tx_bh);
+            virtio_queue_set_notification(q->tx, 1);
+
             if (status & VIRTIO_CONFIG_S_DRIVER_OK &&
                 vdev->vm_running) {
             }
