@@ -40,6 +40,7 @@ std::string sCmdlLine;
 LanguageSettings s_languageSettings = {0};
 AUserConfig* s_userConfig = nullptr;
 bool sKeyCodeForwarding = false;
+bool sEnforceKeyCodeForwarding = false;
 
 // /* this indicates that guest has mounted data partition */
 int s_guest_data_partition_mounted = 0;
@@ -88,7 +89,10 @@ static const QAndroidGlobalVarsAgent globalVarsAgent = {
         .android_snapshot_update_timer =
                 []() { return s_android_snapshot_update_timer; },
         .language = []() { return &s_languageSettings; },
-        .use_keycode_forwarding = []() { return sKeyCodeForwarding; },
+        .use_keycode_forwarding =
+                []() {
+                    return sEnforceKeyCodeForwarding || sKeyCodeForwarding;
+                },
         .userConfig = []() { return s_userConfig; },
         .android_cmdLineOptions = []() { return sAndroid_cmdLineOptions; },
         .inject_cmdLineOptions =
@@ -111,6 +115,8 @@ static const QAndroidGlobalVarsAgent globalVarsAgent = {
         .inject_userConfig = [](AUserConfig* config) { s_userConfig = config; },
         .set_keycode_forwarding =
                 [](bool enabled) { sKeyCodeForwarding = enabled; },
+        .set_enforce_keycode_forwarding =
+                [](bool enabled) { sEnforceKeyCodeForwarding = enabled; },
         .inject_AvdInfo = [](AvdInfo* avd) { sAndroid_avdInfo = avd; },
 
         // /* this indicates that guest has mounted data partition */

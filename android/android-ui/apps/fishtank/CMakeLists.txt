@@ -97,6 +97,65 @@ target_link_libraries(
 # Include the current directory for headers
 target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+prebuilt(QT5)
+android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
+
+# We use EXCLUDE_FROM_ALL on these install rules to ensure that fishtank and its
+# dependencies are NOT included in the default emulator distribution.
+# This allows fishtank to be deployed exclusively to its isolated standalone
+# directory (objs/distribution-fishtank) during the specialized build phase.
+install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
+
+if(LINUX_X86_64)
+  set(FISHTANK_ADDITIONAL_SHARED_LIBS
+      emugl_common
+      android-emu-tracing
+      android-emu-metrics
+      android-emu-curl
+      android-emu-agents
+      android-emu-protos
+      android-emu-base-logging
+      glib2_linux-x86_64
+      libprotobuf
+      abseil_dll
+  )
+
+  foreach(dep ${FISHTANK_ADDITIONAL_SHARED_LIBS})
+    install(TARGETS ${dep} RUNTIME DESTINATION fishtank/lib64 LIBRARY DESTINATION fishtank/lib64 COMPONENT fishtank EXCLUDE_FROM_ALL)
+  endforeach()
+
+  # Install RUNTIME_OS_DEPENDENCIES (like libc++.so)
+  foreach(dep ${RUNTIME_OS_DEPENDENCIES})
+    string(REPLACE ">" ";" SRC_DST ${dep})
+    list(GET SRC_DST 0 SRC)
+    list(GET SRC_DST 1 DST)
+    get_filename_component(DST_DIR ${DST} DIRECTORY)
+    get_filename_component(REAL_SRC ${SRC} REALPATH)
+    get_filename_component(DST_NAME ${DST} NAME)
+    install(FILES ${REAL_SRC} DESTINATION fishtank/${DST_DIR} RENAME ${DST_NAME} COMPONENT fishtank EXCLUDE_FROM_ALL)
+  endforeach()
+endif()
+
+foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
+  if(qt_dep MATCHES ".*>>.*")
+    string(REPLACE ">>" ";" SRC_DST ${qt_dep})
+    list(GET SRC_DST 0 SRC)
+    list(GET SRC_DST 1 DST)
+    if (SRC MATCHES ".*\\*.*")
+      file(GLOB GLOBBED_FILES ${SRC})
+      install(FILES ${GLOBBED_FILES} DESTINATION fishtank/${DST} COMPONENT fishtank EXCLUDE_FROM_ALL)
+    else()
+      install(DIRECTORY ${SRC} DESTINATION fishtank/${DST} COMPONENT fishtank EXCLUDE_FROM_ALL)
+    endif()
+  else()
+    string(REPLACE ">" ";" SRC_DST ${qt_dep})
+    list(GET SRC_DST 0 SRC)
+    list(GET SRC_DST 1 DST)
+    get_filename_component(DST_DIR ${DST} DIRECTORY)
+    install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+  endif()
+endforeach()
+
 android_add_test(
   TARGET fishtank_unittests
   SRC grpc/FishtankGrpcServer_unittest.cpp grpc/FishtankGrpcServer.cpp)

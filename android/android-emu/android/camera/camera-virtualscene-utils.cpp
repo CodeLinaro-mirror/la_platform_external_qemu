@@ -123,6 +123,10 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
 bool RenderedCameraDevice::initializeEgl() {
     mEglDispatch = (const EGLDispatch*)android_getEGLDispatch();
     mGles2 = (const GLESv2Dispatch*)android_getGLESv2Dispatch();
+    if (!mEglDispatch || !mGles2) {
+        LOG(ERROR) << "initializeEgl failed, cannot get GL dispatch.";
+        return false;
+    }
     mEglDisplay = mEglDispatch->eglGetDisplay(EGL_DEFAULT_DISPLAY);
 
     if (mEglDisplay == EGL_NO_DISPLAY) {

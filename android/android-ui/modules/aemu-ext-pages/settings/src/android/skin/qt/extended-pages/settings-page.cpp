@@ -990,7 +990,7 @@ void SettingsPage::on_set_enforceKeycodeForwarding_toggled(bool checked) {
               "and sent to guest AVD as is.");
     }
     saveEnforceKeycodeForwarding(checked);
-    getConsoleAgents()->settings->set_keycode_forwarding(checked);
+    getConsoleAgents()->settings->set_enforce_keycode_forwarding(checked);
 }
 
 void SettingsPage::disableForEmbeddedEmulator() {
