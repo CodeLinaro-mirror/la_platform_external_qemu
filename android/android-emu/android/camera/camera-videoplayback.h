@@ -16,6 +16,9 @@
 
 #pragma once
 
+// TODO(virtualscene): implement videoplayback mode and remove
+// USE_LEGACY_VIDEOPLAYBACK_CAMERA code
+#ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 /*
  * Contains declarations for video playback camera API that is used by the
  * camera emulator.
@@ -97,3 +100,5 @@ int camera_videoplayback_read_frame(CameraDevice* cd,
 void camera_videoplayback_close(CameraDevice* cd);
 
 ANDROID_END_HEADER
+
+#endif //USE_LEGACY_VIDEOPLAYBACK_CAMERA

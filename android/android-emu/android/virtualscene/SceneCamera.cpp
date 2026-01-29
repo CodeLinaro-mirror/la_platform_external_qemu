@@ -119,6 +119,14 @@ glm::mat4 SceneCamera::getViewProjection() const {
     return mProjection * mViewFromWorld;
 }
 
+const glm::mat4& SceneCamera::getView() const {
+    return mViewFromWorld;
+}
+
+const glm::mat4& SceneCamera::getProjection() const {
+    return mProjection;
+}
+
 int64_t SceneCamera::getTimestamp() const {
     return mLastUpdateTime;
 }

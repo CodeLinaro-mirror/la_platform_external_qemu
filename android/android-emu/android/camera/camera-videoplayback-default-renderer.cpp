@@ -16,6 +16,7 @@
 
 #include "android/camera/camera-videoplayback-default-renderer.h"
 
+#ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 #include "aemu/base/async/ThreadLooper.h"
 #include "aemu/base/Log.h"
 #include "host-common/AndroidAsyncMessagePipe.h"
@@ -94,3 +95,5 @@ int64_t DefaultFrameRenderer::render() {
 
 }  // namespace videoplayback
 }  // namespace android
+
+#endif //USE_LEGACY_VIDEOPLAYBACK_CAMERA

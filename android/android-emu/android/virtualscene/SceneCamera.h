@@ -49,6 +49,12 @@ public:
     // Get the timestamp when the camera was last updated.
     int64_t getTimestamp() const;
 
+    // Get the view matrix for the current frame.
+    const glm::mat4& getView() const;
+
+    // Get the projection matrix for the current frame.
+    const glm::mat4& getProjection() const;
+
 private:
     int64_t mLastUpdateTime = 0;
 

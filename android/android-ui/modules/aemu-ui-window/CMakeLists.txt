@@ -2,7 +2,7 @@ android_qt_lib(
   TARGET aemu-ui-window
   # SHARED
   ALIAS ui::window
-  SRC android/emulator-window.c android/main-common-ui.c android/resource.c
+  SRC android/emulator-environment.cpp android/emulator-window.c android/main-common-ui.c android/resource.c
       android/skin/ui.c android/skin/user-config.c android/skin/window.c
   DEPS aemu-gl-init
        aemu-gl-init
@@ -18,7 +18,12 @@ android_qt_lib(
        android-emu-utils
        qemu-host-common-headers
        png
+       gfxstream_glm_headers
+       webrtc-yuv
        ui::common)
+
+target_compile_definitions(aemu-ui-window PRIVATE "-D_LIBCPP_VERSION=__GLIBCPP__")
+
 target_include_directories(
   aemu-ui-window
   PRIVATE

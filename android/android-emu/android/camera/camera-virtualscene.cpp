@@ -33,33 +33,12 @@
 
 using namespace gfxstream::host::gl;
 
-namespace android {
-namespace virtualscene {
-
-class VirtualSceneRenderer : public CameraRenderer {
-public:
-    VirtualSceneRenderer() = default;
-    ~VirtualSceneRenderer() = default;
-    bool initialize(const GLESv2Dispatch* gles2,
-                    int width,
-                    int height) override {
-        return VirtualSceneManager::initialize(gles2, width, height);
-    }
-    void uninitialize() override { VirtualSceneManager::uninitialize(); }
-    int64_t render() override { return VirtualSceneManager::render(); }
-};
-
-}  // namespace virtualscene
-}  // namespace android
-
-
 /*******************************************************************************
  *                     CameraDevice API
  ******************************************************************************/
 
 using android::virtualscene::RenderedCameraDevice;
 using android::virtualscene::VirtualSceneManager;
-using android::virtualscene::VirtualSceneRenderer;
 
 static RenderedCameraDevice* toRenderedCameraDevice(CameraDevice* ccd) {
     if (!ccd || !ccd->opaque) {
@@ -78,9 +57,8 @@ uint32_t camera_virtualscene_preferred_format() {
 }
 
 CameraDevice* camera_virtualscene_open(const char* name, int inp_channel) {
-    RenderedCameraDevice* cd = new RenderedCameraDevice(
-        std::unique_ptr<VirtualSceneRenderer>(new VirtualSceneRenderer()));
-    return cd ? cd->getCameraDevice() : nullptr;
+    RenderedCameraDevice* cd = new RenderedCameraDevice(name);
+    return cd->getCameraDevice();
 }
 
 int camera_virtualscene_start_capturing(CameraDevice* ccd,

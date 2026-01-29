@@ -64,8 +64,6 @@ std::unique_ptr<Scene> Scene::create(Renderer& renderer) {
 bool Scene::initialize() {
     CameraMetrics::instance().setVirtualSceneName(kObjFiles[0]);
 
-    mCamera.setAspectRatio(mRenderer.getAspectRatio());
-
     for (const char* objFile : kObjFiles) {
         std::unique_ptr<MeshSceneObject> sceneObject =
                 MeshSceneObject::load(mRenderer, objFile);
@@ -76,6 +74,8 @@ bool Scene::initialize() {
         mSceneObjects.push_back(
                 std::move(static_unique_cast<SceneObject>(sceneObject)));
     }
+
+    mObjectsVersion++;
 
     return true;
 }
@@ -91,25 +91,25 @@ void Scene::releaseResources() {
             poster.second.sceneObject.reset();
         }
     }
+
+    mObjectsVersion++;
 }
 
-const SceneCamera& Scene::getCamera() const {
-    return mCamera;
-}
-
-int64_t Scene::update() {
-    mCamera.update();
+void Scene::update() {
     for (auto& poster : mPosters) {
         poster.second.sceneObject->update();
     }
-
-    return mCamera.getTimestamp();
 }
 
-std::vector<RenderableObject> Scene::getRenderableObjects() const {
+uint64_t Scene::getVersionHashForView(const RendererView* /*lockedView*/) const {
+    // TODO(virtualscene): check if the objects inside the view frustum includes
+    // any changes/animations
+    return mObjectsVersion;
+}
+
+std::vector<RenderableObject> Scene::getRenderableObjects(const glm::mat4& viewProjection) const {
     std::vector<RenderableObject> renderables;
 
-    const glm::mat4 viewProjection = getCamera().getViewProjection();
     for (auto& sceneObject : mSceneObjects) {
         getRenderableObjectsFromSceneObject(viewProjection, sceneObject.get(),
                                             renderables);
@@ -172,6 +172,8 @@ bool Scene::loadPoster(const char* posterName,
     poster.sceneObject->setTexture(
             poster.texture.isValid() ? poster.texture : poster.defaultTexture);
 
+    mObjectsVersion++;
+
     return true;
 }
 
@@ -184,6 +186,8 @@ void Scene::updatePosterScale(const char* posterName, float scale) {
 
     PosterStorage& poster = it->second;
     poster.sceneObject->setScale(scale);
+
+    mObjectsVersion++;
 }
 
 void Scene::getRenderableObjectsFromSceneObject(

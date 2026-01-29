@@ -752,11 +752,11 @@ private:
 
     void videoplaybackcameraSetup(const char* dir, int sensor_orientation) {
         static const CameraInfoVtbl vtbl = {
-            .open = &camera_videoplayback_open,
-            .start_capturing = &camera_videoplayback_start_capturing,
-            .read_frame = &camera_videoplayback_read_frame,
-            .stop_capturing = &camera_videoplayback_stop_capturing,
-            .close = &camera_videoplayback_close,
+            .open = &camera_virtualscene_open,
+            .start_capturing = &camera_virtualscene_start_capturing,
+            .read_frame = &camera_virtualscene_read_frame,
+            .stop_capturing = &camera_virtualscene_stop_capturing,
+            .close = &camera_virtualscene_close,
             .camera_source = kVideoPlayback,
         };
 
@@ -764,7 +764,10 @@ private:
                 {640, 480},
                 {352, 288},
                 {320, 240},
-                {176, 144},
+                // Our RGB to YUV converter produces a broken image
+                // for 176x144 and even writes outside of the image
+                // memory range.
+                //{176, 144},
                 {1280, 720},
                 {1280, 960}};
 
@@ -780,7 +783,7 @@ private:
         ci.display_name = ASTRDUP("videoplayback");
         ci.device_name = ASTRDUP("videoplayback");
         ci.inp_channel = 0;
-        ci.pixel_format = camera_videoplayback_preferred_format();
+        ci.pixel_format = camera_virtualscene_preferred_format();
         ci.direction = ASTRDUP(dir);
         ci.orientation = sensor_orientation;
         ci.in_use = 0;
