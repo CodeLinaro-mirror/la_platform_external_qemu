@@ -28,6 +28,16 @@ android_add_executable(
       grpc/FishtankGrpcServer.cpp
       main.cpp)
 
+if(APPLE)
+  # Override the default RPATH to match the standalone distribution layout
+  android_target_properties(fishtank all "INSTALL_RPATH=@executable_path/lib64")
+  android_target_properties(fishtank all "INSTALL_RPATH>=@executable_path/lib64/qt/lib")
+  android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path")
+  android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path/lib64")
+  android_target_properties(fishtank all "BUILD_WITH_INSTALL_RPATH=ON")
+  android_target_properties(fishtank all "INSTALL_RPATH_USE_LINK_PATH=ON")
+endif()
+
 protobuf_generate_grpc_cpp(
   SOURCE_DIR ${AEMU_PROTO_DIR}
   SOURCES services/forwarder/service_forwarder.proto
@@ -106,7 +116,7 @@ android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 # directory (objs/distribution-fishtank) during the specialized build phase.
 install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
 
-if(LINUX_X86_64)
+if(LINUX_X86_64 OR APPLE)
   set(FISHTANK_ADDITIONAL_SHARED_LIBS
       emugl_common
       android-emu-tracing
@@ -115,7 +125,7 @@ if(LINUX_X86_64)
       android-emu-agents
       android-emu-protos
       android-emu-base-logging
-      glib2_linux-x86_64
+      glib2_${ANDROID_TARGET_TAG}
       libprotobuf
       abseil_dll
   )
