@@ -2773,6 +2773,11 @@ extern "C" int main(int argc, char** argv) {
 #else
     const bool isAppleArm = false;
 #endif
+#ifdef _WIN32
+    const bool isWindows = true;
+#else
+    const bool isWindows = false;
+#endif
 
     // XR specific feature overrides
     const AvdFlavor avdFlavor = avdInfo_getAvdFlavor(avd);
@@ -2788,10 +2793,16 @@ extern "C" int main(int argc, char** argv) {
         }
     }
 
+    // TODO(b/478015595): XR AVDs have flickering issues on Windows when vulkan
+    // composition is enabled
+    const bool autoEnableVkComposition = !isXrAvd || !isWindows;
+
     // When GuestAngle is used, Vulkan host composition can be automatically
     // enabled on currently supported platforms and device types to get better
-    // performance. Use '-feature -VulkanNativeSwapchain' to disable this behavior.
-    if (fc::isEnabled(fc::GuestAngle) && !fc::isEnabled(fc::VulkanNativeSwapchain)) {
+    // performance. Use '-feature -VulkanNativeSwapchain' to disable this
+    // behavior.
+    if (autoEnableVkComposition && fc::isEnabled(fc::GuestAngle) &&
+        !fc::isEnabled(fc::VulkanNativeSwapchain)) {
         // This will auto enable on XR where we use GuestAngle by default.
         // For gphone images, GuestAngle will become default with minigbm later.
         fc::setIfNotOverriden(fc::VulkanNativeSwapchain, true);
