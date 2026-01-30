@@ -92,6 +92,8 @@ typedef enum {
     kKeyCodeAltRight = LINUX_KEY_RIGHTALT,
     kKeyCodeCapLeft = LINUX_KEY_LEFTSHIFT,
     kKeyCodeCapRight = LINUX_KEY_RIGHTSHIFT,
+    kKeyCodeMetaLeft = LINUX_KEY_LEFTMETA,
+    kKeyCodeMetaRight = LINUX_KEY_RIGHTMETA,
     kKeyCodeTab = LINUX_KEY_TAB,
     kKeyCodeSpace = LINUX_KEY_SPACE,
     kKeyCodeSym = LINUX_KEY_COMPOSE,

@@ -124,6 +124,7 @@ SkinKeyCode skin_keycode_rotate(SkinKeyCode code, int  rotation) {
     _KEYSYM_(END, End)                    \
     _KEYSYM_(PAGEUP, PageUp)              \
     _KEYSYM_(PAGEDOWN, PageDown)          \
+    _KEYSYM_(LEFTMETA, Meta)              \
     _KEYSYM1_(F1)                         \
     _KEYSYM1_(F2)                         \
     _KEYSYM1_(F3)                         \

@@ -505,6 +505,10 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         mToolsUi->next_layout_button->setHidden(true);
     }
 
+    if (!avdInfo_isDesktopApi36OrHigher(avdInfo)) {
+        mToolsUi->meta_button->setHidden(true);
+    }
+
     if (getConsoleAgents()->settings->android_cmdLineOptions()->fuchsia) {
         // These don't apply to Fuchsia
         mToolsUi->prev_layout_button->setHidden(true);
@@ -816,6 +820,7 @@ bool ToolWindow::needExtendedWindow(QtUICommand cmd) const {
         case QtUICommand::HOME:
         case QtUICommand::BACK:
         case QtUICommand::OVERVIEW:
+        case QtUICommand::META:
         case QtUICommand::POWER:
         case QtUICommand::TAKE_SCREENSHOT:
         case QtUICommand::VOLUME_DOWN:
@@ -1065,6 +1070,9 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             break;
         case QtUICommand::OVERVIEW:
             forwardKeyToEmulator(ANDROID_KEY_APPSWITCH, down);
+            break;
+        case QtUICommand::META:
+            forwardKeyToEmulator(LINUX_KEY_LEFTMETA, down);
             break;
         case QtUICommand::WEAR_1:
             forwardKeyToEmulator(LINUX_KEY_HOME, down);
@@ -2017,6 +2025,16 @@ void ToolWindow::on_overview_button_pressed() {
 void ToolWindow::on_overview_button_released() {
     mEmulatorWindow->activateWindow();
     handleUICommand(QtUICommand::OVERVIEW, false);
+}
+
+void ToolWindow::on_meta_button_pressed() {
+    mEmulatorWindow->raise();
+    handleUICommand(QtUICommand::META, true);
+}
+
+void ToolWindow::on_meta_button_released() {
+    mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::META, false);
 }
 
 void ToolWindow::on_wear_button_1_pressed() {
