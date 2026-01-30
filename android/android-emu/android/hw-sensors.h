@@ -411,6 +411,7 @@ void* android_get_posture_listener();
 void* android_get_xr_options_publisher();
 bool android_is_xr_vst_headset_mode();
 bool android_is_xr_glasses_mode();
+bool android_is_xr_mode();
 
 enum XrInputMode {
     XR_INPUT_MODE_UNKNOWN = 0,

@@ -1440,6 +1440,10 @@ bool android_is_xr_glasses_mode() {
     return fc::isEnabled(fc::XrModeGlassesUI);
 }
 
+bool android_is_xr_mode() {
+    return android_is_xr_vst_headset_mode() || android_is_xr_glasses_mode();
+}
+
 bool android_foldable_any_folded_area_configured() {
     for (int i = 0; i < ANDROID_FOLDABLE_MAX_DISPLAY_REGIONS; i++) {
         if (android_foldable_folded_area_configured(i)) {
