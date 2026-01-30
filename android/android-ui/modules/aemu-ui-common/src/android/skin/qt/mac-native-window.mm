@@ -62,3 +62,11 @@ const char* keyboard_host_layout_name_macImpl() {
             inputSource, kTISPropertyInputSourceID);
     return [inputSourceID UTF8String];
 }
+
+void mac_hide_cursor() {
+    [NSCursor hide];
+}
+
+void mac_show_cursor() {
+    [NSCursor unhide];
+}

@@ -334,6 +334,13 @@ public:
     bool paintMultiDisplayWindow(uint32_t id, uint32_t texture);
     void setRelativeMouseCoordMode(bool state);
 
+#ifdef __APPLE__
+    // b/476267783: On Mac, override the default Qt methods to hide cursors
+    // using the native NSCursor API when appropriate.
+    void grabMouse(const QCursor& cursor);
+    void releaseMouse();
+#endif
+
     static bool sClosed;
 
 public slots:
@@ -631,6 +638,11 @@ private:
     SkinRotation mOrientation;  // Rotation of the main window
     bool mWindowIsMinimized = false;
     bool mRelativeMouseCoordMode = true;
+
+#ifdef __APPLE__
+    // See grabMouse/releaseMouse.
+    bool mIsCursorHidden = false;
+#endif
 
     QScreen* mCurrentScreen = nullptr;
     SkinEvent createSkinEventScreenChanged();

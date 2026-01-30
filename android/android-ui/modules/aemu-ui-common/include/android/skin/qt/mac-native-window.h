@@ -21,5 +21,7 @@ int numHeldMouseButtons();
 void nsWindowAdopt(void *parent, void *child);
 bool isOptionKeyHeld();
 const char* keyboard_host_layout_name_macImpl();
+void mac_hide_cursor();
+void mac_show_cursor();
 
 ANDROID_END_HEADER
