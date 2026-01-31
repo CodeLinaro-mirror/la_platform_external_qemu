@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 android_add_library(
   TARGET emulator-murmurhash LICENSE None SRC # cmake-format: sortable

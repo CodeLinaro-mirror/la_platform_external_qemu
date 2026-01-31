@@ -16,6 +16,7 @@ import os
 import platform
 import shutil
 import sys
+import sysconfig
 from pathlib import Path
 from typing import List
 
@@ -90,9 +91,8 @@ class ConfigureTask(BuildTask):
 
         self.add_option(
             "CMAKE_TOOLCHAIN_FILE", self.toolchain.cmake_toolchain()
-        ).add_option("OPTION_SDK_TOOLS_BUILD_NUMBER", build_number).add_option(
-            "Python_EXECUTABLE", sys.executable
         )
+        self.add_option("OPTION_SDK_TOOLS_BUILD_NUMBER", build_number)
 
         if webengine:
             self.with_webengine()
@@ -123,8 +123,14 @@ class ConfigureTask(BuildTask):
 
         self.add_option("OPTION_TEST_LOGS", self.log_dir.absolute())
 
+        # Make sure we don't get stuck in puthon discovery
+        self.add_option("Python3_EXECUTABLE", sys.executable)
+        self.add_option("Python3_LIBRARY", sysconfig.get_config_var('LIBDIR'))
+        self.add_option("Python3_INCLUDE_DIR",sysconfig.get_path('include'))
+
         self.with_features(aosp, features)
         self.with_options(options)
+
 
     def add_option(self, key: str, val: str):
         """
