@@ -217,14 +217,42 @@ int main(int argc, char* argv[]) {
         derror("Could not start renderer");
     }
 
-    // LOG(FATAL) <<
-    auto base = pj(androidQtGetLibraryDir(64, nullptr), "..");
-    // System::get()->getEnvironmentVariable("QT_QPA_PLATFORM_PLUGIN_PATH");
-    System::get()->setEnvironmentVariable("QTWEBENGINEPROCESS_PATH",
-                                          pj(base, "libexec"));
+    // Set Environment variables that get picked up by qt_path.cpp, which in turn, will set
+    // environment variables for Qt to determine the path to the plugins, qtwebengine stuff, etc.
+    auto program_dir = System::get()->getProgramDirectory();
+    auto qt_base_dir = pj({program_dir, "lib64", "qt"});
+#ifdef _WIN32
+    // For windows, we install all the Qt core dlls into the same directory with fishtank.exe.
+    auto qt_lib_path = program_dir;
+    // QtWebEngineProcess.exe lives in qt/bin.
+    auto qt_process_path = pj({qt_base_dir, "bin", "QtWebEngineProcess.exe"});
+#else
+    // For mac/linux, Qt core libraries installed at lib64/qt/lib.
+    auto qt_lib_path = pj(qt_base_dir, "lib");
+    // QtWebEngineProcess lives in qt/libexec.
+    auto qt_process_path = pj({qt_base_dir, "libexec", "QtWebEngineProcess"});
+#endif
+    auto qt_plugin_path = pj(qt_base_dir, "plugins");
+    auto qt_resources_path = pj(qt_base_dir, "resources");
+    auto qt_locales_path =
+            pj({qt_base_dir, "translations", "qtwebengine_locales"});
 
+    System::get()->setEnvironmentVariable("ANDROID_QT_LIB_PATH", qt_lib_path);
+    System::get()->setEnvironmentVariable("QTWEBENGINEPROCESS_PATH",
+                                          qt_process_path);
+    System::get()->setEnvironmentVariable("ANDROID_QT_QPA_PLATFORM_PLUGIN_PATH",
+                                          qt_plugin_path);
     System::get()->setEnvironmentVariable("QTWEBENGINE_RESOURCES_PATH",
-                                          pj(base, "resources"));
+                                          qt_resources_path);
+    System::get()->setEnvironmentVariable("QTWEBENGINE_LOCALES_PATH",
+                                          qt_locales_path);
+
+    LOG(INFO) << "Setting ANDROID_QT_LIB_PATH to: " << qt_lib_path;
+    LOG(INFO) << "Setting QTWEBENGINEPROCESS_PATH to: " << qt_process_path;
+    LOG(INFO) << "Setting ANDROID_QT_QPA_PLATFORM_PLUGIN_PATH to: "
+              << qt_plugin_path;
+    LOG(INFO) << "Setting QTWEBENGINE_RESOURCES_PATH to: " << qt_resources_path;
+    LOG(INFO) << "Setting QTWEBENGINE_LOCALES_PATH to: " << qt_locales_path;
 
     skin_winsys_init_args(qt_argc, &qt_argv);
     if (!emulator_initUserInterface(opts, &uiEmuAgent)) {
