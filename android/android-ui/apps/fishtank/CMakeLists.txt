@@ -116,7 +116,7 @@ android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 # directory (objs/distribution-fishtank) during the specialized build phase.
 install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
 
-if(LINUX_X86_64 OR APPLE)
+if(NOT LINUX_AARCH64)
   set(FISHTANK_ADDITIONAL_SHARED_LIBS
       emugl_common
       android-emu-tracing
@@ -131,7 +131,23 @@ if(LINUX_X86_64 OR APPLE)
   )
 
   foreach(dep ${FISHTANK_ADDITIONAL_SHARED_LIBS})
-    install(TARGETS ${dep} RUNTIME DESTINATION fishtank/lib64 LIBRARY DESTINATION fishtank/lib64 COMPONENT fishtank EXCLUDE_FROM_ALL)
+    if(WINDOWS_MSVC_X86_64)
+      # On Windows, we want the DLLs in the root. Some targets might not be
+      # correctly handled by install(TARGETS) if they are defined elsewhere
+      # as shared but not marked for installation in this component.
+      # We use the generator expression to get the actual DLL path.
+      install(FILES $<TARGET_FILE:${dep}> DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
+    else()
+      # On Linux/MacOS, install libraries to fishtank/lib64 directory.
+      install(
+        TARGETS ${dep}
+        RUNTIME
+        DESTINATION fishtank/lib64
+        LIBRARY
+        DESTINATION fishtank/lib64
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
+    endif()
   endforeach()
 
   # Install RUNTIME_OS_DEPENDENCIES (like libc++.so)
@@ -142,8 +158,42 @@ if(LINUX_X86_64 OR APPLE)
     get_filename_component(DST_DIR ${DST} DIRECTORY)
     get_filename_component(REAL_SRC ${SRC} REALPATH)
     get_filename_component(DST_NAME ${DST} NAME)
-    install(FILES ${REAL_SRC} DESTINATION fishtank/${DST_DIR} RENAME ${DST_NAME} COMPONENT fishtank EXCLUDE_FROM_ALL)
+    if(WINDOWS_MSVC_X86_64)
+      # On windows we usually just install in the root.
+      install(
+        FILES ${REAL_SRC}
+        DESTINATION fishtank
+        RENAME ${DST_NAME}
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
+    else()
+      install(
+        FILES ${REAL_SRC}
+        DESTINATION fishtank/${DST_DIR}
+        RENAME ${DST_NAME}
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
+    endif()
   endforeach()
+
+  if(WINDOWS_MSVC_X86_64)
+    # Include MSVC runtime dependencies
+    prebuilt(MSVC)
+    foreach(dep ${MSVC_DEPENDENCIES})
+      string(REPLACE ">" ";" SRC_DST ${dep})
+      list(GET SRC_DST 0 SRC)
+      list(GET SRC_DST 1 DST)
+      # MSVC dependencies are usually defined as path/to/dll>./dll
+      # We just want them in the fishtank root.
+      get_filename_component(DST_NAME ${DST} NAME)
+      install(
+        FILES ${SRC}
+        DESTINATION fishtank
+        RENAME ${DST_NAME}
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
+    endforeach()
+  endif()
 endif()
 
 foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
@@ -153,7 +203,11 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
     list(GET SRC_DST 1 DST)
     if (SRC MATCHES ".*\\*.*")
       file(GLOB GLOBBED_FILES ${SRC})
-      install(FILES ${GLOBBED_FILES} DESTINATION fishtank/${DST} COMPONENT fishtank EXCLUDE_FROM_ALL)
+      install(
+        FILES ${GLOBBED_FILES}
+        DESTINATION fishtank/${DST}
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
     else()
       install(DIRECTORY ${SRC} DESTINATION fishtank/${DST} COMPONENT fishtank EXCLUDE_FROM_ALL)
     endif()
@@ -162,7 +216,21 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
     list(GET SRC_DST 0 SRC)
     list(GET SRC_DST 1 DST)
     get_filename_component(DST_DIR ${DST} DIRECTORY)
-    install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+    if(WINDOWS_MSVC_X86_64)
+      # On Windows, the DLLs must be next to the executable.
+      # Plugins and resources can stay in their subdirectories,
+      # but core DLLs like Qt6Core must be findable by the OS loader.
+      # We can identify core DLLs because they are installed in lib64/qt/lib.
+      if(SRC MATCHES ".*\\.dll$" AND DST MATCHES "lib64/qt/lib/.*")
+        install(FILES ${SRC} DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
+      else()
+        install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+      endif()
+    else()
+      # On Linux/MacOS, the Qt installation rules defined in emu-qt5-config.cmake don't need any
+      # modification.
+      install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+    endif()
   endif()
 endforeach()
 

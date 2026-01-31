@@ -119,7 +119,7 @@ class DistributionTask(BuildTask):
 
         # We are creating the fishtank zip on linux-x86_64 and darwin.
         # Windows coming soon!
-        if "windows" not in self.data["target"]:
+        if "linux_aarch64" not in self.data["target"]:
             self.zip_sets["release"].update({
                 # Look for all files under {out}/distribution-fishtank
                 "FISHTANK-sdk-repo-{target}-emu-{sdk_build_number}.zip": [
