@@ -173,6 +173,16 @@ if(NOT LINUX_AARCH64)
         RENAME ${DST_NAME}
         COMPONENT fishtank
         EXCLUDE_FROM_ALL)
+      # We need libc++.so.1 in lib64/qt/lib for linux because QtWebEngineProcess has a dependency
+      # on it, and it has an rpath of $ORIGIN/../lib (lib64/qt/libexec/QtWebEngineProcess).
+      if(LINUX_X86_64 AND (DST_NAME STREQUAL "libc++.so.1" OR DST_NAME STREQUAL "libc++.so"))
+        install(
+          FILES ${REAL_SRC}
+          DESTINATION fishtank/lib64/qt/lib
+          RENAME ${DST_NAME}
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
+      endif()
     endif()
   endforeach()
 
