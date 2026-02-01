@@ -252,6 +252,13 @@ int main(int argc, char* argv[]) {
     auto qt_lib_path = program_dir;
     // QtWebEngineProcess.exe lives in qt/bin.
     auto qt_process_path = pj({qt_base_dir, "bin", "QtWebEngineProcess.exe"});
+    // Prepend the program directory to the PATH so that child processes (like
+    // QtWebEngineProcess) can find the Qt DLLs that are located in the same
+    // directory as the main executable.
+    // We only need to do this for Windows because on linux/mac, we use rpaths.
+    std::string currentPath = system->envGet("PATH");
+    system->setEnvironmentVariable("PATH", program_dir + ";" + currentPath);
+    LOG(INFO) << "Prepended " << program_dir << " to PATH";
 #else
     // For mac/linux, Qt core libraries installed at lib64/qt/lib.
     auto qt_lib_path = pj(qt_base_dir, "lib");
