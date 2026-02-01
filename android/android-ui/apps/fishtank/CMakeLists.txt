@@ -229,7 +229,11 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
     else()
       # On Linux/MacOS, the Qt installation rules defined in emu-qt5-config.cmake don't need any
       # modification.
-      install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+      if(SRC MATCHES "QtWebEngineProcess$")
+        install(PROGRAMS ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+      else()
+        install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+      endif()
     endif()
   endif()
 endforeach()
