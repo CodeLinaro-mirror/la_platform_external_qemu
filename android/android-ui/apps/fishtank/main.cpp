@@ -87,6 +87,32 @@ getGlobalControlClient() {
 
 int main(int argc, char* argv[]) {
     base_configure_logs(kLogDefaultOptions);
+
+    auto system = System::get();
+    std::string launcherDir = system->envGet("ANDROID_EMULATOR_LAUNCHER_DIR");
+    if (launcherDir.empty()) {
+        LOG(WARNING) << "ANDROID_EMULATOR_LAUNCHER_DIR is not defined. You must've started "
+                     << "fishtank as a standalone application. Will try to deduce the launcher "
+                     << "directory from ANDROID_SDK_ROOT.";
+        std::string sdkRoot = system->envGet("ANDROID_SDK_ROOT");
+        if (!sdkRoot.empty()) {
+            // Default to the qemu-now emulator launcher for now.
+            launcherDir = pj(sdkRoot, "emulator");
+            system->setEnvironmentVariable("ANDROID_EMULATOR_LAUNCHER_DIR",
+                                           launcherDir);
+            LOG(INFO) << "Inferred ANDROID_EMULATOR_LAUNCHER_DIR from ANDROID_SDK_ROOT: "
+                      << launcherDir;
+        } else {
+            // ANDROID_EMULATOR_LAUNCHER_DIR is critical to resolve things like the
+            // advancedFeatures.ini and maps.key file. Without those things, fishtank will likely
+            // misbehave, which is why we decide to make it a fatal error.
+            LOG(FATAL) << "Neither ANDROID_EMULATOR_LAUNCHER_DIR nor "
+                          "ANDROID_SDK_ROOT is defined. Cannot start fishtank.";
+        }
+    } else {
+        LOG(INFO) << "Using ANDROID_EMULATOR_LAUNCHER_DIR: " << launcherDir;
+    }
+
     process_early_setup(argc, argv);
     // crashhandler_init(argc, argv);
     async_query_host_gpu_start();
