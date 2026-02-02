@@ -13,13 +13,13 @@
     {
       "target": "qemu-system-aarch64",
       "shims": {
-        "win_def_file": "platform/windows-amd64/qemu-system-aarch64.def"
+        "win_def_file": "google/build/qemu-system-aarch64.def"
       }
     },
     {
       "target": "qemu-system-riscv64",
       "shims": {
-        "win_def_file": "platform/windows-amd64/qemu-system-riscv64.def"
+        "win_def_file": "google/build/qemu-system-riscv64.def"
       }
     },
     {
@@ -28,7 +28,7 @@
         "+deps": [
             ":qemu-system-x86_64_manifest_rc"
         ],
-        "win_def_file": "platform/windows-amd64/qemu-system-x86_64.def"
+        "win_def_file": "google/build/qemu-system-x86_64.def"
       }
     },
     {
