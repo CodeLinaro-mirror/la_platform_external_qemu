@@ -128,6 +128,7 @@ if(NOT LINUX_AARCH64)
       glib2_${ANDROID_TARGET_TAG}
       libprotobuf
       abseil_dll
+      gfxstream_backend
   )
 
   foreach(dep ${FISHTANK_ADDITIONAL_SHARED_LIBS})
@@ -204,6 +205,31 @@ if(NOT LINUX_AARCH64)
         EXCLUDE_FROM_ALL)
     endforeach()
   endif()
+
+  # Install ANGLE_DEPENDENCIES (like libshadertranslator)
+  foreach(dep ${ANGLE_DEPENDENCIES})
+    string(REPLACE ">" ";" SRC_DST ${dep})
+    list(GET SRC_DST 0 SRC)
+    list(GET SRC_DST 1 DST)
+    get_filename_component(DST_DIR ${DST} DIRECTORY)
+    get_filename_component(DST_NAME ${DST} NAME)
+    if(WINDOWS_MSVC_X86_64)
+      # On windows we usually just install in the root.
+      install(
+        FILES ${SRC}
+        DESTINATION fishtank
+        RENAME ${DST_NAME}
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
+    else()
+      install(
+        FILES ${SRC}
+        DESTINATION fishtank/${DST_DIR}
+        RENAME ${DST_NAME}
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
+    endif()
+  endforeach()
 endif()
 
 foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
