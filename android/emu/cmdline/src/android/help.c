@@ -2119,10 +2119,6 @@ static void help_no_mouse_reposition(stralloc_t* out) {
            "  like VNC or Chrome remote desktop.\n");
 }
 
-static void help_guest_angle(stralloc_t* out) {
-    PRINTF(" Enables ANGLE as the guest system GLES driver, using Vulkan to render on the host.\n");
-}
-
 static void help_usb_passthrough(stralloc_t* out) {
     PRINTF("  Pass Through a HOST USB device to the guest.\n"
            "  -usb-passthrough vendorid=VID,productid=PID[,hostbus=BUS,hostport=PORT]\n");

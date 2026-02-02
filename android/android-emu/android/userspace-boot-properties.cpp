@@ -309,11 +309,6 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         }
     }
 
-    if (opts->guest_angle) {
-        derror("Command line option -guest-angle is deprecated and will be "
-               "removed, use '-feature GuestAngle' instead.");
-        fc::setEnabledOverride(fc::GuestAngle, true);
-    }
     if (fc::isEnabled(fc::GuestUsesAngle)) {
         derror("Feature flag 'GuestUsesAngle' is deprecated and will be "
                "removed, use 'GuestAngle' instead.");
