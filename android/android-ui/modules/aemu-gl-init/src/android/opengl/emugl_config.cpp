@@ -497,8 +497,177 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     }
 }
 
+static bool vulkanExtensionSupported(const std::vector<VkExtensionProperties>& currentProps,
+                        const char* wantedExtName) {
+    for (uint32_t i = 0; i < currentProps.size(); ++i) {
+        if (!strcmp(wantedExtName, currentProps[i].extensionName)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool vulkanExtensionsSupported(const std::vector<VkExtensionProperties>& currentProps,
+                        const std::vector<const char*>& wantedExtNames) {
+    for (size_t i = 0; i < wantedExtNames.size(); ++i) {
+        if (!vulkanExtensionSupported(currentProps, wantedExtNames[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Must be kept in sync with 'hasSufficientHwGpu' in hw_gpu_check.cpp
 bool hasSufficientHostVulkanDriver(bool isXrAvd) {
-    //TODO(b/469094646): to be implemented
+    // Allow users and tests to skip compatibility checks
+    if (System::get()->envGet("ANDROID_EMU_SKIP_GPU_CHECKS") == "1") {
+        return true;
+    }
+
+#if defined(__APPLE__) && !defined(__arm64__)
+    const bool isMacIntel = true;
+#else
+    const bool isMacIntel = false;
+#endif
+    if (isMacIntel) {
+        // Host Vulkan is not supported on Mac Intel
+        dwarning("%s: unsupported architecture.", __func__);
+        return false;
+    }
+
+    char* vkVendor = nullptr;
+    int vkMajor = 0;
+    int vkMinor = 0;
+    int vkPatch = 0;
+    uint64_t vkDeviceMemBytes = 0;
+    uint32_t vkDriverVersion = 0;
+    uint64_t vkDeviceMaxAllocationCount = 0;
+    bool externalMemorySupported = false;
+    bool swapchainSupported = false;
+
+    emuglConfig_get_vulkan_hardware_gpu(
+            &vkVendor, &vkMajor, &vkMinor, &vkPatch, &vkDeviceMemBytes,
+            &vkDriverVersion, &vkDeviceMaxAllocationCount,
+            &externalMemorySupported, &swapchainSupported);
+
+    if (!vkVendor) {
+        dwarning("%s: could not detect host Vulkan driver.", __func__);
+        return false;
+    }
+
+    const std::string vendorName = vkVendor;
+    free(vkVendor);
+
+    if (!externalMemorySupported) {
+        dwarning("%s: external memory is not supported.", __func__);
+        return false;
+    }
+
+    bool isLavapipe = (strncmp("llvmpipe", vendorName.c_str(), 8) == 0);
+    if (isLavapipe) {
+        // TODO(b/476996927): Avoid CIE/FDE errors in gpu auto mode, by forcing
+        // the usage of bundled lavapipe driver instead.
+        dwarning("%s: host lavapipe is not supported.", __func__);
+        return false;
+    }
+
+    // TODO(b/381540970): Use servers side flags and deny listings for filtering
+    // GPU compatibility
+    bool isAMD = (strncmp("AMD", vendorName.c_str(), 3) == 0);
+    bool isIntel = (strncmp("Intel", vendorName.c_str(), 5) == 0);
+    bool isNvidia = (strncmp("NVIDIA", vendorName.c_str(), 6) == 0);
+
+    // Use regular VK_API_VERSION encoding to print the version by default.
+    uint32_t driverVersionMajor = VK_API_VERSION_MAJOR(vkDriverVersion);
+    uint32_t driverVersionMinor = VK_API_VERSION_MINOR(vkDriverVersion);
+    uint32_t driverVersionPatch = VK_API_VERSION_PATCH(vkDriverVersion);
+
+    uint32_t minDriverVersionMajor = 0;
+    uint32_t minDriverVersionMinor = 0;
+    uint32_t minVkApiVersionMajor = 1;
+    uint32_t minVkApiVersionMinor = 0;
+    uint32_t minVkApiVersionPatch = 0;
+
+    if (isNvidia) {
+        // Decode Nvidia driver version to make it meaningful to the users
+        // Reference: VulkanDeviceInfo::getDriverVersion() at
+        // https://github.com/SaschaWillems/VulkanCapsViewer/blob/master/vulkanDeviceInfo.cpp
+        // 10 bits = major version (up to r1023)
+        // 8 bits = minor version (up to 255)
+        // 8 bits = secondary branch version/build version (up to 255)
+        // 6 bits = tertiary branch/build version (up to 63)
+        driverVersionMajor = (vkDriverVersion >> 22) & 0x3ff;
+        driverVersionMinor = (vkDriverVersion >> 14) & 0x0ff;
+        driverVersionPatch = (vkDriverVersion >> 6) & 0x0ff;
+
+        // Disallow driver versions below 553.35 as they may cause BSODs
+        // (ref:b/379178011).
+        minDriverVersionMajor = 553;
+        minDriverVersionMinor = 35;
+    } else {
+#if defined(_WIN32)
+        // Based on androidEmuglConfigInit
+        if (isAMD) {
+            // on windows, amd gpu with api 1.2.x does not work
+            // for vulkan, disable it
+            minVkApiVersionMinor = 3;
+        } else if (isIntel) {
+            // intel gpu with api < 1.3.240 does not work
+            // for vulkan, disable it
+            minVkApiVersionMinor = 3;
+            minVkApiVersionPatch = 240;
+        }
+#endif
+#if defined(__linux__)
+        if (isAMD && strcmp("AMD Custom GPU 0405 (RADV VANGOGH)",
+                            vendorName.c_str()) == 0) {
+            dwarning("%s: unsupported GPU model.", __func__);
+            return false;
+        }
+#endif
+    }
+
+    bool isUnsupportedVulkanLevel = false;
+    if (vkMajor < minVkApiVersionMajor) {
+        isUnsupportedVulkanLevel = true;
+    } else if (vkMajor == minVkApiVersionMajor) {
+        if ((vkMinor < minVkApiVersionMinor) ||
+            ((vkMinor == minVkApiVersionMinor) &&
+             (vkPatch < minVkApiVersionPatch))) {
+            isUnsupportedVulkanLevel = true;
+        }
+    }
+    if (isUnsupportedVulkanLevel) {
+        dwarning(
+                "%s: unsupported Vulkan API level (%d.%d.%d, min required: "
+                "%d.%d.%d, vendor: %s)",
+                __func__, vkMajor, vkMinor, vkPatch, minVkApiVersionMajor,
+                minVkApiVersionMinor, minVkApiVersionPatch, vendorName.c_str());
+        return false;
+    }
+
+    if (driverVersionMajor < minDriverVersionMajor ||
+        (driverVersionMajor == minDriverVersionMajor &&
+         driverVersionMinor < minDriverVersionMinor)) {
+        dwarning(
+                "%s: unsupported driver version (%d.%d.%d, min required: "
+                "%d.%d.0, vendor: %s).",
+                __func__, driverVersionMajor, driverVersionMinor,
+                driverVersionPatch, minDriverVersionMajor,
+                minDriverVersionMinor, vendorName.c_str());
+        return false;
+    }
+
+    // If vulkan composition is requested, swapchain extensions must be
+    // supported
+    if (!swapchainSupported && fc::isEnabled(fc::VulkanNativeSwapchain)) {
+        dwarning(
+                "Vulkan composition is requested, but the host Vulkan "
+                "driver does not support Vulkan swapchain features "
+                "required.");
+        return false;
+    }
+
     return true;
 }
 
@@ -590,14 +759,20 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
             GET_VK_INSTANCE_PROC(instance, vkGetPhysicalDeviceProperties);
     auto* pvkGetPhysicalDeviceMemoryProperties =
             GET_VK_INSTANCE_PROC(instance, vkGetPhysicalDeviceMemoryProperties);
-    auto* pvkGetPhysicalDeviceQueueFamilyProperties =
-            GET_VK_INSTANCE_PROC(instance, vkGetPhysicalDeviceQueueFamilyProperties);
+    auto* pvkGetPhysicalDeviceQueueFamilyProperties = GET_VK_INSTANCE_PROC(
+            instance, vkGetPhysicalDeviceQueueFamilyProperties);
+    auto* pvkEnumerateInstanceExtensionProperties = GET_VK_INSTANCE_PROC(
+            instance, vkEnumerateInstanceExtensionProperties);
+    auto* pvkEnumerateDeviceExtensionProperties = GET_VK_INSTANCE_PROC(
+            instance, vkEnumerateDeviceExtensionProperties);
 
 #undef GET_VK_INSTANCE_PROC
 
-    if (!pvkEnumeratePhysicalDevices ||
-        !pvkGetPhysicalDeviceProperties || !pvkDestroyInstance ||
-        !pvkGetPhysicalDeviceMemoryProperties || !pvkGetPhysicalDeviceQueueFamilyProperties) {
+    if (!pvkEnumeratePhysicalDevices || !pvkGetPhysicalDeviceProperties ||
+        !pvkDestroyInstance || !pvkGetPhysicalDeviceMemoryProperties ||
+        !pvkGetPhysicalDeviceQueueFamilyProperties ||
+        !pvkEnumerateInstanceExtensionProperties ||
+        !pvkEnumerateDeviceExtensionProperties) {
         derror("Failed to load Vulkan functions!");
         return false;
     }
@@ -629,6 +804,44 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
         return false;
     }
 
+    std::vector<const char*> externalMemoryDeviceExtensionsRequired = {
+            VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
+            VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+#ifdef _WIN32
+            "VK_KHR_external_memory_win32",
+#elif defined(__APPLE__)
+            "VK_EXT_external_memory_metal",
+#elif defined(__linux__)
+            "VK_KHR_external_memory_fd",
+#endif
+    };
+
+    std::vector<const char*> swapchainInstanceExtensionsRequired = {
+            VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef _WIN32
+            "VK_KHR_win32_surface",
+#elif defined(__APPLE__)
+            "VK_EXT_metal_surface",
+#elif defined(__linux__)
+            "VK_KHR_xcb_surface",
+#endif
+    };
+    std::vector<const char*> swapchainDeviceExtensionsRequired = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    };
+
+    uint32_t instanceExtensionCount = 0;
+    pvkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount,
+                                            nullptr);
+    std::vector<VkExtensionProperties> availableInstanceExtensions(
+            instanceExtensionCount);
+    pvkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount,
+                                            availableInstanceExtensions.data());
+    const bool instanceSupportsSwapchain = vulkanExtensionsSupported(
+            availableInstanceExtensions, swapchainInstanceExtensionsRequired);
+
+    std::vector<VkExtensionProperties> availableDeviceExtensions;
     std::vector<DeviceSupportInfo> deviceInfos(deviceCount);
     for (int i = 0; i < deviceCount; i++) {
         pvkGetPhysicalDeviceProperties(devices[i],
@@ -657,9 +870,25 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
             }
         }
 
-        // TODO(b/469094646): calculate feature support information
-        deviceInfos[i].supportsExternalMemory = true;
-        deviceInfos[i].supportsSwapchain = true;
+        uint32_t deviceExtensionCount = 0;
+        pvkEnumerateDeviceExtensionProperties(devices[i], nullptr,
+                                              &deviceExtensionCount, nullptr);
+        availableDeviceExtensions.resize(deviceExtensionCount);
+        pvkEnumerateDeviceExtensionProperties(devices[i], nullptr,
+                                              &deviceExtensionCount,
+                                              availableDeviceExtensions.data());
+
+        // Check if external memory extensions are supported
+        deviceInfos[i].supportsExternalMemory = vulkanExtensionsSupported(
+                availableDeviceExtensions,
+                externalMemoryDeviceExtensionsRequired);
+
+        // Check if swapchain extensions are supported, support is required for
+        // vulkan composition
+        deviceInfos[i].supportsSwapchain =
+                instanceSupportsSwapchain &&
+                vulkanExtensionsSupported(availableDeviceExtensions,
+                                          swapchainDeviceExtensionsRequired);
 
         // Put the GPU information into the logs to be able to track down any
         // errors more easily
@@ -805,12 +1034,17 @@ bool emuglConfig_init(EmuglConfig* config,
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
     if (gles_mode_selected == "auto") {
-        bool switchToSoftwareGles = no_window;
+        bool switchToSoftwareGles = false;
 #ifdef __APPLE__
         // TODO(b/479126903): New macOS system update leaks memory when host
-        // OpenGL driver is used, use software rendering for GL
+        // OpenGL driver is used, always use software rendering for GL
         switchToSoftwareGles = true;
+#else
+        if (no_window || async_query_host_gpu_blacklisted()) {
+            switchToSoftwareGles = true;
+        }
 #endif
+
         if (switchToSoftwareGles) {
             gles_mode_selected = "swangle";
         } else {
