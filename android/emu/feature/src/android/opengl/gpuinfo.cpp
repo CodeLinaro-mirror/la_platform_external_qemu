@@ -140,7 +140,6 @@ bool GpuInfoList::hasGpu() {
 
 void GpuInfoList::clear() {
     blacklist_status = false;
-    Anglelist_status = false;
     SyncBlacklist_status = false;
     VulkanBlacklist_status = false;
     infos.clear();
@@ -413,20 +412,12 @@ public:
     Globals()
         : mAsyncLoadThread([this]() {
               getGpuInfoListNative(&mGpuInfoList);
-
-              mGpuInfoList.blacklist_status = !mGpuInfoList.hasGpu() ||
-                    gpuinfo_query_blacklist(
-                      &mGpuInfoList, sGpuBlacklist, arraySize(sGpuBlacklist));
-#ifdef _WIN32
-              mGpuInfoList.Anglelist_status =
-                      gpuinfo_query_whitelist(&mGpuInfoList, sAngleWhitelist,
-                                              arraySize(sAngleWhitelist));
-#else
-              mGpuInfoList.Anglelist_status = false;
-#endif
+              mGpuInfoList.blacklist_status =
+                      !mGpuInfoList.hasGpu() ||
+                      gpuinfo_query_blacklist(&mGpuInfoList, sGpuBlacklist,
+                                              arraySize(sGpuBlacklist));
               mGpuInfoList.SyncBlacklist_status = gpuinfo_query_blacklist(
                       &mGpuInfoList, sSyncBlacklist, arraySize(sSyncBlacklist));
-
               mGpuInfoList.VulkanBlacklist_status = !isVulkanSafeToUseNative();
           }) {
         mAsyncLoadThread.start();
@@ -464,10 +455,6 @@ const GpuInfoList& globalGpuInfoList() {
 
 bool async_query_host_gpu_blacklisted() {
     return globalGpuInfoList().blacklist_status;
-}
-
-bool async_query_host_gpu_AngleWhitelisted() {
-    return globalGpuInfoList().Anglelist_status;
 }
 
 bool async_query_host_gpu_SyncBlacklisted() {
