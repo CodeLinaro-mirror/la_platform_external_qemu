@@ -31,7 +31,8 @@ android_add_executable(
 if(APPLE)
   # Override the default RPATH to match the standalone distribution layout
   android_target_properties(fishtank all "INSTALL_RPATH=@executable_path/lib64")
-  android_target_properties(fishtank all "INSTALL_RPATH>=@executable_path/lib64/qt/lib")
+  android_target_properties(
+    fishtank all "INSTALL_RPATH>=@executable_path/lib64/qt/lib")
   android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path")
   android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path/lib64")
   android_target_properties(fishtank all "BUILD_WITH_INSTALL_RPATH=ON")
@@ -110,82 +111,102 @@ target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 prebuilt(QT5)
 android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 
-# We use EXCLUDE_FROM_ALL on these install rules to ensure that fishtank and its
-# dependencies are NOT included in the default emulator distribution.
-# This allows fishtank to be deployed exclusively to its isolated standalone
-# directory (objs/distribution-fishtank) during the specialized build phase.
-install(TARGETS fishtank RUNTIME DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
+# Helper function to install dependencies with platform-specific destination logic.
+#
+# This function handles the distribution of various dependency types to the standalone
+# fishtank directory. It supports:
+#   1. CMake Targets: Shared libraries are installed to lib64/ on Unix or the root on Windows.
+#   2. Mapping Strings: Strings in the format "source/path>dest/rel/path" are parsed
+#      and installed. On Windows, the destination is flattened to the root.
+#
+# Arguments:
+#   DEPS: A list of CMake targets or "src>dst" mapping strings.
+function(fishtank_install_dependency)
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs DEPS)
+  cmake_parse_arguments(INST "${options}" "${oneValueArgs}" "${multiValueArgs}"
+                        ${ARGN})
 
-if(NOT LINUX_AARCH64)
-  set(FISHTANK_ADDITIONAL_SHARED_LIBS
-      emugl_common
-      android-emu-tracing
-      android-emu-metrics
-      android-emu-curl
-      android-emu-agents
-      android-emu-protos
-      android-emu-base-logging
-      glib2_${ANDROID_TARGET_TAG}
-      libprotobuf
-      abseil_dll
-      gfxstream_backend
-  )
-
-  foreach(dep ${FISHTANK_ADDITIONAL_SHARED_LIBS})
-    if(WINDOWS_MSVC_X86_64)
-      # On Windows, we want the DLLs in the root. Some targets might not be
-      # correctly handled by install(TARGETS) if they are defined elsewhere
-      # as shared but not marked for installation in this component.
-      # We use the generator expression to get the actual DLL path.
-      install(FILES $<TARGET_FILE:${dep}> DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
-    else()
-      # On Linux/MacOS, install libraries to fishtank/lib64 directory.
-      install(
-        TARGETS ${dep}
-        RUNTIME
-        DESTINATION fishtank/lib64
-        LIBRARY
-        DESTINATION fishtank/lib64
-        COMPONENT fishtank
-        EXCLUDE_FROM_ALL)
-    endif()
-  endforeach()
-
-  # Install RUNTIME_OS_DEPENDENCIES (like libc++.so)
-  foreach(dep ${RUNTIME_OS_DEPENDENCIES})
-    string(REPLACE ">" ";" SRC_DST ${dep})
-    list(GET SRC_DST 0 SRC)
-    list(GET SRC_DST 1 DST)
-    get_filename_component(DST_DIR ${DST} DIRECTORY)
-    get_filename_component(REAL_SRC ${SRC} REALPATH)
-    get_filename_component(DST_NAME ${DST} NAME)
-    if(WINDOWS_MSVC_X86_64)
-      # On windows we usually just install in the root.
-      install(
-        FILES ${REAL_SRC}
-        DESTINATION fishtank
-        RENAME ${DST_NAME}
-        COMPONENT fishtank
-        EXCLUDE_FROM_ALL)
-    else()
-      install(
-        FILES ${REAL_SRC}
-        DESTINATION fishtank/${DST_DIR}
-        RENAME ${DST_NAME}
-        COMPONENT fishtank
-        EXCLUDE_FROM_ALL)
-      # We need libc++.so.1 in lib64/qt/lib for linux because QtWebEngineProcess has a dependency
-      # on it, and it has an rpath of $ORIGIN/../lib (lib64/qt/libexec/QtWebEngineProcess).
-      if(LINUX_X86_64 AND (DST_NAME STREQUAL "libc++.so.1" OR DST_NAME STREQUAL "libc++.so"))
+  foreach(dep ${INST_DEPS})
+    if(dep MATCHES ".*>.*")
+      # Handle "src>dst" mapping
+      string(REPLACE ">" ";" SRC_DST ${dep})
+      list(GET SRC_DST 0 SRC)
+      list(GET SRC_DST 1 DST)
+      get_filename_component(DST_DIR ${DST} DIRECTORY)
+      get_filename_component(DST_NAME ${DST} NAME)
+      get_filename_component(REAL_SRC ${SRC} REALPATH)
+      if(WINDOWS_MSVC_X86_64)
         install(
           FILES ${REAL_SRC}
-          DESTINATION fishtank/lib64/qt/lib
+          DESTINATION fishtank
           RENAME ${DST_NAME}
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
+      else()
+        install(
+          FILES ${REAL_SRC}
+          DESTINATION fishtank/${DST_DIR}
+          RENAME ${DST_NAME}
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
+        # Extra logic for libc++ on Linux to support QtWebEngineProcess.
+        if(LINUX_X86_64 AND (DST_NAME STREQUAL "libc++.so.1"
+                             OR DST_NAME STREQUAL "libc++.so"))
+          install(
+            FILES ${REAL_SRC}
+            DESTINATION fishtank/lib64/qt/lib
+            RENAME ${DST_NAME}
+            COMPONENT fishtank
+            EXCLUDE_FROM_ALL)
+        endif()
+      endif()
+    elseif(TARGET ${dep})
+      # Handle CMake targets
+      if(WINDOWS_MSVC_X86_64)
+        install(
+          FILES $<TARGET_FILE:${dep}>
+          DESTINATION fishtank
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
+      else()
+        install(
+          TARGETS ${dep}
+          RUNTIME DESTINATION fishtank/lib64
+          LIBRARY DESTINATION fishtank/lib64
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
       endif()
     endif()
   endforeach()
+endfunction()
+
+# We use EXCLUDE_FROM_ALL on these install rules to ensure that fishtank and its
+# dependencies are NOT included in the default emulator distribution.
+# This allows fishtank to be deployed exclusively to its isolated standalone
+# directory (objs/distribution-fishtank) during the specialized build phase.
+install(
+  TARGETS fishtank
+  RUNTIME DESTINATION fishtank
+  COMPONENT fishtank
+  EXCLUDE_FROM_ALL)
+
+if(NOT LINUX_AARCH64)
+  fishtank_install_dependency(DEPS
+                              emugl_common
+                              android-emu-tracing
+                              android-emu-metrics
+                              android-emu-curl
+                              android-emu-agents
+                              android-emu-protos
+                              android-emu-base-logging
+                              glib2_${ANDROID_TARGET_TAG}
+                              libprotobuf
+                              abseil_dll
+                              gfxstream_backend
+                              ${RUNTIME_OS_DEPENDENCIES}
+                              ${ANGLE_DEPENDENCIES})
 
   if(WINDOWS_MSVC_X86_64)
     # Include MSVC runtime dependencies
@@ -194,8 +215,6 @@ if(NOT LINUX_AARCH64)
       string(REPLACE ">" ";" SRC_DST ${dep})
       list(GET SRC_DST 0 SRC)
       list(GET SRC_DST 1 DST)
-      # MSVC dependencies are usually defined as path/to/dll>./dll
-      # We just want them in the fishtank root.
       get_filename_component(DST_NAME ${DST} NAME)
       install(
         FILES ${SRC}
@@ -205,39 +224,16 @@ if(NOT LINUX_AARCH64)
         EXCLUDE_FROM_ALL)
     endforeach()
   endif()
-
-  # Install ANGLE_DEPENDENCIES (like libshadertranslator)
-  foreach(dep ${ANGLE_DEPENDENCIES})
-    string(REPLACE ">" ";" SRC_DST ${dep})
-    list(GET SRC_DST 0 SRC)
-    list(GET SRC_DST 1 DST)
-    get_filename_component(DST_DIR ${DST} DIRECTORY)
-    get_filename_component(DST_NAME ${DST} NAME)
-    if(WINDOWS_MSVC_X86_64)
-      # On windows we usually just install in the root.
-      install(
-        FILES ${SRC}
-        DESTINATION fishtank
-        RENAME ${DST_NAME}
-        COMPONENT fishtank
-        EXCLUDE_FROM_ALL)
-    else()
-      install(
-        FILES ${SRC}
-        DESTINATION fishtank/${DST_DIR}
-        RENAME ${DST_NAME}
-        COMPONENT fishtank
-        EXCLUDE_FROM_ALL)
-    endif()
-  endforeach()
 endif()
 
+# For Qt dependencies, the only special thing we do in here is, for windows, flatten all dlls in
+# qt/lib to the root. Everything else is installed as described in emu-qt5-config.cmake.
 foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
   if(qt_dep MATCHES ".*>>.*")
     string(REPLACE ">>" ";" SRC_DST ${qt_dep})
     list(GET SRC_DST 0 SRC)
     list(GET SRC_DST 1 DST)
-    if (SRC MATCHES ".*\\*.*")
+    if(SRC MATCHES ".*\\*.*")
       file(GLOB GLOBBED_FILES ${SRC})
       install(
         FILES ${GLOBBED_FILES}
@@ -245,7 +241,11 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
         COMPONENT fishtank
         EXCLUDE_FROM_ALL)
     else()
-      install(DIRECTORY ${SRC} DESTINATION fishtank/${DST} COMPONENT fishtank EXCLUDE_FROM_ALL)
+      install(
+        DIRECTORY ${SRC}
+        DESTINATION fishtank/${DST}
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
     endif()
   else()
     string(REPLACE ">" ";" SRC_DST ${qt_dep})
@@ -258,17 +258,33 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
       # but core DLLs like Qt6Core must be findable by the OS loader.
       # We can identify core DLLs because they are installed in lib64/qt/lib.
       if(SRC MATCHES ".*\\.dll$" AND DST MATCHES "lib64/qt/lib/.*")
-        install(FILES ${SRC} DESTINATION fishtank COMPONENT fishtank EXCLUDE_FROM_ALL)
+        install(
+          FILES ${SRC}
+          DESTINATION fishtank
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
       else()
-        install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+        install(
+          FILES ${SRC}
+          DESTINATION fishtank/${DST_DIR}
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
       endif()
     else()
       # On Linux/MacOS, the Qt installation rules defined in emu-qt5-config.cmake don't need any
       # modification.
       if(SRC MATCHES "QtWebEngineProcess$")
-        install(PROGRAMS ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+        install(
+          PROGRAMS ${SRC}
+          DESTINATION fishtank/${DST_DIR}
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
       else()
-        install(FILES ${SRC} DESTINATION fishtank/${DST_DIR} COMPONENT fishtank EXCLUDE_FROM_ALL)
+        install(
+          FILES ${SRC}
+          DESTINATION fishtank/${DST_DIR}
+          COMPONENT fishtank
+          EXCLUDE_FROM_ALL)
       endif()
     endif()
   endif()
