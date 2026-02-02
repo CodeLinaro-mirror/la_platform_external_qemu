@@ -3627,9 +3627,15 @@ void EmulatorQtWindow::wheelEvent(QWheelEvent* event) {
             mTrackpadAggregateTimer.start();
         } else {
             // For most mice, 1 wheel click = 15 degrees
-            handleMouseWheelEvent(event->angleDelta().y() * 120 / 15,
+            int scrollScale = 120;
+            // Avoid too sensitive wheel events for Desktop.
+            if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo())) {
+                scrollScale = 1;
+            }
+            handleMouseWheelEvent(event->angleDelta().y() * scrollScale / 15,
                                   Qt::Orientation::Vertical);
-            handleMouseWheelEvent(event->angleDelta().x() * 120 / 15,
+            handleMouseWheelEvent(event->angleDelta().x() * scrollScale / 15,
                                   Qt::Orientation::Horizontal);
         }
     } else if (inputDeviceHasRotary) {
