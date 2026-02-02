@@ -3,7 +3,9 @@
 # Using the experimental bazel build plugin.
 # It targets windows-amd64
 
-load("@goldfish_build//rules:windows_resources.bzl", "windows_resources")
+load("@goldfish_build//rules:windows_resources.bzl", "windows_manifest_resource", "windows_resources")
+windows_manifest_resource(name = "qemu-img_manifest_rc", binary_filename = "qemu-img.exe")
+windows_manifest_resource(name = "qemu-system-x86_64_manifest_rc", binary_filename = "qemu-system-x86_64.exe")
 cc_binary(
    copts = ['-Wno-constant-conversion', '-Wno-macro-redefined', '-Wno-invalid-noreturn', '-Wno-bitfield-constant-conversion', '-Wno-int-to-void-pointer-cast', '-Wno-unused-command-line-argument', '-Wno-undef', '-Wno-microsoft-enum-forward-reference', '-Wno-microsoft-include', '-Wno-deprecated-declarations', '-fms-extensions', '-march=native', '-UNDEBUG'],
    defines = ['GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
@@ -19,7 +21,7 @@ cc_binary(
 cc_interface_binary(
    copts = ['-Wno-constant-conversion', '-Wno-macro-redefined', '-Wno-invalid-noreturn', '-Wno-bitfield-constant-conversion', '-Wno-int-to-void-pointer-cast', '-Wno-unused-command-line-argument', '-Wno-undef', '-Wno-microsoft-enum-forward-reference', '-Wno-microsoft-include', '-Wno-deprecated-declarations', '-fms-extensions', '-march=native', '-UNDEBUG'],
    defines = ['COMPILING_PER_TARGET', 'CONFIG_DEVICES=\\"x86_64-softmmu-config-devices.h\\"', 'CONFIG_TARGET=\\"x86_64-softmmu-config-target.h\\"', 'GLIB_STATIC_COMPILATION', 'GMODULE_STATIC_COMPILATION', '_FILE_OFFSET_BITS=64', '_GNU_SOURCE', '_LARGEFILE_SOURCE'],
-   deps = ['@crosvm//:rutabaga_c_ffi', '@dtc//:libfdt', '@glib//glib', '@glib//gmodule', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-x86_64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', '//google/compat/windows:compat'],
+   deps = ['@crosvm//:rutabaga_c_ffi', '@dtc//:libfdt', '@glib//glib', '@glib//gmodule', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-x86_64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', '//google/compat/windows:compat', ':qemu-system-x86_64_manifest_rc'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-Wl,/SUBSYSTEM:CONSOLE'],
