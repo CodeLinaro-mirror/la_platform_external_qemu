@@ -1,5 +1,5 @@
 project(Nimble)
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 if(NOT DEFINED ANDROID_TARGET_TAG)
   set(ANDROID_QEMU2_TOP_DIR ${CMAKE_CURRENT_LIST_DIR}/../../..)

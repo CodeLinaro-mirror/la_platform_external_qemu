@@ -17,6 +17,10 @@ endif()
 
 set(INCLUDE_SYMBOLS_CMAKE 1)
 
+if(POLICY CMP0116)
+  cmake_policy(SET CMP0116 NEW)
+endif()
+
 # This function uploads and processes symbols for Android applications.
 # Parameters: - TARGET: The name of the target library. - DIRECTORY: The
 # directory to locally store the symbols.
@@ -26,6 +30,9 @@ set(INCLUDE_SYMBOLS_CMAKE 1)
 # * API_KEY: The API key to use for uploading symbols.
 # * URI: The URI of the server to upload the symbols to.
 function(android_upload_symbols)
+  if(POLICY CMP0116)
+    cmake_policy(SET CMP0116 NEW)
+  endif()
   if (OPTION_ASAN)
     message(STATUS "Santizer is enabled. Skipping symbol upload")
     return()
@@ -106,7 +113,8 @@ function(android_upload_symbols)
         "${ANDROID_QEMU2_TOP_DIR}/android/build/python/aemu/symbol_processor.py"
         "-o" "${symbols_DIRECTORY}" "${DEST}"
       COMMENT "Processing symbols for ${symbols_TARGET}"
-      VERBATIM DEPENDS sym_upload dump_syms)
+      VERBATIM)
+    add_dependencies(${symbols_TARGET} sym_upload dump_syms)
   else()
     add_custom_command(
       TARGET ${symbols_TARGET}
@@ -119,6 +127,7 @@ function(android_upload_symbols)
         "${ANDROID_QEMU2_TOP_DIR}/android/build/python/aemu/symbol_processor.py"
         "-o" "${symbols_DIRECTORY}" "${DEST}"
       COMMENT "Processing symbols for ${symbols_TARGET}"
-      VERBATIM DEPENDS sym_upload dump_syms)
+      VERBATIM)
+    add_dependencies(${symbols_TARGET} sym_upload dump_syms)
   endif()
 endfunction()

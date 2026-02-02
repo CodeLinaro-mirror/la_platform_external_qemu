@@ -2,7 +2,7 @@
 
 # We might be running in cross compile build, so setup the required paths and
 # includes..
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 project(bison)
 
 if(NOT ANDROID_QEMU2_TOP_DIR)

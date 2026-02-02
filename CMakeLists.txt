@@ -1,6 +1,15 @@
+cmake_minimum_required(VERSION 3.10)
+if(POLICY CMP0116)
+  cmake_policy(SET CMP0116 NEW)
+endif()
+if(POLICY CMP0175)
+  cmake_policy(SET CMP0175 NEW)
+endif()
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 NEW)
+endif()
 cmake_policy(SET CMP0048 NEW)
 project(Android-Emulator)
-cmake_minimum_required(VERSION 3.12)
 
 # Set this policy to allow gfxstream to modify the passed in targets like
 # ${GFXSTREAM_HOST_COMMON_LIB}.
