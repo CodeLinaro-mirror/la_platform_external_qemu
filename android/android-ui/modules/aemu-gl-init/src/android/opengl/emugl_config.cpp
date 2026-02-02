@@ -774,7 +774,13 @@ bool emuglConfig_init(EmuglConfig* config,
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
     if (gles_mode_selected == "auto") {
-        if (no_window) {
+        bool switchToSoftwareGles = no_window;
+#ifdef __APPLE__
+        // TODO(b/479126903): New macOS system update leaks memory when host
+        // OpenGL driver is used, use software rendering for GL
+        switchToSoftwareGles = true;
+#endif
+        if (switchToSoftwareGles) {
             gles_mode_selected = "swangle";
         } else {
             gles_mode_selected = "host";
