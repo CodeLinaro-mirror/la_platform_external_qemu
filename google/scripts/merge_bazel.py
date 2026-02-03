@@ -453,6 +453,10 @@ class BuildFileFunctions:
         rule = BazelRule(self.configuration, "windows_resources", kwargs)
         self.library.register(rule)
 
+    def windows_manifest_resource(self, **kwargs):
+        rule = BazelRule(self.configuration, "windows_manifest_resource", kwargs)
+        self.library.register(rule)
+
     def filegroup(self, **kwargs):
         rule = BazelRule(self.configuration, "filegroup", kwargs)
         self.library.register(rule)
@@ -461,8 +465,8 @@ class BuildFileFunctions:
         rule = BazelRule(self.configuration, "cc_import", kwargs)
         self.library.register(rule)
 
-    def load(self, bzl, *files):
-        rule = LoadCmd(bzl, *files)
+    def load(self, *args):
+        rule = LoadCmd(args[0], args[1:])
         self.library.register(rule)
 
 

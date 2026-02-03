@@ -1,7 +1,15 @@
 {
   // This will be at the start of the bazel file.
-  "bazel_prefix": "load(\"@goldfish_build//rules:windows_resources.bzl\", \"windows_resources\")",
+  "bazel_prefix": "load(\"@goldfish_build//rules:windows_resources.bzl\", \"windows_manifest_resource\", \"windows_resources\")\nwindows_manifest_resource(name = \"qemu-img_manifest_rc\", binary_filename = \"qemu-img.exe\")\nwindows_manifest_resource(name = \"qemu-system-x86_64_manifest_rc\", binary_filename = \"qemu-system-x86_64.exe\")",
   "shims": [
+    {
+      "target": "qemu-img",
+      "shims": {
+        "+deps": [
+            ":qemu-img_manifest_rc"
+        ]
+      }
+    },
     {
       "target": "qemu-system-aarch64",
       "shims": {
@@ -17,6 +25,9 @@
     {
       "target": "qemu-system-x86_64",
       "shims": {
+        "+deps": [
+            ":qemu-system-x86_64_manifest_rc"
+        ],
         "win_def_file": "platform/windows-amd64/qemu-system-x86_64.def"
       }
     },
