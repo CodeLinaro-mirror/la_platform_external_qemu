@@ -363,7 +363,7 @@ cc_interface_binary(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    win_def_file = "platform/windows-amd64/qemu-system-x86_64.def",
+    win_def_file = "google/build/qemu-system-x86_64.def",
     deps = select({
         "@platforms//os:windows": [
             ":qemu-system-x86_64_manifest_rc",
