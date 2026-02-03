@@ -203,6 +203,8 @@ struct DeviceSupportInfo {
     VkPhysicalDeviceProperties physdevProps;
     VkPhysicalDeviceMemoryProperties memProperties;
     bool hasGraphicsQueueFamily;
+    bool supportsExternalMemory;
+    bool supportsSwapchain;
 
     uint64_t getDeviceMaxAllocationCount() const {
         return physdevProps.limits.maxMemoryAllocationCount;
@@ -437,7 +439,9 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
                                          int* patch,
                                          uint64_t* deviceMemBytes,
                                          uint32_t* driverVersion,
-                                         uint64_t* deviceMaxAllocationCount) {
+                                         uint64_t* deviceMaxAllocationCount,
+                                         bool* supportsExternalMemory,
+                                         bool* supportsSwapchain) {
     if (!vendor || !major || !minor || !patch) {
         derror("%s: Invalid argument!", __func__);
         return;
@@ -485,6 +489,17 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     if (driverVersion) {
         *driverVersion = physicalProp.driverVersion;
     }
+    if (supportsExternalMemory) {
+        *supportsExternalMemory = vkProps.supportsExternalMemory;
+    }
+    if (supportsSwapchain) {
+        *supportsSwapchain = vkProps.supportsSwapchain;
+    }
+}
+
+bool hasSufficientHostVulkanDriver(bool isXrAvd) {
+    //TODO(b/469094646): to be implemented
+    return true;
 }
 
 static bool sVkPropsInitialized = false;
@@ -642,6 +657,10 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
             }
         }
 
+        // TODO(b/469094646): calculate feature support information
+        deviceInfos[i].supportsExternalMemory = true;
+        deviceInfos[i].supportsSwapchain = true;
+
         // Put the GPU information into the logs to be able to track down any
         // errors more easily
         const VkPhysicalDeviceProperties& physdevProps =
@@ -731,13 +750,25 @@ bool emuglConfig_init(EmuglConfig* config,
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
     if (vulkan_mode_selected == "auto") {
-        bool switchToSoftwareVulkan = no_window;
-#if defined(__APPLE__)
-        // Force MoltenVK with 'auto' modes on XR, but otherwise use software
+        bool switchToSoftwareVulkan = false;
         if (!is_xr_mode) {
+#if defined(__APPLE__)
+            // Force MoltenVK with 'auto' modes on XR, but otherwise use
+            // software due to known issues
             switchToSoftwareVulkan = true;
-        }
+#else
+            switchToSoftwareVulkan = no_window;
 #endif
+        }
+
+        if (!switchToSoftwareVulkan) {
+            // Check if the driver is compatible
+            if (!hasSufficientHostVulkanDriver(is_xr_mode)) {
+                dinfo("Host Vulkan driver is not supported.");
+                switchToSoftwareVulkan = true;
+            }
+        }
+
         if (switchToSoftwareVulkan) {
             vulkan_mode_selected = DEFAULT_SOFTWARE_VULKAN_MODE;
         } else {
@@ -862,7 +893,8 @@ bool emuglConfig_init(EmuglConfig* config,
         // to work around the kvm+amdgpu driver bug
         // where kvm apparently error out with Bad Address
         emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
-                                            &vkPatch, nullptr, nullptr, nullptr);
+                                            &vkPatch, nullptr, nullptr, nullptr,
+                                            nullptr, nullptr);
         if (vkVendor) {
             bool isAMD = (strncmp("AMD", vkVendor, 3) == 0);
             bool isIntel = (strncmp("Intel", vkVendor, 5) == 0);
