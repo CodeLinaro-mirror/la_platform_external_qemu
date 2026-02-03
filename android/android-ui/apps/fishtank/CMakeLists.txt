@@ -71,6 +71,7 @@ target_link_libraries(
           aemu-ui-qt-base
           aemu::recording
           android-emu
+          android-emu-base-process
           android-grpc-client
           android-grpc-interceptors
           android-grpc-services-stack
