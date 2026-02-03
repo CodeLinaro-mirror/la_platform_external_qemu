@@ -1823,6 +1823,15 @@ extern "C" int main(int argc, char** argv) {
                 &android::metrics::MetricsReporter::get(), looper);
     }
 
+    // VulkanNativeSwapchain depends on GuestAngle, auto-enable if requested
+    if (fc::isEnabled(fc::VulkanNativeSwapchain) &&
+        !fc::isEnabled(fc::GuestAngle)) {
+        fc::setIfNotOverriden(fc::GuestAngle, true);
+        if (fc::isEnabled(fc::GuestAngle)) {
+            dprint("Auto-enabled GuestAngle feature for VulkanNativeSwapchain");
+        }
+    }
+
     if (!fc::isOverridden(fc::GuestAngle)) {
         switch (skin_winsys_get_preferred_guest_gles_driver()) {
             case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
