@@ -1829,6 +1829,9 @@ extern "C" int main(int argc, char** argv) {
         fc::setIfNotOverriden(fc::GuestAngle, true);
         if (fc::isEnabled(fc::GuestAngle)) {
             dprint("Auto-enabled GuestAngle feature for VulkanNativeSwapchain");
+        } else {
+            derror("GuestAngle feature is required for VulkanNativeSwapchain, "
+                   "but disabled by the user.");
         }
     }
 
