@@ -97,7 +97,7 @@ void android_virtio_send_touch_as_mt(const SkinEvent* const data,
     }
 
     if (!s_virtio_input_multi_touch[displayId]) {
-        derror("%s: virtio-input-multi-touch device for display %d not registered",
+        D("%s: virtio-input-multi-touch device for display %d not registered",
           __func__, displayId);
         return;
     }
@@ -124,7 +124,7 @@ void android_virtio_send_touch_as_mt(const SkinEvent* const data,
 void android_virtio_send_touchpad_as_mt(const SkinEvent* const data,
                                    int touchpadId) {
     if (!s_virtio_input_multi_touch_touchpad) {
-        derror("%s: virtio-input-multi-touch touchpad device %d not registered",
+        D("%s: virtio-input-multi-touch touchpad device %d not registered",
           __func__, touchpadId);
         return;
     }
@@ -538,7 +538,7 @@ int android_virtio_send_event_as_mt(int type,
         event.value = cpu_to_le32(value);
         virtio_input_send(vinput, &event);
     } else {
-        derror("%s: virtio-input-multi-touch %sdevice for display %d not registered",
+        D("%s: virtio-input-multi-touch %sdevice for display %d not registered",
           __func__, touchpad ? "touchpad " : "", displayId);
     }
     return 1;
@@ -554,7 +554,7 @@ void android_virtio_send_mouse_as_mt(int dx,
     }
 
     if (!s_virtio_input_multi_touch[displayId]) {
-        derror("%s: virtio-input-multi-touch device for display %d not registered",
+        D("%s: virtio-input-multi-touch device for display %d not registered",
           __func__, displayId);
         return;
     }
@@ -585,7 +585,7 @@ void android_virtio_send_pen_as_mt(int dx,
     }
 
     if (!s_virtio_input_multi_touch[displayId]) {
-        derror("%s: virtio-input-multi-touch device for display %d not registered",
+        D("%s: virtio-input-multi-touch device for display %d not registered",
           __func__, displayId);
         return;
     }

@@ -4753,12 +4753,6 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
         /* Initialize camera */
         android_camera_service_init();
 
-        // If the screen is configured for no-touch, we need to turn off VirtioInput
-        // to prevent input events being translated to touch events.
-        if (androidHwConfig_isScreenNoTouch(
-                getConsoleAgents()->settings->hw())) {
-            feature_set_enabled_override(kFeature_VirtioInput, false);
-        }
         /* Initialize multi-touch emulation. */
         if (androidHwConfig_isScreenMultiTouch(
                 getConsoleAgents()->settings->hw()) ||
