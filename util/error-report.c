@@ -28,6 +28,7 @@ typedef enum {
 
 /* Prepend timestamp to messages */
 bool message_with_timestamp;
+bool message_with_loc;
 bool error_with_guestname;
 const char *error_guest_name;
 
@@ -201,7 +202,9 @@ static void vreport(report_type type, const char *fmt, va_list ap)
         error_printf("%s ", error_guest_name);
     }
 
-    print_loc();
+    if (message_with_loc) {
+        print_loc();
+    }
 
     switch (type) {
     case REPORT_TYPE_ERROR:
