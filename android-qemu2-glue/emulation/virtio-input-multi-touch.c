@@ -89,7 +89,7 @@ static void translate_pen_event(int x,
     multitouch_update_displayId(0);
 }
 
-void android_virtio_touch_event(const SkinEvent* const data,
+void android_virtio_send_touch_as_mt(const SkinEvent* const data,
                                 int displayId) {
     uint32_t w, h = 0;
 
@@ -114,7 +114,7 @@ void android_virtio_touch_event(const SkinEvent* const data,
     multitouch_update_displayId(0);
 }
 
-void android_virtio_touchpad_event(const SkinEvent* const data,
+void android_virtio_send_touchpad_as_mt(const SkinEvent* const data,
                                    int touchpadId) {
     multitouch_update_touchpad(touchpadId);
     multitouch_update(MTES_FINGER, data, data->u.multi_touch_point.x,
@@ -505,7 +505,7 @@ static const TypeInfo types[] = {
 
 DEFINE_TYPES(types)
 
-int android_virtio_input_send(int type,
+int android_virtio_send_event_as_mt(int type,
                               int code,
                               int value,
                               int displayId,
@@ -529,7 +529,7 @@ int android_virtio_input_send(int type,
     return 1;
 }
 
-void android_virtio_kbd_mouse_event(int dx,
+void android_virtio_send_mouse_as_mt(int dx,
                                     int dy,
                                     int dz,
                                     int buttonsState,
@@ -554,7 +554,7 @@ void android_virtio_kbd_mouse_event(int dx,
     translate_mouse_event(dx, dy, buttonsState, displayId);
 }
 
-void android_virtio_pen_event(int dx,
+void android_virtio_send_pen_as_mt(int dx,
                               int dy,
                               const SkinEvent* ev,
                               int buttonsState,
