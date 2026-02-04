@@ -322,6 +322,13 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         }
     }
 
+    if (avdInfo_isDesktopApi36OrHigher(avdInfo)) {
+        mExtendedUi->cellularButton->setVisible(false);
+        mExtendedUi->telephoneButton->setVisible(false);
+        mExtendedUi->dpadButton->setVisible(false);
+        mExtendedUi->fingerButton->setVisible(false);
+    }
+
     if (avdFlavor == AVD_TV) {
         mExtendedUi->locationButton->setVisible(false);
         mExtendedUi->cellularButton->setVisible(false);
