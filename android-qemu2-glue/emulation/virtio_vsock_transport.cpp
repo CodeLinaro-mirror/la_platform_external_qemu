@@ -77,7 +77,7 @@ struct VsockUnixSocketTransport : public IVsockNewTransport {
     }
 
     void ioFunc(const int fd, const unsigned events) {
-        char buf[1024];
+        char buf[16384];
 
         if (events & LOOP_IO_READ) {
             const int n = socket_recv(fd, buf, sizeof(buf));

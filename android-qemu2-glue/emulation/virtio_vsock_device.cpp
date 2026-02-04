@@ -967,7 +967,7 @@ void VSockStream::sendOp(enum virtio_vsock_op op) {
 void VSockStream::signalWake(const bool write) {
     if (mPipe) {
         while (true) {
-            uint8_t data[1024];
+            uint8_t data[16384];
             AndroidPipeBuffer abuf;
             abuf.data = data;
             abuf.size = sizeof(data);
