@@ -874,6 +874,15 @@ message AndroidStudioEvent {
   optional ServerPushNotificationEvent server_push_notification_event = 244
       [lazy = true];
 
+  // set when kind = USER_TIER_UPGRADE_EVENT
+  optional UserTierUpgradeEvent user_tier_upgrade_event = 245 [lazy = true];
+
+  // set when kind = RENDER_TOOL_EVENT
+  optional RenderToolEvent render_tool_event = 246 [lazy = true];
+
+  // set when kind = EMULATOR_CONSOLE_EVENTS
+  repeated EmulatorConsoleEvent emulator_console_events = 247;
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1868,6 +1877,18 @@ message AndroidStudioEvent {
 
     // Event related to server push notifications.
     SERVER_PUSH_NOTIFICATION_EVENT = 363;
+
+    // Event related to consumer user tier upgrade flow.
+    USER_TIER_UPGRADE_EVENT = 364;
+
+    // Event related to the Render Tool API.
+    RENDER_TOOL_EVENT = 365;
+
+    // Event related to onboarding triggered by the quick-edit feature.
+    QUICK_EDIT_ONBOARDING = 366;
+
+    // Event related to console emulator events.
+    EMULATOR_CONSOLE_EVENTS = 367;
   }
 
   // Represents different Performance Monitoring types.
@@ -3974,6 +3995,19 @@ message EmulatorUiEvent {
     EXTENDED_SETTINGS_TAB = 13;
     EXTENDED_HELP_TAB = 14;
   }
+}
+// Describes a user sending a command to the Emulator Console.
+message EmulatorConsoleEvent {
+  // The command that was used.
+  optional string command = 1;
+  // The source of the command.
+  enum Source {
+    UNKNOWN = 0;
+    TELNET = 1;
+  }
+  optional Source source = 2;
+  // How many times it was used.
+  optional int64 value = 3;
 }
 
 message EmulatorPercentileEstimator {
@@ -7354,7 +7388,7 @@ message AppLinksAssistantEvent {
       [lazy = true];
 
   // UI event source.
-  // Next ID: 61
+  // Next ID: 67
   // Note: Not a properly sequentially incrementing ID (200 & 201 are used)
   enum EventSource {
     // Will be deprecated and replaced by NEW_LINK_CREATION_SIDE_PANEL.
@@ -7453,6 +7487,14 @@ message AppLinksAssistantEvent {
     // Deep Link AI
     CODE_INSERT_DIALOG_GEMINI_BUTTON = 59;
     DLLA_APP_SCREEN_OPEN_CONFIRMATION = 60;
+
+    // The secondary tab for viewing missing URLs info.
+    MISSING_URL_OVERVIEW_TABLE = 61;
+    MISSING_URL_OVERVIEW_TABLE_DETAILS_BUTTON = 62;
+    MISSING_URL_OVERVIEW_TABLE_FIX_ALL_APP_CHECKS_BUTTON = 63;
+    MISSING_URL_OVERVIEW_TABLE_FIX_ALL_WEB_CHECKS_BUTTON = 64;
+    MISSING_URL_OVERVIEW_TABLE_SEARCH_BOX = 65;
+    MISSING_URL_OVERVIEW_TABLE_FILTERS = 66;
   }
 
   // The state list of UI event source.
@@ -12458,6 +12500,35 @@ message VsPluginEvent {
   }
 }
 
+message RenderToolEvent {
+  // Top-level success status
+  optional bool is_success = 1;
+
+  enum RenderError {
+    UNKNOWN_RENDER_ERROR = 0;
+    ERROR_FILE_NOT_FOUND = 1;
+    ERROR_BLOCKED_BY_AI_EXCLUDE = 2;
+    ERROR_MODULE_NOT_FOUND = 3;
+    ERROR_COMPONENT_NOT_FOUND = 4;
+    // Failures during rendering
+    ERROR_COMPILATION_FAILED = 5;
+    ERROR_RENDER_FAILED = 6;  // RenderResult contained errors
+    ERROR_UNEXPECTED = 7;     // Generic exceptions
+  }
+
+  // The specific error if is_success is false
+  optional RenderError render_error = 2;
+
+  // Parameters
+  optional bool is_compilation_requested = 3;
+  optional bool is_layout_scanner_requested = 4;
+  optional bool show_decorations = 5;
+  optional int64 compilation_duration_ms = 6;
+
+  // Total time from Tool start to Tool finish (includes compilation + overhead)
+  optional int64 total_latency_ms = 7;
+}
+
 message AppInspectionEvent {
   enum Type {
     UNKNOWN_EVENT_TYPE = 0;
@@ -13643,6 +13714,7 @@ message DeviceManagerEvent {
 }
 
 // Event related to Glasses emulator pairing assistant
+// Next ID: 24
 message GlassesPairingEvent {
   // The kind of GlassesPairingEvent
   optional EventKind kind = 1;
@@ -13664,6 +13736,10 @@ message GlassesPairingEvent {
     PAIRING_LAUNCH_STARTED = 6;
     // Wizard is awaiting user authorization on the phone
     PAIRING_AWAITING_AUTHORIZATION = 7;
+    // Wizard is connecting glassesto the glasses core on the phone
+    PAIRING_GLASSES_CORE_CONNECTING = 22;
+    // Wizard is connecting to the glasses core on the phone
+    PAIRING_GLASSES_CORE_CONNECTED = 23;
     // Error: Timeout waiting for devices to start
     PAIRING_ERROR_TIMEOUT = 8;
     // Error: Device launch failed
@@ -13674,12 +13750,24 @@ message GlassesPairingEvent {
     PAIRING_ERROR_NO_COMPANION_APP = 11;
     // Error: Bluetooth address conflict or failure
     PAIRING_ERROR_BLUETOOTH_ADDRESS = 12;
-    // Error: Pairing bond failed
+    // Error: Pairing bluetooth bond failed
     PAIRING_ERROR_BOND_FAILED = 13;
     // Error: Pairing connection failed
     PAIRING_ERROR_CONNECTION_FAILED = 14;
     // Warning: Phone already has paired devices, pairing might fail
     PAIRING_WARNING_PHONE_ALREADY_PAIRED = 15;
+    // Error: Pairing worker cancelled
+    PAIRING_ERROR_WORKER_CANCELLED = 16;
+    // Error: Polling for pairing state failed (timeout)
+    PAIRING_ERROR_POLLING_FAILED = 17;
+    // Error: Companion CDM association failed
+    PAIRING_ERROR_COMPANION_CDM_FAILED = 18;
+    // Error: Shell command failed execution (e.g., pm grant, am broadcast)
+    PAIRING_ERROR_SHELL_COMMAND = 19;
+    // Error: IO error when interacting with the device
+    PAIRING_ERROR_IO_FAILED = 20;
+    // Error: Generic or unknown pairing error
+    PAIRING_ERROR_GENERIC = 21;
   }
 }
 
@@ -15991,6 +16079,7 @@ message SmlChatBotEvent {
     CHAT = 1;
     AGENT_MODE = 2;
     VERSION_UPGRADE_AGENT = 3;
+    QUICK_EDIT = 4;
   }
 
   message BotResponse {
@@ -16156,6 +16245,7 @@ message SmlChatBotEvent {
     QUERY_WITH_CONTEXT_SUBMITTED = 4;
     REFERENCE_DELETED = 5;
     IMAGE_ATTACHMENT_CLICKED = 6;
+    QUERY_STOPPED = 7;
   }
 
   message QueryBoxEventMetadata {
@@ -16470,6 +16560,25 @@ message SmlChatBotEvent {
       NewChat new_chat = 3;
     }
   }
+  enum ConversationAction {
+    UNKNOWN_ACTION = 0;
+    // Delete a conversation(request and response pairs).
+    DELETE = 1;
+    // Edit and resend a request.
+    EDIT = 2;
+    // Regenerate the response for the same request.
+    REGENERATE = 3;
+  }
+  message ConversationActionInvoked {
+    // Metadata about the conversation on which action is being performed on.
+    optional SmlResponseMetadata metadata = 1 [lazy = true];
+    // The action performed by the user on a chat bot conversation (e.g. edit,
+    // delete).
+    optional ConversationAction conversation_action = 2;
+    // The chat mode (e.g. chat, agent etc) the user was in when performing the
+    // action.
+    optional ChatMode chat_mode = 3;
+  }
 
   oneof content {
     BotResponse response = 1 [lazy = true];
@@ -16491,6 +16600,7 @@ message SmlChatBotEvent {
     SessionManagerEvent session_manager_event = 17 [lazy = true];
     RecentChatsEvent recent_chats_event = 18 [lazy = true];
     ChangesDrawerEvent changes_drawer_event = 19 [lazy = true];
+    ConversationActionInvoked conversation_action_invoked = 20 [lazy = true];
   }
 }
 
@@ -16513,11 +16623,23 @@ message SmlConfigurationEvent {
   // User agrees to sending project context with queries
   optional bool project_context_enabled = 6;
 
-  // The product variant that was fetched by the LoadCodeAssist API
-  optional SmlProductVariant product_variant = 7;
+  // Deprecated. The existing SmlProductVariant was a combined enum to identify
+  // both user account type and license type. Use UserAccountType and
+  // LicenseType instead. The product variant that was fetched by the
+  // LoadCodeAssist API
+  optional SmlProductVariant product_variant = 7 [deprecated = true];
 
   // User has auto-approve enabled for tool calls in agent mode
   optional bool agent_auto_accept_enabled = 8;
+
+  // details.
+  optional string tier_name = 9;
+
+  // The license type that was fetched by the LoadCodeAssist API.
+  optional LicenseType license_type = 10;
+
+  // The user account type that was fetched by the LoadCodeAssist API.
+  optional UserAccountType user_account_type = 11;
 
   enum SmlProductVariant {
     PRODUCT_VARIANT_UNKNOWN = 0;
@@ -16526,6 +16648,18 @@ message SmlConfigurationEvent {
     PRODUCT_VARIANT_DASHER_USER_CHOICE = 3 [deprecated = true];
     PRODUCT_VARIANT_DASHER_FREE = 4;
     PRODUCT_VARIANT_DASHER_BUSINESS = 5;
+  }
+
+  enum UserAccountType {
+    USER_ACCOUNT_TYPE_UNKNOWN = 0;
+    USER_ACCOUNT_TYPE_CONSUMER = 1;
+    USER_ACCOUNT_TYPE_DASHER = 2;
+  }
+
+  enum LicenseType {
+    LICENSE_TYPE_UNKNOWN = 0;
+    LICENSE_TYPE_CONSUMER = 1;
+    LICENSE_TYPE_BUSINESS = 2;
   }
 }
 
@@ -17210,6 +17344,8 @@ message AdbServerStatus {
     TYPE_MDNS_DEFAULT = 1;
     TYPE_BONJOUR = 2;
     TYPE_OPENSCREEN = 3;
+    TYPE_LIBADBMDNS = 4;
+    TYPE_MDNS_DISABLED = 5;
   }
 
   enum USBBackend {
@@ -17217,6 +17353,7 @@ message AdbServerStatus {
     TYPE_USB_DEFAULT = 1;
     TYPE_LIBUSB = 2;
     TYPE_NATIVE = 3;
+    TYPE_USB_DISABLED = 4;
   }
 
   optional bool is_managed = 1;
@@ -17234,6 +17371,9 @@ message ScreenshotTestComposePreviewEvent {
     PREVIEW_RENDERING = 2;
     VALIDATE_CLICKED = 3;
     UPDATE_CLICKED = 4;
+    SCREENSHOT_DIALOG_OPEN = 5;
+    SCREENSHOT_DIALOG_CLOSE = 6;
+    SCREENSHOT_DIALOG_ALREADY_OPEN = 7;
   }
 
   optional Type type = 1;
@@ -18261,6 +18401,8 @@ message GeminiAdvertiserEvent {
     // Features related to UI tools, such as compose preview generation, fix
     // render issues, transform preview, etc.
     UI_TOOLS = 13;
+    // Update dependencies to latest versions.
+    UPDATE_DEPENDENCIES = 14;
   }
 
   enum Action {
@@ -18371,6 +18513,26 @@ message ServerPushNotificationEvent {
   optional string action_title = 4;
 }
 
+message UserTierUpgradeEvent {
+  // The flow via which user tried to upgrade the user tier.
+  enum UpgradeFlow {
+    UNKNOWN_UPGRADE_FLOW = 0;
+    SETTINGS = 1;
+    MODEL_PICKER = 2;
+    TIER_CHIP = 3;
+    EXHAUSTIVE_NOTIFICATION = 4;
+  }
+
+  // The user tier before going through the upgrade flow.
+  optional string previous_tier_name = 1;
+
+  // The user tier after returning back to studio post going through the upgrade
+  // flow.
+  optional string current_tier_name = 2;
+
+  optional UpgradeFlow upgrade_flow = 3;
+}
+
 message AdvertiserNotificationEvent {
   enum Type {
     UNKNOWN_TYPE = 0;
@@ -18426,9 +18588,20 @@ message NextEditPredictionEvent {
     // Add fields specific to the REJECTED event here, if any.
   }
 
+  message EnabledStatus {
+    enum Status {
+      UNKNOWN_STATUS = 0;
+      ENABLED = 1;
+      DISABLED = 2;
+      PAUSED = 3;
+    }
+    optional Status status = 1;
+  }
+
   oneof next_edit_prediction {
     PredictionShown shown = 1 [lazy = true];
     PredictionAccepted accepted = 2 [lazy = true];
     PredictionRejected rejected = 3 [lazy = true];
+    EnabledStatus enabled_status = 4 [lazy = true];
   }
 }
