@@ -25,6 +25,7 @@ using android_studio::EmulatorCompatibilityInfo;
 
 // A check to make sure there is a enough GPU capabilities available
 // for the given avd.
+// Must be kept in sync with android::emulation::hasSufficientHostVulkanDriver
 AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     EmulatorCompatibilityInfo metrics;
     if (avd == nullptr) {
@@ -221,7 +222,7 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         }
     }
     if (driverVersionMajor < minDriverVersionMajor ||
-        (driverVersionMinor == minDriverVersionMajor &&
+        (driverVersionMajor == minDriverVersionMajor &&
          driverVersionMinor < minDriverVersionMinor)) {
         isUnsupportedGpuDriver = true;
     }
