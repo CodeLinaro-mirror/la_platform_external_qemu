@@ -16,6 +16,7 @@
 #include "android/console.h"
 #include "android/multitouch-screen.h"
 #include "android/skin/event.h"
+#include "android/utils/debug.h"
 
 #include "host-common/hw-config.h"
 #include "qemu/osdep.h"
@@ -89,13 +90,19 @@ static void translate_pen_event(int x,
     multitouch_update_displayId(0);
 }
 
-void android_virtio_touch_event(const SkinEvent* const data,
+void android_virtio_send_touch_as_mt(const SkinEvent* const data,
                                 int displayId) {
-    uint32_t w, h = 0;
-
     if (displayId < 0 || displayId >= VIRTIO_INPUT_MAX_NUM) {
         displayId = 0;
     }
+
+    if (!s_virtio_input_multi_touch[displayId]) {
+        derror("%s: virtio-input-multi-touch device for display %d not registered",
+          __func__, displayId);
+        return;
+    }
+
+    uint32_t w, h = 0;
 
     if (!getConsoleAgents()->multi_display->getMultiDisplay(
                 displayId, NULL, NULL, &w, &h, NULL, NULL, NULL)) {
@@ -114,8 +121,13 @@ void android_virtio_touch_event(const SkinEvent* const data,
     multitouch_update_displayId(0);
 }
 
-void android_virtio_touchpad_event(const SkinEvent* const data,
+void android_virtio_send_touchpad_as_mt(const SkinEvent* const data,
                                    int touchpadId) {
+    if (!s_virtio_input_multi_touch_touchpad) {
+        derror("%s: virtio-input-multi-touch touchpad device %d not registered",
+          __func__, touchpadId);
+        return;
+    }
     multitouch_update_touchpad(touchpadId);
     multitouch_update(MTES_FINGER, data, data->u.multi_touch_point.x,
                       data->u.multi_touch_point.y);
@@ -505,7 +517,7 @@ static const TypeInfo types[] = {
 
 DEFINE_TYPES(types)
 
-int android_virtio_input_send(int type,
+int android_virtio_send_event_as_mt(int type,
                               int code,
                               int value,
                               int displayId,
@@ -525,20 +537,29 @@ int android_virtio_input_send(int type,
         event.code = cpu_to_le16(code);
         event.value = cpu_to_le32(value);
         virtio_input_send(vinput, &event);
+    } else {
+        derror("%s: virtio-input-multi-touch %sdevice for display %d not registered",
+          __func__, touchpad ? "touchpad " : "", displayId);
     }
     return 1;
 }
 
-void android_virtio_kbd_mouse_event(int dx,
+void android_virtio_send_mouse_as_mt(int dx,
                                     int dy,
                                     int dz,
                                     int buttonsState,
                                     int displayId) {
-    uint32_t w, h = 0;
-
     if (displayId < 0 || displayId >= VIRTIO_INPUT_MAX_NUM) {
         displayId = 0;
     }
+
+    if (!s_virtio_input_multi_touch[displayId]) {
+        derror("%s: virtio-input-multi-touch device for display %d not registered",
+          __func__, displayId);
+        return;
+    }
+
+    uint32_t w, h = 0;
 
     if (!getConsoleAgents()->multi_display->getMultiDisplay(displayId, NULL, NULL, &w,
                                                   &h, NULL, NULL, NULL)) {
@@ -554,16 +575,22 @@ void android_virtio_kbd_mouse_event(int dx,
     translate_mouse_event(dx, dy, buttonsState, displayId);
 }
 
-void android_virtio_pen_event(int dx,
+void android_virtio_send_pen_as_mt(int dx,
                               int dy,
                               const SkinEvent* ev,
                               int buttonsState,
                               int displayId) {
-    uint32_t w, h = 0;
-
     if (displayId < 0 || displayId >= VIRTIO_INPUT_MAX_NUM) {
         displayId = 0;
     }
+
+    if (!s_virtio_input_multi_touch[displayId]) {
+        derror("%s: virtio-input-multi-touch device for display %d not registered",
+          __func__, displayId);
+        return;
+    }
+
+    uint32_t w, h = 0;
 
     if (!getConsoleAgents()->multi_display->getMultiDisplay(displayId, NULL, NULL, &w,
                                                   &h, NULL, NULL, NULL)) {
