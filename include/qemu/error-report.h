@@ -74,6 +74,7 @@ void set_logger(logger logger);
     })
 
 extern bool message_with_timestamp;
+extern bool message_with_loc;
 extern bool error_with_guestname;
 extern const char *error_guest_name;
 
