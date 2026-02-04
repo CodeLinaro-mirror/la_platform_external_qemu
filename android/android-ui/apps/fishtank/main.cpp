@@ -16,6 +16,7 @@
 #include "aemu/base/Debug.h"
 #include "aemu/base/ProcessControl.h"
 #include "aemu/base/files/PathUtils.h"
+#include "aemu/base/process/Command.h"
 #include "android/avd/info.h"
 #include "android/base/system/System.h"
 #include "android/cmdline-definitions.h"
@@ -44,12 +45,14 @@
 #include <algorithm>
 #include "absl/log/log.h"
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_join.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/feature_control.h"
 
 using android::base::pj;
 using android::base::System;
+using android::emulation::control::EmulatorAdvertisement;
 
 namespace fc = android::featurecontrol;
 
@@ -91,8 +94,10 @@ int main(int argc, char* argv[]) {
     auto system = System::get();
     std::string launcherDir = system->envGet("ANDROID_EMULATOR_LAUNCHER_DIR");
     if (launcherDir.empty()) {
-        LOG(WARNING) << "ANDROID_EMULATOR_LAUNCHER_DIR is not defined. You must've started "
-                     << "fishtank as a standalone application. Will try to deduce the launcher "
+        LOG(WARNING) << "ANDROID_EMULATOR_LAUNCHER_DIR is not defined. You "
+                        "must've started "
+                     << "fishtank as a standalone application. Will try to "
+                        "deduce the launcher "
                      << "directory from ANDROID_SDK_ROOT.";
         std::string sdkRoot = system->envGet("ANDROID_SDK_ROOT");
         if (!sdkRoot.empty()) {
@@ -100,12 +105,14 @@ int main(int argc, char* argv[]) {
             launcherDir = pj(sdkRoot, "emulator");
             system->setEnvironmentVariable("ANDROID_EMULATOR_LAUNCHER_DIR",
                                            launcherDir);
-            LOG(INFO) << "Inferred ANDROID_EMULATOR_LAUNCHER_DIR from ANDROID_SDK_ROOT: "
+            LOG(INFO) << "Inferred ANDROID_EMULATOR_LAUNCHER_DIR from "
+                         "ANDROID_SDK_ROOT: "
                       << launcherDir;
         } else {
-            // ANDROID_EMULATOR_LAUNCHER_DIR is critical to resolve things like the
-            // advancedFeatures.ini and maps.key file. Without those things, fishtank will likely
-            // misbehave, which is why we decide to make it a fatal error.
+            // ANDROID_EMULATOR_LAUNCHER_DIR is critical to resolve things like
+            // the advancedFeatures.ini and maps.key file. Without those things,
+            // fishtank will likely misbehave, which is why we decide to make it
+            // a fatal error.
             LOG(FATAL) << "Neither ANDROID_EMULATOR_LAUNCHER_DIR nor "
                           "ANDROID_SDK_ROOT is defined. Cannot start fishtank.";
         }
@@ -175,8 +182,42 @@ int main(int argc, char* argv[]) {
     }
 
     std::string discovery = opts->fishtank;
-    if ("default" == discovery) {
-        android::emulation::control::EmulatorAdvertisement adv({});
+
+    // 3 Options:
+
+    // -- "default": Pick the first running emulator
+    // -- "<pid>": Find the PID, and corresponding discovery file
+    // -- "file.ini": Discovery file to use.
+    int qemu_pid = 0;
+    if (absl::SimpleAtoi(discovery, &qemu_pid)) {
+        EmulatorAdvertisement adv({});
+
+        // We are willing to wait 5 seconds for the discovery file.
+        auto start = absl::Now();
+        auto deadline = start + absl::Seconds(5);
+        auto proc = android::base::Process::fromPid(qemu_pid);
+        auto possibleDiscoveryFile =
+                EmulatorAdvertisement::discoveryFile(qemu_pid);
+        while ((proc != nullptr && proc->isAlive() &&
+                !possibleDiscoveryFile.ok()) &&
+               absl::Now() < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            proc = android::base::Process::fromPid(qemu_pid);
+            possibleDiscoveryFile =
+                    EmulatorAdvertisement::discoveryFile(qemu_pid);
+        }
+        if (proc == nullptr || !proc->isAlive()) {
+            LOG(FATAL) << "The qemu process " << qemu_pid << " does not exist";
+        }
+        if (!possibleDiscoveryFile.ok()) {
+            LOG(FATAL) << "The discovery file was not found after "
+                       << (absl::Now() - start)
+                       << ", with status: " << possibleDiscoveryFile.status();
+        }
+
+        discovery = possibleDiscoveryFile.value();
+    } else if ("default" == discovery) {
+        EmulatorAdvertisement adv({});
         auto emulators = adv.discoverRunningEmulators();
         std::vector<std::string> discovery_files;
         std::copy_if(emulators.begin(), emulators.end(),
@@ -243,12 +284,14 @@ int main(int argc, char* argv[]) {
         derror("Could not start renderer");
     }
 
-    // Set Environment variables that get picked up by qt_path.cpp, which in turn, will set
-    // environment variables for Qt to determine the path to the plugins, qtwebengine stuff, etc.
+    // Set Environment variables that get picked up by qt_path.cpp, which in
+    // turn, will set environment variables for Qt to determine the path to the
+    // plugins, qtwebengine stuff, etc.
     auto program_dir = System::get()->getProgramDirectory();
     auto qt_base_dir = pj({program_dir, "lib64", "qt"});
 #ifdef _WIN32
-    // For windows, we install all the Qt core dlls into the same directory with fishtank.exe.
+    // For windows, we install all the Qt core dlls into the same directory with
+    // fishtank.exe.
     auto qt_lib_path = program_dir;
     // QtWebEngineProcess.exe lives in qt/bin.
     auto qt_process_path = pj({qt_base_dir, "bin", "QtWebEngineProcess.exe"});
