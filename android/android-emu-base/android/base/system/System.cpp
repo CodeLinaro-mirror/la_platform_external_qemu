@@ -1392,7 +1392,7 @@ public:
         }
 
         if (!cpu_impl_name) {
-            cpu_impl_name = malloc(17);
+            cpu_impl_name = (char*) malloc(17);
             if (!cpu_impl_name) {
                 string errorStr =
                     StringFormat("Error in %s: memory allocation failed.",
@@ -1404,7 +1404,7 @@ public:
             snprintf(cpu_impl_name, 17, "Implementer_0x%02x", cpu_impl_id);
         }
         if (!cpu_part_name) {
-            cpu_part_name = malloc(11);
+            cpu_part_name = (char*) malloc(11);
             if (!cpu_part_name) {
                 string errorStr =
                     StringFormat("Error in %s: memory allocation failed.",
