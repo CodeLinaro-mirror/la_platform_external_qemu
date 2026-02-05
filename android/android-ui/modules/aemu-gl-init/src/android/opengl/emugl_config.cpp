@@ -524,15 +524,22 @@ bool hasSufficientHostVulkanDriver(bool isXrAvd) {
         return true;
     }
 
-#if defined(__APPLE__) && !defined(__arm64__)
-    const bool isMacIntel = true;
+#if defined(__APPLE__)
+#if defined(__arm64__)
+    // Known hardware configuration, no need to check
+    return true;
 #else
-    const bool isMacIntel = false;
+    // Host Vulkan is not supported on Mac Intel
+    dwarning("%s: unsupported architecture.", __func__);
+    return false;
 #endif
-    if (isMacIntel) {
-        // Host Vulkan is not supported on Mac Intel
-        dwarning("%s: unsupported architecture.", __func__);
-        return false;
+#endif
+
+    if (isXrAvd) {
+        // Always use hardware for XR, as the host driver tests are done within
+        // the Avd compatibility tests at startup, and the users are warned in
+        // case of any incompatibilities
+        return true;
     }
 
     char* vkVendor = nullptr;
