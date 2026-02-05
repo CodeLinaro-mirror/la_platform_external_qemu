@@ -26,12 +26,9 @@ class BaseEnvironment(UserDict):
             {
                 "PATH": str(
                     aosp
-                    / "external"
-                    / "qemu"
-                    / "android"
-                    / "third_party"
-                    / "chromium"
-                    / "depot_tools"
+                    / "prebuilts"
+                    / "ninja"
+                    / f"{platform.system().lower()}-x86"
                 )
                 + os.pathsep
                 + os.environ.get("PATH", "")

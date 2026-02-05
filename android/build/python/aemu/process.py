@@ -93,14 +93,7 @@ def get_system_env():
             raise Exception("Missing required environment variable")
     else:
         local_env = os.environ.copy()
-        local_env["PATH"] = (
-            os.path.join(
-                get_qemu_root(), "android", "third_party", "chromium", "depot_tools"
-            )
-            + os.pathsep
-            + local_env["PATH"]
-        )
-
+  
     _CACHED_ENV = local_env
     return local_env
 
