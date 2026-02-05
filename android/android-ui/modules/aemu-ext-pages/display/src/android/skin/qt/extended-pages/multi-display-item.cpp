@@ -82,9 +82,7 @@ MultiDisplayItem::MultiDisplayItem(int id, QWidget* parent)
     mUi->dpi->setMinValue(120);
     mUi->dpi->setMaxValue(640);
 
-    if (getDisplayTypes().size() > 1) {
-        mCurrentIndex = 1; /* 720p as default */
-    }
+    mCurrentIndex = getDisplayTypes().size() > 1 ? 1 : 0; /* 720p as default */
     mUi->selectDisplayType->setCurrentIndex(mCurrentIndex);
     setValues(mCurrentIndex);
     connect(mUi->selectDisplayType, SIGNAL(currentIndexChanged(int)), this,
