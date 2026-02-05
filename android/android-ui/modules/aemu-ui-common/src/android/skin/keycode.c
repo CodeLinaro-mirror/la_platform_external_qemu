@@ -124,6 +124,7 @@ SkinKeyCode skin_keycode_rotate(SkinKeyCode code, int  rotation) {
     _KEYSYM_(END, End)                    \
     _KEYSYM_(PAGEUP, PageUp)              \
     _KEYSYM_(PAGEDOWN, PageDown)          \
+    _KEYSYM_(LEFTMETA, Meta)              \
     _KEYSYM1_(F1)                         \
     _KEYSYM1_(F2)                         \
     _KEYSYM1_(F3)                         \
@@ -145,6 +146,7 @@ SkinKeyCode skin_keycode_rotate(SkinKeyCode code, int  rotation) {
     _KEYSYM1_(REWIND)                     \
     _KEYSYM1_(FASTFORWARD)                \
     _KEYSYM1_(SLEEP)                      \
+    _KEYSYM1_(SCALE)                      \
     _KEYSYM1_ANDROID_(STEM_PRIMARY)       \
     _KEYSYM1_ANDROID_(STEM_1)             \
     _KEYSYM1_ANDROID_(STEM_2)             \

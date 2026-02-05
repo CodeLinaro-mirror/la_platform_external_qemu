@@ -1278,6 +1278,28 @@ void EmulatorQtWindow::setRelativeMouseCoordMode(bool state) {
     mRelativeMouseCoordMode = state;
 }
 
+#ifdef __APPLE__
+
+void EmulatorQtWindow::grabMouse(const QCursor& cursor) {
+    QFrame::grabMouse(cursor);
+    // b/476267783: On Mac, setting a blank cursor does not necessarily hide
+    // the cursor. We also invoke the native API to hide the cursor.
+    if (cursor == Qt::BlankCursor) {
+        mac_hide_cursor();
+        mIsCursorHidden = true;
+    }
+}
+
+void EmulatorQtWindow::releaseMouse() {
+    QFrame::releaseMouse();
+    if (mIsCursorHidden) {
+        mac_show_cursor();
+        mIsCursorHidden = false;
+    }
+}
+
+#endif  // __APPLE__
+
 void EmulatorQtWindow::mouseMoveEvent(QMouseEvent* event) {
     // The motion event will interfere with the swipe gesture being synthesized.
     if (mWheelScrollTimer.isActive())
@@ -3605,9 +3627,15 @@ void EmulatorQtWindow::wheelEvent(QWheelEvent* event) {
             mTrackpadAggregateTimer.start();
         } else {
             // For most mice, 1 wheel click = 15 degrees
-            handleMouseWheelEvent(event->angleDelta().y() * 120 / 15,
+            int scrollScale = 120;
+            // Avoid too sensitive wheel events for Desktop.
+            if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo())) {
+                scrollScale = 1;
+            }
+            handleMouseWheelEvent(event->angleDelta().y() * scrollScale / 15,
                                   Qt::Orientation::Vertical);
-            handleMouseWheelEvent(event->angleDelta().x() * 120 / 15,
+            handleMouseWheelEvent(event->angleDelta().x() * scrollScale / 15,
                                   Qt::Orientation::Horizontal);
         }
     } else if (inputDeviceHasRotary) {

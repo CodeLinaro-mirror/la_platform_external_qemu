@@ -13,13 +13,14 @@
 // limitations under the License.
 #pragma once
 
-#include <memory>         // for make_unique, unique_ptr
-#include <string>         // for string, hash, operator==
-#include <unordered_map>  // for unordered_map
-#include <vector>         // for vector
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
-#include "aemu/base/Compiler.h"          // for DISALLOW_COPY_AND_ASSIGN
-#include "android/base/system/System.h"  // for System, System::Pid
+#include "absl/status/statusor.h"
+#include "aemu/base/Compiler.h"
+#include "android/base/system/System.h"
 
 namespace android {
 namespace emulation {
@@ -36,7 +37,7 @@ using EmulatorProperties = std::unordered_map<std::string, std::string>;
 // Mainly here so you can write proper unit tests.
 class EmulatorLivenessStrategy {
 public:
-    virtual ~EmulatorLivenessStrategy(){};
+    virtual ~EmulatorLivenessStrategy() {};
     virtual bool isAlive(std::string myFile,
                          std::string discoveryFile) const = 0;
 };
@@ -97,6 +98,9 @@ public:
 
     // True if a advertisement exists for the given pid.
     static bool exists(base::System::Pid pid);
+
+    // Returns the discovery file for the given pid.
+    static absl::StatusOr<std::string> discoveryFile(base::System::Pid pid);
 
     // Deletes all ini files in <user-specific_tmp_directory>/avd/running and
     // directories <user-specific_tmp_directory>/avd/running/<pid> for

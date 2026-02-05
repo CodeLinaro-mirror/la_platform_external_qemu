@@ -36,6 +36,7 @@ namespace base {
 #  define HOST_VULKAN_RESULT "host"
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swiftshader" // Windows redirects swangle to swiftshader
+#  define AUTO_GLES_RESULT "host"
 #elif defined(__APPLE__)
 #  define LIB_NAME(x)  "lib" x ".dylib"
 #if defined(__arm64__)
@@ -47,12 +48,14 @@ namespace base {
 #endif
 #  define SWIFTSHADER_RESULT "swangle" // Mac redirects swiftshader to swangle
 #  define SWANGLE_RESULT "swangle"
+#  define AUTO_GLES_RESULT "swangle"   // TODO(b/479126903)
 #else
 #  define LIB_NAME(x)  "lib" x ".so"
 #  define LAVAPIPE_RESULT "lavapipe"
 #  define HOST_VULKAN_RESULT "host"
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swangle"
+#  define AUTO_GLES_RESULT "host"
 #endif
 
 static std::string makeLibSubPath(const char* name) {
@@ -296,7 +299,7 @@ TEST(EmuglConfig, initFromUISetting) {
 
         switch (i) {
         case WINSYS_GLESBACKEND_PREFERENCE_AUTO:
-            EXPECT_STREQ("host", config.gles_backend);
+            EXPECT_STREQ(AUTO_GLES_RESULT, config.gles_backend);
 #ifdef __APPLE__
             // When host gpu is not enforced, swiftshader will be used on macOS
             // for vulkan
@@ -400,7 +403,7 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
             EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
         }else {
             EXPECT_TRUE(initRes);
-            EXPECT_STREQ("host", config.gles_backend);
+            EXPECT_STREQ(AUTO_GLES_RESULT, config.gles_backend);
         }
     }
 
@@ -418,7 +421,7 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
             EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
         }else {
             EXPECT_TRUE(initRes);
-            EXPECT_STREQ("host", config.gles_backend);
+            EXPECT_STREQ(AUTO_GLES_RESULT, config.gles_backend);
         }
     }
 }

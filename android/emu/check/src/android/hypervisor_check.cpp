@@ -48,7 +48,7 @@ AvdCompatibilityCheckResult hasCompatibleHypervisor(AvdInfo* avd) {
     AndroidCpuAccelerator accelerator = androidCpuAcceleration_getAccelerator();
 
     if (isXrAvd && accelerator == ANDROID_CPU_ACCELERATOR_AEHD) {
-        metrics.set_check(EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_GPU_CHECK_NO_VULKAN);
+        metrics.set_check(EmulatorCompatibilityInfo::AVD_COMPATIBILITY_CHECK_SYSTEM_CORE);
         metrics.set_details("Accelerator for Xr");
         return {
                 .description = absl::StrFormat(

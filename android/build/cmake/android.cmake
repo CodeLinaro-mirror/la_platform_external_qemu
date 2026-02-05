@@ -1327,7 +1327,7 @@ endfunction()
 function(android_copy_file TGT SRC DST)
   add_custom_command(
     TARGET ${TGT} PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                    ${SRC} ${DST} MAIN_DEPENDENCY ${SRC})
+                                    ${SRC} ${DST})
 endfunction()
 
 # Copies the given test directory to the given destination. The test data

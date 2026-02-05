@@ -84,8 +84,8 @@ static void user_event_key(unsigned code, bool down) {
 static void user_event_generic(SkinGenericEventCode event) {
     bool sent = false;
     if (feature_is_enabled(kFeature_VirtioInput)) {
-        sent = android_virtio_input_send(event.type, event.code, event.value,
-                                         event.displayId, event.touchpad);
+        sent = android_virtio_send_event_as_mt(event.type, event.code, event.value,
+                                               event.displayId, event.touchpad);
     }
 
     if (!sent) {
@@ -102,11 +102,11 @@ static void user_event_generic_events(SkinGenericEventCode* events, int count) {
 
 static void user_event_touch(const SkinEvent * const data,
                              int displayId) {
-    android_virtio_touch_event(data, displayId);
+    android_virtio_send_touch_as_mt(data, displayId);
 }
 
 static void user_event_touchpad(const SkinEvent* const data, int touchpadId) {
-    android_virtio_touchpad_event(data, touchpadId);
+    android_virtio_send_touchpad_as_mt(data, touchpadId);
 }
 
 static void user_event_mouse(int dx,
@@ -120,7 +120,7 @@ static void user_event_mouse(int dx,
     if (feature_is_enabled(kFeature_VirtioInput) &&
         !feature_is_enabled(kFeature_VirtioMouse) &&
         !feature_is_enabled(kFeature_VirtioTablet))
-        android_virtio_kbd_mouse_event(dx, dy, dz, buttonsState, displayId);
+        android_virtio_send_mouse_as_mt(dx, dy, dz, buttonsState, displayId);
     else {
         if (feature_is_enabled(kFeature_VirtioTablet)) {
             kbd_put_tablet_button_state(buttonsState);
@@ -162,7 +162,7 @@ static void user_event_pen(int dx,
     if (VERBOSE_CHECK(keys)) {
         dprint(">> PEN [%d %d : 0x%04x]", dx, dy, buttonsState);
     }
-    android_virtio_pen_event(dx, dy, ev, buttonsState, displayId);
+    android_virtio_send_pen_as_mt(dx, dy, ev, buttonsState, displayId);
 }
 
 // Scales v by a factor of 1/d. If the result is zero, returns 1 or -1 instead

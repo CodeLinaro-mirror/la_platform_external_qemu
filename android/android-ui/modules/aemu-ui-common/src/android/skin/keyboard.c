@@ -363,7 +363,10 @@ void skin_keyboard_process_event(SkinKeyboard* kb, SkinEvent* ev, int down) {
         case kKeyCodeAltRight:
         case kKeyCodeCapLeft:
         case kKeyCodeCapRight:
+        case kKeyCodeMetaLeft:
+        case kKeyCodeMetaRight:
         case kKeyCodeSym:
+        case kKeyCodeScale:
         case LINUX_KEY_PLAYPAUSE:
         case LINUX_KEY_BACK:
         case LINUX_KEY_POWER:
@@ -380,6 +383,17 @@ void skin_keyboard_process_event(SkinKeyboard* kb, SkinEvent* ev, int down) {
         case LINUX_KEY_HEADSETHOOK:
         case LINUX_KEY_SEND:
         case LINUX_KEY_DELETE:
+        case LINUX_KEY_FORWARD:
+        case LINUX_KEY_REFRESH:
+        case LINUX_KEY_FULL_SCREEN:
+        case LINUX_KEY_SELECTIVE_SCREENSHOT:
+        case LINUX_KEY_BRIGHTNESSDOWN:
+        case LINUX_KEY_BRIGHTNESSUP:
+        case LINUX_KEY_PREVIOUSSONG:
+        case LINUX_KEY_NEXTSONG:
+        case LINUX_KEY_MICMUTE:
+        case LINUX_KEY_MUTE:
+        case LINUX_KEY_SCREENLOCK:
         case ANDROID_KEY_APPSWITCH:
         case ANDROID_KEY_STEM_PRIMARY:
         case ANDROID_KEY_STEM_1:

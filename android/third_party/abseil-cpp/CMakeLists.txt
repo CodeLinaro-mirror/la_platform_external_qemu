@@ -23,7 +23,7 @@ if (TARGET absl::strings)
   # Do not include twice.
   return()
 endif()
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 cmake_policy(SET CMP0079 NEW)
 set(ABSL_ROOT ${ANDROID_QEMU2_TOP_DIR}/../abseil-cpp)
 list(APPEND CMAKE_MODULE_PATH ${ABSL_ROOT}/CMake ${ABSL_ROOT}/absl/copts)

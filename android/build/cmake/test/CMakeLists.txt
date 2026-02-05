@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 project(TEST)
 
 # This here is to make sure we can find the dependencies. You don't need this if

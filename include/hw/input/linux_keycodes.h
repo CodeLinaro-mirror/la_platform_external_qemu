@@ -135,7 +135,7 @@
 #define LINUX_KEY_KPEQUAL               117
 #define LINUX_KEY_KPPLUSMINUS           118
 #define LINUX_KEY_PAUSE                 119
-
+#define LINUX_KEY_SCALE                 120
 #define LINUX_KEY_KPCOMMA               121
 #define LINUX_KEY_HANGEUL               122
 #define LINUX_KEY_HANGUEL               KEY_HANGEUL
@@ -170,6 +170,7 @@
 #define LINUX_KEY_WWW                   150
 #define LINUX_KEY_MSDOS                 151
 #define LINUX_KEY_COFFEE                152
+#define LINUX_KEY_SCREENLOCK LINUX_KEY_COFFEE
 #define LINUX_KEY_DIRECTION             153
 #define LINUX_KEY_CYCLEWINDOWS  154
 #define LINUX_KEY_MAIL          155
@@ -273,6 +274,8 @@
 #define LINUX_KEY_PLUS                243
 #define LINUX_KEY_NOTIFICATION        244
 
+#define LINUX_KEY_MICMUTE             248
+
 #define LINUX_BTN_MISC          0x100
 #define LINUX_BTN_0                     0x100
 #define LINUX_BTN_1                     0x101
@@ -366,7 +369,8 @@
 #define LINUX_KEY_TITLE                 0x171
 #define LINUX_KEY_SUBTITLE              0x172
 #define LINUX_KEY_ANGLE                 0x173
-#define LINUX_KEY_ZOOM          0x174
+#define LINUX_KEY_FULL_SCREEN           0x174
+#define LINUX_KEY_ZOOM LINUX_KEY_FULL_SCREEN
 #define LINUX_KEY_MODE          0x175
 #define LINUX_KEY_KEYBOARD              0x176
 #define LINUX_KEY_SCREEN                0x177
@@ -450,6 +454,8 @@
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define LINUX_KEY_MIN_INTERESTING       KEY_MUTE
 #define LINUX_KEY_MAX                   0x1ff
+
+#define LINUX_KEY_SELECTIVE_SCREENSHOT 0x27a
 
 #ifndef ABS_MT_SLOT
 #define LINUX_ABS_MT_SLOT          0x2f  /* MT slot being modified */

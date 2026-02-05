@@ -198,7 +198,6 @@ EmulatorAdvertisement::~EmulatorAdvertisement() {
     garbageCollect();
 }
 
-
 int EmulatorAdvertisement::garbageCollect() const {
     auto start = std::chrono::high_resolution_clock::now();
     DD("Starting garbage collection of advertisement.");
@@ -272,12 +271,22 @@ std::string EmulatorAdvertisement::location() const {
     return result;
 }
 
-// True if a advertisement exists for the given pid.
-bool EmulatorAdvertisement::exists(System::Pid pid) {
+absl::StatusOr<std::string> EmulatorAdvertisement::discoveryFile(
+        System::Pid pid) {
     std::string pidfile = android::base::StringFormat(location_format, pid);
     std::string pidPath = android::base::pj(
             android::ConfigDirs::getDiscoveryDirectory(), pidfile);
-    return System::get()->pathIsFile(pidPath);
+    return System::get()->pathIsFile(pidPath)
+                   ? absl::StatusOr<std::string>(pidPath)
+                   : absl::NotFoundError(absl::StrFormat(
+                             "Discovery file for pid %d (%s) not found in %s",
+                             pid, pidfile,
+                             android::ConfigDirs::getDiscoveryDirectory()));
+}
+
+// True if a advertisement exists for the given pid.
+bool EmulatorAdvertisement::exists(System::Pid pid) {
+    return discoveryFile(pid).ok();
 }
 
 bool EmulatorAdvertisement::write() const {

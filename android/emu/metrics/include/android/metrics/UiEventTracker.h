@@ -58,7 +58,7 @@ private:
 };
 
 // This class is used to batch individual UiEventTrackers.
-class MultipleUiEventsTracker {
+class AEMU_METRICS_API MultipleUiEventsTracker {
 public:
     DISALLOW_COPY_ASSIGN_AND_MOVE(MultipleUiEventsTracker);
     MultipleUiEventsTracker() = default;

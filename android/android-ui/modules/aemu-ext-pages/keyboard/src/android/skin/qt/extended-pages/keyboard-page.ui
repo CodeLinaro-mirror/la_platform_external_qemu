@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>KeyboardPage</class>
+ <widget class="QWidget" name="KeyboardPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>622</width>
+    <height>580</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>30</y>
+     <width>90</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Additional keys</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="gridLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>50</y>
+     <width>560</width>
+     <height>80</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="1" column="4">
+     <widget class="RaisedMaterialButton" name="volumeMuteButton">
+      <property name="toolTip">
+       <string>Mute Speakers</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_volume_mute</normaloff>:/light/key_volume_mute</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_volume_mute</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="3">
+     <widget class="RaisedMaterialButton" name="micMuteButton">
+      <property name="toolTip">
+       <string>System Microphone Mute</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_mic_mute</normaloff>:/light/key_mic_mute</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_mic_mute</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="5">
+     <widget class="RaisedMaterialButton" name="screenLockButton">
+      <property name="toolTip">
+       <string>Screen Lock</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_lock</normaloff>:/light/key_lock</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_lock</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="4">
+     <widget class="RaisedMaterialButton" name="brightnessDownButton">
+      <property name="toolTip">
+       <string>Display Brightness Down</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_brightness_down</normaloff>:/light/key_brightness_down</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_brightness_down</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="RaisedMaterialButton" name="forwardButton">
+      <property name="toolTip">
+       <string>Forward</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_forward</normaloff>:/light/key_forward</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_forward</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="5">
+     <widget class="RaisedMaterialButton" name="brightnessUpButton">
+      <property name="toolTip">
+       <string>Display Brightness Up</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_brightness_up</normaloff>:/light/key_brightness_up</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_brightness_up</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="2">
+     <widget class="RaisedMaterialButton" name="mediaNextButton">
+      <property name="toolTip">
+       <string>Next Track</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_media_next</normaloff>:/light/key_media_next</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_media_next</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="RaisedMaterialButton" name="mediaPlayPauseButton">
+      <property name="toolTip">
+       <string>Play / Pause</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_play_pause</normaloff>:/light/key_play_pause</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_play_pause</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="RaisedMaterialButton" name="mediaPreviousButton">
+      <property name="toolTip">
+       <string>Previous Track</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_media_previous</normaloff>:/light/key_media_previous</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_media_previous</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="RaisedMaterialButton" name="refreshButton">
+      <property name="toolTip">
+       <string>Refresh</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_refresh</normaloff>:/light/key_refresh</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_refresh</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="3">
+     <widget class="RaisedMaterialButton" name="screenCaptureButton">
+      <property name="toolTip">
+       <string>Screen Capture</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_screen_capture</normaloff>:/light/key_screen_capture</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_screen_capture</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="2">
+     <widget class="RaisedMaterialButton" name="fullScreenButton">
+      <property name="toolTip">
+       <string>Full Screen</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/light/key_full_screen</normaloff>:/light/key_full_screen</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>20</width>
+        <height>25</height>
+       </size>
+      </property>
+      <property name="themeIconName" stdset="0">
+       <string>key_full_screen</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>RaisedMaterialButton</class>
+   <extends>QPushButton</extends>
+   <header>android/skin/qt/raised-material-button.h</header>
+  </customwidget>
+ </customwidgets>
+ <tabstops>
+  <tabstop>forwardButton</tabstop>
+  <tabstop>refreshButton</tabstop>
+  <tabstop>fullScreenButton</tabstop>
+  <tabstop>screenCaptureButton</tabstop>
+  <tabstop>brightnessDownButton</tabstop>
+  <tabstop>brightnessUpButton</tabstop>
+  <tabstop>mediaPreviousButton</tabstop>
+  <tabstop>mediaPlayPauseButton</tabstop>
+  <tabstop>mediaNextButton</tabstop>
+  <tabstop>micMuteButton</tabstop>
+  <tabstop>volumeMuteButton</tabstop>
+  <tabstop>screenLockButton</tabstop>
+ </tabstops>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>

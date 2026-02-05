@@ -753,7 +753,7 @@ private:
     }
 
     void vqParseGuestToHostRequestLocked(
-            const struct virtio_vsock_hdr* request) {
+            const struct virtio_vsock_hdr* request, const void* requestData) {
         if (request->type != VIRTIO_VSOCK_TYPE_STREAM) {
             return;
         }
@@ -821,8 +821,7 @@ private:
                     case VIRTIO_VSOCK_OP_RW:
                         stream->setGuestPos(request->buf_alloc,
                                             request->fwd_cnt);
-                        if (stream->writeGuestToHost(request + 1,
-                                                     request->len)) {
+                        if (stream->writeGuestToHost(requestData, request->len)) {
                             stream->sendOp(VIRTIO_VSOCK_OP_CREDIT_UPDATE);
                         } else {
                             stream->sendOp(VIRTIO_VSOCK_OP_CREDIT_UPDATE);
@@ -870,27 +869,32 @@ private:
     }
 
     void vqParseGuestToHostLocked() {
+        const size_t vqGuestToHostBufSize = mVqGuestToHostBuf.size();
+        size_t consumed = 0;
+
         while (true) {
-            if (mVqGuestToHostBuf.size() < sizeof(struct virtio_vsock_hdr)) {
+            if ((vqGuestToHostBufSize - consumed) < sizeof(struct virtio_vsock_hdr)) {
                 break;
             }
 
-            const auto request =
-                    reinterpret_cast<const struct virtio_vsock_hdr*>(
-                            mVqGuestToHostBuf.data());
-            const size_t requestSize = sizeof(*request) + request->len;
-            if (mVqGuestToHostBuf.size() < requestSize) {
+            const uint8_t* requestStart = &mVqGuestToHostBuf[consumed];
+            struct virtio_vsock_hdr request;
+            ::memcpy(&request, requestStart, sizeof(request));
+            if (request.len > (vqGuestToHostBufSize - consumed - sizeof(request))) {
                 break;
             }
 
-            vqParseGuestToHostRequestLocked(request);
+            vqParseGuestToHostRequestLocked(&request, &requestStart[sizeof(request)]);
+            consumed += sizeof(request) + request.len;
+        }
 
-            if (requestSize == mVqGuestToHostBuf.size()) {
+        if (consumed > 0) {
+            if (consumed == vqGuestToHostBufSize) {
                 mVqGuestToHostBuf.clear();
             } else {
                 mVqGuestToHostBuf.erase(
                         mVqGuestToHostBuf.begin(),
-                        mVqGuestToHostBuf.begin() + requestSize);
+                        mVqGuestToHostBuf.begin() + consumed);
             }
         }
     }
@@ -963,7 +967,7 @@ void VSockStream::sendOp(enum virtio_vsock_op op) {
 void VSockStream::signalWake(const bool write) {
     if (mPipe) {
         while (true) {
-            uint8_t data[1024];
+            uint8_t data[16384];
             AndroidPipeBuffer abuf;
             abuf.data = data;
             abuf.size = sizeof(data);

@@ -288,9 +288,6 @@ OPT_FLAG(no_mouse_reposition,
          "Do not reposition the mouse to emulator window center if mouse "
          "pointer gets out of the window.")
 
-OPT_FLAG(guest_angle,
-         "Enable guest ANGLE as system driver.")
-
 OPT_LIST(usb_passthrough, "VID PID BUS PORTS", "Host USB device Passthrough")
 
 OPT_LIST(append_userspace_opt, "key=value", "Appends a property which is passed to the userspace.")

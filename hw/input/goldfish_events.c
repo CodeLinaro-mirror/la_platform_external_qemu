@@ -200,6 +200,7 @@ static const GoldfishEventCodeInfo ev_key_codes_table[] = {
     KEY_CODE(KEY_KPEQUAL, LINUX_KEY_KPEQUAL),
     KEY_CODE(KEY_KPPLUSMINUS, LINUX_KEY_KPPLUSMINUS),
     KEY_CODE(KEY_PAUSE, LINUX_KEY_PAUSE),
+    KEY_CODE(KEY_SCALE, LINUX_KEY_SCALE),
     KEY_CODE(KEY_KPCOMMA, LINUX_KEY_KPCOMMA),
     KEY_CODE(KEY_HANGEUL, LINUX_KEY_HANGEUL),
     KEY_CODE(KEY_HANJA, LINUX_KEY_HANJA),
@@ -322,6 +323,11 @@ static const GoldfishEventCodeInfo ev_key_codes_table[] = {
     KEY_CODE(KEY_FOCUS, LINUX_KEY_FOCUS),
     KEY_CODE(KEY_PLUS, LINUX_KEY_PLUS),
     KEY_CODE(KEY_NOTIFICATION, LINUX_KEY_NOTIFICATION),
+    KEY_CODE(KEY_MICMUTE, LINUX_KEY_MICMUTE),
+
+    KEY_CODE(KEY_ZOOM,
+             LINUX_KEY_FULL_SCREEN),  // ZOOM is alias of FULL_SCREEN key code.
+    KEY_CODE(KEY_SELECTIVE_SCREENSHOT, LINUX_KEY_SELECTIVE_SCREENSHOT),
 
     KEY_CODE(KEY_APPSWITCH, ANDROID_KEY_APPSWITCH),
     KEY_CODE(KEY_STEM_PRIMARY, ANDROID_KEY_STEM_PRIMARY),
@@ -757,6 +763,7 @@ static void goldfish_evdev_realize(DeviceState *dev, Error **errp)
     goldfish_events_set_bit(s, EV_KEY, LINUX_KEY_POWER);
     goldfish_events_set_bit(s, EV_KEY, LINUX_KEY_SEARCH);
     goldfish_events_set_bit(s, EV_KEY, LINUX_KEY_SLEEP);
+    goldfish_events_set_bit(s, EV_KEY, LINUX_KEY_SCALE);
 
     goldfish_events_set_bit(s, EV_KEY, ANDROID_KEY_APPSWITCH);
     goldfish_events_set_bit(s, EV_KEY, ANDROID_KEY_STEM_PRIMARY);
