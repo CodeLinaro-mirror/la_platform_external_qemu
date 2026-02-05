@@ -378,6 +378,11 @@ static QemuOptsList qemu_msg_opts = {
             .help = "Prepends guest name for error messages but only if "
                     "-name guest is set otherwise option is ignored\n",
         },
+        {
+            .name = "loc",
+            .type = QEMU_OPT_BOOL,
+            .help = "Adds location information to the logs.\n",
+        },
         { /* end of list */ }
     },
 };
@@ -811,6 +816,7 @@ static void realtime_init(void)
 static void configure_msg(QemuOpts *opts)
 {
     message_with_timestamp = qemu_opt_get_bool(opts, "timestamp", false);
+    message_with_loc = qemu_opt_get_bool(opts, "loc", false);
     error_with_guestname = qemu_opt_get_bool(opts, "guest-name", false);
 }
 

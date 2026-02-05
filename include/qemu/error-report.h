@@ -73,6 +73,7 @@ void error_set_log_info(bool log_info);
     })
 
 extern bool message_with_timestamp;
+extern bool message_with_loc;
 extern bool error_with_guestname;
 extern const char *error_guest_name;
 
