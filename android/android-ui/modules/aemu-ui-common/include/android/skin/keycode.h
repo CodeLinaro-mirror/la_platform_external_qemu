@@ -136,7 +136,7 @@ typedef enum {
     kKeyCodeSleep = LINUX_KEY_SLEEP,
     kKeyCodeScale = LINUX_KEY_SCALE,
     kKeyCodeRefresh = LINUX_KEY_REFRESH,
-    kKeyCodeSelectiveScreenshot = LINUX_KEY_SELECTIVE_SCREENSHOT,
+    kKeyCodePrintScreen = LINUX_KEY_SYSRQ,
     kKeyCodeMicMute = LINUX_KEY_MICMUTE,
     kKeyCodeFullScreen = LINUX_KEY_FULL_SCREEN,
     kKeyCodeMute = LINUX_KEY_MUTE,
