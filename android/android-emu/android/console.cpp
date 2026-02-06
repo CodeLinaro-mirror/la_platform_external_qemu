@@ -2608,6 +2608,7 @@ static int do_snapshot_pull(ControlClient client, char* args) {
         return -1;
     }
     std::string& filename = arg_strings[1];
+    dinfo("Snapshot pull: raw filename from command: %s", filename.c_str());
     const char* directory = nullptr;
     std::unique_ptr<std::ofstream> dstFile;
     android::emulation::control::FileFormat format =
@@ -2623,19 +2624,24 @@ static int do_snapshot_pull(ControlClient client, char* args) {
         directory = filename.c_str();
     }
     if (format != android::emulation::control::DIRECTORY) {
+        dinfo("Snapshot pull: opening destination file: %s", filename.c_str());
         dstFile.reset(new std::ofstream(
                 android::base::PathUtils::asUnicodePath(filename.data()).c_str(),
                 std::ios::binary | std::ios::out));
         if (!dstFile->is_open()) {
+            dinfo("Snapshot pull: FAILED to open file: %s", filename.c_str());
             control_write(client, "KO: Failed to write to %s\r\n",
                           filename.c_str());
             return -1;
         }
+        dinfo("Snapshot pull: file opened successfully.");
     }
 
+    dinfo("Snapshot pull: calling pullSnapshot for %s", arg_strings[0].c_str());
     bool succeed = android::emulation::control::pullSnapshot(
             arg_strings[0].c_str(), dstFile->rdbuf(), directory, false, format,
             false, client, control_write_err_cb);
+    dinfo("Snapshot pull: pullSnapshot returned %d", succeed);
     return succeed ? 0 : -1;
 }
 

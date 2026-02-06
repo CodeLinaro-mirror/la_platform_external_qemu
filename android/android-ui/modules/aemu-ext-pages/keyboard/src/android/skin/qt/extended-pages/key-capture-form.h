@@ -11,28 +11,13 @@
 
 #pragma once
 
-#include <QPushButton>
-#include <QWidget>
-#include <memory>
+#include <QKeySequenceEdit>
 
-#include "android/skin/keycode.h"
-#include "ui_keyboard-page.h"
-
-class EmulatorQtWindow;
-
-class KeyboardPage : public QWidget {
+class KeyCaptureForm : public QKeySequenceEdit {
     Q_OBJECT
-
 public:
-    explicit KeyboardPage(QWidget* parent = nullptr);
-    void setEmulatorWindow(EmulatorQtWindow* eW);
+    explicit KeyCaptureForm(QWidget* parent = nullptr);
 
-private slots:
-    void on_keyComboSendButton_clicked();
-
-private:
-    void toggleKeyButtonDown(const SkinKeyCode key_code, const bool down);
-
-    std::unique_ptr<Ui::KeyboardPage> mUi;
-    EmulatorQtWindow* mEmulatorWindow;
+protected:
+    bool event(QEvent* e) override;
 };

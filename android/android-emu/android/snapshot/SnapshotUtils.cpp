@@ -1,4 +1,3 @@
-
 // Copyright (C) 2021 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -90,16 +89,19 @@ bool pullSnapshot(const char* snapshotName,
 
     crashreport::CrashReporter::get()->hangDetector().pause(true);
     // Exports all qcow2 images..
-    bool succeed;
+    bool succeed = true;
+    dinfo("pullSnapshot started for %s, format=%d", snapshotName, (int)format);
+
     // Put everything in main thread, to avoid calling export during
     // snapshot operations.
     android::base::ThreadLooper::runOnMainLooperAndWaitForCompletion(
             [&snapshot, targetDir, tmpdir, &succeed, &sw, format, opaque,
              &errConsumer, output, deleteAfterPull] {
+                dinfo("pullSnapshot lambda running, initial succeed=%d", succeed);
                 if (!succeed) {
                     return;
                 }
-                dprint("Exported snapshot in %" PRIu64 " us", sw.restartUs());
+                dinfo("Exported snapshot in %" PRIu64 " us", sw.restartUs());
                 // iniFile_saveToFile returns 0 on succeed.
                 succeed = !iniFile_saveToFile(
                         avdInfo_getConfigIni(
@@ -143,6 +145,7 @@ bool pullSnapshot(const char* snapshotName,
                         format == FileFormat::DIRECTORY ? targetDir
                                                         : tmpdir.c_str(),
                         opaque, errConsumer);
+                dinfo("snapshotExport result: %d", succeed);
 
                 if (format == FileFormat::DIRECTORY) {
                     if (deleteAfterPull) {
@@ -151,54 +154,33 @@ bool pullSnapshot(const char* snapshotName,
                     return;
                 }
                 // Stream the targetDir out as a tar.gz..
-
+                static constexpr uint32_t k1MB = 1024 * 1024;
                 std::unique_ptr<std::ostream> stream;
+                std::unique_ptr<std::streambuf> sbuf;
                 std::ostream* streamPtr = nullptr;
                 if (format == TARGZ) {
-                    stream = std::make_unique<base::GzipOutputStream>(output);
+                    // Use a 1MB buffer and best speed for large snapshot files.
+                    sbuf.reset(new base::GzipOutputStreambuf(output, Z_BEST_SPEED, k1MB));
+                    stream = std::make_unique<std::ostream>(sbuf.get());
                     streamPtr = stream.get();
                 } else {
                     stream = std::make_unique<std::ostream>(output);
                     streamPtr = stream.get();
                 }
 
-                // Use of  a 64 KB  buffer gives good performance (see
-                // performance tests.)
-                base::TarWriter tw(targetDir, *streamPtr, k64KB);
+                // Use a 1MB buffer for TarWriter as well.
+                base::TarWriter tw(targetDir, *streamPtr, k1MB);
+                dinfo("TarWriter initialized for targetDir: %s", targetDir);
+                dinfo("DEBUG: Compressing main snapshot data (disk and RAM)...");
                 tw.addDirectory(".");
                 if (tw.fail()) {
                     logError(tw.error_msg(), opaque, errConsumer);
+                    dinfo("TarWriter addDirectory failed: %s", tw.error_msg().c_str());
                     succeed = false;
                     return;
                 }
-                dprint("Completed writing in %" PRIu64 " us", sw.restartUs());
-                // Now add in the metadata.
-                auto entries = base::System::get()->scanDirEntries(
-                        snapshot->dataDir(), true);
-                for (const auto& fname : entries) {
-                    if (!base::System::get()->pathIsFile(fname)) {
-                        continue;
-                    }
-                    struct stat sb;
-                    std::string name;
-                    char buf[k64KB];
-                    base::PathUtils::split(fname.data(), nullptr, &name);
-
-                    // Use of  a 64 KB  buffer gives good performance (see
-                    // performance tests.)
-                    std::ifstream ifs(
-                            PathUtils::asUnicodePath(fname.data()).c_str(),
-                            std::ios_base::in | std::ios_base::binary);
-                    ifs.rdbuf()->pubsetbuf(buf, sizeof(buf));
-                    dprint("Zipping %s", name.data());
-                    if (android_stat(fname.c_str(), &sb) != 0 ||
-                        !tw.addFileEntryFromStream(ifs, name, sb)) {
-                        logError("Unable to tar " + fname, opaque, errConsumer);
-                        succeed = false;
-                        break;
-                    }
-                }
-                dprint("Wrote metadata in %" PRIu64 " us", sw.restartUs());
+                dinfo("DEBUG: Main snapshot data compression complete.");
+                dinfo("Completed writing in %" PRIu64 " us", sw.restartUs());
 
                 tw.close();
                 if (tw.fail()) {
@@ -210,6 +192,7 @@ bool pullSnapshot(const char* snapshotName,
             });
 
     crashreport::CrashReporter::get()->hangDetector().pause(false);
+    dinfo("pullSnapshot finished for %s, success=%d", snapshotName, succeed);
     return succeed;
 }
 

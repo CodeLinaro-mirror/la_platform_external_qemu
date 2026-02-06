@@ -242,6 +242,7 @@ const std::unordered_map<int, int> QT_TO_LINUX_KEYCODE_MODIFIERS{
         QT_TO_LINUX_KEY(Control, LEFTCTRL),
         QT_TO_LINUX_KEY(Alt, LEFTALT),
         QT_TO_LINUX_KEY(Shift, LEFTSHIFT),
+        QT_TO_LINUX_KEY(Meta, LEFTMETA),
 };
 
 static int convertKeyCode(int sym, bool& isModifier) {
@@ -2974,6 +2975,9 @@ int EmulatorQtWindow::generateModData(
     }
     if (eventModifiers & Qt::AltModifier) {
         mod |= kKeyModLAlt;
+    }
+    if (eventModifiers & Qt::MetaModifier) {
+        mod |= kKeyModLMeta;
     }
 
     return mod;

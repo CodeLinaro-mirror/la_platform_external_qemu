@@ -188,14 +188,17 @@ bool TarWriter::addFileEntryFromStream(std::istream& ifs,
         return false;
     }
 
-    char buf[TARBLOCK];
-    do {
-        ifs.read(&buf[0], TARBLOCK);
-        mDest.write(&buf[0], ifs.gcount());
+    std::vector<char> buf(mBufferSize > 0 ? mBufferSize : 128 * 1024);
+    while (ifs.good()) {
+        ifs.read(buf.data(), buf.size());
+        auto count = ifs.gcount();
+        if (count > 0) {
+            mDest.write(buf.data(), count);
+        }
         if (mDest.bad()) {
             return error("Failed to write " + name + " to stream");
         }
-    } while (ifs.gcount() > 0);
+    }
 
     size_t bytes_to_write = sb.st_size;
     int padding = TARBLOCK - (bytes_to_write % TARBLOCK);
@@ -223,9 +226,10 @@ bool TarWriter::addFileEntry(std::string name) {
 
     std::ifstream ifs(PathUtils::asUnicodePath(fname.c_str()).c_str(),
                       std::ios_base::in | std::ios_base::binary);
-    char readBuffer[mBufferSize];
+    std::vector<char> readBuffer;
     if (mBufferSize != 0) {
-        ifs.rdbuf()->pubsetbuf(readBuffer, mBufferSize);
+        readBuffer.resize(mBufferSize);
+        ifs.rdbuf()->pubsetbuf(readBuffer.data(), readBuffer.size());
     }
 
     return addFileEntryFromStream(ifs, name, sb);

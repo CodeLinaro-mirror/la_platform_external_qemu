@@ -10,6 +10,10 @@
 // GNU General Public License for more details.
 
 #include "android/skin/qt/extended-pages/keyboard-page.h"
+#include <QEvent>
+#include <QPushButton>
+#include "android/skin/event.h"
+#include "android/skin/keycode.h"
 #include "android/skin/qt/emulator-qt-window.h"
 
 KeyboardPage::KeyboardPage(QWidget* parent)
@@ -57,4 +61,37 @@ void KeyboardPage::toggleKeyButtonDown(const SkinKeyCode key_code,
         skin_event.u.key.mod = 0;
         mEmulatorWindow->queueSkinEvent(skin_event);
     }
+}
+
+void KeyboardPage::on_keyComboSendButton_clicked() {
+    Qt::KeyboardModifiers mods;
+
+    if (mUi->modifierCtrlButton->isChecked()) {
+        mods |= Qt::ControlModifier;
+    }
+    if (mUi->modifierAltButton->isChecked()) {
+        mods |= Qt::AltModifier;
+    }
+    if (mUi->modifierShiftButton->isChecked()) {
+        mods |= Qt::ShiftModifier;
+    }
+    if (mUi->modifierMetaButton->isChecked()) {
+        mods |= Qt::MetaModifier;
+    }
+
+    int keycode;
+    QKeySequence keySequence = mUi->keyKaptureForm->keySequence();
+    if (!keySequence.isEmpty()) {
+        keycode = keySequence[0];
+    }
+
+    QKeyEvent event = QKeyEvent(QEvent::KeyPress, keycode, mods, nullptr);
+
+    // The ideal behavior is sending the shortcut input to a virtual device
+    // directly. Since the current implementation uses the public method of
+    // EmulatorQtWindow, however, it can trigger the AEMU UI shortcuts depending
+    // on feature flags and settings.
+    // Bypassing the UI side shortcut handling will require refactoring of
+    // EmulatorQtWindow.
+    mEmulatorWindow->handleKeyEvent(kEventTextInput, event);
 }
