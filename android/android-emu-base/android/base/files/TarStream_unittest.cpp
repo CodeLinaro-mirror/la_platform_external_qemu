@@ -291,5 +291,41 @@ TEST_F(TarStreamTest, stream_can_extract_tar) {
     }
 }
 
+TEST_F(TarStreamTest, read_write_large_gzip_optimized) {
+    // This test verifies the optimizations used in pullSnapshot:
+    // 1. Z_BEST_SPEED
+    // 2. 1MB Buffers
+    std::string large_file = pj(indir, "large.bin");
+    const size_t kSize = 2 * 1024 * 1024; // 2MB
+    std::vector<char> data(kSize, 'A');
+    {
+        std::ofstream ofs(large_file, std::ios::binary);
+        ofs.write(data.data(), data.size());
+    }
+
+    std::stringstream ss;
+    const uint32_t k1MB = 1024 * 1024;
+    {
+        std::unique_ptr<std::streambuf> sbuf(new GzipOutputStreambuf(ss.rdbuf(), Z_BEST_SPEED, k1MB));
+        std::ostream gos(sbuf.get());
+        TarWriter tw(indir, gos, k1MB);
+        EXPECT_TRUE(tw.addFileEntry("large.bin"));
+        EXPECT_TRUE(tw.close());
+    }
+
+    // Verify compatibility with standard GzipInputStream
+    {
+        GzipInputStream gis(ss);
+        TarReader tr(outdir, gis);
+        auto fst = tr.first();
+
+        EXPECT_TRUE(fst.valid);
+        EXPECT_STREQ(fst.name.c_str(), "large.bin");
+        EXPECT_EQ(fst.size, kSize);
+        EXPECT_TRUE(tr.extract(fst));
+        EXPECT_TRUE(is_equal(large_file, pj(outdir, "large.bin")));
+    }
+}
+
 }  // namespace base
 }  // namespace android
