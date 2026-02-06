@@ -16,8 +16,10 @@
 
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/virtualscene/Renderer.h"
+#include "android/virtualscene/Scene.h"
 
 #define VIRTUALSCENE_PIXEL_FORMAT V4L2_PIX_FMT_RGB32
+static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
 
 #ifdef _WIN32
 #undef ERROR
@@ -47,47 +49,45 @@ static uint32_t cameraFormatFromFormat(RendererView::Format format) {
 
 RenderedCameraDevice::RenderedCameraDevice(std::string_view name) {
     mHeader.opaque = this;
-    if (name == "virtualscene") {
-        mSceneMode = SceneMode::VirtualScene;
-    }
-    else if (name == "videoplayback") {
-        mSceneMode = SceneMode::VideoPlayback;
-    }
-    else {
-        mSceneMode = SceneMode::Unknown;
-    }
+
+    // "environment" means the camera will use the global environment
+    // scene, defined in environment.ini, to render the frames
+    // Otherwise, it'll create it's own scene
+    mUseEnvironmentScene = (name == "environment");
 }
 
 RenderedCameraDevice::~RenderedCameraDevice() {
     stopCapturing();
 }
 
-int RenderedCameraDevice::startCapturing(uint32_t pixelFormat, int frameWidth, int frameHeight) {
+int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
+                                         int frameWidth,
+                                         int frameHeight) {
     VLOG(camera) << "Start capturing at " << frameWidth << " x " << frameHeight;
 
-    if (mSceneMode == SceneMode::VirtualScene) {
-        if (!VirtualSceneManager::isInitialized()) {
-            // TODO(virtualscene): support multiple scenes and initialize
-            // 'environment' scene always from the environment service
-            const bool cameraUsesEnvironment = false;
-            if (!cameraUsesEnvironment && VirtualSceneManager::initialize()) {
-                LOG(INFO) << "Initialized VirtualSceneManager";
-            } else {
-                LOG(ERROR) << "Virtual scene is not initialized!";
-                stopCapturing();
-                return -1;
-            }
+    // TODO(virtualscene-manager): support multiple scenes
+    if (!mUseEnvironmentScene) {
+        // If the camera mode is not set to "environment", the camera
+        // needs to create a scene that it'll own.
+        SceneConfig defaultSceneConfig(SceneConfig::Mode::VirtualScene,
+                                       kDefaultSceneObj);
+        if (VirtualSceneManager::initialize(defaultSceneConfig)) {
+            LOG(INFO) << "Initialized VirtualSceneManager for the camera";
         }
-        VirtualSceneManager::showSceneControls(true);
-
-        mSceneCamera.setAspectRatio(static_cast<float>(frameWidth) / frameHeight);
-    }
-    else if (mSceneMode == SceneMode::VideoPlayback) {
-        //TODO(virtualscene): create video playback scene and create a view from it
     }
 
-    mActiveView = std::make_unique<RendererView>();
-    mActiveView->updateTarget(formatFromCameraFormat(pixelFormat), frameWidth, frameHeight);
+    if (!VirtualSceneManager::isInitialized()) {
+        LOG(ERROR) << "Virtual scene is not initialized!";
+        stopCapturing();
+        return -1;
+    }
+
+    mSceneCamera.setAspectRatio(static_cast<float>(frameWidth) / frameHeight);
+
+    mActiveView = VirtualSceneManager::createView(
+            formatFromCameraFormat(pixelFormat), frameWidth, frameHeight);
+
+    VirtualSceneManager::setSceneControlsParameters(true);
 
     return 0;
 }
@@ -98,7 +98,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat, int frameWidth, i
 // frame properties (different from the previous one) may fail.
 void RenderedCameraDevice::stopCapturing() {
     mActiveView.reset();
-    VirtualSceneManager::showSceneControls(false);
+    VirtualSceneManager::setSceneControlsParameters(false);
 }
 
 int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
@@ -108,58 +108,9 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
                                     float expComp,
                                     const char* direction,
                                     int orientation) {
-    if (mSceneMode == SceneMode::VideoPlayback) {
-        // TODO(virtualscene): create video playback scene and render a view
-        static float animTime = 0;
-        animTime += 0.01f;
-        if (animTime > 1) {
-            animTime = 0;
-        }
-
-        std::lock_guard lock(mActiveView->mLock);
-        mActiveView->preRenderLocked();
-        const int dummyVideoWidth = mActiveView->getWidthLocked();
-        const int dummyVideoHeight = mActiveView->getHeightLocked();
-        const int stride = dummyVideoWidth * 4;
-        std::vector<uint8_t>& fbData = mActiveView->getFramebufferLocked();
-        if(fbData.size() < dummyVideoWidth * dummyVideoHeight * 4) {
-            // preRenderLocked failed
-            return -1;
-        }
-        for (int y = 0; y < dummyVideoHeight; y++) {
-            for (int x = 0; x < dummyVideoWidth; x++) {
-                // Render a procedural animation
-                uint8_t& r = fbData[(y * dummyVideoWidth + x)*4 + 0];
-                uint8_t& g = fbData[(y * dummyVideoWidth + x)*4 + 1];
-                uint8_t& b = fbData[(y * dummyVideoWidth + x)*4 + 2];
-                uint8_t& a = fbData[(y * dummyVideoWidth + x)*4 + 3];
-
-                float u = (x / (float)dummyVideoWidth) * 10.0;
-                float v = (y / (float)dummyVideoHeight) * 10.0;
-                float local_u = u - floor(u);
-                float local_v = v - floor(v);
-                float dist = abs(local_u - 0.5) + abs(local_v - 0.5);
-                float threshold =
-                        0.1 + 0.4 * (0.5 + 0.5 * sin(animTime * 6.283));
-                float mask = (dist < threshold) ? 1.0 : 0.0;
-
-                r = (uint8_t)(mask * 100);
-                g = (uint8_t)(mask * 200);
-                b = (uint8_t)(mask * 255);
-                a = 255;
-            }
-        }
-        mActiveView->postRenderLocked();
-
-        uint32_t pixelFormat =
-                cameraFormatFromFormat(mActiveView->getFormatLocked());
-        return convert_frame(fbData.data(), pixelFormat, fbData.size(),
-                             dummyVideoWidth, dummyVideoHeight, resultFrame,
-                             rScale, gScale, bScale, expComp, "front", 1);
-    }
-
-    // TODO(virtualscene): create the view here based on the target resolution to avoid resizing?
-    VirtualSceneManager::update();  // TODO(virtualscene): should be updated once, externally
+    // TODO(virtualscene-perf): update the view here to avoid resizing?
+    // TODO(virtualscene-manager): should be updated once, externally
+    VirtualSceneManager::update();
 
     // Update camera based on physical model and set view projection accordingly
     mSceneCamera.update();
@@ -177,7 +128,8 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
         const std::vector<uint8_t>& fbData =
                 mActiveView->getFramebufferLocked();
 
-        uint32_t pixelFormat = cameraFormatFromFormat(mActiveView->getFormatLocked());
+        uint32_t pixelFormat =
+                cameraFormatFromFormat(mActiveView->getFormatLocked());
         conversionResult = convert_frame(
                 fbData.data(), pixelFormat, fbData.size(),
                 mActiveView->getWidthLocked(), mActiveView->getHeightLocked(),

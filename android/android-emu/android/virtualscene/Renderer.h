@@ -21,6 +21,7 @@
  */
 
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
+#include "aemu/base/AlignedBuf.h"
 #include "aemu/base/memory/LazyInstance.h"
 #include "aemu/base/synchronization/Lock.h"
 #include "android/utils/compiler.h"
@@ -33,6 +34,9 @@ using namespace gfxstream::host::gl;
 
 namespace android {
 namespace virtualscene {
+
+class Scene;
+class SceneOverlayObject;
 
 struct Material {
     int id = -1;
@@ -76,6 +80,8 @@ public:
 
 class RendererView {
 public:
+    RendererView(Scene* scene);
+
     enum class Format {
         RGBA8,
     };
@@ -100,6 +106,7 @@ public:
     static void applyBlurInPlaceCPU(int width,
                                     int height,
                                     uint8_t* rgbaDataInOut,
+                                    int32_t* scratchBuffer,
                                     float sigma);
 
     bool updateResizedLocked(const uint8_t* rgbaPixels, int w_old, int h_old);
@@ -107,10 +114,9 @@ public:
 protected:
     friend class RendererImpl;
     friend class VirtualSceneManagerImpl;
-    friend class RenderedCameraDevice;  // TODO(virtualscene): temp, for dummy
-                                        // videoplayback implementation
 
     std::mutex mLock;
+    Scene* mScene;
     int mFrameWidth = 0;
     int mFrameHeight = 0;
     Format mFormat = Format::RGBA8;
@@ -122,6 +128,9 @@ protected:
         static const uint64_t INVALID_SCENE_HASH = ~0ULL;
         uint64_t mSceneHash = INVALID_SCENE_HASH;
         std::vector<uint8_t> mFramebufferRGBA8;
+        android::AlignedBuf<int32_t, 16> mBlurScratchBuffer;
+
+        Cache() : mBlurScratchBuffer(0) {}
 
         void invalidate() {
             mSceneHash = INVALID_SCENE_HASH;
@@ -295,7 +304,7 @@ public:
     virtual Texture duplicateTexture(Texture texture) = 0;
 
     // Render a frame.
-    virtual bool render(RendererView* view,
+    virtual bool render(RendererView* lockedView,
                         const std::vector<RenderableObject>& renderables,
                         float time) = 0;
 

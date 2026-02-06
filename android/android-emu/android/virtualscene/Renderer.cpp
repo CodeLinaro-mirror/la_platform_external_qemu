@@ -83,8 +83,8 @@ struct ScopeTimer {
 
 static constexpr int kSuperSampleMultiple = 2;
 
-// TODO(virtualscene): Implement proper offscreen rendering and remove backing
-// framebuffer dimensions from the renderer.
+// TODO(virtualscene-perf): Implement proper offscreen rendering and remove
+// backing framebuffer dimensions from the renderer.
 static constexpr int kRendererDefaultFramebufferWidth = 1024;
 static constexpr int kRendererDefaultFramebufferHeight = 1024;
 
@@ -368,6 +368,10 @@ private:
  *                     RendererView routines
  ******************************************************************************/
 
+RendererView::RendererView(Scene* scene) {
+    mScene = scene;
+}
+
 void RendererView::updateTarget(Format format,
                                 int frameWidth,
                                 int frameHeight) {
@@ -410,89 +414,56 @@ void RendererView::preRenderLocked() {
     // Allocate space to cache render results on the CPU
     auto viewCacheSize = mFrameWidth * mFrameHeight * 4;
     mCache.mFramebufferRGBA8.resize(viewCacheSize);
+
+    // Caller should allocate CumulativeSum table of width * height * 16
+    // bytes aligned to 16 byte boundary. height can be radius * 2 + 2 to
+    // save memory as the buffer is treated as circular.
+    auto scratchBufferNumItems =
+            (mFrameWidth * (mFrameHeight + 1) * 16) / sizeof(uint32_t);
+    if (mCache.mBlurScratchBuffer.size() < scratchBufferNumItems) {
+        mCache.mBlurScratchBuffer.resize(scratchBufferNumItems);
+    }
 }
 
 void RendererView::postRenderLocked() {
-    // TODO(virtualscene): apply blur on the GPU side
+    // TODO(virtualscene-perf): apply blur on the GPU side
     if (mBlurFactor > 0) {
         applyBlurInPlaceCPU(mFrameWidth, mFrameHeight,
-                            mCache.mFramebufferRGBA8.data(), mBlurFactor);
+                            mCache.mFramebufferRGBA8.data(),
+                            mCache.mBlurScratchBuffer.data(), mBlurFactor);
     }
 }
 
 void RendererView::applyBlurInPlaceCPU(int width,
                                        int height,
                                        uint8_t* rgbaDataInOut,
+                                       int32_t* scratchBuffer,
                                        float sigma) {
     // No blur, return
-    if (sigma <= 0) {
+    if (sigma <= 0 || !scratchBuffer) {
         return;
     }
 
-    // Limit blur factor to avoid large kernels with low performance
-    const float maxSigma = 8.0f;
-    if (sigma > maxSigma) {
-        sigma = maxSigma;
-    }
-
     ScopeTimer timerObj(__func__);
-    auto BlurRGBA = [&](const int radius) {
-        auto AlignedAlloc = [](size_t size) -> void* {
-#if defined(_MSC_VER)
-            return _aligned_malloc(size, 16);
-#else
-            void* ptr = nullptr;
-            if (posix_memalign(&ptr, 16, size) != 0) {
-                return nullptr;
-            }
-            return ptr;
-#endif
-        };
 
-        auto AlignedFree = [](void* ptr) {
-#if defined(_MSC_VER)
-            _aligned_free(ptr);
-#else
-            free(ptr);
-#endif
-        };
+    // Limit blur factor to avoid large kernels with low performance
+    const int blurRadius = std::min((int)sigma, 16);
+    const int stride = width * 4;
 
-        // Caller should allocate CumulativeSum table of width * height * 16
-        // bytes aligned to 16 byte boundary. height can be radius * 2 + 2 to
-        // save memory as the buffer is treated as circular.
-        size_t buffer_size = width * (height + 1) * 16;
-        int32_t* scratchBuffer =
-                static_cast<int32_t*>(AlignedAlloc(buffer_size));
-        if (!scratchBuffer) {
-            derror("%s: cannot allocate scratch buffer for libyuv::ARGBBlur",
-                   __func__);
-            return false;
-        }
-
-        const int stride = width * 4;
-        std::vector<uint8_t> tempData(width * height * 4);
-        int result =
-                libyuv::ARGBBlur(rgbaDataInOut, stride, tempData.data(), stride,
-                                 scratchBuffer, stride, width, height, radius);
-
-        // TODO(virtualscene): re-use scratch buffer later
-        AlignedFree(scratchBuffer);
-
-        if (result != 0) {
-            derror("%s: libyuv::ARGBBlur failed for radius=%d (result = %d)",
-                   __func__, radius, result);
-            return false;
-        }
-
-        memcpy(rgbaDataInOut, tempData.data(), tempData.size());
-        return true;
-    };
-
-    const int blurRadius = 1 + (int)sigma * 2;
-    return BlurRGBA(blurRadius);
+    std::vector<uint8_t> tempData(width * height * 4);
+    int result =
+            libyuv::ARGBBlur(rgbaDataInOut, stride, tempData.data(), stride,
+                             scratchBuffer, stride, width, height, blurRadius);
+    if (result != 0) {
+        derror("%s: libyuv::ARGBBlur failed for radius=%d (result = %d)",
+               __func__, blurRadius, result);
+        return false;
+    }
+    memcpy(rgbaDataInOut, tempData.data(), tempData.size());
+    return true;
 }
 
-bool RendererView::updateResizedLocked(const uint8_t* rgbaPixels,
+bool RendererView::updateResizedLocked(const uint8_t* inputRgba,
                                        int inputWidth,
                                        int inputHeight) {
     if (mFrameWidth <= 0 || mFrameHeight <= 0 || inputWidth <= 0 ||
@@ -506,11 +477,17 @@ bool RendererView::updateResizedLocked(const uint8_t* rgbaPixels,
     }
 
     ScopeTimer timerObj(__func__);
-    uint8_t* dst_rgba = mCache.mFramebufferRGBA8.data();
+    std::vector<uint8_t>& outputRgba = getFramebufferLocked();
+    if (inputWidth == mFrameWidth && inputHeight == mFrameHeight) {
+        // Exact match, copy directly
+        memcpy(outputRgba.data(), inputRgba, outputRgba.size());
+        return true;
+    }
+
     int inputStride = inputWidth * 4;
     int outputStride = mFrameWidth * 4;
     int result = libyuv::ARGBScale(
-            rgbaPixels, inputStride, inputWidth, inputHeight, dst_rgba,
+            inputRgba, inputStride, inputWidth, inputHeight, outputRgba.data(),
             outputStride, mFrameWidth, mFrameHeight, libyuv::kFilterBilinear);
 
     if (result != 0) {
@@ -630,7 +607,9 @@ private:
     // The result must be released with glDeleteProgram.
     GLuint linkShaders(GLuint vertexId, GLuint fragmentId);
 
-    GLint getAttribLocation(GLuint program, const char* name, bool optional = false);
+    GLint getAttribLocation(GLuint program,
+                            const char* name,
+                            bool optional = false);
     GLint getUniformLocation(GLuint program, const char* name);
 
     GLuint getTextureId(Texture texture) const;
@@ -1249,9 +1228,7 @@ bool RendererImpl::render(RendererView* lockedView,
     // Finish rendering and readback the framebuffer
     mGL.swapBuffers();
 
-    lockedView->preRenderLocked();
-
-    // TODO(virtualscene): Implement non blocking readback
+    // TODO(virtualscene-perf): Implement non blocking readback
     auto readbackSize = mRenderWidth * mRenderHeight * 4;
     if (mRenderWidth == lockedView->getWidthLocked() &&
         mRenderHeight == lockedView->getHeightLocked()) {
@@ -1279,8 +1256,6 @@ bool RendererImpl::render(RendererView* lockedView,
             return false;
         }
     }
-
-    lockedView->postRenderLocked();
 
     return true;
 }
@@ -1569,7 +1544,9 @@ GLuint RendererImpl::linkShaders(GLuint vertexId, GLuint fragmentId) {
     return programId;
 }
 
-GLint RendererImpl::getAttribLocation(GLuint program, const char* name, bool optional) {
+GLint RendererImpl::getAttribLocation(GLuint program,
+                                      const char* name,
+                                      bool optional) {
     GLint location = mGles2->glGetAttribLocation(program, name);
     if (location < 0 && !optional) {
         W("%s: Program attrib '%s' not found", __FUNCTION__, name);

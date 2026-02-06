@@ -16,7 +16,7 @@
 
 #pragma once
 
-// TODO(virtualscene): implement videoplayback mode and remove
+// TODO(virtualscene-video): implement videoplayback mode and remove
 // USE_LEGACY_VIDEOPLAYBACK_CAMERA code
 #ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 /*
