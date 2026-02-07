@@ -207,7 +207,8 @@ if(NOT LINUX_AARCH64)
                               abseil_dll
                               gfxstream_backend
                               ${RUNTIME_OS_DEPENDENCIES}
-                              ${ANGLE_DEPENDENCIES})
+                              ${ANGLE_DEPENDENCIES}
+                              ${SWIFTSHADER_DEPENDENCIES})
 
   if(WINDOWS_MSVC_X86_64)
     # Include MSVC runtime dependencies
