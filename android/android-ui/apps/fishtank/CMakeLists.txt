@@ -294,7 +294,10 @@ endforeach()
 
 android_add_test(
   TARGET fishtank_unittests
-  SRC grpc/FishtankGrpcServer_unittest.cpp grpc/FishtankGrpcServer.cpp)
+  SRC grpc/FishtankGrpcServer_unittest.cpp
+      grpc/FishtankGrpcServer.cpp
+      agents/sensors_agent_unittest.cpp
+      agents/sensors_agent.cpp)
 
 target_link_libraries(
   fishtank_unittests
