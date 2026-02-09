@@ -133,6 +133,16 @@ int main(int argc, char* argv[]) {
     int qt_argc = 1;
     injectFishtankConsoleAgents();
 
+    int discovery_timeout = 15;
+    std::string timeoutEnv = system->envGet("ANDROID_FISHTANK_DISCOVERY_TIMEOUT_SECS");
+    if (!timeoutEnv.empty()) {
+        if (!absl::SimpleAtoi(timeoutEnv, &discovery_timeout)) {
+            LOG(ERROR) << "Invalid value for ANDROID_FISHTANK_DISCOVERY_TIMEOUT_SECS: "
+                       << timeoutEnv << ". Using default: 15";
+            discovery_timeout = 15;
+        }
+    }
+
     // ParameterList params(argc, argv);
     getConsoleAgents()->settings->inject_android_cmdLine(
             android::base::createEscapedLaunchString(argc, argv).c_str());
@@ -194,9 +204,10 @@ int main(int argc, char* argv[]) {
     if (absl::SimpleAtoi(discovery, &qemu_serial)) {
         EmulatorAdvertisement adv({});
 
-        // We are willing to wait 5 seconds for the discovery file.
+        // We are willing to wait for the discovery file.
         auto start = absl::Now();
-        auto deadline = start + absl::Seconds(5);
+        LOG(INFO) << "Waiting " << discovery_timeout << " seconds for discovery file";
+        auto deadline = start + absl::Seconds(discovery_timeout);
         std::string possibleDiscoveryFile =
                 adv.discoverEmulatorWithProperties({{"port.serial", discovery}});
         while (possibleDiscoveryFile.empty() && absl::Now() < deadline) {
