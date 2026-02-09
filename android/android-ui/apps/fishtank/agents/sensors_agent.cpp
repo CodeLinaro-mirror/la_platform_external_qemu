@@ -15,7 +15,15 @@
 #include "android/hw-sensors.h"
 
 #include "android/emulation/control/sensors_agent.h"
+#include "android/physics/physical_state_agent.h"
 #include "emulator_controller.pb.h"
+
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <optional>
+#include <thread>
+#include <vector>
 
 using android::emulation::control::PhysicalModelValue;
 using android::emulation::control::ParameterValue;
@@ -28,12 +36,137 @@ using android::emulation::control::ParameterValue;
 #define DPRINT(...)
 #endif
 
+/*
+ * The Sensors Agent in Fishtank redirects sensor and physical model interactions
+ * to a remote emulator instance over gRPC.
+ *
+ * One challenge is that Fishtank needs to notify its UI when the physical state
+ * (e.g., device rotation) changes, even if that change was initiated by another
+ * gRPC client or the backend's own simulation.
+ *
+ * Since the current gRPC backend does not support streaming notifications for
+ * physical model changes, we implement a polling mechanism here. When a
+ * QAndroidPhysicalStateAgent is registered by the UI, we start a background
+ * thread that periodically checks for changes in key physical parameters
+ * (Position and Rotation) and triggers the appropriate callbacks.
+ */
+
+static QAndroidPhysicalStateAgent gPhysicalStateAgent = {};
+static std::thread gPollingThread;
+static std::atomic<bool> gStopPolling{false};
+
+// Helper to get a vec3 physical parameter synchronously
+static bool getPhysicalParameterVec3(int parameter, float out[3]) {
+    auto client = getGlobalControlClient();
+    if (!client) return false;
+
+    PhysicalModelValue request;
+    request.set_target((PhysicalModelValue::PhysicalType)parameter);
+
+    PhysicalModelValue response;
+    grpc::ClientContext context;
+    // Use a short timeout for polling
+    context.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(100));
+
+    auto status = client->service()->getPhysicalModel(&context, request, &response);
+    if (!status.ok()) return false;
+
+    auto data = response.value().data();
+    for (int i = 0; i < 3 && i < data.size(); i++) {
+        out[i] = data.Get(i);
+    }
+    return true;
+}
+
+// Helper to check if a 3-component parameter has changed significantly.
+static bool hasSignificantChange(const float current[3],
+                                 const float last[3],
+                                 float threshold) {
+    for (int i = 0; i < 3; i++) {
+        if (std::abs(current[i] - last[i]) > threshold) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void pollingLoop() {
+    enum class MovementState { STATIONARY, MOVING };
+
+    std::optional<std::array<float, 3>> lastPos;
+    std::optional<std::array<float, 3>> lastRot;
+    MovementState movementState = MovementState::STATIONARY;
+
+    while (!gStopPolling) {
+        float currentPos[3] = {0, 0, 0};
+        float currentRot[3] = {0, 0, 0};
+
+        // Poll POSITION and ROTATION from the backend.
+        // These are the primary indicators of device movement in the physical model.
+        bool ok = getPhysicalParameterVec3(PHYSICAL_PARAMETER_POSITION, currentPos);
+        ok &= getPhysicalParameterVec3(PHYSICAL_PARAMETER_ROTATION, currentRot);
+
+        if (ok) {
+            // These thresholds (0.001 for position, 0.01 for rotation) are
+            // chosen to filter out minor numerical jitter or noise in the
+            // physical model simulation while remaining sensitive enough to
+            // detect intentional movement.
+            bool changed = false;
+
+            // We only check for changes if we have a baseline from a previous poll.
+            if (lastPos && lastRot) {
+                const bool posChanged =
+                        hasSignificantChange(currentPos, lastPos->data(), 0.001f);
+                const bool rotChanged =
+                        hasSignificantChange(currentRot, lastRot->data(), 0.01f);
+                changed = posChanged || rotChanged;
+
+                if (changed) {
+                    // Transition: Stationary -> Moving
+                    if (movementState == MovementState::STATIONARY) {
+                        movementState = MovementState::MOVING;
+                        if (gPhysicalStateAgent.onPhysicalStateChanging) {
+                            gPhysicalStateAgent.onPhysicalStateChanging(
+                                    gPhysicalStateAgent.context);
+                        }
+                    }
+
+                    // Notify the UI that the state has updated (e.g. from an
+                    // external gRPC client) so it can refresh its view.
+                    if (gPhysicalStateAgent.onTargetStateChanged) {
+                        gPhysicalStateAgent.onTargetStateChanged(
+                                gPhysicalStateAgent.context);
+                    }
+                } else if (movementState == MovementState::MOVING) {
+                    // Transition: Moving -> Stationary
+                    movementState = MovementState::STATIONARY;
+                    if (gPhysicalStateAgent.onPhysicalStateStabilized) {
+                        gPhysicalStateAgent.onPhysicalStateStabilized(
+                                gPhysicalStateAgent.context);
+                    }
+                }
+            }
+
+            lastPos = {currentPos[0], currentPos[1], currentPos[2]};
+            lastRot = {currentRot[0], currentRot[1], currentRot[2]};
+        }
+
+        // Polling at 100ms is completely arbitrary and can be adjusted if needed.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
 const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
         .setPhysicalParameterTarget =
                 [](int parameter, const float* value, size_t len, int interpolation_method) {
                     DPRINT("setPhysicalParameterTarget(parameter: %d, len: %zu)", parameter, len);
                     auto client = getGlobalControlClient();
                     if (!client) return -1;
+
+                    // Manually trigger "changing" callback for instant local feedback
+                    if (gPhysicalStateAgent.onPhysicalStateChanging) {
+                        gPhysicalStateAgent.onPhysicalStateChanging(gPhysicalStateAgent.context);
+                    }
 
                     PhysicalModelValue request;
                     request.set_target((PhysicalModelValue::PhysicalType)parameter);
@@ -45,6 +178,12 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                     grpc::ClientContext context;
                     google::protobuf::Empty response;
                     auto status = client->service()->setPhysicalModel(&context, request, &response);
+
+                    // Manually trigger "target changed" callback
+                    if (gPhysicalStateAgent.onTargetStateChanged) {
+                        gPhysicalStateAgent.onTargetStateChanged(gPhysicalStateAgent.context);
+                    }
+
                     return status.ok() ? 0 : -1;
                 },
         .getPhysicalParameter =
@@ -122,7 +261,21 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                 },
         .setPhysicalStateAgent =
                 [](const struct QAndroidPhysicalStateAgent* agent) {
-                    NOT_IMPLEMENTED("QAndroidSensorsAgent.setPhysicalStateAgent(agent: %p)", agent);
+                    DPRINT("setPhysicalStateAgent(agent: %p)", agent);
+
+                    // Stop previous polling if any
+                    if (gPollingThread.joinable()) {
+                        gStopPolling = true;
+                        gPollingThread.join();
+                    }
+
+                    if (agent) {
+                        gPhysicalStateAgent = *agent;
+                        gStopPolling = false;
+                        gPollingThread = std::thread(pollingLoop);
+                    } else {
+                        gPhysicalStateAgent = {};
+                    }
                     return 0;
                 },
         .advanceTime = []() { NOT_IMPLEMENTED("QAndroidSensorsAgent.advanceTime"); },

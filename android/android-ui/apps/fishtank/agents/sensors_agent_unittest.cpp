@@ -14,18 +14,48 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <atomic>
 #include <memory>
+#include <thread>
 
 #include "android/android-ui/apps/fishtank/fishtank_agents.h"
 #include "android/emulation/control/sensors_agent.h"
 #include "android/emulation/control/utils/EmulatorControlClient.h"
+#include "android/physics/physical_state_agent.h"
 #include "emulator_controller_mock.grpc.pb.h"
 
 using namespace android::emulation::control;
 using testing::_;
 using testing::DoAll;
+using testing::Invoke;
 using testing::Return;
 using testing::SetArgPointee;
+
+// Helper to capture callbacks from the PhysicalStateAgent.
+struct MockPhysicalStateAgent {
+    static void onTargetStateChanged(void* context) {
+        static_cast<MockPhysicalStateAgent*>(context)->targetStateChangedCount++;
+    }
+    static void onPhysicalStateChanging(void* context) {
+        static_cast<MockPhysicalStateAgent*>(context)->physicalStateChangingCount++;
+    }
+    static void onPhysicalStateStabilized(void* context) {
+        static_cast<MockPhysicalStateAgent*>(context)->physicalStateStabilizedCount++;
+    }
+
+    std::atomic<int> targetStateChangedCount{0};
+    std::atomic<int> physicalStateChangingCount{0};
+    std::atomic<int> physicalStateStabilizedCount{0};
+
+    QAndroidPhysicalStateAgent agent() {
+        return {
+                .context = this,
+                .onTargetStateChanged = onTargetStateChanged,
+                .onPhysicalStateChanging = onPhysicalStateChanging,
+                .onPhysicalStateStabilized = onPhysicalStateStabilized,
+        };
+    }
+};
 
 // Global control client for the agent to use.
 static std::shared_ptr<EmulatorControlClient> gTestControlClient;
@@ -128,4 +158,58 @@ TEST_F(SensorsAgentTest, GetPhysicalParameterFailure) {
             .WillOnce(Return(::grpc::Status(::grpc::StatusCode::INTERNAL, "Error")));
 
     EXPECT_EQ(-1, mAgent->getPhysicalParameter(0, values, 1, 0));
+}
+
+// Verifies that setPhysicalParameterTarget triggers the appropriate callbacks
+// in the registered PhysicalStateAgent.
+TEST_F(SensorsAgentTest, SetPhysicalParameterTargetTriggersCallbacks) {
+    MockPhysicalStateAgent mockAgent;
+    auto agent = mockAgent.agent();
+
+    // We expect some getPhysicalModel calls from the polling thread if we register the agent.
+    mAgent->setPhysicalStateAgent(&agent);
+
+    float values[] = {1.0f, 2.0f, 3.0f};
+    EXPECT_CALL(*mMockStub, setPhysicalModel(_, _, _))
+            .WillOnce(Return(::grpc::Status::OK));
+    EXPECT_CALL(*mMockStub, getPhysicalModel(_, _, _))
+            .WillRepeatedly(Return(::grpc::Status::OK));
+
+    EXPECT_EQ(0, mAgent->setPhysicalParameterTarget(0, values, 3, 0));
+
+    EXPECT_GT(mockAgent.physicalStateChangingCount, 0);
+    EXPECT_GT(mockAgent.targetStateChangedCount, 0);
+}
+
+// Verifies that the background polling thread detects changes in the physical
+// model and triggers the appropriate callbacks.
+TEST_F(SensorsAgentTest, PollingDetectsChanges) {
+    MockPhysicalStateAgent mockAgent;
+    auto agent = mockAgent.agent();
+
+    // Mock getPhysicalModel to return a moving value.
+    // The polling loop checks both POSITION (0) and ROTATION (1).
+    std::atomic<int> callCount{0};
+    EXPECT_CALL(*mMockStub, getPhysicalModel(_, _, _))
+            .WillRepeatedly(Invoke([&callCount](::grpc::ClientContext*,
+                                                const PhysicalModelValue& req,
+                                                PhysicalModelValue* resp) {
+                resp->set_status(PhysicalModelValue::OK);
+                auto data = resp->mutable_value();
+                // Return 0.0 then 1.0 to simulate movement.
+                float val = (callCount.load() < 10) ? 0.0f : 1.0f;
+                data->add_data(val);
+                data->add_data(val);
+                data->add_data(val);
+                callCount++;
+                return ::grpc::Status::OK;
+            }));
+
+    mAgent->setPhysicalStateAgent(&agent);
+
+    // Wait long enough for the physical state to stabilize.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+    EXPECT_GT(mockAgent.physicalStateChangingCount, 0);
+    EXPECT_GT(mockAgent.targetStateChangedCount, 0);
 }

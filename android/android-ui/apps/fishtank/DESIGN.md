@@ -48,6 +48,12 @@ Since the emulator doesn't know Fishtank's address upfront, Fishtank uses the `S
 2.  It calls `ServiceForwarder.registerForwarder` on the emulator, providing its local address and the services it offers (`android.emulation.control.UiController`).
 3.  The emulator backend then routes any `UiController` requests to Fishtank's local server.
 
+### Physical State Callbacks
+
+Many UI components (like the Virtual Sensors page) rely on asynchronous notifications to provide smooth updates. This is handled via the `QAndroidPhysicalStateAgent` interface, which provides callbacks for when a physical parameter starts changing (`onPhysicalStateChanging`) and when it stabilizes (`onPhysicalStateStabilized`).
+
+Because some gRPC backends do not yet support streaming notifications for physical model changes, Fishtank may employ **polling** strategies to detect backend changes (e.g., from other gRPC clients) and manually trigger these local callbacks to ensure the UI remains responsive and synchronized.
+
 ### Rendering and SwiftShader
 
 Fishtank is designed to be lightweight and compatible. It typically uses **SwiftShader** (a software GL implementation) for its own UI rendering to avoid dependencies on host GPU drivers, ensuring consistent behavior across different environments. This is configured in `main.cpp` by setting the library search paths and renderer configuration.
@@ -62,7 +68,7 @@ Fishtank is an ongoing project, and not all emulator agents are fully implemente
 | **Location** | 🟡 Partial | `gpsSendLoc` and `gpsGetLoc` are implemented. NMEA and GNSS specific calls are currently `NOT_IMPLEMENTED`. |
 | **Clipboard** | ✅ Full | Bi-directional clipboard sync is implemented using gRPC streaming and unary calls. |
 | **Battery** | ❌ None | All calls are currently `NOT_IMPLEMENTED`. |
-| **Sensors** | 🟡 Partial | Physical parameter calls are implemented and forwarded via gRPC. |
+| **Sensors** | 🟡 Partial | All physical parameter calls are implemented via gRPC, including a background polling mechanism for state changes. Still missing sensor calls. |
 | **Cellular** | ❌ None | All calls are currently `NOT_IMPLEMENTED`. |
 | **Display** | 🟡 Partial | Basic display information is available, but complex multi-display management is still being hooked up. |
 | **VM Operations** | 🟡 Partial | Basic VM control (start/stop/pause) is partially implemented via gRPC. |
