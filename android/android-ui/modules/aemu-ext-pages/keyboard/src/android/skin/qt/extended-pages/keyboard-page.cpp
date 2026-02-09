@@ -27,7 +27,7 @@ KeyboardPage::KeyboardPage(QWidget* parent)
             {mUi->forwardButton, kKeyCodeForward},
             {mUi->refreshButton, kKeyCodeRefresh},
             {mUi->fullScreenButton, kKeyCodeFullScreen},
-            {mUi->screenCaptureButton, kKeyCodeSelectiveScreenshot},
+            {mUi->screenCaptureButton, kKeyCodePrintScreen},
             {mUi->brightnessDownButton, kKeyCodeBrightnessDown},
             {mUi->brightnessUpButton, kKeyCodeBrightnessUp},
             {mUi->mediaPreviousButton, kKeyCodePreviousSong},
