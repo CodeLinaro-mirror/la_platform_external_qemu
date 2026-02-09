@@ -334,6 +334,7 @@ public:
     bool paintMultiDisplayWindow(uint32_t id, uint32_t texture);
     void setRelativeMouseCoordMode(bool state);
     const char* releaseMouseShortcutName() const;
+    bool isReleaseMouseShortcut(SkinEventType type, const QKeyEvent& event) const;
     void updateWindowTitle();
 
 #ifdef __APPLE__

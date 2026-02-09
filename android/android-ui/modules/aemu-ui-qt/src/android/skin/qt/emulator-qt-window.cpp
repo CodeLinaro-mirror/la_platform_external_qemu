@@ -1286,11 +1286,31 @@ void EmulatorQtWindow::setRelativeMouseCoordMode(bool state) {
 }
 
 const char* EmulatorQtWindow::releaseMouseShortcutName() const {
+    if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo())) {
+#ifdef __APPLE__
+        return "Cmd+Option+7";
+#else
+        return "Ctrl+Alt+7";
+#endif
+    }
 #ifdef __APPLE__
     return "Cmd+R";
 #else
     return "Ctrl+R";
 #endif
+}
+
+bool EmulatorQtWindow::isReleaseMouseShortcut(SkinEventType type,
+                                              const QKeyEvent& event) const {
+    if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo())) {
+        return event.key() == Qt::Key_7 &&
+            event.modifiers() == (Qt::ControlModifier | Qt::AltModifier) &&
+            type == kEventKeyDown;
+    }
+    return event.key() == Qt::Key_R &&
+        event.modifiers() == Qt::ControlModifier && type == kEventKeyDown;
 }
 
 void EmulatorQtWindow::updateWindowTitle() {
@@ -3049,8 +3069,7 @@ void EmulatorQtWindow::handleKeyEvent(SkinEventType type,
     // inside the code.
     if (!android::featurecontrol::isEnabled(
                 android::featurecontrol::VirtioDualModeMouse)) {
-        if (event.key() == Qt::Key_R &&
-            event.modifiers() == Qt::ControlModifier && type == kEventKeyDown) {
+        if (isReleaseMouseShortcut(type, event)) {
             D("%s: mouse released\n", __func__);
             releaseMouse();
 
