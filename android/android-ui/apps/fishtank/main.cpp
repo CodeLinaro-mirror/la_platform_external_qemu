@@ -188,36 +188,29 @@ int main(int argc, char* argv[]) {
     // 3 Options:
 
     // -- "default": Pick the first running emulator
-    // -- "<pid>": Find the PID, and corresponding discovery file
+    // -- "<serial>": Find the emulator with the given serial port (e.g. 5554)
     // -- "file.ini": Discovery file to use.
-    int qemu_pid = 0;
-    if (absl::SimpleAtoi(discovery, &qemu_pid)) {
+    int qemu_serial = 0;
+    if (absl::SimpleAtoi(discovery, &qemu_serial)) {
         EmulatorAdvertisement adv({});
 
         // We are willing to wait 5 seconds for the discovery file.
         auto start = absl::Now();
         auto deadline = start + absl::Seconds(5);
-        auto proc = android::base::Process::fromPid(qemu_pid);
-        auto possibleDiscoveryFile =
-                EmulatorAdvertisement::discoveryFile(qemu_pid);
-        while ((proc != nullptr && proc->isAlive() &&
-                !possibleDiscoveryFile.ok()) &&
-               absl::Now() < deadline) {
+        std::string possibleDiscoveryFile =
+                adv.discoverEmulatorWithProperties({{"port.serial", discovery}});
+        while (possibleDiscoveryFile.empty() && absl::Now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            proc = android::base::Process::fromPid(qemu_pid);
-            possibleDiscoveryFile =
-                    EmulatorAdvertisement::discoveryFile(qemu_pid);
-        }
-        if (proc == nullptr || !proc->isAlive()) {
-            LOG(FATAL) << "The qemu process " << qemu_pid << " does not exist";
-        }
-        if (!possibleDiscoveryFile.ok()) {
-            LOG(FATAL) << "The discovery file was not found after "
-                       << (absl::Now() - start)
-                       << ", with status: " << possibleDiscoveryFile.status();
+            possibleDiscoveryFile = adv.discoverEmulatorWithProperties(
+                    {{"port.serial", discovery}});
         }
 
-        discovery = possibleDiscoveryFile.value();
+        if (possibleDiscoveryFile.empty()) {
+            LOG(FATAL) << "The discovery file for serial " << discovery
+                       << " was not found after " << (absl::Now() - start);
+        }
+
+        discovery = possibleDiscoveryFile;
     } else if ("default" == discovery) {
         EmulatorAdvertisement adv({});
         auto emulators = adv.discoverRunningEmulators();
