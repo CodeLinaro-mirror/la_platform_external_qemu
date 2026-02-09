@@ -333,6 +333,8 @@ public:
     bool addMultiDisplayWindow(uint32_t id, bool add, uint32_t w, uint32_t h);
     bool paintMultiDisplayWindow(uint32_t id, uint32_t texture);
     void setRelativeMouseCoordMode(bool state);
+    const char* releaseMouseShortcutName() const;
+    void updateWindowTitle();
 
 #ifdef __APPLE__
     // b/476267783: On Mac, override the default Qt methods to hide cursors
@@ -638,6 +640,7 @@ private:
     SkinRotation mOrientation;  // Rotation of the main window
     bool mWindowIsMinimized = false;
     bool mRelativeMouseCoordMode = true;
+    QString mBaseWindowTitle;
 
 #ifdef __APPLE__
     // See grabMouse/releaseMouse.
