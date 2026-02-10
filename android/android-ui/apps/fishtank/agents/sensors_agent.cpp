@@ -236,8 +236,30 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
 
         .setCoarseOrientation =
                 [](int orientation) {
-                    NOT_IMPLEMENTED("QAndroidSensorsAgent.setCoarseOrientation(orientation: %d)", orientation);
-                    return 0;
+                    DPRINT("setCoarseOrientation(orientation: %d)",
+                           orientation);
+                    float rotation[3] = {0, 0, 0};
+                    switch (orientation) {
+                        case ANDROID_COARSE_PORTRAIT:
+                            rotation[2] = 0.0f;
+                            break;
+                        case ANDROID_COARSE_REVERSE_LANDSCAPE:
+                            rotation[2] = -90.0f;
+                            break;
+                        case ANDROID_COARSE_REVERSE_PORTRAIT:
+                            rotation[2] = 180.0f;
+                            break;
+                        case ANDROID_COARSE_LANDSCAPE:
+                            rotation[2] = 90.0f;
+                            break;
+                        default:
+                            return -1;
+                    }
+
+                    return sFishtankQAndroidSensorsAgent
+                            .setPhysicalParameterTarget(
+                                    PHYSICAL_PARAMETER_ROTATION, rotation, 3,
+                                    0);
                 },
         .setSensorOverride =
                 [](int sensor, const float* value, size_t len) {

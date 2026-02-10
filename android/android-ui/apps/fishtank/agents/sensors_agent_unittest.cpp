@@ -180,6 +180,25 @@ TEST_F(SensorsAgentTest, GetPhysicalParameterFailure) {
     EXPECT_EQ(-1, mAgent->getPhysicalParameter(0, values, 1, 0));
 }
 
+// Verifies that setCoarseOrientation correctly converts the coarse orientation
+// to a rotation vector and calls setPhysicalModel.
+TEST_F(SensorsAgentTest, SetCoarseOrientation) {
+    // ANDROID_COARSE_LANDSCAPE (3) should result in rotation[2] = 90.0f
+    EXPECT_CALL(*mMockStub, setPhysicalModel(_, _, _))
+            .WillOnce([](::grpc::ClientContext* context,
+                         const PhysicalModelValue& request,
+                         ::google::protobuf::Empty* response) {
+                EXPECT_EQ(PhysicalModelValue::ROTATION, request.target());
+                EXPECT_EQ(3, request.value().data_size());
+                EXPECT_EQ(0.0f, request.value().data(0));
+                EXPECT_EQ(0.0f, request.value().data(1));
+                EXPECT_EQ(90.0f, request.value().data(2));
+                return ::grpc::Status::OK;
+            });
+
+    EXPECT_EQ(0, mAgent->setCoarseOrientation(3));
+}
+
 // Verifies that getSensor correctly retrieves data from the gRPC
 // backend and populates the provided value pointers.
 TEST_F(SensorsAgentTest, GetSensorSuccess) {

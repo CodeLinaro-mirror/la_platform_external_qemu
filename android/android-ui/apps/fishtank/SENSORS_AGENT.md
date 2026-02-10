@@ -20,13 +20,21 @@ In a standard integrated emulator, these are triggered directly by the C++ `Phys
 - [x] Implement `getPhysicalParameterSize`
 - [x] Implement `getPhysicalParameter`
 - [x] Implement `setPhysicalParameterTarget`
-- [ ] Implement `getSensor`
-- [ ] Implement `getSensorSize`
+- [x] Implement `getSensor`
+- [x] Implement `getSensorSize`
+- [x] Implement `setCoarseOrientation`
 - [ ] Implement `setSensorOverride`
 - [x] Implement `setPhysicalStateAgent` (with polling)
 
-## Implementation Details: Polling for Physical State
+## Implementation Details
 
+### Physical Parameters and Sensors
+Most calls are straightforwardly forwarded to the corresponding `getSensor`, `setSensor`, `getPhysicalModel`, or `setPhysicalModel` gRPC RPCs. 
+
+### Coarse Orientation
+`setCoarseOrientation` is implemented by converting the coarse-grained orientation (Portrait, Landscape, etc.) into a 3D rotation vector (on the Z-axis) and forwarding it as a `ROTATION` physical parameter update via gRPC. This matches the behavior of the standard emulator.
+
+### Polling for Physical State
 Since `streamPhysicalModel` is not available in the backend, Fishtank implements a periodic polling mechanism (in `sensors_agent.cpp`) that triggers when a `QAndroidPhysicalStateAgent` is registered.
 
 1.  **Background Thread**: A dedicated thread polls the backend's POSITION and ROTATION parameters every 100ms (an arbitrary choice that can be adjusted).
