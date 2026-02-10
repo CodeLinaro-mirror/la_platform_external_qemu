@@ -4,5 +4,3 @@ alias(
     actual = "@aemu//windows:compat",
     visibility = ["//visibility:public"],
 )
-
-exports_files(["file.h"])

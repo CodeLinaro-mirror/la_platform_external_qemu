@@ -51,9 +51,6 @@
 #include "qemu/ctype.h"
 #include "qemu/cutils.h"
 #include "qemu/error-report.h"
-#ifdef _WIN32
-#include "google/compat/windows/file.h"
-#endif
 
 void strpadcpy(char *buf, int buf_size, const char *str, char pad)
 {
@@ -1057,7 +1054,7 @@ void qemu_init_exec_dir(const char *argv0)
         return;
     }
 
-    len = aemu_GetModuleFileName(NULL, buf, sizeof(buf) - 1);
+    len = GetModuleFileName(NULL, buf, sizeof(buf) - 1);
     if (len == 0) {
         return;
     }

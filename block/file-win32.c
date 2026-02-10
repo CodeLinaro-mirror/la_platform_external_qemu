@@ -35,7 +35,6 @@
 #include "qemu/iov.h"
 #include "qobject/qdict.h"
 #include "qobject/qstring.h"
-#include "google/compat/windows/file.h"
 #include <windows.h>
 #include <winioctl.h>
 
@@ -251,7 +250,7 @@ static void raw_probe_alignment(BlockDriverState *bs, Error **errp)
     }
 
     if (s->drive_path[0]) {
-        aemu_GetDiskFreeSpace(s->drive_path, &sectorsPerCluster,
+        GetDiskFreeSpace(s->drive_path, &sectorsPerCluster,
                          &dg.Geometry.BytesPerSector,
                          &freeClusters, &totalClusters);
         bs->bl.request_alignment = dg.Geometry.BytesPerSector;
@@ -391,11 +390,11 @@ static int raw_open(BlockDriverState *bs, QDict *options, int flags,
     } else {
         /* Relative path.  */
         char buf[MAX_PATH];
-        aemu_GetCurrentDirectory(MAX_PATH, buf);
+        GetCurrentDirectory(MAX_PATH, buf);
         snprintf(s->drive_path, sizeof(s->drive_path), "%c:\\", buf[0]);
     }
 
-    s->hfile = aemu_CreateFile(filename, access_flags,
+    s->hfile = CreateFile(filename, access_flags,
                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                           OPEN_EXISTING, overlapped, NULL);
     if (s->hfile == INVALID_HANDLE_VALUE) {
@@ -661,7 +660,7 @@ static int raw_reopen_prepare(BDRVReopenState *state,
      */
 
     raw_parse_flags(state->flags, s->aio != NULL, &access_flags, &overlapped);
-    rs->hfile = aemu_CreateFile(state->bs->filename, access_flags,
+    rs->hfile = CreateFile(state->bs->filename, access_flags,
                            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                            OPEN_EXISTING, overlapped, NULL);
 
@@ -894,7 +893,7 @@ static int hdev_open(BlockDriverState *bs, QDict *options, int flags,
 
     create_flags = OPEN_EXISTING;
 
-    s->hfile = aemu_CreateFile(filename, access_flags,
+    s->hfile = CreateFile(filename, access_flags,
                           FILE_SHARE_READ, NULL,
                           create_flags, overlapped, NULL);
     if (s->hfile == INVALID_HANDLE_VALUE) {

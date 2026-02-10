@@ -10895,7 +10895,6 @@ cc_library(
             "platform/windows-amd64/riscv64-softmmu-config-target.h",
             "platform/windows-amd64/x86_64-softmmu-config-devices.h",
             "platform/windows-amd64/x86_64-softmmu-config-target.h",
-            "//google/compat/windows:file.h",
         ],
         "@platforms//os:macos": [
             "platform/darwin-arm64/aarch64-softmmu-config-devices.h",

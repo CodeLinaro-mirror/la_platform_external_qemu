@@ -29,7 +29,6 @@
 #include "chardev/char.h"
 
 #ifdef _WIN32
-#include "google/compat/windows/file.h"
 #include "chardev/char-win.h"
 #else
 #include "chardev/char-fd.h"
@@ -61,7 +60,7 @@ static void qmp_chardev_open_file(Chardev *chr,
         flags = CREATE_ALWAYS;
     }
 
-    out = aemu_CreateFile(file->out, accessmode, FILE_SHARE_READ, NULL, flags,
+    out = CreateFile(file->out, accessmode, FILE_SHARE_READ, NULL, flags,
                      FILE_ATTRIBUTE_NORMAL, NULL);
     if (out == INVALID_HANDLE_VALUE) {
         error_setg(errp, "open %s failed", file->out);
