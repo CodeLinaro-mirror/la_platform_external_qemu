@@ -180,6 +180,40 @@ TEST_F(SensorsAgentTest, GetPhysicalParameterFailure) {
     EXPECT_EQ(-1, mAgent->getPhysicalParameter(0, values, 1, 0));
 }
 
+// Verifies that getSensor correctly retrieves data from the gRPC
+// backend and populates the provided value pointers.
+TEST_F(SensorsAgentTest, GetSensorSuccess) {
+    float val1 = 0.0f, val2 = 0.0f, val3 = 0.0f;
+    float* values[] = {&val1, &val2, &val3};
+
+    EXPECT_CALL(*mMockStub, getSensor(_, _, _))
+            .WillOnce([](::grpc::ClientContext* context,
+                         const SensorValue& request, SensorValue* response) {
+                response->mutable_value()->add_data(1.1f);
+                response->mutable_value()->add_data(2.2f);
+                response->mutable_value()->add_data(3.3f);
+                response->set_status(SensorValue::OK);
+                return ::grpc::Status::OK;
+            });
+
+    EXPECT_EQ(0, mAgent->getSensor(0, values, 3));
+    EXPECT_EQ(1.1f, val1);
+    EXPECT_EQ(2.2f, val2);
+    EXPECT_EQ(3.3f, val3);
+}
+
+// Verifies that getSensor returns failure (-1) when the underlying
+// gRPC call fails.
+TEST_F(SensorsAgentTest, GetSensorFailure) {
+    float val1 = 0.0f;
+    float* values[] = {&val1};
+
+    EXPECT_CALL(*mMockStub, getSensor(_, _, _))
+            .WillOnce(Return(::grpc::Status(::grpc::StatusCode::INTERNAL, "Error")));
+
+    EXPECT_EQ(-1, mAgent->getSensor(0, values, 1));
+}
+
 // Verifies that setPhysicalParameterTarget triggers the appropriate callbacks
 // in the registered PhysicalStateAgent.
 TEST_F(SensorsAgentTest, SetPhysicalParameterTargetTriggersCallbacks) {

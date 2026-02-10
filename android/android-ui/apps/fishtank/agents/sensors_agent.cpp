@@ -246,8 +246,28 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                 },
         .getSensor =
                 [](int sensor, float* const* value, size_t len) {
-                    NOT_IMPLEMENTED("QAndroidSensorsAgent.getSensor(sensor: %d, value: %p, len: %zu)", sensor, value, len);
-                    return 0;
+                    DPRINT("getSensor(sensor: %d, len: %zu)", sensor, len);
+                    auto client = getGlobalControlClient();
+                    if (!client) return -1;
+
+                    android::emulation::control::SensorValue request;
+                    request.set_target(
+                            (android::emulation::control::SensorValue::SensorType)
+                                    sensor);
+
+                    android::emulation::control::SensorValue response;
+                    grpc::ClientContext context;
+                    auto status = client->service()->getSensor(&context, request,
+                                                               &response);
+                    if (!status.ok()) return -1;
+
+                    auto data = response.value().data();
+                    for (size_t i = 0; i < len && i < (size_t)data.size(); i++) {
+                        if (value[i]) {
+                            *value[i] = data.Get(i);
+                        }
+                    }
+                    return (int)response.status();
                 },
         .getSensorSize =
                 [](int sensor, size_t* size) {
