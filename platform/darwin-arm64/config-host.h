@@ -373,7 +373,7 @@
 
 #define CONFIG_TRACE_FILE "trace"
 
-#define CONFIG_TRACE_LOG
+#define CONFIG_TRACE_NOP
 
 #undef CONFIG_TSAN
 
