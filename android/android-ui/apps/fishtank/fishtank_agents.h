@@ -46,7 +46,7 @@ struct QAndroidVmOperations;
 #define DEBUG 1
 #if DEBUG >= 1
 #define NOT_IMPLEMENTED(fmt, ...) \
-    dinfo("FishtankAgents: " fmt, ##__VA_ARGS__);
+    derror("[NOT_IMPLEMENTED] FishtankAgents: " fmt, ##__VA_ARGS__);
 #else
 #define NOT_IMPLEMENTED(...)
 #endif
