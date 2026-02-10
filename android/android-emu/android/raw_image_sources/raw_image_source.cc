@@ -13,13 +13,12 @@
 
 #include "android/camera/camera-common.h"
 
-static uint8_t defaultImageData[16] = {
-    0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF,
-    0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF
+static uint8_t defaultImageData[4] = {
+    0xFF, 0x00, 0xFF, 0xFF
 };
 
 static RawImageBuffer defaultImage = {defaultImageData, sizeof(defaultImageData),
-                             V4L2_PIX_FMT_RGB32, 2, 2};
+                             V4L2_PIX_FMT_RGB32, 1, 1};
 
 int DefaultRawImageProvider::Start(uint32_t pixel_format,
                                         int width,
