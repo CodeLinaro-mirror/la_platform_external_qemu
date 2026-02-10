@@ -25,7 +25,6 @@
   //   replaces, common content.
   "project_name": "qemu",
   "source_path": "third_party/qemu",
-
   "common": {
     // "dependencies": A dictionary of libraries required for the build. These
     // are used to generate pkg-config (.pc) files, which Meson uses to find
@@ -250,6 +249,7 @@
       "-Dtcg_interpreter": "false",
       "-Dtools": "enabled",
       "-Dtpm": "disabled",
+      "-Dtrace_backends": "nop",
       "-Dtsan": "false",
       "-Du2f": "disabled",
       "-Duadk": "disabled",
