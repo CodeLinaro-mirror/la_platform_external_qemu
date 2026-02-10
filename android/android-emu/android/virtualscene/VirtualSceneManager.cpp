@@ -243,7 +243,7 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
     std::lock_guard lock(view->mLock);
 
     auto sceneHash = mScene->getVersionHashForView(view);
-    if (view->mCache.isValidFor(sceneHash)) {
+    if (view->mCache.isValidFor(sceneHash, renderTime)) {
         // TODO(virtualscene-perf): check the hash at higher level to avoid
         // copies&conversions
         finishCallback();
@@ -255,6 +255,7 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
     // Update cache with the render results
     auto readbackSize = view->getWidthLocked() * view->getHeightLocked() * 4;
     view->mCache.mSceneHash = sceneHash;
+    view->mCache.mRenderTime = renderTime;
     view->mCache.mFramebufferRGBA8.resize(readbackSize);
 
     // Make the renderer context current for graphics operations

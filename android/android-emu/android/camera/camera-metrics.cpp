@@ -162,6 +162,9 @@ void camera_metrics_report_start_session(CameraSourceType source_type,
         case kVideoPlayback:
             type = EmulatorCameraSession::EMULATOR_CAMERA_TYPE_VIDEO_PLAYBACK;
             break;
+        case kEnvironment:
+            type = EmulatorCameraSession::EMULATOR_CAMERA_TYPE_ENVIRONMENT;
+            break;
         default:
             assert(false);
             break;

@@ -2162,13 +2162,15 @@ bool emulator_parseFeatureCommandLineOptions(AndroidOptions* opts,
         if (memcmp(opts->camera_back, "webcam", 6) &&
             strcmp(opts->camera_back, "emulated") &&
             strcmp(opts->camera_back, "virtualscene") &&
+            strcmp(opts->camera_back, "videoplayback") &&
+            strcmp(opts->camera_back, "environment") &&
             strncmp(opts->camera_back, "videofile", 9) &&
             strncmp(opts->camera_back, "imagefile", 9) &&
             strcmp(opts->camera_back, "none")) {
             derror("Invalid value for -camera-back <mode> parameter: %s\n"
-                   "Valid values are: 'emulated', 'imagefile:options', "
-                   "'virtualscene', 'videofile:options', 'webcam<N>' or "
-                   "'none'\n",
+                   "Valid values are: 'webcam<N>', 'emulated', 'virtualscene', "
+                   "'videoplayback', 'environment', 'videofile:options', "
+                   "'imagefile:options', or 'none'\n",
                    opts->camera_back);
             return false;
         }
@@ -2178,11 +2180,15 @@ bool emulator_parseFeatureCommandLineOptions(AndroidOptions* opts,
     if (opts->camera_front) {
         if (memcmp(opts->camera_front, "webcam", 6) &&
             strcmp(opts->camera_front, "emulated") &&
+            strcmp(opts->camera_front, "environment") &&
+            strcmp(opts->camera_front, "videoplayback") &&
             strncmp(opts->camera_front, "videofile", 9) &&
+            strncmp(opts->camera_front, "imagefile", 9) &&
             strcmp(opts->camera_front, "none")) {
             derror("Invalid value for -camera-front <mode> parameter: %s\n"
-                   "Valid values are: 'emulated', 'virtualscene', "
-                   "'videofile:options', 'webcam<N>', or 'none'\n",
+                   "Valid values are: 'webcam<N>', 'emulated', 'environment', "
+                   "'videoplayback', 'videofile:options', 'imagefile:options', "
+                   "or 'none'\n",
                    opts->camera_front);
             return false;
         }

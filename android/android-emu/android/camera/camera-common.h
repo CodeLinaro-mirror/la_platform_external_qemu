@@ -166,6 +166,8 @@ typedef enum CameraSourceType {
     kVideofile,
     /* An image playback camera, feeds in a static image. */
     kImagefile,
+    /* An environment camera, feeds content from environment.ini. */
+    kEnvironment,
 } CameraSourceType;
 
 typedef struct CameraInfoVtbl {
