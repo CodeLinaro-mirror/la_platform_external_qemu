@@ -278,5 +278,7 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                     }
                     return 0;
                 },
-        .advanceTime = []() { NOT_IMPLEMENTED("QAndroidSensorsAgent.advanceTime"); },
+        .advanceTime = []() {
+            // We are just a UI, therefore we don't care about advancing time.
+        },
 };
