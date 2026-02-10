@@ -48,7 +48,11 @@ bool warn_report_once_cond(bool *printed, const char *fmt, ...)
 
 void error_init(const char *argv0);
 
-void error_set_log_info(bool log_info);
+// TODO(whollins): Remove this when main-emu-next-dev branch of goldfish is turned down.
+void error_set_log_info(bool);
+
+typedef void(*logger)(int severity, const char *file, int line, const char *fmt, va_list ap);
+void set_logger(logger logger);
 
 /*
  * Similar to error_report(), except it prints the message just once.

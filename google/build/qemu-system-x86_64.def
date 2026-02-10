@@ -329,6 +329,7 @@ EXPORTS
     replay_register_char_driver
     resettable_class_set_parent_phases
     runstate_get
+    set_logger
     socket_address_flatten
     socket_local_address
     strstart

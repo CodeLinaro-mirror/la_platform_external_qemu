@@ -14,7 +14,7 @@
 #include "monitor/monitor.h"
 #include "qemu/error-report.h"
 
-static bool log_info = true;
+static logger override_logger = NULL;
 
 /*
  * @report_type is the type of message: error, warning or
@@ -38,7 +38,12 @@ int error_printf(const char *fmt, ...)
     int ret;
 
     va_start(ap, fmt);
-    ret = error_vprintf(fmt, ap);
+    if (override_logger) {
+        override_logger(/*severity=*/2, /*file=*/NULL, /*line=*/-1, fmt, ap);
+        ret = 0;
+    } else {
+        ret = error_vprintf(fmt, ap);
+    }
     va_end(ap);
     return ret;
 }
@@ -179,6 +184,27 @@ real_time_iso8601(void)
     return g_date_time_format_iso8601(dt);
 }
 
+static char *format_cur_loc_cmdline(char * const dest, const int dest_cap) {
+    int i = 0, size = 0;
+    const int cur_loc_num = cur_loc->num;
+    char * const *cur_loc_ptr = cur_loc->ptr;
+    char *sep = "";
+    for (i = 0; i < cur_loc_num; i++) {
+        int needed = snprintf(dest + size, dest_cap - size, "%s%s", sep, cur_loc_ptr[i]);
+        size += needed;
+        if (size >= dest_cap) {
+            dest[dest_cap - 4] = '.';
+            dest[dest_cap - 3] = '.';
+            dest[dest_cap - 2] = '.';
+            size = dest_cap - 1;
+            break;
+        }
+        sep = " ";
+    }
+    dest[size] = '\0';
+    return dest;
+}
+
 /*
  * Print a message to current monitor if we have one, else to stderr.
  * @report_type is the type of message: error, warning or informational.
@@ -189,6 +215,37 @@ real_time_iso8601(void)
 G_GNUC_PRINTF(2, 0)
 static void vreport(report_type type, const char *fmt, va_list ap)
 {
+    if (override_logger) {
+        const int cmdline_cap = 64;
+        char cmdline_buf[cmdline_cap];
+
+        const char *file = NULL;
+        int line = -1;
+        // Default to ERROR.
+        int severity = 2;
+        switch (type) {
+        case REPORT_TYPE_WARNING:
+            severity = 1;
+            break;
+        case REPORT_TYPE_INFO:
+            severity = 0;
+            break;
+        }
+        switch (cur_loc->kind) {
+        case LOC_CMDLINE:
+            file = format_cur_loc_cmdline(cmdline_buf, cmdline_cap);
+            break;
+        case LOC_FILE:
+            file = (const char *)cur_loc->ptr;
+            if (cur_loc->num) {
+                line = cur_loc->num;
+            }
+            break;
+        }
+        override_logger(severity, file, line, fmt, ap);
+        return;
+    }
+
     gchar *timestr;
 
     if (message_with_timestamp && !monitor_cur()) {
@@ -253,10 +310,7 @@ void warn_vreport(const char *fmt, va_list ap)
  */
 void info_vreport(const char *fmt, va_list ap)
 {
-    if (log_info)
-    {
-        vreport(REPORT_TYPE_INFO, fmt, ap);
-    }
+    vreport(REPORT_TYPE_INFO, fmt, ap);
 }
 
 /*
@@ -299,14 +353,11 @@ void warn_report(const char *fmt, ...)
  */
 void info_report(const char *fmt, ...)
 {
-    if (log_info)
-    {
-        va_list ap;
+    va_list ap;
 
-        va_start(ap, fmt);
-        vreport(REPORT_TYPE_INFO, fmt, ap);
-        va_end(ap);
-    }
+    va_start(ap, fmt);
+    vreport(REPORT_TYPE_INFO, fmt, ap);
+    va_end(ap);
 }
 
 /*
@@ -404,7 +455,9 @@ void error_init(const char *argv0)
     qemu_glog_domains = g_strdup(g_getenv("G_MESSAGES_DEBUG"));
 }
 
-void error_set_log_info(bool should_log)
-{
-    log_info = should_log;
+// TODO(whollins): Remove this when main-emu-next-dev branch of goldfish is turned down.
+void error_set_log_info(bool ignored) {}
+
+void set_logger(logger logger) {
+    override_logger = logger;
 }
