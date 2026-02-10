@@ -251,8 +251,27 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                 },
         .getSensorSize =
                 [](int sensor, size_t* size) {
-                    NOT_IMPLEMENTED("QAndroidSensorsAgent.getSensorSize(sensor: %d, size: %p)", sensor, size);
-                    return 0;
+                    DPRINT("getSensorSize(sensor: %d)", sensor);
+                    if (!size) return 0;
+#define VALUE_SIZE_float 1
+#define VALUE_SIZE_vec3 3
+#define VALUE_SIZE_vec4 4
+#define SENSOR_(x, y, z, v, w) \
+    case ANDROID_SENSOR_##x:   \
+        *size = VALUE_SIZE_##v; \
+        return 0;
+
+                    switch (sensor) {
+                        SENSORS_LIST
+                        case MAX_SENSORS:
+                            break;
+                    }
+                    derror("Unknown sensor: %d", sensor);
+                    return -1;
+#undef SENSOR_
+#undef VALUE_SIZE_float
+#undef VALUE_SIZE_vec3
+#undef VALUE_SIZE_vec4
                 },
         .getDelayMs =
                 []() {

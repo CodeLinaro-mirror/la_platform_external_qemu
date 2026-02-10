@@ -103,6 +103,26 @@ TEST_F(SensorsAgentTest, GetPhysicalParameterSize) {
     EXPECT_EQ(-1, mAgent->getPhysicalParameterSize(100, &size));
 }
 
+// Verifies that getSensorSize returns the correct size (number of floats)
+// for various sensor types.
+TEST_F(SensorsAgentTest, GetSensorSize) {
+    size_t size = 0;
+    // ACCELERATION (0) should be 3
+    EXPECT_EQ(0, mAgent->getSensorSize(0, &size));
+    EXPECT_EQ(3, size);
+
+    // LIGHT (6) should be 1
+    EXPECT_EQ(0, mAgent->getSensorSize(6, &size));
+    EXPECT_EQ(1, size);
+
+    // RGBC_LIGHT (15) should be 4
+    EXPECT_EQ(0, mAgent->getSensorSize(15, &size));
+    EXPECT_EQ(4, size);
+
+    // Unknown sensors should return -1.
+    EXPECT_EQ(-1, mAgent->getSensorSize(100, &size));
+}
+
 // Verifies that setPhysicalParameterTarget correctly forwards the request to the
 // gRPC backend and returns success (0) when the RPC is successful.
 TEST_F(SensorsAgentTest, SetPhysicalParameterTargetSuccess) {
