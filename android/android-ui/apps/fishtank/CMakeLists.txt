@@ -139,9 +139,18 @@ function(fishtank_install_dependency)
       get_filename_component(DST_NAME ${DST} NAME)
       get_filename_component(REAL_SRC ${SRC} REALPATH)
       if(WINDOWS_MSVC_X86_64)
+        # On Windows, we typically flatten DLLs to the root so the OS loader
+        # can find them. We identify these because they are usually mapped
+        # to lib64/. However, some dependencies (like SwiftShader or Angle)
+        # must remain in their subdirectories.
+        if(DST_DIR STREQUAL "lib64")
+          set(FISHTANK_DEST "fishtank")
+        else()
+          set(FISHTANK_DEST "fishtank/${DST_DIR}")
+        endif()
         install(
           FILES ${REAL_SRC}
-          DESTINATION fishtank
+          DESTINATION ${FISHTANK_DEST}
           RENAME ${DST_NAME}
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
