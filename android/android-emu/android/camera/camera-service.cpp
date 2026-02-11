@@ -741,6 +741,7 @@ private:
         ci.frame_sizes_num = sizeof(kEmulateDims) / sizeof(*kEmulateDims);
         ci.display_name = ASTRDUP("virtualscene");
         ci.device_name = ASTRDUP("virtualscene");
+        ci.camera_name = ASTRDUP("virtualscene");
         ci.inp_channel = 0;
         ci.pixel_format = camera_virtualscene_preferred_format();
         ci.direction = ASTRDUP("back");
@@ -779,6 +780,7 @@ private:
         ci.frame_sizes_num = sizeof(kEmulateDims) / sizeof(*kEmulateDims);
         ci.display_name = ASTRDUP("videoplayback");
         ci.device_name = ASTRDUP("videoplayback");
+        ci.camera_name = ASTRDUP("videoplayback");
         ci.inp_channel = 0;
         ci.pixel_format = camera_videoplayback_preferred_format();
         ci.direction = ASTRDUP(dir);

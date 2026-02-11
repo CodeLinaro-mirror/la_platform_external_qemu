@@ -199,7 +199,9 @@ typedef struct CameraInfoVtbl {
 typedef struct CameraInfo {
     const CameraInfoVtbl* vtbl;
 
-    /* User-friendly camera display name. */
+    /* Actual user-friendly name of the camera. */
+    char*               camera_name;
+    /* User-friendly camera display name for emulator use. */
     char*               display_name;
     /* Device name for the camera. */
     char*               device_name;
