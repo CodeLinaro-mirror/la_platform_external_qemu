@@ -83,7 +83,7 @@ def git_commit(destination_dir, args):
             - artifact: The artifact to commit.
     """
     # Append to the header if netsim_version and canary_version are specified
-    commit_header = f"Update bazel build from http://aosp/{args.cl}"
+    commit_header = f"Update bazel build from http://go/ag/{args.cl}"
 
     # Add a commit_msg footer if buganizer_id is specified
     commit_footer = f"\nBug: {args.buganizer_id}" if args.buganizer_id else ""
@@ -94,7 +94,7 @@ def git_commit(destination_dir, args):
 
 This updates the bazel build from the running the meson generator on build bots.
 
-The build is based on http://aosp/{args.cl}, with presubmit build targets:
+The build is based on http://go/ag/{args.cl}, with presubmit build targets:
 
 - go/ab/{args.mac_bid}
 - go/ab/{args.win_bid}
@@ -103,7 +103,7 @@ The build is based on http://aosp/{args.cl}, with presubmit build targets:
 You can recreate the commit by running:
 
 ```sh
-            {sys.argv[0]} \\
+            {Path(sys.argv[0]).name} \\
             --dest {args.dest} \\
             --cl {args.cl} \\
             --mac-bid {args.mac_bid} \\
