@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <vector>
 #include <functional>
+#include <vector>
 /*
  * Defines the Virtual Scene, used by the Virtual Scene Camera
  */
@@ -26,14 +26,14 @@
 #include "aemu/base/synchronization/Lock.h"
 #include "android/emulation/control/virtual_scene_agent.h"
 #include "android/utils/compiler.h"
-
+#include "android/virtualscene/Renderer.h"
 
 namespace android {
 namespace virtualscene {
 
 // Forward declarations.
 class VirtualSceneManagerImpl;
-class RendererView;
+struct SceneConfig;
 
 class VirtualSceneManager {
 public:
@@ -42,7 +42,7 @@ public:
 
     // Initialize virtual scene rendering.
     // Returns true if initialization succeeded.
-    static bool initialize();
+    static bool initialize(const SceneConfig& config);
 
     // Check if virtual scene rendering has been initialized and is usable
     static bool isInitialized();
@@ -55,6 +55,11 @@ public:
 
     // Update scene animations and poster changes
     static void update();
+
+    // Creates a view for the scene
+    static std::unique_ptr<RendererView> createView(RendererView::Format format,
+                                                    int frameWidth,
+                                                    int frameHeight);
 
     // Render the virtual scene to the given view.
     static bool renderView(RendererView* view,
@@ -106,7 +111,7 @@ public:
     // Returns true for enabled, false for disabled.
     static bool getAnimationState();
 
-    static void showSceneControls(bool show);
+    static void setSceneControlsParameters(bool show);
 
 private:
     static android::base::StaticLock mLock;

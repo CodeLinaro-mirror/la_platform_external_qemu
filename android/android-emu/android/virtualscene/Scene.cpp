@@ -16,26 +16,24 @@
 
 #include "android/virtualscene/Scene.h"
 
-#include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
 #include "android/camera/camera-metrics.h"
+#include "android/loadpng.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
 #include "android/virtualscene/Renderer.h"
 
 #include <cmath>
+#include <filesystem>
 
 using namespace android::base;
 using android::camera::CameraMetrics;
+namespace fs = std::filesystem;
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
 #define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
 #define D_ACTIVE VERBOSE_CHECK(virtualscene)
-
-static constexpr const char* kObjFiles[] = {
-        "Toren1BD.obj",
-};
 
 // static_cast the value in a unique_ptr.
 // After this call, the unique_ptr that the value is cast from will be removed.
@@ -47,13 +45,45 @@ std::unique_ptr<To> static_unique_cast(std::unique_ptr<From>& from) {
 namespace android {
 namespace virtualscene {
 
-Scene::Scene(Renderer& renderer) : mRenderer(renderer) {}
+SceneConfig::SceneConfig(Mode mode, std::string_view filename) {
+    mSceneMode = mode;
+    mFilename = filename;
+}
+
+SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
+    if (sceneModeStr == "virtualscene") {
+        return SceneConfig::Mode::VirtualScene;
+    } else if (sceneModeStr == "videoplayback") {
+        return SceneConfig::Mode::VideoPlayback;
+    } else if (sceneModeStr == "imagefile") {
+        return SceneConfig::Mode::ImageFile;
+    } else {
+        dwarning("Unknown scene mode requested: %s", sceneModeStr);
+        return SceneConfig::Mode::Unknown;
+    }
+}
+
+const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
+    if (mode == SceneConfig::Mode::VirtualScene) {
+        return "virtualscene";
+    } else if (mode == SceneConfig::Mode::VideoPlayback) {
+        return "videoplayback";
+    } else if (mode == SceneConfig::Mode::ImageFile) {
+        return "imagefile";
+    } else {
+        return "unknown";
+    }
+}
+
+Scene::Scene(Renderer& renderer, const SceneConfig& config)
+    : mRenderer(renderer), mConfig(config) {}
 
 Scene::~Scene() = default;
 
-std::unique_ptr<Scene> Scene::create(Renderer& renderer) {
+std::unique_ptr<Scene> Scene::create(Renderer& renderer,
+                                     const SceneConfig& config) {
     std::unique_ptr<Scene> scene;
-    scene.reset(new Scene(renderer));
+    scene.reset(new Scene(renderer, config));
     if (!scene || !scene->initialize()) {
         return nullptr;
     }
@@ -62,17 +92,58 @@ std::unique_ptr<Scene> Scene::create(Renderer& renderer) {
 }
 
 bool Scene::initialize() {
-    CameraMetrics::instance().setVirtualSceneName(kObjFiles[0]);
+    dprint("Initializing scene with '%s' mode, file:%s",
+           SceneConfig::modeToString(mConfig.mSceneMode),
+           mConfig.mFilename.c_str());
 
-    for (const char* objFile : kObjFiles) {
-        std::unique_ptr<MeshSceneObject> sceneObject =
-                MeshSceneObject::load(mRenderer, objFile);
-        if (!sceneObject) {
-            return false;
-        }
+    CameraMetrics::instance().setVirtualSceneName(mConfig.mFilename.c_str());
 
-        mSceneObjects.push_back(
-                std::move(static_unique_cast<SceneObject>(sceneObject)));
+    auto sceneMode = getSceneMode();
+    switch (sceneMode) {
+        case SceneConfig::Mode::Unknown: {
+            derror("%s: Unknown scene mode!", __func__);
+        } break;
+        case SceneConfig::Mode::VirtualScene: {
+            std::unique_ptr<MeshSceneObject> sceneObject =
+                    MeshSceneObject::load(mRenderer, mConfig.mFilename.c_str());
+            if (!sceneObject) {
+                derror("%s: Could not load scene object: %s", __func__,
+                       mConfig.mFilename.c_str());
+                return false;
+            }
+
+            mSceneObjects.push_back(
+                    std::move(static_unique_cast<SceneObject>(sceneObject)));
+        } break;
+        case SceneConfig::Mode::VideoPlayback: {
+            // TODO(virtualscene-video): actually load mConfig.mFilename video,
+            // and change render()
+            if (!fs::exists(mConfig.mFilename)) {
+                derror("%s: Could not load video file: %s", __func__,
+                       mConfig.mFilename.c_str());
+                return false;
+            }
+        } break;
+        case SceneConfig::Mode::ImageFile: {
+            uint32_t width = 0;
+            uint32_t height = 0;
+            void* backgroundImageData =
+                    loadpng(mConfig.mFilename.c_str(), &width, &height);
+            if (!backgroundImageData) {
+                derror("%s: Could not load background image: %s", __func__,
+                       mConfig.mFilename.c_str());
+                return false;
+            }
+            mOverlayObject = std::make_unique<SceneOverlayObject>();
+            mOverlayObject->mWidth = width;
+            mOverlayObject->mHeight = height;
+            mOverlayObject->mDataRGBA.resize(width * height * 4);
+            memcpy(mOverlayObject->mDataRGBA.data(), backgroundImageData,
+                   mOverlayObject->mDataRGBA.size());
+            free(backgroundImageData);
+        } break;
+        default:
+            dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
     }
 
     mObjectsVersion++;
@@ -96,18 +167,21 @@ void Scene::releaseResources() {
 }
 
 void Scene::update() {
+    // TODO(virtualscene-video): this should play the video in video mode
     for (auto& poster : mPosters) {
         poster.second.sceneObject->update();
     }
 }
 
-uint64_t Scene::getVersionHashForView(const RendererView* /*lockedView*/) const {
-    // TODO(virtualscene): check if the objects inside the view frustum includes
+uint64_t Scene::getVersionHashForView(
+        const RendererView* /*lockedView*/) const {
+    // TODO(virtualscene-perf): check if the objects inside the view frustum includes
     // any changes/animations
     return mObjectsVersion;
 }
 
-std::vector<RenderableObject> Scene::getRenderableObjects(const glm::mat4& viewProjection) const {
+std::vector<RenderableObject> Scene::getRenderableObjects(
+        const glm::mat4& viewProjection) const {
     std::vector<RenderableObject> renderables;
 
     for (auto& sceneObject : mSceneObjects) {

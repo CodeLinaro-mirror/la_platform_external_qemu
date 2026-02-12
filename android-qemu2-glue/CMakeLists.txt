@@ -130,6 +130,7 @@ target_link_libraries(
 
 add_dependencies(libqemu2-glue virtio_gpu_timelines_fbs_header)
 
+target_compile_definitions(libqemu2-glue PRIVATE "-D_LIBCPP_VERSION=__GLIBCPP__")
 target_compile_definitions(libqemu2-glue INTERFACE "-DCONFIG_VIRGL")
 android_add_library(
   TARGET libqemu2-glue-vm-operations LICENSE Apache-2.0

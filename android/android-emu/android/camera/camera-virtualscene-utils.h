@@ -21,11 +21,10 @@
 #include "aemu/base/Log.h"
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/camera/camera-format-converters.h"
-#include "host-common/opengles.h"
-#include "android/virtualscene/VirtualSceneManager.h"
 #include "android/virtualscene/SceneCamera.h"
+#include "android/virtualscene/VirtualSceneManager.h"
 #include "emugl/common/OpenGLDispatchLoader.h"
-
+#include "host-common/opengles.h"
 
 namespace android {
 namespace virtualscene {
@@ -65,13 +64,7 @@ private:
 
     SceneCamera mSceneCamera;
     std::unique_ptr<RendererView> mActiveView;
-
-    //TODO(virtualscene): this should only exist on the image provider side
-    enum class SceneMode {
-        Unknown = 0,
-        VirtualScene,
-        VideoPlayback,
-    } mSceneMode = SceneMode::Unknown;
+    bool mUseEnvironmentScene;
 };
 
 }  // namespace virtualscene
