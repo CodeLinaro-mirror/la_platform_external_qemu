@@ -180,6 +180,37 @@ TEST_F(SensorsAgentTest, GetPhysicalParameterFailure) {
     EXPECT_EQ(-1, mAgent->getPhysicalParameter(0, values, 1, 0));
 }
 
+// Verifies that setSensorOverride correctly forwards the request to the
+// gRPC backend and returns success (0) when the RPC is successful.
+TEST_F(SensorsAgentTest, SetSensorOverrideSuccess) {
+    float values[] = {1.1f, 2.2f, 3.3f};
+
+    EXPECT_CALL(*mMockStub, setSensor(_, _, _))
+            .WillOnce([](::grpc::ClientContext* context,
+                         const SensorValue& request,
+                         ::google::protobuf::Empty* response) {
+                EXPECT_EQ(0, (int)request.target());
+                EXPECT_EQ(3, request.value().data_size());
+                EXPECT_EQ(1.1f, request.value().data(0));
+                EXPECT_EQ(2.2f, request.value().data(1));
+                EXPECT_EQ(3.3f, request.value().data(2));
+                return ::grpc::Status::OK;
+            });
+
+    EXPECT_EQ(0, mAgent->setSensorOverride(0, values, 3));
+}
+
+// Verifies that setSensorOverride returns failure (-1) when the
+// underlying gRPC call fails.
+TEST_F(SensorsAgentTest, SetSensorOverrideFailure) {
+    float values[] = {1.1f};
+
+    EXPECT_CALL(*mMockStub, setSensor(_, _, _))
+            .WillOnce(Return(::grpc::Status(::grpc::StatusCode::INTERNAL, "Error")));
+
+    EXPECT_EQ(-1, mAgent->setSensorOverride(0, values, 1));
+}
+
 // Verifies that setCoarseOrientation correctly converts the coarse orientation
 // to a rotation vector and calls setPhysicalModel.
 TEST_F(SensorsAgentTest, SetCoarseOrientation) {
