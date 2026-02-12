@@ -386,7 +386,7 @@ void skin_keyboard_process_event(SkinKeyboard* kb, SkinEvent* ev, int down) {
         case LINUX_KEY_FORWARD:
         case LINUX_KEY_REFRESH:
         case LINUX_KEY_FULL_SCREEN:
-        case LINUX_KEY_SELECTIVE_SCREENSHOT:
+        case LINUX_KEY_SYSRQ:
         case LINUX_KEY_BRIGHTNESSDOWN:
         case LINUX_KEY_BRIGHTNESSUP:
         case LINUX_KEY_PREVIOUSSONG:

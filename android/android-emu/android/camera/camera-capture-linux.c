@@ -789,6 +789,7 @@ _camera_device_get_info(LinuxCameraDevice* cd, CameraInfo* cis)
     D("webcam choose format %.4s\n", (char*)&_preferred_formats[chosen]);
 
     cis->device_name = ASTRDUP(cd->device_name);
+    cis->camera_name = ASTRDUP(cd->caps.card);
     cis->inp_channel = cd->input_channel;
     cis->pixel_format = formats[chosen].format;
     cis->frame_sizes_num = formats[chosen].dim_num;
@@ -1110,8 +1111,6 @@ int camera_enumerate_devices(CameraInfo* cis, int max) {
                 found++;
             }
             camera_device_close(cd);
-        } else {
-            break;
         }
     }
 

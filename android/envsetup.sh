@@ -5,7 +5,11 @@
 PROGDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 export ASAN_OPTIONS=$(cat ${PROGDIR}/asan_overrides)
 
-LOCAL_NINJA_PATH="$PROGDIR/third_party/chromium/depot_tools"
+OS="linux-x86"
+if [ "$(uname)" == "Darwin" ]; then
+  OS="darwin-x86"
+fi
+LOCAL_NINJA_PATH="$PROGDIR/../../../prebuilts/ninja/$OS"
 
 if [ $(which ninja) ] ; then
   LOCAL_VER=$("$LOCAL_NINJA_PATH"/ninja --version 2>/dev/null || echo "Error: Local Ninja not found")

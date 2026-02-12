@@ -39,6 +39,8 @@
 #include "android/skin/qt/emulator-qt-window.h"
 #include "android/skin/qt/init-qt.h"
 #include "android/utils/debug.h"
+#include "android/utils/string.h"                           // for str_reset
+#include "android/utils/system.h"
 #include "fishtank_agents.h"
 #include "grpc/FishtankGrpcServer.h"
 
@@ -131,6 +133,16 @@ int main(int argc, char* argv[]) {
     int qt_argc = 1;
     injectFishtankConsoleAgents();
 
+    int discovery_timeout = 15;
+    std::string timeoutEnv = system->envGet("ANDROID_FISHTANK_DISCOVERY_TIMEOUT_SECS");
+    if (!timeoutEnv.empty()) {
+        if (!absl::SimpleAtoi(timeoutEnv, &discovery_timeout)) {
+            LOG(ERROR) << "Invalid value for ANDROID_FISHTANK_DISCOVERY_TIMEOUT_SECS: "
+                       << timeoutEnv << ". Using default: 15";
+            discovery_timeout = 15;
+        }
+    }
+
     // ParameterList params(argc, argv);
     getConsoleAgents()->settings->inject_android_cmdLine(
             android::base::createEscapedLaunchString(argc, argv).c_str());
@@ -186,36 +198,30 @@ int main(int argc, char* argv[]) {
     // 3 Options:
 
     // -- "default": Pick the first running emulator
-    // -- "<pid>": Find the PID, and corresponding discovery file
+    // -- "<serial>": Find the emulator with the given serial port (e.g. 5554)
     // -- "file.ini": Discovery file to use.
-    int qemu_pid = 0;
-    if (absl::SimpleAtoi(discovery, &qemu_pid)) {
+    int qemu_serial = 0;
+    if (absl::SimpleAtoi(discovery, &qemu_serial)) {
         EmulatorAdvertisement adv({});
 
-        // We are willing to wait 5 seconds for the discovery file.
+        // We are willing to wait for the discovery file.
         auto start = absl::Now();
-        auto deadline = start + absl::Seconds(5);
-        auto proc = android::base::Process::fromPid(qemu_pid);
-        auto possibleDiscoveryFile =
-                EmulatorAdvertisement::discoveryFile(qemu_pid);
-        while ((proc != nullptr && proc->isAlive() &&
-                !possibleDiscoveryFile.ok()) &&
-               absl::Now() < deadline) {
+        LOG(INFO) << "Waiting " << discovery_timeout << " seconds for discovery file";
+        auto deadline = start + absl::Seconds(discovery_timeout);
+        std::string possibleDiscoveryFile =
+                adv.discoverEmulatorWithProperties({{"port.serial", discovery}});
+        while (possibleDiscoveryFile.empty() && absl::Now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            proc = android::base::Process::fromPid(qemu_pid);
-            possibleDiscoveryFile =
-                    EmulatorAdvertisement::discoveryFile(qemu_pid);
-        }
-        if (proc == nullptr || !proc->isAlive()) {
-            LOG(FATAL) << "The qemu process " << qemu_pid << " does not exist";
-        }
-        if (!possibleDiscoveryFile.ok()) {
-            LOG(FATAL) << "The discovery file was not found after "
-                       << (absl::Now() - start)
-                       << ", with status: " << possibleDiscoveryFile.status();
+            possibleDiscoveryFile = adv.discoverEmulatorWithProperties(
+                    {{"port.serial", discovery}});
         }
 
-        discovery = possibleDiscoveryFile.value();
+        if (possibleDiscoveryFile.empty()) {
+            LOG(FATAL) << "The discovery file for serial " << discovery
+                       << " was not found after " << (absl::Now() - start);
+        }
+
+        discovery = possibleDiscoveryFile;
     } else if ("default" == discovery) {
         EmulatorAdvertisement adv({});
         auto emulators = adv.discoverRunningEmulators();
@@ -252,32 +258,33 @@ int main(int argc, char* argv[]) {
             android::emulation::control::EmulatorGrpcClient::me());
     initializeGrpcUserEventAgent(gControlClient.get());
 
-    if (!fc::isOverridden(fc::GuestAngle)) {
-        switch (skin_winsys_get_preferred_guest_gles_driver()) {
-            case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
-                fc::setEnabledOverride(fc::GuestAngle, false);
-                dinfo("Guest GLES Driver: Native (ext controls)");
-                break;
-            case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE:
-                fc::setEnabledOverride(fc::GuestAngle, true);
-                dinfo("Guest GLES Driver: Angle (ext controls)");
-                break;
-            default:
-                dinfo("Guest GLES Driver: Auto (ext controls)");
-        }
+    auto program_dir = System::get()->getProgramDirectory();
+
+    // Fishtank UI does not use any Vulkan
+    fc::setEnabledOverride(fc::Vulkan, false);
+    // Fishtank UI only uses/ships with swiftshader GL library.
+    // Map null/auto/empty gpu mode to 'swiftshader_indirect'
+    if (!hw->hw_gpu_mode || !strcmp(hw->hw_gpu_mode, "") || !strcmp(hw->hw_gpu_mode, "auto")) {
+        str_reset(&hw->hw_gpu_mode, "swiftshader_indirect");
     }
 
-    // Use advancedFeatures to override renderer if the user has
-    // selected in UI that the preferred renderer is "autoselected".
-    WinsysPreferredGlesBackend uiPreferredGlesBackend =
-            skin_winsys_get_preferred_gles_backend();
-
     android_set_external_renderer_active(true);
+
     // Needs to be called before compatibility checks to correctly control
     // if hw gpu is going to be used
     RendererConfig rendererConfig;
-    if (!configureRenderer(uiPreferredGlesBackend, &rendererConfig)) {
+    if (!configureRenderer(WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED, &rendererConfig)) {
         derror("Error: could not configure renderer!");
+    }
+
+    if (!strcmp(hw->hw_gpu_mode, "swiftshader_indirect") ||
+        !strcmp(hw->hw_gpu_mode, "swiftshader")) {
+        // Use the swiftshader libraries bundled with fishtank.
+        // We add this search path right after configureRenderer, so we can override the search
+        // path added by that call.
+        auto swiftshader_dir = pj({program_dir, "lib64", "gles_swiftshader"});
+        LOG(INFO) << "Adding swiftshader library search path: " << swiftshader_dir;
+        add_library_search_dir(swiftshader_dir.c_str());
     }
 
     if (!startRenderer(&rendererConfig)) {
@@ -287,7 +294,7 @@ int main(int argc, char* argv[]) {
     // Set Environment variables that get picked up by qt_path.cpp, which in
     // turn, will set environment variables for Qt to determine the path to the
     // plugins, qtwebengine stuff, etc.
-    auto program_dir = System::get()->getProgramDirectory();
+
     auto qt_base_dir = pj({program_dir, "lib64", "qt"});
 #ifdef _WIN32
     // For windows, we install all the Qt core dlls into the same directory with

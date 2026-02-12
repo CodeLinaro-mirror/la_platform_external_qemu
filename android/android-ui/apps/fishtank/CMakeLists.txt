@@ -139,9 +139,18 @@ function(fishtank_install_dependency)
       get_filename_component(DST_NAME ${DST} NAME)
       get_filename_component(REAL_SRC ${SRC} REALPATH)
       if(WINDOWS_MSVC_X86_64)
+        # On Windows, we typically flatten DLLs to the root so the OS loader
+        # can find them. We identify these because they are usually mapped
+        # to lib64/. However, some dependencies (like SwiftShader or Angle)
+        # must remain in their subdirectories.
+        if(DST_DIR STREQUAL "lib64")
+          set(FISHTANK_DEST "fishtank")
+        else()
+          set(FISHTANK_DEST "fishtank/${DST_DIR}")
+        endif()
         install(
           FILES ${REAL_SRC}
-          DESTINATION fishtank
+          DESTINATION ${FISHTANK_DEST}
           RENAME ${DST_NAME}
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
@@ -207,7 +216,8 @@ if(NOT LINUX_AARCH64)
                               abseil_dll
                               gfxstream_backend
                               ${RUNTIME_OS_DEPENDENCIES}
-                              ${ANGLE_DEPENDENCIES})
+                              ${ANGLE_DEPENDENCIES}
+                              ${SWIFTSHADER_DEPENDENCIES})
 
   if(WINDOWS_MSVC_X86_64)
     # Include MSVC runtime dependencies
@@ -293,7 +303,10 @@ endforeach()
 
 android_add_test(
   TARGET fishtank_unittests
-  SRC grpc/FishtankGrpcServer_unittest.cpp grpc/FishtankGrpcServer.cpp)
+  SRC grpc/FishtankGrpcServer_unittest.cpp
+      grpc/FishtankGrpcServer.cpp
+      agents/sensors_agent_unittest.cpp
+      agents/sensors_agent.cpp)
 
 target_link_libraries(
   fishtank_unittests
