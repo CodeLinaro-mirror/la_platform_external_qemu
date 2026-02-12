@@ -741,6 +741,19 @@ int MediaFoundationCameraDevice::enumerateDevices(MFInitialize& mf,
             }
         }
 
+        Win32UnicodeString cameraName;
+        {
+            WCHAR* friendlyName = nullptr;
+            UINT32 friendlyNameLength = 0;
+            hr = devices[i]->GetAllocatedString(
+                    MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &friendlyName,
+                    &friendlyNameLength);
+
+            if (SUCCEEDED(hr)) {
+                cameraName = Win32UnicodeString(friendlyName);
+                CoTaskMemFree(friendlyName);
+            }
+        }
         WebcamInfo webcamInfo;
         if (SUCCEEDED(hr)) {
             ComPtr<IMFMediaSource> source;
@@ -790,6 +803,7 @@ int MediaFoundationCameraDevice::enumerateDevices(MFInitialize& mf,
             snprintf(displayName, sizeof(displayName), "webcam%d", found);
             info.display_name = ASTRDUP(displayName);
             info.device_name = ASTRDUP(deviceName.toString().c_str());
+            info.camera_name = ASTRDUP(cameraName.toString().c_str());
             info.direction = ASTRDUP("front");
             info.inp_channel = 0;
             info.frame_sizes_num = static_cast<int>(allDims.size());

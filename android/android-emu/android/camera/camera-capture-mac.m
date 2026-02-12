@@ -777,9 +777,11 @@ int camera_enumerate_devices(CameraInfo* cis, int max) {
       char *user_name;
       asprintf(&user_name, "webcam%d", found);
       char *device_name = [[videoDevice uniqueID] UTF8String];
+      char *camera_name = [[videoDevice localizedName] UTF8String];
       cis[found].frame_sizes_num = sizeof(_emulate_dims) / sizeof(*_emulate_dims);
       memcpy(cis[found].frame_sizes, _emulate_dims, sizeof(_emulate_dims));
       cis[found].device_name = ASTRDUP(device_name);
+      cis[found].camera_name = ASTRDUP(camera_name);
       cis[found].inp_channel = 0;
       cis[found].display_name = user_name;
       cis[found].in_use = 0;
