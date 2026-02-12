@@ -829,6 +829,12 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
     mIgnoreWheelEvent =
             settings.value(Ui::Settings::DISABLE_MOUSE_WHEEL, false).toBool();
 
+    if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo()) &&
+            !settings.contains(Ui::Settings::DISABLE_PINCH_TO_ZOOM)) {
+        settings.setValue(Ui::Settings::DISABLE_PINCH_TO_ZOOM, true);
+    }
+
     mDisablePinchToZoom =
             settings.value(Ui::Settings::DISABLE_PINCH_TO_ZOOM, false).toBool();
     // set custom ADB path if saved
