@@ -54,6 +54,9 @@
       <property name="themeIconName" stdset="0">
        <string>key_volume_mute</string>
       </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
+      </property>
      </widget>
     </item>
     <item row="1" column="3">
@@ -73,6 +76,9 @@
       </property>
       <property name="themeIconName" stdset="0">
        <string>key_mic_mute</string>
+      </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
       </property>
      </widget>
     </item>
@@ -94,6 +100,9 @@
       <property name="themeIconName" stdset="0">
        <string>key_lock</string>
       </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
+      </property>
      </widget>
     </item>
     <item row="0" column="4">
@@ -113,6 +122,9 @@
       </property>
       <property name="themeIconName" stdset="0">
        <string>key_brightness_down</string>
+      </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
       </property>
      </widget>
     </item>
@@ -134,6 +146,9 @@
       <property name="themeIconName" stdset="0">
        <string>key_forward</string>
       </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
+      </property>
      </widget>
     </item>
     <item row="0" column="5">
@@ -153,6 +168,9 @@
       </property>
       <property name="themeIconName" stdset="0">
        <string>key_brightness_up</string>
+      </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
       </property>
      </widget>
     </item>
@@ -174,6 +192,9 @@
       <property name="themeIconName" stdset="0">
        <string>key_media_next</string>
       </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
+      </property>
      </widget>
     </item>
     <item row="1" column="1">
@@ -193,6 +214,9 @@
       </property>
       <property name="themeIconName" stdset="0">
        <string>key_play_pause</string>
+      </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
       </property>
      </widget>
     </item>
@@ -214,6 +238,9 @@
       <property name="themeIconName" stdset="0">
        <string>key_media_previous</string>
       </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
+      </property>
      </widget>
     </item>
     <item row="0" column="1">
@@ -233,6 +260,9 @@
       </property>
       <property name="themeIconName" stdset="0">
        <string>key_refresh</string>
+      </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
       </property>
      </widget>
     </item>
@@ -254,6 +284,9 @@
       <property name="themeIconName" stdset="0">
        <string>key_screen_capture</string>
       </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
+      </property>
      </widget>
     </item>
     <item row="0" column="2">
@@ -273,6 +306,9 @@
       </property>
       <property name="themeIconName" stdset="0">
        <string>key_full_screen</string>
+      </property>
+      <property name="ColorGroup" stdset="0">
+       <string>Button</string>
       </property>
      </widget>
     </item>
@@ -406,14 +442,24 @@
   <widget class="RaisedMaterialButton" name="keyComboSendButton">
    <property name="geometry">
     <rect>
-     <x>460</x>
+     <x>420</x>
      <y>260</y>
-     <width>80</width>
-     <height>20</height>
+     <width>120</width>
+     <height>36</height>
     </rect>
    </property>
    <property name="text">
     <string>Send</string>
+   </property>
+   <property name="font">
+    <font>
+     <family>Roboto</family>
+     <weight>75</weight>
+     <bold>true</bold>
+    </font>
+   </property>
+   <property name="ColorGroup" stdset="0">
+    <string>Button</string>
    </property>
   </widget>
  </widget>
