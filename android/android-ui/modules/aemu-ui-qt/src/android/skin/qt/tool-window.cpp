@@ -255,6 +255,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     mToolsUi->setupUi(this);
     const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
     const AvdFlavor avdFlavor = avdInfo ? avdInfo_getAvdFlavor(avdInfo) : AVD_OTHER;
+    bool avdIsDesktopApi36OrHigher = avdInfo && avdInfo_isDesktopApi36OrHigher(avdInfo);
 
     mToolsUi->mainLayout->setAlignment(Qt::AlignCenter);
     mToolsUi->winButtonsLayout->setAlignment(Qt::AlignCenter);
@@ -280,6 +281,10 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 #else
             "F1         SHOW_PANE_HELP\n"
 #endif
+            ;
+
+    if (!avdIsDesktopApi36OrHigher) {
+        default_shortcuts +=
             "Ctrl+S     TAKE_SCREENSHOT\n"
             "Ctrl+P     POWER\n"
 #ifndef __APPLE__
@@ -289,8 +294,9 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 #endif
             "Ctrl+O     OVERVIEW\n"
             "Ctrl+Backspace BACK\n";
+    }
 
-    if (avdFlavor != AVD_XR) {
+    if (avdFlavor != AVD_XR && !avdIsDesktopApi36OrHigher) {
         default_shortcuts +=
             "Ctrl+Shift+A       SHOW_PANE_CAMERA\n"
             "Ctrl+M             MENU\n"
@@ -301,7 +307,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
             "Ctrl+T             TOGGLE_TRACKBALL\n";
     }
 
-    if (avdFlavor != AVD_WEAR) {
+    if (avdFlavor != AVD_WEAR && !avdIsDesktopApi36OrHigher) {
         default_shortcuts += "Ctrl+=     VOLUME_UP\n";
         default_shortcuts += "Ctrl+-     VOLUME_DOWN\n";
         if (avdFlavor != AVD_XR) {
@@ -313,7 +319,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     if (!android_foldable_any_folded_area_configured() &&
         !android_foldable_hinge_configured() &&
         !android_foldable_rollable_configured() && !resizableEnabled() &&
-        avdFlavor != AVD_XR) {
+        avdFlavor != AVD_XR && !avdIsDesktopApi36OrHigher) {
         // Zoom is not available for foldable and resizable AVDs
         default_shortcuts += "Ctrl+Z    ENTER_ZOOM\n";
         default_shortcuts += "Ctrl+Up   ZOOM_IN\n";
@@ -359,7 +365,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 
     if (fc::isEnabled(fc::TvRemote) && avdFlavor == AVD_TV) {
         default_shortcuts += "Ctrl+Shift+D SHOW_PANE_TV_REMOTE\n";
-    } else if (avdFlavor != AVD_XR) {
+    } else if (avdFlavor != AVD_XR && !avdIsDesktopApi36OrHigher) {
         default_shortcuts += "Ctrl+Shift+D SHOW_PANE_DPAD\n";
     }
 
@@ -375,7 +381,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     updateMicrophoneUI();
 
     if (avdFlavor != AVD_TV) {
-        if (avdFlavor != AVD_XR) {
+        if (avdFlavor != AVD_XR && !avdIsDesktopApi36OrHigher) {
             default_shortcuts +=
                     "Ctrl+Shift+L SHOW_PANE_LOCATION\n"
                     "Ctrl+Shift+C SHOW_PANE_CELLULAR\n"
@@ -390,7 +396,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     QTextStream stream(&default_shortcuts);
     mShortcutKeyStore.populateFromTextStream(stream, parseQtUICommand);
 
-    if (avdFlavor != AVD_XR) {
+    if (avdFlavor != AVD_XR && !avdIsDesktopApi36OrHigher) {
         // Multitouch is disabled on XR images.
         // Need to add this one separately because QKeySequence cannot parse
         // the string "Ctrl".
@@ -505,7 +511,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         mToolsUi->next_layout_button->setHidden(true);
     }
 
-    if (!avdInfo_isDesktopApi36OrHigher(avdInfo)) {
+    if (!avdIsDesktopApi36OrHigher) {
         mToolsUi->meta_button->setHidden(true);
     }
 
