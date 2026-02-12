@@ -238,6 +238,10 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->displaysButton->setVisible(false);
     }
 
+    if (avdInfo_isDesktopApi36OrHigher(avdInfo)) {
+        mSidebarButtons.addButton(mExtendedUi->keyboardButton);
+    }
+
     if (avdFlavor != AVD_XR || avdFlavor != AVD_GLASSES || avdFlavor != AVD_ANDROID_AUTO) {
         mSidebarButtons.addButton(mExtendedUi->cellularButton);
         mSidebarButtons.addButton(mExtendedUi->telephoneButton);
