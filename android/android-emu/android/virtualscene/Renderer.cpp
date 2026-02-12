@@ -16,6 +16,13 @@
 
 #include "android/virtualscene/Renderer.h"
 
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "aemu/base/ArraySize.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/synchronization/MessageChannel.h"
@@ -25,13 +32,20 @@
 #include "android/utils/system.h"
 #include "android/virtualscene/RenderTarget.h"
 #include "android/virtualscene/TextureUtils.h"
+#include "emugl/common/OpenGLDispatchLoader.h"
+#include "host-common/opengles.h"
 
-#include <algorithm>
-#include <cmath>
-#include <functional>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
+#ifdef _WIN32
+/* Include declarations that are missing in non-Linux headers. */
+#include "android/camera/camera-win.h"
+#elif _DARWIN_C_SOURCE
+/* Include declarations that are missing in non-Linux headers. */
+#include "android/camera/camera-win.h"
+#else
+#include <linux/videodev2.h>
+#endif /* _WIN32 */
+
+#include <libyuv.h>
 
 using namespace android::base;
 
@@ -49,7 +63,30 @@ using namespace android::base;
 #define T(...) ((void)0)
 #endif
 
+struct ScopeTimer {
+    ScopeTimer(const char* name) {
+#if T_ACTIVE
+        mFuncName = name;
+        mStartTime = get_uptime_ms();
+#endif
+    }
+
+#if T_ACTIVE
+    ~ScopeTimer() {
+        const uint64_t scopeTime = get_uptime_ms() - mStartTime;
+        dinfo("ScopeTimer: '%s' took %llu ms", mFuncName, scopeTime);
+    }
+    const char* mFuncName;
+    int64_t mStartTime;
+#endif
+};
+
 static constexpr int kSuperSampleMultiple = 2;
+
+// TODO(virtualscene): Implement proper offscreen rendering and remove backing
+// framebuffer dimensions from the renderer.
+static constexpr int kRendererDefaultFramebufferWidth = 1024;
+static constexpr int kRendererDefaultFramebufferHeight = 1024;
 
 static constexpr char kTexturedVertexShader[] = R"(
 attribute vec3 in_position;
@@ -98,7 +135,6 @@ void main() {
   gl_FragColor = texture2D(tex_sampler, gl_FragCoord.xy * resolution);
 }
 )";
-
 
 static constexpr char kCheckerboardFragmentShader[] = R"(
 precision mediump float;
@@ -209,13 +245,15 @@ void main() {
 )";
 
 static constexpr android::virtualscene::VertexPositionUV kScreenQuadVerts[] = {
-    { glm::vec3(-1.f, -1.f, 0.f), glm::vec2(0.f,  0.f) },
-    { glm::vec3( 3.f, -1.f, 0.f), glm::vec2(2.f,  0.f) },
-    { glm::vec3(-1.f,  3.f, 0.f), glm::vec2(0.f,  2.f) },
+        {glm::vec3(-1.f, -1.f, 0.f), glm::vec2(0.f, 0.f)},
+        {glm::vec3(3.f, -1.f, 0.f), glm::vec2(2.f, 0.f)},
+        {glm::vec3(-1.f, 3.f, 0.f), glm::vec2(0.f, 2.f)},
 };
 
 static constexpr GLuint kScreenQuadIndices[] = {
-    0, 1, 2,
+        0,
+        1,
+        2,
 };
 
 namespace android {
@@ -256,16 +294,14 @@ struct RendererHeldResources {
     std::vector<Texture> textures;
 };
 
-enum class LoaderCommandType {
-    Shutdown,
-    LoadTexture
-};
+enum class LoaderCommandType { Shutdown, LoadTexture };
 
 struct LoaderCommand {
     LoaderCommandType mType;
     int mHandle = -1;
 
-    LoaderCommand(LoaderCommandType type, int handle) : mType(type), mHandle(handle) {}
+    LoaderCommand(LoaderCommandType type, int handle)
+        : mType(type), mHandle(handle) {}
 };
 
 using RenderableParameterCallback =
@@ -277,6 +313,214 @@ static uint64_t durationUsToMs(uint64_t startUs, uint64_t endUs) {
     return durationUs / 1000;
 }
 
+// Defines an RAII object to automatically unset the EGL context when the scope
+// exits.
+class ScopedEglContext : public RendererContext {
+public:
+    ScopedEglContext() {
+        mEglDispatch = nullptr;
+        mEglDisplay = EGL_NO_DISPLAY;
+    }
+
+    // Unset the EGL context on scope exit.
+    // |eglDispatch| - If non-null, the EGLDispatch object will be used to call
+    //                 eglMakeCurrent with EGL_NO_CONTEXT. If this is non-null,
+    //                 |eglDisplay| must also be EGL_NO_DISPLAY.
+    // |eglDisplay| - EGLDisplay handle, if |eglDispatch| is null, this must be
+    //                set to EGL_NO_DISPLAY.
+    ScopedEglContext(const gfxstream::host::gl::EGLDispatch* eglDispatch,
+                     const EGLDisplay eglDisplay)
+        : mEglDispatch(eglDispatch), mEglDisplay(eglDisplay) {
+        if ((eglDispatch && eglDisplay != EGL_NO_DISPLAY) ||
+            (!eglDispatch && eglDisplay == EGL_NO_DISPLAY)) {
+            // valid
+        } else {
+            derror("Invalid ScopedEglContext");
+        }
+    }
+
+    ScopedEglContext(ScopedEglContext&& other)
+        : mEglDispatch(other.mEglDispatch), mEglDisplay(other.mEglDisplay) {
+        other.mEglDispatch = nullptr;
+        other.mEglDisplay = nullptr;
+    }
+
+    ~ScopedEglContext() {
+        if (mEglDispatch) {
+            const EGLBoolean eglResult = mEglDispatch->eglMakeCurrent(
+                    mEglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE,
+                    EGL_NO_CONTEXT);
+            if (eglResult == EGL_FALSE) {
+                LOG(WARNING) << "Could not unset eglMakeCurrent error "
+                             << mEglDispatch->eglGetError();
+            }
+        }
+    }
+
+    bool isValid() const override { return mEglDispatch; }
+
+private:
+    const gfxstream::host::gl::EGLDispatch* mEglDispatch;
+    EGLDisplay mEglDisplay;
+};
+
+/*******************************************************************************
+ *                     RendererView routines
+ ******************************************************************************/
+
+void RendererView::updateTarget(Format format,
+                                int frameWidth,
+                                int frameHeight) {
+    std::lock_guard lock(mLock);
+    if (mFormat == format && mFrameWidth == frameWidth &&
+        mFrameHeight == frameHeight) {
+        // Setting the same values should not invalidate the cache
+        return;
+    }
+
+    mFormat = format;
+    mFrameWidth = frameWidth;
+    mFrameHeight = frameHeight;
+    mCache.invalidate();
+}
+
+void RendererView::updateViewProjection(const glm::mat4& viewProj) {
+    std::lock_guard lock(mLock);
+    if (mViewProjection == viewProj) {
+        // Setting the same values should not invalidate the cache
+        return;
+    }
+
+    mViewProjection = viewProj;
+    mCache.invalidate();
+}
+
+void RendererView::setBlurFactor(float factor) {
+    std::lock_guard lock(mLock);
+    if (mBlurFactor == factor) {
+        // Setting the same value should not invalidate the cache
+        return;
+    }
+
+    mBlurFactor = factor;
+    mCache.invalidate();
+}
+
+void RendererView::preRenderLocked() {
+    // Allocate space to cache render results on the CPU
+    auto viewCacheSize = mFrameWidth * mFrameHeight * 4;
+    mCache.mFramebufferRGBA8.resize(viewCacheSize);
+}
+
+void RendererView::postRenderLocked() {
+    // TODO(virtualscene): apply blur on the GPU side
+    if (mBlurFactor > 0) {
+        applyBlurInPlaceCPU(mFrameWidth, mFrameHeight,
+                            mCache.mFramebufferRGBA8.data(), mBlurFactor);
+    }
+}
+
+void RendererView::applyBlurInPlaceCPU(int width,
+                                       int height,
+                                       uint8_t* rgbaDataInOut,
+                                       float sigma) {
+    // No blur, return
+    if (sigma <= 0) {
+        return;
+    }
+
+    // Limit blur factor to avoid large kernels with low performance
+    const float maxSigma = 8.0f;
+    if (sigma > maxSigma) {
+        sigma = maxSigma;
+    }
+
+    ScopeTimer timerObj(__func__);
+    auto BlurRGBA = [&](const int radius) {
+        auto AlignedAlloc = [](size_t size) -> void* {
+#if defined(_MSC_VER)
+            return _aligned_malloc(size, 16);
+#else
+            void* ptr = nullptr;
+            if (posix_memalign(&ptr, 16, size) != 0) {
+                return nullptr;
+            }
+            return ptr;
+#endif
+        };
+
+        auto AlignedFree = [](void* ptr) {
+#if defined(_MSC_VER)
+            _aligned_free(ptr);
+#else
+            free(ptr);
+#endif
+        };
+
+        // Caller should allocate CumulativeSum table of width * height * 16
+        // bytes aligned to 16 byte boundary. height can be radius * 2 + 2 to
+        // save memory as the buffer is treated as circular.
+        size_t buffer_size = width * (height + 1) * 16;
+        int32_t* scratchBuffer =
+                static_cast<int32_t*>(AlignedAlloc(buffer_size));
+        if (!scratchBuffer) {
+            derror("%s: cannot allocate scratch buffer for libyuv::ARGBBlur",
+                   __func__);
+            return false;
+        }
+
+        const int stride = width * 4;
+        std::vector<uint8_t> tempData(width * height * 4);
+        int result =
+                libyuv::ARGBBlur(rgbaDataInOut, stride, tempData.data(), stride,
+                                 scratchBuffer, stride, width, height, radius);
+
+        // TODO(virtualscene): re-use scratch buffer later
+        AlignedFree(scratchBuffer);
+
+        if (result != 0) {
+            derror("%s: libyuv::ARGBBlur failed for radius=%d (result = %d)",
+                   __func__, radius, result);
+            return false;
+        }
+
+        memcpy(rgbaDataInOut, tempData.data(), tempData.size());
+        return true;
+    };
+
+    const int blurRadius = 1 + (int)sigma * 2;
+    return BlurRGBA(blurRadius);
+}
+
+bool RendererView::updateResizedLocked(const uint8_t* rgbaPixels,
+                                       int inputWidth,
+                                       int inputHeight) {
+    if (mFrameWidth <= 0 || mFrameHeight <= 0 || inputWidth <= 0 ||
+        inputHeight <= 0) {
+        derror("%s: Invalid input size", __func__);
+        return false;
+    }
+    if (mCache.mFramebufferRGBA8.size() != (mFrameWidth * mFrameHeight * 4)) {
+        derror("%s: Invalid cache size", __func__);
+        return false;
+    }
+
+    ScopeTimer timerObj(__func__);
+    uint8_t* dst_rgba = mCache.mFramebufferRGBA8.data();
+    int inputStride = inputWidth * 4;
+    int outputStride = mFrameWidth * 4;
+    int result = libyuv::ARGBScale(
+            rgbaPixels, inputStride, inputWidth, inputHeight, dst_rgba,
+            outputStride, mFrameWidth, mFrameHeight, libyuv::kFilterBilinear);
+
+    if (result != 0) {
+        derror("%s: failed!", __func__);
+        return false;
+    }
+
+    return true;
+}
+
 /*******************************************************************************
  *                     Renderer routines
  ******************************************************************************/
@@ -285,7 +529,7 @@ class RendererImpl : public Renderer {
     DISALLOW_COPY_AND_ASSIGN(RendererImpl);
 
 public:
-    RendererImpl(const GLESv2Dispatch* gles2, int width, int height);
+    RendererImpl(int width, int height);
     ~RendererImpl();
 
     bool initialize();
@@ -314,8 +558,11 @@ public:
     Texture loadTextureAsync(const char* filename) override;
     Texture duplicateTexture(Texture texture) override;
 
-    void render(const std::vector<RenderableObject>& renderables,
+    bool render(RendererView* view,
+                const std::vector<RenderableObject>& renderables,
                 float time) override;
+
+    std::unique_ptr<RendererContext> makeCurrent() override;
 
 private:
     void dispatchToRenderThread(std::function<void()>&& workItem);
@@ -383,7 +630,7 @@ private:
     // The result must be released with glDeleteProgram.
     GLuint linkShaders(GLuint vertexId, GLuint fragmentId);
 
-    GLint getAttribLocation(GLuint program, const char* name);
+    GLint getAttribLocation(GLuint program, const char* name, bool optional = false);
     GLint getUniformLocation(GLuint program, const char* name);
 
     GLuint getTextureId(Texture texture) const;
@@ -392,8 +639,6 @@ private:
     // Should be called under mResourceLock.
     void processRenderable(const Renderable& renderable,
                            RenderableParameterCallback parameterCallback);
-
-    const GLESv2Dispatch* const mGles2;
 
     const int mRenderWidth;
     const int mRenderHeight;
@@ -419,13 +664,36 @@ private:
 
     // Standard materials.
     Material mMaterialTextured;
+
+    struct EglState {
+        ~EglState() { destroy(); }
+
+        bool initialize(int frameWidth, int frameHeight);
+        void destroy();
+        ScopedEglContext makeEglCurrent();
+
+        void swapBuffers() {
+            mEglDispatch->eglSwapBuffers(mEglDisplay, mEglSurface);
+        }
+
+        // Dispatch tables for EGL and GLESv2 APIs. Note that these will be
+        // nullptr if there was a problem when loading the host libraries.
+        const gfxstream::host::gl::EGLDispatch* mEglDispatch = nullptr;
+        const gfxstream::host::gl::GLESv2Dispatch* mGles2 = nullptr;
+
+        EGLDisplay mEglDisplay = EGL_NO_DISPLAY;
+        EGLContext mEglContext = EGL_NO_CONTEXT;
+        EGLSurface mEglSurface = EGL_NO_SURFACE;
+        bool mEglInitialized = false;
+    } mGL;
+    const gfxstream::host::gl::GLESv2Dispatch* mGles2 =
+            nullptr;  // Same as mGL.mGles2, kept for legacy reasons
 };
 
-std::unique_ptr<Renderer> Renderer::create(const GLESv2Dispatch* gles2,
-                                           int width,
-                                           int height) {
+std::unique_ptr<Renderer> Renderer::create() {
     std::unique_ptr<RendererImpl> renderer;
-    renderer.reset(new RendererImpl(gles2, width, height));
+    renderer.reset(new RendererImpl(kRendererDefaultFramebufferWidth,
+                                    kRendererDefaultFramebufferHeight));
     if (!renderer->initialize()) {
         return nullptr;
     }
@@ -435,15 +703,26 @@ std::unique_ptr<Renderer> Renderer::create(const GLESv2Dispatch* gles2,
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
 
-RendererImpl::RendererImpl(const GLESv2Dispatch* gles2, int width, int height)
-    : mGles2(gles2),
-      mRenderWidth(width),
+RendererImpl::RendererImpl(int width, int height)
+    : mRenderWidth(width),
       mRenderHeight(height),
       mLoaderThread([this](LoaderCommand&& command) {
           return onLoaderCommand(std::move(command));
       }) {}
 
 bool RendererImpl::initialize() {
+    if (!mGL.initialize(mRenderWidth, mRenderHeight)) {
+        LOG(ERROR) << "Cannot initilize Egl";
+        return false;
+    }
+
+    auto context = mGL.makeEglCurrent();
+    if (!context.isValid()) {
+        return false;
+    }
+
+    mGles2 = mGL.mGles2;
+
     mScreenRenderTarget = RenderTarget::createDefault(
             *this, mGles2, mRenderWidth, mRenderHeight);
     if (!mScreenRenderTarget) {
@@ -494,6 +773,12 @@ bool RendererImpl::initialize() {
 }
 
 RendererImpl::~RendererImpl() {
+    auto context = mGL.makeEglCurrent();
+    if (!context.isValid()) {
+        E("%s: Failed to setup EGL context for cleanup.", __FUNCTION__);
+        return;
+    }
+
     mLoaderThread.enqueue(LoaderCommand(LoaderCommandType::Shutdown, -1));
     mLoaderThread.join();
 
@@ -738,7 +1023,7 @@ Material RendererImpl::createMaterialScreenSpace(const char* frag) {
     MaterialData material;
     material.program = program;
     material.positionLocation = getAttribLocation(program, "in_position");
-    material.uvLocation = getAttribLocation(program, "in_uv");
+    material.uvLocation = getAttribLocation(program, "in_uv", true);
     material.texSamplerLocation = getUniformLocation(program, "tex_sampler");
     material.resolutionLocation = getUniformLocation(program, "resolution");
 
@@ -853,8 +1138,8 @@ Texture RendererImpl::loadTextureAsync(const char* filename) {
     Texture texture =
             createTextureInternal(TextureState::Placeholder, path.c_str(),
                                   TextureUtils::createPlaceholder());
-    mLoaderThread.enqueue(LoaderCommand(LoaderCommandType::LoadTexture,
-                                        texture.id));
+    mLoaderThread.enqueue(
+            LoaderCommand(LoaderCommandType::LoadTexture, texture.id));
     return texture;
 }
 
@@ -879,8 +1164,10 @@ Texture RendererImpl::duplicateTexture(Texture texture) {
     return texture;
 }
 
-void RendererImpl::render(const std::vector<RenderableObject>& renderables,
+bool RendererImpl::render(RendererView* lockedView,
+                          const std::vector<RenderableObject>& renderables,
                           float time) {
+    ScopeTimer timerObj(__func__);
     mRenderTargets[0]->bind();
 
     mGles2->glEnable(GL_CULL_FACE);
@@ -958,6 +1245,48 @@ void RendererImpl::render(const std::vector<RenderableObject>& renderables,
     while (mRenderThreadDispatcherQueue.tryReceive(&workItem)) {
         workItem();
     }
+
+    // Finish rendering and readback the framebuffer
+    mGL.swapBuffers();
+
+    lockedView->preRenderLocked();
+
+    // TODO(virtualscene): Implement non blocking readback
+    auto readbackSize = mRenderWidth * mRenderHeight * 4;
+    if (mRenderWidth == lockedView->getWidthLocked() &&
+        mRenderHeight == lockedView->getHeightLocked()) {
+        // Same size, readback directly into the cache
+        mGles2->glReadPixels(0, 0, mRenderWidth, mRenderHeight, GL_RGBA,
+                             GL_UNSIGNED_BYTE,
+                             lockedView->mCache.mFramebufferRGBA8.data());
+    } else {
+        // Renderer is created with a different size, readback full and resize
+        // for the cache
+        T("%s: Renderer resolution mismatch (%dx%d), resizing virtual "
+          "scene output to (%dx%d)",
+          __FUNCTION__, mRenderWidth, mRenderHeight,
+          lockedView->getWidthLocked(), lockedView->getHeightLocked());
+        std::vector<uint8_t> readback_r8g8b8a8;
+        readback_r8g8b8a8.resize(readbackSize);
+        mGles2->glReadPixels(0, 0, mRenderWidth, mRenderHeight, GL_RGBA,
+                             GL_UNSIGNED_BYTE, readback_r8g8b8a8.data());
+
+        // Resize an RGBA image using Bilinear Interpolation.
+        if (!lockedView->updateResizedLocked(readback_r8g8b8a8.data(),
+                                             mRenderWidth, mRenderHeight)) {
+            derror("%s: Failed to resize the framebuffer for the view",
+                   __FUNCTION__);
+            return false;
+        }
+    }
+
+    lockedView->postRenderLocked();
+
+    return true;
+}
+
+std::unique_ptr<RendererContext> RendererImpl::makeCurrent() {
+    return std::make_unique<ScopedEglContext>(mGL.makeEglCurrent());
 }
 
 void RendererImpl::dispatchToRenderThread(std::function<void()>&& workItem) {
@@ -1027,8 +1356,9 @@ Texture RendererImpl::tryGetCachedTexture(const char* filename) {
 
 Texture RendererImpl::createEmptyTexture(uint32_t width, uint32_t height) {
     if (!isTextureSizeValid(width, height)) {
-        E("createEmptyTexture: Invalid texture size, %d x %d, GL_MAX_TEXTURE_SIZE = %d", width,
-          height, GL_MAX_TEXTURE_SIZE);
+        E("createEmptyTexture: Invalid texture size, %d x %d, "
+          "GL_MAX_TEXTURE_SIZE = %d",
+          width, height, GL_MAX_TEXTURE_SIZE);
         return Texture();
     }
 
@@ -1120,10 +1450,8 @@ void RendererImpl::onLoaderLoadTexture(Texture texture) {
 
     const uint64_t loadEndUs = System::get()->getHighResTimeUs();
 
-    dispatchToRenderThread([
-        this, texture, loadStartUs, loadEndUs,
-        result = std::move(resultOpt.value())
-    ]() {
+    dispatchToRenderThread([this, texture, loadStartUs, loadEndUs,
+                            result = std::move(resultOpt.value())]() {
         const uint64_t importStartUs = System::get()->getHighResTimeUs();
         if (!replaceTextureInternal(texture, result)) {
             return;
@@ -1241,9 +1569,9 @@ GLuint RendererImpl::linkShaders(GLuint vertexId, GLuint fragmentId) {
     return programId;
 }
 
-GLint RendererImpl::getAttribLocation(GLuint program, const char* name) {
+GLint RendererImpl::getAttribLocation(GLuint program, const char* name, bool optional) {
     GLint location = mGles2->glGetAttribLocation(program, name);
-    if (location < 0) {
+    if (location < 0 && !optional) {
         W("%s: Program attrib '%s' not found", __FUNCTION__, name);
     }
 
@@ -1334,6 +1662,110 @@ void RendererImpl::processRenderable(
     }
     if (material.uvLocation >= 0 && vertexInfo.hasUV) {
         mGles2->glDisableVertexAttribArray(material.uvLocation);
+    }
+}
+
+bool RendererImpl::EglState::initialize(int frameWidth, int frameHeight) {
+    mEglDispatch = (const EGLDispatch*)android_getEGLDispatch();
+    mGles2 = (const GLESv2Dispatch*)android_getGLESv2Dispatch();
+    if (!mEglDispatch || !mGles2) {
+        LOG(ERROR) << "EglState::initialize failed, cannot get GL dispatch.";
+        return false;
+    }
+
+    mEglDisplay = mEglDispatch->eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (mEglDisplay == EGL_NO_DISPLAY) {
+        LOG(ERROR) << "eglGetDisplay failed, error "
+                   << mEglDispatch->eglGetError();
+        return false;
+    }
+
+    EGLint eglMaj = 0;
+    EGLint eglMin = 0;
+
+    // Try to initialize EGL display.
+    // Initializing an already-initialized display is OK.
+    if (mEglDispatch->eglInitialize(mEglDisplay, &eglMaj, &eglMin) ==
+        EGL_FALSE) {
+        LOG(ERROR) << "eglInitialize failed, error "
+                   << mEglDispatch->eglGetError();
+        return false;
+    }
+
+    // Get an EGL config.
+    const EGLint attribs[] = {EGL_SURFACE_TYPE,
+                              EGL_PBUFFER_BIT,
+                              EGL_RENDERABLE_TYPE,
+                              EGL_OPENGL_ES_BIT,
+                              EGL_BLUE_SIZE,
+                              8,
+                              EGL_GREEN_SIZE,
+                              8,
+                              EGL_RED_SIZE,
+                              8,
+                              EGL_DEPTH_SIZE,
+                              16,
+                              EGL_NONE};
+    EGLint numConfig = 0;
+    EGLConfig eglConfig;
+    EGLBoolean chooseResult = mEglDispatch->eglChooseConfig(
+            mEglDisplay, attribs, &eglConfig, 1, &numConfig);
+    if (chooseResult == EGL_FALSE || numConfig < 1) {
+        LOG(ERROR) << "eglChooseConfig failed, error "
+                   << mEglDispatch->eglGetError();
+        return false;
+    }
+
+    // Create a context.
+    const EGLint contextAttribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+    mEglContext = mEglDispatch->eglCreateContext(
+            mEglDisplay, eglConfig, EGL_NO_CONTEXT, contextAttribs);
+    if (mEglContext == EGL_NO_CONTEXT) {
+        LOG(ERROR) << "eglCreateContext failed, error "
+                   << mEglDispatch->eglGetError();
+        return false;
+    }
+
+    // Finally, create a window surface associated with this widget.
+    const EGLint pbufferAttribs[] = {EGL_WIDTH, frameWidth, EGL_HEIGHT,
+                                     frameHeight, EGL_NONE};
+    mEglSurface = mEglDispatch->eglCreatePbufferSurface(mEglDisplay, eglConfig,
+                                                        pbufferAttribs);
+    if (mEglSurface == EGL_NO_SURFACE) {
+        LOG(ERROR) << "eglCreatePbufferSurface failed, error "
+                   << mEglDispatch->eglGetError();
+        return false;
+    }
+
+    mEglInitialized = true;
+    return true;
+}
+
+ScopedEglContext RendererImpl::EglState::makeEglCurrent() {
+    const EGLBoolean result = mEglDispatch->eglMakeCurrent(
+            mEglDisplay, mEglSurface, mEglSurface, mEglContext);
+    if (result == EGL_FALSE) {
+        LOG(ERROR) << "eglMakeCurrent failed, error "
+                   << mEglDispatch->eglGetError();
+
+        // Explicitly set mEglInitialized to false here to avoid an infinite
+        // loop with stopCapturing.
+        mEglInitialized = false;
+
+        // Return an empty ScopedEglContext because we failed to call
+        // eglMakeCurrent.
+        return ScopedEglContext(nullptr, EGL_NO_DISPLAY);
+    }
+
+    return ScopedEglContext(mEglDispatch, mEglDisplay);
+}
+
+void RendererImpl::EglState::destroy() {
+    if (mEglDispatch && mEglDisplay != EGL_NO_DISPLAY) {
+        mEglDispatch->eglDestroySurface(mEglDisplay, mEglSurface);
+        mEglDispatch->eglDestroyContext(mEglDisplay, mEglContext);
+        // Don't eglTerminate the display, we don't own the instance.
+        mEglDisplay = EGL_NO_DISPLAY;
     }
 }
 

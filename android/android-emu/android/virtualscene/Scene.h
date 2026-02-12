@@ -61,11 +61,14 @@ public:
 
     // Update the scene for the next frame.
     //
-    // Returns the timestamp for the frame.
-    int64_t update();
+    void update();
+
+    // Returns a hash value based on the scene contents and animations. Can be
+    // used to cache the results of a view and check if anything has changed.
+    uint64_t getVersionHashForView(const RendererView* lockedView) const;
 
     // Get the list of RenderableObjects for the current frame.
-    std::vector<RenderableObject> getRenderableObjects() const;
+    std::vector<RenderableObject> getRenderableObjects(const glm::mat4& viewProjection) const;
 
     // Create a new poster location.
     //
@@ -119,9 +122,9 @@ private:
     };
 
     Renderer& mRenderer;
-    SceneCamera mCamera;
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;
+    uint64_t mObjectsVersion = 0;
 };
 
 }  // namespace virtualscene

@@ -68,7 +68,7 @@ static bool s_qt_hide_windw = 0;
 
 void emulator_window_refresh(EmulatorWindow* emulator);
 
-static bool emulator_window_load_environment(const AvdInfo* avdInfo);
+extern bool emulator_window_load_environment(const AvdInfo* avdInfo, const bool transparentDisplay);
 
 static void write_window_name(char* buff,
                               size_t buff_len,
@@ -355,13 +355,14 @@ void emulator_window_setup(EmulatorWindow* emulator) {
         }
     }
 
-    // The environments are only supported when the display is transparent
-    // to make the background visible through host composition.
-    if (getConsoleAgents()->settings->hw()->hw_lcd_transparent) {
-        if (!emulator_window_load_environment(
-                    getConsoleAgents()->settings->avdInfo())) {
-            derror("%s: Could not setup environment", __func__);
-        }
+    // The environment file initializes the virtual scene system which is used
+    // when the display is transparent  to make the background visible through
+    // host composition.
+    const bool transparentDisplay =
+            getConsoleAgents()->settings->hw()->hw_lcd_transparent;
+    if (!emulator_window_load_environment(
+                getConsoleAgents()->settings->avdInfo(), transparentDisplay)) {
+        derror("%s: Could not setup environment", __func__);
     }
 
     emulator->ui = skin_ui_create(
@@ -765,209 +766,4 @@ void emulator_window_set_screen_mask(int width,
     emulator_screen_mask.width = width;
     emulator_screen_mask.height = height;
     emulator_screen_mask.rgbaData = rgbaData;
-}
-
-static int clamp_int(int x, int min, int max) {
-    return (x < min) ? min : (x > max) ? max : x;
-}
-
-static float clamp_float(float x, float min, float max) {
-    return (x < min) ? min : (x > max) ? max : x;
-}
-
-static void apply_blur_in_place(int width,
-                                int height,
-                                uint8_t* rgbaDataInOut,
-                                float sigma) {
-    // No blur, return
-    if (sigma <= 0) {
-        return;
-    }
-
-    // Create the 1D gaussian kernel
-    const int maxKernelRadius = 16;
-    float kernel[2 * maxKernelRadius + 1];
-
-    int kernelRadius = clamp_int((int)(ceil(sigma * 3.0)), 1, maxKernelRadius);
-    int kernelSize = 2 * kernelRadius + 1;
-    {
-        float sum = 0.0;
-        float s = 2.0 * sigma * sigma;
-        for (int i = -kernelRadius; i <= kernelRadius; i++) {
-            float val = exp(-(i * i) / s);
-            kernel[i + kernelRadius] = val;
-            sum += val;
-        }
-        // Normalize
-        for (int i = 0; i < kernelSize; i++) {
-            kernel[i] /= sum;
-        }
-    }
-
-    // Temporary buffer to hold the result of the horizontal pass
-    float* tempRGB = malloc(width * height * sizeof(float) * 3);
-
-    // Horizontal Pass
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            float r = 0.0, g = 0.0, b = 0.0;
-
-            for (int i = -kernelRadius; i <= kernelRadius; i++) {
-                // Handle edges
-                int ix = clamp_int(x + i, 0, width - 1);
-                int idx = (y * width + ix) * 4;
-                float weight = kernel[i + kernelRadius];
-
-                r += rgbaDataInOut[idx + 0] * weight;
-                g += rgbaDataInOut[idx + 1] * weight;
-                b += rgbaDataInOut[idx + 2] * weight;
-            }
-
-            int outIdx = (y * width + x) * 3;
-            tempRGB[outIdx + 0] = r;
-            tempRGB[outIdx + 1] = g;
-            tempRGB[outIdx + 2] = b;
-        }
-    }
-
-    // Vertical Pass
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            float r = 0.0, g = 0.0, b = 0.0;
-
-            for (int i = -kernelRadius; i <= kernelRadius; i++) {
-                // Handle edges by clamping
-                int iy = clamp_int(y + i, 0, height - 1);
-                int idx = (iy * width + x) * 3;  // Read from RGB buffer
-                float weight = kernel[i + kernelRadius];
-
-                r += tempRGB[idx + 0] * weight;
-                g += tempRGB[idx + 1] * weight;
-                b += tempRGB[idx + 2] * weight;
-            }
-
-            int outIdx = (y * width + x) * 4; // Output is RGBA
-
-            // Clamp final values back to 0-255 range and cast to uint8_t
-            rgbaDataInOut[outIdx + 0] = (uint8_t)(clamp_float(r, 0.0f, 255.0f));
-            rgbaDataInOut[outIdx + 1] = (uint8_t)(clamp_float(g, 0.0f, 255.0f));
-            rgbaDataInOut[outIdx + 2] = (uint8_t)(clamp_float(b, 0.0f, 255.0f));
-            // No need to change the alpha value
-        }
-    }
-
-    free(tempRGB);
-}
-
-static bool emulator_window_load_environment(const AvdInfo* avdInfo) {
-    if (!avdInfo) {
-        derror("%s: Invalid AVD info", __func__);
-        return false;
-    }
-
-    CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
-    if (!environmentIni) {
-        derror("%s: Cannot find AVD environment config", __func__);
-        return false;
-    }
-
-    const char* avdBasePath = avdInfo_getContentPath(avdInfo);
-    if (!avdBasePath) {
-        derror("%s: Cannot find AVD path", __func__);
-        return false;
-    }
-
-    // Load background image
-    const char* backgroundFilename =
-            iniFile_getString(environmentIni, "background.image.filename", 0);
-    if (backgroundFilename && backgroundFilename[0] != '\0' &&
-        strlen(backgroundFilename) < MAX_PATH) {
-        const char backgroundPath[1024];
-        sprintf(backgroundPath, "%s%s%s", avdBasePath, PATH_SEP,
-                backgroundFilename);
-        dinfo("%s: Setting up background image: %s", __func__, backgroundPath);
-
-        // Read and decode this file
-        // TODO: support other file formats
-        uint32_t width = 0, height = 0;
-        void* backgroundImageData = loadpng(backgroundPath, &width, &height);
-
-        const uint32_t maxSizeSupported = 4096;
-        if (width > maxSizeSupported || height > maxSizeSupported) {
-            derror("%s: Background image is too big(%dx%d), maximum extent: %d",
-                   __func__, width, height, maxSizeSupported);
-            return false;
-        }
-
-        if (backgroundImageData) {
-            // Apply blur in place, allow configuration to adjust the radius
-            const double defaultBlurRadius = width * 0.01;
-            const float blurValue = (float)iniFile_getDouble(
-                    environmentIni, "background.image.blurRadius",
-                    defaultBlurRadius);
-            if (blurValue > 0) {
-                const int64_t start = get_uptime_ms();
-                apply_blur_in_place(width, height, backgroundImageData,
-                                    blurValue);
-                const int64_t end = get_uptime_ms();
-                const uint64_t blur_time = end - start;
-                dinfo("%s: Image blurring took %llu ms, blur amount = %.2f\n",
-                      __func__, blur_time, blurValue);
-            }
-
-            const int left = iniFile_getInteger(
-                    environmentIni, "background.image.crop.left", 0);
-            const int right = iniFile_getInteger(
-                    environmentIni, "background.image.crop.right", 0);
-            const int top = iniFile_getInteger(environmentIni,
-                                               "background.image.crop.top", 0);
-            const int bottom = iniFile_getInteger(
-                    environmentIni, "background.image.crop.bottom", 0);
-
-            const int croppedWidth = right - left;
-            const int croppedHeight = bottom - top;
-            dinfo("Background image size: %dx%d. "
-                  "Crop parameters [%d %d %dx%d]",
-                  width, height, left, right, croppedWidth, croppedHeight);
-            if (left >= 0 && right <= width && top >= 0 && bottom <= height &&
-                croppedWidth > 0 && croppedHeight > 0) {
-                // Copy pixels into a new buffer
-                dinfo("Cropping the background image [%d %d %d %d]", left,
-                      right, top, bottom);
-                uint32_t* croppedPixels =
-                        malloc(croppedWidth * croppedHeight * sizeof(uint32_t));
-                {
-                    // Copy cropped region into croppedPixels
-                    const uint32_t* srcData = backgroundImageData;
-                    uint32_t* dstData = croppedPixels;
-                    for (int dstY = 0; dstY < croppedHeight; dstY++) {
-                        memcpy(dstData, srcData + left,
-                               croppedWidth * sizeof(uint32_t));
-                        dstData += croppedWidth;
-                        srcData += width;
-                    }
-                }
-
-                android_setOpenglesScreenBackground(
-                        croppedWidth, croppedHeight,
-                        (const uint8_t*)(croppedPixels));
-                free(croppedPixels);
-            } else {
-                // no cropping, provide all the pixels directly
-                android_setOpenglesScreenBackground(
-                        width, height, (const uint8_t*)(backgroundImageData));
-            }
-
-            free(backgroundImageData);
-        } else {
-            derror("%s: Could not load background image: %s", __func__,
-                   backgroundPath);
-        }
-    } else {
-        derror("%s: Invalidbackground image filename.", __func__);
-    }
-
-    free(backgroundFilename);
-
-    return true;
 }

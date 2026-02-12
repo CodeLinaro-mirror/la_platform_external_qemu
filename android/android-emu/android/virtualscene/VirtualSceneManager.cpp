@@ -16,19 +16,21 @@
 
 #include "android/virtualscene/VirtualSceneManager.h"
 
-#include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
 #include "android/cmdline-option.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/hw-config.h"
 #include "host-common/hw-config-helper.h"
+#include "host-common/opengles.h"
 #include "android/console.h"
 #include "android/skin/winsys.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/PosterInfo.h"
 #include "android/virtualscene/Renderer.h"
 #include "android/virtualscene/Scene.h"
+#include "android/virtualscene/Scene.h"
+#include "android/camera/camera-virtualscene-utils.h"
 
 #include <deque>
 #include <string_view>
@@ -145,10 +147,13 @@ private:
 public:
     ~VirtualSceneManagerImpl();
 
-    static std::unique_ptr<VirtualSceneManagerImpl>
-    create(const GLESv2Dispatch* gles2, int width, int height);
+    static std::unique_ptr<VirtualSceneManagerImpl> create();
 
-    int64_t render();
+    void update();
+
+    bool renderView(RendererView* view,
+                    float renderTime,
+                    std::function<void()> finishCallback);
 
     // Queue an update to a poster filename that should be executed on the
     // render thread.
@@ -181,19 +186,18 @@ VirtualSceneManagerImpl::VirtualSceneManagerImpl(
 }
 
 VirtualSceneManagerImpl::~VirtualSceneManagerImpl() {
-    skin_winsys_show_virtual_scene_controls(false);
     mScene->releaseResources();
 }
 
-std::unique_ptr<VirtualSceneManagerImpl> VirtualSceneManagerImpl::create(
-        const GLESv2Dispatch* gles2,
-        int width,
-        int height) {
-    std::unique_ptr<Renderer> renderer = Renderer::create(gles2, width, height);
+std::unique_ptr<VirtualSceneManagerImpl> VirtualSceneManagerImpl::create() {
+    std::unique_ptr<Renderer> renderer = Renderer::create();
     if (!renderer) {
         E("VirtualSceneManager renderer failed to construct");
         return nullptr;
     }
+
+    // Make the renderer context current for graphics operations
+    auto context = renderer->makeCurrent();
 
     std::unique_ptr<Scene> scene = Scene::create(*renderer.get());
     if (!scene) {
@@ -208,28 +212,57 @@ std::unique_ptr<VirtualSceneManagerImpl> VirtualSceneManagerImpl::create(
         }
     }
 
-    skin_winsys_show_virtual_scene_controls(true);
-
     return std::unique_ptr<VirtualSceneManagerImpl>(
             new VirtualSceneManagerImpl(std::move(renderer), std::move(scene)));
 }
 
-int64_t VirtualSceneManagerImpl::render() {
-    // Apply any pending updates to the scene.  This must be done on the OpenGL
-    // thread.
-    const auto& posters = sSettings->getPosterSettings();
-    while (!mPosterFilenameUpdates.empty()) {
-        const std::string& posterName = mPosterFilenameUpdates.front();
-        loadPosterInternal(posterName.c_str(), posters.at(posterName),
-                           Scene::LoadBehavior::Default);
-        mPosterFilenameUpdates.pop_front();
+void VirtualSceneManagerImpl::update() {
+    mScene->update();
+}
+
+bool VirtualSceneManagerImpl::renderView(RendererView* view,
+                                         float renderTime,
+                                         std::function<void()> finishCallback) {
+    std::lock_guard lock(view->mLock);
+
+    auto sceneHash = mScene->getVersionHashForView(view);
+    if (!view->mCache.isValidFor(sceneHash)) {
+        // View is not up to date,need to render again.
+
+        // Update cache with the render results
+        auto readbackSize = view->getWidthLocked() * view->getHeightLocked() * 4;
+        view->mCache.mSceneHash = sceneHash;
+        view->mCache.mFramebufferRGBA8.resize(readbackSize);
+
+        // Make the renderer context current for graphics operations
+        auto context = mRenderer->makeCurrent();
+        if (!context->isValid()) {
+            derror("%s: Cannot use EGL context", __FUNCTION__);
+            return false;
+        }
+
+        // Apply any pending updates to the scene.  This must be done on the
+        // OpenGL thread.
+        const auto& posters = sSettings->getPosterSettings();
+        while (!mPosterFilenameUpdates.empty()) {
+            const std::string& posterName = mPosterFilenameUpdates.front();
+            loadPosterInternal(posterName.c_str(), posters.at(posterName),
+                               Scene::LoadBehavior::Default);
+            mPosterFilenameUpdates.pop_front();
+        }
+
+        const auto renderables =
+                mScene->getRenderableObjects(view->mViewProjection);
+        if (!mRenderer->render(view, renderables, renderTime)) {
+            derror("Scene rendering failed");
+            return false;
+        }
     }
 
-    const int64_t timestamp = mScene->update();
-    mRenderer->render(
-            mScene->getRenderableObjects(),
-            (sSettings->getAnimationState() ? timestamp : 0) / 1000000000.0f);
-    return timestamp;
+    // TODO(virtualscene): check the hash at higher level to avoid copies&conversions
+    finishCallback();
+
+    return true;
 }
 
 void VirtualSceneManagerImpl::queuePosterUpdate(const char* posterName) {
@@ -287,20 +320,25 @@ void VirtualSceneManager::parseCmdline() {
     }
 }
 
-bool VirtualSceneManager::initialize(const GLESv2Dispatch* gles2,
-                                     int width,
-                                     int height) {
+bool VirtualSceneManager::initialize() {
     AutoLock lock(mLock);
     if (mImpl) {
         E("VirtualSceneManager already initialized");
         return false;
     }
 
-    mImpl = VirtualSceneManagerImpl::create(gles2, width, height).release();
+    D("Initializing VirtualSceneManager");
+    mImpl = VirtualSceneManagerImpl::create().release();
     return mImpl != nullptr;
 }
 
+bool VirtualSceneManager::isInitialized() {
+    AutoLock lock(mLock);
+    return (mImpl != nullptr);
+}
+
 void VirtualSceneManager::uninitialize() {
+    // TODO(virtualscene): correctly call uninitialize at exit
     AutoLock lock(mLock);
     if (!mImpl) {
         E("VirtualSceneManager not initialized");
@@ -309,18 +347,31 @@ void VirtualSceneManager::uninitialize() {
 
     // To make sure it's released the same way it was created, attach to a
     // unique_ptr and let that release it.
+    D("Uninitializing VirtualSceneManager");
     std::unique_ptr<VirtualSceneManagerImpl> stateReleaser(mImpl);
     mImpl = nullptr;
 }
 
-int64_t VirtualSceneManager::render() {
+void VirtualSceneManager::update() {
     AutoLock lock(mLock);
     if (!mImpl) {
         E("VirtualSceneManager not initialized");
         return 0L;
     }
 
-    return mImpl->render();
+    return mImpl->update();
+}
+
+bool VirtualSceneManager::renderView(RendererView* view,
+                                     float renderTime,
+                                     std::function<void()> finishCallback) {
+    AutoLock lock(mLock);
+    if (!mImpl) {
+        E("VirtualSceneManager not initialized");
+        return false;
+    }
+
+    return mImpl->renderView(view, renderTime, finishCallback);
 }
 
 void VirtualSceneManager::setInitialPoster(const char* posterName,
@@ -390,6 +441,12 @@ void VirtualSceneManager::setAnimationState(bool state) {
 bool VirtualSceneManager::getAnimationState() {
     AutoLock lock(mLock);
     return sSettings->getAnimationState();
+}
+
+void VirtualSceneManager::showSceneControls(bool show) {
+    // TODO(virtualscene): reconsider how to enable/disable controls
+    dprint("%s: %s", __func__, (show ? "true" : "false"));
+    skin_winsys_show_virtual_scene_controls(show);
 }
 
 }  // namespace virtualscene

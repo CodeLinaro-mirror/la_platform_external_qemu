@@ -65,6 +65,87 @@ struct RenderableObject {
     Renderable renderable;
 };
 
+// EGL requires the current context to be bound for operating, this
+// RAII interface class helps overwrite with a class to call eglMakeCurrent
+class RendererContext {
+public:
+    virtual ~RendererContext() = default;
+
+    virtual bool isValid() const { return false; }
+};
+
+class RendererView {
+public:
+    enum class Format {
+        RGBA8,
+    };
+
+    // Updates render target related values, and re-creates the render target
+    void updateTarget(Format format, int frameWidth, int frameHeight);
+
+    // Updates positional values that do not require render target recreation
+    void updateViewProjection(const glm::mat4& viewProj);
+
+    void setBlurFactor(float factor);
+
+    std::vector<uint8_t>& getFramebufferLocked() {
+        return mCache.mFramebufferRGBA8;
+    }
+
+    Format getFormatLocked() const { return mFormat; }
+    int getWidthLocked() const { return mFrameWidth; }
+    int getHeightLocked() const { return mFrameHeight; }
+
+    // Some temporary utility functions for CPU side image processing
+    static void applyBlurInPlaceCPU(int width,
+                                    int height,
+                                    uint8_t* rgbaDataInOut,
+                                    float sigma);
+
+    bool updateResizedLocked(const uint8_t* rgbaPixels, int w_old, int h_old);
+
+protected:
+    friend class RendererImpl;
+    friend class VirtualSceneManagerImpl;
+    friend class RenderedCameraDevice;  // TODO(virtualscene): temp, for dummy
+                                        // videoplayback implementation
+
+    std::mutex mLock;
+    int mFrameWidth = 0;
+    int mFrameHeight = 0;
+    Format mFormat = Format::RGBA8;
+
+    glm::mat4 mViewProjection = glm::mat4(1.0f);
+    float mBlurFactor = 0.0f;
+
+    struct Cache {
+        static const uint64_t INVALID_SCENE_HASH = ~0ULL;
+        uint64_t mSceneHash = INVALID_SCENE_HASH;
+        std::vector<uint8_t> mFramebufferRGBA8;
+
+        void invalidate() {
+            mSceneHash = INVALID_SCENE_HASH;
+            mFramebufferRGBA8.clear();
+        }
+
+        bool isValidFor(int64_t sceneHash) const {
+            if (sceneHash == INVALID_SCENE_HASH) {
+                // Cannot cache with an invalid hash
+                return false;
+            }
+            return (mSceneHash == sceneHash) && (mFramebufferRGBA8.size() > 0);
+        }
+    };
+
+    Cache mCache;  // CPU side readback cache
+
+    // preRender callback to be called before a rendering operation
+    void preRenderLocked();
+
+    // postRender callback to be called after a rendering operation
+    void postRenderLocked();
+};
+
 class Renderer {
     DISALLOW_COPY_AND_ASSIGN(Renderer);
 
@@ -76,12 +157,9 @@ public:
 
     // Create a virtual scene Renderer.
     //
-    // |gles2| - Pointer to GLESv2Dispatch, must be non-null.
-    //
     // Returns a Renderer instance if the renderer was successfully created or
     // null if there was an error.
-    static std::unique_ptr<Renderer> create(const GLESv2Dispatch* gles2,
-                                            int width, int height);
+    static std::unique_ptr<Renderer> create();
 
     // Get the aspect ratio of the frame, w/h.
     virtual float getAspectRatio() = 0;
@@ -217,8 +295,13 @@ public:
     virtual Texture duplicateTexture(Texture texture) = 0;
 
     // Render a frame.
-    virtual void render(const std::vector<RenderableObject>& renderables,
+    virtual bool render(RendererView* view,
+                        const std::vector<RenderableObject>& renderables,
                         float time) = 0;
+
+    // Make EGL context current for the scope
+    // TODO: this is a temporary API, due to the limitation of egl.
+    virtual std::unique_ptr<RendererContext> makeCurrent() = 0;
 };
 
 }  // namespace virtualscene
