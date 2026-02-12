@@ -23,7 +23,9 @@ In a standard integrated emulator, these are triggered directly by the C++ `Phys
 - [x] Implement `getSensor`
 - [x] Implement `getSensorSize`
 - [x] Implement `setCoarseOrientation`
-- [ ] Implement `setSensorOverride`
+- [x] Implement `setSensorOverride`
+- [x] Implement `getDelayMs`
+- [x] Implement `advanceTime`
 - [x] Implement `setPhysicalStateAgent` (with polling)
 
 ## Implementation Details
@@ -33,6 +35,11 @@ Most calls are straightforwardly forwarded to the corresponding `getSensor`, `se
 
 ### Coarse Orientation
 `setCoarseOrientation` is implemented by converting the coarse-grained orientation (Portrait, Landscape, etc.) into a 3D rotation vector (on the Z-axis) and forwarding it as a `ROTATION` physical parameter update via gRPC. This matches the behavior of the standard emulator.
+
+### Backend-Specific APIs
+`getDelayMs` and `advanceTime` are implemented as stubs:
+-   **`getDelayMs`**: Returns `0`. This value typically represents the sensor update rate requested by the guest OS HAL. Since Fishtank doesn't directly interface with the HAL, this value has no meaning for the UI.
+-   **`advanceTime`**: Does nothing. This is used by the automation controller to drive the physical model simulation forward. Since Fishtank is just a UI client, it does not participate in the simulation timing.
 
 ### Polling for Physical State
 Since `streamPhysicalModel` is not available in the backend, Fishtank implements a periodic polling mechanism (in `sensors_agent.cpp`) that triggers when a `QAndroidPhysicalStateAgent` is registered.

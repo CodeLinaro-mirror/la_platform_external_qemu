@@ -263,8 +263,27 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                 },
         .setSensorOverride =
                 [](int sensor, const float* value, size_t len) {
-                    NOT_IMPLEMENTED("QAndroidSensorsAgent.setSensorOverride(sensor: %d, value: %p, len: %zu)", sensor, value, len);
-                    return 0;
+                    DPRINT("setSensorOverride(sensor: %d, len: %zu)", sensor,
+                           len);
+                    auto client = getGlobalControlClient();
+                    if (!client) return -1;
+
+                    android::emulation::control::SensorValue request;
+                    request.set_target(
+                            (android::emulation::control::SensorValue::SensorType)
+                                    sensor);
+                    auto val = request.mutable_value();
+                    for (size_t i = 0; i < len; i++) {
+                        val->add_data(value[i]);
+                    }
+
+                    grpc::ClientContext context;
+                    google::protobuf::Empty response;
+                    auto status =
+                            client->service()->setSensor(&context, request,
+                                                         &response);
+
+                    return status.ok() ? 0 : -1;
                 },
         .getSensor =
                 [](int sensor, float* const* value, size_t len) {
@@ -317,7 +336,10 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                 },
         .getDelayMs =
                 []() {
-                    NOT_IMPLEMENTED("QAndroidSensorsAgent.getDelayMs");
+                    DPRINT("getDelayMs()");
+                    // We return 0 here because there is currently no gRPC API
+                    // available to retrieve the sensor update delay from the
+                    // backend.
                     return 0;
                 },
         .setPhysicalStateAgent =

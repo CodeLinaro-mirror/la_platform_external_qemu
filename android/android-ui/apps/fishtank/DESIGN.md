@@ -68,7 +68,7 @@ Fishtank is an ongoing project, and not all emulator agents are fully implemente
 | **Location** | 🟡 Partial | `gpsSendLoc` and `gpsGetLoc` are implemented. NMEA and GNSS specific calls are currently `NOT_IMPLEMENTED`. |
 | **Clipboard** | ✅ Full | Bi-directional clipboard sync is implemented using gRPC streaming and unary calls. |
 | **Battery** | ❌ None | All calls are currently `NOT_IMPLEMENTED`. |
-| **Sensors** | 🟡 Partial | Physical parameter and most sensor calls (getSensor, getSensorSize, setCoarseOrientation) are implemented and forwarded via gRPC. Includes a background polling mechanism for physical state changes. |
+| **Sensors** | ✅ Full | All physical parameter and sensor calls are implemented and forwarded via gRPC. Includes a background polling mechanism for physical state changes. |
 | **Cellular** | ❌ None | All calls are currently `NOT_IMPLEMENTED`. |
 | **Display** | 🟡 Partial | Basic display information is available, but complex multi-display management is still being hooked up. |
 | **VM Operations** | 🟡 Partial | Basic VM control (start/stop/pause) is partially implemented via gRPC. |
