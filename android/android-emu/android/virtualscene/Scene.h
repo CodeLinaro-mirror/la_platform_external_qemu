@@ -78,17 +78,13 @@ public:
 
     ~Scene();
 
-    // Create a Scene.
-    //
-    // |gles2| - Pointer to GLESv2Dispatch, must be non-null.
-    //
-    // Returns a Scene instance if the scene was successfully created or
+    // Creates a scene instance if the scene was successfully created or
     // null if there was an error.
-    static std::unique_ptr<Scene> create(Renderer& renderer,
+    static std::unique_ptr<Scene> create(std::unique_ptr<Renderer> renderer,
                                          const SceneConfig& config);
 
     // Before teardown, release all Renderer resources and SceneObjects.
-    void releaseResources();
+    bool releaseResources();
 
     // Get the scene camera.
     const SceneCamera& getCamera() const;
@@ -137,11 +133,15 @@ public:
     //           clamped.
     void updatePosterScale(const char* posterName, float scale);
 
-    SceneOverlayObject* getOverlayObject() { return mOverlayObject.get(); }
+    const SceneOverlayObject* getOverlayObject() const {
+        return mOverlayObject.get();
+    }
+
+    Renderer* getRenderer() { return mRenderer.get(); }
 
 private:
     // Private constructor, use Scene::create to create an instance.
-    Scene(Renderer& renderer, const SceneConfig& config);
+    Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config);
 
     // Load the scene and create SceneObjects.
     //
@@ -160,7 +160,7 @@ private:
         Texture defaultTexture;
     };
 
-    Renderer& mRenderer;
+    std::unique_ptr<Renderer> mRenderer;
     SceneConfig mConfig;
 
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
