@@ -55,6 +55,13 @@ struct SceneConfig {
 
     // Returns fullpath to default file for the given scene mode
     static const char* defaultFilenameForMode(SceneConfig::Mode mode);
+
+    // Check if a GPU renderer should be initialized for the scene mode
+    static bool modeRequiresRenderer(SceneConfig::Mode mode);
+
+    // Check if the scene mode supports view rotations, otherwise a seperate
+    // rotation operation will be required
+    static bool modeSupportViewRotations(SceneConfig::Mode mode);
 };
 
 // TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
@@ -138,6 +145,9 @@ public:
     }
 
     Renderer* getRenderer() { return mRenderer.get(); }
+
+    void loadUserResources();
+    void unloadUserResources();
 
 private:
     // Private constructor, use Scene::create to create an instance.

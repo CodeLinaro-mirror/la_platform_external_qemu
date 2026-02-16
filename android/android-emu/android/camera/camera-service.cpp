@@ -513,14 +513,26 @@ struct CameraService {
             return !strncmp(name, "webcam", 6);
         };
 
-        constexpr size_t kVideofileCamPrefixSize = 10;
+        // Filename is optional, if not given a default image/video will be used
+        constexpr char* kVideofileCamPrefix = "videofile";
+        constexpr std::size_t kVideofileCamPrefixSize = std::string_view(kVideofileCamPrefix).length();
         static const auto isVideofileCam = [](const char* name){
-            return !strncmp(name, "videofile:", kVideofileCamPrefixSize);
+            return !strncmp(name, kVideofileCamPrefix, kVideofileCamPrefixSize);
         };
 
-        constexpr size_t kImagefileCamPrefixSize = 10;
-        static const auto isImagefileCam = [](const char* name) {
-            return !strncmp(name, "imagefile:", kImagefileCamPrefixSize);
+        constexpr const char* kImagefileCamPrefix = "imagefile";
+        constexpr std::size_t kImagefileCamPrefixSize = std::string_view(kImagefileCamPrefix).length();
+        static auto isImagefileCam = [](const char* name) {
+            return !strncmp(name, kImagefileCamPrefix, kImagefileCamPrefixSize);
+        };
+
+        static auto getCameraFilename =
+                [](const char* name,
+                   const std::size_t prefixSize) -> const char* {
+            if (strlen(name) < (prefixSize + 1) || name[prefixSize] != ':') {
+                return nullptr;
+            }
+            return name + prefixSize + 1;
         };
 
         if (androidHwConfig_hasVirtualSceneCamera(hwCfg)) {
@@ -538,20 +550,23 @@ struct CameraService {
         } else if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
             virtualscenecameraSetup("back", cameraBackOrientation, kVideoPlayback);
         } else if (isVideofileCam(cameraBack)) {
-            videofilecameraSetup("back", cameraBackOrientation, cameraBack + kVideofileCamPrefixSize);
+            const char* filename = getCameraFilename(cameraBack, kVideofileCamPrefixSize);
+            videofilecameraSetup("back", cameraBackOrientation, filename);
         } else if (isImagefileCam(cameraBack)) {
-            imagefilecameraSetup("back", cameraBackOrientation, cameraBack + kImagefileCamPrefixSize);
+            const char* filename = getCameraFilename(cameraBack, kImagefileCamPrefixSize);
+            imagefilecameraSetup("back", cameraBackOrientation, filename);
         }
 
-        if (androidHwConfig_hasVideoPlaybackFrontCamera(hwCfg)) {
-            virtualscenecameraSetup("front", cameraFrontOrientation, kVideoPlayback);
-        } else if (androidHwConfig_hasEnvironmentFrontCamera(hwCfg)) {
+        if (androidHwConfig_hasEnvironmentFrontCamera(hwCfg)) {
             virtualscenecameraSetup("front", cameraFrontOrientation, kEnvironment);
+        } else if (androidHwConfig_hasVideoPlaybackFrontCamera(hwCfg)) {
+            virtualscenecameraSetup("front", cameraFrontOrientation, kVideoPlayback);
         } else if (isVideofileCam(cameraFront)) {
-            videofilecameraSetup("front", cameraFrontOrientation, cameraFront + kVideofileCamPrefixSize);
+            const char* filename = getCameraFilename(cameraFront, kVideofileCamPrefixSize);
+            videofilecameraSetup("front", cameraFrontOrientation, filename);
         } else if (isImagefileCam(cameraFront)) {
-            imagefilecameraSetup("front", cameraFrontOrientation,
-                                 cameraFront + kImagefileCamPrefixSize);
+            const char* filename = getCameraFilename(cameraFront, kImagefileCamPrefixSize);
+            imagefilecameraSetup("front", cameraFrontOrientation, filename);
         }
 
         /* Lets see if HW config uses emulated cameras. */
@@ -716,19 +731,32 @@ private:
 
     void virtualscenecameraSetup(const char* dir,
                                  int sensor_orientation,
-                                 CameraSourceType sourceType) {
-        const char* device_name;
+                                 CameraSourceType sourceType,
+                                 const char* sceneFilename = nullptr) {
+        std::string device_name;
         switch (sourceType) {
+            case kVirtualScene:
+                // virtualscene=environment with default config
+                device_name = "environment";
+                break;
             case kEnvironment:
                 device_name = "environment";
                 break;
             case kVideoPlayback:
+            case kVideofile:
                 device_name = "videoplayback";
                 break;
-            case kVirtualScene:
-                [[fallthrough]];
-            default:
-                device_name = "virtualscene";
+            case kImagefile:
+                device_name = "imagefile";
+                break;
+            default: {
+                derror("%s: unknown camera source type", __func__);
+                device_name = "environment";
+            }
+        }
+        if (sceneFilename) {
+            device_name += camera_virtualscene_name_argument_separator();
+            device_name.append(sceneFilename);
         }
 
         static const CameraInfoVtbl vtbl = {
@@ -760,9 +788,9 @@ private:
         ci.vtbl = &vtbl;
         memcpy(ci.frame_sizes, kEmulateDims, sizeof(kEmulateDims));
         ci.frame_sizes_num = sizeof(kEmulateDims) / sizeof(*kEmulateDims);
-        ci.display_name = ASTRDUP(device_name);
-        ci.device_name = ASTRDUP(device_name);
-        ci.camera_name = ASTRDUP(device_name);
+        ci.display_name = ASTRDUP(device_name.c_str());
+        ci.device_name = ASTRDUP(device_name.c_str());
+        ci.camera_name = ASTRDUP(device_name.c_str());
         ci.inp_channel = 0;
         ci.pixel_format = camera_virtualscene_preferred_format();
         ci.direction = ASTRDUP(dir);

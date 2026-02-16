@@ -135,6 +135,15 @@ const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
     }
 }
 
+bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
+    // Currently, only Mesh3dScene requires a renderer
+    return (mode == SceneConfig::Mode::Mesh3dScene);
+}
+
+bool SceneConfig::modeSupportViewRotations(SceneConfig::Mode mode) {
+    // Currently, only Mesh3dScene supports view rotations
+    return (mode == SceneConfig::Mode::Mesh3dScene);
+}
 
 Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
     : mRenderer(std::move(renderer)), mConfig(config) {
@@ -147,6 +156,7 @@ Scene::~Scene() {
         // releaseResources should have been called!
         E("%s: Scene resources are not released!", __func__);
     }
+    mRenderer.reset();
 }
 
 std::unique_ptr<Scene> Scene::create(std::unique_ptr<Renderer> renderer,
@@ -383,6 +393,16 @@ void Scene::getRenderableObjectsFromSceneObject(
             outRenderableObjects.push_back({mvp, renderable});
         }
     }
+}
+
+// TODO(virtualscene-perf): implement load/unload user resources functions
+// to reduce memory usage of the scene when there are no users of it
+void Scene::loadUserResources() {
+    dprint("%s", __FUNCTION__);
+}
+
+void Scene::unloadUserResources() {
+    dprint("%s", __FUNCTION__);
 }
 
 }  // namespace virtualscene

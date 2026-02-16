@@ -12,11 +12,6 @@
 
 #include "android/emulator-window.h"
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,21 +27,19 @@
 #include "android/console.h"
 #include "android/hw-sensors.h"
 #include "android/network/globals.h"
-#include "android/skin/keycode.h"
-#include "android/skin/window.h"
-#include "android/skin/winsys.h"
 #include "android/ui-emu-agent.h"
 #include "android/utils/debug.h"
 #include "android/utils/path.h"
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/Scene.h"
-#include "android/virtualscene/SceneCamera.h"
-#include "android/virtualscene/VirtualSceneManager.h"
 #include "host-common/display_agent.h"
 #include "host-common/hw-config-helper.h"
 #include "host-common/opengles.h"
 #include "host-common/vm_operations.h"
 #include "host-common/window_agent.h"
+
+#include "android/virtualscene/Renderer.h"
+#include "android/virtualscene/Scene.h"
+#include "android/virtualscene/SceneCamera.h"
+#include "android/virtualscene/VirtualSceneManager.h"
 
 using android::virtualscene::RendererView;
 using android::virtualscene::SceneCamera;
@@ -75,9 +68,8 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
 
     // Check if the camera is set to 'environment' or 'virtualscene'
     const bool cameraUsesEnvironment = (hwCameraBack == "environment") ||
-                                       (hwCameraFront == "environment");
-
-    // Check if the camera is set to 'environment'
+                                       (hwCameraFront == "environment") ||
+                                       (hwCameraBack == "virtualscene");
     const bool backgroundUsesEnvironment = transparentDisplay;
     const bool environmentRequired =
             cameraUsesEnvironment || backgroundUsesEnvironment;
@@ -87,11 +79,25 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         return true;
     }
 
+    struct ScopeTimer {
+        ScopeTimer() { mStartTime = get_uptime_ms(); }
+        ~ScopeTimer() {
+            const uint64_t scopeTime = get_uptime_ms() - mStartTime;
+            dprint("%s: took %llu ms", __func__, scopeTime);
+        }
+        int64_t mStartTime;
+    } timer;
+
     // Environment is required, set it up
     CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
     if (!environmentIni) {
-        // Not having an environment file is unexpected, defaults will be used
-        dwarning("%s: No environment config is provided", __func__);
+        // Not having an environment file is unexpected if it's not in
+        // 'virtualscene' mode, defaults will be used
+        if (hwCameraBack != "virtualscene") {
+            dwarning("%s: No environment config is provided", __func__);
+        } else {
+            dinfo("%s: No environment config is provided", __func__);
+        }
     }
 
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
@@ -113,7 +119,6 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
             sceneMode = SceneConfig::Mode::VideoPlayback;
             sceneFilename = backgroundVideoFilename;
         } else if (!backgroundSceneFilename.empty()) {
-            // If nothing is given, load default virtual scene
             sceneMode = SceneConfig::Mode::Mesh3dScene;
             sceneFilename = backgroundSceneFilename;
         }
@@ -124,8 +129,8 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
     }
 
     if (sceneMode == SceneConfig::Mode::Unknown || sceneFilename.empty()) {
-        // If the input is invalid, load default virtual scene
-        dinfo("%s: Using default environment config", __func__);
+        dinfo("%s: Using default virtual scene contents for the environment.",
+              __func__);
         sceneMode = SceneConfig::Mode::Mesh3dScene;
         sceneFilename = SceneConfig::defaultFilenameForMode(sceneMode);
     }
@@ -156,10 +161,13 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         glm::mat4 viewProjection = sceneCamera.getProjection() * cameraView;
 
         std::unique_ptr<RendererView> backgroundView =
-                VirtualSceneManager::createView(RendererView::Format::RGBA8,
-                                                displayWidth, displayheight);
+                std::make_unique<RendererView>();
+        backgroundView->updateTarget(RendererView::Format::RGBA8, displayWidth,
+                                     displayheight);
         backgroundView->updateViewProjection(viewProjection);
         backgroundView->setBlurFactor(backgroundBlur);
+
+        VirtualSceneManager::addSceneUser();
 
         // TODO(virtualscene-manager): this should be called regularly at ~30fps,
         // should be configurable through environment.ini based on scene

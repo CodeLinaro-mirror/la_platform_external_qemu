@@ -113,8 +113,6 @@ private:
 
 class RendererView {
 public:
-    RendererView(Scene* scene);
-
     enum class Format {
         RGBA8,
     };
@@ -144,10 +142,9 @@ public:
 
 protected:
     friend class RendererImpl;
-    friend class VirtualSceneManagerImpl;
+    friend class ScenesManager;
 
     std::mutex mLock;
-    Scene* mScene;
     int mFrameWidth = 0;
     int mFrameHeight = 0;
     Format mFormat = Format::RGBA8;

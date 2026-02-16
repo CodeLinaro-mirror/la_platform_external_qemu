@@ -47,9 +47,6 @@ static constexpr const char* kPosterFile = "Toren1BD.posters";
 namespace android {
 namespace virtualscene {
 
-StaticLock VirtualSceneManager::mLock;
-VirtualSceneManagerImpl* VirtualSceneManager::mImpl = nullptr;
-
 // Stores settings for the virtual scene.
 //
 // Access to the instance of this class, sSettings should be guarded by
@@ -136,67 +133,27 @@ private:
 
 static LazyInstance<Settings> sSettings = LAZY_INSTANCE_INIT;
 
-// All functions in this class must be called under the
-// VirtualSceneManager::mLock lock.
-class VirtualSceneManagerImpl {
-private:
-    VirtualSceneManagerImpl(std::unique_ptr<Renderer>&& renderer,
-                            std::unique_ptr<Scene>&& scene);
+/*******************************************************************************
+ *                     ScenesManager API.
+ ******************************************************************************/
 
-public:
-    ~VirtualSceneManagerImpl();
+StaticLock ScenesManager::mLock;
+std::vector<std::shared_ptr<Scene>> ScenesManager::mScenes;
 
-    static std::unique_ptr<VirtualSceneManagerImpl> create(
-            const SceneConfig& mode);
-
-    void update();
-
-    std::unique_ptr<RendererView> createView(RendererView::Format format,
-                                             int frameWidth,
-                                             int frameHeight);
-
-    bool renderView(RendererView* view,
-                    float renderTime,
-                    std::function<void()> finishCallback);
-
-    // Queue an update to a poster filename that should be executed on the
-    // render thread.
-    void queuePosterUpdate(const char* posterName);
-
-    // Update the poster scale.
-    void updatePosterScale(const char* posterName, float scale);
-
-    // Load a PosterSetting in the scene.
-    void loadPosterInternal(const char* posterName,
-                            const Settings::PosterSetting& setting,
-                            Scene::LoadBehavior loadBehavior);
-
-    void setSceneControlsParameters(bool show);
-
-private:
-    std::unique_ptr<Scene> mScene;
-
-    std::deque<std::string> mPosterFilenameUpdates;
-};
-
-VirtualSceneManagerImpl::VirtualSceneManagerImpl(
-        std::unique_ptr<Renderer>&& renderer,
-        std::unique_ptr<Scene>&& scene)
-    : mScene(std::move(scene)) {
-    // Load the poster configuration in the scene.
-    for (const auto& it : sSettings->getPosterSettings()) {
-        loadPosterInternal(it.first.c_str(), it.second,
-                           Scene::LoadBehavior::Synchronous);
+std::shared_ptr<Scene> ScenesManager::createScene(std::string_view sceneName,
+                                                  const SceneConfig& config) {
+    if (config.mSceneMode == SceneConfig::Mode::Unknown) {
+        E("%s: invalid config", __func__);
+        return nullptr;
     }
-}
 
-VirtualSceneManagerImpl::~VirtualSceneManagerImpl() {
-    mScene->releaseResources();
-}
+    // Create a new scene
+    D("Initializing a scene with mode:%s, filename:%s",
+      SceneConfig::modeToString(config.mSceneMode), config.mFilename.c_str());
 
-std::unique_ptr<VirtualSceneManagerImpl> VirtualSceneManagerImpl::create(
-        const SceneConfig& config) {
-    bool rendererRequired = (config.mSceneMode == SceneConfig::Mode::Mesh3dScene);
+    // Only initialize a renderer for the scene if GL is required
+    bool rendererRequired =
+            SceneConfig::modeRequiresRenderer(config.mSceneMode);
 
     std::unique_ptr<Renderer> renderer = nullptr;
     if (rendererRequired) {
@@ -214,43 +171,32 @@ std::unique_ptr<VirtualSceneManagerImpl> VirtualSceneManagerImpl::create(
         return nullptr;
     }
 
-    std::unique_ptr<Scene> scene = Scene::create(std::move(renderer), config);
+    std::shared_ptr<Scene> scene = Scene::create(std::move(renderer), config);
     if (!scene) {
         E("VirtualSceneManager scene failed to load");
         return nullptr;
     }
 
-    for (const auto& it : sSettings->getPosterLocations()) {
-        if (!scene->createPosterLocation(it)) {
-            E("VirtualSceneManager failed to create poster location");
-            return nullptr;
-        }
+    // Return existing one if the same scene was already created
+    AutoLock lock(mLock);
+    mScenes.push_back(scene);
+
+    return scene;
+}
+
+bool ScenesManager::renderView(Scene* scene,
+                               RendererView* view,
+                               float renderTime,
+                               std::function<void()> finishCallback) {
+    // TODO(virtualscene-perf): do not create different renderers for each scene
+    if (!scene || !view) {
+        E("%s: invalid parameters", __FUNCTION__);
+        return false;
     }
 
-    return std::unique_ptr<VirtualSceneManagerImpl>(
-            new VirtualSceneManagerImpl(std::move(renderer), std::move(scene)));
-}
-
-void VirtualSceneManagerImpl::update() {
-    mScene->update();
-}
-
-std::unique_ptr<RendererView> VirtualSceneManagerImpl::createView(
-        RendererView::Format format,
-        int frameWidth,
-        int frameHeight) {
-    std::unique_ptr<RendererView> view =
-            std::make_unique<RendererView>(mScene.get());
-    view->updateTarget(format, frameWidth, frameHeight);
-    return view;
-}
-
-bool VirtualSceneManagerImpl::renderView(RendererView* view,
-                                         float renderTime,
-                                         std::function<void()> finishCallback) {
     std::lock_guard lock(view->mLock);
 
-    auto sceneHash = mScene->getVersionHashForView(view);
+    auto sceneHash = scene->getVersionHashForView(view);
     if (view->mCache.isValidFor(sceneHash, renderTime)) {
         // TODO(virtualscene-perf): check the hash at higher level to avoid
         // copies&conversions
@@ -265,89 +211,93 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
     view->mCache.mSceneHash = sceneHash;
     view->mCache.mRenderTime = renderTime;
 
+    SceneConfig::Mode mode = scene->getSceneMode();
+    Renderer* renderer = nullptr;
+    if (SceneConfig::modeRequiresRenderer(mode)) {
+        renderer = scene->getRenderer();
+
+        // This mode requires renderer
+        if (!renderer) {
+            E("%s: invalid scene renderer in mode %s", __FUNCTION__,
+              SceneConfig::modeToString(mode));
+            return false;
+        }
+    }
+
     // Make the renderer context current for graphics operations
-    Renderer* renderer = mScene->getRenderer();
     auto context = renderer ? renderer->makeCurrent() : nullptr;
     if (renderer && !context->isValid()) {
         E("%s: Cannot use EGL context", __FUNCTION__);
         return false;
     }
 
-    // Apply any pending updates to the scene.  This must be done on the
-    // OpenGL thread.
-    const auto& posters = sSettings->getPosterSettings();
-    while (!mPosterFilenameUpdates.empty()) {
-        const std::string& posterName = mPosterFilenameUpdates.front();
-        loadPosterInternal(posterName.c_str(), posters.at(posterName),
-                           Scene::LoadBehavior::Default);
-        mPosterFilenameUpdates.pop_front();
-    }
-
     view->preRenderLocked();
 
-    SceneConfig::Mode mode = mScene->getSceneMode();
-    if (mode == SceneConfig::Mode::Mesh3dScene) {
-        // This mode requires renderer
-        if (!renderer) {
-            E("%s: invalid scene renderer", __FUNCTION__);
-            return false;
-        }
-        const auto renderables =
-                mScene->getRenderableObjects(view->mViewProjection);
-        if (!renderer->render(view, renderables, renderTime)) {
-            E("Scene rendering failed");
-            return false;
-        }
-    } else if (mode == SceneConfig::Mode::VideoPlayback) {
-        // TODO(virtualscene-video): create video playback scene and render a view
-        // Renders a procedural animation for now..
-        const int dummyVideoWidth = view->getWidthLocked();
-        const int dummyVideoHeight = view->getHeightLocked();
-        const int stride = dummyVideoWidth * 4;
-        std::vector<uint8_t>& fbData = view->getFramebufferLocked();
-        if (fbData.size() < dummyVideoWidth * dummyVideoHeight * 4) {
-            // preRenderLocked failed
-            E("Scene rendering failed");
-            return false;
-        }
-        for (int y = 0; y < dummyVideoHeight; y++) {
-            for (int x = 0; x < dummyVideoWidth; x++) {
-                uint8_t& r = fbData[(y * dummyVideoWidth + x) * 4 + 0];
-                uint8_t& g = fbData[(y * dummyVideoWidth + x) * 4 + 1];
-                uint8_t& b = fbData[(y * dummyVideoWidth + x) * 4 + 2];
-                uint8_t& a = fbData[(y * dummyVideoWidth + x) * 4 + 3];
-
-                float u = (x / (float)dummyVideoWidth) * 10.0;
-                float v = (y / (float)dummyVideoHeight) * 10.0;
-                float local_u = u - floor(u);
-                float local_v = v - floor(v);
-                float dist = abs(local_u - 0.5) + abs(local_v - 0.5);
-                float threshold =
-                        0.1 + 0.4 * (0.5 + 0.5 * sin(renderTime * 6.283));
-                float mask = (dist < threshold) ? 1.0 : 0.0;
-
-                r = (uint8_t)(mask * 100);
-                g = (uint8_t)(mask * 200);
-                b = (uint8_t)(mask * 255);
-                a = 255;
+    switch (mode) {
+        case SceneConfig::Mode::Mesh3dScene: {
+            const auto renderables =
+                    scene->getRenderableObjects(view->mViewProjection);
+            if (!renderer || !renderer->render(view, renderables, renderTime)) {
+                E("Scene rendering failed");
+                return false;
             }
-        }
-    } else if (mode == SceneConfig::Mode::ImageFile) {
-        const SceneOverlayObject* overlay = mScene->getOverlayObject();
-        if (!overlay || !overlay->isValid()) {
-            E("Scene rendering failed");
-            return false;
-        }
-        std::vector<uint8_t>& fbData = view->getFramebufferLocked();
+        } break;
+        case SceneConfig::Mode::VideoPlayback: {
+            // TODO(virtualscene-video): create video playback scene and render
+            // a view Renders a procedural animation for now..
+            const int dummyVideoWidth = view->getWidthLocked();
+            const int dummyVideoHeight = view->getHeightLocked();
+            const int stride = dummyVideoWidth * 4;
+            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
+            if (fbData.size() < dummyVideoWidth * dummyVideoHeight * 4) {
+                // preRenderLocked failed
+                E("Scene rendering failed");
+                return false;
+            }
+            for (int y = 0; y < dummyVideoHeight; y++) {
+                for (int x = 0; x < dummyVideoWidth; x++) {
+                    uint8_t& r = fbData[(y * dummyVideoWidth + x) * 4 + 0];
+                    uint8_t& g = fbData[(y * dummyVideoWidth + x) * 4 + 1];
+                    uint8_t& b = fbData[(y * dummyVideoWidth + x) * 4 + 2];
+                    uint8_t& a = fbData[(y * dummyVideoWidth + x) * 4 + 3];
 
-        ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
-                           fbData.data());
-        if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
-                                overlay->mDataRGBA.data(),
-                                ImageScaler::ScaleMode::ScaleToFill)) {
-            E("%s: Failed to resize the framebuffer for the view",
-                   __FUNCTION__);
-            return false;
+                    float u = (x / (float)dummyVideoWidth) * 10.0;
+                    float v = (y / (float)dummyVideoHeight) * 10.0;
+                    float local_u = u - floor(u);
+                    float local_v = v - floor(v);
+                    float dist = abs(local_u - 0.5) + abs(local_v - 0.5);
+                    float threshold =
+                            0.1 + 0.4 * (0.5 + 0.5 * sin(renderTime * 6.283));
+                    float mask = (dist < threshold) ? 1.0 : 0.0;
+
+                    r = (uint8_t)(mask * 100);
+                    g = (uint8_t)(mask * 200);
+                    b = (uint8_t)(mask * 255);
+                    a = 255;
+                }
+            }
+        } break;
+        case SceneConfig::Mode::ImageFile: {
+            const SceneOverlayObject* overlay = scene->getOverlayObject();
+            if (!overlay || !overlay->isValid()) {
+                E("Scene rendering failed");
+                return false;
+            }
+            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
+
+            ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
+                               fbData.data());
+            if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
+                                    overlay->mDataRGBA.data(),
+                                    ImageScaler::ScaleMode::ScaleToFill)) {
+                E("%s: Failed to resize the framebuffer for the view",
+                  __FUNCTION__);
+                return false;
+            }
+        } break;
+        default: {
+            E("%s: Unknown scene mode: %d", __FUNCTION__,
+              static_cast<int>(mode));
         }
     }
 
@@ -359,40 +309,61 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
     return true;
 }
 
-void VirtualSceneManagerImpl::queuePosterUpdate(const char* posterName) {
-    mPosterFilenameUpdates.push_back(posterName);
-}
+bool ScenesManager::removeScene(Scene* scene) {
+    D("%s", __func__);
 
-void VirtualSceneManagerImpl::updatePosterScale(const char* posterName,
-                                                float scale) {
-    mScene->updatePosterScale(posterName, scale);
-}
-
-void VirtualSceneManagerImpl::setSceneControlsParameters(bool show) {
-    dprint("%s: show=%s", __func__, (show ? "true" : "false"));
-
-    // Only show the controls if it's a 3d virtual scene
-    if (mScene->getSceneMode() == SceneConfig::Mode::Mesh3dScene) {
-        skin_winsys_show_virtual_scene_controls(show);
+    AutoLock lock(mLock);
+    if (!scene || !scene->releaseResources()) {
+        return false;
     }
-}
 
-void VirtualSceneManagerImpl::loadPosterInternal(
-        const char* posterName,
-        const Settings::PosterSetting& setting,
-        Scene::LoadBehavior loadBehavior) {
-    if (setting.mFilename.empty()) {
-        // Always render empty posters at 100% scale.
-        mScene->loadPoster(posterName, nullptr, 1.0f, loadBehavior);
+    // Remove from mScenes array
+    auto it = std::find_if(
+            mScenes.begin(), mScenes.end(),
+            [&scene](const auto& iter) { return iter.get() == scene; });
+    if (it != mScenes.end()) {
+        // Warn if the caller is not the only reference
+        if (it->use_count() > 2) {
+            D("Removing scene with references");
+        }
+        mScenes.erase(it);
     } else {
-        mScene->loadPoster(posterName, setting.mFilename.c_str(),
-                           setting.mScale, loadBehavior);
+        E("%s: could not find scene", __FUNCTION__);
     }
+
+    return true;
+}
+
+bool ScenesManager::removeAll() {
+    D("%s", __func__);
+
+    // First make sure VirtualSceneManager is uninitialized, should
+    // be done outside the lock
+    VirtualSceneManager::uninitialize();
+
+    // Release all scenes
+    AutoLock lock(mLock);
+    for (auto& it : mScenes) {
+        // Warn if there are other users of the scene
+        if (it.use_count() > 1) {
+            D("Removing scene with references");
+        }
+        it->releaseResources();
+    }
+
+    mScenes.clear();
+
+    return true;
 }
 
 /*******************************************************************************
  *                     VirtualSceneManager API.
  ******************************************************************************/
+
+StaticLock VirtualSceneManager::mLock;
+std::shared_ptr<Scene> VirtualSceneManager::mEnvironmentScene;
+std::deque<std::string> VirtualSceneManager::mPosterFilenameUpdates;
+int VirtualSceneManager::mNumUsers = 0;
 
 void VirtualSceneManager::parseCmdline() {
     AutoLock lock(mLock);
@@ -426,70 +397,97 @@ void VirtualSceneManager::parseCmdline() {
 
 bool VirtualSceneManager::initialize(const SceneConfig& config) {
     AutoLock lock(mLock);
-    if (mImpl) {
+    if (mEnvironmentScene) {
         E("VirtualSceneManager already initialized");
         return false;
     }
 
     D("Initializing VirtualSceneManager with mode:%s, filename:%s",
       SceneConfig::modeToString(config.mSceneMode), config.mFilename.c_str());
-    mImpl = VirtualSceneManagerImpl::create(config).release();
-    return mImpl != nullptr;
-}
 
-bool VirtualSceneManager::isInitialized() {
-    AutoLock lock(mLock);
-    return (mImpl != nullptr);
+    std::shared_ptr<Scene> scene =
+            ScenesManager::createScene("environment", config);
+
+    if (!scene) {
+        E("VirtualSceneManager scene could not be initialized");
+        return false;
+    }
+
+    if (Renderer* renderer = scene->getRenderer()) {
+        auto context = renderer->makeCurrent();
+
+        //  Load the poster configuration in the scene.
+        for (const auto& it : sSettings->getPosterLocations()) {
+            if (!scene->createPosterLocation(it)) {
+                E("VirtualSceneManager failed to create poster location");
+                return false;
+            }
+        }
+
+        for (const auto& it : sSettings->getPosterSettings()) {
+            const char* posterName = it.first.c_str();
+            const Settings::PosterSetting& setting = it.second;
+            Scene::LoadBehavior loadBehavior = Scene::LoadBehavior::Default;
+            scene->loadPoster(posterName, setting.mFilename.c_str(),
+                              setting.mScale, loadBehavior);
+        }
+    }
+
+    mEnvironmentScene = std::move(scene);
+
+    return true;
 }
 
 void VirtualSceneManager::uninitialize() {
-    // TODO(virtualscene-manager): correctly call uninitialize at exit
-    AutoLock lock(mLock);
-    if (!mImpl) {
-        E("VirtualSceneManager not initialized");
-        return;
-    }
-
-    // To make sure it's released the same way it was created, attach to a
-    // unique_ptr and let that release it.
     D("Uninitializing VirtualSceneManager");
-    std::unique_ptr<VirtualSceneManagerImpl> stateReleaser(mImpl);
-    mImpl = nullptr;
+    AutoLock lock(mLock);
+    if (mEnvironmentScene) {
+        ScenesManager::removeScene(mEnvironmentScene.get());
+        mEnvironmentScene.reset();
+    }
+    mPosterFilenameUpdates.clear();
 }
 
 void VirtualSceneManager::update() {
     AutoLock lock(mLock);
-    if (!mImpl) {
-        E("VirtualSceneManager not initialized");
+    if (!mEnvironmentScene) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
         return 0L;
     }
 
-    return mImpl->update();
-}
-
-std::unique_ptr<RendererView> VirtualSceneManager::createView(
-        RendererView::Format format,
-        int frameWidth,
-        int frameHeight) {
-    AutoLock lock(mLock);
-    if (!mImpl) {
-        E("VirtualSceneManager not initialized");
-        return nullptr;
-    }
-
-    return mImpl->createView(format, frameWidth, frameHeight);
+    return mEnvironmentScene->update();
 }
 
 bool VirtualSceneManager::renderView(RendererView* view,
                                      float renderTime,
                                      std::function<void()> finishCallback) {
     AutoLock lock(mLock);
-    if (!mImpl) {
-        E("VirtualSceneManager not initialized");
+    if (!mEnvironmentScene) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
         return false;
     }
 
-    return mImpl->renderView(view, renderTime, finishCallback);
+    return ScenesManager::renderView(
+            mEnvironmentScene.get(), view, renderTime, [&]() {
+                // Posters needs to be updated within the render context
+                // TODO(virtualscene): load posters async and avoid overwriting
+                // finishCallback
+                const auto& posters = sSettings->getPosterSettings();
+                while (!mPosterFilenameUpdates.empty()) {
+                    const char* posterName =
+                            mPosterFilenameUpdates.front().c_str();
+                    const Settings::PosterSetting& setting =
+                            posters.at(posterName);
+                    Scene::LoadBehavior loadBehavior =
+                            Scene::LoadBehavior::Default;
+                    mEnvironmentScene->loadPoster(posterName,
+                                                  setting.mFilename.c_str(),
+                                                  setting.mScale, loadBehavior);
+                    mPosterFilenameUpdates.pop_front();
+                }
+
+                finishCallback();
+            });
 }
 
 void VirtualSceneManager::setInitialPoster(const char* posterName,
@@ -499,9 +497,7 @@ void VirtualSceneManager::setInitialPoster(const char* posterName,
 
     // If the scene is active, it will update the poster in the next render()
     // invocation.
-    if (mImpl) {
-        mImpl->queuePosterUpdate(posterName);
-    }
+    mPosterFilenameUpdates.push_back(posterName);
 }
 
 bool VirtualSceneManager::loadPoster(const char* posterName,
@@ -511,9 +507,7 @@ bool VirtualSceneManager::loadPoster(const char* posterName,
 
     // If the scene is active, it will update the poster in the next render()
     // invocation.
-    if (mImpl) {
-        mImpl->queuePosterUpdate(posterName);
-    }
+    mPosterFilenameUpdates.push_back(posterName);
 
     return true;
 }
@@ -546,8 +540,8 @@ void VirtualSceneManager::setPosterScale(const char* posterName, float scale) {
     sSettings->setPosterScale(posterName, scale);
 
     // Updating the poster scale can be done on any thread, update it now.
-    if (mImpl) {
-        mImpl->updatePosterScale(posterName, scale);
+    if (mEnvironmentScene) {
+        mEnvironmentScene->updatePosterScale(posterName, scale);
     }
 }
 
@@ -563,8 +557,44 @@ bool VirtualSceneManager::getAnimationState() {
 
 void VirtualSceneManager::setSceneControlsParameters(bool show) {
     AutoLock lock(mLock);
-    if (mImpl) {
-        mImpl->setSceneControlsParameters(show);
+    if (!mEnvironmentScene) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
+        return;
+    }
+
+    // Only allow showing scene controls if it's a mesh3d scene
+    if (!show ||
+        (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::Mesh3dScene)) {
+        dprint("%s: show=%s", __func__, (show ? "true" : "false"));
+        skin_winsys_show_virtual_scene_controls(show);
+    }
+}
+
+std::shared_ptr<Scene> VirtualSceneManager::addSceneUser() {
+    AutoLock lock(mLock);
+    if (!mEnvironmentScene) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
+        return nullptr;
+    }
+    if (mNumUsers == 0) {
+        // Make sure the scene is ready to use
+        mEnvironmentScene->loadUserResources();
+    }
+    mNumUsers++;
+
+    return mEnvironmentScene;
+}
+
+void VirtualSceneManager::removeSceneUser() {
+    AutoLock lock(mLock);
+    if (!mEnvironmentScene) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
+        return nullptr;
+    }
+    mNumUsers--;
+    if (mNumUsers == 0) {
+        // Allow scene to unload resources when there are no users of it
+        mEnvironmentScene->unloadUserResources();
     }
 }
 

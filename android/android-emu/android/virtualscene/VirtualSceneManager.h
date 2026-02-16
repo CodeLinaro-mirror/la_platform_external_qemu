@@ -16,8 +16,12 @@
 
 #pragma once
 
+#include <deque>
 #include <functional>
+#include <memory>
+#include <string_view>
 #include <vector>
+
 /*
  * Defines the Virtual Scene, used by the Virtual Scene Camera
  */
@@ -32,9 +36,34 @@ namespace android {
 namespace virtualscene {
 
 // Forward declarations.
-class VirtualSceneManagerImpl;
 struct SceneConfig;
 
+// ScenesManager is responsible for creating, rendering and destroying
+// scenes. Clients can create and render scenes through this interface
+// without any interaction with the 'environment' scene, like posters..etc.
+class ScenesManager {
+public:
+    // Parse command line options for the virtual scene.
+    static std::shared_ptr<Scene> createScene(std::string_view sceneName,
+                                              const SceneConfig& config);
+
+    // Render the virtual scene to the given view.
+    static bool renderView(Scene* scene,
+                           RendererView* view,
+                           float renderTime,
+                           std::function<void()> finishCallback);
+
+    static bool removeScene(Scene* scene);
+
+    static bool removeAll();
+
+private:
+    static android::base::StaticLock mLock;
+    static std::vector<std::shared_ptr<Scene>> mScenes;
+};
+
+// VirtualSceneManager is responsible for 'virtualscene', which is a special
+// type of shared scene and can support changing posters.
 class VirtualSceneManager {
 public:
     // Parse command line options for the virtual scene.
@@ -44,9 +73,6 @@ public:
     // Returns true if initialization succeeded.
     static bool initialize(const SceneConfig& config);
 
-    // Check if virtual scene rendering has been initialized and is usable
-    static bool isInitialized();
-
     // Uninitialize virtual scene rendering, may be called on any thread, but
     // the same EGL context that was active when initialize() was called must be
     // active. This function modifies the GL state, callers must be resilient to
@@ -55,11 +81,6 @@ public:
 
     // Update scene animations and poster changes
     static void update();
-
-    // Creates a view for the scene
-    static std::unique_ptr<RendererView> createView(RendererView::Format format,
-                                                    int frameWidth,
-                                                    int frameHeight);
 
     // Render the virtual scene to the given view.
     static bool renderView(RendererView* view,
@@ -113,9 +134,14 @@ public:
 
     static void setSceneControlsParameters(bool show);
 
+    static std::shared_ptr<Scene> addSceneUser();
+    static void removeSceneUser();
+
 private:
     static android::base::StaticLock mLock;
-    static VirtualSceneManagerImpl* mImpl;
+    static std::shared_ptr<Scene> mEnvironmentScene;
+    static std::deque<std::string> mPosterFilenameUpdates;
+    static int mNumUsers;
 };
 
 }  // namespace virtualscene
