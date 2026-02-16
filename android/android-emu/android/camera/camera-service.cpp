@@ -450,38 +450,6 @@ cameraClientGetMaxResolution(const CameraInfo& info) {
     return getMaxResolution(maxDim, maxDim + frameSizesNum);
 }
 
-std::optional<std::string> getEnvironmentBackground(const AndroidHwConfig* hwCfg) {
-    // TODO(b/446687857): make a new camera mode, called 'environment' and
-    // only replace the back camera image if it's set to that. Currently
-    // this requires extra changes on the AVD flow side, so we enforce the
-    // background based on the transparency property of the AVD instead.
-    if (!hwCfg->hw_lcd_transparent) {
-        return std::nullopt;
-    }
-    const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
-    CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
-    if (!environmentIni) {
-        // no environment.ini is given
-        return std::nullopt;
-    }
-
-    const char* environmentImagePath =
-            iniFile_getString(environmentIni, "background.image.filename", 0);
-
-    // Environment settings are local to the AVD folder
-    std::string environmentImageFullPath = PathUtils::join(
-            avdInfo_getContentPath(avdInfo), environmentImagePath);
-    if (!android::base::System::get()->pathExists(environmentImageFullPath)) {
-        derror("%s: Invalid environment settings for the camera. Source not found: %s",
-               __func__, environmentImageFullPath.c_str());
-        return std::nullopt;
-    }
-
-    dinfo("%s: Camera will use environment settings: %s", __func__,
-          environmentImagePath);
-    return environmentImageFullPath;
-}
-
 struct ICppQemudClient {
     virtual ~ICppQemudClient() = default;
     virtual void recv(QemudClient* qc, const uint8_t* data, size_t size) = 0;
@@ -535,18 +503,11 @@ struct CameraService {
             return name + prefixSize + 1;
         };
 
-        if (androidHwConfig_hasVirtualSceneCamera(hwCfg)) {
-            // If we are loading the virtual scene, check if we have an environment background.
-            // If so, use the environment background as the virutal environment.
-            std::optional<std::string> environmentImageFullPath = getEnvironmentBackground(hwCfg);
-            if (environmentImageFullPath.has_value()) {
-                imagefilecameraSetup("back", cameraBackOrientation, environmentImageFullPath->c_str());
-            } else {
-                virtualscenecameraSetup("back", cameraBackOrientation, kVirtualScene);
-            }
-        } else if (androidHwConfig_hasEnvironmentBackCamera(hwCfg)) {
+        if (androidHwConfig_hasEnvironmentBackCamera(hwCfg)) {
             // Same with virtual scene, but it'll share the global environment scene
             virtualscenecameraSetup("back", cameraBackOrientation, kEnvironment);
+        } else if (androidHwConfig_hasVirtualSceneCamera(hwCfg)) {
+            virtualscenecameraSetup("back", cameraBackOrientation, kVirtualScene);
         } else if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
             virtualscenecameraSetup("back", cameraBackOrientation, kVideoPlayback);
         } else if (isVideofileCam(cameraBack)) {
@@ -554,7 +515,7 @@ struct CameraService {
             videofilecameraSetup("back", cameraBackOrientation, filename);
         } else if (isImagefileCam(cameraBack)) {
             const char* filename = getCameraFilename(cameraBack, kImagefileCamPrefixSize);
-            imagefilecameraSetup("back", cameraBackOrientation, filename);
+            virtualscenecameraSetup("back", cameraBackOrientation, kImagefile, filename);
         }
 
         if (androidHwConfig_hasEnvironmentFrontCamera(hwCfg)) {
@@ -566,7 +527,7 @@ struct CameraService {
             videofilecameraSetup("front", cameraFrontOrientation, filename);
         } else if (isImagefileCam(cameraFront)) {
             const char* filename = getCameraFilename(cameraFront, kImagefileCamPrefixSize);
-            imagefilecameraSetup("front", cameraFrontOrientation, filename);
+            virtualscenecameraSetup("front", cameraFrontOrientation, kImagefile, filename);
         }
 
         /* Lets see if HW config uses emulated cameras. */
@@ -797,15 +758,6 @@ private:
         ci.orientation = sensor_orientation;
         ci.in_use = 0;
 
-        addCameraInfo(std::move(ci));
-    }
-
-    void imagefilecameraSetup(const char* dir, int orientation, const char* args) {
-        CameraInfo ci;
-        if (camera_imagefile_init_CameraInfo(&ci, dir, args)) {
-            return;
-        }
-        ci.orientation = orientation;
         addCameraInfo(std::move(ci));
     }
 

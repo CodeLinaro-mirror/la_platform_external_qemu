@@ -16,6 +16,7 @@
 
 #include "android/camera/camera-imagefile.h"
 
+#ifdef USE_LEGACY_IMAGEFILE_CAMERA
 #include <png.h>
 #include <optional>
 #include <string>
@@ -348,3 +349,4 @@ int camera_imagefile_init_CameraInfo(CameraInfo* ci,
 
     return 0;
 }
+#endif
