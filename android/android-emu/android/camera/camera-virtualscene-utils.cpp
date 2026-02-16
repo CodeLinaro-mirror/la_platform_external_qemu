@@ -69,7 +69,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
     if (!mUseEnvironmentScene) {
         // If the camera mode is not set to "environment", the camera
         // needs to create a scene that it'll own.
-        SceneConfig defaultSceneConfig(SceneConfig::Mode::VirtualScene,
+        SceneConfig defaultSceneConfig(SceneConfig::Mode::Mesh3dScene,
                                        kDefaultSceneObj);
         if (VirtualSceneManager::initialize(defaultSceneConfig)) {
             LOG(INFO) << "Initialized VirtualSceneManager for the camera";

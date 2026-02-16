@@ -52,7 +52,7 @@ SceneConfig::SceneConfig(Mode mode, std::string_view filename) {
 
 SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
     if (sceneModeStr == "virtualscene") {
-        return SceneConfig::Mode::VirtualScene;
+        return SceneConfig::Mode::Mesh3dScene;
     } else if (sceneModeStr == "videoplayback") {
         return SceneConfig::Mode::VideoPlayback;
     } else if (sceneModeStr == "imagefile") {
@@ -64,8 +64,8 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
 }
 
 const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
-    if (mode == SceneConfig::Mode::VirtualScene) {
-        return "virtualscene";
+    if (mode == SceneConfig::Mode::Mesh3dScene) {
+        return "mesh3dscene";
     } else if (mode == SceneConfig::Mode::VideoPlayback) {
         return "videoplayback";
     } else if (mode == SceneConfig::Mode::ImageFile) {
@@ -103,7 +103,7 @@ bool Scene::initialize() {
         case SceneConfig::Mode::Unknown: {
             derror("%s: Unknown scene mode!", __func__);
         } break;
-        case SceneConfig::Mode::VirtualScene: {
+        case SceneConfig::Mode::Mesh3dScene: {
             std::unique_ptr<MeshSceneObject> sceneObject =
                     MeshSceneObject::load(mRenderer, mConfig.mFilename.c_str());
             if (!sceneObject) {

@@ -118,7 +118,7 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
             sceneFilename = backgroundPath;
         } else if (!backgroundSceneFilename.empty()) {
             // If nothing is given, load default virtual scene
-            sceneMode = SceneConfig::Mode::VirtualScene;
+            sceneMode = SceneConfig::Mode::Mesh3dScene;
             sceneFilename = backgroundSceneFilename;
         }
 
@@ -130,7 +130,7 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
     if (sceneMode == SceneConfig::Mode::Unknown || sceneFilename.empty()) {
         // If the input is invalid, load default virtual scene
         dinfo("%s: Using default environment config", __func__);
-        sceneMode = SceneConfig::Mode::VirtualScene;
+        sceneMode = SceneConfig::Mode::Mesh3dScene;
         sceneFilename = "Toren1BD.obj";
     }
 

@@ -40,7 +40,7 @@ class SceneObject;
 struct SceneConfig {
     enum class Mode {
         Unknown = 0,
-        VirtualScene,
+        Mesh3dScene,
         VideoPlayback,
         ImageFile,
     };

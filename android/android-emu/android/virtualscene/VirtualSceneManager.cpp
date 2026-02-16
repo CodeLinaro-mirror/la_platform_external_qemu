@@ -278,7 +278,7 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
     view->preRenderLocked();
 
     SceneConfig::Mode mode = mScene->getSceneMode();
-    if (mode == SceneConfig::Mode::VirtualScene) {
+    if (mode == SceneConfig::Mode::Mesh3dScene) {
         const auto renderables =
                 mScene->getRenderableObjects(view->mViewProjection);
         if (!mRenderer->render(view, renderables, renderTime)) {
@@ -359,7 +359,7 @@ void VirtualSceneManagerImpl::setSceneControlsParameters(bool show) {
     dprint("%s: show=%s", __func__, (show ? "true" : "false"));
 
     // Only show the controls if it's a 3d virtual scene
-    if (mScene->getSceneMode() == SceneConfig::Mode::VirtualScene) {
+    if (mScene->getSceneMode() == SceneConfig::Mode::Mesh3dScene) {
         skin_winsys_show_virtual_scene_controls(show);
     }
 }
