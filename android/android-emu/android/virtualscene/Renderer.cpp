@@ -1801,6 +1801,10 @@ bool RendererImpl::EglState::initialize(int frameWidth, int frameHeight) {
 }
 
 ScopedEglContext RendererImpl::EglState::makeEglCurrent() {
+    if (!mEglDispatch) {
+        LOG(ERROR) << "eglMakeCurrent failed, no EGL";
+        return ScopedEglContext(nullptr, EGL_NO_DISPLAY);
+    }
     const EGLBoolean result = mEglDispatch->eglMakeCurrent(
             mEglDisplay, mEglSurface, mEglSurface, mEglContext);
     if (result == EGL_FALSE) {
