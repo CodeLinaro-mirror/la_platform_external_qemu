@@ -325,10 +325,13 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
             derror("Scene rendering failed");
             return false;
         }
+        std::vector<uint8_t>& fbData = view->getFramebufferLocked();
 
-        // Resize an RGBA image using Bilinear Interpolation.
-        if (!view->updateResizedLocked(overlay->mDataRGBA.data(),
-                                       overlay->mWidth, overlay->mHeight)) {
+        ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
+                           fbData.data());
+        if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
+                                overlay->mDataRGBA.data(),
+                                ImageScaler::ScaleMode::ScaleToFill)) {
             derror("%s: Failed to resize the framebuffer for the view",
                    __FUNCTION__);
             return false;

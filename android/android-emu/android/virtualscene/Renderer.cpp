@@ -365,6 +365,119 @@ private:
 };
 
 /*******************************************************************************
+ *                     ImageScaler routines
+ ******************************************************************************/
+
+ImageScaler::ImageScaler(int width, int height, uint8_t* buffer)
+    : mFrameWidth(width), mFrameHeight(height), mOutputRgba(buffer) {}
+
+bool ImageScaler::updateImage(int inputWidth,
+                              int inputHeight,
+                              const uint8_t* inputRgba,
+                              ScaleMode mode) {
+    // Basic validation
+    if (!inputRgba || !mOutputRgba || inputWidth <= 0 || inputHeight <= 0 ||
+        mFrameWidth <= 0 || mFrameHeight <= 0) {
+        derror("%s: Invalid input dimensions or pointers", __func__);
+        return false;
+    }
+
+    int result = -1;
+    switch (mode) {
+        case ScaleMode::AspectFitLetterbox:
+            result = aspectFitLetterbox(inputWidth, inputHeight, inputRgba);
+            break;
+        case ScaleMode::AspectFitZoom:
+            result = aspectFitZoom(inputWidth, inputHeight, inputRgba);
+            break;
+        case ScaleMode::ScaleToFill:
+            result = scaleToFill(inputWidth, inputHeight, inputRgba);
+            break;
+        default:
+            derror("%s: Unknown ScaleMode encountered", __func__);
+            return false;
+    }
+
+    if (result != 0) {
+        derror("%s: libyuv::ARGBScale failed! error: %d", __func__, result);
+        return false;
+    }
+
+    return true;
+}
+
+int ImageScaler::aspectFitLetterbox(int inputWidth,
+                                    int inputHeight,
+                                    const uint8_t* inputRgba) {
+    float scaleX = static_cast<float>(mFrameWidth) / inputWidth;
+    float scaleY = static_cast<float>(mFrameHeight) / inputHeight;
+
+    // Use the smaller scale factor to ensure the whole image fits inside
+    float scale = std::min(scaleX, scaleY);
+
+    int targetWidth = static_cast<int>(inputWidth * scale);
+    int targetHeight = static_cast<int>(inputHeight * scale);
+
+    // Calculate offsets to center the image
+    int offsetX = (mFrameWidth - targetWidth) / 2;
+    int offsetY = (mFrameHeight - targetHeight) / 2;
+
+    // Clear the entire output buffer to black (0) to handle the letterboxing
+    // 4 bytes per pixel for RGBA
+    std::memset(mOutputRgba, 0, mFrameWidth * mFrameHeight * 4);
+
+    int inputStride = inputWidth * 4;
+    int outputStride = mFrameWidth * 4;
+
+    // Offset the destination pointer
+    uint8_t* dstPtr = mOutputRgba + (offsetY * outputStride) + (offsetX * 4);
+    return libyuv::ARGBScale(inputRgba, inputStride, inputWidth, inputHeight,
+                             dstPtr, outputStride, targetWidth, targetHeight,
+                             libyuv::kFilterBilinear);
+}
+
+int ImageScaler::aspectFitZoom(int inputWidth,
+                               int inputHeight,
+                               const uint8_t* inputRgba) {
+    float scaleX = static_cast<float>(mFrameWidth) / inputWidth;
+    float scaleY = static_cast<float>(mFrameHeight) / inputHeight;
+
+    // Use the larger scale factor so the image fills the entire area (cropping
+    // excess)
+    float scale = std::max(scaleX, scaleY);
+
+    // Calculate the crop window in the input image
+    int srcCropWidth = static_cast<int>(mFrameWidth / scale);
+    int srcCropHeight = static_cast<int>(mFrameHeight / scale);
+
+    // Calculate offsets to center the crop window
+    int srcOffsetX = (inputWidth - srcCropWidth) / 2;
+    int srcOffsetY = (inputHeight - srcCropHeight) / 2;
+
+    int inputStride = inputWidth * 4;
+    int outputStride = mFrameWidth * 4;
+
+    // Offset the source pointer
+    const uint8_t* srcPtr =
+            inputRgba + (srcOffsetY * inputStride) + (srcOffsetX * 4);
+    return libyuv::ARGBScale(srcPtr, inputStride, srcCropWidth, srcCropHeight,
+                             mOutputRgba, outputStride, mFrameWidth,
+                             mFrameHeight, libyuv::kFilterBilinear);
+}
+
+int ImageScaler::scaleToFill(int inputWidth,
+                             int inputHeight,
+                             const uint8_t* inputRgba) {
+    int inputStride = inputWidth * 4;
+    int outputStride = mFrameWidth * 4;
+
+    // Simply map full source to full destination
+    return libyuv::ARGBScale(inputRgba, inputStride, inputWidth, inputHeight,
+                             mOutputRgba, outputStride, mFrameWidth,
+                             mFrameHeight, libyuv::kFilterBilinear);
+}
+
+/*******************************************************************************
  *                     RendererView routines
  ******************************************************************************/
 
@@ -460,41 +573,6 @@ void RendererView::applyBlurInPlaceCPU(int width,
         return false;
     }
     memcpy(rgbaDataInOut, tempData.data(), tempData.size());
-    return true;
-}
-
-bool RendererView::updateResizedLocked(const uint8_t* inputRgba,
-                                       int inputWidth,
-                                       int inputHeight) {
-    if (mFrameWidth <= 0 || mFrameHeight <= 0 || inputWidth <= 0 ||
-        inputHeight <= 0) {
-        derror("%s: Invalid input size", __func__);
-        return false;
-    }
-    if (mCache.mFramebufferRGBA8.size() != (mFrameWidth * mFrameHeight * 4)) {
-        derror("%s: Invalid cache size", __func__);
-        return false;
-    }
-
-    ScopeTimer timerObj(__func__);
-    std::vector<uint8_t>& outputRgba = getFramebufferLocked();
-    if (inputWidth == mFrameWidth && inputHeight == mFrameHeight) {
-        // Exact match, copy directly
-        memcpy(outputRgba.data(), inputRgba, outputRgba.size());
-        return true;
-    }
-
-    int inputStride = inputWidth * 4;
-    int outputStride = mFrameWidth * 4;
-    int result = libyuv::ARGBScale(
-            inputRgba, inputStride, inputWidth, inputHeight, outputRgba.data(),
-            outputStride, mFrameWidth, mFrameHeight, libyuv::kFilterBilinear);
-
-    if (result != 0) {
-        derror("%s: failed!", __func__);
-        return false;
-    }
-
     return true;
 }
 
@@ -1249,8 +1327,12 @@ bool RendererImpl::render(RendererView* lockedView,
                              GL_UNSIGNED_BYTE, readback_r8g8b8a8.data());
 
         // Resize an RGBA image using Bilinear Interpolation.
-        if (!lockedView->updateResizedLocked(readback_r8g8b8a8.data(),
-                                             mRenderWidth, mRenderHeight)) {
+        ImageScaler scaler(lockedView->getWidthLocked(),
+                           lockedView->getHeightLocked(),
+                           lockedView->getFramebufferLocked().data());
+        if (!scaler.updateImage(mRenderWidth, mRenderHeight,
+                                readback_r8g8b8a8.data(),
+                                ImageScaler::ScaleMode::ScaleToFill)) {
             derror("%s: Failed to resize the framebuffer for the view",
                    __FUNCTION__);
             return false;

@@ -78,6 +78,39 @@ public:
     virtual bool isValid() const { return false; }
 };
 
+// Image scaling class to encapsulate different CPU side image scaling
+// functionalities.
+class ImageScaler {
+public:
+    enum class ScaleMode {
+        AspectFitLetterbox,  // Preserves aspect ratio by adding black bars.
+        AspectFitZoom,       // Preserve aspect ratio, crops excess.
+        ScaleToFill          // Ignore aspect ratio, stretch the image to fill.
+    };
+
+    ImageScaler(int width, int height, uint8_t* buffer);
+
+    bool updateImage(int inputWidth,
+                     int inputHeight,
+                     const uint8_t* inputRgba,
+                     ScaleMode mode);
+
+private:
+    int mFrameWidth;
+    int mFrameHeight;
+    uint8_t* mOutputRgba;
+
+    // Helper functions for specific scaling logic
+    // Returns libyuv status code (0 on success)
+    int aspectFitLetterbox(int inputWidth,
+                           int inputHeight,
+                           const uint8_t* inputRgba);
+    int aspectFitZoom(int inputWidth,
+                      int inputHeight,
+                      const uint8_t* inputRgba);
+    int scaleToFill(int inputWidth, int inputHeight, const uint8_t* inputRgba);
+};
+
 class RendererView {
 public:
     RendererView(Scene* scene);
@@ -108,8 +141,6 @@ public:
                                     uint8_t* rgbaDataInOut,
                                     int32_t* scratchBuffer,
                                     float sigma);
-
-    bool updateResizedLocked(const uint8_t* rgbaPixels, int w_old, int h_old);
 
 protected:
     friend class RendererImpl;
