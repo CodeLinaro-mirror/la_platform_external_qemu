@@ -19,7 +19,6 @@
 #include "android/virtualscene/Scene.h"
 
 #define VIRTUALSCENE_PIXEL_FORMAT V4L2_PIX_FMT_RGB32
-static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
 
 #ifdef _WIN32
 #undef ERROR
@@ -69,8 +68,9 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
     if (!mUseEnvironmentScene) {
         // If the camera mode is not set to "environment", the camera
         // needs to create a scene that it'll own.
-        SceneConfig defaultSceneConfig(SceneConfig::Mode::Mesh3dScene,
-                                       kDefaultSceneObj);
+        SceneConfig::Mode mode = SceneConfig::Mode::Mesh3dScene;
+        SceneConfig defaultSceneConfig(
+                mode, SceneConfig::defaultFilenameForMode(mode));
         if (VirtualSceneManager::initialize(defaultSceneConfig)) {
             LOG(INFO) << "Initialized VirtualSceneManager for the camera";
         }

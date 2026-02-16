@@ -35,6 +35,15 @@ namespace fs = std::filesystem;
 #define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
 #define D_ACTIVE VERBOSE_CHECK(virtualscene)
 
+// Default filenames for different scene modes, can be used
+// when the file cannot be found or loaded, all relative to
+// the emulator's 'resources' folder
+// TODO(virtualscene): create and use proper default image&video
+static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
+static constexpr const char* kDefaultImageFile = "poster.png";
+static constexpr const char* kDefaultVideoFile =
+        "macroPreviews/Reset_position.mp4";
+
 // static_cast the value in a unique_ptr.
 // After this call, the unique_ptr that the value is cast from will be removed.
 template <typename To, typename From>
@@ -72,6 +81,19 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
         return "imagefile";
     } else {
         return "unknown";
+    }
+}
+
+const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
+    if (mode == SceneConfig::Mode::Mesh3dScene) {
+        return kDefaultSceneObj;
+    } else if (mode == SceneConfig::Mode::VideoPlayback) {
+        return kDefaultVideoFile;
+    } else if (mode == SceneConfig::Mode::ImageFile) {
+        return kDefaultImageFile;
+    } else {
+        derror("%s: Invalid mode %d", __func__, (int)mode);
+        return "invalid_filename";
     }
 }
 

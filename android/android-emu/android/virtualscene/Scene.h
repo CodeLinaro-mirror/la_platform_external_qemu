@@ -52,6 +52,9 @@ struct SceneConfig {
 
     static Mode modeFromString(std::string_view sceneModeStr);
     static const char* modeToString(SceneConfig::Mode mode);
+
+    // Returns fullpath to default file for the given scene mode
+    static const char* defaultFilenameForMode(SceneConfig::Mode mode);
 };
 
 // TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
