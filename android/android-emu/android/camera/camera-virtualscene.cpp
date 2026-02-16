@@ -48,10 +48,6 @@ static RenderedCameraDevice* toRenderedCameraDevice(CameraDevice* ccd) {
     return reinterpret_cast<RenderedCameraDevice*>(ccd->opaque);
 }
 
-void camera_virtualscene_parse_cmdline() {
-    VirtualSceneManager::parseCmdline();
-}
-
 uint32_t camera_virtualscene_preferred_format() {
     return VIRTUALSCENE_PIXEL_FORMAT;
 }
