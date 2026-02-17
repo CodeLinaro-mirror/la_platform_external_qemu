@@ -1,0 +1,56 @@
+---
+name: aemu-ui-qt-expert
+description: Expert in the Android Emulator standalone UI (Qt-based). Use when modifying, debugging, or extending the emulator's host-side user interface, including the main window, extended controls, toolbars, and multi-display support.
+---
+
+# AEMU Qt UI Expert
+
+Expert guidance for working with the Android Emulator standalone UI, written in C++ using the Qt framework.
+
+## Core Procedures
+
+### Architectural Navigation
+- **Main Window**: `EmulatorQtWindow` in `src/android/skin/qt/emulator-qt-window.cpp`.
+- **Extended Controls**: `ExtendedWindow` in `src/android/skin/qt/extended-window.cpp`.
+- **Toolbar**: `ToolWindow` in `src/android/skin/qt/tool-window.cpp`.
+- **Entry Point**: `winsys-qt.cpp` implements the `winsys.h` interface.
+
+### Implementing Thread-Safe UI Calls
+When calling UI code from the emulator thread, you MUST use Qt signals and slots to ensure the code executes on the Qt Main Thread.
+
+1.  **Define Signal**: Add a signal to the class header.
+2.  **Add Slot**: Add a corresponding private slot that performs the actual work.
+3.  **Cross-Thread Execution**:
+    - For async calls: `emit mySignal(args);`
+    - For sync (blocking) calls: Pass a `QSemaphore*`, emit the signal, and call `semaphore->acquire()`.
+
+### UI Development
+- **Layouts**: Prefer editing `.ui` files with Qt Designer.
+- **Resources**: Add icons and assets to `resources.qrc` or `static_resources.qrc`.
+- **Styling**: Stylesheets are used for branding and dark mode support; see `stylesheet.cpp`.
+
+### Backend Interaction
+Interact with the emulator via agents.
+- Access agents via `getConsoleAgents()` or `EmulatorQtWindow::getInstance()->getAdbInterface()`.
+- Use the `UiEmuAgent` for general emulator state and control.
+
+### Testing and Verification
+- **Unit Tests**: Found in `test/` or alongside source as `*_unittest.cpp`.
+- **Note on Unit Testing**: Currently, the Qt UI lacks comprehensive unit tests. A large refactor is required to decouple components enough to allow for effective testing.
+- **Page/Controller Pattern**: For new pages in Extended Controls, use the Page/Controller pattern to allow mocking the backend in tests.
+- **Visual Verification**: Always verify changes visually, as many UI issues (layout, clipping, focus) are not caught by unit tests.
+
+## Common Tasks
+
+### Adding a new page to Extended Controls
+1. Create a `.ui` file for the layout.
+2. Create a page class inheriting from `QWidget`.
+3. Create a controller interface and mock for testing.
+4. Register the new page in `ExtendedWindow::adjustTabs`.
+
+### Debugging UI Events
+- Trace events in `EmulatorQtWindow::event` or specific handlers like `keyPressEvent`.
+- Use `QtLogger` for UI-side logging.
+
+## References
+- See [architecture.md](references/architecture.md) for detailed multi-threading and component details.
