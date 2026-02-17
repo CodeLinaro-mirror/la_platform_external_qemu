@@ -849,6 +849,9 @@ void VirtualSensorsPage::updateUIFromModelCurrentState() {
             mUi->positionXSlider->setValue(position.x, false);
             mUi->positionYSlider->setValue(position.y, false);
             mUi->positionZSlider->setValue(position.z, false);
+
+            mSlidersTargetRotation = eulerDegrees;
+            mSlidersTargetPosition = position;
         }
 
         mUi->temperatureSensorValueWidget->setValue(
