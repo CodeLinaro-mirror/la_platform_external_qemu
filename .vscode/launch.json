@@ -31,14 +31,14 @@
       },
       "osx": {
         "postRunCommands": [
-          "pro hand -n false -p true -s false SIGUSR1",
-          "pro hand -n false -p true -s false SIGUSR2"
+          "process handle SIGUSR1 -s false -n false -p true",
+          "process handle SIGUSR2 -s false -n false -p true"
         ],
       },
       "linux": {
         "postRunCommands": [
-          "pro hand -n false -p true -s false SIGUSR1",
-          "pro hand -n false -p true -s false SIGUSR2"
+          "process handle SIGUSR1 -s false -n false -p true",
+          "process handle SIGUSR2 -s false -n false -p true"
         ],
       }
     },
@@ -69,14 +69,14 @@
       },
       "osx": {
         "postRunCommands": [
-          "pro hand -n false -p true -s false SIGUSR1",
-          "pro hand -n false -p true -s false SIGUSR2"
+          "process handle SIGUSR1 -s false -n false -p true",
+          "process handle SIGUSR2 -s false -n false -p true",
         ]
       },
       "linux": {
         "postRunCommands": [
-          "pro hand -n false -p true -s false SIGUSR1",
-          "pro hand -n false -p true -s false SIGUSR2"
+          "process handle SIGUSR1 -s false -n false -p true",
+          "process handle SIGUSR2 -s false -n false -p true",
         ]
       }
     },
