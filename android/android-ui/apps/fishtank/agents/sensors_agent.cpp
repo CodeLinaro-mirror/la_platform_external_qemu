@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <optional>
 #include <thread>
 #include <vector>
@@ -40,120 +41,61 @@ using android::emulation::control::ParameterValue;
  * The Sensors Agent in Fishtank redirects sensor and physical model interactions
  * to a remote emulator instance over gRPC.
  *
- * One challenge is that Fishtank needs to notify its UI when the physical state
- * (e.g., device rotation) changes, even if that change was initiated by another
- * gRPC client or the backend's own simulation.
+ * Fishtank notifies its UI when the physical state (e.g., device rotation) changes
+ * by subscribing to PhysicalStateEvents via the SensorService gRPC API.
  *
- * Since the current gRPC backend does not support streaming notifications for
- * physical model changes, we implement a polling mechanism here. When a
- * QAndroidPhysicalStateAgent is registered by the UI, we start a background
- * thread that periodically checks for changes in key physical parameters
- * (Position and Rotation) and triggers the appropriate callbacks.
+ * NOTE: This implementation currently only supports a single registration cycle
+ * (one setPhysicalStateAgent call with a valid agent). It does not track or
+ * cancel previous gRPC streams if setPhysicalStateAgent is called multiple times
+ * with different valid agents.
  */
 
 static QAndroidPhysicalStateAgent gPhysicalStateAgent = {};
-static std::thread gPollingThread;
-static std::atomic<bool> gStopPolling{false};
 
-// Helper to get a vec3 physical parameter synchronously
-static bool getPhysicalParameterVec3(int parameter, float out[3]) {
-    auto client = getGlobalControlClient();
-    if (!client) return false;
+// Protects gPhysicalStateAgent access. Callbacks can arrive on gRPC threads
+// while the agent is being registered/unregistered on the main UI thread.
+static std::mutex gAgentMutex;
 
-    PhysicalModelValue request;
-    request.set_target((PhysicalModelValue::PhysicalType)parameter);
+static void subscribeToPhysicalStateEvents(
+        android::emulation::control::SensorClient* sensorClient) {
+    DPRINT("Attempting to subscribe to PhysicalStateEvents via SensorService...");
+    sensorClient->receivePhysicalStateEvents(
+            /* incoming: Called every time a new event is received from the stream */
+            [](const android::emulation::control::incubating::PhysicalStateEvent* event) {
+                if (!event)
+                    return;
+                DPRINT("Received PhysicalStateEvent: %d", (int)event->event());
 
-    PhysicalModelValue response;
-    grpc::ClientContext context;
-    // Use a short timeout for polling
-    context.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(100));
-
-    auto status = client->service()->getPhysicalModel(&context, request, &response);
-    if (!status.ok()) return false;
-
-    auto data = response.value().data();
-    for (int i = 0; i < 3 && i < data.size(); i++) {
-        out[i] = data.Get(i);
-    }
-    return true;
-}
-
-// Helper to check if a 3-component parameter has changed significantly.
-static bool hasSignificantChange(const float current[3],
-                                 const float last[3],
-                                 float threshold) {
-    for (int i = 0; i < 3; i++) {
-        if (std::abs(current[i] - last[i]) > threshold) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void pollingLoop() {
-    enum class MovementState { STATIONARY, MOVING };
-
-    std::optional<std::array<float, 3>> lastPos;
-    std::optional<std::array<float, 3>> lastRot;
-    MovementState movementState = MovementState::STATIONARY;
-
-    while (!gStopPolling) {
-        float currentPos[3] = {0, 0, 0};
-        float currentRot[3] = {0, 0, 0};
-
-        // Poll POSITION and ROTATION from the backend.
-        // These are the primary indicators of device movement in the physical model.
-        bool ok = getPhysicalParameterVec3(PHYSICAL_PARAMETER_POSITION, currentPos);
-        ok &= getPhysicalParameterVec3(PHYSICAL_PARAMETER_ROTATION, currentRot);
-
-        if (ok) {
-            // These thresholds (0.001 for position, 0.01 for rotation) are
-            // chosen to filter out minor numerical jitter or noise in the
-            // physical model simulation while remaining sensitive enough to
-            // detect intentional movement.
-            bool changed = false;
-
-            // We only check for changes if we have a baseline from a previous poll.
-            if (lastPos && lastRot) {
-                const bool posChanged =
-                        hasSignificantChange(currentPos, lastPos->data(), 0.001f);
-                const bool rotChanged =
-                        hasSignificantChange(currentRot, lastRot->data(), 0.01f);
-                changed = posChanged || rotChanged;
-
-                if (changed) {
-                    // Transition: Stationary -> Moving
-                    if (movementState == MovementState::STATIONARY) {
-                        movementState = MovementState::MOVING;
+                std::lock_guard<std::mutex> lock(gAgentMutex);
+                switch (event->event()) {
+                    case android::emulation::control::incubating::PhysicalStateEvent::STATE_EVENT_UNDEFINED:
+                        break;
+                    case android::emulation::control::incubating::PhysicalStateEvent::STATE_PHYSICAL_STATE_CHANGING:
                         if (gPhysicalStateAgent.onPhysicalStateChanging) {
                             gPhysicalStateAgent.onPhysicalStateChanging(
                                     gPhysicalStateAgent.context);
                         }
-                    }
-
-                    // Notify the UI that the state has updated (e.g. from an
-                    // external gRPC client) so it can refresh its view.
-                    if (gPhysicalStateAgent.onTargetStateChanged) {
-                        gPhysicalStateAgent.onTargetStateChanged(
-                                gPhysicalStateAgent.context);
-                    }
-                } else if (movementState == MovementState::MOVING) {
-                    // Transition: Moving -> Stationary
-                    movementState = MovementState::STATIONARY;
-                    if (gPhysicalStateAgent.onPhysicalStateStabilized) {
-                        gPhysicalStateAgent.onPhysicalStateStabilized(
-                                gPhysicalStateAgent.context);
-                    }
+                        break;
+                    case android::emulation::control::incubating::PhysicalStateEvent::STATE_PHYSICAL_STATE_STABILIZED:
+                        if (gPhysicalStateAgent.onPhysicalStateStabilized) {
+                            gPhysicalStateAgent.onPhysicalStateStabilized(
+                                    gPhysicalStateAgent.context);
+                        }
+                        break;
+                    case android::emulation::control::incubating::PhysicalStateEvent::STATE_TARGET_STATE_CHANGED:
+                        if (gPhysicalStateAgent.onTargetStateChanged) {
+                            gPhysicalStateAgent.onTargetStateChanged(
+                                    gPhysicalStateAgent.context);
+                        }
+                        break;
                 }
-            }
-
-            lastPos = {currentPos[0], currentPos[1], currentPos[2]};
-            lastRot = {currentRot[0], currentRot[1], currentRot[2]};
-        }
-
-        // Polling at 100ms is completely arbitrary and can be adjusted if needed.
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+            },
+            /* onDone: Called when the stream is closed or an error occurs */
+            [](absl::Status status) {
+                if (!status.ok()) {
+                    derror("SensorService stream error: %s", status.ToString().c_str());
+                }
+            });
 }
 
 const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
@@ -163,9 +105,12 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                     auto client = getGlobalControlClient();
                     if (!client) return -1;
 
-                    // Manually trigger "changing" callback for instant local feedback
-                    if (gPhysicalStateAgent.onPhysicalStateChanging) {
-                        gPhysicalStateAgent.onPhysicalStateChanging(gPhysicalStateAgent.context);
+                    {
+                        std::lock_guard<std::mutex> lock(gAgentMutex);
+                        // Manually trigger "changing" callback for instant local feedback
+                        if (gPhysicalStateAgent.onPhysicalStateChanging) {
+                            gPhysicalStateAgent.onPhysicalStateChanging(gPhysicalStateAgent.context);
+                        }
                     }
 
                     PhysicalModelValue request;
@@ -175,13 +120,16 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                         val->add_data(value[i]);
                     }
 
-                    grpc::ClientContext context;
+                    auto context = client->client()->newContext();
                     google::protobuf::Empty response;
-                    auto status = client->service()->setPhysicalModel(&context, request, &response);
+                    auto status = client->service()->setPhysicalModel(context.get(), request, &response);
 
-                    // Manually trigger "target changed" callback
-                    if (gPhysicalStateAgent.onTargetStateChanged) {
-                        gPhysicalStateAgent.onTargetStateChanged(gPhysicalStateAgent.context);
+                    {
+                        std::lock_guard<std::mutex> lock(gAgentMutex);
+                        // Manually trigger "target changed" callback
+                        if (gPhysicalStateAgent.onTargetStateChanged) {
+                            gPhysicalStateAgent.onTargetStateChanged(gPhysicalStateAgent.context);
+                        }
                     }
 
                     return status.ok() ? 0 : -1;
@@ -197,8 +145,8 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                     // Note: emulator_controller.proto doesn't support parameterValueType yet.
 
                     PhysicalModelValue response;
-                    grpc::ClientContext context;
-                    auto status = client->service()->getPhysicalModel(&context, request, &response);
+                    auto context = client->client()->newContext();
+                    auto status = client->service()->getPhysicalModel(context.get(), request, &response);
                     if (!status.ok()) return -1;
 
                     auto data = response.value().data();
@@ -277,10 +225,10 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                         val->add_data(value[i]);
                     }
 
-                    grpc::ClientContext context;
+                    auto context = client->client()->newContext();
                     google::protobuf::Empty response;
                     auto status =
-                            client->service()->setSensor(&context, request,
+                            client->service()->setSensor(context.get(), request,
                                                          &response);
 
                     return status.ok() ? 0 : -1;
@@ -297,8 +245,8 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                                     sensor);
 
                     android::emulation::control::SensorValue response;
-                    grpc::ClientContext context;
-                    auto status = client->service()->getSensor(&context, request,
+                    auto context = client->client()->newContext();
+                    auto status = client->service()->getSensor(context.get(), request,
                                                                &response);
                     if (!status.ok()) return -1;
 
@@ -346,18 +294,19 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                 [](const struct QAndroidPhysicalStateAgent* agent) {
                     DPRINT("setPhysicalStateAgent(agent: %p)", agent);
 
-                    // Stop previous polling if any
-                    if (gPollingThread.joinable()) {
-                        gStopPolling = true;
-                        gPollingThread.join();
+                    {
+                        std::lock_guard<std::mutex> lock(gAgentMutex);
+                        gPhysicalStateAgent =
+                                agent ? *agent : QAndroidPhysicalStateAgent{};
                     }
 
                     if (agent) {
-                        gPhysicalStateAgent = *agent;
-                        gStopPolling = false;
-                        gPollingThread = std::thread(pollingLoop);
-                    } else {
-                        gPhysicalStateAgent = {};
+                        auto sensorClient = getGlobalSensorClient();
+                        if (sensorClient) {
+                            subscribeToPhysicalStateEvents(sensorClient.get());
+                        } else {
+                            derror("SensorClient not available, cannot subscribe to events.");
+                        }
                     }
                     return 0;
                 },

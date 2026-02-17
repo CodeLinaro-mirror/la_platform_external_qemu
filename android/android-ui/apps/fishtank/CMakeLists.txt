@@ -78,6 +78,7 @@ target_link_libraries(
           android-grpc-certificate-factory
           service_forwarder_client
           emulator_controller-service-client
+          sensor-service-client
           android-emu-curl
           android-hw-config
           ext-page-battery
@@ -316,6 +317,7 @@ target_link_libraries(
           android-grpc-certificate-factory
           service_forwarder_client
           emulator_controller-service-client
+          sensor-service-client
           gmock
           android-emu-test-launcher)
 
