@@ -14,6 +14,7 @@
 
 #include "android/physics/Physics.h"
 #include "android/utils/compiler.h"
+#include "host-common/misc.h"
 #include "host-common/window_agent.h"
 
 #include <stdint.h>
@@ -207,6 +208,9 @@ extern int android_sensors_set_coarse_orientation(
 
 /* get the coarse orientation value */
 extern AndroidCoarseOrientation android_sensors_get_coarse_orientation();
+
+/* Converts skin rotation to coarse orientation */
+extern AndroidCoarseOrientation skin_rotation_to_coarse_orientation(SkinRotation rotation);
 
 /* get sensor values */
 extern int android_sensors_get(int sensor_id,
