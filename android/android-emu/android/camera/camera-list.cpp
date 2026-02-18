@@ -36,7 +36,7 @@ void android_camera_list_webcams(void) {
     for (int i = 0; i < connected_cnt; i++) {
         printf(" Camera '%s' is connected to device '%s' on channel %d "
                "using pixel format '%.4s'\n",
-               ci[i].display_name, ci[i].device_name, ci[i].inp_channel,
+               ci[i].display_name, ci[i].camera_name, ci[i].inp_channel,
                (const char*)&ci[i].pixel_format);
 
         camera_info_done(&ci[i]);

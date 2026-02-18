@@ -22,6 +22,7 @@
 #pragma once
 
 #ifdef _WIN32
+#undef ERROR_FILE_NOT_FOUND
 #undef WAIT_FAILED
 #undef WAIT_TIMEOUT
 #undef WINDOWS

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 set(emulator-libkeymaster3_src)
 android_add_library(
   TARGET emulator-libkeymaster3

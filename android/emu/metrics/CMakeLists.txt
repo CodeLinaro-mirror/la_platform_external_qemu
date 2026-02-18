@@ -14,6 +14,7 @@ android_add_library(
   src
   SRC android/CommonReportedInfo.cpp
       android/metrics/AsyncMetricsReporter.cpp
+      android/metrics/ConsoleEventTracker.cpp
       android/metrics/CrashMetricsReporting.cpp
       android/metrics/FileMetricsWriter.cpp
       android/metrics/metrics.cpp
@@ -97,6 +98,7 @@ if(NOT LINUX_AARCH64)
     TARGET android-emu-metrics_unittests
     SRC test/android/CommonReportedInfo_unittest.cpp
         test/android/metrics/tests/AsyncMetricsReporter_unittest.cpp
+        test/android/metrics/tests/ConsoleEventTracker_unittest.cpp
         test/android/metrics/tests/FileMetricsWriter_unittest.cpp
         test/android/metrics/tests/MetricsReporter_unittest.cpp
         test/android/metrics/tests/NullMetricsClasses_unittest.cpp

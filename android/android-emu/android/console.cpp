@@ -21,9 +21,9 @@
  *
  */
 
+#include "absl/strings/str_split.h"
 #include "android/console.h"
 #include "android/console_internal.h"
-
 #include "aemu/base/ProcessControl.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/misc/StringUtils.h"
@@ -39,6 +39,9 @@
 #include "android/emulator-window.h"
 #include "android/hw-events.h"
 #include "android/hw-sensors.h"
+#include "android/metrics/ConsoleEventTracker.h"
+#include "android/metrics/MetricsReporter.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "android/network/constants.h"
 #include "android/network/control.h"
 #include "android/network/globals.h"
@@ -72,6 +75,8 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include <assert.h>
@@ -497,6 +502,52 @@ static void control_send_help_prompt(ControlClient client) {
                   "Android Console: type 'help' for a list of commands\r\n");
 }
 
+static std::string get_primary_name(const char* command_names) {
+    if (!command_names) {
+        return "";
+    }
+    std::vector<std::string> names = absl::StrSplit(command_names, '|');
+    return names.empty() ? "" : names[0];
+}
+
+static void report_console_command(const char* command) {
+    if (!command || command[0] == '\0') {
+        return;
+    }
+
+    // Set of commands we care about tracking.
+    // Includes top-level commands and detailed subcommands for 'avd' and 'event'.
+    static const std::unordered_set<std::string_view> tracked_commands = {
+            "help", "help-verbose", "ping", "automation", "event",
+            "geo", "gsm", "cdma", "crash", "crash-on-exit", "kill", "restart",
+            "network", "grpc", "power", "quit", "redir", "sms", "avd",
+            "qemu", "sensor", "physics", "finger", "debug", "rotate",
+            "screenrecord", "fold", "unfold", "posture", "multidisplay",
+            "icebox", "nodraw", "resize-display", "virtualscene-image",
+            "proxy", "phonenumber", "auth",
+            // Comprehensive AVD subcommands
+            "avd stop", "avd start", "avd status", "avd heartbeat",
+            "avd rewindaudio", "avd name", "avd grpc", "avd pause",
+            "avd hostmicon", "avd hostmicoff", "avd resume", "avd bugreport",
+            "avd id", "avd windowtype", "avd path", "avd discoverypath",
+            "avd snapshotspath", "avd snapshotpath",
+            "avd snapshot list", "avd snapshot save", "avd snapshot load",
+            "avd snapshot del", "avd snapshot delete", "avd snapshot remap",
+            "avd snapshot pull", "avd snapshot push", "avd snapshot last_loaded",
+            // Detailed Event subcommands
+            "event send", "event types", "event codes", "event text",
+            "event mouse",
+    };
+
+    if (tracked_commands.count(command) == 0) {
+        return;
+    }
+
+    static auto sTracker = std::make_shared<android::metrics::ConsoleEventTracker>(
+            android_studio::EmulatorConsoleEvent::TELNET);
+    sTracker->increment(command);
+}
+
 static void control_client_do_command(ControlClient client) {
     char* line = client->buff;
     char* args = NULL;
@@ -522,10 +573,21 @@ static void control_client_do_command(ControlClient client) {
         return;
     }
 
+    std::string top_level_name = get_primary_name(cmd->names);
+    std::string full_path = top_level_name;
+
     for (;;) {
         CommandDef subcmd;
 
         if (cmd->handler) {
+            // Report usage. Use full path for avd/event, otherwise just
+            // top-level.
+            if (top_level_name == "avd" || top_level_name == "event") {
+                report_console_command(full_path.c_str());
+            } else {
+                report_console_command(top_level_name.c_str());
+            }
+
             if (!cmd->handler(client, args)) {
                 control_write(client, "OK\r\n");
             }
@@ -556,6 +618,8 @@ static void control_client_do_command(ControlClient client) {
             control_write(client, "KO:  bad sub-command\r\n");
             break;
         }
+        full_path += " ";
+        full_path += get_primary_name(subcmd->names);
         cmd = subcmd;
     }
 }
@@ -2544,6 +2608,7 @@ static int do_snapshot_pull(ControlClient client, char* args) {
         return -1;
     }
     std::string& filename = arg_strings[1];
+    dinfo("Snapshot pull: raw filename from command: %s", filename.c_str());
     const char* directory = nullptr;
     std::unique_ptr<std::ofstream> dstFile;
     android::emulation::control::FileFormat format =
@@ -2559,19 +2624,24 @@ static int do_snapshot_pull(ControlClient client, char* args) {
         directory = filename.c_str();
     }
     if (format != android::emulation::control::DIRECTORY) {
+        dinfo("Snapshot pull: opening destination file: %s", filename.c_str());
         dstFile.reset(new std::ofstream(
                 android::base::PathUtils::asUnicodePath(filename.data()).c_str(),
                 std::ios::binary | std::ios::out));
         if (!dstFile->is_open()) {
+            dinfo("Snapshot pull: FAILED to open file: %s", filename.c_str());
             control_write(client, "KO: Failed to write to %s\r\n",
                           filename.c_str());
             return -1;
         }
+        dinfo("Snapshot pull: file opened successfully.");
     }
 
+    dinfo("Snapshot pull: calling pullSnapshot for %s", arg_strings[0].c_str());
     bool succeed = android::emulation::control::pullSnapshot(
             arg_strings[0].c_str(), dstFile->rdbuf(), directory, false, format,
             false, client, control_write_err_cb);
+    dinfo("Snapshot pull: pullSnapshot returned %d", succeed);
     return succeed ? 0 : -1;
 }
 

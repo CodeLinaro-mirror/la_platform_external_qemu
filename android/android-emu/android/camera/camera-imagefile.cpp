@@ -340,6 +340,7 @@ int camera_imagefile_init_CameraInfo(CameraInfo* ci,
     ci->vtbl = &vtbl;
     ci->display_name = ::strdup(args);
     ci->device_name = ::strdup(args);
+    ci->camera_name = ::strdup(args);
     ci->inp_channel = 0;
     ci->pixel_format = V4L2_PIX_FMT_RGB32;
     ci->direction = ::strdup(direction);

@@ -304,16 +304,12 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
             char* vkVendor = nullptr;
             int vkMajor, vkMinor, vkPatch;
             emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
-                                                &vkPatch, nullptr, nullptr, nullptr);
+                                                &vkPatch, nullptr, nullptr, nullptr,
+                                            nullptr, nullptr);
             isVkNVIDIA = (vkVendor && strncmp("NVIDIA", vkVendor, 6) == 0);
         }
     }
 
-    if (opts->guest_angle) {
-        derror("Command line option -guest-angle is deprecated and will be "
-               "removed, use '-feature GuestAngle' instead.");
-        fc::setEnabledOverride(fc::GuestAngle, true);
-    }
     if (fc::isEnabled(fc::GuestUsesAngle)) {
         derror("Feature flag 'GuestUsesAngle' is deprecated and will be "
                "removed, use 'GuestAngle' instead.");

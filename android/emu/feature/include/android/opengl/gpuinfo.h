@@ -33,7 +33,6 @@
 // the started processes hang or what not.
 void async_query_host_gpu_start();
 bool async_query_host_gpu_blacklisted();
-bool async_query_host_gpu_AngleWhitelisted();
 bool async_query_host_gpu_SyncBlacklisted();
 bool async_query_host_gpu_VulkanBlacklisted();
 
@@ -101,7 +100,6 @@ public:
     std::vector<GpuInfo> infos;
 
     bool blacklist_status = false;
-    bool Anglelist_status = false;
     bool SyncBlacklist_status = false;
     bool VulkanBlacklist_status = false;
     std::optional<bool> has_gpu_cached = {};

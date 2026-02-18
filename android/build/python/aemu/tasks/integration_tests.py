@@ -27,6 +27,9 @@ from aemu.process.py_runner import PyRunner
 class EmulatorDistributionNotFoundException(Exception):
     pass
 
+class FishtankDistributionNotFoundException(Exception):
+    pass
+
 
 class IntegrationTestTask(BuildTask):
     """Runs the e2e integration tests."""
@@ -101,11 +104,18 @@ class IntegrationTestTask(BuildTask):
             raise EmulatorDistributionNotFoundException(
                 f"No emulator found in {emulator_dir}, did you run ninja install?"
             )
+        fishtank_dir = self.build_directory / "distribution-fishtank" / "fishtank"
+        if shutil.which("fishtank", path=fishtank_dir) is None:
+            raise EmulatorDistributionNotFoundException(
+                f"No fishtank found in {fishtank_dir}, did you run ninja install?"
+            )
         py.run(
             [
                 self.launcher,
                 "--emulator",
                 emulator_dir / "emulator",
+                "--fishtank",
+                fishtank_dir / "fishtank",
                 "--symbols",
                 self.build_directory / "build" / "symbols",
                 "--test_suite",

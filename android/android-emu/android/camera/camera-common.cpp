@@ -30,6 +30,7 @@ void camera_info_done(CameraInfo* ci) {
     if (ci != nullptr) {
         reassign(&ci->display_name, nullptr);
         reassign(&ci->device_name, nullptr);
+        reassign(&ci->camera_name, nullptr);
         ci->inp_channel = 0;
         ci->pixel_format = 0;
         reassign(&ci->direction, nullptr);
@@ -48,6 +49,7 @@ void camera_info_copy(CameraInfo* ci, const CameraInfo* from) {
     } else if ((const CameraInfo*)ci != from) {
         reassign(&ci->display_name, from->display_name);
         reassign(&ci->device_name, from->device_name);
+        reassign(&ci->camera_name, from->camera_name);
         ci->inp_channel = from->inp_channel;
         ci->pixel_format = from->pixel_format;
         reassign(&ci->direction, from->direction);

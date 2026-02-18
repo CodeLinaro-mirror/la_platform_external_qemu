@@ -16,6 +16,7 @@
 #include "aemu/base/Debug.h"
 #include "aemu/base/ProcessControl.h"
 #include "aemu/base/files/PathUtils.h"
+#include "aemu/base/process/Command.h"
 #include "android/avd/info.h"
 #include "android/base/system/System.h"
 #include "android/cmdline-definitions.h"
@@ -38,18 +39,22 @@
 #include "android/skin/qt/emulator-qt-window.h"
 #include "android/skin/qt/init-qt.h"
 #include "android/utils/debug.h"
+#include "android/utils/string.h"                           // for str_reset
+#include "android/utils/system.h"
 #include "fishtank_agents.h"
 #include "grpc/FishtankGrpcServer.h"
 
 #include <algorithm>
 #include "absl/log/log.h"
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_join.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/feature_control.h"
 
 using android::base::pj;
 using android::base::System;
+using android::emulation::control::EmulatorAdvertisement;
 
 namespace fc = android::featurecontrol;
 
@@ -87,6 +92,36 @@ getGlobalControlClient() {
 
 int main(int argc, char* argv[]) {
     base_configure_logs(kLogDefaultOptions);
+
+    auto system = System::get();
+    std::string launcherDir = system->envGet("ANDROID_EMULATOR_LAUNCHER_DIR");
+    if (launcherDir.empty()) {
+        LOG(WARNING) << "ANDROID_EMULATOR_LAUNCHER_DIR is not defined. You "
+                        "must've started "
+                     << "fishtank as a standalone application. Will try to "
+                        "deduce the launcher "
+                     << "directory from ANDROID_SDK_ROOT.";
+        std::string sdkRoot = system->envGet("ANDROID_SDK_ROOT");
+        if (!sdkRoot.empty()) {
+            // Default to the qemu-now emulator launcher for now.
+            launcherDir = pj(sdkRoot, "emulator");
+            system->setEnvironmentVariable("ANDROID_EMULATOR_LAUNCHER_DIR",
+                                           launcherDir);
+            LOG(INFO) << "Inferred ANDROID_EMULATOR_LAUNCHER_DIR from "
+                         "ANDROID_SDK_ROOT: "
+                      << launcherDir;
+        } else {
+            // ANDROID_EMULATOR_LAUNCHER_DIR is critical to resolve things like
+            // the advancedFeatures.ini and maps.key file. Without those things,
+            // fishtank will likely misbehave, which is why we decide to make it
+            // a fatal error.
+            LOG(FATAL) << "Neither ANDROID_EMULATOR_LAUNCHER_DIR nor "
+                          "ANDROID_SDK_ROOT is defined. Cannot start fishtank.";
+        }
+    } else {
+        LOG(INFO) << "Using ANDROID_EMULATOR_LAUNCHER_DIR: " << launcherDir;
+    }
+
     process_early_setup(argc, argv);
     // crashhandler_init(argc, argv);
     async_query_host_gpu_start();
@@ -97,6 +132,16 @@ int main(int argc, char* argv[]) {
     char* qt_argv = argv[0];
     int qt_argc = 1;
     injectFishtankConsoleAgents();
+
+    int discovery_timeout = 15;
+    std::string timeoutEnv = system->envGet("ANDROID_FISHTANK_DISCOVERY_TIMEOUT_SECS");
+    if (!timeoutEnv.empty()) {
+        if (!absl::SimpleAtoi(timeoutEnv, &discovery_timeout)) {
+            LOG(ERROR) << "Invalid value for ANDROID_FISHTANK_DISCOVERY_TIMEOUT_SECS: "
+                       << timeoutEnv << ". Using default: 15";
+            discovery_timeout = 15;
+        }
+    }
 
     // ParameterList params(argc, argv);
     getConsoleAgents()->settings->inject_android_cmdLine(
@@ -149,8 +194,36 @@ int main(int argc, char* argv[]) {
     }
 
     std::string discovery = opts->fishtank;
-    if ("default" == discovery) {
-        android::emulation::control::EmulatorAdvertisement adv({});
+
+    // 3 Options:
+
+    // -- "default": Pick the first running emulator
+    // -- "<serial>": Find the emulator with the given serial port (e.g. 5554)
+    // -- "file.ini": Discovery file to use.
+    int qemu_serial = 0;
+    if (absl::SimpleAtoi(discovery, &qemu_serial)) {
+        EmulatorAdvertisement adv({});
+
+        // We are willing to wait for the discovery file.
+        auto start = absl::Now();
+        LOG(INFO) << "Waiting " << discovery_timeout << " seconds for discovery file";
+        auto deadline = start + absl::Seconds(discovery_timeout);
+        std::string possibleDiscoveryFile =
+                adv.discoverEmulatorWithProperties({{"port.serial", discovery}});
+        while (possibleDiscoveryFile.empty() && absl::Now() < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            possibleDiscoveryFile = adv.discoverEmulatorWithProperties(
+                    {{"port.serial", discovery}});
+        }
+
+        if (possibleDiscoveryFile.empty()) {
+            LOG(FATAL) << "The discovery file for serial " << discovery
+                       << " was not found after " << (absl::Now() - start);
+        }
+
+        discovery = possibleDiscoveryFile;
+    } else if ("default" == discovery) {
+        EmulatorAdvertisement adv({});
         auto emulators = adv.discoverRunningEmulators();
         std::vector<std::string> discovery_files;
         std::copy_if(emulators.begin(), emulators.end(),
@@ -185,46 +258,84 @@ int main(int argc, char* argv[]) {
             android::emulation::control::EmulatorGrpcClient::me());
     initializeGrpcUserEventAgent(gControlClient.get());
 
-    if (!fc::isOverridden(fc::GuestAngle)) {
-        switch (skin_winsys_get_preferred_guest_gles_driver()) {
-            case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_NATIVE:
-                fc::setEnabledOverride(fc::GuestAngle, false);
-                dinfo("Guest GLES Driver: Native (ext controls)");
-                break;
-            case WINSYS_GUEST_GLES_DRIVER_PREFERENCE_GUESTANGLE:
-                fc::setEnabledOverride(fc::GuestAngle, true);
-                dinfo("Guest GLES Driver: Angle (ext controls)");
-                break;
-            default:
-                dinfo("Guest GLES Driver: Auto (ext controls)");
-        }
+    auto program_dir = System::get()->getProgramDirectory();
+
+    // Fishtank UI does not use any Vulkan
+    fc::setEnabledOverride(fc::Vulkan, false);
+    // Fishtank UI only uses/ships with swiftshader GL library.
+    // Map null/auto/empty gpu mode to 'swiftshader_indirect'
+    if (!hw->hw_gpu_mode || !strcmp(hw->hw_gpu_mode, "") || !strcmp(hw->hw_gpu_mode, "auto")) {
+        str_reset(&hw->hw_gpu_mode, "swiftshader_indirect");
     }
 
-    // Use advancedFeatures to override renderer if the user has
-    // selected in UI that the preferred renderer is "autoselected".
-    WinsysPreferredGlesBackend uiPreferredGlesBackend =
-            skin_winsys_get_preferred_gles_backend();
-
     android_set_external_renderer_active(true);
+
     // Needs to be called before compatibility checks to correctly control
     // if hw gpu is going to be used
     RendererConfig rendererConfig;
-    if (!configureRenderer(uiPreferredGlesBackend, &rendererConfig)) {
+    if (!configureRenderer(WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED, &rendererConfig)) {
         derror("Error: could not configure renderer!");
+    }
+
+    if (!strcmp(hw->hw_gpu_mode, "swiftshader_indirect") ||
+        !strcmp(hw->hw_gpu_mode, "swiftshader")) {
+        // Use the swiftshader libraries bundled with fishtank.
+        // We add this search path right after configureRenderer, so we can override the search
+        // path added by that call.
+        auto swiftshader_dir = pj({program_dir, "lib64", "gles_swiftshader"});
+        LOG(INFO) << "Adding swiftshader library search path: " << swiftshader_dir;
+        add_library_search_dir(swiftshader_dir.c_str());
     }
 
     if (!startRenderer(&rendererConfig)) {
         derror("Could not start renderer");
     }
 
-    // LOG(FATAL) <<
-    auto base = pj(androidQtGetLibraryDir(64, nullptr), "..");
-    // System::get()->getEnvironmentVariable("QT_QPA_PLATFORM_PLUGIN_PATH");
-    System::get()->setEnvironmentVariable("QTWEBENGINEPROCESS_PATH",
-                                          pj(base, "libexec"));
+    // Set Environment variables that get picked up by qt_path.cpp, which in
+    // turn, will set environment variables for Qt to determine the path to the
+    // plugins, qtwebengine stuff, etc.
 
+    auto qt_base_dir = pj({program_dir, "lib64", "qt"});
+#ifdef _WIN32
+    // For windows, we install all the Qt core dlls into the same directory with
+    // fishtank.exe.
+    auto qt_lib_path = program_dir;
+    // QtWebEngineProcess.exe lives in qt/bin.
+    auto qt_process_path = pj({qt_base_dir, "bin", "QtWebEngineProcess.exe"});
+    // Prepend the program directory to the PATH so that child processes (like
+    // QtWebEngineProcess) can find the Qt DLLs that are located in the same
+    // directory as the main executable.
+    // We only need to do this for Windows because on linux/mac, we use rpaths.
+    std::string currentPath = system->envGet("PATH");
+    system->setEnvironmentVariable("PATH", program_dir + ";" + currentPath);
+    LOG(INFO) << "Prepended " << program_dir << " to PATH";
+#else
+    // For mac/linux, Qt core libraries installed at lib64/qt/lib.
+    auto qt_lib_path = pj(qt_base_dir, "lib");
+    // QtWebEngineProcess lives in qt/libexec.
+    auto qt_process_path = pj({qt_base_dir, "libexec", "QtWebEngineProcess"});
+#endif
+    auto qt_plugin_path = pj(qt_base_dir, "plugins");
+    auto qt_resources_path = pj(qt_base_dir, "resources");
+    auto qt_locales_path =
+            pj({qt_base_dir, "translations", "qtwebengine_locales"});
+
+    System::get()->setEnvironmentVariable("ANDROID_QT_LIB_PATH", qt_lib_path);
+    System::get()->setEnvironmentVariable("QTWEBENGINEPROCESS_PATH",
+                                          qt_process_path);
+    System::get()->setEnvironmentVariable("ANDROID_QT_QPA_PLATFORM_PLUGIN_PATH",
+                                          qt_plugin_path);
     System::get()->setEnvironmentVariable("QTWEBENGINE_RESOURCES_PATH",
-                                          pj(base, "resources"));
+                                          qt_resources_path);
+    System::get()->setEnvironmentVariable("QTWEBENGINE_LOCALES_PATH",
+                                          qt_locales_path);
+
+    LOG(INFO) << "Setting ANDROID_QT_LIB_PATH to: " << qt_lib_path;
+    LOG(INFO) << "Setting QTWEBENGINEPROCESS_PATH to: " << qt_process_path;
+    LOG(INFO) << "Setting ANDROID_QT_QPA_PLATFORM_PLUGIN_PATH to: "
+              << qt_plugin_path;
+    LOG(INFO) << "Setting QTWEBENGINE_RESOURCES_PATH to: " << qt_resources_path;
+    LOG(INFO) << "Setting QTWEBENGINE_LOCALES_PATH to: " << qt_locales_path;
 
     skin_winsys_init_args(qt_argc, &qt_argv);
     if (!emulator_initUserInterface(opts, &uiEmuAgent)) {
@@ -255,9 +366,15 @@ int main(int argc, char* argv[]) {
     }
 
     android::files::TemporaryFile pixels;
-    LOG(INFO) << "Sharing pixels at: " << pixels.path();
     EmulatorQtWindow* window = EmulatorQtWindow::getInstance();
-    window->initializeStreamer("file:///" + pixels.path());
+
+    if (!opts->qt_hide_window) {
+        LOG(INFO) << "Visible ui, initializng pixel streamer at: "
+                  << pixels.path();
+        window->initializeStreamer("file:///" + pixels.path());
+    } else {
+        LOG(INFO) << "No visible ui, not initializing pixel streamer";
+    }
 
     LOG(INFO) << "Setting up window";
     emulator_window_setup(emulator_window_get());

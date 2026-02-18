@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 android_add_library(
   TARGET emulator-tinyepoxy LICENSE Apache-2.0 SRC # cmake-format: sortable

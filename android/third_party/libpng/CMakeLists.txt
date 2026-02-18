@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.0.2)
-cmake_policy(VERSION 3.0.2)
 project(libpng)
 set(PNG_SRC_DIR ${ANDROID_QEMU2_TOP_DIR}/../libpng/)
 

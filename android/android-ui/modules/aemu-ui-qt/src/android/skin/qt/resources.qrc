@@ -61,6 +61,7 @@
         <file alias="minimize">images/light/ic_remove_678_48dp.svg</file>
         <file alias="more">images/light/ic_more_horiz_678_48dp.svg</file>
         <file alias="overview">images/light/System_Overview_678.svg</file>
+        <file alias="meta">images/light/meta.svg</file>
         <file alias="wear_button_1">images/light/wear_button1.svg</file>
         <file alias="wear_button_2">images/light/wear_button2.svg</file>
         <file alias="palm">images/light/palm.svg</file>
@@ -237,6 +238,20 @@
         <file alias="virtSensors">images/light/Virtual_Sensors_678.svg</file>
         <file alias="walk">images/light/ic_directions_walk_222_48dp.svg</file>
 
+        <!-- Used in the Keyboard page in the "extended" window -->
+        <file alias="key_brightness_down">images/light/key_brightness_down.svg</file>
+        <file alias="key_brightness_up">images/light/key_brightness_up.svg</file>
+        <file alias="key_forward">images/light/key_forward.svg</file>
+        <file alias="key_full_screen">images/light/key_full_screen.svg</file>
+        <file alias="key_lock">images/light/key_lock.svg</file>
+        <file alias="key_media_next">images/light/key_media_next.svg</file>
+        <file alias="key_media_previous">images/light/key_media_previous.svg</file>
+        <file alias="key_mic_mute">images/light/key_mic_mute.svg</file>
+        <file alias="key_play_pause">images/light/key_play_pause.svg</file>
+        <file alias="key_refresh">images/light/key_refresh.svg</file>
+        <file alias="key_screen_capture">images/light/key_screen_capture.svg</file>
+        <file alias="key_volume_mute">images/light/key_volume_mute.svg</file>
+
         <!-- Used in the posture selection tool mini-window -->
         <file alias="posture_closed">images/light/posture_closed.svg</file>
         <file alias="posture_flipped">images/light/posture_flipped.svg</file>
@@ -272,6 +287,7 @@
         <file alias="minimize">images/dark/ic_remove_white_48dp.svg</file>
         <file alias="more">images/dark/ic_more_horiz_white_48dp.svg</file>
         <file alias="overview">images/dark/System_Overview_white.svg</file>
+        <file alias="meta">images/dark/meta.svg</file>
         <file alias="wear_button_1">images/dark/wear_button1.svg</file>
         <file alias="wear_button_2">images/dark/wear_button2.svg</file>
         <file alias="palm">images/dark/palm.svg</file>
@@ -448,6 +464,20 @@
         <file alias="posture_open">images/dark/posture_open.svg</file>
         <file alias="posture_tent">images/dark/posture_tent.svg</file>
 
+        <!-- Used in the Keyboard page in the "extended" window -->
+        <file alias="key_brightness_down">images/dark/key_brightness_down.svg</file>
+        <file alias="key_brightness_up">images/dark/key_brightness_up.svg</file>
+        <file alias="key_forward">images/dark/key_forward.svg</file>
+        <file alias="key_full_screen">images/dark/key_full_screen.svg</file>
+        <file alias="key_lock">images/dark/key_lock.svg</file>
+        <file alias="key_media_next">images/dark/key_media_next.svg</file>
+        <file alias="key_media_previous">images/dark/key_media_previous.svg</file>
+        <file alias="key_mic_mute">images/dark/key_mic_mute.svg</file>
+        <file alias="key_play_pause">images/dark/key_play_pause.svg</file>
+        <file alias="key_refresh">images/dark/key_refresh.svg</file>
+        <file alias="key_screen_capture">images/dark/key_screen_capture.svg</file>
+        <file alias="key_volume_mute">images/dark/key_volume_mute.svg</file>
+
         <!-- Used in the resizable display selection tool mini-window -->
         <file alias="display_mode_phone">images/dark/phone_mode.svg</file>
         <file alias="display_mode_phone_expand">images/dark/phone_expand.svg</file>
@@ -473,6 +503,7 @@
         <file alias="minimize">images/studio-light/ic_remove_666_48dp.svg</file>
         <file alias="more">images/studio-light/ic_more_horiz_666_48dp.svg</file>
         <file alias="overview">images/studio-light/System_Overview_666.svg</file>
+        <file alias="meta">images/studio-light/meta.svg</file>
         <file alias="power_settings">images/studio-light/ic_power_settings_new_666_48px.svg</file>
         <file alias="screen_rotation">images/studio-light/ic_screen_rotation_666_48dp.svg</file>
         <file alias="screen_rotation_left">images/studio-light/Rotate_Left_666.svg</file>
@@ -624,6 +655,20 @@
         <file alias="tv_remote_settings">images/studio-light/tv_remote_settings.svg</file>
         <file alias="tv_remote_settings_pressed">images/studio-light/tv_remote_settings_pressed.svg</file>
 
+        <!-- Used in the Keyboard page in the "extended" window -->
+        <file alias="key_brightness_down">images/studio-light/key_brightness_down.svg</file>
+        <file alias="key_brightness_up">images/studio-light/key_brightness_up.svg</file>
+        <file alias="key_forward">images/studio-light/key_forward.svg</file>
+        <file alias="key_full_screen">images/studio-light/key_full_screen.svg</file>
+        <file alias="key_lock">images/studio-light/key_lock.svg</file>
+        <file alias="key_media_next">images/studio-light/key_media_next.svg</file>
+        <file alias="key_media_previous">images/studio-light/key_media_previous.svg</file>
+        <file alias="key_mic_mute">images/studio-light/key_mic_mute.svg</file>
+        <file alias="key_play_pause">images/studio-light/key_play_pause.svg</file>
+        <file alias="key_refresh">images/studio-light/key_refresh.svg</file>
+        <file alias="key_screen_capture">images/studio-light/key_screen_capture.svg</file>
+        <file alias="key_volume_mute">images/studio-light/key_volume_mute.svg</file>
+
     </qresource>
 
     <qresource prefix="/studio-dark">
@@ -640,6 +685,7 @@
         <file alias="minimize">images/studio-dark/ic_remove_white_48dp.svg</file>
         <file alias="more">images/studio-dark/ic_more_horiz_white_48dp.svg</file>
         <file alias="overview">images/studio-dark/System_Overview_white.svg</file>
+        <file alias="meta">images/studio-dark/meta.svg</file>
         <file alias="power_settings">images/studio-dark/ic_power_settings_new_48px.svg</file>
         <file alias="screen_rotation">images/studio-dark/ic_screen_rotation_white_48dp.svg</file>
         <file alias="screen_rotation_left">images/studio-dark/Rotate_Left_white.svg</file>
@@ -786,6 +832,20 @@
         <file alias="tv_remote_settings">images/studio-dark/tv_remote_settings.svg</file>
         <file alias="tv_remote_settings_pressed">images/studio-dark/tv_remote_settings_pressed.svg</file>
 
+        <!-- Used in the Keyboard page in the "extended" window -->
+        <file alias="key_brightness_down">images/studio-dark/key_brightness_down.svg</file>
+        <file alias="key_brightness_up">images/studio-dark/key_brightness_up.svg</file>
+        <file alias="key_forward">images/studio-dark/key_forward.svg</file>
+        <file alias="key_full_screen">images/studio-dark/key_full_screen.svg</file>
+        <file alias="key_lock">images/studio-dark/key_lock.svg</file>
+        <file alias="key_media_next">images/studio-dark/key_media_next.svg</file>
+        <file alias="key_media_previous">images/studio-dark/key_media_previous.svg</file>
+        <file alias="key_mic_mute">images/studio-dark/key_mic_mute.svg</file>
+        <file alias="key_play_pause">images/studio-dark/key_play_pause.svg</file>
+        <file alias="key_refresh">images/studio-dark/key_refresh.svg</file>
+        <file alias="key_screen_capture">images/studio-dark/key_screen_capture.svg</file>
+        <file alias="key_volume_mute">images/studio-dark/key_volume_mute.svg</file>
+
     </qresource>
 
     <qresource prefix="/studio-contrast">
@@ -802,6 +862,7 @@
         <file alias="minimize">images/studio-contrast/ic_remove_white_48dp.svg</file>
         <file alias="more">images/studio-contrast/ic_more_horiz_white_48dp.svg</file>
         <file alias="overview">images/studio-contrast/System_Overview_white.svg</file>
+        <file alias="meta">images/studio-contrast/meta.svg</file>
         <file alias="power_settings">images/studio-contrast/ic_power_settings_new_48px.svg</file>
         <file alias="screen_rotation">images/studio-contrast/ic_screen_rotation_white_48dp.svg</file>
         <file alias="screen_rotation_left">images/studio-contrast/Rotate_Left_white.svg</file>
@@ -946,6 +1007,20 @@
         <file alias="tv_remote_live_tv_pressed">images/studio-contrast/tv_remote_live_tv_pressed.svg</file>
         <file alias="tv_remote_settings">images/studio-contrast/tv_remote_settings.svg</file>
         <file alias="tv_remote_settings_pressed">images/studio-contrast/tv_remote_settings_pressed.svg</file>
+
+        <!-- Used in the Keyboard page in the "extended" window -->
+        <file alias="key_brightness_down">images/studio-contrast/key_brightness_down.svg</file>
+        <file alias="key_brightness_up">images/studio-contrast/key_brightness_up.svg</file>
+        <file alias="key_forward">images/studio-contrast/key_forward.svg</file>
+        <file alias="key_full_screen">images/studio-contrast/key_full_screen.svg</file>
+        <file alias="key_lock">images/studio-contrast/key_lock.svg</file>
+        <file alias="key_media_next">images/studio-contrast/key_media_next.svg</file>
+        <file alias="key_media_previous">images/studio-contrast/key_media_previous.svg</file>
+        <file alias="key_mic_mute">images/studio-contrast/key_mic_mute.svg</file>
+        <file alias="key_play_pause">images/studio-contrast/key_play_pause.svg</file>
+        <file alias="key_refresh">images/studio-contrast/key_refresh.svg</file>
+        <file alias="key_screen_capture">images/studio-contrast/key_screen_capture.svg</file>
+        <file alias="key_volume_mute">images/studio-contrast/key_volume_mute.svg</file>
     </qresource>
 
     <qresource prefix="/cursor">

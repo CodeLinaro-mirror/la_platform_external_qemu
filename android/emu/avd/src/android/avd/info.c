@@ -934,6 +934,10 @@ static void _avdInfo_forceGlassesConfig(AvdInfo* i) {
             write = true;
             iniFile_setString(i->configIni, "hw.screen", "no-touch");
         }
+        if (!iniFile_hasKey(i->configIni, "hw.camera.back.orientation")) {
+            write = true;
+            iniFile_setInteger(i->configIni, "hw.camera.back.orientation", 0);
+        }
         if (write) {
             char* iniPath = _avdInfo_getContentFilePath(i, CORE_CONFIG_INI);
             if (iniPath) {

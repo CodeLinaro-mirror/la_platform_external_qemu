@@ -22,10 +22,7 @@ typedef struct VirtIOWifiQueue {
     VirtQueue* rx;
     VirtQueue* tx;
     QEMUBH* tx_bh;
-    uint32_t tx_waiting;
-    struct {
-        VirtQueueElement* elem;
-    } async_tx;
+    VirtQueueElement* unsent_tx;
 } VirtIOWifiQueue;
 
 typedef struct VirtIOWifi {

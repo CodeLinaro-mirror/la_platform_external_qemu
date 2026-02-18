@@ -7,30 +7,33 @@ prebuilt(MSVC)
 android_add_executable(
   TARGET emulator INSTALL .
   LICENSE Apache-2.0
-  SRC ../images/emulator_icon.rc main-emulator.cpp
+  SRC main-emulator.cpp
   DEPS aemu-gl-init
-       android-emu-agents-headers
-       android-emu-avd
-       android-emu-base
-       android-emu-base-headers
-       android-emu-crash-initializer
-       android-emu-crashreport
-       android-emu-crashreport-consent-never
-       android-emu-files
-       android-emu-launch
-       android-emu-utils
-       android-hw-config
-       qemu-host-common-headers
-       ui::common
-       ui::window)
+  android-emu-agents-headers
+  android-emu-avd
+  android-emu-base
+  android-emu-base-headers
+  android-emu-crash-initializer
+  android-emu-crashreport
+  android-emu-crashreport-consent-never
+  android-emu-files
+  android-emu-launch
+  android-emu-utils
+  android-hw-config
+  qemu-host-common-headers
+  ui::common
+  ui::window)
+
+
+add_resource(TARGET emulator RESOURCE ../images/emulator_icon.rc)
 target_include_directories(
   emulator # This is not right!, an implicit dependency..
   PRIVATE ${ANDROID_QEMU2_TOP_DIR}/android/android-emu)
 target_compile_definitions(
   emulator
   PRIVATE "-DCRASHUPLOAD=${OPTION_CRASHUPLOAD}"
-          "-DANDROID_SDK_TOOLS_REVISION=${OPTION_SDK_TOOLS_REVISION}"
-          "-DANDROID_SDK_TOOLS_BUILD_NUMBER=${OPTION_SDK_TOOLS_BUILD_NUMBER}")
+  "-DANDROID_SDK_TOOLS_REVISION=${OPTION_SDK_TOOLS_REVISION}"
+  "-DANDROID_SDK_TOOLS_BUILD_NUMBER=${OPTION_SDK_TOOLS_BUILD_NUMBER}")
 if(NOT WINDOWS)
   target_link_libraries(emulator PRIVATE android-emu-feature)
 endif()
@@ -42,7 +45,7 @@ if(BUILDING_FOR_AARCH64)
   endif()
 elseif(OPTION_MINBUILD)
   add_dependencies(emulator qemu-system-x86_64 qemu-system-aarch64
-                   qemu-system-x86_64-headless qemu-system-aarch64-headless)
+    qemu-system-x86_64-headless qemu-system-aarch64-headless)
 else()
   add_dependencies(
     emulator
@@ -58,31 +61,31 @@ endif()
 
 set(PC_BIOS "${ANDROID_QEMU2_TOP_DIR}/pc-bios")
 set(EMULATOR_BIOS_DEPENDENCIES
-    "${PC_BIOS}/bios.bin>lib/pc-bios/bios.bin"
-    "${PC_BIOS}/vgabios-cirrus.bin>lib/pc-bios/vgabios-cirrus.bin"
-    "${PC_BIOS}/vgabios-stdvga.bin>lib/pc-bios/vgabios-stdvga.bin"
-    "${PC_BIOS}/vgabios-virtio.bin>lib/pc-bios/vgabios-virtio.bin"
-    "${PC_BIOS}/bios-256k.bin>lib/pc-bios/bios-256k.bin"
-    "${PC_BIOS}/efi-virtio.rom>lib/pc-bios/efi-virtio.rom"
-    "${PC_BIOS}/efi-e1000.rom>lib/pc-bios/efi-e1000.rom"
-    "${PC_BIOS}/efi-e1000e.rom>lib/pc-bios/efi-e1000e.rom"
-    "${PC_BIOS}/kvmvapic.bin>lib/pc-bios/kvmvapic.bin"
-    "${PC_BIOS}/linuxboot.bin>lib/pc-bios/linuxboot.bin"
-    "${PC_BIOS}/multiboot.bin>lib/pc-bios/multiboot.bin"
-    "${PC_BIOS}/linuxboot_dma.bin>lib/pc-bios/linuxboot_dma.bin")
+  "${PC_BIOS}/bios.bin>lib/pc-bios/bios.bin"
+  "${PC_BIOS}/vgabios-cirrus.bin>lib/pc-bios/vgabios-cirrus.bin"
+  "${PC_BIOS}/vgabios-stdvga.bin>lib/pc-bios/vgabios-stdvga.bin"
+  "${PC_BIOS}/vgabios-virtio.bin>lib/pc-bios/vgabios-virtio.bin"
+  "${PC_BIOS}/bios-256k.bin>lib/pc-bios/bios-256k.bin"
+  "${PC_BIOS}/efi-virtio.rom>lib/pc-bios/efi-virtio.rom"
+  "${PC_BIOS}/efi-e1000.rom>lib/pc-bios/efi-e1000.rom"
+  "${PC_BIOS}/efi-e1000e.rom>lib/pc-bios/efi-e1000e.rom"
+  "${PC_BIOS}/kvmvapic.bin>lib/pc-bios/kvmvapic.bin"
+  "${PC_BIOS}/linuxboot.bin>lib/pc-bios/linuxboot.bin"
+  "${PC_BIOS}/multiboot.bin>lib/pc-bios/multiboot.bin"
+  "${PC_BIOS}/linuxboot_dma.bin>lib/pc-bios/linuxboot_dma.bin")
 android_license(
   TARGET EMULATOR_BIOS_DEPENDENCIES
   LIBNAME bios
   URL "https://android.googlesource.com/platform/external/qemu-pc-bios/+/refs/heads/master/"
   SPDX "LGPL-2.0-or-later"
   LICENSE
-    "https://android.googlesource.com/platform/external/qemu-pc-bios/+/refs/heads/master/README"
+  "https://android.googlesource.com/platform/external/qemu-pc-bios/+/refs/heads/master/README"
   LOCAL "${ANDROID_QEMU2_TOP_DIR}/LICENSES/LICENSE.BIOS")
 
 set(EMULATOR_KEYMAP_DEPENDENCIES
-    "${ANDROID_QEMU2_TOP_DIR}/pc-bios/keymaps/*>>lib/pc-bios/keymaps")
+  "${ANDROID_QEMU2_TOP_DIR}/pc-bios/keymaps/*>>lib/pc-bios/keymaps")
 set(CERT_DEPEPENDENCIES
-    "${ANDROID_QEMU2_TOP_DIR}/android/data/ca-bundle.pem>lib/ca-bundle.pem")
+  "${ANDROID_QEMU2_TOP_DIR}/android/data/ca-bundle.pem>lib/ca-bundle.pem")
 set(EMULATOR_HW_DEPENDENCIES "${HW_PROPERTIES_INI}>lib/hardware-properties.ini")
 
 # Install all the depencies in the right place during build
@@ -141,15 +144,15 @@ android_install_dependency(windows_msvc-x86_64 MSVC_DEPENDENCIES)
 
 # Text files have no licenses.
 android_license(TARGET "SKIN_DEPENDENCIES" LIBNAME None SPDX None
-                LICENSE None LOCAL None)
+  LICENSE None LOCAL None)
 android_license(TARGET "EMULATOR_KEYMAP_DEPENDENCIES" LIBNAME None SPDX None
-                LICENSE None LOCAL None)
+  LICENSE None LOCAL None)
 android_license(TARGET "CERT_DEPEPENDENCIES" LIBNAME None SPDX None LICENSE None
-                LOCAL None)
+  LOCAL None)
 android_license(TARGET "EMULATOR_HW_DEPENDENCIES" LIBNAME None SPDX None
-                LICENSE None LOCAL None)
+  LICENSE None LOCAL None)
 android_license(TARGET "EMULATOR_FEATURE_DEPENDENCIES" LIBNAME None SPDX None
-                LICENSE None LOCAL None)
+  LICENSE None LOCAL None)
 
 # Bug b/148548657 android_target_dependency(emulator linux-x86_64
 # DARWINN_DEPENDENCIES) android_install_dependency(linux-x86_64
@@ -165,7 +168,7 @@ android_target_properties(emulator all "${RUNTIME_OS_PROPERTIES}")
 # Install files we need.
 install(FILES ${ANDROID_QEMU2_TOP_DIR}/android-info.txt DESTINATION .)
 install(FILES ${ANDROID_QEMU2_TOP_DIR}/LICENSES/LICENSE.APACHE2 DESTINATION .
-        RENAME LICENSE)
+  RENAME LICENSE)
 
 # Duplicate install for windows (emulator-check needs these)
 if(WINDOWS_MSVC_X86_64)

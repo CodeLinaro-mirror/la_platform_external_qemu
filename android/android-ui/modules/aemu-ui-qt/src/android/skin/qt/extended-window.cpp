@@ -53,6 +53,7 @@
 #include "android/skin/qt/extended-pages/finger-page.h"
 #include "android/skin/qt/extended-pages/google-play-page.h"
 #include "android/skin/qt/extended-pages/help-page.h"
+#include "android/skin/qt/extended-pages/keyboard-page.h"
 #include "android/skin/qt/extended-pages/location-page.h"
 #include "android/skin/qt/extended-pages/microphone-page.h"
 #include "android/skin/qt/extended-pages/multi-display-page.h"
@@ -106,6 +107,7 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
 
     mExtendedUi->setupUi(this);
     mExtendedUi->helpPage->initialize(tW->getShortcutKeyStore());
+    mExtendedUi->keyboardPage->setEmulatorWindow(mEmulatorWindow);
     mExtendedUi->dpadPage->setEmulatorWindow(mEmulatorWindow);
     mExtendedUi->rotaryInputPage->setEmulatorWindow(mEmulatorWindow);
     mExtendedUi->microphonePage->setEmulatorWindow(mEmulatorWindow);
@@ -188,6 +190,7 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         {PANE_IDX_HELP,          mExtendedUi->helpButton},
         {PANE_IDX_RECORD,        mExtendedUi->recordButton},
         {PANE_IDX_GOOGLE_PLAY,   mExtendedUi->googlePlayButton},
+        {PANE_IDX_KEYBOARD,      mExtendedUi->keyboardButton},
     };
     // clang-format on
 
@@ -322,6 +325,13 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         }
     }
 
+    if (avdInfo_isDesktopApi36OrHigher(avdInfo)) {
+        mExtendedUi->cellularButton->setVisible(false);
+        mExtendedUi->telephoneButton->setVisible(false);
+        mExtendedUi->dpadButton->setVisible(false);
+        mExtendedUi->fingerButton->setVisible(false);
+    }
+
     if (avdFlavor == AVD_TV) {
         mExtendedUi->locationButton->setVisible(false);
         mExtendedUi->cellularButton->setVisible(false);
@@ -373,6 +383,10 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->fingerButton->setVisible(false);
         mExtendedUi->telephoneButton->setVisible(false);
         mExtendedUi->virtSensorsButton->setVisible(false);
+    }
+
+    if (!avdInfo_isDesktopApi36OrHigher(avdInfo)) {
+        mExtendedUi->keyboardButton->setVisible(false);
     }
 
 #ifdef __APPLE__
@@ -444,6 +458,7 @@ static std::string translate_idx(ExtendedWindowPane value) {
         PANE(PANE_IDX_CAR)
         PANE(PANE_IDX_CAR_ROTARY)
         PANE(PANE_IDX_SENSOR_REPLAY)
+        PANE(PANE_IDX_KEYBOARD)
     }
 #undef PANE
     // Remove _IDX from the string.
@@ -593,6 +608,9 @@ void ExtendedWindow::on_bugreportButton_clicked() {
 }
 void ExtendedWindow::on_cellularButton_clicked() {
     adjustTabs(PANE_IDX_CELLULAR);
+}
+void ExtendedWindow::on_keyboardButton_clicked() {
+    adjustTabs(PANE_IDX_KEYBOARD);
 }
 void ExtendedWindow::on_dpadButton_clicked() {
     if (android::featurecontrol::isEnabled(android::featurecontrol::TvRemote) &&

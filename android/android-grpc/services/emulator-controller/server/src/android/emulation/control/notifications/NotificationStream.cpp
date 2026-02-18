@@ -164,7 +164,9 @@ NotificationStreamWriter* NotificationStream::notificationStream() {
     stream->eventArrived(getCameraNotificationEvent());
     stream->eventArrived(getPostureNotificationEvent());
     stream->eventArrived(getBootedNotificationEvent());
-    stream->eventArrived(getXrOptionsNotificationEvent());
+    if (android_is_xr_mode()) {
+        stream->eventArrived(getXrOptionsNotificationEvent());
+    }
     return stream;
 }
 

@@ -242,6 +242,7 @@ const std::unordered_map<int, int> QT_TO_LINUX_KEYCODE_MODIFIERS{
         QT_TO_LINUX_KEY(Control, LEFTCTRL),
         QT_TO_LINUX_KEY(Alt, LEFTALT),
         QT_TO_LINUX_KEY(Shift, LEFTSHIFT),
+        QT_TO_LINUX_KEY(Meta, LEFTMETA),
 };
 
 static int convertKeyCode(int sym, bool& isModifier) {
@@ -1278,6 +1279,50 @@ void EmulatorQtWindow::setRelativeMouseCoordMode(bool state) {
     mRelativeMouseCoordMode = state;
 }
 
+const char* EmulatorQtWindow::releaseMouseShortcutName() const {
+#ifdef __APPLE__
+    return "Cmd+R";
+#else
+    return "Ctrl+R";
+#endif
+}
+
+void EmulatorQtWindow::updateWindowTitle() {
+    if (mBaseWindowTitle.isEmpty()) {
+        mBaseWindowTitle = mContainer.windowTitle();
+    }
+    if (mMouseGrabbed) {
+        QString title = QString("[Mouse captured, press %1 to release] %2")
+            .arg(releaseMouseShortcutName())
+            .arg(mBaseWindowTitle);
+        mContainer.setWindowTitle(title);
+    } else {
+        mContainer.setWindowTitle(mBaseWindowTitle);
+    }
+}
+
+#ifdef __APPLE__
+
+void EmulatorQtWindow::grabMouse(const QCursor& cursor) {
+    QFrame::grabMouse(cursor);
+    // b/476267783: On Mac, setting a blank cursor does not necessarily hide
+    // the cursor. We also invoke the native API to hide the cursor.
+    if (cursor == Qt::BlankCursor) {
+        mac_hide_cursor();
+        mIsCursorHidden = true;
+    }
+}
+
+void EmulatorQtWindow::releaseMouse() {
+    QFrame::releaseMouse();
+    if (mIsCursorHidden) {
+        mac_show_cursor();
+        mIsCursorHidden = false;
+    }
+}
+
+#endif  // __APPLE__
+
 void EmulatorQtWindow::mouseMoveEvent(QMouseEvent* event) {
     // The motion event will interfere with the swipe gesture being synthesized.
     if (mWheelScrollTimer.isActive())
@@ -1394,19 +1439,14 @@ void EmulatorQtWindow::mousePressEvent(QMouseEvent* event) {
     if (enableMouseGrab && !mMouseGrabbed) {
         if (mPromptMouseRestoreMessageBox) {
             QMessageBox msgBox;
-            QString text =
+            QString text = QString(
                     "You have clicked the mouse inside the Emulator "
                     "display. This will cause Emulator to capture the "
                     "host mouse pointer and the keyboard, which will "
                     "make them unavailable to other host applications."
-                    "<br><br>You can press "
-#ifdef __APPLE__
-                    "Cmd+R"
-#else
-                    "Ctrl+R"
-#endif
-                    " to uncapture the keyboard and "
-                    "mouse and return to normal operation.";
+                    "<br><br>You can press %1 to uncapture the keyboard and "
+                    "mouse and return to normal operation."
+                    ).arg(releaseMouseShortcutName());
 
             if (!getConsoleAgents()
                          ->settings->android_cmdLineOptions()
@@ -1430,6 +1470,7 @@ void EmulatorQtWindow::mousePressEvent(QMouseEvent* event) {
         queueSkinEvent(createMouseTrackingSkinEvent(kEventMouseStartTracking));
 
         mMouseGrabbed = true;
+        updateWindowTitle();
         if (!android::featurecontrol::isEnabled(
                     android::featurecontrol::VirtioDualModeMouse)) {
             // Don't send this mouse event to the guest. Either the user likely
@@ -1464,6 +1505,7 @@ void EmulatorQtWindow::mouseReleaseEvent(QMouseEvent* event) {
         D("Mouse Released");
         releaseMouse();
         mMouseGrabbed = false;
+        updateWindowTitle();
         mContainer.setCursor(getCursorShape(/*mouseGrabbed*/ false));
     }
     if (event->source() == Qt::MouseEventNotSynthesized) {
@@ -2343,7 +2385,8 @@ void EmulatorQtWindow::slot_setWindowIcon(const unsigned char* data,
 void EmulatorQtWindow::slot_setWindowTitle(QString title,
                                            QSemaphore* semaphore) {
     QSemaphoreReleaser semReleaser(semaphore);
-    mContainer.setWindowTitle(title);
+    mBaseWindowTitle = title;
+    updateWindowTitle();
 
     // This is the first time that we know the android_serial_number_port
     // has been set. This port ensures AdbInterface can identify the correct
@@ -2953,6 +2996,9 @@ int EmulatorQtWindow::generateModData(
     if (eventModifiers & Qt::AltModifier) {
         mod |= kKeyModLAlt;
     }
+    if (eventModifiers & Qt::MetaModifier) {
+        mod |= kKeyModLMeta;
+    }
 
     return mod;
 }
@@ -3006,6 +3052,7 @@ void EmulatorQtWindow::handleKeyEvent(SkinEventType type,
                     createMouseTrackingSkinEvent(kEventMouseStopTracking));
 
             mMouseGrabbed = false;
+            updateWindowTitle();
         }
     }
 
@@ -3605,9 +3652,15 @@ void EmulatorQtWindow::wheelEvent(QWheelEvent* event) {
             mTrackpadAggregateTimer.start();
         } else {
             // For most mice, 1 wheel click = 15 degrees
-            handleMouseWheelEvent(event->angleDelta().y() * 120 / 15,
+            int scrollScale = 120;
+            // Avoid too sensitive wheel events for Desktop.
+            if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo())) {
+                scrollScale = 1;
+            }
+            handleMouseWheelEvent(event->angleDelta().y() * scrollScale / 15,
                                   Qt::Orientation::Vertical);
-            handleMouseWheelEvent(event->angleDelta().x() * 120 / 15,
+            handleMouseWheelEvent(event->angleDelta().x() * scrollScale / 15,
                                   Qt::Orientation::Horizontal);
         }
     } else if (inputDeviceHasRotary) {
