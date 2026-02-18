@@ -76,6 +76,7 @@
 #include "android/utils/timezone.h"
 #include "android/utils/win32_cmdline_quote.h"
 #include "android/verified-boot/load_config.h"
+#include "android/virtualscene/VirtualSceneManager.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/MultiDisplay.h"
 #include "host-common/constants.h"
@@ -1949,14 +1950,15 @@ extern "C" int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!strcmp(hw->hw_camera_back, "virtualscene")) {
+    if (!strcmp(hw->hw_camera_back, "virtualscene") ||
+        !strcmp(hw->hw_camera_back, "environment")) {
         if (!feature_is_enabled(kFeature_VirtualScene)) {
             // If the virtual scene camera is selected in the avd, but not
             // supported, use the emulated camera instead.
             str_reset(&hw->hw_camera_back, "emulated");
         } else {
             // Parse virtual scene command line options, if enabled.
-            camera_virtualscene_parse_cmdline();
+            android::virtualscene::VirtualSceneManager::parseCmdline();
         }
     } else if (!strcmp(hw->hw_camera_back, "videoplayback")) {
         if (!feature_is_enabled(kFeature_VideoPlayback)) {
