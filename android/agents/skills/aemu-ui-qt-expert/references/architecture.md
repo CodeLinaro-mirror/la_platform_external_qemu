@@ -68,6 +68,26 @@ Extended control pages typically follow a "Controller" pattern to facilitate tes
 - **Implementations**: A "Legacy" controller using agents or a "gRPC" controller.
 - **Mocks**: Used in unit tests to verify UI interactions without a full emulator backend.
 
+## Fishtank Standalone UI
+
+Fishtank is a specialized, standalone Qt application that provides the emulator UI experience but is architecturally decoupled from the emulator process.
+
+### 1. Decoupled Communication (gRPC)
+Unlike the standard UI which uses local agents, Fishtank interacts with the backend exclusively via gRPC.
+- **Clients**: Uses `EmulatorControllerClient` and `SensorServiceClient` to talk to the backend.
+- **Service Discovery**: Uses a discovery file (passed via `-fishtank <file>`) to locate the backend's gRPC port.
+
+### 2. Event-Driven Physical State (Push Model)
+Fishtank uses the `SensorService` to subscribe to physical state events (Position, Rotation, Hinge).
+- **Stream**: `receivePhysicalStateEvents` stream replaces polling.
+- **UI Sync**: Events from the stream are translated into `QAndroidPhysicalStateAgent` callbacks, which trigger the UI's internal polling/animation timers.
+
+### 3. Specialized Proxy Agents
+Fishtank implements its own versions of the standard AEMU agents (e.g., `sFishtankQAndroidSensorsAgent`). These agents act as proxies that convert standard agent calls into gRPC RPCs.
+
+### 4. Isolated Deployment
+The Fishtank build process is isolated (using `EXCLUDE_FROM_ALL` in CMake) to produce a standalone distribution directory (`objs/distribution-fishtank`) containing its own Qt libraries and dependencies.
+
 Example Test:
 ```cpp
 TEST_F(BatteryPageTest, SliderUpdatesChargeLevel) {
