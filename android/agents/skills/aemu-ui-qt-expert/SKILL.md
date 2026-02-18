@@ -34,6 +34,15 @@ Interact with the emulator via agents.
 - Access agents via `getConsoleAgents()` or `EmulatorQtWindow::getInstance()->getAdbInterface()`.
 - Use the `UiEmuAgent` for general emulator state and control.
 
+### Fishtank UI (Standalone Mode)
+Fishtank is a specialized, standalone version of the emulator UI (`android/android-ui/apps/fishtank`) that operates in a decoupled mode.
+- **Architecture**: Decoupled from the emulator backend; communicates exclusively via gRPC (e.g., `SensorService`, `EmulatorController`).
+- **Event Loop**: Uses `receivePhysicalStateEvents` (gRPC stream) for real-time physical model updates (Position, Rotation, Hinge), replacing legacy polling.
+- **Workflow**: Strictly follows TDD and atomic commits.
+    - **TDD**: Write unit tests for all logic changes (see `*_unittest.cpp`).
+    - **Documentation**: Update `DESIGN.md`, `SENSORS_AGENT.md`, and `WORKFLOW.md` after every task.
+- **Agents**: Implements its own specialized agents (e.g., `sFishtankQAndroidSensorsAgent`) that proxy calls to the gRPC backend.
+
 ### Testing and Verification
 - **Unit Tests**: Found in `test/` or alongside source as `*_unittest.cpp`.
 - **Note on Unit Testing**: Currently, the Qt UI lacks comprehensive unit tests. A large refactor is required to decouple components enough to allow for effective testing.
