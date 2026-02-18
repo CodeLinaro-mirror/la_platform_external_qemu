@@ -60,21 +60,30 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         return false;
     }
 
-    CIniFile* configIni = avdInfo_getConfigIni(avdInfo);
-    if (!configIni) {
+    AndroidHwConfig* hwCfg = getConsoleAgents() && getConsoleAgents()->settings
+                                     ? getConsoleAgents()->settings->hw()
+                                     : nullptr;
+
+    if (!hwCfg) {
         derror("%s: Invalid AVD config", __func__);
         return false;
     }
+    const std::string hwCameraBack = hwCfg->hw_camera_back;
+    const std::string hwCameraFront = hwCfg->hw_camera_front;
+    dprint("%s: cameraBack:%s cameraFront:%s", __func__, hwCameraBack.c_str(),
+           hwCameraFront.c_str());
+
+    // Check if the camera is set to 'environment' or 'virtualscene'
+    const bool cameraUsesEnvironment = (hwCameraBack == "environment") ||
+                                       (hwCameraFront == "environment");
 
     // Check if the camera is set to 'environment'
-    std::string hwCameraBack = iniFile_getString(configIni, "hw.camera.back", "");
-    const bool cameraUsesEnvironment = (hwCameraBack == "environment");
     const bool backgroundUsesEnvironment = transparentDisplay;
     const bool environmentRequired =
             cameraUsesEnvironment || backgroundUsesEnvironment;
 
     if (!environmentRequired) {
-        dinfo("%s: Environment is not required", __func__);
+        dinfo("%s: Environment scene is not required", __func__);
         return true;
     }
 
@@ -137,16 +146,15 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
     // Initialize virtual scene and background view
     SceneConfig sceneConfig(sceneMode, sceneFilename);
     if (!VirtualSceneManager::initialize(sceneConfig)) {
-        LOG(ERROR) << "Cannot initialize virtual scene for the environment";
+        derror("%s: Cannot initialize virtual scene for the environment",
+               __func__);
         return false;
     }
 
     if (backgroundUsesEnvironment) {
         dinfo("%s: Setting up screen background view", __func__);
-        const int displayWidth =
-                iniFile_getInteger(configIni, "hw.lcd.width", 512);
-        const int displayheight =
-                iniFile_getInteger(configIni, "hw.lcd.height", 512);
+        const int displayWidth = hwCfg->hw_lcd_width;
+        const int displayheight = hwCfg->hw_lcd_height;
 
         SceneCamera sceneCamera;
         sceneCamera.setAspectRatio(static_cast<float>(displayWidth) /
