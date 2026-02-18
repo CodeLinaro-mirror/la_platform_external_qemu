@@ -542,6 +542,11 @@ bool hasSufficientHostVulkanDriver(bool isXrAvd) {
         return true;
     }
 
+    if (async_query_host_gpu_VulkanBlacklisted()) {
+        dwarning("%s: unsupported GPU", __func__);
+        return false;
+    }
+
     char* vkVendor = nullptr;
     int vkMajor = 0;
     int vkMinor = 0;
