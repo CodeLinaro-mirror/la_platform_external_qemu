@@ -513,6 +513,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 
     if (!avdIsDesktopApi36OrHigher) {
         mToolsUi->meta_button->setHidden(true);
+        mToolsUi->open_keyboard_page_button->setHidden(true);
     }
 
     if (getConsoleAgents()->settings->android_cmdLineOptions()->fuchsia) {
@@ -2069,6 +2070,10 @@ void ToolWindow::on_meta_button_pressed() {
 void ToolWindow::on_meta_button_released() {
     mEmulatorWindow->activateWindow();
     handleUICommand(QtUICommand::META, false);
+}
+
+void ToolWindow::on_open_keyboard_page_button_clicked() {
+    showOrRaiseExtendedWindow(PANE_IDX_KEYBOARD);
 }
 
 void ToolWindow::on_wear_button_1_pressed() {
