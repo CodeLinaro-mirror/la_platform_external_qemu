@@ -100,7 +100,11 @@ void ModemClient::receivePhoneEvents(OnEvent<PhoneEvent> incoming,
     auto context = mClient->newContext();
     static google::protobuf::Empty empty;
     auto read = new SimpleClientLambdaReader<PhoneEvent>(
-            context, incoming,
+            context,
+            [incoming](const PhoneEvent* event) {
+                incoming(event);
+                return grpc::Status::OK;
+            },
             [onDone](auto status) {
                 onDone(ConvertGrpcStatusToAbseilStatus(status));
             });
