@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <QString>
+#include "android/console.h"
+#include "android/hw-sensors.h"
 #include "android/emulator-window.h"
 #include "android/skin/qt/emulator-qt-window.h"
 #include "android/skin/qt/extended-pages/microphone-page.h"
@@ -38,13 +40,15 @@ static SkinRotation getRotation() {
     const QAndroidSensorsAgent* sensorsAgent = getConsoleAgents()->sensors;
     if (!sensorsAgent)
         return SKIN_ROTATION_0;
-    sensorsAgent->advanceTime();
-    glm::vec3 device_accelerometer;
+    glm::vec3 device_accelerometer(0.0f, 0.0f, 0.0f);
     auto out = {&device_accelerometer.x, &device_accelerometer.y,
                 &device_accelerometer.z};
-    // TODO(jansene): Actually get the sensor
-    // sensorsAgent->getSensor(ANDROID_SENSOR_ACCELERATION, out.begin(),
-    //                         out.size());
+    sensorsAgent->getSensor(ANDROID_SENSOR_ACCELERATION, out.begin(),
+                            out.size());
+
+    if (glm::length(device_accelerometer) < 0.01f) {
+        return SKIN_ROTATION_0;
+    }
     glm::vec3 normalized_accelerometer = glm::normalize(device_accelerometer);
 
     static const std::array<std::pair<glm::vec3, SkinRotation>, 4> directions{
@@ -67,20 +71,34 @@ static const QAndroidEmulatorWindowAgent sFishtankQAndroidEmulatorWindowAgent = 
         .getEmulatorWindow = emulator_window_get,
         .rotate90Clockwise =
                 [] {
-                    // TODO(jansene): Add rotation.
-                    // if (const auto instance =
-                    //             android::MultiDisplay::getInstance())
-                    //             {
-                    //     if (instance &&
-                    //         (android_foldable_is_pixel_fold() ||
-                    //          instance->isMultiDisplayEnabled() ==
-                    //                  false)) {
-                    //         return emulator_window_rotate_90(true);
-                    //     }
-                    // }
-                    return false;
+                    const int fromState = getRotation();
+                    SkinRotation nextRotation = SKIN_ROTATION_0;
+                    switch (fromState) {
+                        case SKIN_ROTATION_0:
+                            nextRotation = SKIN_ROTATION_90;
+                            break;
+                        case SKIN_ROTATION_90:
+                            nextRotation = SKIN_ROTATION_180;
+                            break;
+                        case SKIN_ROTATION_180:
+                            nextRotation = SKIN_ROTATION_270;
+                            break;
+                        case SKIN_ROTATION_270:
+                            nextRotation = SKIN_ROTATION_0;
+                            break;
+                    }
+
+                    return getConsoleAgents()->sensors->setCoarseOrientation(
+                                   skin_rotation_to_coarse_orientation(
+                                           nextRotation)) == 0;
                 },
-        .rotate = emulator_window_rotate,
+        .rotate =
+                [](int skinRotation) {
+                    return getConsoleAgents()->sensors->setCoarseOrientation(
+                                   skin_rotation_to_coarse_orientation(
+                                           static_cast<SkinRotation>(
+                                                   skinRotation))) == 0;
+                },
         .getRotation = []() -> int { return getRotation(); },
         .showMessage =
                 [](const char* message, WindowMessageType type, int timeoutMs) {

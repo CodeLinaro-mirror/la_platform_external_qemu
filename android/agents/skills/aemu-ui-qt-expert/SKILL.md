@@ -30,13 +30,14 @@ When calling UI code from the emulator thread, you MUST use Qt signals and slots
 - **Styling**: Stylesheets are used for branding and dark mode support; see `stylesheet.cpp`.
 
 ### Backend Interaction
-Interact with the emulator via agents.
-- Access agents via `getConsoleAgents()` or `EmulatorQtWindow::getInstance()->getAdbInterface()`.
-- Use the `UiEmuAgent` for general emulator state and control.
+Interact with the emulator exclusively via agents.
+- **Agent Abstraction Mandate**: To support the ongoing transition to a decoupled architecture (Fishtank), UI code must NEVER access `qemulator->ui` or global backend state directly.
+- **The Bridge Pattern**: Agents (via `getConsoleAgents()`) are the mandatory abstraction layer. The UI should call an Agent method; whether that Agent then performs a direct C call (legacy mode) or a gRPC call (Fishtank mode) is an implementation detail hidden from the UI.
+- **Agent Stub Audit**: When functionality is missing or broken in decoupled modes, always audit the agent implementations (e.g., `fishtank_window_agent.cpp`) for incomplete `TODO` stubs or commented-out code.
 
 ### Fishtank UI (Standalone Mode)
-Fishtank is a specialized, standalone version of the emulator UI (`android/android-ui/apps/fishtank`) that operates in a decoupled mode.
-- **Architecture**: Decoupled from the emulator backend; communicates exclusively via gRPC (e.g., `SensorService`, `EmulatorController`).
+Fishtank is a specialized, standalone version of the emulator UI (`android/android-ui/apps/fishtank`) in a transitional decoupled state.
+- **Goal**: Move all functionality to a decoupled gRPC interface with Agents serving as the abstraction layer.
 - **Event Loop**: Uses `receivePhysicalStateEvents` (gRPC stream) for real-time physical model updates (Position, Rotation, Hinge), replacing legacy polling.
 - **Workflow**: Strictly follows TDD and atomic commits.
     - **TDD**: Write unit tests for all logic changes (see `*_unittest.cpp`).

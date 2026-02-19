@@ -1104,7 +1104,31 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
         case QtUICommand::ROTATE_RIGHT:
         case QtUICommand::ROTATE_LEFT:
             if (down) {
-                emulator_window_rotate_90(cmd == QtUICommand::ROTATE_RIGHT);
+                const int fromState = sUiEmuAgent->window->getRotation();
+                const bool isRight = cmd == QtUICommand::ROTATE_RIGHT;
+                SkinRotation nextRotation = SKIN_ROTATION_0;
+                switch (fromState) {
+                    case SKIN_ROTATION_0:
+                        nextRotation =
+                                isRight ? SKIN_ROTATION_90 : SKIN_ROTATION_270;
+                        break;
+                    case SKIN_ROTATION_90:
+                        nextRotation =
+                                isRight ? SKIN_ROTATION_180 : SKIN_ROTATION_0;
+                        break;
+                    case SKIN_ROTATION_180:
+                        nextRotation =
+                                isRight ? SKIN_ROTATION_270 : SKIN_ROTATION_90;
+                        break;
+                    case SKIN_ROTATION_270:
+                        nextRotation =
+                                isRight ? SKIN_ROTATION_0 : SKIN_ROTATION_180;
+                        break;
+                }
+
+                sUiEmuAgent->sensors->setCoarseOrientation(
+                        skin_rotation_to_coarse_orientation(nextRotation));
+                skin_winsys_touch_qt_extended_virtual_sensors();
             }
             break;
         case QtUICommand::SHOW_PANE_SENSOR_REPLAY:
