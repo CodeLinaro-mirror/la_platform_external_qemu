@@ -110,4 +110,7 @@ int androidHwConfig_hasVideoPlaybackFrontCamera(AndroidHwConfig* config);
 
 int androidHwConfig_hasVideoPlaybackBackCamera(AndroidHwConfig* config);
 
+int androidHwConfig_hasEnvironmentBackCamera(AndroidHwConfig* config);
+int androidHwConfig_hasEnvironmentFrontCamera(AndroidHwConfig* config);
+
 ANDROID_END_HEADER

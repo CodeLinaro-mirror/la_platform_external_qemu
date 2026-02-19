@@ -530,10 +530,13 @@ struct CameraService {
             if (environmentImageFullPath.has_value()) {
                 imagefilecameraSetup("back", cameraBackOrientation, environmentImageFullPath->c_str());
             } else {
-                virtualscenecameraSetup(cameraBackOrientation);
+                virtualscenecameraSetup("back", cameraBackOrientation, kVirtualScene);
             }
+        } else if (androidHwConfig_hasEnvironmentBackCamera(hwCfg)) {
+            // Same with virtual scene, but it'll share the global environment scene
+            virtualscenecameraSetup("back", cameraBackOrientation, kEnvironment);
         } else if (androidHwConfig_hasVideoPlaybackBackCamera(hwCfg)) {
-            videoplaybackcameraSetup("back", cameraBackOrientation);
+            virtualscenecameraSetup("back", cameraBackOrientation, kVideoPlayback);
         } else if (isVideofileCam(cameraBack)) {
             videofilecameraSetup("back", cameraBackOrientation, cameraBack + kVideofileCamPrefixSize);
         } else if (isImagefileCam(cameraBack)) {
@@ -541,7 +544,9 @@ struct CameraService {
         }
 
         if (androidHwConfig_hasVideoPlaybackFrontCamera(hwCfg)) {
-            videoplaybackcameraSetup("front", cameraFrontOrientation);
+            virtualscenecameraSetup("front", cameraFrontOrientation, kVideoPlayback);
+        } else if (androidHwConfig_hasEnvironmentFrontCamera(hwCfg)) {
+            virtualscenecameraSetup("front", cameraFrontOrientation, kEnvironment);
         } else if (isVideofileCam(cameraFront)) {
             videofilecameraSetup("front", cameraFrontOrientation, cameraFront + kVideofileCamPrefixSize);
         } else if (isImagefileCam(cameraFront)) {
@@ -709,14 +714,30 @@ private:
                                                           clientParams);
     }
 
-    void virtualscenecameraSetup(int sensor_orientation) {
+    void virtualscenecameraSetup(const char* dir,
+                                 int sensor_orientation,
+                                 CameraSourceType sourceType) {
+        const char* device_name;
+        switch (sourceType) {
+            case kEnvironment:
+                device_name = "environment";
+                break;
+            case kVideoPlayback:
+                device_name = "videoplayback";
+                break;
+            case kVirtualScene:
+                [[fallthrough]];
+            default:
+                device_name = "virtualscene";
+        }
+
         static const CameraInfoVtbl vtbl = {
             .open = &camera_virtualscene_open,
             .start_capturing = &camera_virtualscene_start_capturing,
             .read_frame = &camera_virtualscene_read_frame,
             .stop_capturing = &camera_virtualscene_stop_capturing,
             .close = &camera_virtualscene_close,
-            .camera_source = kVirtualScene,
+            .camera_source = sourceType,
         };
 
         static const CameraFrameDim kEmulateDims[] = {
@@ -739,50 +760,11 @@ private:
         ci.vtbl = &vtbl;
         memcpy(ci.frame_sizes, kEmulateDims, sizeof(kEmulateDims));
         ci.frame_sizes_num = sizeof(kEmulateDims) / sizeof(*kEmulateDims);
-        ci.display_name = ASTRDUP("virtualscene");
-        ci.device_name = ASTRDUP("virtualscene");
-        ci.camera_name = ASTRDUP("virtualscene");
+        ci.display_name = ASTRDUP(device_name);
+        ci.device_name = ASTRDUP(device_name);
+        ci.camera_name = ASTRDUP(device_name);
         ci.inp_channel = 0;
         ci.pixel_format = camera_virtualscene_preferred_format();
-        ci.direction = ASTRDUP("back");
-        ci.orientation = sensor_orientation;
-        ci.in_use = 0;
-
-        addCameraInfo(std::move(ci));
-    }
-
-    void videoplaybackcameraSetup(const char* dir, int sensor_orientation) {
-        static const CameraInfoVtbl vtbl = {
-            .open = &camera_videoplayback_open,
-            .start_capturing = &camera_videoplayback_start_capturing,
-            .read_frame = &camera_videoplayback_read_frame,
-            .stop_capturing = &camera_videoplayback_stop_capturing,
-            .close = &camera_videoplayback_close,
-            .camera_source = kVideoPlayback,
-        };
-
-        static const CameraFrameDim kEmulateDims[] = {
-                {640, 480},
-                {352, 288},
-                {320, 240},
-                {176, 144},
-                {1280, 720},
-                {1280, 960}};
-
-        CameraInfo ci;
-        ci.frame_sizes = (CameraFrameDim*)malloc(sizeof(kEmulateDims));
-        if (!ci.frame_sizes) {
-            return;
-        }
-
-        ci.vtbl = &vtbl;
-        memcpy(ci.frame_sizes, kEmulateDims, sizeof(kEmulateDims));
-        ci.frame_sizes_num = sizeof(kEmulateDims) / sizeof(*kEmulateDims);
-        ci.display_name = ASTRDUP("videoplayback");
-        ci.device_name = ASTRDUP("videoplayback");
-        ci.camera_name = ASTRDUP("videoplayback");
-        ci.inp_channel = 0;
-        ci.pixel_format = camera_videoplayback_preferred_format();
         ci.direction = ASTRDUP(dir);
         ci.orientation = sensor_orientation;
         ci.in_use = 0;

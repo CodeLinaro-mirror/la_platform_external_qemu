@@ -16,6 +16,7 @@
 
 #include "android/camera/camera-videoplayback.h"
 
+#ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/camera/camera-format-converters.h"
 #include "android/camera/camera-videoplayback-render-multiplexer.h"
@@ -152,3 +153,5 @@ void camera_videoplayback_close(CameraDevice* ccd) {
 
     delete cd;
 }
+
+#endif //USE_LEGACY_VIDEOPLAYBACK_CAMERA

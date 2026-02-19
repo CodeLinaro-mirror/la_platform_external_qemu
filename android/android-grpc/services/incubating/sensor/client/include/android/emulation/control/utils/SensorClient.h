@@ -54,6 +54,8 @@ public:
         }
     }
 
+    virtual ~SensorClient() = default;
+
     /**
      * @brief Gets the value of a specific sensor.
      *
@@ -62,7 +64,7 @@ public:
      * the sensor value. If an error occurs, the status will be non-OK and the
      * `SensorValue` object will be empty.
      */
-    absl::StatusOr<incubating::SensorValue> getSensorValue(int sensorId);
+    virtual absl::StatusOr<incubating::SensorValue> getSensorValue(int sensorId);
 
     /**
      * @brief Sets the value of a specific sensor.
@@ -74,7 +76,7 @@ public:
      * @param value The new value to set for the sensor.
      * @param onDone The callback to be invoked when the operation completes.
      */
-    void setSensorValueAsync(
+    virtual void setSensorValueAsync(
             const incubating::SensorValue value,
             OnCompleted<Empty> onDone = [](auto status) {});
 
@@ -88,7 +90,7 @@ public:
      * @param value The new value to set for the physical model parameter.
      * @param onDone The callback to be invoked when the operation completes.
      */
-    void setPhysicalModelAsync(
+    virtual void setPhysicalModelAsync(
             const incubating::PhysicalModelValue value,
             OnCompleted<Empty> onDone = [](auto status) {});
 
@@ -102,7 +104,7 @@ public:
      * containing the physical model value. If an error occurs, the status will
      * be non-OK and the `PhysicalModelValue` object will be empty.
      */
-    absl::StatusOr<incubating::PhysicalModelValue> getPhysicalModel(
+    virtual absl::StatusOr<incubating::PhysicalModelValue> getPhysicalModel(
             int parameterId,
             int type);
 
@@ -116,7 +118,7 @@ public:
      * model event.
      * @param onDone The callback to be invoked when the event stream has ended.
      */
-    void receivePhysicalModelEvents(
+    virtual void receivePhysicalModelEvents(
             incubating::PhysicalModelValue value,
             OnEvent<incubating::PhysicalModelValue> incoming,
             OnFinished onDone);
@@ -128,8 +130,8 @@ public:
      * state event.
      * @param onDone The callback to be invoked when the event stream has ended.
      */
-    void receivePhysicalStateEvents(OnEvent<PhysicalStateEvent> incoming,
-                                    OnFinished onDone);
+    virtual void receivePhysicalStateEvents(OnEvent<PhysicalStateEvent> incoming,
+                                            OnFinished onDone);
 
 private:
     std::shared_ptr<EmulatorGrpcClient> mClient;

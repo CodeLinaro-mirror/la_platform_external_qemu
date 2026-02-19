@@ -21,10 +21,13 @@
 #include "android/android-ui/apps/fishtank/fishtank_agents.h"
 #include "android/emulation/control/sensors_agent.h"
 #include "android/emulation/control/utils/EmulatorControlClient.h"
+#include "android/emulation/control/utils/SensorClient.h"
 #include "android/physics/physical_state_agent.h"
 #include "emulator_controller_mock.grpc.pb.h"
+#include "sensor_service_mock.grpc.pb.h"
 
 using namespace android::emulation::control;
+using android::emulation::control::incubating::MockSensorServiceStub;
 using testing::_;
 using testing::DoAll;
 using testing::Invoke;
@@ -59,20 +62,44 @@ struct MockPhysicalStateAgent {
 
 // Global control client for the agent to use.
 static std::shared_ptr<EmulatorControlClient> gTestControlClient;
+static std::shared_ptr<SensorClient> gTestSensorClient;
 
 std::shared_ptr<EmulatorControlClient> getGlobalControlClient() {
     return gTestControlClient;
 }
+
+std::shared_ptr<SensorClient> getGlobalSensorClient() {
+    return gTestSensorClient;
+}
+
+class MockSensorClient : public SensorClient {
+public:
+    MockSensorClient(std::shared_ptr<EmulatorGrpcClient> client,
+                     android::emulation::control::incubating::SensorService::
+                             StubInterface* service = nullptr)
+        : SensorClient(client, service) {}
+    MOCK_METHOD(void,
+                receivePhysicalStateEvents,
+                (OnEvent<PhysicalStateEvent>, OnFinished),
+                (override));
+};
 
 class SensorsAgentTest : public ::testing::Test {
 protected:
     void SetUp() override {
         auto mockStub = std::make_unique<MockEmulatorControllerStub>();
         mMockStub = mockStub.get();
+
         // EmulatorControlClient takes ownership of the stub.
         auto testClient = std::make_shared<EmulatorTestClient>();
         gTestControlClient = std::make_shared<EmulatorControlClient>(
                 testClient, mockStub.release());
+
+        auto sensorMockStub = std::make_unique<MockSensorServiceStub>();
+        gTestSensorClient = std::make_shared<MockSensorClient>(
+                testClient, sensorMockStub.release());
+        mMockSensorClient =
+                static_cast<MockSensorClient*>(gTestSensorClient.get());
         mAgent = &sFishtankQAndroidSensorsAgent;
     }
 
@@ -81,9 +108,11 @@ protected:
             mAgent->setPhysicalStateAgent(nullptr);
         }
         gTestControlClient.reset();
+        gTestSensorClient.reset();
     }
 
     MockEmulatorControllerStub* mMockStub;
+    MockSensorClient* mMockSensorClient;
     const QAndroidSensorsAgent* mAgent;
 };
 
@@ -180,6 +209,37 @@ TEST_F(SensorsAgentTest, GetPhysicalParameterFailure) {
     EXPECT_EQ(-1, mAgent->getPhysicalParameter(0, values, 1, 0));
 }
 
+// Verifies that setSensorOverride correctly forwards the request to the
+// gRPC backend and returns success (0) when the RPC is successful.
+TEST_F(SensorsAgentTest, SetSensorOverrideSuccess) {
+    float values[] = {1.1f, 2.2f, 3.3f};
+
+    EXPECT_CALL(*mMockStub, setSensor(_, _, _))
+            .WillOnce([](::grpc::ClientContext* context,
+                         const SensorValue& request,
+                         ::google::protobuf::Empty* response) {
+                EXPECT_EQ(0, (int)request.target());
+                EXPECT_EQ(3, request.value().data_size());
+                EXPECT_EQ(1.1f, request.value().data(0));
+                EXPECT_EQ(2.2f, request.value().data(1));
+                EXPECT_EQ(3.3f, request.value().data(2));
+                return ::grpc::Status::OK;
+            });
+
+    EXPECT_EQ(0, mAgent->setSensorOverride(0, values, 3));
+}
+
+// Verifies that setSensorOverride returns failure (-1) when the
+// underlying gRPC call fails.
+TEST_F(SensorsAgentTest, SetSensorOverrideFailure) {
+    float values[] = {1.1f};
+
+    EXPECT_CALL(*mMockStub, setSensor(_, _, _))
+            .WillOnce(Return(::grpc::Status(::grpc::StatusCode::INTERNAL, "Error")));
+
+    EXPECT_EQ(-1, mAgent->setSensorOverride(0, values, 1));
+}
+
 // Verifies that setCoarseOrientation correctly converts the coarse orientation
 // to a rotation vector and calls setPhysicalModel.
 TEST_F(SensorsAgentTest, SetCoarseOrientation) {
@@ -233,56 +293,36 @@ TEST_F(SensorsAgentTest, GetSensorFailure) {
     EXPECT_EQ(-1, mAgent->getSensor(0, values, 1));
 }
 
-// Verifies that setPhysicalParameterTarget triggers the appropriate callbacks
-// in the registered PhysicalStateAgent.
-TEST_F(SensorsAgentTest, SetPhysicalParameterTargetTriggersCallbacks) {
+// Verifies that setPhysicalStateAgent correctly subscribes to physical state
+// events and that these events trigger the appropriate callbacks in the
+// registered PhysicalStateAgent.
+TEST_F(SensorsAgentTest, SetPhysicalStateAgentSubscribesAndTriggersCallbacks) {
     MockPhysicalStateAgent mockAgent;
     auto agent = mockAgent.agent();
 
-    // We expect some getPhysicalModel calls from the polling thread if we register the agent.
-    mAgent->setPhysicalStateAgent(&agent);
-
-    float values[] = {1.0f, 2.0f, 3.0f};
-    EXPECT_CALL(*mMockStub, setPhysicalModel(_, _, _))
-            .WillOnce(Return(::grpc::Status::OK));
-    EXPECT_CALL(*mMockStub, getPhysicalModel(_, _, _))
-            .WillRepeatedly(Return(::grpc::Status::OK));
-
-    EXPECT_EQ(0, mAgent->setPhysicalParameterTarget(0, values, 3, 0));
-
-    EXPECT_GT(mockAgent.physicalStateChangingCount, 0);
-    EXPECT_GT(mockAgent.targetStateChangedCount, 0);
-}
-
-// Verifies that the background polling thread detects changes in the physical
-// model and triggers the appropriate callbacks.
-TEST_F(SensorsAgentTest, PollingDetectsChanges) {
-    MockPhysicalStateAgent mockAgent;
-    auto agent = mockAgent.agent();
-
-    // Mock getPhysicalModel to return a moving value.
-    // The polling loop checks both POSITION (0) and ROTATION (1).
-    std::atomic<int> callCount{0};
-    EXPECT_CALL(*mMockStub, getPhysicalModel(_, _, _))
-            .WillRepeatedly(Invoke([&callCount](::grpc::ClientContext*,
-                                                const PhysicalModelValue& req,
-                                                PhysicalModelValue* resp) {
-                resp->set_status(PhysicalModelValue::OK);
-                auto data = resp->mutable_value();
-                // Return 0.0 then 1.0 to simulate movement.
-                float val = (callCount.load() < 10) ? 0.0f : 1.0f;
-                data->add_data(val);
-                data->add_data(val);
-                data->add_data(val);
-                callCount++;
-                return ::grpc::Status::OK;
+    OnEvent<PhysicalStateEvent> capturedCallback;
+    EXPECT_CALL(*mMockSensorClient, receivePhysicalStateEvents(_, _))
+            .WillOnce(Invoke([&capturedCallback](auto incoming, auto) {
+                capturedCallback = incoming;
             }));
 
     mAgent->setPhysicalStateAgent(&agent);
 
-    // Wait long enough for the physical state to stabilize.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    ASSERT_TRUE(capturedCallback);
 
-    EXPECT_GT(mockAgent.physicalStateChangingCount, 0);
-    EXPECT_GT(mockAgent.targetStateChangedCount, 0);
+    // Simulate events.
+    PhysicalStateEvent event;
+    event.set_event(PhysicalStateEvent::STATE_PHYSICAL_STATE_CHANGING);
+    capturedCallback(&event);
+    EXPECT_EQ(mockAgent.physicalStateChangingCount, 1);
+
+    event.set_event(PhysicalStateEvent::STATE_PHYSICAL_STATE_STABILIZED);
+    capturedCallback(&event);
+    EXPECT_EQ(mockAgent.physicalStateStabilizedCount, 1);
+
+    event.set_event(PhysicalStateEvent::STATE_TARGET_STATE_CHANGED);
+    capturedCallback(&event);
+    EXPECT_EQ(mockAgent.targetStateChangedCount, 1);
 }
+
+

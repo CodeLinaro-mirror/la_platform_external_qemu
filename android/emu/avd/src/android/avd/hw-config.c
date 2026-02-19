@@ -571,3 +571,11 @@ int androidHwConfig_hasVideoPlaybackFrontCamera(AndroidHwConfig* config) {
 int androidHwConfig_hasVideoPlaybackBackCamera(AndroidHwConfig* config) {
     return strcmp(config->hw_camera_back, "videoplayback") == 0;
 }
+
+int androidHwConfig_hasEnvironmentBackCamera(AndroidHwConfig* config) {
+    return strcmp(config->hw_camera_back, "environment") == 0;
+}
+
+int androidHwConfig_hasEnvironmentFrontCamera(AndroidHwConfig* config) {
+    return strcmp(config->hw_camera_front, "environment") == 0;
+}

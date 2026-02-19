@@ -16,6 +16,7 @@
 
 #pragma once
 
+#ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 #include <stddef.h>
 #include <stdint.h>
 #include <iosfwd>
@@ -92,3 +93,5 @@ private:
 
 }  // namespace videoplayback
 }  // namespace android
+
+#endif //USE_LEGACY_VIDEOPLAYBACK_CAMERA

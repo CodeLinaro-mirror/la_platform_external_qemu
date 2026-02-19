@@ -17,6 +17,7 @@
 #include "host-common/window_agent.h"
 #include <memory>
 #include "android/emulation/control/utils/EmulatorControlClient.h"
+#include "android/emulation/control/utils/SensorClient.h"
 
 // clang-format off
 struct QAndroidAutomationAgent;
@@ -76,6 +77,7 @@ extern "C" const QAndroidSurfaceAgent* const gQAndroidSurfaceAgent;
 
 
 std::shared_ptr<android::emulation::control::EmulatorControlClient> getGlobalControlClient();
+std::shared_ptr<android::emulation::control::SensorClient> getGlobalSensorClient();
 
 void initializeGrpcUserEventAgent(
         android::emulation::control::EmulatorControlClient* client);
