@@ -75,6 +75,7 @@ public:
         return new SimpleServerLambdaReader<CarEvent>([this](auto request) {
             mCarDataAgent->sendCarData(request->data().data(),
                                        request->data().size());
+            return grpc::Status::OK;
         });
     }
 
