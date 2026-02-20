@@ -65,15 +65,15 @@ The UI interacts with the emulator backend through **Agents**. Key agents includ
 Extended control pages typically follow a "Controller" pattern to facilitate testing:
 - **Page**: The UI class (e.g., `BatteryPage`).
 - **Controller**: An interface defining the backend operations (e.g., `BatteryController`).
-- **Implementations**: A "Legacy" controller using agents or a "gRPC" controller.
+- **Implementations**: A "Legacy" controller using agents or a "gRPC" controller (used in Embedded or Decoupled modes).
 - **Mocks**: Used in unit tests to verify UI interactions without a full emulator backend.
 
-## Fishtank Standalone UI
+## Fishtank Decoupled UI
 
-Fishtank is a specialized, standalone Qt application that provides the emulator UI experience but is architecturally decoupled from the emulator process.
+Fishtank is a specialized, decoupled Qt application that provides the emulator UI experience but runs without a built-in QEMU backend.
 
 ### 1. Decoupled Communication (gRPC)
-Unlike the standard UI which uses local agents, Fishtank interacts with the backend exclusively via gRPC.
+Unlike the **Standalone Emulator UI** which uses local agents, Fishtank interacts with the backend (typically an **Embedded Emulator**) exclusively via gRPC.
 - **Clients**: Uses `EmulatorControllerClient` and `SensorServiceClient` to talk to the backend.
 - **Service Discovery**: Uses a discovery file (passed via `-fishtank <file>`) to locate the backend's gRPC port.
 
@@ -86,7 +86,29 @@ Fishtank uses the `SensorService` to subscribe to physical state events (Positio
 Fishtank implements its own versions of the standard AEMU agents (e.g., `sFishtankQAndroidSensorsAgent`). These agents act as proxies that convert standard agent calls into gRPC RPCs.
 
 ### 4. Isolated Deployment
-The Fishtank build process is isolated (using `EXCLUDE_FROM_ALL` in CMake) to produce a standalone distribution directory (`objs/distribution-fishtank`) containing its own Qt libraries and dependencies.
+The Fishtank build process is isolated (using `EXCLUDE_FROM_ALL` in CMake) to produce a distribution directory (`$REPO_ROOT/external/qemu/objs/distribution-fishtank`) containing its own Qt libraries and dependencies.
+
+## Technical Debt: The `messagePump` Loop
+
+Fishtank currently uses a `messagePump` (in `$REPO_ROOT/external/qemu/android/android-ui/apps/fishtank/main.cpp`) as a surrogate for the QEMU `MainLoopThread`. This is a significant piece of architectural technical debt required to keep the legacy C "Skin" code alive in a decoupled environment.
+
+### Why it exists
+Legacy modules like `keyboard.c` and `ui.c` were designed for a single-process model where a backend thread periodically "polls" the UI. `messagePump` provides this heartbeat (ticking every 10ms) to:
+- Flush the `SkinKeyboard` keycode buffer.
+- Manage character repeat rates and multi-stage key mappings.
+- Process events queued in `mSkinEventQueue`.
+
+### Migration Challenges
+Eliminating `messagePump` is difficult due to several "implicit logic" gaps in the current gRPC implementation:
+1. **`SkinKeyboard` State Machine:** Legacy code handles "stuck key" prevention and modifier state (Shift/Ctrl/Alt) synchronization. Bypassing the queue requires re-implementing this logic in C++ to avoid guest-side state desync.
+2. **Key Aliasing/Translation:** The legacy stack performs complex mapping (e.g., `.key` files) and handles Evdev sequencing (`EV_KEY` -> `EV_SYN`).
+3. **De Facto Mutex:** Because legacy C code is often non-thread-safe, `messagePump` acts as a single-threaded execution context that prevents race conditions.
+
+### Long-term Strategy
+The goal is to move to a **Pure Push Model**:
+- **Starve the Pump:** Shift all input handlers (`keyPressEvent`, `mouseMoveEvent`) to call Agent methods directly (bypassing the queue).
+- **Translation Library:** Move the keycode translation and layout mapping logic into a standalone C++ library used by the UI Agent layer.
+- **Kill Switch:** Once `mSkinEventQueue` remains perpetually empty and no legacy module requires a "tick," the `messagePump` thread and its associated 10ms latency can be removed.
 
 Example Test:
 ```cpp
