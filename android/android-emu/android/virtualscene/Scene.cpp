@@ -22,6 +22,7 @@
 #include "android/camera/camera-metrics.h"
 #include "android/console.h"
 #include "android/loadpng.h"
+#include "android/raw_image_sources/image_file/raw_image_file_source.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
 #include "android/virtualscene/Renderer.h"
@@ -153,7 +154,7 @@ Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
 
 Scene::~Scene() {
     D("%s: destroying Scene", __func__);
-    if (mSceneObjects.size() || mOverlayObject) {
+    if (mSceneObjects.size() || mRawImageSource) {
         // releaseResources should have been called!
         E("%s: Scene resources are not released!", __func__);
     }
@@ -215,28 +216,12 @@ bool Scene::initialize() {
             }
         } break;
         case SceneConfig::Mode::ImageFile: {
-            uint32_t width = 0;
-            uint32_t height = 0;
-            void* backgroundImageData =
-                    loadpng(sceneFilename.c_str(), &width, &height);
-            if (!backgroundImageData) {
-                // Do not error out, but load default magenta image to avoid
-                // crashes, not-working camera or black screen
-                derror("%s: Could not load background image: %s", __func__,
-                       sceneFilename.c_str());
-                width = 1;
-                height = 1;
-                uint32_t* magentaData = (uint32_t*)malloc(width * height * 4);
-                *magentaData = 0xFFFF00FF;
-                backgroundImageData = magentaData;
+            mRawImageSource = RawImageFileSource::Create(sceneFilename);
+            if (!mRawImageSource) {
+                derror("%s: Could not load background image: %s\nFalling back to default", __func__,
+                    mConfig.mFilename.c_str());
+                mRawImageSource = std::make_unique<DefaultRawImageProvider>();
             }
-            mOverlayObject = std::make_unique<SceneOverlayObject>();
-            mOverlayObject->mWidth = width;
-            mOverlayObject->mHeight = height;
-            mOverlayObject->mDataRGBA.resize(width * height * 4);
-            memcpy(mOverlayObject->mDataRGBA.data(), backgroundImageData,
-                   mOverlayObject->mDataRGBA.size());
-            free(backgroundImageData);
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
@@ -270,7 +255,7 @@ bool Scene::releaseResources() {
 
     mSceneObjects.clear();
 
-    mOverlayObject.reset();
+    mRawImageSource.reset();
 
     mObjectsVersion++;
 

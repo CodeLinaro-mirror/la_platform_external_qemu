@@ -21,6 +21,7 @@
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/cmdline-option.h"
 #include "android/console.h"
+#include "android/raw_image_sources/raw_image_source.h"
 #include "android/skin/winsys.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/PosterInfo.h"
@@ -296,20 +297,30 @@ bool ScenesManager::renderView(Scene* scene,
             }
         } break;
         case SceneConfig::Mode::ImageFile: {
-            const SceneOverlayObject* overlay = scene->getOverlayObject();
-            if (!overlay || !overlay->isValid()) {
+            RawImageSource* imageSource = scene->getRawImageSource();
+            if (!imageSource) {
                 E("Scene rendering failed");
                 return false;
             }
-            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
-
-            ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
+            auto func = __FUNCTION__;
+            int res = imageSource->AccessImage([&](RawImageBuffer* buffer){
+                if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
+                    derror("%s: Unsupported pixel format from image provider: %d",
+                        func, buffer->pixel_format);
+                    return -1;
+                }
+                std::vector<uint8_t>& fbData = view->getFramebufferLocked();
+                ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
                                fbData.data());
-            if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
-                                    overlay->mDataRGBA.data(),
-                                    ImageScaler::ScaleMode::ScaleToFill)) {
-                E("%s: Failed to resize the framebuffer for the view",
-                  __FUNCTION__);
+                if (!scaler.updateImage(buffer->width, buffer->height,
+                                        buffer->buffer,
+                                        ImageScaler::ScaleMode::ScaleToFill)) {
+                    E("%s: Failed to resize the framebuffer for the view", func);
+                    return -1;
+                }
+                return 0;
+            });
+            if (res != 0) {
                 return false;
             }
         } break;

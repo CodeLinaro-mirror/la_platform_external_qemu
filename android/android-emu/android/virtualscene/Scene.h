@@ -21,6 +21,7 @@
  */
 
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
+#include "android/raw_image_sources/raw_image_source.h"
 #include "android/utils/compiler.h"
 #include "android/virtualscene/PosterInfo.h"
 #include "android/virtualscene/PosterSceneObject.h"
@@ -62,19 +63,6 @@ struct SceneConfig {
     // Check if the scene mode supports view rotations, otherwise a seperate
     // rotation operation will be required
     static bool modeSupportViewRotations(SceneConfig::Mode mode);
-};
-
-// TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
-// will be removed once the 2d quad objects are used directly instead
-struct SceneOverlayObject {
-    uint32_t mWidth;
-    uint32_t mHeight;
-    std::vector<uint8_t> mDataRGBA;
-
-    bool isValid() const {
-        return (mWidth > 0) && (mHeight > 0) &&
-               (mDataRGBA.size() == (mWidth * mHeight * 4));
-    }
 };
 
 class Scene {
@@ -143,9 +131,7 @@ public:
     //           clamped.
     void updatePosterScale(const char* posterName, float scale);
 
-    const SceneOverlayObject* getOverlayObject() const {
-        return mOverlayObject.get();
-    }
+    RawImageSource* getRawImageSource() const { return mRawImageSource.get(); }
 
     Renderer* getRenderer() { return mRenderer.get(); }
 
@@ -180,7 +166,7 @@ private:
 
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;
-    std::unique_ptr<SceneOverlayObject> mOverlayObject;
+    std::unique_ptr<RawImageSource> mRawImageSource;
     uint64_t mObjectsVersion = 0;
     uint64_t mFrameTimeUs = 0;
     uint64_t mStartTimeUs = 0;
