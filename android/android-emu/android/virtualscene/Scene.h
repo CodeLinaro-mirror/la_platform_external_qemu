@@ -43,6 +43,7 @@ struct SceneConfig {
         Unknown = 0,
         Mesh3dScene,
         VideoPlayback,
+        VideoFile,
         ImageFile,
     };
 

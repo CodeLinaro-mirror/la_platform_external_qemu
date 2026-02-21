@@ -182,7 +182,7 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             ret.sceneMode = SceneConfig::Mode::ImageFile;
             ret.sceneFilename = backgroundImageFilename;
         } else if (!backgroundVideoFilename.empty()) {
-            ret.sceneMode = SceneConfig::Mode::VideoPlayback;
+            ret.sceneMode = SceneConfig::Mode::VideoFile;
             ret.sceneFilename = backgroundVideoFilename;
         } else if (!backgroundSceneFilename.empty()) {
             ret.sceneMode = SceneConfig::Mode::Mesh3dScene;
@@ -353,7 +353,8 @@ bool ScenesManager::renderView(Scene* scene,
                 }
             }
         } break;
-        case SceneConfig::Mode::ImageFile: {
+        case SceneConfig::Mode::ImageFile:
+        case SceneConfig::Mode::VideoFile: {
             const SceneOverlayObject* overlay = scene->getOverlayObject();
             if (!overlay || !overlay->isValid()) {
                 E("Scene rendering failed");

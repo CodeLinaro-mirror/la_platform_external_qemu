@@ -25,6 +25,7 @@
 #include "android/loadpng.h"
 #include "android/raw_image_sources/image_file/raw_image_file_source.h"
 #include "android/raw_image_sources/raw_image_source.h"
+#include "android/raw_image_sources/video_file/raw_video_file_source.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
 #include "android/virtualscene/Renderer.h"
@@ -105,6 +106,8 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
         return SceneConfig::Mode::Mesh3dScene;
     } else if (sceneModeStr == "videoplayback") {
         return SceneConfig::Mode::VideoPlayback;
+    } else if (sceneModeStr == "videofile") {
+        return SceneConfig::Mode::VideoFile;
     } else if (sceneModeStr == "imagefile") {
         return SceneConfig::Mode::ImageFile;
     } else {
@@ -118,6 +121,8 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
         return "mesh3dscene";
     } else if (mode == SceneConfig::Mode::VideoPlayback) {
         return "videoplayback";
+    } else if (mode == SceneConfig::Mode::VideoFile) {
+        return "videofile";
     } else if (mode == SceneConfig::Mode::ImageFile) {
         return "imagefile";
     } else {
@@ -128,7 +133,8 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
 const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
     if (mode == SceneConfig::Mode::Mesh3dScene) {
         return kDefaultSceneObj;
-    } else if (mode == SceneConfig::Mode::VideoPlayback) {
+    } else if (mode == SceneConfig::Mode::VideoPlayback ||
+               mode == SceneConfig::Mode::VideoFile) {
         return kDefaultVideoFile;
     } else if (mode == SceneConfig::Mode::ImageFile) {
         return kDefaultImageFile;
@@ -225,6 +231,10 @@ bool Scene::initialize() {
                        sceneFilename.c_str());
                 return false;
             }
+        } break;
+        case SceneConfig::Mode::VideoFile: {
+            needsRawImageSource = true;
+            mRawImageSource = RawVideofileSource::Create(sceneFilename);
         } break;
         case SceneConfig::Mode::ImageFile: {
             needsRawImageSource = true;
