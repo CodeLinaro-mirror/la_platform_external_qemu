@@ -2573,8 +2573,8 @@ void EmulatorQtWindow::screenshot() {
         }
     }
 
-    if (!android::emulation::captureScreenshot(savePath.toStdString().c_str(),
-                                               nullptr, displayId)) {
+    const auto uiAgent = mToolWindow->getUiEmuAgent();
+    if (!uiAgent->record->doSnap(savePath.toStdString().c_str(), displayId)) {
         showErrorDialog(tr("Screenshot failed"), tr("Screenshot"));
     } else {
         // Display the flash animation immediately as feedback - if it fails, an
