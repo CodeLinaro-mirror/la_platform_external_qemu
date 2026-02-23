@@ -40,11 +40,9 @@ namespace fs = std::filesystem;
 // Default filenames for different scene modes, can be used
 // when the file cannot be found or loaded, all relative to
 // the emulator's 'resources' folder
-// TODO(virtualscene): create and use proper default image&video
 static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
-static constexpr const char* kDefaultImageFile = "poster.png";
-static constexpr const char* kDefaultVideoFile =
-        "macroPreviews/Reset_position.mp4";
+static constexpr const char* kDefaultImageFile = "default.png";
+static constexpr const char* kDefaultVideoFile = "default.mp4";
 
 // Function to find fullpath from a filename for the scene
 // Scene filenames can be provided as fullpaths, AVD local,
