@@ -85,6 +85,8 @@ void messagePump(int, char**) {
 std::shared_ptr<android::emulation::control::EmulatorControlClient>
         gControlClient;
 std::shared_ptr<android::emulation::control::SensorClient> gSensorClient;
+std::shared_ptr<android::emulation::control::SimpleScreenRecordingClient>
+        gRecordingClient;
 
 std::shared_ptr<android::emulation::control::EmulatorControlClient>
 getGlobalControlClient() {
@@ -94,6 +96,11 @@ getGlobalControlClient() {
 std::shared_ptr<android::emulation::control::SensorClient>
 getGlobalSensorClient() {
     return gSensorClient;
+}
+
+std::shared_ptr<android::emulation::control::SimpleScreenRecordingClient>
+getGlobalRecordingClient() {
+    return gRecordingClient;
 }
 
 int main(int argc, char* argv[]) {
@@ -265,6 +272,9 @@ int main(int argc, char* argv[]) {
     gSensorClient =
             std::make_shared<android::emulation::control::SensorClient>(
                     android::emulation::control::EmulatorGrpcClient::me());
+    gRecordingClient = std::make_shared<
+            android::emulation::control::SimpleScreenRecordingClient>(
+            android::emulation::control::EmulatorGrpcClient::me());
     initializeGrpcUserEventAgent(gControlClient.get());
 
     auto program_dir = System::get()->getProgramDirectory();

@@ -18,6 +18,7 @@ using namespace android::emulation::control;
 
 std::shared_ptr<EmulatorControlClient> gTestControlClient;
 std::shared_ptr<SensorClient> gTestSensorClient;
+std::shared_ptr<SimpleScreenRecordingClient> gTestRecordingClient;
 
 std::shared_ptr<EmulatorControlClient> getGlobalControlClient() {
     return gTestControlClient;
@@ -25,4 +26,8 @@ std::shared_ptr<EmulatorControlClient> getGlobalControlClient() {
 
 std::shared_ptr<SensorClient> getGlobalSensorClient() {
     return gTestSensorClient;
+}
+
+std::shared_ptr<SimpleScreenRecordingClient> getGlobalRecordingClient() {
+    return gTestRecordingClient;
 }

@@ -79,6 +79,7 @@ target_link_libraries(
           service_forwarder_client
           emulator_controller-service-client
           sensor-service-client
+          screen-recording-service-client
           android-emu-curl
           android-hw-config
           ext-page-battery
@@ -321,6 +322,7 @@ target_link_libraries(
           service_forwarder_client
           emulator_controller-service-client
           sensor-service-client
+          screen-recording-service-client
           gmock
           android-emu-test-launcher)
 
