@@ -71,7 +71,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 
     if (mUseEnvironmentScene) {
         mScene = VirtualSceneManager::addSceneUser();
-    }else{
+    } else {
         // Create and own the scene
         std::string sceneMode;
         std::string sceneFilename;
@@ -143,23 +143,13 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
         return -1;
     }
     // TODO(virtualscene-perf): update the view here to avoid resizing?
-    if (mUseEnvironmentScene) {
-        // TODO(virtualscene-manager): update externally
-        VirtualSceneManager::update();
-    } else {
+    if (!mUseEnvironmentScene) {
         mScene->update();
     }
 
     // Update camera based on physical model and set view projection accordingly
     mSceneCamera.update();
     mActiveView->updateViewProjection(mSceneCamera.getViewProjection());
-
-    resultFrame->frame_time = mSceneCamera.getTimestamp();
-
-    float renderTime = 0.0f;
-    if (!mUseEnvironmentScene || VirtualSceneManager::getAnimationState()) {
-        renderTime = resultFrame->frame_time / 1000000000.0f;
-    }
 
     int conversionResult = -1;
     auto onRenderComplete = [&]() {
@@ -186,19 +176,23 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
                 convertOrientation);
     };
 
+    uint64_t frameTime = 0;
     bool renderResult = false;
     if (mUseEnvironmentScene) {
         renderResult = VirtualSceneManager::renderView(
-                mActiveView.get(), renderTime, onRenderComplete);
+                mActiveView.get(), onRenderComplete, &frameTime);
     } else {
         renderResult = ScenesManager::renderView(
-                mScene.get(), mActiveView.get(), renderTime, onRenderComplete);
+                mScene.get(), mActiveView.get(), onRenderComplete, &frameTime);
     }
 
     if (!renderResult) {
         LOG(ERROR) << "Virtual scene could not be rendered!";
         return -1;
     }
+
+    // Set the frame time used in the render
+    resultFrame->frame_time = static_cast<int64_t>(frameTime);
 
     return conversionResult;
 }

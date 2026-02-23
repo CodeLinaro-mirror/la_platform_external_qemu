@@ -155,7 +155,7 @@ protected:
     struct Cache {
         static const uint64_t INVALID_SCENE_HASH = ~0ULL;
         uint64_t mSceneHash = INVALID_SCENE_HASH;
-        float mRenderTime = 0.0f;
+        uint64_t mFrameTime = 0;
         std::vector<uint8_t> mFramebufferRGBA8;
         android::AlignedBuf<int32_t, 16> mBlurScratchBuffer;
 
@@ -166,14 +166,13 @@ protected:
             mFramebufferRGBA8.clear();
         }
 
-        bool isValidFor(int64_t sceneHash, float renderTime) const {
+        bool isValidFor(uint64_t sceneHash, uint64_t frameTime) const {
             if (sceneHash == INVALID_SCENE_HASH) {
                 // Cannot cache with an invalid hash
                 return false;
             }
             return (mSceneHash == sceneHash) &&
-                    (mFramebufferRGBA8.size() > 0) &&
-                    (renderTime == mRenderTime);
+                   (mFramebufferRGBA8.size() > 0) && (frameTime == mFrameTime);
         }
     };
 

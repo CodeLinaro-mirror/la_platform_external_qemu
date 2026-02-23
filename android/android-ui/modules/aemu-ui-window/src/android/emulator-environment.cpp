@@ -83,7 +83,7 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         ScopeTimer() { mStartTime = get_uptime_ms(); }
         ~ScopeTimer() {
             const uint64_t scopeTime = get_uptime_ms() - mStartTime;
-            dprint("%s: took %llu ms", __func__, scopeTime);
+            dprint("emulatorSetupEnvironment: took %llu ms", __func__, scopeTime);
         }
         int64_t mStartTime;
     } timer;
@@ -148,41 +148,49 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         const int displayWidth = hwCfg->hw_lcd_width;
         const int displayheight = hwCfg->hw_lcd_height;
 
-        SceneCamera sceneCamera;
-        sceneCamera.setAspectRatio(static_cast<float>(displayWidth) /
-                                   displayheight);
-        sceneCamera.update();
+        // Set update callback, to update the background image after each
+        // scene update
+        VirtualSceneManager::setUpdateCallback([displayWidth, displayheight,
+                                                backgroundBlur]() {
+            const float aspectRatio =
+                    static_cast<float>(displayWidth) / displayheight;
+            SceneCamera sceneCamera;
+            sceneCamera.setAspectRatio(aspectRatio);
+            sceneCamera.update();
 
-        // SceneCamera uses 90 degrees rotated views by default for
-        // the camera rendering, rotate it back to correct for background
-        glm::mat4 cameraView =
-                glm::rotate(sceneCamera.getView(), glm::radians(-90.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f));
-        glm::mat4 viewProjection = sceneCamera.getProjection() * cameraView;
+            // SceneCamera uses 90 degrees rotated views by default for
+            // the camera rendering, rotate it back to correct for background
+            glm::mat4 cameraView =
+                    glm::rotate(sceneCamera.getView(), glm::radians(-90.0f),
+                                glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::mat4 viewProjection = sceneCamera.getProjection() * cameraView;
 
-        std::unique_ptr<RendererView> backgroundView =
-                std::make_unique<RendererView>();
-        backgroundView->updateTarget(RendererView::Format::RGBA8, displayWidth,
-                                     displayheight);
-        backgroundView->updateViewProjection(viewProjection);
-        backgroundView->setBlurFactor(backgroundBlur);
+            // TODO(virtualscene): keep the view object in a service
+            // TODO(virtualscene): do not call renderView if it's a static
+            // image, adjust fps based on environment.ini
+            std::unique_ptr<RendererView> backgroundView =
+                    std::make_unique<RendererView>();
+            backgroundView->updateTarget(RendererView::Format::RGBA8,
+                                         displayWidth, displayheight);
+            backgroundView->setBlurFactor(backgroundBlur);
+
+            backgroundView->updateViewProjection(viewProjection);
+
+            VirtualSceneManager::renderView(
+                    backgroundView.get(),
+                    [&]() {
+                        const std::vector<uint8_t>& fbData =
+                                backgroundView->getFramebufferLocked();
+
+                        android_setOpenglesScreenBackground(
+                                backgroundView->getWidthLocked(),
+                                backgroundView->getHeightLocked(),
+                                fbData.data());
+                    },
+                    nullptr);
+        });
 
         VirtualSceneManager::addSceneUser();
-
-        // TODO(virtualscene-manager): this should be called regularly at ~30fps,
-        // should be configurable through environment.ini based on scene
-        // type
-        VirtualSceneManager::update();
-
-        VirtualSceneManager::renderView(
-                backgroundView.get(), 0.0f, [&backgroundView]() {
-                    const std::vector<uint8_t>& fbData =
-                            backgroundView->getFramebufferLocked();
-
-                    android_setOpenglesScreenBackground(
-                            backgroundView->getWidthLocked(),
-                            backgroundView->getHeightLocked(), fbData.data());
-                });
     }
 
     return true;

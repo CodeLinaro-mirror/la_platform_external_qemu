@@ -37,12 +37,22 @@
 
 using namespace android::base;
 
+//TODO(virtualscene): disable debug logs after testing throughly
+#define DEBUG_LOGS 1
+
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
-#define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
-#define D_ACTIVE VERBOSE_CHECK(virtualscene)
+
+#if DEBUG_LOGS
+#define D(...) dprint(__VA_ARGS__)
+#else
+#define D(...) (void)0
+#endif
 
 static constexpr const char* kPosterFile = "Toren1BD.posters";
+
+// Update at 30 fps by default
+static constexpr int kUpdatePerSecond = 30;
 
 namespace android {
 namespace virtualscene {
@@ -186,18 +196,23 @@ std::shared_ptr<Scene> ScenesManager::createScene(std::string_view sceneName,
 
 bool ScenesManager::renderView(Scene* scene,
                                RendererView* view,
-                               float renderTime,
-                               std::function<void()> finishCallback) {
+                               std::function<void()> finishCallback,
+                               uint64_t* outFrameTime) {
     // TODO(virtualscene-perf): do not create different renderers for each scene
     if (!scene || !view) {
         E("%s: invalid parameters", __FUNCTION__);
         return false;
     }
 
+    const uint64_t frameTime = scene->getFrameTimeUs();
+    if (outFrameTime) {
+        *outFrameTime = frameTime;
+    }
+
     std::lock_guard lock(view->mLock);
 
     auto sceneHash = scene->getVersionHashForView(view);
-    if (view->mCache.isValidFor(sceneHash, renderTime)) {
+    if (view->mCache.isValidFor(sceneHash, frameTime)) {
         // TODO(virtualscene-perf): check the hash at higher level to avoid
         // copies&conversions
         finishCallback();
@@ -209,7 +224,7 @@ bool ScenesManager::renderView(Scene* scene,
     // Update cache with the render results
     auto readbackSize = view->getWidthLocked() * view->getHeightLocked() * 4;
     view->mCache.mSceneHash = sceneHash;
-    view->mCache.mRenderTime = renderTime;
+    view->mCache.mFrameTime = frameTime;
 
     SceneConfig::Mode mode = scene->getSceneMode();
     Renderer* renderer = nullptr;
@@ -225,6 +240,7 @@ bool ScenesManager::renderView(Scene* scene,
     }
 
     // Make the renderer context current for graphics operations
+    const float renderTime = frameTime / 1000000.0f;
     auto context = renderer ? renderer->makeCurrent() : nullptr;
     if (renderer && !context->isValid()) {
         E("%s: Cannot use EGL context", __FUNCTION__);
@@ -310,7 +326,7 @@ bool ScenesManager::renderView(Scene* scene,
 }
 
 bool ScenesManager::removeScene(Scene* scene) {
-    D("%s", __func__);
+    D("ScenesManager::%s", __func__);
 
     AutoLock lock(mLock);
     if (!scene || !scene->releaseResources()) {
@@ -335,7 +351,7 @@ bool ScenesManager::removeScene(Scene* scene) {
 }
 
 bool ScenesManager::removeAll() {
-    D("%s", __func__);
+    D("ScenesManager::%s", __func__);
 
     // First make sure VirtualSceneManager is uninitialized, should
     // be done outside the lock
@@ -363,7 +379,10 @@ bool ScenesManager::removeAll() {
 StaticLock VirtualSceneManager::mLock;
 std::shared_ptr<Scene> VirtualSceneManager::mEnvironmentScene;
 std::deque<std::string> VirtualSceneManager::mPosterFilenameUpdates;
+std::optional<std::thread> VirtualSceneManager::mBackgroundUpdateThread;
+std::function<void()> VirtualSceneManager::mUpdateCallback;
 int VirtualSceneManager::mNumUsers = 0;
+std::atomic<bool> VirtualSceneManager::mKeepUpdating = false;
 
 void VirtualSceneManager::parseCmdline() {
     AutoLock lock(mLock);
@@ -434,12 +453,17 @@ bool VirtualSceneManager::initialize(const SceneConfig& config) {
     }
 
     mEnvironmentScene = std::move(scene);
+    mKeepUpdating = false;
 
     return true;
 }
 
 void VirtualSceneManager::uninitialize() {
     D("Uninitializing VirtualSceneManager");
+    // First, stop the update thread, should be done outside of
+    // the lock so that the tasks can finish properly.
+    stopSceneUpdateThread();
+
     AutoLock lock(mLock);
     if (mEnvironmentScene) {
         ScenesManager::removeScene(mEnvironmentScene.get());
@@ -449,18 +473,34 @@ void VirtualSceneManager::uninitialize() {
 }
 
 void VirtualSceneManager::update() {
-    AutoLock lock(mLock);
+    if (!mLock.tryLock()) {
+        // Scene is in use, skip this update..
+        return;
+    }
     if (!mEnvironmentScene) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
-        return 0L;
     }
 
-    return mEnvironmentScene->update();
+    // Settings::AnimationState is mainly used for TV animation in default
+    // virtualscene and animation is controlled by renderTime in shaders. Always
+    // update the scene and timer in other modes.
+    const bool updateTime = (mEnvironmentScene->getSceneMode() !=
+                             SceneConfig::Mode::Mesh3dScene) ||
+                            sSettings->getAnimationState();
+    mEnvironmentScene->update(updateTime);
+
+    mLock.unlock();
+
+    // Perform any requested updates, should be called outside of the lock as
+    // any lock requiring operations should hold its own lock
+    if (mUpdateCallback) {
+        mUpdateCallback();
+    }
 }
 
 bool VirtualSceneManager::renderView(RendererView* view,
-                                     float renderTime,
-                                     std::function<void()> finishCallback) {
+                                     std::function<void()> finishCallback,
+                                     uint64_t* outFrameTime) {
     AutoLock lock(mLock);
     if (!mEnvironmentScene) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
@@ -468,7 +508,8 @@ bool VirtualSceneManager::renderView(RendererView* view,
     }
 
     return ScenesManager::renderView(
-            mEnvironmentScene.get(), view, renderTime, [&]() {
+            mEnvironmentScene.get(), view,
+            [&]() {
                 // Posters needs to be updated within the render context
                 // TODO(virtualscene): load posters async and avoid overwriting
                 // finishCallback
@@ -487,7 +528,8 @@ bool VirtualSceneManager::renderView(RendererView* view,
                 }
 
                 finishCallback();
-            });
+            },
+            outFrameTime);
 }
 
 void VirtualSceneManager::setInitialPoster(const char* posterName,
@@ -565,7 +607,7 @@ void VirtualSceneManager::setSceneControlsParameters(bool show) {
     // Only allow showing scene controls if it's a mesh3d scene
     if (!show ||
         (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::Mesh3dScene)) {
-        dprint("%s: show=%s", __func__, (show ? "true" : "false"));
+        D("%s: show=%s", __func__, (show ? "true" : "false"));
         skin_winsys_show_virtual_scene_controls(show);
     }
 }
@@ -579,6 +621,8 @@ std::shared_ptr<Scene> VirtualSceneManager::addSceneUser() {
     if (mNumUsers == 0) {
         // Make sure the scene is ready to use
         mEnvironmentScene->loadUserResources();
+
+        startSceneUpdateThread();
     }
     mNumUsers++;
 
@@ -595,7 +639,69 @@ void VirtualSceneManager::removeSceneUser() {
     if (mNumUsers == 0) {
         // Allow scene to unload resources when there are no users of it
         mEnvironmentScene->unloadUserResources();
+
+        lock.unlock();
+        stopSceneUpdateThread();
     }
+}
+
+void VirtualSceneManager::setUpdateCallback(std::function<void()> callback) {
+    AutoLock lock(mLock);
+    if (mUpdateCallback) {
+        // Callback should be set only once as it'll be used outside of the lock
+        E("%s:%d Background update callback is already set", __func__,
+          __LINE__);
+        return;
+    }
+    mUpdateCallback = callback;
+}
+
+void VirtualSceneManager::updateSceneWorker() {
+    const auto interval = std::chrono::microseconds(1000000 / kUpdatePerSecond);
+    auto nextUpdateTime = std::chrono::steady_clock::now();
+    while (mKeepUpdating) {
+        nextUpdateTime += interval;
+
+        update();
+
+        // Sleep until the next update
+        auto now = std::chrono::steady_clock::now();
+        if (now >= nextUpdateTime) {
+            // update took longer than the interval, skip missed frames
+            nextUpdateTime = now;
+        } else {
+            std::this_thread::sleep_until(nextUpdateTime);
+        }
+    }
+}
+
+void VirtualSceneManager::startSceneUpdateThread() {
+    D("%s: Starting update thread", __func__);
+    if (mBackgroundUpdateThread) {
+        E("%s:%d Background Update Thread is already initialized", __func__,
+          __LINE__);
+        return;
+    }
+    mKeepUpdating = true;
+    mBackgroundUpdateThread = std::thread(updateSceneWorker);
+}
+
+void VirtualSceneManager::stopSceneUpdateThread() {
+    D("%s: Stopping update thread", __func__);
+    mKeepUpdating = false;
+    std::thread threadToJoin;
+    {
+        // Only lock to reset the member variable
+        AutoLock lock(mLock);
+        if (mBackgroundUpdateThread.has_value()) {
+            threadToJoin = std::move(*mBackgroundUpdateThread);
+            mBackgroundUpdateThread.reset();
+        }
+    }
+    if (threadToJoin.joinable()) {
+        threadToJoin.join();
+    }
+    D("%s: Stopped update thread", __func__);
 }
 
 }  // namespace virtualscene

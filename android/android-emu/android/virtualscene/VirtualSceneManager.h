@@ -19,7 +19,9 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 /*
@@ -50,8 +52,8 @@ public:
     // Render the virtual scene to the given view.
     static bool renderView(Scene* scene,
                            RendererView* view,
-                           float renderTime,
-                           std::function<void()> finishCallback);
+                           std::function<void()> finishCallback,
+                           uint64_t* outFrameTime);
 
     static bool removeScene(Scene* scene);
 
@@ -84,8 +86,8 @@ public:
 
     // Render the virtual scene to the given view.
     static bool renderView(RendererView* view,
-                           float renderTime,
-                           std::function<void()> finishCallback);
+                           std::function<void()> finishCallback,
+                           uint64_t* outFrameTime);
 
     // Set the initial poster of the scene, loaded from persisted settings.
     // Command line flags take precedence, so if the -virtualscene-poster flag
@@ -137,11 +139,20 @@ public:
     static std::shared_ptr<Scene> addSceneUser();
     static void removeSceneUser();
 
+    static void setUpdateCallback(std::function<void()> callback);
+
 private:
     static android::base::StaticLock mLock;
     static std::shared_ptr<Scene> mEnvironmentScene;
     static std::deque<std::string> mPosterFilenameUpdates;
+    static std::optional<std::thread> mBackgroundUpdateThread;
+    static std::function<void()> mUpdateCallback;
     static int mNumUsers;
+    static std::atomic<bool> mKeepUpdating;
+
+    static void updateSceneWorker();
+    static void startSceneUpdateThread();
+    static void stopSceneUpdateThread();
 };
 
 }  // namespace virtualscene

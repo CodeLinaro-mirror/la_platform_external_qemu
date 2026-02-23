@@ -16,10 +16,11 @@
 
 #include "android/virtualscene/Scene.h"
 
-#include "android/avd/info.h" // to resolve avd path for resources
+#include "Scene.h"
+#include "android/avd/info.h"  // to resolve avd path for resources
 #include "android/base/system/System.h"
-#include "android/console.h"
 #include "android/camera/camera-metrics.h"
+#include "android/console.h"
 #include "android/loadpng.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
@@ -194,8 +195,7 @@ bool Scene::initialize() {
                 return false;
             }
             std::unique_ptr<MeshSceneObject> sceneObject =
-                    MeshSceneObject::load(*mRenderer,
-                                          sceneFilename.c_str());
+                    MeshSceneObject::load(*mRenderer, sceneFilename.c_str());
             if (!sceneObject) {
                 derror("%s: Could not load scene object: %s", __func__,
                        sceneFilename.c_str());
@@ -242,6 +242,9 @@ bool Scene::initialize() {
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
     }
 
+    mStartTimeUs = System::get()->getUnixTimeUs();
+    mFrameTimeUs = 0;
+
     mObjectsVersion++;
 
     return true;
@@ -274,17 +277,22 @@ bool Scene::releaseResources() {
     return true;
 }
 
-void Scene::update() {
+void Scene::update(bool updateTime) {
     // TODO(virtualscene-video): this should play the video in video mode
     for (auto& poster : mPosters) {
         poster.second.sceneObject->update();
+    }
+
+    if (updateTime) {
+        // TODO(virtualscene): use ThreadLooper::nowNs(ClockType::kVirtual) ?
+        mFrameTimeUs = System::get()->getUnixTimeUs() - mStartTimeUs;
     }
 }
 
 uint64_t Scene::getVersionHashForView(
         const RendererView* /*lockedView*/) const {
-    // TODO(virtualscene-perf): check if the objects inside the view frustum includes
-    // any changes/animations
+    // TODO(virtualscene-perf): check if the objects inside the view frustum
+    // includes any changes/animations
     return mObjectsVersion;
 }
 

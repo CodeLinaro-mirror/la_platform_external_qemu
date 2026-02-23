@@ -99,8 +99,11 @@ public:
     const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
 
     // Update the scene for the next frame.
-    //
-    void update();
+    // updateTime: Some animations are controlled by the global renderTime, use
+    //             this argument to disallow frame time updates, so such
+    //             animations would keep working as expected when animations are
+    //             paused.
+    void update(bool updateTime = true);
 
     // Returns a hash value based on the scene contents and animations. Can be
     // used to cache the results of a view and check if anything has changed.
@@ -149,6 +152,8 @@ public:
     void loadUserResources();
     void unloadUserResources();
 
+    uint64_t getFrameTimeUs() const { return mFrameTimeUs; }
+
 private:
     // Private constructor, use Scene::create to create an instance.
     Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config);
@@ -177,6 +182,8 @@ private:
     std::unordered_map<std::string, PosterStorage> mPosters;
     std::unique_ptr<SceneOverlayObject> mOverlayObject;
     uint64_t mObjectsVersion = 0;
+    uint64_t mFrameTimeUs = 0;
+    uint64_t mStartTimeUs = 0;
 };
 
 }  // namespace virtualscene
