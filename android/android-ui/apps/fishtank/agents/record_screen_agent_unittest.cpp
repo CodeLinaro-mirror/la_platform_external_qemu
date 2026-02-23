@@ -25,7 +25,9 @@
 #include "android/base/testing/TestTempDir.h"
 #include "android/emulation/control/utils/EmulatorControlClient.h"
 #include "android/emulation/control/utils/EmulatorGrcpClient.h"
+#include "android/emulation/control/utils/SimpleScreenRecordingClient.h"
 #include "emulator_controller.grpc.pb.h"
+#include "screen_recording_service.grpc.pb.h"
 #include "fishtank_agents.h"
 #include "host-common/record_screen_agent.h"
 
@@ -37,6 +39,7 @@ using android::base::TestTempDir;
 
 // Defined in test_client_setup.cpp
 extern std::shared_ptr<EmulatorControlClient> gTestControlClient;
+extern std::shared_ptr<SimpleScreenRecordingClient> gTestRecordingClient;
 
 // A mock implementation of the EmulatorController service for testing.
 class MockEmulatorController final : public EmulatorController::Service {
@@ -44,12 +47,25 @@ public:
     MOCK_METHOD(::grpc::Status, getScreenshot, (::grpc::ServerContext* context, const ImageFormat* request, Image* response), (override));
 };
 
+// A mock implementation of the ScreenRecording service for testing.
+class MockScreenRecording final : public incubating::ScreenRecording::Service {
+public:
+    MOCK_METHOD(::grpc::Status, StartRecording, (::grpc::ServerContext* context, const incubating::RecordingInfo* request, incubating::RecordingInfo* response), (override));
+    MOCK_METHOD(::grpc::Status, StopRecording, (::grpc::ServerContext* context, const incubating::RecordingInfo* request, incubating::RecordingInfo* response), (override));
+};
+
 class RecordScreenAgentTest : public Test {
 protected:
     void TearDown() override {
         if (server) {
             server->Shutdown();
+            // Wait for all calls to finish before destroying mock services.
+            server->Wait();
         }
+
+        // Reset global pointers to trigger EmulatorGrpcClient cleanup.
+        gTestControlClient.reset();
+        gTestRecordingClient.reset();
     }
 
     void StartServer() {
@@ -60,6 +76,7 @@ protected:
                                  grpc::InsecureServerCredentials(),
                                  &selected_port);
         builder.RegisterService(&service);
+        builder.RegisterService(&recordingService);
         server = builder.BuildAndStart();
         ASSERT_NE(server, nullptr);
         ASSERT_NE(selected_port, 0);
@@ -102,13 +119,15 @@ protected:
                                      .withDiscoveryFile(mDiscoveryFile->path())
                                      .build();
         ASSERT_TRUE(emuGrpcClient.ok());
-        gTestControlClient = std::make_shared<EmulatorControlClient>(
-                std::shared_ptr<EmulatorGrpcClient>(std::move(*emuGrpcClient)));
+        auto sharedEmuGrpcClient = std::shared_ptr<EmulatorGrpcClient>(std::move(*emuGrpcClient));
+        gTestControlClient = std::make_shared<EmulatorControlClient>(sharedEmuGrpcClient);
+        gTestRecordingClient = std::make_shared<SimpleScreenRecordingClient>(sharedEmuGrpcClient);
 
         mAgent = &sFishtankQAndroidRecordScreenAgent;
     }
 
     MockEmulatorController service;
+    MockScreenRecording recordingService;
     std::unique_ptr<grpc::Server> server;
     std::string server_address;
     std::unique_ptr<TmpDiscoveryFile> mDiscoveryFile;
@@ -161,3 +180,99 @@ TEST_F(RecordScreenAgentTest, DoSnapFailure) {
     std::ifstream file(testFile);
     EXPECT_FALSE(file.is_open());
 }
+
+TEST_F(RecordScreenAgentTest, StartRecordingSuccess) {
+    ::RecordingInfo info = {};
+    info.fileName = "test_video.mp4";
+    info.width = 1280;
+    info.height = 720;
+    info.displayId = 0;
+
+    bool callbackCalled = false;
+    info.cb = [](void* opaque, RecordingStatus status) {
+        bool* called = static_cast<bool*>(opaque);
+        if (status == RECORD_STARTED) {
+            *called = true;
+        }
+    };
+    info.opaque = &callbackCalled;
+
+    EXPECT_CALL(recordingService, StartRecording(_, _, _))
+            .WillOnce([&](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                EXPECT_EQ(request->file_name(), "test_video.mp4");
+                EXPECT_EQ(request->width(), 1280);
+                EXPECT_EQ(request->height(), 720);
+                EXPECT_EQ(request->display(), 0);
+
+                response->set_state(incubating::RecordingInfo::RECORDER_STATE_RECORDING);
+                return ::grpc::Status::OK;
+            });
+
+    bool result = mAgent->startRecording(&info);
+
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(callbackCalled);
+}
+
+TEST_F(RecordScreenAgentTest, StartRecordingFailure) {
+    ::RecordingInfo info = {};
+    info.fileName = "test_video_fail.mp4";
+
+    bool callbackCalled = false;
+    info.cb = [](void* opaque, RecordingStatus status) {
+        bool* called = static_cast<bool*>(opaque);
+        if (status == RECORD_START_FAILED) {
+            *called = true;
+        }
+    };
+    info.opaque = &callbackCalled;
+
+    EXPECT_CALL(recordingService, StartRecording(_, _, _))
+            .WillOnce([&](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Error");
+            });
+
+    bool result = mAgent->startRecording(&info);
+
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(callbackCalled);
+}
+
+TEST_F(RecordScreenAgentTest, StartRecordingAsyncSuccess) {
+    ::RecordingInfo info = {};
+    info.fileName = "test_video_async.mp4";
+
+    struct CallbackData {
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool called = false;
+    } data;
+
+    info.cb = [](void* opaque, RecordingStatus status) {
+        CallbackData* d = static_cast<CallbackData*>(opaque);
+        if (status == RECORD_STARTED) {
+            std::lock_guard<std::mutex> lock(d->mtx);
+            d->called = true;
+            d->cv.notify_one();
+        }
+    };
+    info.opaque = &data;
+
+    EXPECT_CALL(recordingService, StartRecording(_, _, _))
+            .WillOnce([&](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                response->set_state(incubating::RecordingInfo::RECORDER_STATE_RECORDING);
+                return ::grpc::Status::OK;
+            });
+
+    bool result = mAgent->startRecordingAsync(&info);
+
+    EXPECT_TRUE(result);
+
+    std::unique_lock<std::mutex> lock(data.mtx);
+    bool success = data.cv.wait_for(lock, std::chrono::seconds(5), [&] { return data.called; });
+    EXPECT_TRUE(success);
+}
+
