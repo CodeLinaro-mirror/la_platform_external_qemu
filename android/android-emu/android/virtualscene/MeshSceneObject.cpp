@@ -21,6 +21,7 @@
 #include <tiny_obj_loader.h>
 
 #include <unordered_map>
+#include <filesystem>
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
@@ -29,6 +30,7 @@
 
 using android::base::PathUtils;
 using android::base::System;
+namespace fs = std::filesystem;
 
 namespace android {
 namespace virtualscene {
@@ -37,11 +39,13 @@ MeshSceneObject::MeshSceneObject(Renderer& renderer) : SceneObject(renderer) {}
 
 std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
                                                        const char* filename) {
+    if (!filename) {
+        E("%s: Invalid input", __FUNCTION__);
+        return nullptr;
+    }
+    const fs::path filePath(filename);
     const std::string resourcesDir =
-            PathUtils::addTrailingDirSeparator(PathUtils::join(
-                    System::get()->getLauncherDirectory(), "resources"));
-    const std::string filePath = PathUtils::join(
-            System::get()->getLauncherDirectory(), "resources", filename);
+            PathUtils::addTrailingDirSeparator(filePath.parent_path().string());
 
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -49,7 +53,7 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
 
     std::string err;
     const bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
-                                      filePath.c_str(), resourcesDir.c_str());
+                                      filename, resourcesDir.c_str());
     if (!ret) {
         E("%s: Error loading obj %s: %s", __FUNCTION__, filename,
           err.empty() ? "<no message>" : err.c_str());

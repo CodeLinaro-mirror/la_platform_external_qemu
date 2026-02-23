@@ -16,7 +16,9 @@
 
 #include "android/virtualscene/Scene.h"
 
+#include "android/avd/info.h" // to resolve avd path for resources
 #include "android/base/system/System.h"
+#include "android/console.h"
 #include "android/camera/camera-metrics.h"
 #include "android/loadpng.h"
 #include "android/utils/debug.h"
@@ -43,6 +45,42 @@ static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
 static constexpr const char* kDefaultImageFile = "poster.png";
 static constexpr const char* kDefaultVideoFile =
         "macroPreviews/Reset_position.mp4";
+
+// Function to find fullpath from a filename for the scene
+// Scene filenames can be provided as fullpaths, AVD local,
+// or from 'in 'resources' folder.
+std::string resolveSceneFilename(const std::string& sceneFilename) {
+    // Check if it's a fullpath
+    fs::path inputPath(sceneFilename);
+    if (fs::exists(inputPath)) {
+        return inputPath.string();
+    }
+
+    // If it's not a usable full path, try AVD local
+    const char* avdBasePath =
+            getConsoleAgents() && getConsoleAgents()->settings
+                    ? avdInfo_getContentPath(
+                              getConsoleAgents()->settings->avdInfo())
+                    : nullptr;
+    if (avdBasePath) {
+        fs::path avdPath = fs::path(avdBasePath) / inputPath;
+        if (fs::exists(avdPath)) {
+            return avdPath.string();
+        }
+    }
+
+    // If not in AVD folder, check 'resources' folder
+    fs::path resourcesBasePath =
+            fs::path(System::get()->getLauncherDirectory()) / "resources";
+    fs::path resourcePath = resourcesBasePath / inputPath;
+    if (fs::exists(resourcePath)) {
+        return resourcePath.string();
+    }
+
+    dwarning("Could not resolve environment scene filename '%s'",
+             sceneFilename.c_str());
+    return sceneFilename;
+}
 
 // static_cast the value in a unique_ptr.
 // After this call, the unique_ptr that the value is cast from will be removed.
@@ -132,7 +170,7 @@ bool Scene::initialize() {
     CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
     // Find the file, in case it's given as a local path
-    const std::string sceneFilename = mConfig.mFilename;
+    const std::string sceneFilename = resolveSceneFilename(mConfig.mFilename);
     const auto sceneMode = getSceneMode();
 
     switch (sceneMode) {
@@ -172,9 +210,15 @@ bool Scene::initialize() {
             void* backgroundImageData =
                     loadpng(sceneFilename.c_str(), &width, &height);
             if (!backgroundImageData) {
+                // Do not error out, but load default magenta image to avoid
+                // crashes, not-working camera or black screen
                 derror("%s: Could not load background image: %s", __func__,
-                       mConfig.mFilename.c_str());
-                return false;
+                       sceneFilename.c_str());
+                width = 1;
+                height = 1;
+                uint32_t* magentaData = (uint32_t*)malloc(width * height * 4);
+                *magentaData = 0xFFFF00FF;
+                backgroundImageData = magentaData;
             }
             mOverlayObject = std::make_unique<SceneOverlayObject>();
             mOverlayObject->mWidth = width;
