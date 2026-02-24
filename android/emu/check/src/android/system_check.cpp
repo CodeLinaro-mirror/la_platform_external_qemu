@@ -57,11 +57,12 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
 
     const char* avdName = avdInfo_getName(avd);
     const bool isXrAvd = (avdInfo_getAvdFlavor(avd) == AVD_XR);
+    const bool isGlassesAvd = (avdInfo_getAvdFlavor(avd) == AVD_GLASSES);
 
     // Check number of cores
     const int numCores = System::get()->getCpuCoreCount();
-    const int minNumCores = isXrAvd ? 4 : 2;
-    const int idealMinNumCores = isXrAvd ? 8 : 4;
+    const int minNumCores = (isXrAvd || isGlassesAvd) ? 4 : 2;
+    const int idealMinNumCores = (isXrAvd || isGlassesAvd) ? 8 : 4;
     if (numCores < minNumCores) {
         // < 0.1% of our users as of November 2024
         metrics.set_check(
@@ -100,7 +101,7 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
     }
     const uint64_t ramMB = (memUsage.total_phys_memory / (1024 * 1024));
     const uint64_t minRamMB = 2048;
-    const uint64_t idealMinRamMB = isXrAvd ? 16384 : 4096;
+    const uint64_t idealMinRamMB = (isXrAvd || isGlassesAvd) ? 16384 : 4096;
     // < 5% of our users as of November 2024
     // TODO(b/376873919): Improve the reporting to account for avd requirements.
     if (ramMB < minRamMB) {
