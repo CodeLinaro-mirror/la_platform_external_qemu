@@ -512,7 +512,8 @@ struct CameraService {
             virtualscenecameraSetup("back", cameraBackOrientation, kVideoPlayback);
         } else if (isVideofileCam(cameraBack)) {
             const char* filename = getCameraFilename(cameraBack, kVideofileCamPrefixSize);
-            videofilecameraSetup("back", cameraBackOrientation, filename);
+            virtualscenecameraSetup("back", cameraBackOrientation, kVideofile,
+                                    filename);
         } else if (isImagefileCam(cameraBack)) {
             const char* filename = getCameraFilename(cameraBack, kImagefileCamPrefixSize);
             virtualscenecameraSetup("back", cameraBackOrientation, kImagefile, filename);
@@ -524,7 +525,8 @@ struct CameraService {
             virtualscenecameraSetup("front", cameraFrontOrientation, kVideoPlayback);
         } else if (isVideofileCam(cameraFront)) {
             const char* filename = getCameraFilename(cameraFront, kVideofileCamPrefixSize);
-            videofilecameraSetup("front", cameraFrontOrientation, filename);
+            virtualscenecameraSetup("front", cameraFrontOrientation, kVideofile,
+                                    filename);
         } else if (isImagefileCam(cameraFront)) {
             const char* filename = getCameraFilename(cameraFront, kImagefileCamPrefixSize);
             virtualscenecameraSetup("front", cameraFrontOrientation, kImagefile, filename);
@@ -704,8 +706,10 @@ private:
                 device_name = "environment";
                 break;
             case kVideoPlayback:
-            case kVideofile:
                 device_name = "videoplayback";
+                break;
+            case kVideofile:
+                device_name = "videofile";
                 break;
             case kImagefile:
                 device_name = "imagefile";
