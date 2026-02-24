@@ -89,6 +89,8 @@ public:
 
     const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
 
+    int getSceneRotation() { return mBaseRotation; }
+
     // Update the scene for the next frame.
     // updateTime: Some animations are controlled by the global renderTime, use
     //             this argument to disallow frame time updates, so such
@@ -173,6 +175,7 @@ private:
     uint64_t mObjectsVersion = 0;
     uint64_t mFrameTimeUs = 0;
     uint64_t mStartTimeUs = 0;
+    int mBaseRotation = 0;
 };
 
 }  // namespace virtualscene

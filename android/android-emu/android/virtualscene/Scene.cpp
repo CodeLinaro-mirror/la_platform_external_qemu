@@ -187,6 +187,7 @@ bool Scene::initialize() {
     const std::string sceneFilename = resolveSceneFilename(mConfig.mFilename);
     const auto sceneMode = getSceneMode();
 
+    bool needsRawImageSource = false;
     switch (sceneMode) {
         case SceneConfig::Mode::Unknown: {
             derror("%s: Unknown scene mode!", __func__);
@@ -207,6 +208,10 @@ bool Scene::initialize() {
 
             mSceneObjects.push_back(
                     std::move(static_unique_cast<SceneObject>(sceneObject)));
+
+            // TODO (virtualScene) The virtual scene by default renders the
+            // image rotated 90 degrees
+            mBaseRotation = 90;
         } break;
         case SceneConfig::Mode::VideoPlayback: {
             // TODO(virtualscene-video): actually load sceneFilename video,
@@ -218,16 +223,20 @@ bool Scene::initialize() {
             }
         } break;
         case SceneConfig::Mode::ImageFile: {
+            needsRawImageSource = true;
             mRawImageSource = RawImageFileSource::Create(sceneFilename);
-            if (!mRawImageSource) {
-                derror("%s: Could not load background image: '%s', falling "
-                       "back to default",
-                       __func__, mConfig.mFilename.c_str());
-                mRawImageSource = std::make_unique<DefaultRawImageProvider>();
-            }
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
+    }
+
+    if (needsRawImageSource) {
+        if (!mRawImageSource) {
+            derror("%s: Could not load background image: '%s', falling back to default",
+                   __func__, mConfig.mFilename.c_str());
+            mRawImageSource = std::make_unique<DefaultRawImageProvider>();
+        }
+        mBaseRotation = mRawImageSource->GetBaseRotation();
     }
 
     mStartTimeUs = System::get()->getUnixTimeUs();

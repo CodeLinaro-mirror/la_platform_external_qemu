@@ -943,10 +943,12 @@ bool BackgroundUpdateService::start(int displayWidth,
     VirtualSceneManager::setUpdateCallback([&]() {
         mSceneCamera->update();
 
+        // TODO(virtualscene) Handle rotation properly for all scenes.
         // SceneCamera uses 90 degrees rotated views by default for
         // the camera rendering, rotate it back to correct for background
+        float angle = VirtualSceneManager::getSceneBaseRotation();
         glm::mat4 rollRotation =
-                glm::rotate(glm::mat4(1.0f), glm::radians(90.0f),
+                glm::rotate(glm::mat4(1.0f), glm::radians(angle),
                             glm::vec3(0.0f, 0.0f, 1.0f));
         glm::mat4 cameraView = rollRotation * mSceneCamera->getView();
         glm::mat4 viewProjection = mSceneCamera->getProjection() * cameraView;
@@ -991,6 +993,20 @@ void BackgroundUpdateService::updateBlurAmount(float blurAmount) {
     if (mBackgroundView) {
         mBackgroundView->setBlurFactor(blurAmount);
     }
+}
+
+int VirtualSceneManager::getSceneBaseRotationLocked() {
+    if (!mEnvironmentScene) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
+        return 0;
+    } else {
+        return mEnvironmentScene->getSceneRotation();
+    }
+}
+
+int VirtualSceneManager::getSceneBaseRotation() {
+    AutoLock lock(mLock);
+    return getSceneBaseRotationLocked();
 }
 
 }  // namespace virtualscene

@@ -31,6 +31,10 @@ public:
      * function */
     virtual int AccessImage(std::function<int(RawImageBuffer*)> accessor) = 0;
     virtual int Stop() = 0;
+    /* This is the rotation that must be applied to the images produced by this
+     * source to have them oriented in the natural way.
+     */
+    virtual int GetBaseRotation() { return 0; }
 };
 
 // DefaultImageProvider provides a 1x1 magenta image to serve as a default when
