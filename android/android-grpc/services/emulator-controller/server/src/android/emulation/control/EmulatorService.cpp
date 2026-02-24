@@ -537,8 +537,13 @@ public:
                                 mXrInputEventSender.sendXrHeadAngularVelocity(
                                         request->xr_head_angular_velocity_event());
                             } else if (request->has_xr_head_velocity_event()) {
-                                mXrInputEventSender.sendXrHeadVelocity(
-                                        request->xr_head_velocity_event());
+                                mXrInputEventSender.sendXrHeadVelocity(request->xr_head_velocity_event());
+                            } else if (request->has_xr_hand_event()) {
+                                const MouseEvent& handEvent = request->xr_hand_event();
+                                mXrInputEventSender.sendXrHandEvent(handEvent.x(), handEvent.y(), handEvent.buttons(), handEvent.display());
+                            } else if (request->has_xr_eye_event()) {
+                                const MouseEvent& eyeEvent = request->xr_eye_event();
+                                mXrInputEventSender.sendXrEyeEvent(eyeEvent.x(), eyeEvent.y(), eyeEvent.buttons(), eyeEvent.display());
                             } else {
                                 return Status(
                                         ::grpc::StatusCode::INVALID_ARGUMENT,

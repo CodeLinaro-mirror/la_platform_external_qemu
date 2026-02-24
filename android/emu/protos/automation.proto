@@ -64,6 +64,8 @@ message PhysicalModelEvent {
         XR_HEAD_VELOCITY = 28;
         XR_OPTIONS = 29;
         XR_HAND_GESTURE = 30;
+        XR_HAND_EVENT = 31;
+        XR_EYE_EVENT = 32;
     }
 
     optional ParameterType type = 1;
