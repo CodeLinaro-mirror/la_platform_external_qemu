@@ -228,6 +228,7 @@ enum pmbus_registers {
 /* PAGES */
 #define PB_MAX_PAGES            0x1F
 #define PB_ALL_PAGES            0xFF
+#define PB_ALL_PHASES           0xFF
 
 #define PMBUS_ERR_BYTE          0xFF
 
@@ -266,6 +267,7 @@ OBJECT_DECLARE_TYPE(PMBusDevice, PMBusDeviceClass,
 struct PMBusDeviceClass {
     SMBusDeviceClass parent_class;
     uint8_t device_num_pages;
+    uint8_t device_num_phases;
 
     /**
      * Implement quick_cmd, receive byte, and write_data to support non-standard
@@ -417,14 +419,17 @@ struct PMBusDevice {
     SMBusDevice smb;
 
     uint8_t num_pages;
+    uint8_t num_phases;
     uint8_t code;
     uint8_t page;
+    uint8_t phase;
 
     /*
      * PMBus registers are stored in a PMBusPage structure allocated by
      * calling pmbus_pages_alloc()
      */
     PMBusPage *pages;
+    PMBusPage **phases;
     uint8_t capability;
 
 
