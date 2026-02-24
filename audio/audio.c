@@ -156,10 +156,15 @@ static inline int audio_bits_to_index (int bits)
 void AUD_vlog (const char *cap, const char *fmt, va_list ap)
 {
     if (cap) {
-        fprintf(stderr, "%s: ", cap);
+        loc_set_file(cap, 0);
     }
 
-    vfprintf(stderr, fmt, ap);
+    // TODO: Remove newlines from fmt.
+    error_vreport(fmt, ap);
+
+    if (cap) {
+        loc_set_none();
+    }
 }
 
 void AUD_log (const char *cap, const char *fmt, ...)
