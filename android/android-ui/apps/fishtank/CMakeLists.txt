@@ -307,7 +307,10 @@ android_add_test(
   SRC grpc/FishtankGrpcServer_unittest.cpp
       grpc/FishtankGrpcServer.cpp
       agents/sensors_agent_unittest.cpp
-      agents/sensors_agent.cpp)
+      agents/sensors_agent.cpp
+      agents/record_screen_agent_unittest.cpp
+      agents/record_screen_agent.cpp
+      agents/test_client_setup.cpp)
 
 target_link_libraries(
   fishtank_unittests

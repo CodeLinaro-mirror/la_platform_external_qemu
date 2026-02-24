@@ -13,7 +13,15 @@
 // limitations under the License.
 #include "fishtank_agents.h"
 
+#include "absl/strings/match.h"
+#include "aemu/base/files/PathUtils.h"
+#include "android/base/system/System.h"
+#include "android/utils/debug.h"
 #include "host-common/record_screen_agent.h"
+
+#include <condition_variable>
+#include <fstream>
+#include <mutex>
 
 const QAndroidRecordScreenAgent sFishtankQAndroidRecordScreenAgent = {
         .startRecording =
@@ -43,8 +51,69 @@ const QAndroidRecordScreenAgent sFishtankQAndroidRecordScreenAgent = {
                 },
         .doSnap =
                 [](const char* name, uint32_t displayId) {
-                    NOT_IMPLEMENTED("QAndroidRecordScreenAgent.doSnap(name: %s, displayId: %u)", name, displayId);
-                    return false;
+                    auto client = getGlobalControlClient();
+                    if (!client) {
+                        return false;
+                    }
+
+                    android::emulation::control::ImageFormat format;
+                    format.set_format(android::emulation::control::ImageFormat::PNG);
+                    format.set_display(displayId);
+
+                    bool success = false;
+                    std::mutex mtx;
+                    std::condition_variable cv;
+                    bool done = false;
+
+                    client->getScreenshotAsync(
+                            format,
+                            [&](absl::StatusOr<android::emulation::control::Image*> imgOrStatus) {
+                        std::lock_guard<std::mutex> lock(mtx);
+                        if (imgOrStatus.ok()) {
+                            auto img = *imgOrStatus;
+                            if (img && !img->image().empty()) {
+                                std::string outputFilePath;
+                                std::string outputDirectoryPath = name ? name : "";
+
+                                if (absl::EndsWith(outputDirectoryPath, ".png")) {
+                                    outputFilePath = outputDirectoryPath;
+                                } else {
+                                    char fileName[100];
+                                    snprintf(fileName, sizeof(fileName), "Screenshot_%lld.png",
+                                            (int64_t) android::base::System::get()->getUnixTime());
+                                    outputFilePath =
+                                            outputDirectoryPath.empty()
+                                                    ? fileName
+                                                    : android::base::PathUtils::join(
+                                                              outputDirectoryPath,
+                                                              fileName);
+                                }
+
+                                std::ofstream file(
+                                        android::base::PathUtils::asUnicodePath(
+                                                outputFilePath.c_str())
+                                                .c_str(),
+                                        std::ios::binary);
+                                if (file) {
+                                    file.write(img->image().data(),
+                                               img->image().size());
+                                    success = true;
+                                    dinfo("Saved screenshot to %s", outputFilePath.c_str());
+                                } else {
+                                    derror("Failed to open %s for writing", outputFilePath.c_str());
+                                }
+                            }
+                        } else {
+                            derror("gRPC getScreenshot failed: %s",
+                                   imgOrStatus.status().ToString().c_str());
+                        }
+                        done = true;
+                        cv.notify_one();
+                    });
+
+                    std::unique_lock<std::mutex> lock(mtx);
+                    cv.wait(lock, [&] { return done; });
+                    return success;
                 },
         .startSharedMemoryModule = [](int size) -> const char* {
             NOT_IMPLEMENTED("QAndroidRecordScreenAgent.startSharedMemoryModule(size: %d)", size);

@@ -60,17 +60,9 @@ struct MockPhysicalStateAgent {
     }
 };
 
-// Global control client for the agent to use.
-static std::shared_ptr<EmulatorControlClient> gTestControlClient;
-static std::shared_ptr<SensorClient> gTestSensorClient;
-
-std::shared_ptr<EmulatorControlClient> getGlobalControlClient() {
-    return gTestControlClient;
-}
-
-std::shared_ptr<SensorClient> getGlobalSensorClient() {
-    return gTestSensorClient;
-}
+// Defined in test_client_setup.cpp
+extern std::shared_ptr<EmulatorControlClient> gTestControlClient;
+extern std::shared_ptr<SensorClient> gTestSensorClient;
 
 class MockSensorClient : public SensorClient {
 public:
@@ -324,5 +316,3 @@ TEST_F(SensorsAgentTest, SetPhysicalStateAgentSubscribesAndTriggersCallbacks) {
     capturedCallback(&event);
     EXPECT_EQ(mockAgent.targetStateChangedCount, 1);
 }
-
-
