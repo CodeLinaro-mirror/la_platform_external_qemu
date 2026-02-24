@@ -19,6 +19,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "android/emulation/control/utils/EmulatorGrcpClient.h"
+#include "android/emulation/control/utils/GenericCallbackFunctions.h"
 #include "google/protobuf/empty.pb.h"
 #include "sensor_service.grpc.pb.h"
 #include "sensor_service.pb.h"
@@ -27,12 +28,6 @@ namespace android {
 namespace emulation {
 namespace control {
 
-template <typename T>
-using OnCompleted = std::function<void(absl::StatusOr<T*>)>;
-using OnFinished = std::function<void(absl::Status)>;
-
-template <typename T>
-using OnEvent = std::function<void(const T*)>;
 using ::google::protobuf::Empty;
 using incubating::PhysicalStateEvent;
 using incubating::SensorService;

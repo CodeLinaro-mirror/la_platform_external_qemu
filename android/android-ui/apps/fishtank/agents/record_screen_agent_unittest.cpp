@@ -276,3 +276,100 @@ TEST_F(RecordScreenAgentTest, StartRecordingAsyncSuccess) {
     EXPECT_TRUE(success);
 }
 
+TEST_F(RecordScreenAgentTest, StopRecordingSuccess) {
+    ::RecordingInfo info = {};
+    info.fileName = "test_stop.mp4";
+    info.cb = [](void* opaque, RecordingStatus status) {};
+
+    // First, start recording to set the state
+    EXPECT_CALL(recordingService, StartRecording(_, _, _))
+            .WillOnce([](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                response->set_state(incubating::RecordingInfo::RECORDER_STATE_RECORDING);
+                return ::grpc::Status::OK;
+            });
+    mAgent->startRecording(&info);
+
+    EXPECT_CALL(recordingService, StopRecording(_, _, _))
+            .WillOnce([](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                response->set_state(incubating::RecordingInfo::RECORDER_STATE_STOPPED);
+                return ::grpc::Status::OK;
+            });
+
+    bool result = mAgent->stopRecording();
+    EXPECT_TRUE(result);
+    EXPECT_EQ(mAgent->getRecorderState().state, RECORDER_STOPPED);
+}
+
+TEST_F(RecordScreenAgentTest, StopRecordingFailure) {
+    // First, start recording to set the state
+    ::RecordingInfo info = {};
+    info.fileName = "test_stop_fail.mp4";
+    EXPECT_CALL(recordingService, StartRecording(_, _, _))
+            .WillOnce([](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                response->set_state(incubating::RecordingInfo::RECORDER_STATE_RECORDING);
+                return ::grpc::Status::OK;
+            });
+    mAgent->startRecording(&info);
+
+    EXPECT_CALL(recordingService, StopRecording(_, _, _))
+            .WillOnce([](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Error");
+            });
+
+    bool result = mAgent->stopRecording();
+    EXPECT_FALSE(result);
+    EXPECT_EQ(mAgent->getRecorderState().state, RECORDER_RECORDING);
+}
+
+TEST_F(RecordScreenAgentTest, StopRecordingAsyncSuccess) {
+    ::RecordingInfo info = {};
+    info.fileName = "test_stop_async.mp4";
+
+    struct CallbackData {
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool called = false;
+    } data;
+
+    info.cb = [](void* opaque, RecordingStatus status) {
+        CallbackData* d = static_cast<CallbackData*>(opaque);
+        if (status == RECORD_STOPPED) {
+            std::lock_guard<std::mutex> lock(d->mtx);
+            d->called = true;
+            d->cv.notify_one();
+        }
+    };
+    info.opaque = &data;
+
+    // First, start recording
+    EXPECT_CALL(recordingService, StartRecording(_, _, _))
+            .WillOnce([](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                response->set_state(incubating::RecordingInfo::RECORDER_STATE_RECORDING);
+                return ::grpc::Status::OK;
+            });
+    mAgent->startRecording(&info);
+
+    EXPECT_CALL(recordingService, StopRecording(_, _, _))
+            .WillOnce([](::grpc::ServerContext* context,
+                         const incubating::RecordingInfo* request, incubating::RecordingInfo* response) {
+                response->set_state(incubating::RecordingInfo::RECORDER_STATE_STOPPED);
+                return ::grpc::Status::OK;
+            });
+
+    bool result = mAgent->stopRecordingAsync();
+    EXPECT_TRUE(result);
+
+    std::unique_lock<std::mutex> lock(data.mtx);
+    bool success = data.cv.wait_for(lock, std::chrono::seconds(5), [&] { return data.called; });
+    EXPECT_TRUE(success);
+    EXPECT_EQ(mAgent->getRecorderState().state, RECORDER_STOPPED);
+}
+
+TEST_F(RecordScreenAgentTest, GetRecorderInitialState) {
+    EXPECT_EQ(mAgent->getRecorderState().state, RECORDER_STOPPED);
+}

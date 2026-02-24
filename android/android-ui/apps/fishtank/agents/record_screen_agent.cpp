@@ -181,18 +181,92 @@ const QAndroidRecordScreenAgent sFishtankQAndroidRecordScreenAgent = {
                 },
         .stopRecording =
                 []() {
-                    NOT_IMPLEMENTED("QAndroidRecordScreenAgent.stopRecording");
-                    return false;
+                    auto client = getGlobalRecordingClient();
+                    if (!client) {
+                        return false;
+                    }
+
+                    bool success = false;
+                    std::mutex mtx;
+                    std::condition_variable cv;
+                    bool done = false;
+
+                    ::RecordingInfo currentInfo;
+                    {
+                        std::lock_guard<std::mutex> lock(sCurrentRecording.mtx);
+                        currentInfo = sCurrentRecording.info;
+                    }
+                    auto infoCopy = std::make_shared<RecordingInfoWrapper>(&currentInfo);
+
+                    client->stopRecordingAsync(
+                            toProto(&currentInfo),
+                            [&, infoCopy](absl::StatusOr<incubating::RecordingInfo*> result) {
+                                std::lock_guard<std::mutex> lock(mtx);
+                                if (result.ok()) {
+                                    auto proto = *result;
+                                    success = proto->state() ==
+                                              incubating::RecordingInfo::
+                                                      RECORDER_STATE_STOPPED;
+                                    handleRecordingStatus(&infoCopy->info, proto->state());
+                                    updateActiveRecording(&infoCopy->info, !success, toAgentState(proto->state()));
+                                } else {
+                                    derror("gRPC StopRecording failed: %s",
+                                           result.status().ToString().c_str());
+                                    handleRecordingStatus(
+                                            &infoCopy->info,
+                                            incubating::RecordingInfo::
+                                                    RECORDER_STOP_FAILED);
+                                    updateActiveRecording(&infoCopy->info, true, RECORDER_RECORDING);
+                                }
+                                done = true;
+                                cv.notify_one();
+                            });
+
+                    std::unique_lock<std::mutex> lock(mtx);
+                    cv.wait(lock, [&] { return done; });
+                    return success;
                 },
         .stopRecordingAsync =
                 []() {
-                    NOT_IMPLEMENTED("QAndroidRecordScreenAgent.stopRecordingAsync");
-                    return false;
+                    auto client = getGlobalRecordingClient();
+                    if (!client) {
+                        return false;
+                    }
+
+                    ::RecordingInfo currentInfo;
+                    {
+                        std::lock_guard<std::mutex> lock(sCurrentRecording.mtx);
+                        currentInfo = sCurrentRecording.info;
+                    }
+                    auto infoCopy = std::make_shared<RecordingInfoWrapper>(&currentInfo);
+
+                    client->stopRecordingAsync(
+                            toProto(&currentInfo),
+                            [infoCopy](absl::StatusOr<incubating::RecordingInfo*> result) {
+                                if (result.ok()) {
+                                    auto proto = *result;
+                                    bool stopped = proto->state() ==
+                                              incubating::RecordingInfo::
+                                                      RECORDER_STATE_STOPPED;
+                                    handleRecordingStatus(&infoCopy->info,
+                                                         proto->state());
+                                    updateActiveRecording(&infoCopy->info, !stopped, toAgentState(proto->state()));
+                                } else {
+                                    derror("gRPC StopRecording failed: %s",
+                                           result.status().ToString().c_str());
+                                    handleRecordingStatus(
+                                            &infoCopy->info,
+                                            incubating::RecordingInfo::
+                                                    RECORDER_STOP_FAILED);
+                                    updateActiveRecording(&infoCopy->info, true, RECORDER_RECORDING);
+                                }
+                            });
+                    return true;
                 },
         .getRecorderState =
                 []() {
-                    NOT_IMPLEMENTED("QAndroidRecordScreenAgent.getRecorderState");
-                    return RecorderStates{RECORDER_STOPPED, 0};
+                    std::lock_guard<std::mutex> lock(sCurrentRecording.mtx);
+                    return RecorderStates{sCurrentRecording.state, sCurrentRecording.info.displayId};
                 },
         .doSnap =
                 [](const char* name, uint32_t displayId) {

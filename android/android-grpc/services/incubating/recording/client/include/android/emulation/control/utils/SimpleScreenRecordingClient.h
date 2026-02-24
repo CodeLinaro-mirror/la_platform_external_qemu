@@ -28,12 +28,6 @@ namespace android {
 namespace emulation {
 namespace control {
 
-template <typename T>
-using OnCompleted = std::function<void(absl::StatusOr<T*>)>;
-using OnFinished = std::function<void(absl::Status)>;
-
-template <typename T>
-using OnEvent = std::function<void(const T*)>;
 using namespace incubating;
 using ::google::protobuf::Empty;
 

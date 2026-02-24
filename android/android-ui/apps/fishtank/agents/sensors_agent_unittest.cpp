@@ -299,7 +299,7 @@ TEST_F(SensorsAgentTest, SetPhysicalStateAgentSubscribesAndTriggersCallbacks) {
     MockPhysicalStateAgent mockAgent;
     auto agent = mockAgent.agent();
 
-    OnEvent<android::emulation::control::PhysicalStateEvent> capturedCallback;
+    android::emulation::control::OnEvent<android::emulation::control::PhysicalStateEvent> capturedCallback;
     EXPECT_CALL(*mMockSensorClient, receivePhysicalStateEvents(_, _))
             .WillOnce(Invoke([&capturedCallback](auto incoming, auto) {
                 capturedCallback = incoming;
