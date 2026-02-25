@@ -85,6 +85,9 @@ public:
     // Update scene animations and poster changes
     static void update();
 
+    // Check if the view's cache requires update due to view/scene changes
+    static bool viewCacheRequiresUpdate(const RendererView* view);
+
     // Render the virtual scene to the given view.
     static bool renderView(RendererView* view,
                            std::function<void()> finishCallback,

@@ -216,15 +216,14 @@ bool ScenesManager::renderView(Scene* scene,
 
     auto sceneHash = scene->getVersionHashForView(view);
     if (view->mCache.isValidFor(sceneHash, frameTime)) {
-        // TODO(virtualscene-perf): check the hash at higher level to avoid
-        // copies&conversions
+        // We still need to call finish callback to let caller use the existing
+        // view cache. viewCacheRequiresUpdate should be used when a final
+        // copy/conversion is not needed.
         finishCallback();
         return true;
     }
 
-    // View is not up to date,need to render again.
-
-    // Update cache with the render results
+    // View is not up to date, render and update the cache
     auto readbackSize = view->getWidthLocked() * view->getHeightLocked() * 4;
     view->mCache.mSceneHash = sceneHash;
     view->mCache.mFrameTime = frameTime;
@@ -492,9 +491,15 @@ void VirtualSceneManager::update() {
     // Settings::AnimationState is mainly used for TV animation in default
     // virtualscene and animation is controlled by renderTime in shaders. Always
     // update the scene and timer in other modes.
-    const bool updateTime = (mEnvironmentScene->getSceneMode() !=
-                             SceneConfig::Mode::Mesh3dScene) ||
-                            sSettings->getAnimationState();
+    bool updateTime = true;
+    if (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::ImageFile) {
+        // Static scene, no need to update which may invalidate view caches
+        updateTime = false;
+    } else if (mEnvironmentScene->getSceneMode() ==
+               SceneConfig::Mode::Mesh3dScene) {
+        // Use virtualscene settings for animation control
+        updateTime = sSettings->getAnimationState();
+    }
     mEnvironmentScene->update(updateTime);
 
     mLock.unlock();
@@ -504,6 +509,23 @@ void VirtualSceneManager::update() {
     if (mUpdateCallback) {
         mUpdateCallback();
     }
+}
+
+bool VirtualSceneManager::viewCacheRequiresUpdate(const RendererView* view) {
+    if (!view) {
+        E("%s: invalid parameters", __FUNCTION__);
+        return false;
+    }
+
+    uint64_t sceneHash, frameTime;
+    {
+        AutoLock lock(mLock);
+        sceneHash = mEnvironmentScene->getVersionHashForView(view);
+        frameTime = mEnvironmentScene->getFrameTimeUs();
+    }
+
+    std::lock_guard lock(view->mLock);
+    return !(view->mCache.isValidFor(sceneHash, frameTime));
 }
 
 bool VirtualSceneManager::renderView(RendererView* view,
@@ -749,17 +771,19 @@ bool BackgroundUpdateService::start(int displayWidth,
 
         mBackgroundView->updateViewProjection(viewProjection);
 
-        VirtualSceneManager::renderView(
-                mBackgroundView.get(),
-                [&]() {
-                    const std::vector<uint8_t>& fbData =
-                            mBackgroundView->getFramebufferLocked();
+        if (VirtualSceneManager::viewCacheRequiresUpdate(mBackgroundView.get())) {
+            VirtualSceneManager::renderView(
+                    mBackgroundView.get(),
+                    [&]() {
+                        const std::vector<uint8_t>& fbData =
+                                mBackgroundView->getFramebufferLocked();
 
-                    android_setOpenglesScreenBackground(
-                            mBackgroundView->getWidthLocked(),
-                            mBackgroundView->getHeightLocked(), fbData.data());
-                },
-                nullptr);
+                        android_setOpenglesScreenBackground(
+                                mBackgroundView->getWidthLocked(),
+                                mBackgroundView->getHeightLocked(), fbData.data());
+                    },
+                    nullptr);
+        }
     });
 
     VirtualSceneManager::addSceneUser();

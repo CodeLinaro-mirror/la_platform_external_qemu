@@ -143,8 +143,9 @@ public:
 protected:
     friend class RendererImpl;
     friend class ScenesManager;
+    friend class VirtualSceneManager;
 
-    std::mutex mLock;
+    mutable std::mutex mLock;
     int mFrameWidth = 0;
     int mFrameHeight = 0;
     Format mFormat = Format::RGBA8;
