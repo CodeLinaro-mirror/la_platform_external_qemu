@@ -35,9 +35,12 @@
 #include <string_view>
 #include <unordered_map>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 using namespace android::base;
 
-//TODO(virtualscene): disable debug logs after testing throughly
+// TODO(virtualscene): disable debug logs after testing throughly
 #define DEBUG_LOGS 1
 
 #define E(...) derror(__VA_ARGS__)
@@ -460,6 +463,11 @@ bool VirtualSceneManager::initialize(const SceneConfig& config) {
 
 void VirtualSceneManager::uninitialize() {
     D("Uninitializing VirtualSceneManager");
+
+    // TODO(virtualscene): stop background update service before calling this
+    // function
+    BackgroundUpdateService::stop();
+
     // First, stop the update thread, should be done outside of
     // the lock so that the tasks can finish properly.
     stopSceneUpdateThread();
@@ -687,6 +695,9 @@ void VirtualSceneManager::startSceneUpdateThread() {
 }
 
 void VirtualSceneManager::stopSceneUpdateThread() {
+    if (!mKeepUpdating) {
+        return;
+    }
     D("%s: Stopping update thread", __func__);
     mKeepUpdating = false;
     std::thread threadToJoin;
@@ -702,6 +713,64 @@ void VirtualSceneManager::stopSceneUpdateThread() {
         threadToJoin.join();
     }
     D("%s: Stopped update thread", __func__);
+}
+
+/*******************************************************************************
+ *                     ScenesManager API.
+ ******************************************************************************/
+std::unique_ptr<SceneCamera> BackgroundUpdateService::mSceneCamera;
+std::unique_ptr<RendererView> BackgroundUpdateService::mBackgroundView;
+
+bool BackgroundUpdateService::start(int displayWidth,
+                                    int displayHeight,
+                                    float backgroundBlur) {
+    const float aspectRatio = static_cast<float>(displayWidth) / displayHeight;
+    mSceneCamera = std::make_unique<SceneCamera>();
+    mSceneCamera->setAspectRatio(aspectRatio);
+
+    // TODO(virtualscene): do not call renderView if it's a static
+    // image, adjust fps based on environment.ini
+    mBackgroundView = std::make_unique<RendererView>();
+    mBackgroundView->updateTarget(RendererView::Format::RGBA8, displayWidth,
+                                  displayHeight);
+    mBackgroundView->setBlurFactor(backgroundBlur);
+
+    // Set update callback, to update the background image after each
+    // scene update
+    VirtualSceneManager::setUpdateCallback([&]() {
+        mSceneCamera->update();
+
+        // SceneCamera uses 90 degrees rotated views by default for
+        // the camera rendering, rotate it back to correct for background
+        glm::mat4 cameraView =
+                glm::rotate(mSceneCamera->getView(), glm::radians(-90.0f),
+                            glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::mat4 viewProjection = mSceneCamera->getProjection() * cameraView;
+
+        mBackgroundView->updateViewProjection(viewProjection);
+
+        VirtualSceneManager::renderView(
+                mBackgroundView.get(),
+                [&]() {
+                    const std::vector<uint8_t>& fbData =
+                            mBackgroundView->getFramebufferLocked();
+
+                    android_setOpenglesScreenBackground(
+                            mBackgroundView->getWidthLocked(),
+                            mBackgroundView->getHeightLocked(), fbData.data());
+                },
+                nullptr);
+    });
+
+    VirtualSceneManager::addSceneUser();
+
+    return true;
+}
+
+void BackgroundUpdateService::stop() {
+    VirtualSceneManager::removeSceneUser();
+    mBackgroundView.reset();
+    mSceneCamera.reset();
 }
 
 }  // namespace virtualscene

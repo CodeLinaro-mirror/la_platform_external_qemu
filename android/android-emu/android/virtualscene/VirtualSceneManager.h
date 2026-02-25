@@ -39,6 +39,7 @@ namespace virtualscene {
 
 // Forward declarations.
 struct SceneConfig;
+class SceneCamera;
 
 // ScenesManager is responsible for creating, rendering and destroying
 // scenes. Clients can create and render scenes through this interface
@@ -153,6 +154,19 @@ private:
     static void updateSceneWorker();
     static void startSceneUpdateThread();
     static void stopSceneUpdateThread();
+};
+
+// TODO(virtualscene): move into a regular service
+class BackgroundUpdateService {
+public:
+    static bool start(int displayWidth,
+                      int displayHeight,
+                      float backgroundBlur);
+    static void stop();
+
+private:
+    static std::unique_ptr<SceneCamera> mSceneCamera;
+    static std::unique_ptr<RendererView> mBackgroundView;
 };
 
 }  // namespace virtualscene
