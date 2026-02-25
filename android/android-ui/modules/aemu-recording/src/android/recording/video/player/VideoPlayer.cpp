@@ -1232,6 +1232,10 @@ int VideoPlayerImpl::play() {
 
     if (audioStream != -1) {
         mAudioOutputEngine = AudioOutputEngine::get();
+        if (!mAudioOutputEngine) {
+            LOG(INFO) << "No audio output engine found. Video playback will be "
+                         "silent.";
+        }
 
         mAudioStreamIdx = audioStream;
 
