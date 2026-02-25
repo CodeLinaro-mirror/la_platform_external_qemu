@@ -114,6 +114,21 @@ target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 prebuilt(QT5)
 android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 
+# Strips the given prebuilt executable during install.
+# We define this locally because android_strip_prebuilt in android.cmake
+# is currently broken for standalone distributions (it evaluates CMAKE_INSTALL_PREFIX
+# at configuration time instead of install time).
+function(fishtank_strip FNAME)
+  if(NOT WINDOWS_MSVC_X86_64)
+    install(
+      CODE "if(CMAKE_INSTALL_DO_STRIP)
+              execute_process(COMMAND \"${CMAKE_STRIP}\" \"$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${FNAME}\")
+            endif()"
+      COMPONENT fishtank
+      EXCLUDE_FROM_ALL)
+  endif()
+endfunction()
+
 # Helper function to install dependencies with platform-specific destination logic.
 #
 # This function handles the distribution of various dependency types to the standalone
@@ -163,6 +178,9 @@ function(fishtank_install_dependency)
           RENAME ${DST_NAME}
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
+        if(DST_NAME MATCHES ".*\\.so.*" OR DST_NAME MATCHES ".*\\.dylib")
+          fishtank_strip("fishtank/${DST}")
+        endif()
         # Extra logic for libc++ on Linux to support QtWebEngineProcess.
         if(LINUX_X86_64 AND (DST_NAME STREQUAL "libc++.so.1"
                              OR DST_NAME STREQUAL "libc++.so"))
@@ -172,6 +190,7 @@ function(fishtank_install_dependency)
             RENAME ${DST_NAME}
             COMPONENT fishtank
             EXCLUDE_FROM_ALL)
+          fishtank_strip("fishtank/lib64/qt/lib/${DST_NAME}")
         endif()
       endif()
     elseif(TARGET ${dep})
@@ -189,6 +208,8 @@ function(fishtank_install_dependency)
           LIBRARY DESTINATION fishtank/lib64
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
+        # We don't need android_strip_prebuilt here because targets are stripped
+        # automatically by cmake --install --strip (which we added to compile.py)
       endif()
     endif()
   endforeach()
@@ -292,12 +313,16 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
           DESTINATION fishtank/${DST_DIR}
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
+        fishtank_strip("fishtank/${DST_DIR}/QtWebEngineProcess")
       else()
         install(
           FILES ${SRC}
           DESTINATION fishtank/${DST_DIR}
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
+        if(SRC MATCHES ".*\\.so.*" OR SRC MATCHES ".*\\.dylib")
+          fishtank_strip("fishtank/${DST}")
+        endif()
       endif()
     endif()
   endif()
