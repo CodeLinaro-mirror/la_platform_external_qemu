@@ -81,6 +81,8 @@ class CompileTask(BuildTask):
             "--prefix",
             fishtank_dist_dir,
         ]
+        if platform.system() != "Windows":
+            self.cmake_cmd_fishtank.append("--strip")
         self.env = get_default_environment(aosp, self.toolchain.visual_studio_version())
 
     def filter_ninja_error(self, logline: str):
