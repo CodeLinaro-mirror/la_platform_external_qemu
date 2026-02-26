@@ -36,7 +36,6 @@ namespace android {
 namespace virtualscene {
 
 class Scene;
-class SceneOverlayObject;
 
 struct Material {
     int id = -1;

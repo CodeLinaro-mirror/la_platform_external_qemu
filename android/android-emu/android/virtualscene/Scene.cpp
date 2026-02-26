@@ -16,7 +16,6 @@
 
 #include "android/virtualscene/Scene.h"
 
-#include "Scene.h"
 #include "android/avd/info.h"  // to resolve avd path for resources
 #include "android/base/system/System.h"
 #include "android/camera/camera-metrics.h"
@@ -216,8 +215,9 @@ bool Scene::initialize() {
         case SceneConfig::Mode::ImageFile: {
             mRawImageSource = RawImageFileSource::Create(sceneFilename);
             if (!mRawImageSource) {
-                derror("%s: Could not load background image: %s\nFalling back to default", __func__,
-                    mConfig.mFilename.c_str());
+                derror("%s: Could not load background image: '%s', falling "
+                       "back to default",
+                       __func__, mConfig.mFilename.c_str());
                 mRawImageSource = std::make_unique<DefaultRawImageProvider>();
             }
         } break;

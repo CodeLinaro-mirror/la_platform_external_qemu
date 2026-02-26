@@ -191,7 +191,6 @@ std::shared_ptr<Scene> ScenesManager::createScene(std::string_view sceneName,
         return nullptr;
     }
 
-    // Return existing one if the same scene was already created
     AutoLock lock(mLock);
     mScenes.push_back(scene);
 
