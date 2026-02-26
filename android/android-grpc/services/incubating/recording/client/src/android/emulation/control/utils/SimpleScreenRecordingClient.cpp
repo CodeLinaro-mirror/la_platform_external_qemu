@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "android/emulation/control/utils/SimpleScreenRecordingClient.h"
+#include "android/grpc/utils/SimpleAsyncGrpc.h"
 
 namespace android {
 namespace emulation {
@@ -27,6 +28,49 @@ namespace control {
 #endif
 
 using ::google::protobuf::Empty;
+
+void SimpleScreenRecordingClient::startRecordingAsync(
+        RecordingInfo info,
+        OnCompleted<RecordingInfo> onDone) {
+    auto [request, response, context] =
+            createGrpcRequestContext<RecordingInfo, RecordingInfo>(mClient);
+    *request = std::move(info);
+    mService->async()->StartRecording(
+            context.get(), request, response,
+            grpcCallCompletionHandler(std::move(context), request, response,
+                                      std::move(onDone)));
+}
+
+void SimpleScreenRecordingClient::stopRecordingAsync(
+        RecordingInfo info,
+        OnCompleted<RecordingInfo> onDone) {
+    auto [request, response, context] =
+            createGrpcRequestContext<RecordingInfo, RecordingInfo>(mClient);
+    *request = std::move(info);
+    mService->async()->StopRecording(
+            context.get(), request, response,
+            grpcCallCompletionHandler(std::move(context), request, response,
+                                      std::move(onDone)));
+}
+
+void SimpleScreenRecordingClient::streamRecordingEvents(
+        OnEvent<RecordingInfo> onEvent,
+        OnFinished onDone) {
+    auto context = mClient->newContext();
+    static Empty empty;
+    auto read = new SimpleClientLambdaReader<RecordingInfo>(
+            context,
+            [onEvent](auto event) {
+                onEvent(event);
+                return ::grpc::Status::OK;
+            },
+            [onDone](auto status) {
+                onDone(ConvertGrpcStatusToAbseilStatus(status));
+            });
+    mService->async()->ReceiveRecordingEvents(context.get(), &empty, read);
+    read->StartRead();
+    read->StartCall();
+}
 
 }  // namespace control
 }  // namespace emulation

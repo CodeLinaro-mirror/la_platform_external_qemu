@@ -266,12 +266,21 @@ public:
             safe_execv(args[0], args.data());
             return std::nullopt;
         }
+        mAttr = new posix_spawnattr_t;
+        if (posix_spawnattr_init(mAttr)) {
+            DD("Unable to initialize spawnattr..");
+            return std::nullopt;
+        }
+#ifdef __APPLE__
+        // Do not inherit any custom exception handlers; reset them to the system default
+        // This will ensure that if the child process crashes, it will not be intercepted
+        // by crashpad.
+        if (posix_spawnattr_setexceptionports_np(mAttr, EXC_MASK_ALL,
+                                                MACH_PORT_NULL, 0, 0)) {
+            DD("Failed to request exception ports.");
+        }
+#endif
         if (!mInherit) {
-            mAttr = new posix_spawnattr_t;
-            if (posix_spawnattr_init(mAttr)) {
-                DD("Unable to initialize spawnattr..");
-                return std::nullopt;
-            }
 #ifdef __APPLE__
             if (posix_spawnattr_setflags(mAttr, POSIX_SPAWN_CLOEXEC_DEFAULT)) {
                 DD("Failed to request CLOEXEC.");

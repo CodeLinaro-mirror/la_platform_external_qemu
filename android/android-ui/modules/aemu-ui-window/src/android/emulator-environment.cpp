@@ -87,12 +87,6 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         return true;
     }
 
-    const char* avdBasePath = avdInfo_getContentPath(avdInfo);
-    if (!avdBasePath) {
-        derror("%s: Cannot find AVD path", __func__);
-        return false;
-    }
-
     // Environment is required, set it up
     CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
     if (!environmentIni) {
@@ -114,17 +108,10 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
                 environmentIni, "background.scene.filename", "");
         if (!backgroundImageFilename.empty()) {
             sceneMode = SceneConfig::Mode::ImageFile;
-            // Convert local path to absolute
-            std::string backgroundPath = avdBasePath;
-            backgroundPath.append(PATH_SEP);
-            backgroundPath.append(backgroundImageFilename);
-            sceneFilename = backgroundPath;
+            sceneFilename = backgroundImageFilename;
         } else if (!backgroundVideoFilename.empty()) {
             sceneMode = SceneConfig::Mode::VideoPlayback;
-            std::string backgroundPath = avdBasePath;
-            backgroundPath.append(PATH_SEP);
-            backgroundPath.append(backgroundVideoFilename);
-            sceneFilename = backgroundPath;
+            sceneFilename = backgroundVideoFilename;
         } else if (!backgroundSceneFilename.empty()) {
             // If nothing is given, load default virtual scene
             sceneMode = SceneConfig::Mode::Mesh3dScene;

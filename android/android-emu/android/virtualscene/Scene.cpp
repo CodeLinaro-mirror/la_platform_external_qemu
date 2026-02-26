@@ -16,7 +16,9 @@
 
 #include "android/virtualscene/Scene.h"
 
+#include "android/avd/info.h" // to resolve avd path for resources
 #include "android/base/system/System.h"
+#include "android/console.h"
 #include "android/camera/camera-metrics.h"
 #include "android/loadpng.h"
 #include "android/utils/debug.h"
@@ -43,6 +45,42 @@ static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
 static constexpr const char* kDefaultImageFile = "poster.png";
 static constexpr const char* kDefaultVideoFile =
         "macroPreviews/Reset_position.mp4";
+
+// Function to find fullpath from a filename for the scene
+// Scene filenames can be provided as fullpaths, AVD local,
+// or from 'in 'resources' folder.
+std::string resolveSceneFilename(const std::string& sceneFilename) {
+    // Check if it's a fullpath
+    fs::path inputPath(sceneFilename);
+    if (fs::exists(inputPath)) {
+        return inputPath.string();
+    }
+
+    // If it's not a usable full path, try AVD local
+    const char* avdBasePath =
+            getConsoleAgents() && getConsoleAgents()->settings
+                    ? avdInfo_getContentPath(
+                              getConsoleAgents()->settings->avdInfo())
+                    : nullptr;
+    if (avdBasePath) {
+        fs::path avdPath = fs::path(avdBasePath) / inputPath;
+        if (fs::exists(avdPath)) {
+            return avdPath.string();
+        }
+    }
+
+    // If not in AVD folder, check 'resources' folder
+    fs::path resourcesBasePath =
+            fs::path(System::get()->getLauncherDirectory()) / "resources";
+    fs::path resourcePath = resourcesBasePath / inputPath;
+    if (fs::exists(resourcePath)) {
+        return resourcePath.string();
+    }
+
+    dwarning("Could not resolve environment scene filename '%s'",
+             sceneFilename.c_str());
+    return sceneFilename;
+}
 
 // static_cast the value in a unique_ptr.
 // After this call, the unique_ptr that the value is cast from will be removed.
@@ -97,15 +135,24 @@ const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
     }
 }
 
-Scene::Scene(Renderer& renderer, const SceneConfig& config)
-    : mRenderer(renderer), mConfig(config) {}
 
-Scene::~Scene() = default;
+Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
+    : mRenderer(std::move(renderer)), mConfig(config) {
+    D("%s: creating Scene", __func__);
+}
 
-std::unique_ptr<Scene> Scene::create(Renderer& renderer,
+Scene::~Scene() {
+    D("%s: destroying Scene", __func__);
+    if (mSceneObjects.size() || mOverlayObject) {
+        // releaseResources should have been called!
+        E("%s: Scene resources are not released!", __func__);
+    }
+}
+
+std::unique_ptr<Scene> Scene::create(std::unique_ptr<Renderer> renderer,
                                      const SceneConfig& config) {
     std::unique_ptr<Scene> scene;
-    scene.reset(new Scene(renderer, config));
+    scene.reset(new Scene(std::move(renderer), config));
     if (!scene || !scene->initialize()) {
         return nullptr;
     }
@@ -114,23 +161,34 @@ std::unique_ptr<Scene> Scene::create(Renderer& renderer,
 }
 
 bool Scene::initialize() {
-    dprint("Initializing scene with '%s' mode, file:%s",
-           SceneConfig::modeToString(mConfig.mSceneMode),
+    const char* sceneModeStr = SceneConfig::modeToString(mConfig.mSceneMode);
+    dprint("Initializing scene with '%s' mode, file:%s", sceneModeStr,
            mConfig.mFilename.c_str());
 
-    CameraMetrics::instance().setVirtualSceneName(mConfig.mFilename.c_str());
+    // Use scene mode name for metrics
+    // TODO(virtualscene): decide and add new metrics without PII
+    CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
-    auto sceneMode = getSceneMode();
+    // Find the file, in case it's given as a local path
+    const std::string sceneFilename = resolveSceneFilename(mConfig.mFilename);
+    const auto sceneMode = getSceneMode();
+
     switch (sceneMode) {
         case SceneConfig::Mode::Unknown: {
             derror("%s: Unknown scene mode!", __func__);
         } break;
         case SceneConfig::Mode::Mesh3dScene: {
+            if (mRenderer == nullptr) {
+                derror("%s: No renderer for scene: %s", __func__,
+                       sceneFilename.c_str());
+                return false;
+            }
             std::unique_ptr<MeshSceneObject> sceneObject =
-                    MeshSceneObject::load(mRenderer, mConfig.mFilename.c_str());
+                    MeshSceneObject::load(*mRenderer,
+                                          sceneFilename.c_str());
             if (!sceneObject) {
                 derror("%s: Could not load scene object: %s", __func__,
-                       mConfig.mFilename.c_str());
+                       sceneFilename.c_str());
                 return false;
             }
 
@@ -138,11 +196,11 @@ bool Scene::initialize() {
                     std::move(static_unique_cast<SceneObject>(sceneObject)));
         } break;
         case SceneConfig::Mode::VideoPlayback: {
-            // TODO(virtualscene-video): actually load mConfig.mFilename video,
+            // TODO(virtualscene-video): actually load sceneFilename video,
             // and change render()
-            if (!fs::exists(mConfig.mFilename)) {
+            if (!fs::exists(sceneFilename)) {
                 derror("%s: Could not load video file: %s", __func__,
-                       mConfig.mFilename.c_str());
+                       sceneFilename.c_str());
                 return false;
             }
         } break;
@@ -150,11 +208,17 @@ bool Scene::initialize() {
             uint32_t width = 0;
             uint32_t height = 0;
             void* backgroundImageData =
-                    loadpng(mConfig.mFilename.c_str(), &width, &height);
+                    loadpng(sceneFilename.c_str(), &width, &height);
             if (!backgroundImageData) {
+                // Do not error out, but load default magenta image to avoid
+                // crashes, not-working camera or black screen
                 derror("%s: Could not load background image: %s", __func__,
-                       mConfig.mFilename.c_str());
-                return false;
+                       sceneFilename.c_str());
+                width = 1;
+                height = 1;
+                uint32_t* magentaData = (uint32_t*)malloc(width * height * 4);
+                *magentaData = 0xFFFF00FF;
+                backgroundImageData = magentaData;
             }
             mOverlayObject = std::make_unique<SceneOverlayObject>();
             mOverlayObject->mWidth = width;
@@ -173,19 +237,31 @@ bool Scene::initialize() {
     return true;
 }
 
-void Scene::releaseResources() {
-    mSceneObjects.clear();
+bool Scene::releaseResources() {
+    auto context = mRenderer ? mRenderer->makeCurrent() : nullptr;
+    if (mRenderer) {
+        if (!context->isValid()) {
+            E("%s: Cannot use EGL context", __FUNCTION__);
+            return false;
+        }
 
-    for (auto& poster : mPosters) {
-        mRenderer.releaseTexture(poster.second.texture);
-        mRenderer.releaseTexture(poster.second.defaultTexture);
+        for (auto& poster : mPosters) {
+            mRenderer->releaseTexture(poster.second.texture);
+            mRenderer->releaseTexture(poster.second.defaultTexture);
 
-        if (poster.second.sceneObject) {
-            poster.second.sceneObject.reset();
+            if (poster.second.sceneObject) {
+                poster.second.sceneObject.reset();
+            }
         }
     }
 
+    mSceneObjects.clear();
+
+    mOverlayObject.reset();
+
     mObjectsVersion++;
+
+    return true;
 }
 
 void Scene::update() {
@@ -223,9 +299,16 @@ std::vector<RenderableObject> Scene::getRenderableObjects(
 }
 
 bool Scene::createPosterLocation(const PosterInfo& info) {
+    if (mConfig.mSceneMode != SceneConfig::Mode::Mesh3dScene) {
+        // Scene mode doesn't support poster locations, not an error
+        return true;
+    }
+    if (!mRenderer) {
+        return false;
+    }
     PosterStorage storage;
     storage.sceneObject =
-            PosterSceneObject::create(mRenderer, info.position, info.rotation,
+            PosterSceneObject::create(*mRenderer, info.position, info.rotation,
                                       kPosterMinimumSizeMeters, info.size);
     if (!storage.sceneObject) {
         W("%s: Failed to create poster scene object %s.", __FUNCTION__,
@@ -235,7 +318,7 @@ bool Scene::createPosterLocation(const PosterInfo& info) {
 
     if (!info.defaultFilename.empty()) {
         storage.defaultTexture =
-                mRenderer.loadTextureAsync(info.defaultFilename.c_str());
+                mRenderer->loadTextureAsync(info.defaultFilename.c_str());
         storage.sceneObject->setTexture(storage.defaultTexture);
     }
 
@@ -255,13 +338,16 @@ bool Scene::loadPoster(const char* posterName,
 
     PosterStorage& poster = it->second;
 
-    mRenderer.releaseTexture(poster.texture);
+    mRenderer->releaseTexture(poster.texture);
     poster.texture = Texture();
 
-    if (filename) {
+    if (filename && strlen(filename) > 0) {
         poster.texture = loadBehavior == LoadBehavior::Synchronous
-                                 ? mRenderer.loadTexture(filename)
-                                 : mRenderer.loadTextureAsync(filename);
+                                 ? mRenderer->loadTexture(filename)
+                                 : mRenderer->loadTextureAsync(filename);
+    } else {
+        // Always render empty posters at 100% scale.
+        scale = 1.0f;
     }
 
     poster.sceneObject->setScale(scale);

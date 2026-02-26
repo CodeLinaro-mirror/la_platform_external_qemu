@@ -174,7 +174,6 @@ public:
     void setSceneControlsParameters(bool show);
 
 private:
-    std::unique_ptr<Renderer> mRenderer;
     std::unique_ptr<Scene> mScene;
 
     std::deque<std::string> mPosterFilenameUpdates;
@@ -183,7 +182,7 @@ private:
 VirtualSceneManagerImpl::VirtualSceneManagerImpl(
         std::unique_ptr<Renderer>&& renderer,
         std::unique_ptr<Scene>&& scene)
-    : mRenderer(std::move(renderer)), mScene(std::move(scene)) {
+    : mScene(std::move(scene)) {
     // Load the poster configuration in the scene.
     for (const auto& it : sSettings->getPosterSettings()) {
         loadPosterInternal(it.first.c_str(), it.second,
@@ -197,16 +196,25 @@ VirtualSceneManagerImpl::~VirtualSceneManagerImpl() {
 
 std::unique_ptr<VirtualSceneManagerImpl> VirtualSceneManagerImpl::create(
         const SceneConfig& config) {
-    std::unique_ptr<Renderer> renderer = Renderer::create();
-    if (!renderer) {
-        E("VirtualSceneManager renderer failed to construct");
-        return nullptr;
+    bool rendererRequired = (config.mSceneMode == SceneConfig::Mode::Mesh3dScene);
+
+    std::unique_ptr<Renderer> renderer = nullptr;
+    if (rendererRequired) {
+        renderer = Renderer::create();
+        if (!renderer) {
+            E("VirtualSceneManager renderer failed to construct");
+            return nullptr;
+        }
     }
 
     // Make the renderer context current for graphics operations
-    auto context = renderer->makeCurrent();
+    auto context = renderer ? renderer->makeCurrent() : nullptr;
+    if (context && !context->isValid()) {
+        E("%s: Cannot use EGL context", __FUNCTION__);
+        return nullptr;
+    }
 
-    std::unique_ptr<Scene> scene = Scene::create(*renderer.get(), config);
+    std::unique_ptr<Scene> scene = Scene::create(std::move(renderer), config);
     if (!scene) {
         E("VirtualSceneManager scene failed to load");
         return nullptr;
@@ -256,12 +264,12 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
     auto readbackSize = view->getWidthLocked() * view->getHeightLocked() * 4;
     view->mCache.mSceneHash = sceneHash;
     view->mCache.mRenderTime = renderTime;
-    view->mCache.mFramebufferRGBA8.resize(readbackSize);
 
     // Make the renderer context current for graphics operations
-    auto context = mRenderer->makeCurrent();
-    if (!context->isValid()) {
-        derror("%s: Cannot use EGL context", __FUNCTION__);
+    Renderer* renderer = mScene->getRenderer();
+    auto context = renderer ? renderer->makeCurrent() : nullptr;
+    if (renderer && !context->isValid()) {
+        E("%s: Cannot use EGL context", __FUNCTION__);
         return false;
     }
 
@@ -279,10 +287,15 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
 
     SceneConfig::Mode mode = mScene->getSceneMode();
     if (mode == SceneConfig::Mode::Mesh3dScene) {
+        // This mode requires renderer
+        if (!renderer) {
+            E("%s: invalid scene renderer", __FUNCTION__);
+            return false;
+        }
         const auto renderables =
                 mScene->getRenderableObjects(view->mViewProjection);
-        if (!mRenderer->render(view, renderables, renderTime)) {
-            derror("Scene rendering failed");
+        if (!renderer->render(view, renderables, renderTime)) {
+            E("Scene rendering failed");
             return false;
         }
     } else if (mode == SceneConfig::Mode::VideoPlayback) {
@@ -294,7 +307,7 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
         std::vector<uint8_t>& fbData = view->getFramebufferLocked();
         if (fbData.size() < dummyVideoWidth * dummyVideoHeight * 4) {
             // preRenderLocked failed
-            derror("Scene rendering failed");
+            E("Scene rendering failed");
             return false;
         }
         for (int y = 0; y < dummyVideoHeight; y++) {
@@ -320,9 +333,9 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
             }
         }
     } else if (mode == SceneConfig::Mode::ImageFile) {
-        SceneOverlayObject* overlay = mScene->getOverlayObject();
+        const SceneOverlayObject* overlay = mScene->getOverlayObject();
         if (!overlay || !overlay->isValid()) {
-            derror("Scene rendering failed");
+            E("Scene rendering failed");
             return false;
         }
         std::vector<uint8_t>& fbData = view->getFramebufferLocked();
@@ -332,7 +345,7 @@ bool VirtualSceneManagerImpl::renderView(RendererView* view,
         if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
                                 overlay->mDataRGBA.data(),
                                 ImageScaler::ScaleMode::ScaleToFill)) {
-            derror("%s: Failed to resize the framebuffer for the view",
+            E("%s: Failed to resize the framebuffer for the view",
                    __FUNCTION__);
             return false;
         }

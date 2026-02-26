@@ -95,7 +95,12 @@ void SensorClient::receivePhysicalModelEvents(
     auto context = mClient->newContext();
 
     auto read = new SimpleClientLambdaReader<PhysicalModelValue>(
-            context, incoming,  [onDone, request](auto status) {
+            context,
+            [incoming](const PhysicalModelValue* event) {
+                incoming(event);
+                return grpc::Status::OK;
+            },
+            [onDone, request](auto status) {
                 delete request;
                 onDone(ConvertGrpcStatusToAbseilStatus(status));
             });
@@ -110,7 +115,12 @@ void SensorClient::receivePhysicalStateEvents(
     auto context = mClient->newContext();
     static google::protobuf::Empty empty;
     auto read = new SimpleClientLambdaReader<PhysicalStateEvent>(
-            context, incoming,  [onDone](auto status) {
+            context,
+            [incoming](const PhysicalStateEvent* event) {
+                incoming(event);
+                return grpc::Status::OK;
+            },
+            [onDone](auto status) {
                 onDone(ConvertGrpcStatusToAbseilStatus(status));
             });
     mService->async()->receivePhysicalStateEvents(context.get(), &empty, read);
