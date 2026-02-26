@@ -481,10 +481,6 @@ int ImageScaler::scaleToFill(int inputWidth,
  *                     RendererView routines
  ******************************************************************************/
 
-RendererView::RendererView(Scene* scene) {
-    mScene = scene;
-}
-
 void RendererView::updateTarget(Format format,
                                 int frameWidth,
                                 int frameHeight) {
@@ -748,10 +744,12 @@ private:
 };
 
 std::unique_ptr<Renderer> Renderer::create() {
+    dprint("virtualscene: Creating renderer.");
     std::unique_ptr<RendererImpl> renderer;
     renderer.reset(new RendererImpl(kRendererDefaultFramebufferWidth,
                                     kRendererDefaultFramebufferHeight));
     if (!renderer->initialize()) {
+        derror("virtualscene: could not create renderer.");
         return nullptr;
     }
     return std::move(renderer);

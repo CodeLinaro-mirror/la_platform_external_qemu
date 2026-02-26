@@ -111,8 +111,6 @@ void SceneCamera::update() {
             glm::inverse(rotationMat) * glm::translate(glm::mat4(), -position);
 
     mViewFromWorld = mCameraFromSensors * inverseSensorsPose;
-
-    mLastUpdateTime = timestamp;
 }
 
 glm::mat4 SceneCamera::getViewProjection() const {
@@ -125,10 +123,6 @@ const glm::mat4& SceneCamera::getView() const {
 
 const glm::mat4& SceneCamera::getProjection() const {
     return mProjection;
-}
-
-int64_t SceneCamera::getTimestamp() const {
-    return mLastUpdateTime;
 }
 
 }  // namespace virtualscene

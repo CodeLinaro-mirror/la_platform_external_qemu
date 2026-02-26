@@ -21,6 +21,7 @@
  */
 
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
+#include "android/raw_image_sources/raw_image_source.h"
 #include "android/utils/compiler.h"
 #include "android/virtualscene/PosterInfo.h"
 #include "android/virtualscene/PosterSceneObject.h"
@@ -55,19 +56,13 @@ struct SceneConfig {
 
     // Returns fullpath to default file for the given scene mode
     static const char* defaultFilenameForMode(SceneConfig::Mode mode);
-};
 
-// TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
-// will be removed once the 2d quad objects are used directly instead
-struct SceneOverlayObject {
-    uint32_t mWidth;
-    uint32_t mHeight;
-    std::vector<uint8_t> mDataRGBA;
+    // Check if a GPU renderer should be initialized for the scene mode
+    static bool modeRequiresRenderer(SceneConfig::Mode mode);
 
-    bool isValid() const {
-        return (mWidth > 0) && (mHeight > 0) &&
-               (mDataRGBA.size() == (mWidth * mHeight * 4));
-    }
+    // Check if the scene mode supports view rotations, otherwise a seperate
+    // rotation operation will be required
+    static bool modeSupportViewRotations(SceneConfig::Mode mode);
 };
 
 class Scene {
@@ -92,8 +87,11 @@ public:
     const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
 
     // Update the scene for the next frame.
-    //
-    void update();
+    // updateTime: Some animations are controlled by the global renderTime, use
+    //             this argument to disallow frame time updates, so such
+    //             animations would keep working as expected when animations are
+    //             paused.
+    void update(bool updateTime = true);
 
     // Returns a hash value based on the scene contents and animations. Can be
     // used to cache the results of a view and check if anything has changed.
@@ -133,11 +131,14 @@ public:
     //           clamped.
     void updatePosterScale(const char* posterName, float scale);
 
-    const SceneOverlayObject* getOverlayObject() const {
-        return mOverlayObject.get();
-    }
+    RawImageSource* getRawImageSource() const { return mRawImageSource.get(); }
 
     Renderer* getRenderer() { return mRenderer.get(); }
+
+    void loadUserResources();
+    void unloadUserResources();
+
+    uint64_t getFrameTimeUs() const { return mFrameTimeUs; }
 
 private:
     // Private constructor, use Scene::create to create an instance.
@@ -165,8 +166,10 @@ private:
 
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;
-    std::unique_ptr<SceneOverlayObject> mOverlayObject;
+    std::unique_ptr<RawImageSource> mRawImageSource;
     uint64_t mObjectsVersion = 0;
+    uint64_t mFrameTimeUs = 0;
+    uint64_t mStartTimeUs = 0;
 };
 
 }  // namespace virtualscene

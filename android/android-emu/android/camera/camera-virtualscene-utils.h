@@ -21,6 +21,7 @@
 #include "aemu/base/Log.h"
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/camera/camera-format-converters.h"
+#include "android/virtualscene/Scene.h"
 #include "android/virtualscene/SceneCamera.h"
 #include "android/virtualscene/VirtualSceneManager.h"
 #include "emugl/common/OpenGLDispatchLoader.h"
@@ -64,6 +65,8 @@ private:
 
     SceneCamera mSceneCamera;
     std::unique_ptr<RendererView> mActiveView;
+    std::shared_ptr<Scene> mScene;
+    std::string mName;
     bool mUseEnvironmentScene;
 };
 

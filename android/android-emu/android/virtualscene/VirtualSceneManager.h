@@ -16,8 +16,14 @@
 
 #pragma once
 
+#include <deque>
 #include <functional>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <thread>
 #include <vector>
+
 /*
  * Defines the Virtual Scene, used by the Virtual Scene Camera
  */
@@ -32,9 +38,35 @@ namespace android {
 namespace virtualscene {
 
 // Forward declarations.
-class VirtualSceneManagerImpl;
 struct SceneConfig;
+class SceneCamera;
 
+// ScenesManager is responsible for creating, rendering and destroying
+// scenes. Clients can create and render scenes through this interface
+// without any interaction with the 'environment' scene, like posters..etc.
+class ScenesManager {
+public:
+    // Parse command line options for the virtual scene.
+    static std::shared_ptr<Scene> createScene(std::string_view sceneName,
+                                              const SceneConfig& config);
+
+    // Render the virtual scene to the given view.
+    static bool renderView(Scene* scene,
+                           RendererView* view,
+                           std::function<void()> finishCallback,
+                           uint64_t* outFrameTime);
+
+    static bool removeScene(Scene* scene);
+
+    static bool removeAll();
+
+private:
+    static android::base::StaticLock mLock;
+    static std::vector<std::shared_ptr<Scene>> mScenes;
+};
+
+// VirtualSceneManager is responsible for 'virtualscene', which is a special
+// type of shared scene and can support changing posters.
 class VirtualSceneManager {
 public:
     // Parse command line options for the virtual scene.
@@ -43,9 +75,6 @@ public:
     // Initialize virtual scene rendering.
     // Returns true if initialization succeeded.
     static bool initialize(const SceneConfig& config);
-
-    // Check if virtual scene rendering has been initialized and is usable
-    static bool isInitialized();
 
     // Uninitialize virtual scene rendering, may be called on any thread, but
     // the same EGL context that was active when initialize() was called must be
@@ -56,15 +85,13 @@ public:
     // Update scene animations and poster changes
     static void update();
 
-    // Creates a view for the scene
-    static std::unique_ptr<RendererView> createView(RendererView::Format format,
-                                                    int frameWidth,
-                                                    int frameHeight);
+    // Check if the view's cache requires update due to view/scene changes
+    static bool viewCacheRequiresUpdate(const RendererView* view);
 
     // Render the virtual scene to the given view.
     static bool renderView(RendererView* view,
-                           float renderTime,
-                           std::function<void()> finishCallback);
+                           std::function<void()> finishCallback,
+                           uint64_t* outFrameTime);
 
     // Set the initial poster of the scene, loaded from persisted settings.
     // Command line flags take precedence, so if the -virtualscene-poster flag
@@ -113,9 +140,36 @@ public:
 
     static void setSceneControlsParameters(bool show);
 
+    static std::shared_ptr<Scene> addSceneUser();
+    static void removeSceneUser();
+
+    static void setUpdateCallback(std::function<void()> callback);
+
 private:
     static android::base::StaticLock mLock;
-    static VirtualSceneManagerImpl* mImpl;
+    static std::shared_ptr<Scene> mEnvironmentScene;
+    static std::deque<std::string> mPosterFilenameUpdates;
+    static std::optional<std::thread> mBackgroundUpdateThread;
+    static std::function<void()> mUpdateCallback;
+    static int mNumUsers;
+    static std::atomic<bool> mKeepUpdating;
+
+    static void updateSceneWorker();
+    static void startSceneUpdateThread();
+    static void stopSceneUpdateThread();
+};
+
+// TODO(virtualscene): move into a regular service
+class BackgroundUpdateService {
+public:
+    static bool start(int displayWidth,
+                      int displayHeight,
+                      float backgroundBlur);
+    static void stop();
+
+private:
+    static std::unique_ptr<SceneCamera> mSceneCamera;
+    static std::unique_ptr<RendererView> mBackgroundView;
 };
 
 }  // namespace virtualscene
