@@ -86,6 +86,7 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
         .setFailureReason = nullptr,    // Not currently mocked.
         .setExiting = nullptr,          // Not currently mocked.
         .allowRealAudio = nullptr,      // Not currently mocked.
+        .getRealAudioEventListener = nullptr, // Not currently mocked.
         .physicalMemoryGetAddr =
                 [](uint64_t gpa) {
                     void* res = HostAddressSpaceDevice::get()->getHostAddr(gpa);

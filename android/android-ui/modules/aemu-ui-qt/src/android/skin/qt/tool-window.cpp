@@ -1421,10 +1421,6 @@ void ToolWindow::setMicrophoneEnabled(bool enabled) {
     // Enable or disable host audio into the AVD
     getConsoleAgents()->vm->allowRealAudio(enabled);
 
-    // Save the setting into persistent storage
-    saveSetting(Ui::Settings::PER_AVD_MIC_ALLOW_READ_AUDIO,
-                Ui::Settings::MIC_ALLOW_READ_AUDIO, enabled);
-
     updateMicrophoneUI();
 
     // Emit the signal to allow the microphone page to update its UI

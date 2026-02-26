@@ -719,6 +719,23 @@ public:
         return Status::OK;
     }
 
+    Status setMicrophoneState(ServerContext* context,
+                              const MicrophoneState* requestPtr,
+                              ::google::protobuf::Empty* reply) override {
+        getConsoleAgents()->vm->allowRealAudio(requestPtr->realaudioenabled());
+
+        return Status::OK;
+    }
+
+    Status getMicrophoneState(ServerContext* context,
+                              const Empty* request,
+                              MicrophoneState* reply) override {
+        reply->set_realaudioenabled(
+                getConsoleAgents()->vm->isRealAudioAllowed());
+
+        return Status::OK;
+    }
+
     Status streamScreenshot(ServerContext* context,
                             const ImageFormat* request,
                             ServerWriter<Image>* writer) override {

@@ -27,6 +27,7 @@ extern "C" {
 #include "aemu/base/Optional.h"                    // for Optional
 #include "aemu/base/StringFormat.h"                // for StringFormatWit...
 
+#include "aemu/base/EventNotificationSupport.h"
 #include "aemu/base/files/PathUtils.h"             // for pj, PathUtils
 #include "android/base/system/System.h"               // for System
 #include "android/emulation/CpuAccelerator.h"         // for GetCurrentCpuAc...
@@ -86,6 +87,7 @@ extern "C" {
 #include <algorithm>  // for find_if
 #include <cstdio>     // for NULL, rename
 #include <memory>
+#include <mutex>
 #include <string>     // for string, operator+
 #include <string_view>
 #include <unordered_map>
@@ -999,12 +1001,37 @@ static void set_exiting() {
     sExiting = true;
 }
 
-static void allow_real_audio(bool allow) {
-    qemu_allow_real_audio(allow);
+// This is currently used to both provide grpc notifications of the setting
+// change and to save the setting to QSettings. This WILL NOT work on headless.
+
+namespace {
+class RealAudioStatePublisher
+    : public android::base::EventNotificationSupport<bool> {
+public:
+    void notifyListeners(bool allow) { fireEvent(allow); }
+};
+
+}  // namespace
+
+static RealAudioStatePublisher sRealAudioEventSupport;
+static std::mutex sRealAudioLock;
+
+static void* get_real_audio_event_listener() {
+    return &sRealAudioEventSupport;
 }
 
 static bool is_real_audio_allowed() {
     return qemu_is_real_audio_allowed();
+}
+
+static void allow_real_audio(bool allow) {
+    std::lock_guard<std::mutex> lock(sRealAudioLock);
+    bool changed = is_real_audio_allowed() != allow;
+    qemu_allow_real_audio(allow);
+
+    if (changed) {
+        sRealAudioEventSupport.notifyListeners(allow);
+    }
 }
 
 static void set_stat_snasphot_use_vulkan() {
@@ -1281,6 +1308,7 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
         .setFailureReason = set_failure_reason,
         .setExiting = set_exiting,
         .allowRealAudio = allow_real_audio,
+        .getRealAudioEventListener = get_real_audio_event_listener,
         .physicalMemoryGetAddr = physical_memory_get_addr,
         .isRealAudioAllowed = is_real_audio_allowed,
         .setSkipSnapshotSave = set_skip_snapshot_save,

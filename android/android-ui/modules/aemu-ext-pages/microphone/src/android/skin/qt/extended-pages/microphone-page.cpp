@@ -14,6 +14,7 @@
 #include <QCheckBox>                                  // for QCheckBox
 #include <QDesktopServices>                           // for QDesktopServices
 
+#include "aemu/base/EventNotificationSupport.h"
 #include "android/skin/backend-defs.h"
 #include "android/avd/info.h"                         // for avdInfo_getAvdF...
 #include "android/avd/util.h"                         // for AVD_ANDROID_AUTO
@@ -158,7 +159,6 @@ void MicrophonePage::on_mic_inserted_toggled(bool checked) {
 }
 
 void MicrophonePage::on_mic_allowRealAudio_toggled(bool checked) {
-    saveMicAllowRealAudio(checked);
     getConsoleAgents()->vm->allowRealAudio(checked);
 
     // Emit the signal to allow the main toolbar to update its UI
@@ -214,5 +214,11 @@ void MicrophonePage::forwardKeyToEmulator(uint32_t keycode, bool down) {
 }
 
 void MicrophonePage::loadSettings() {
+    auto notifier = static_cast<android::base::EventNotificationSupport<bool>*>(
+            getConsoleAgents()->vm->getRealAudioEventListener());
     getConsoleAgents()->vm->allowRealAudio(getSavedMicAllowRealAudio());
+    if (notifier) {
+        notifier->registerOnce(
+                [&](bool enabled) { saveMicAllowRealAudio(enabled); });
+    }
 }

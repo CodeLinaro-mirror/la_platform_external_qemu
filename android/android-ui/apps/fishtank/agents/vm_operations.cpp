@@ -118,6 +118,11 @@ const QAndroidVmOperations sFishtankQAndroidVmOperations = {
                     NOT_IMPLEMENTED("QAndroidVmOperations.isRealAudioAllowed");
                     return false;
                 },
+        .getRealAudioEventListener =
+                []() -> void* {
+                    NOT_IMPLEMENTED("QAndroidVmOperations.getRealAudioEventListener");
+                    return nullptr;
+                },
         .setSkipSnapshotSave =
                 [](bool used) {
                     NOT_IMPLEMENTED("QAndroidVmOperations.setSkipSnapshotSave");
