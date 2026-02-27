@@ -881,18 +881,15 @@ void LocationPage::timeout_v2() {
     emit targetHeadingChanged(
             mHeadingOnRoute);  // Update the magnetometer repeatedly
 
-    if (mIsGpxKmlPlayback) {
-        // Don't interpolate between gpx/kml points.
-        mMsIntoSegment = mSegmentDurationMs;
-        mTimer.setInterval(mSegmentDurationMs);
 #if DEBUG_PLAYBACK
+    if (mIsGpxKmlPlayback) {
         qDebug() << "Gpx point #" << mNextRoutePointIdx - 1 << ": next pt in "
                  << mSegmentDurationMs << " ms";
-#endif
-    } else {
-        int sleepTime = mSegmentDurationMs - mMsIntoSegment;
-        mTimer.setInterval(std::min((int)UPDATE_INTERVAL, sleepTime));
     }
+#endif
+
+    int sleepTime = mSegmentDurationMs - mMsIntoSegment;
+    mTimer.setInterval(std::min((int)UPDATE_INTERVAL, sleepTime));
     mTimer.start();
 #endif  // USE_WEBENGINE
 }
