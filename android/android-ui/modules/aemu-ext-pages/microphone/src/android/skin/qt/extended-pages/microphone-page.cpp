@@ -13,6 +13,7 @@
 
 #include <QCheckBox>                                  // for QCheckBox
 #include <QDesktopServices>                           // for QDesktopServices
+#include <memory>
 
 #include "aemu/base/EventNotificationSupport.h"
 #include "android/avd/info.h"  // for avdInfo_getAvdF...
@@ -98,6 +99,21 @@ MicrophonePage::MicrophonePage(QWidget* parent)
         // voice assist button
         mUi->mic_voiceAssistButton->setHidden(true);
     }
+
+    connect(this, SIGNAL(_externalMicrophoneEnabledChanged(bool)), this,
+            SLOT(onExternalMicrophoneEnabledChanged(bool)));
+
+    auto notifier = static_cast<android::base::EventNotificationSupport<bool>*>(
+            getConsoleAgents()->vm->getRealAudioEventListener());
+    if (notifier) {
+        mRealAudioEventListener =
+                std::make_unique<android::base::RaiiEventListener<
+                        android::base::EventNotificationSupport<bool>, bool>>(
+                        notifier, [this](bool enabled) {
+                            emit this->_externalMicrophoneEnabledChanged(
+                                    enabled);
+                        });
+    }
 }
 
 void MicrophonePage::on_mic_hasMic_toggled(bool checked) {
@@ -160,14 +176,13 @@ void MicrophonePage::on_mic_inserted_toggled(bool checked) {
 
 void MicrophonePage::on_mic_allowRealAudio_toggled(bool checked) {
     getConsoleAgents()->vm->allowRealAudio(checked);
-
-    // Emit the signal to allow the main toolbar to update its UI
-    emit microphoneEnabledChanged();
 }
 
-void MicrophonePage::onMicrophoneEnabledChanged() {
+void MicrophonePage::onExternalMicrophoneEnabledChanged(bool enabled) {
     // Update the UI to match the external state change
-    mUi->mic_allowRealAudio->setCheckState(getSavedMicAllowRealAudio() ? Qt::Checked : Qt::Unchecked);
+    const QSignalBlocker blocker(mUi->mic_allowRealAudio);
+    mUi->mic_allowRealAudio->setCheckState(enabled ? Qt::Checked
+                                                   : Qt::Unchecked);
 }
 
 void MicrophonePage::on_mic_voiceAssistButton_pressed() {
