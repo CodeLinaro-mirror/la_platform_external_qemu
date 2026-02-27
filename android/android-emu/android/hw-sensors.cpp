@@ -1735,6 +1735,36 @@ bool android_xr_set_head_velocity(float x, float y, float z) {
                 PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
 }
 
+bool android_xr_set_hand_event(int32_t x, int32_t y, int32_t buttons, int32_t display) {
+    float mouse_data[] = {
+        static_cast<float>(x),
+        static_cast<float>(y),
+        absl::bit_cast<float>(buttons), // NOTE(stevensavold): See android_xr_set_eye_event() in hw-sensors.cpp for explaination of this bit_cast
+        static_cast<float>(display),
+    };
+
+    return static_cast<bool>(
+            android_physical_model_set(
+                PHYSICAL_PARAMETER_XR_HAND_EVENT,
+                mouse_data, std::size(mouse_data),
+                PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}
+
+bool android_xr_set_eye_event(int32_t x, int32_t y, int32_t buttons, int32_t display) {
+    float mouse_data[] = {
+        static_cast<float>(x),
+        static_cast<float>(y),
+        absl::bit_cast<float>(buttons), // NOTE(stevensavold): We bit_cast here because the X Macro generated functions have a float interface but do not read/modify the contents. This is safe as long as we bit_cast the value back out on the other side
+        static_cast<float>(display),
+    };
+
+    return static_cast<bool>(
+            android_physical_model_set(
+                PHYSICAL_PARAMETER_XR_EYE_EVENT,
+                mouse_data, std::size(mouse_data),
+                PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
+}
+
 bool android_xr_set_options(int environment, float passthroughCoefficient) {
     float options_vector[] = {environment, passthroughCoefficient, 0.0f};
     return static_cast<bool>(

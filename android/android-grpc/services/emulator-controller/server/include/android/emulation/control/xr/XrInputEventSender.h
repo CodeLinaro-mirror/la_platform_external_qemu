@@ -35,6 +35,8 @@ public:
     void sendXrHeadMovement(const Translation translation);
     void sendXrHeadAngularVelocity(const AngularVelocity angular_velocity);
     void sendXrHeadVelocity(const Velocity velocity);
+    void sendXrHandEvent(int32_t x, int32_t y, int32_t buttons, int32_t display);
+    void sendXrEyeEvent(int32_t x, int32_t y, int32_t buttons, int32_t display);
 
 private:
     void doSendXrCommand(const XrCommand command);
@@ -42,6 +44,8 @@ private:
     void doSendXrHeadMovement(float delta_x, float delta_y, float delta_z);
     void doSendXrHeadAngularVelocity(float omega_x, float omega_y, float omega_z);
     void doSendXrHeadVelocity(float x, float y, float z);
+    void doSendXrHandEvent(int32_t x, int32_t y, int32_t buttons, int32_t display);
+    void doSendXrEyeEvent(int32_t x, int32_t y, int32_t buttons, int32_t display);
 
     const AndroidConsoleAgents* const mAgents;
 };

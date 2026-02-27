@@ -180,6 +180,30 @@ void XrDeviceModel::setXrHeadVelocity(float x,
     qemudClientSend(request);
 }
 
+void XrDeviceModel::setXrHandEvent(float x, float y, float buttons, float display, PhysicalInterpolation mode) {
+    D("XrDeviceModel::setXrHandEvent %f %f %f %f", x, y, buttons, display);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_HAND_EVENT);
+    auto mouseEvent = request.mutable_xr_hand_event();
+    mouseEvent->set_x(static_cast<int32_t>(x));
+    mouseEvent->set_y(static_cast<int32_t>(y));
+    mouseEvent->set_buttons(absl::bit_cast<int32_t>(buttons)); // NOTE(stevensavold): See android_xr_set_eye_event() in hw-sensors.cpp for explaination of this bit_cast
+    mouseEvent->set_display(static_cast<int32_t>(display));
+    qemudClientSend(request);
+}
+
+void XrDeviceModel::setXrEyeEvent(float x, float y, float buttons, float display, PhysicalInterpolation mode) {
+    D("XrDeviceModel::setXrEyeEvent %f %f %f %f", x, y, buttons, display);
+    EmulatorRequest request;
+    request.set_msg_type(MsgType::MSG_TYPE_SET_EYE_EVENT);
+    auto mouseEvent = request.mutable_xr_eye_event();
+    mouseEvent->set_x(static_cast<int32_t>(x));
+    mouseEvent->set_y(static_cast<int32_t>(y));
+    mouseEvent->set_buttons(absl::bit_cast<int32_t>(buttons)); // NOTE(stevensavold): See android_xr_set_eye_event() in hw-sensors.cpp for explaination of this bit_cast
+    mouseEvent->set_display(static_cast<int32_t>(display));
+    qemudClientSend(request);
+}
+
 void XrDeviceModel::setXrOptions(int environment,
                                 float passthroughCoefficient,
                                 PhysicalInterpolation mode) {
