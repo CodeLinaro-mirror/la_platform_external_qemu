@@ -81,16 +81,28 @@ QString LocationPage::toJsonString(const GpsFixArray* arr) {
     }
     // The first point will always have 0 sec delay.
     time_t prevTime = (*arr)[0].time;
+    time_t lastDelay = 0;
 
     ret.append("{\"path\":[");
     for (int i = 0; i < arr->size(); ++i) {
         const GpsFix& fix = (*arr)[i];
         time_t delay = fix.time - prevTime;
-        // Ensure all other delays are > 0, even if multiple points have
+        // Ensure all other delays are strictly increasing, even if multiple points have
         // the same timestamp.
-        if (delay == 0 && i != 0) {
-            delay = 2;
+        if (i != 0 && delay <= lastDelay) {
+            const double kDefaultSpeedMetersPerSecond = 10.0; // 36 km/h
+            const double kMinCalculatedDelaySeconds = 2.0;
+
+            double distMeters = LocationPage::getDistanceMeters(
+                    (*arr)[i - 1].latitude, (*arr)[i - 1].longitude,
+                    fix.latitude, fix.longitude);
+            double calculatedDelay = distMeters / kDefaultSpeedMetersPerSecond;
+            if (calculatedDelay < kMinCalculatedDelaySeconds) {
+                calculatedDelay = kMinCalculatedDelaySeconds;
+            }
+            delay = lastDelay + std::round(calculatedDelay);
         }
+        lastDelay = delay;
         ret.append(QString("{\"lat\":%1,\"lng\":%2,\"elevation\":%3,\"delay_sec\":%4},")
                 .arg(QString::number(fix.latitude, 'f', 15))
                 .arg(QString::number(fix.longitude, 'f', 15))
