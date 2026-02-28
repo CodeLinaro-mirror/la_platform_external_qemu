@@ -27,6 +27,7 @@
 #include "aemu/base/process/Command.h"
 #include "android/base/system/System.h"
 #include "android/emulation/control/interceptor/MetricsInterceptor.h"
+#include "host-common/FeatureControl.h"
 #include "grpcpp/channel.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
@@ -75,7 +76,16 @@ bool GrpcChannelReady(const std::shared_ptr<grpc::Channel> &channel) {
 
 std::unique_ptr<android::base::ObservableProcess> RunNetsimd(
     NetsimdOptions options) {
-  auto exe = android::base::System::get()->findBundledExecutable("netsimd");
+  std::string executable = "netsimd";
+  if (android::featurecontrol::isEnabled(android::featurecontrol::NetsimX)) {
+#ifdef _WIN32
+    // TODO: remove this once netsimdx.exe is available on windows.
+    BtsLogWarn("NetsimX is enabled but netsimdx is not yet available on Windows.");
+#else
+    executable = "netsimdx";
+#endif
+  }
+  auto exe = android::base::System::get()->findBundledExecutable(executable);
   std::vector<std::string> program_with_args{exe};
   if (options.no_cli_ui) program_with_args.push_back("--no-cli-ui");
   if (options.no_web_ui) program_with_args.push_back("--no-web-ui");
