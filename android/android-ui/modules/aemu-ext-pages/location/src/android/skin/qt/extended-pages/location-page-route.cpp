@@ -615,6 +615,9 @@ void LocationPage::writeRouteJsonFile(const std::string& pathOfProtoFile,
 void LocationPage::routeSendingFinished(bool ok) {
     mRouteSender.reset();
     mUi->loc_playRouteButton->setEnabled(ok);
+    if (!ok) {
+        setLoadingOverlayVisible(false);
+    }
     // Wait until the route has drawn on the map before hiding the overlay.
     // When onSavedRouteDrawn() gets called.
 }
@@ -669,7 +672,9 @@ void LocationPage::finishGeoDataLoading_v2(
         return;
     }
     const GpsFixArray& fixes = mGpsFixesArray;
-    if (fixes.size() == 1) {
+    if (fixes.size() == 0) {
+        showErrorDialog(tr("No valid locations found in the file."), tr("Geo Data Parser"));
+    } else if (fixes.size() == 1) {
         mUi->locationTabs->setCurrentIndex(0);
         savePoint(fixes[0].latitude,
                   fixes[0].longitude,
@@ -685,6 +690,7 @@ void LocationPage::finishGeoDataLoading_v2(
     setButtonEnabled(mUi->loc_importGpxKmlButton, theme, true);
     setButtonEnabled(mUi->loc_importGpxKmlButton_route, theme, true);
     setButtonEnabled(mUi->loc_playRouteButton, theme, true);
+    mNowLoadingGeoData = false;
 }
 
 #endif // USE_WEBENGINE
