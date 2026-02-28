@@ -13,6 +13,7 @@
 #include "android/gps/KmlParser.h"
 
 #include "aemu/base/StringParse.h"
+#include "android/utils/debug.h"
 
 #include <libxml/parser.h>
 
@@ -25,6 +26,8 @@
 #endif
 
 using std::string;
+
+#define D(...) VERBOSE_PRINT(gps, __VA_ARGS__)
 
 // Coordinates can be nested arbitrarily deep within a Placemark, depending
 // on the type of object (Point, LineString, Polygon) the Placemark contains
@@ -159,6 +162,9 @@ static bool traverseSubtree(xmlNode* current,
                 *error = "Location found with missing or malformed coordinates";
                 return false;
             }
+        } else if (current->name != nullptr &&
+                !strcmp((const char *) current->name, "NetworkLink")) {
+            D("KML NetworkLink is not supported and will be ignored.");
         } else if (current->name != nullptr &&
                 strcmp((const char *) current->name, "text")) {
 
