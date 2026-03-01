@@ -20,9 +20,14 @@ Fishtank's primary goal is to provide a rich, native UI experience for the Andro
 ### Emulator Discovery and Connection
 
 Fishtank can connect to an emulator in three ways:
--   `--fishtank default`: Automatically picks the first running emulator it finds.
--   `--fishtank <serial>`: Connects to the emulator with the specified serial port (e.g., 5554).
--   `--fishtank <file.ini>`: Uses a specific gRPC discovery file.
+-   `-fishtank default`: Automatically picks the first running emulator it finds.
+-   `-fishtank <serial>`: Connects to the emulator with the specified serial port (e.g., 5554).
+-   `-fishtank <file.ini>`: Uses a specific gRPC discovery file.
+
+Fishtank now automatically configures the AVD name and necessary environment
+variables (`ANDROID_EMULATOR_LAUNCHER_DIR`, `ANDROID_AVD_HOME`) from the
+emulator's discovery file. This makes it possible to run fishtank using only the
+serial number without needing `-avd` or manual environment setup.
 
 Discovery is handled by the `EmulatorAdvertisement` class, which looks for `.ini` files in the emulator's runtime directory.
 
