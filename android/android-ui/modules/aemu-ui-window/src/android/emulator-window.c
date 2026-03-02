@@ -87,6 +87,10 @@ static void emulator_window_light_brightness(void* opaque,
     VERBOSE_PRINT(hw_control, "%s: light='%s' value=%d ui=%p", __FUNCTION__,
                   light, value, emulator->ui);
 
+    if (!emulator->ui) {
+        return;
+    }
+
     if (!strcmp(light, "lcd_backlight")) {
         skin_ui_set_lcd_brightness(emulator->ui, value);
         return;
@@ -370,6 +374,12 @@ void emulator_window_setup(EmulatorWindow* emulator) {
             &my_ui_funcs, &my_ui_params, s_use_emugl_subwindow);
     if (!emulator->ui) {
         return;
+    }
+
+    if (getConsoleAgents()->hw_control) {
+        int current_brightness =
+                getConsoleAgents()->hw_control->getBrightness("lcd_backlight");
+        skin_ui_set_lcd_brightness(emulator->ui, current_brightness);
     }
 
     if (s_use_emugl_subwindow) {
