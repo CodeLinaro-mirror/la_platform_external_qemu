@@ -67,30 +67,30 @@ struct MockPhysicalStateAgent {
 };
 
 // Defined in test_client_setup.cpp
-extern std::shared_ptr<EmulatorControlClient> gTestControlClient;
-extern std::shared_ptr<SensorClient> gTestSensorClient;
+extern std::shared_ptr<android::emulation::control::EmulatorControlClient> gTestControlClient;
+extern std::shared_ptr<android::emulation::control::SensorClient> gTestSensorClient;
 
-class MockSensorClient : public SensorClient {
+class MockSensorClient : public android::emulation::control::SensorClient {
 public:
-    MockSensorClient(std::shared_ptr<EmulatorGrpcClient> client,
+    MockSensorClient(std::shared_ptr<android::emulation::control::EmulatorGrpcClient> client,
                      android::emulation::control::incubating::SensorService::
                              StubInterface* service = nullptr)
         : SensorClient(client, service) {}
     MOCK_METHOD(void,
                 receivePhysicalStateEvents,
-                (OnEvent<android::emulation::control::PhysicalStateEvent>, OnFinished),
+                (android::emulation::control::OnEvent<android::emulation::control::PhysicalStateEvent>, android::emulation::control::OnFinished),
                 (override));
 };
 
 class SensorsAgentTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        auto mockStub = std::make_unique<MockEmulatorControllerStub>();
+        auto mockStub = std::make_unique<android::emulation::control::MockEmulatorControllerStub>();
         mMockStub = mockStub.get();
 
         // EmulatorControlClient takes ownership of the stub.
-        auto testClient = std::make_shared<EmulatorTestClient>();
-        gTestControlClient = std::make_shared<EmulatorControlClient>(
+        auto testClient = std::make_shared<android::emulation::control::EmulatorTestClient>();
+        gTestControlClient = std::make_shared<android::emulation::control::EmulatorControlClient>(
                 testClient, mockStub.release());
 
         auto sensorMockStub = std::make_unique<MockSensorServiceStub>();
@@ -109,7 +109,7 @@ protected:
         gTestSensorClient.reset();
     }
 
-    MockEmulatorControllerStub* mMockStub;
+    android::emulation::control::MockEmulatorControllerStub* mMockStub;
     MockSensorClient* mMockSensorClient;
     const QAndroidSensorsAgent* mAgent;
 };
@@ -299,7 +299,7 @@ TEST_F(SensorsAgentTest, SetPhysicalStateAgentSubscribesAndTriggersCallbacks) {
     MockPhysicalStateAgent mockAgent;
     auto agent = mockAgent.agent();
 
-    OnEvent<android::emulation::control::PhysicalStateEvent> capturedCallback;
+    android::emulation::control::OnEvent<android::emulation::control::PhysicalStateEvent> capturedCallback;
     EXPECT_CALL(*mMockSensorClient, receivePhysicalStateEvents(_, _))
             .WillOnce(Invoke([&capturedCallback](auto incoming, auto) {
                 capturedCallback = incoming;

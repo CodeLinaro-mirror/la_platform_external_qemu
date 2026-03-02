@@ -22,7 +22,6 @@ namespace emulation {
 AudioOutputEngine* AudioOutputEngine::mInstance = nullptr;
 
 AudioOutputEngine* AudioOutputEngine::get() {
-    CHECK(mInstance);
     return mInstance;
 }
 

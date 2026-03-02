@@ -109,6 +109,7 @@ public:
     // for example, during the period where vm setups
     static void set(AudioOutputEngine* engine) { mInstance = engine; }
 
+    // Returns the audio output engine, or nullptr if none has been set.
     static AudioOutputEngine* get();
 
 private:
