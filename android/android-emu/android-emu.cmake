@@ -206,12 +206,16 @@ set(virtual_environment_renderer_src
     android/ver/src/raw_image_sources/fourcc_utils.cc
     android/ver/src/raw_image_sources/raw_image_source.cc
     android/ver/src/raw_image_sources/image_file/raw_image_file_source.cc
-    android/ver/src/raw_image_sources/video_file/raw_video_file_source.cc)
+    android/ver/src/raw_image_sources/video_file/raw_video_file_source.cc
+    android/ver/src/raw_image_sources/webcam/webcam_source.cc)
 
 android_add_library(
   TARGET virtual_environment_renderer
   LICENSE Apache-2.0
   SRC ${virtual_environment_renderer_src}
+  WINDOWS android/ver/src/raw_image_sources/webcam/webcam_source_windows.cc
+  LINUX android/ver/src/raw_image_sources/webcam/webcam_source_linux.cc
+  DARWIN android/ver/src/raw_image_sources/webcam/webcam_source_mac.mm
   DEPS android-emu-base-headers
        qemu-host-common-headers
        android-emu-base
