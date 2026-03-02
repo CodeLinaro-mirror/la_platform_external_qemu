@@ -16,6 +16,7 @@
 
 #include "android/camera/camera-videoplayback-render-multiplexer.h"
 
+#ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 #include <string>
 
 #include "aemu/base/Log.h"
@@ -349,3 +350,5 @@ bool RenderMultiplexer::videoIsLoaded(uint32_t async_id) {
 
 }  // namespace videoplayback
 }  // namespace android
+
+#endif USE_LEGACY_VIDEOPLAYBACK_CAMERA

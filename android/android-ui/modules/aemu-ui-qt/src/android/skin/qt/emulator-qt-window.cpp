@@ -829,6 +829,12 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
     mIgnoreWheelEvent =
             settings.value(Ui::Settings::DISABLE_MOUSE_WHEEL, false).toBool();
 
+    if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo()) &&
+            !settings.contains(Ui::Settings::DISABLE_PINCH_TO_ZOOM)) {
+        settings.setValue(Ui::Settings::DISABLE_PINCH_TO_ZOOM, true);
+    }
+
     mDisablePinchToZoom =
             settings.value(Ui::Settings::DISABLE_PINCH_TO_ZOOM, false).toBool();
     // set custom ADB path if saved
@@ -1280,11 +1286,31 @@ void EmulatorQtWindow::setRelativeMouseCoordMode(bool state) {
 }
 
 const char* EmulatorQtWindow::releaseMouseShortcutName() const {
+    if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo())) {
+#ifdef __APPLE__
+        return "Cmd+Option+7";
+#else
+        return "Ctrl+Alt+7";
+#endif
+    }
 #ifdef __APPLE__
     return "Cmd+R";
 #else
     return "Ctrl+R";
 #endif
+}
+
+bool EmulatorQtWindow::isReleaseMouseShortcut(SkinEventType type,
+                                              const QKeyEvent& event) const {
+    if (avdInfo_isDesktopApi36OrHigher(
+                getConsoleAgents()->settings->avdInfo())) {
+        return event.key() == Qt::Key_7 &&
+            event.modifiers() == (Qt::ControlModifier | Qt::AltModifier) &&
+            type == kEventKeyDown;
+    }
+    return event.key() == Qt::Key_R &&
+        event.modifiers() == Qt::ControlModifier && type == kEventKeyDown;
 }
 
 void EmulatorQtWindow::updateWindowTitle() {
@@ -2547,8 +2573,8 @@ void EmulatorQtWindow::screenshot() {
         }
     }
 
-    if (!android::emulation::captureScreenshot(savePath.toStdString().c_str(),
-                                               nullptr, displayId)) {
+    const auto uiAgent = mToolWindow->getUiEmuAgent();
+    if (!uiAgent->record->doSnap(savePath.toStdString().c_str(), displayId)) {
         showErrorDialog(tr("Screenshot failed"), tr("Screenshot"));
     } else {
         // Display the flash animation immediately as feedback - if it fails, an
@@ -3043,8 +3069,7 @@ void EmulatorQtWindow::handleKeyEvent(SkinEventType type,
     // inside the code.
     if (!android::featurecontrol::isEnabled(
                 android::featurecontrol::VirtioDualModeMouse)) {
-        if (event.key() == Qt::Key_R &&
-            event.modifiers() == Qt::ControlModifier && type == kEventKeyDown) {
+        if (isReleaseMouseShortcut(type, event)) {
             D("%s: mouse released\n", __func__);
             releaseMouse();
 

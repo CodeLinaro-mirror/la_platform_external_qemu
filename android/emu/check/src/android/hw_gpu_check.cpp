@@ -110,11 +110,12 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
     uint64_t vkDeviceMaxAllocationCount = 0;
     bool externalMemorySupported = false;
     bool swapchainSupported = false;
+    bool ycbcrSupported = false;
 
     emuglConfig_get_vulkan_hardware_gpu(
             &vkVendor, &vkMajor, &vkMinor, &vkPatch, &vkDeviceMemBytes,
             &vkDriverVersion, &vkDeviceMaxAllocationCount,
-            &externalMemorySupported, &swapchainSupported);
+            &externalMemorySupported, &swapchainSupported, &ycbcrSupported);
 
     if (!vkVendor) {
         // Could not properly detect the hardware parameters
@@ -148,6 +149,18 @@ AvdCompatibilityCheckResult hasSufficientHwGpu(AvdInfo* avd) {
         return {.description = absl::StrFormat(
                         "GPU driver is not supported to run avd: `%s`. Missing "
                         "capabilities to support VulkanNativeSwapchain feature.", name),
+                .status = AvdCompatibility::Error,
+                .metrics = metrics};
+    }
+
+    if (!ycbcrSupported){
+        // Cannot not use Vulkan composition on this hardware GPU, should switch to software
+        metrics.set_check(EmulatorCompatibilityInfo::
+                                  AVD_COMPATIBILITY_CHECK_GPU_CHECK_UNSUPPORTED_VULKAN_VERSION);
+        metrics.set_details("VulkanFail");
+        return {.description = absl::StrFormat(
+                        "GPU driver is not supported to run avd: `%s`. Missing "
+                        "capabilities to support YCbCr content.", name),
                 .status = AvdCompatibility::Error,
                 .metrics = metrics};
     }

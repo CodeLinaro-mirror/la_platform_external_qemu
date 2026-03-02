@@ -3544,6 +3544,8 @@ message EmulatorCameraSession {
     EMULATOR_CAMERA_TYPE_VIRTUAL_SCENE = 2;
     // Camera source is the video playback camera.
     EMULATOR_CAMERA_TYPE_VIDEO_PLAYBACK = 3;
+    // Camera source is the virtual scene defined by the environment.
+    EMULATOR_CAMERA_TYPE_ENVIRONMENT = 4;
   }
 
   // List of possible camera directions.

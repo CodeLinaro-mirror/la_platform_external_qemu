@@ -19,6 +19,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "android/emulation/control/utils/EmulatorGrcpClient.h"
+#include "android/emulation/control/utils/GenericCallbackFunctions.h"
 #include "google/protobuf/empty.pb.h"
 #include "screen_recording_service.grpc.pb.h"
 #include "screen_recording_service.pb.h"
@@ -50,7 +51,31 @@ public:
         }
     }
 
-    // TODO(jansene): Add methods when needed.
+    /**
+     * @brief Asynchronously starts a screen recording session.
+     * @param info The recording information.
+     * @param onDone Callback invoked when the operation completes.
+     */
+    void startRecordingAsync(RecordingInfo info,
+                             OnCompleted<RecordingInfo> onDone);
+
+    /**
+     * @brief Asynchronously stops an active screen recording session.
+     * @param info The recording information (usually just display ID is
+     * needed).
+     * @param onDone Callback invoked when the operation completes.
+     */
+    void stopRecordingAsync(RecordingInfo info,
+                            OnCompleted<RecordingInfo> onDone);
+
+    /**
+     * @brief Asynchronously streams recording events from the emulator.
+     * @param onEvent Callback invoked for each incoming event.
+     * @param onDone Callback invoked when the stream terminates.
+     */
+    void streamRecordingEvents(OnEvent<RecordingInfo> onEvent,
+                               OnFinished onDone);
+
 private:
     std::shared_ptr<EmulatorGrpcClient> mClient;
     std::unique_ptr<ScreenRecording::StubInterface> mService;

@@ -37,6 +37,39 @@ namespace virtualscene {
 // Forward declarations.
 class SceneObject;
 
+struct SceneConfig {
+    enum class Mode {
+        Unknown = 0,
+        Mesh3dScene,
+        VideoPlayback,
+        ImageFile,
+    };
+
+    SceneConfig(Mode mode, std::string_view filename);
+
+    Mode mSceneMode = Mode::Unknown;
+    std::string mFilename;
+
+    static Mode modeFromString(std::string_view sceneModeStr);
+    static const char* modeToString(SceneConfig::Mode mode);
+
+    // Returns fullpath to default file for the given scene mode
+    static const char* defaultFilenameForMode(SceneConfig::Mode mode);
+};
+
+// TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
+// will be removed once the 2d quad objects are used directly instead
+struct SceneOverlayObject {
+    uint32_t mWidth;
+    uint32_t mHeight;
+    std::vector<uint8_t> mDataRGBA;
+
+    bool isValid() const {
+        return (mWidth > 0) && (mHeight > 0) &&
+               (mDataRGBA.size() == (mWidth * mHeight * 4));
+    }
+};
+
 class Scene {
     DISALLOW_COPY_AND_ASSIGN(Scene);
 
@@ -45,27 +78,30 @@ public:
 
     ~Scene();
 
-    // Create a Scene.
-    //
-    // |gles2| - Pointer to GLESv2Dispatch, must be non-null.
-    //
-    // Returns a Scene instance if the scene was successfully created or
+    // Creates a scene instance if the scene was successfully created or
     // null if there was an error.
-    static std::unique_ptr<Scene> create(Renderer& renderer);
+    static std::unique_ptr<Scene> create(std::unique_ptr<Renderer> renderer,
+                                         const SceneConfig& config);
 
     // Before teardown, release all Renderer resources and SceneObjects.
-    void releaseResources();
+    bool releaseResources();
 
     // Get the scene camera.
     const SceneCamera& getCamera() const;
 
+    const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
+
     // Update the scene for the next frame.
     //
-    // Returns the timestamp for the frame.
-    int64_t update();
+    void update();
+
+    // Returns a hash value based on the scene contents and animations. Can be
+    // used to cache the results of a view and check if anything has changed.
+    uint64_t getVersionHashForView(const RendererView* lockedView) const;
 
     // Get the list of RenderableObjects for the current frame.
-    std::vector<RenderableObject> getRenderableObjects() const;
+    std::vector<RenderableObject> getRenderableObjects(
+            const glm::mat4& viewProjection) const;
 
     // Create a new poster location.
     //
@@ -97,9 +133,15 @@ public:
     //           clamped.
     void updatePosterScale(const char* posterName, float scale);
 
+    const SceneOverlayObject* getOverlayObject() const {
+        return mOverlayObject.get();
+    }
+
+    Renderer* getRenderer() { return mRenderer.get(); }
+
 private:
     // Private constructor, use Scene::create to create an instance.
-    Scene(Renderer& renderer);
+    Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config);
 
     // Load the scene and create SceneObjects.
     //
@@ -118,10 +160,13 @@ private:
         Texture defaultTexture;
     };
 
-    Renderer& mRenderer;
-    SceneCamera mCamera;
+    std::unique_ptr<Renderer> mRenderer;
+    SceneConfig mConfig;
+
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;
+    std::unique_ptr<SceneOverlayObject> mOverlayObject;
+    uint64_t mObjectsVersion = 0;
 };
 
 }  // namespace virtualscene

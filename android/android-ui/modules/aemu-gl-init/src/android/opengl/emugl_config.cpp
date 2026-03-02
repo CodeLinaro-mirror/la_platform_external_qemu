@@ -205,6 +205,7 @@ struct DeviceSupportInfo {
     bool hasGraphicsQueueFamily;
     bool supportsExternalMemory;
     bool supportsSwapchain;
+    bool supportsYcbcrConversion;
 
     uint64_t getDeviceMaxAllocationCount() const {
         return physdevProps.limits.maxMemoryAllocationCount;
@@ -441,7 +442,8 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
                                          uint32_t* driverVersion,
                                          uint64_t* deviceMaxAllocationCount,
                                          bool* supportsExternalMemory,
-                                         bool* supportsSwapchain) {
+                                         bool* supportsSwapchain,
+                                         bool* supportsYcbcrConversion) {
     if (!vendor || !major || !minor || !patch) {
         derror("%s: Invalid argument!", __func__);
         return;
@@ -495,6 +497,9 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     if (supportsSwapchain) {
         *supportsSwapchain = vkProps.supportsSwapchain;
     }
+    if (supportsYcbcrConversion) {
+        *supportsYcbcrConversion = vkProps.supportsYcbcrConversion;
+    }
 }
 
 static bool vulkanExtensionSupported(const std::vector<VkExtensionProperties>& currentProps,
@@ -542,6 +547,11 @@ bool hasSufficientHostVulkanDriver(bool isXrAvd) {
         return true;
     }
 
+    if (async_query_host_gpu_VulkanBlacklisted()) {
+        dwarning("%s: unsupported GPU", __func__);
+        return false;
+    }
+
     char* vkVendor = nullptr;
     int vkMajor = 0;
     int vkMinor = 0;
@@ -551,11 +561,12 @@ bool hasSufficientHostVulkanDriver(bool isXrAvd) {
     uint64_t vkDeviceMaxAllocationCount = 0;
     bool externalMemorySupported = false;
     bool swapchainSupported = false;
+    bool ycbcrSupported = false;
 
     emuglConfig_get_vulkan_hardware_gpu(
             &vkVendor, &vkMajor, &vkMinor, &vkPatch, &vkDeviceMemBytes,
             &vkDriverVersion, &vkDeviceMaxAllocationCount,
-            &externalMemorySupported, &swapchainSupported);
+            &externalMemorySupported, &swapchainSupported, &ycbcrSupported);
 
     if (!vkVendor) {
         dwarning("%s: could not detect host Vulkan driver.", __func__);
@@ -675,6 +686,11 @@ bool hasSufficientHostVulkanDriver(bool isXrAvd) {
         return false;
     }
 
+    if (!ycbcrSupported) {
+        dwarning("Vulkan device do not support YCbCr conversion.");
+        return false;
+    }
+
     return true;
 }
 
@@ -728,10 +744,10 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "DetectGpuInfo";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 1, 0);
     appInfo.pEngineName = "test_engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 1, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_1;
 
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -772,6 +788,8 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
             instance, vkEnumerateInstanceExtensionProperties);
     auto* pvkEnumerateDeviceExtensionProperties = GET_VK_INSTANCE_PROC(
             instance, vkEnumerateDeviceExtensionProperties);
+    auto* pvkGetPhysicalDeviceFeatures2 = GET_VK_INSTANCE_PROC(
+            instance, vkGetPhysicalDeviceFeatures2);
 
 #undef GET_VK_INSTANCE_PROC
 
@@ -896,6 +914,26 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
                 instanceSupportsSwapchain &&
                 vulkanExtensionsSupported(availableDeviceExtensions,
                                           swapchainDeviceExtensionsRequired);
+
+        // Check if the device supports ycbcr conversion, necessary for video
+        // rendering.
+        deviceInfos[i].supportsYcbcrConversion = false;
+        if (pvkGetPhysicalDeviceFeatures2 &&
+            vulkanExtensionSupported(
+                    availableDeviceExtensions,
+                    VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME)) {
+            VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcrFeatures = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES,
+            };
+            VkPhysicalDeviceFeatures2 features2 = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+                .pNext = &ycbcrFeatures,
+            };
+            pvkGetPhysicalDeviceFeatures2(devices[i], &features2);
+
+            deviceInfos[i].supportsYcbcrConversion =
+                    ycbcrFeatures.samplerYcbcrConversion == VK_TRUE;
+        }
 
         // Put the GPU information into the logs to be able to track down any
         // errors more easily
@@ -1135,7 +1173,7 @@ bool emuglConfig_init(EmuglConfig* config,
         // where kvm apparently error out with Bad Address
         emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
                                             &vkPatch, nullptr, nullptr, nullptr,
-                                            nullptr, nullptr);
+                                            nullptr, nullptr, nullptr);
         if (vkVendor) {
             bool isAMD = (strncmp("AMD", vkVendor, 3) == 0);
             bool isIntel = (strncmp("Intel", vkVendor, 5) == 0);

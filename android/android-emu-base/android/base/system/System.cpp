@@ -2371,6 +2371,15 @@ public:
             return -1;
         }
 
+        // Do not inherit any custom exception handlers; reset them to the system default
+        // This will ensure that if the child process crashes, it will not be intercepted
+        // by crashpad.
+        if (posix_spawnattr_setexceptionports_np(&attr, EXC_MASK_ALL,
+                                                 MACH_PORT_NULL, 0, 0)) {
+            LOG(DEBUG) << "Failed to reset exception ports.";
+            return -1;
+        }
+
         posix_spawn_file_actions_t fileActions;
         if (posix_spawn_file_actions_init(&fileActions)) {
             LOG(DEBUG) << "Failed to initialize fileactions obj.";

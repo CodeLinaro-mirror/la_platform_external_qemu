@@ -16,6 +16,7 @@
 
 #include "android/camera/camera-videoplayback-video-renderer.h"
 
+#ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/videoplayback/VideoplaybackRenderTarget.h"
@@ -52,3 +53,5 @@ VideoplaybackRenderTarget* VideoplaybackVideoRenderer::renderTarget() {
 
 }  // namespace videoplayback
 }  // namespace android
+
+#endif USE_LEGACY_VIDEOPLAYBACK_CAMERA

@@ -45,11 +45,6 @@ using android::base::PathUtils;
 namespace android {
 namespace emulation {
 
-// Global background image data to be applied on the CPU side when taking
-// screenshots on transparent displays
-static std::mutex sBackgroundImageMutex;
-static std::optional<Image> sBackgroundImage;
-
 bool captureScreenshot(const char* outputDirectoryPath,
                        std::string* pOutputFilepath,
                        uint32_t displayId) {
@@ -120,32 +115,6 @@ RgbColor bilinearSample(const Image& img,
     result.b = lerpComponent(bTop, bBottom, ty);
 
     return result;
-}
-
-AEMU_EXPORT bool setScreenshotBackground(const int width,
-                                         const int height,
-                                         const int numChannels,
-                                         const uint8_t* pixelData) {
-    std::lock_guard<std::mutex> guard(sBackgroundImageMutex);
-    if (pixelData == nullptr) {
-        // Can be used to reset
-        sBackgroundImage = std::nullopt;
-        return true;
-    }
-    if (width == 0 || height == 0 ||
-        ((numChannels != 3) && (numChannels != 4))) {
-        // Invalid input
-        return false;
-    }
-
-    const ImageFormat format =
-            (numChannels == 3) ? ImageFormat::RGB888 : ImageFormat::RGBA8888;
-    std::vector<uint8_t> pixels(width * height * numChannels);
-    memcpy(pixels.data(), pixelData, pixels.size());
-    sBackgroundImage =
-            Image(width, height, numChannels, format, std::move(pixels));
-
-    return true;
 }
 
 Image takeScreenshot(

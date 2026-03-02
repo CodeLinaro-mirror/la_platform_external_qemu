@@ -138,7 +138,12 @@ void EmulatorControlClient::registerNotificationListener(
     auto context = mClient->newContext();
     static google::protobuf::Empty empty;
     auto read = new SimpleClientLambdaReader<Notification>(
-            context, incoming, [onDone](auto status) {
+            context,
+            [incoming](const Notification* event) {
+                incoming(event);
+                return grpc::Status::OK;
+            },
+            [onDone](auto status) {
                 onDone(ConvertGrpcStatusToAbseilStatus(status));
             });
     mOutstandingRpcs++;
@@ -189,7 +194,11 @@ void EmulatorControlClient::streamClipboardAsync(OnEvent<ClipData> cb,
             createGrpcRequestContext<Empty, ClipData>(mClient);
     mOutstandingRpcs++;
     auto read = new SimpleClientLambdaReader<ClipData>(
-            context, [cb](auto event) { cb(event); },
+            context,
+            [cb](const ClipData* event) {
+                cb(event);
+                return grpc::Status::OK;
+            },
             [response, request, finished](auto status) {
                 finished(ConvertGrpcStatusToAbseilStatus(status));
                 delete response;

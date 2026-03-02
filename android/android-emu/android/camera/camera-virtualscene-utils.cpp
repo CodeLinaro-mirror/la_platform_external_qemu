@@ -15,6 +15,8 @@
  */
 
 #include "android/camera/camera-virtualscene-utils.h"
+#include "android/virtualscene/Renderer.h"
+#include "android/virtualscene/Scene.h"
 
 #define VIRTUALSCENE_PIXEL_FORMAT V4L2_PIX_FMT_RGB32
 
@@ -27,10 +29,30 @@ using namespace gfxstream::host::gl;
 namespace android {
 namespace virtualscene {
 
-RenderedCameraDevice::RenderedCameraDevice(
-        std::unique_ptr<CameraRenderer> renderer)
-    : renderer(std::move(renderer)) {
+static RendererView::Format formatFromCameraFormat(uint32_t cameraPixelFormat) {
+    if (cameraPixelFormat == V4L2_PIX_FMT_RGB32) {
+        return RendererView::Format::RGBA8;
+    }
+    derror("Unsupported camera format for virtual scene views %lu",
+           cameraPixelFormat);
+    return RendererView::Format::RGBA8;
+}
+
+static uint32_t cameraFormatFromFormat(RendererView::Format format) {
+    if (format == RendererView::Format::RGBA8) {
+        return V4L2_PIX_FMT_RGB32;
+    }
+    derror("Unknown view format %lu", (uint32_t)format);
+    return 0;
+}
+
+RenderedCameraDevice::RenderedCameraDevice(std::string_view name) {
     mHeader.opaque = this;
+
+    // "environment" means the camera will use the global environment
+    // scene, defined in environment.ini, to render the frames
+    // Otherwise, it'll create it's own scene
+    mUseEnvironmentScene = (name == "environment");
 }
 
 RenderedCameraDevice::~RenderedCameraDevice() {
@@ -38,31 +60,34 @@ RenderedCameraDevice::~RenderedCameraDevice() {
 }
 
 int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
-                                             int frameWidth,
-                                             int frameHeight) {
+                                         int frameWidth,
+                                         int frameHeight) {
     VLOG(camera) << "Start capturing at " << frameWidth << " x " << frameHeight;
 
-    mFramebufferData.resize(4 * frameWidth * frameHeight);
-
-    mFramebufferWidth = frameWidth;
-    mFramebufferHeight = frameHeight;
-
-    bool succeeded = false;
-    if (initializeEgl()) {
-        auto context = makeEglCurrent();
-        if (context.isValid()) {
-            if (renderer->initialize(mGles2, frameWidth, frameHeight)) {
-                succeeded = true;
-            } else {
-                LOG(ERROR) << "Camera Renderer initialize failed";
-            }
+    // TODO(virtualscene-manager): support multiple scenes
+    if (!mUseEnvironmentScene) {
+        // If the camera mode is not set to "environment", the camera
+        // needs to create a scene that it'll own.
+        SceneConfig::Mode mode = SceneConfig::Mode::Mesh3dScene;
+        SceneConfig defaultSceneConfig(
+                mode, SceneConfig::defaultFilenameForMode(mode));
+        if (VirtualSceneManager::initialize(defaultSceneConfig)) {
+            LOG(INFO) << "Initialized VirtualSceneManager for the camera";
         }
     }
 
-    if (!succeeded) {
+    if (!VirtualSceneManager::isInitialized()) {
+        LOG(ERROR) << "Virtual scene is not initialized!";
         stopCapturing();
         return -1;
     }
+
+    mSceneCamera.setAspectRatio(static_cast<float>(frameWidth) / frameHeight);
+
+    mActiveView = VirtualSceneManager::createView(
+            formatFromCameraFormat(pixelFormat), frameWidth, frameHeight);
+
+    VirtualSceneManager::setSceneControlsParameters(true);
 
     return 0;
 }
@@ -72,28 +97,8 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 // reset camera device by reopening its handle. Otherwise attempts to set up new
 // frame properties (different from the previous one) may fail.
 void RenderedCameraDevice::stopCapturing() {
-    if (mEglInitialized) {
-        // Only call makeEglCurrent if egl is initialized, to avoid an infinite
-        // loop when eglMakeCurrent fails.
-        auto context = makeEglCurrent();
-        if (context.isValid()) {
-            renderer->uninitialize();
-        }
-    }
-
-    if (mEglDispatch && mEglDisplay != EGL_NO_DISPLAY) {
-        mEglDispatch->eglDestroySurface(mEglDisplay, mEglSurface);
-        mEglDispatch->eglDestroyContext(mEglDisplay, mEglContext);
-        // Don't eglTerminate the display, we don't own the instance.
-        mEglDisplay = EGL_NO_DISPLAY;
-    }
-
-    mFramebufferData.clear();
-    mFramebufferData.shrink_to_fit();
-    mFramebufferWidth = 0;
-    mFramebufferHeight = 0;
-
-    mEglInitialized = false;
+    mActiveView.reset();
+    VirtualSceneManager::setSceneControlsParameters(false);
 }
 
 int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
@@ -103,117 +108,36 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
                                     float expComp,
                                     const char* direction,
                                     int orientation) {
-    auto context = makeEglCurrent();
-    if (!context.isValid()) {
-        return -1;
+    // TODO(virtualscene-perf): update the view here to avoid resizing?
+    // TODO(virtualscene-manager): should be updated once, externally
+    VirtualSceneManager::update();
+
+    // Update camera based on physical model and set view projection accordingly
+    mSceneCamera.update();
+    mActiveView->updateViewProjection(mSceneCamera.getViewProjection());
+
+    resultFrame->frame_time = mSceneCamera.getTimestamp();
+
+    float renderTime = 0.0f;
+    if (VirtualSceneManager::getAnimationState()) {
+        renderTime = resultFrame->frame_time / 1000000000.0f;
     }
 
-    resultFrame->frame_time = renderer->render();
-    mEglDispatch->eglSwapBuffers(mEglDisplay, mEglSurface);
-    mGles2->glReadPixels(0, 0, mFramebufferWidth, mFramebufferHeight, GL_RGBA,
-                         GL_UNSIGNED_BYTE, mFramebufferData.data());
+    int conversionResult = -1;
+    VirtualSceneManager::renderView(mActiveView.get(), renderTime, [&]() {
+        const std::vector<uint8_t>& fbData =
+                mActiveView->getFramebufferLocked();
+
+        uint32_t pixelFormat =
+                cameraFormatFromFormat(mActiveView->getFormatLocked());
+        conversionResult = convert_frame(
+                fbData.data(), pixelFormat, fbData.size(),
+                mActiveView->getWidthLocked(), mActiveView->getHeightLocked(),
+                resultFrame, rScale, gScale, bScale, expComp, "front", 1);
+    });
 
     // Convert frame to the receiving buffers.
-    return convert_frame(mFramebufferData.data(), VIRTUALSCENE_PIXEL_FORMAT,
-                         mFramebufferData.size(), mFramebufferWidth,
-                         mFramebufferHeight, resultFrame, rScale, gScale,
-                         bScale, expComp, "front", 1);
-}
-
-bool RenderedCameraDevice::initializeEgl() {
-    mEglDispatch = (const EGLDispatch*)android_getEGLDispatch();
-    mGles2 = (const GLESv2Dispatch*)android_getGLESv2Dispatch();
-    if (!mEglDispatch || !mGles2) {
-        LOG(ERROR) << "initializeEgl failed, cannot get GL dispatch.";
-        return false;
-    }
-    mEglDisplay = mEglDispatch->eglGetDisplay(EGL_DEFAULT_DISPLAY);
-
-    if (mEglDisplay == EGL_NO_DISPLAY) {
-        LOG(ERROR) << "eglGetDisplay failed, error "
-                   << mEglDispatch->eglGetError();
-        return false;
-    }
-
-    EGLint eglMaj = 0;
-    EGLint eglMin = 0;
-
-    // Try to initialize EGL display.
-    // Initializing an already-initialized display is OK.
-    if (mEglDispatch->eglInitialize(mEglDisplay, &eglMaj, &eglMin) ==
-        EGL_FALSE) {
-        LOG(ERROR) << "eglInitialize failed, error "
-                   << mEglDispatch->eglGetError();
-        return false;
-    }
-
-    // Get an EGL config.
-    const EGLint attribs[] = {EGL_SURFACE_TYPE,
-                              EGL_PBUFFER_BIT,
-                              EGL_RENDERABLE_TYPE,
-                              EGL_OPENGL_ES_BIT,
-                              EGL_BLUE_SIZE,
-                              8,
-                              EGL_GREEN_SIZE,
-                              8,
-                              EGL_RED_SIZE,
-                              8,
-                              EGL_DEPTH_SIZE,
-                              16,
-                              EGL_NONE};
-    EGLint numConfig = 0;
-    EGLConfig eglConfig;
-    EGLBoolean chooseResult = mEglDispatch->eglChooseConfig(
-            mEglDisplay, attribs, &eglConfig, 1, &numConfig);
-    if (chooseResult == EGL_FALSE || numConfig < 1) {
-        LOG(ERROR) << "eglChooseConfig failed, error "
-                   << mEglDispatch->eglGetError();
-        return false;
-    }
-
-    // Create a context.
-    const EGLint contextAttribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-    mEglContext = mEglDispatch->eglCreateContext(
-            mEglDisplay, eglConfig, EGL_NO_CONTEXT, contextAttribs);
-    if (mEglContext == EGL_NO_CONTEXT) {
-        LOG(ERROR) << "eglCreateContext failed, error "
-                   << mEglDispatch->eglGetError();
-        return false;
-    }
-
-    // Finally, create a window surface associated with this widget.
-    const EGLint pbufferAttribs[] = {EGL_WIDTH, mFramebufferWidth, EGL_HEIGHT,
-                                     mFramebufferHeight, EGL_NONE};
-    mEglSurface = mEglDispatch->eglCreatePbufferSurface(mEglDisplay, eglConfig,
-                                                        pbufferAttribs);
-    if (mEglSurface == EGL_NO_SURFACE) {
-        LOG(ERROR) << "eglCreatePbufferSurface failed, error "
-                   << mEglDispatch->eglGetError();
-        return false;
-    }
-
-    mEglInitialized = true;
-    return true;
-}
-
-ScopedEglContext RenderedCameraDevice::makeEglCurrent() {
-    const EGLBoolean result = mEglDispatch->eglMakeCurrent(
-            mEglDisplay, mEglSurface, mEglSurface, mEglContext);
-    if (result == EGL_FALSE) {
-        LOG(ERROR) << "eglMakeCurrent failed, error "
-                   << mEglDispatch->eglGetError();
-
-        // Explicitly set mEglInitialized to false here to avoid an infinite
-        // loop with stopCapturing.
-        mEglInitialized = false;
-        stopCapturing();
-
-        // Return an empty ScopedEglContext because we failed to call
-        // eglMakeCurrent.
-        return ScopedEglContext(nullptr, EGL_NO_DISPLAY);
-    }
-
-    return ScopedEglContext(mEglDispatch, mEglDisplay);
+    return conversionResult;
 }
 
 }  // namespace virtualscene

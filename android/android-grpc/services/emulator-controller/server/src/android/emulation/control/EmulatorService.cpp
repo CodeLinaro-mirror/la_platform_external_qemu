@@ -494,8 +494,10 @@ public:
     virtual ::grpc::ServerReadReactor<WheelEvent>* injectWheel(
             ::grpc::CallbackServerContext* /*context*/,
             ::google::protobuf::Empty* /*response*/) override {
-        return new SimpleServerLambdaReader<WheelEvent>(
-                [this](auto request) { mWheelEventSender.send(*request); });
+        return new SimpleServerLambdaReader<WheelEvent>([this](auto request) {
+            mWheelEventSender.send(*request);
+            return Status::OK;
+        });
     }
 
     virtual ::grpc::ServerReadReactor<InputEvent>* streamInputEvent(
@@ -503,8 +505,9 @@ public:
             ::google::protobuf::Empty* /*response*/) override {
         SimpleServerLambdaReader<InputEvent>* eventReader =
                 new SimpleServerLambdaReader<InputEvent>(
-                        [this, &eventReader](auto request) {
-                            VERBOSE_INFO(keys, "InputEvent: %s", request->ShortDebugString());
+                        [this](auto request) -> grpc::Status {
+                            VERBOSE_INFO(keys, "InputEvent: %s",
+                                         request->ShortDebugString());
                             if (request->has_key_event()) {
                                 mKeyEventSender.send(request->key_event());
                             } else if (request->has_mouse_event()) {
@@ -512,37 +515,36 @@ public:
                             } else if (request->has_touch_event()) {
                                 mTouchEventSender.send(request->touch_event());
                             } else if (request->has_touchpad_event()) {
-                                mTouchpadEventSender.send(request->touchpad_event());
+                                mTouchpadEventSender.send(
+                                        request->touchpad_event());
                             } else if (request->has_android_event()) {
-                                mAndroidEventSender.send(request->android_event());
+                                mAndroidEventSender.send(
+                                        request->android_event());
                             } else if (request->has_pen_event()) {
                                 mPenEventSender.send(request->pen_event());
                             } else if (request->has_wheel_event()) {
                                 mWheelEventSender.send(request->wheel_event());
                             } else if (request->has_xr_command()) {
                                 mXrInputEventSender.sendXrCommand(
-                                    request->xr_command());
+                                        request->xr_command());
                             } else if (request->has_xr_head_rotation_event()) {
                                 mXrInputEventSender.sendXrHeadRotation(
-                                    request->xr_head_rotation_event());
+                                        request->xr_head_rotation_event());
                             } else if (request->has_xr_head_movement_event()) {
                                 mXrInputEventSender.sendXrHeadMovement(
-                                    request->xr_head_movement_event());
+                                        request->xr_head_movement_event());
                             } else if (request->has_xr_head_angular_velocity_event()) {
                                 mXrInputEventSender.sendXrHeadAngularVelocity(
-                                    request->xr_head_angular_velocity_event());
+                                        request->xr_head_angular_velocity_event());
                             } else if (request->has_xr_head_velocity_event()) {
                                 mXrInputEventSender.sendXrHeadVelocity(
-                                    request->xr_head_velocity_event());
+                                        request->xr_head_velocity_event());
                             } else {
-                                // Mark the stream as completed, this will
-                                // result in setting that status and scheduling
-                                // of a completion (onDone) event the async
-                                // queue.
-                                eventReader->Finish(Status(
+                                return Status(
                                         ::grpc::StatusCode::INVALID_ARGUMENT,
-                                        "Unknown event, is the emulator out of date?."));
+                                        "Unknown event, is the emulator out of date?.");
                             }
+                            return Status::OK;
                         });
         // Note that the event reader will delete itself on completion of
         // the request.

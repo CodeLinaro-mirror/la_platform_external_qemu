@@ -17,6 +17,8 @@
 #include "host-common/window_agent.h"
 #include <memory>
 #include "android/emulation/control/utils/EmulatorControlClient.h"
+#include "android/emulation/control/utils/SensorClient.h"
+#include "android/emulation/control/utils/SimpleScreenRecordingClient.h"
 
 // clang-format off
 struct QAndroidAutomationAgent;
@@ -76,6 +78,8 @@ extern "C" const QAndroidSurfaceAgent* const gQAndroidSurfaceAgent;
 
 
 std::shared_ptr<android::emulation::control::EmulatorControlClient> getGlobalControlClient();
+std::shared_ptr<android::emulation::control::SensorClient> getGlobalSensorClient();
+std::shared_ptr<android::emulation::control::SimpleScreenRecordingClient> getGlobalRecordingClient();
 
 void initializeGrpcUserEventAgent(
         android::emulation::control::EmulatorControlClient* client);

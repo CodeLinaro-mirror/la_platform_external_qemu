@@ -305,7 +305,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
             int vkMajor, vkMinor, vkPatch;
             emuglConfig_get_vulkan_hardware_gpu(&vkVendor, &vkMajor, &vkMinor,
                                                 &vkPatch, nullptr, nullptr, nullptr,
-                                            nullptr, nullptr);
+                                            nullptr, nullptr, nullptr);
             isVkNVIDIA = (vkVendor && strncmp("NVIDIA", vkVendor, 6) == 0);
         }
     }

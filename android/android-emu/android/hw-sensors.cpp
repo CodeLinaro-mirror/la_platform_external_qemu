@@ -1108,6 +1108,19 @@ extern int android_sensors_set_coarse_orientation(
     return 0;
 }
 
+extern AndroidCoarseOrientation skin_rotation_to_coarse_orientation(SkinRotation rotation) {
+    switch (rotation) {
+        case SKIN_ROTATION_0:
+            return ANDROID_COARSE_PORTRAIT;
+        case SKIN_ROTATION_90:
+            return ANDROID_COARSE_REVERSE_LANDSCAPE;
+        case SKIN_ROTATION_180:
+            return ANDROID_COARSE_REVERSE_PORTRAIT;
+        case SKIN_ROTATION_270:
+            return ANDROID_COARSE_LANDSCAPE;
+    }
+}
+
 /* Get the coarse orientation value */
 extern AndroidCoarseOrientation android_sensors_get_coarse_orientation() {
     android_hw_sensors_init(NULL);

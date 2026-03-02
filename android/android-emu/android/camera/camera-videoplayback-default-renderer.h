@@ -16,6 +16,7 @@
 
 #pragma once
 
+#ifdef USE_LEGACY_VIDEOPLAYBACK_CAMERA
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "aemu/base/Optional.h"
 #include "aemu/base/Result.h"
@@ -47,3 +48,5 @@ class DefaultFrameRenderer : public virtualscene::CameraRenderer {
 
 }  // namespace videoplayback
 }  // namespace android
+
+#endif //USE_LEGACY_VIDEOPLAYBACK_CAMERA

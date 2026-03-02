@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <functional>
+#include <vector>
 /*
  * Defines the Virtual Scene, used by the Virtual Scene Camera
  */
@@ -24,33 +26,26 @@
 #include "aemu/base/synchronization/Lock.h"
 #include "android/emulation/control/virtual_scene_agent.h"
 #include "android/utils/compiler.h"
-
-namespace gfxstream {
-namespace host {
-namespace gl {
-class GLESv2Dispatch;
-}  // namespace gl
-}  // namespace host
-}  // namespace gfxstream
-
+#include "android/virtualscene/Renderer.h"
 
 namespace android {
 namespace virtualscene {
 
 // Forward declarations.
 class VirtualSceneManagerImpl;
+struct SceneConfig;
 
 class VirtualSceneManager {
 public:
     // Parse command line options for the virtual scene.
     static void parseCmdline();
 
-    // Initialize virtual scene rendering. Callers must have an active EGL
-    // context.
-    // |gles2| - Pointer to GLESv2Dispatch, must be non-null.
-    //
+    // Initialize virtual scene rendering.
     // Returns true if initialization succeeded.
-    static bool initialize(const gfxstream::host::gl::GLESv2Dispatch* gles2, int width, int height);
+    static bool initialize(const SceneConfig& config);
+
+    // Check if virtual scene rendering has been initialized and is usable
+    static bool isInitialized();
 
     // Uninitialize virtual scene rendering, may be called on any thread, but
     // the same EGL context that was active when initialize() was called must be
@@ -58,13 +53,18 @@ public:
     // that.
     static void uninitialize();
 
-    // Render the virtual scene to the currently bound render target. This may
-    // be called on any thread, but the same EGL context that was active when
-    // initialize() was called must be active. This function modifies the GL
-    // state, callers must be resilient to that.
-    //
-    // Returns the timestamp at which the frame is rendered.
-    static int64_t render();
+    // Update scene animations and poster changes
+    static void update();
+
+    // Creates a view for the scene
+    static std::unique_ptr<RendererView> createView(RendererView::Format format,
+                                                    int frameWidth,
+                                                    int frameHeight);
+
+    // Render the virtual scene to the given view.
+    static bool renderView(RendererView* view,
+                           float renderTime,
+                           std::function<void()> finishCallback);
 
     // Set the initial poster of the scene, loaded from persisted settings.
     // Command line flags take precedence, so if the -virtualscene-poster flag
@@ -110,6 +110,8 @@ public:
     //
     // Returns true for enabled, false for disabled.
     static bool getAnimationState();
+
+    static void setSceneControlsParameters(bool show);
 
 private:
     static android::base::StaticLock mLock;

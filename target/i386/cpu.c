@@ -551,6 +551,22 @@ static FeatureWordInfo feature_word_info[FEATURE_WORDS] = {
         .tcg_features = 0,
         .unmigratable_flags = 0,
     },
+    [FEAT_8000_0021_EAX] = {
+        .feat_names = {
+            "no-nested-data-bp", NULL, "lfence-always-serializing", NULL,
+            NULL, NULL, "null-sel-clr-base", NULL,
+            NULL, NULL, NULL, NULL,
+            NULL, NULL, NULL, NULL,
+            NULL, NULL, NULL, NULL,
+            NULL, NULL, NULL, NULL,
+            NULL, NULL, NULL, NULL,
+            NULL, NULL, NULL, NULL,
+        },
+        .cpuid_eax = 0x80000021,
+        .cpuid_reg = R_EAX,
+        .tcg_features = 0,
+        .unmigratable_flags = 0,
+    },
     [FEAT_XSAVE] = {
         .feat_names = {
             "xsaveopt", "xsavec", "xgetbv1", "xsaves",
@@ -3795,6 +3811,10 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
         *ecx = 0;
         *edx = 0;
         break;
+    case 0x80000021:
+        *eax = env->features[FEAT_8000_0021_EAX];
+        *ebx = *ecx = *edx = 0;
+        break;
     default:
         /* reserved values: zero */
         *eax = 0;
@@ -4228,6 +4248,10 @@ static void x86_cpu_expand_features(X86CPU *cpu, Error **errp)
         /* SEV requires CPUID[0x8000001F] */
         if (sev_enabled()) {
             x86_cpu_adjust_level(cpu, &env->cpuid_min_xlevel, 0x8000001F);
+        }
+
+        if (env->features[FEAT_8000_0021_EAX]) {
+            x86_cpu_adjust_level(cpu, &env->cpuid_min_xlevel, 0x80000021);
         }
     }
 

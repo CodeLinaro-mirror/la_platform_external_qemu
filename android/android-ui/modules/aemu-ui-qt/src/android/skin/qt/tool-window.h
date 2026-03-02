@@ -316,6 +316,7 @@ private slots:
     void on_overview_button_released();
     void on_meta_button_pressed();
     void on_meta_button_released();
+    void on_open_keyboard_page_button_clicked();
     void on_wear_button_1_pressed();
     void on_wear_button_1_released();
     void on_wear_button_2_pressed();
