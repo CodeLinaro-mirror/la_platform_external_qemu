@@ -753,6 +753,7 @@ void VirtualSceneManager::stopSceneUpdateThread() {
  ******************************************************************************/
 std::unique_ptr<SceneCamera> BackgroundUpdateService::mSceneCamera;
 std::unique_ptr<RendererView> BackgroundUpdateService::mBackgroundView;
+bool BackgroundUpdateService::mStarted = false;
 
 bool BackgroundUpdateService::start(int displayWidth,
                                     int displayHeight,
@@ -798,14 +799,21 @@ bool BackgroundUpdateService::start(int displayWidth,
     });
 
     VirtualSceneManager::addSceneUser();
+    mStarted = true;
 
     return true;
 }
 
 void BackgroundUpdateService::stop() {
+    if (!mStarted) {
+        // Service is not active
+        return;
+    }
+
     VirtualSceneManager::removeSceneUser();
     mBackgroundView.reset();
     mSceneCamera.reset();
+    mStarted = false;
 }
 
 }  // namespace virtualscene

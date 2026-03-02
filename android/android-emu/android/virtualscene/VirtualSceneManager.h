@@ -170,6 +170,7 @@ public:
 private:
     static std::unique_ptr<SceneCamera> mSceneCamera;
     static std::unique_ptr<RendererView> mBackgroundView;
+    static bool mStarted;
 };
 
 }  // namespace virtualscene
