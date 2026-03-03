@@ -203,6 +203,7 @@ set(WINDOWS_LIBS
     delayimp
     dbghelp
     diaguids
+    dismapi
     dmoguids
     dxguid
     gdi32
@@ -241,6 +242,7 @@ if(WIN32 AND MSVC)
    # If you are building from
   get_filename_component(VCTOOLS_PATH "$ENV{VCTOOLSINSTALLDIR}" ABSOLUTE CACHE)
   get_filename_component(VSINSTALLDIR "$ENV{VSINSTALLDIR}" ABSOLUTE CACHE)
+  get_filename_component(WINSDKDIR "$ENV{WindowsSdkDir}" ABSOLUTE CACHE)
 
   FIND_DIA_SDK()
 
@@ -266,5 +268,20 @@ if(WIN32 AND MSVC)
   set_target_properties(atls::atls
                         PROPERTIES INTERFACE_LINK_LIBRARIES ${ATL_LIBRARY} INTERFACE_INCLUDE_DIRECTORIES
                                    ${ATL_INCLUDE_DIR})
+
+  # Find the dismapi path, it will typically look something like this.
+  #C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\SDKs\DismApi
+  message(STATUS "Looking for diamapi: [${WINSDKDIR}]")
+  find_path(DISMAPI_INCLUDE_DIR
+            dismapi.h # Find a path with dismapi.h
+	    HINTS "${WINSDKDIR}/Assessment and Deployment Kit/Deployment Tools/SDKs/DismApi/Include"
+	    DOC "path to dism api header files")
+  message(STATUS "Found dismapi Include: ${DISMAPI_INCLUDE_DIR}")
+
+  find_library(DISMAPI_LIBRARY NAMES dismapi.lib HINTS ${DISMAPI_INCLUDE_DIR}/../lib/amd64)
+  message(STATUS "Found dismapi Library: ${DISMAPI_LIBRARY}")
+  set_target_properties(dismapi::dismapi
+                        PROPERTIES INTERFACE_LINK_LIBRARIES ${DISMAPI_LIBRARY} INTERFACE_INCLUDE_DIRECTORIES
+                                   ${DISMAPI_INCLUDE_DIR})
 
 endif()

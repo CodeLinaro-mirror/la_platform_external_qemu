@@ -95,7 +95,8 @@ class Licensing(object):
         "setupapi::setupapi",
         "comsuppw::comsuppw",
         "wbemuuid::wbemuuid",
-        "D3d9.lib"
+        "D3d9.lib",
+        "dismapi::dismapi",
     ]
 
     def __init__(self, build_dir, qemu_root):
