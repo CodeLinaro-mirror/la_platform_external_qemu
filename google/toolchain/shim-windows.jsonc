@@ -6,7 +6,7 @@
       "target": "qemu-img",
       "shims": {
         "+deps": [
-            ":qemu-img_manifest_rc"
+          ":qemu-img_manifest_rc"
         ]
       }
     },
@@ -26,7 +26,7 @@
       "target": "qemu-system-x86_64",
       "shims": {
         "+deps": [
-            ":qemu-system-x86_64_manifest_rc"
+          ":qemu-system-x86_64_manifest_rc"
         ],
         "win_def_file": "google/build/qemu-system-x86_64.def"
       }
@@ -65,13 +65,16 @@
           "-Wno-microsoft-include",
           "-Wno-deprecated-declarations",
           "-fms-extensions",
-          "-march=native",
           // QEMU does not support NDEBUG (see qemu/osdep.h), so explicitly disable it
           "-UNDEBUG"
         ],
         // We need a compat layer for some windows magic.
-        "+deps": ["//google/compat/windows:compat"],
-        "+local_defines": ["BUILDING_QEMU_BINARY"]
+        "+deps": [
+          "//google/compat/windows:compat"
+        ],
+        "+local_defines": [
+          "BUILDING_QEMU_BINARY"
+        ]
       }
     }
   ],
@@ -82,6 +85,8 @@
       "@glib//gmodule"
     ]
   },
-  "export": ["qemu-system-x86_64"],
+  "export": [
+    "qemu-system-x86_64"
+  ],
   "exclude": []
 }

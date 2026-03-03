@@ -34,7 +34,6 @@ cc_binary(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -306,7 +305,6 @@ cc_interface_binary(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -440,7 +438,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -608,7 +605,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -722,7 +718,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -842,7 +837,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -3862,7 +3856,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -4025,7 +4018,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -4101,7 +4093,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -4189,7 +4180,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -4285,7 +4275,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -4383,7 +4372,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -4490,7 +4478,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -4572,7 +4559,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -5843,7 +5829,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -6609,7 +6594,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -6704,7 +6688,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -6791,7 +6774,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
@@ -6921,7 +6903,6 @@ cc_library(
             "-Wno-microsoft-include",
             "-Wno-deprecated-declarations",
             "-fms-extensions",
-            "-march=native",
         ],
         "@platforms//os:macos": [
             "-fwrapv",
