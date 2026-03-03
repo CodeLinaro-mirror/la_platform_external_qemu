@@ -144,6 +144,7 @@ EXPORTS
     object_ref
     object_resolve_path_component
     object_resolve_path_type
+    object_resolve_type_unambiguous
     object_unparent
     object_unref
     OnOffAuto_lookup
