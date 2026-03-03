@@ -13,23 +13,25 @@
 
 #include <QCheckBox>                                  // for QCheckBox
 #include <QDesktopServices>                           // for QDesktopServices
+#include <memory>
 
-#include "android/skin/backend-defs.h"
-#include "android/avd/info.h"                         // for avdInfo_getAvdF...
-#include "android/avd/util.h"                         // for AVD_ANDROID_AUTO
-#include "android/console.h"                          // for getConsoleAgents
-#include "host-common/vm_operations.h"  // for QAndroidVmOpera...
+#include "aemu/base/EventNotificationSupport.h"
+#include "android/avd/info.h"  // for avdInfo_getAvdF...
+#include "android/avd/util.h"  // for AVD_ANDROID_AUTO
+#include "android/console.h"   // for getConsoleAgents
 #include "android/emulation/control/adb/AdbInterface.h"
 #include "android/hw-events.h"                        // for EV_KEY, EV_SW
 #include "android/metrics/UiEventTracker.h"           // for UiEventTracker
-#include "android/skin/keycode.h"                     // for kKeyCodeAssist
-#include "android/skin/event.h"                       // for SkinEvent, Skin...
-#include "android/skin/qt/avd-settings-helper.h"      // for getAvdSettingsFile
-#include "android/skin/qt/emulator-qt-window.h"       // for EmulatorQtWindow
-#include "android/skin/qt/extended-pages/common.h"    // for getSelectedTheme
-#include "android/skin/qt/qt-settings.h"              // for PER_AVD_SETTIN...
-#include "android/skin/qt/raised-material-button.h"   // for RaisedMaterialB...
-#include "android/metrics/studio_stats_wrapper.pb.h"                          // for EmulatorUiEvent
+#include "android/metrics/studio_stats_wrapper.pb.h"  // for EmulatorUiEvent
+#include "android/skin/backend-defs.h"
+#include "android/skin/event.h"                      // for SkinEvent, Skin...
+#include "android/skin/keycode.h"                    // for kKeyCodeAssist
+#include "android/skin/qt/avd-settings-helper.h"     // for getAvdSettingsFile
+#include "android/skin/qt/emulator-qt-window.h"      // for EmulatorQtWindow
+#include "android/skin/qt/extended-pages/common.h"   // for getSelectedTheme
+#include "android/skin/qt/qt-settings.h"             // for PER_AVD_SETTIN...
+#include "android/skin/qt/raised-material-button.h"  // for RaisedMaterialB...
+#include "host-common/vm_operations.h"               // for QAndroidVmOpera...
 
 #include "host-common/FeatureControl.h"
 #include "host-common/feature_control.h"
@@ -97,6 +99,21 @@ MicrophonePage::MicrophonePage(QWidget* parent)
         // voice assist button
         mUi->mic_voiceAssistButton->setHidden(true);
     }
+
+    connect(this, SIGNAL(_externalMicrophoneEnabledChanged(bool)), this,
+            SLOT(onExternalMicrophoneEnabledChanged(bool)));
+
+    auto notifier = static_cast<android::base::EventNotificationSupport<bool>*>(
+            getConsoleAgents()->vm->getRealAudioEventListener());
+    if (notifier) {
+        mRealAudioEventListener =
+                std::make_unique<android::base::RaiiEventListener<
+                        android::base::EventNotificationSupport<bool>, bool>>(
+                        notifier, [this](bool enabled) {
+                            emit this->_externalMicrophoneEnabledChanged(
+                                    enabled);
+                        });
+    }
 }
 
 void MicrophonePage::on_mic_hasMic_toggled(bool checked) {
@@ -158,16 +175,14 @@ void MicrophonePage::on_mic_inserted_toggled(bool checked) {
 }
 
 void MicrophonePage::on_mic_allowRealAudio_toggled(bool checked) {
-    saveMicAllowRealAudio(checked);
     getConsoleAgents()->vm->allowRealAudio(checked);
-
-    // Emit the signal to allow the main toolbar to update its UI
-    emit microphoneEnabledChanged();
 }
 
-void MicrophonePage::onMicrophoneEnabledChanged() {
+void MicrophonePage::onExternalMicrophoneEnabledChanged(bool enabled) {
     // Update the UI to match the external state change
-    mUi->mic_allowRealAudio->setCheckState(getSavedMicAllowRealAudio() ? Qt::Checked : Qt::Unchecked);
+    const QSignalBlocker blocker(mUi->mic_allowRealAudio);
+    mUi->mic_allowRealAudio->setCheckState(enabled ? Qt::Checked
+                                                   : Qt::Unchecked);
 }
 
 void MicrophonePage::on_mic_voiceAssistButton_pressed() {
@@ -214,5 +229,11 @@ void MicrophonePage::forwardKeyToEmulator(uint32_t keycode, bool down) {
 }
 
 void MicrophonePage::loadSettings() {
+    auto notifier = static_cast<android::base::EventNotificationSupport<bool>*>(
+            getConsoleAgents()->vm->getRealAudioEventListener());
     getConsoleAgents()->vm->allowRealAudio(getSavedMicAllowRealAudio());
+    if (notifier) {
+        notifier->registerOnce(
+                [&](bool enabled) { saveMicAllowRealAudio(enabled); });
+    }
 }
