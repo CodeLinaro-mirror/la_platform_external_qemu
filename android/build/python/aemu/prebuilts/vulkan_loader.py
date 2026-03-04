@@ -53,10 +53,11 @@ def installVulkanLoader(builddir, installdir):
     if installdir.exists():
         for item in os.listdir(builddir):
             path = os.path.join(installdir, item)
-            if os.path.isdir(path):
-                shutil.rmtree(path)
-            elif os.path.isfile(path):
-                os.remove(path)
+            if os.path.lexists(path):
+                if os.path.islink(path) or os.path.isfile(path):
+                    os.remove(path)
+                elif os.path.isdir(path):
+                    shutil.rmtree(path)
 
     shutil.copytree(builddir, installdir, symlinks=True, dirs_exist_ok=True)
 
@@ -231,6 +232,7 @@ def _build_native(args, prebuilts_out_dir):
         "UPDATE_DEPS=On",
         f"-DCMAKE_BUILD_TYPE={build_config}",
         f"-DCMAKE_INSTALL_PREFIX={install_dir}",
+        "-DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON",
     ]
 
     subprocess.run(cmake_cmd, cwd=clone_dir, check=True, env=env)
