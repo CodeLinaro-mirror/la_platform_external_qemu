@@ -890,6 +890,30 @@ void PhysicalModelImpl::setTargetInternalXrHeadVelocity(
     targetStateChanged();
 }
 
+void PhysicalModelImpl::setTargetInternalXrHandEvent(
+        vec4 value,
+        PhysicalInterpolation mode) {
+    if (!android_is_xr_mode()) return;
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrHandEvent(value.x, value.y, value.z, value.w, mode);
+    }
+    targetStateChanged();
+}
+
+void PhysicalModelImpl::setTargetInternalXrEyeEvent(
+        vec4 value,
+        PhysicalInterpolation mode) {
+    if (!android_is_xr_mode()) return;
+    physicalStateChanging();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mMutex);
+        mXrDeviceModel.setXrEyeEvent(value.x, value.y, value.z, value.w, mode);
+    }
+    targetStateChanged();
+}
+
 void PhysicalModelImpl::setTargetInternalXrOptions(
         vec3 value,
         PhysicalInterpolation mode) {
@@ -1082,6 +1106,16 @@ vec3 PhysicalModelImpl::getParameterXrHeadAngularVelocity(
 vec3 PhysicalModelImpl::getParameterXrHeadVelocity(
         ParameterValueType parameterValueType) const {
     return {0, 0, 0};
+}
+
+vec4 PhysicalModelImpl::getParameterXrHandEvent(
+        ParameterValueType parameterValueType) const {
+    return {0, 0, 0, 0};
+}
+
+vec4 PhysicalModelImpl::getParameterXrEyeEvent(
+        ParameterValueType parameterValueType) const {
+    return {0, 0, 0, 0};
 }
 
 vec3 PhysicalModelImpl::getParameterXrOptions(

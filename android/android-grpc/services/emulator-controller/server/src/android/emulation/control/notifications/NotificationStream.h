@@ -83,6 +83,7 @@ private:
     std::optional<Notification> getDisplayNotificationEvent();
     std::optional<Notification> getBootedNotificationEvent();
     std::optional<Notification> getXrOptionsNotificationEvent();
+    std::optional<Notification> getMicrophoneStateNotificationEvent(bool allow);
     NotificationEventChangeSupport mNotificationListeners; // publisher holding a list of subscribers/listeners
     VirtualSceneCamera* mCamera;
     const AndroidConsoleAgents* mAgents;

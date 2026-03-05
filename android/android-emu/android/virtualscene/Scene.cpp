@@ -16,11 +16,12 @@
 
 #include "android/virtualscene/Scene.h"
 
-#include "android/avd/info.h" // to resolve avd path for resources
+#include "android/avd/info.h"  // to resolve avd path for resources
 #include "android/base/system/System.h"
-#include "android/console.h"
 #include "android/camera/camera-metrics.h"
+#include "android/console.h"
 #include "android/loadpng.h"
+#include "android/raw_image_sources/image_file/raw_image_file_source.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
 #include "android/virtualscene/Renderer.h"
@@ -40,11 +41,9 @@ namespace fs = std::filesystem;
 // Default filenames for different scene modes, can be used
 // when the file cannot be found or loaded, all relative to
 // the emulator's 'resources' folder
-// TODO(virtualscene): create and use proper default image&video
 static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
-static constexpr const char* kDefaultImageFile = "poster.png";
-static constexpr const char* kDefaultVideoFile =
-        "macroPreviews/Reset_position.mp4";
+static constexpr const char* kDefaultImageFile = "default.png";
+static constexpr const char* kDefaultVideoFile = "default.mp4";
 
 // Function to find fullpath from a filename for the scene
 // Scene filenames can be provided as fullpaths, AVD local,
@@ -135,6 +134,15 @@ const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
     }
 }
 
+bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
+    // Currently, only Mesh3dScene requires a renderer
+    return (mode == SceneConfig::Mode::Mesh3dScene);
+}
+
+bool SceneConfig::modeSupportViewRotations(SceneConfig::Mode mode) {
+    // Currently, only Mesh3dScene supports view rotations
+    return (mode == SceneConfig::Mode::Mesh3dScene);
+}
 
 Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
     : mRenderer(std::move(renderer)), mConfig(config) {
@@ -143,10 +151,11 @@ Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
 
 Scene::~Scene() {
     D("%s: destroying Scene", __func__);
-    if (mSceneObjects.size() || mOverlayObject) {
+    if (mSceneObjects.size() || mRawImageSource) {
         // releaseResources should have been called!
         E("%s: Scene resources are not released!", __func__);
     }
+    mRenderer.reset();
 }
 
 std::unique_ptr<Scene> Scene::create(std::unique_ptr<Renderer> renderer,
@@ -184,8 +193,7 @@ bool Scene::initialize() {
                 return false;
             }
             std::unique_ptr<MeshSceneObject> sceneObject =
-                    MeshSceneObject::load(*mRenderer,
-                                          sceneFilename.c_str());
+                    MeshSceneObject::load(*mRenderer, sceneFilename.c_str());
             if (!sceneObject) {
                 derror("%s: Could not load scene object: %s", __func__,
                        sceneFilename.c_str());
@@ -205,32 +213,20 @@ bool Scene::initialize() {
             }
         } break;
         case SceneConfig::Mode::ImageFile: {
-            uint32_t width = 0;
-            uint32_t height = 0;
-            void* backgroundImageData =
-                    loadpng(sceneFilename.c_str(), &width, &height);
-            if (!backgroundImageData) {
-                // Do not error out, but load default magenta image to avoid
-                // crashes, not-working camera or black screen
-                derror("%s: Could not load background image: %s", __func__,
-                       sceneFilename.c_str());
-                width = 1;
-                height = 1;
-                uint32_t* magentaData = (uint32_t*)malloc(width * height * 4);
-                *magentaData = 0xFFFF00FF;
-                backgroundImageData = magentaData;
+            mRawImageSource = RawImageFileSource::Create(sceneFilename);
+            if (!mRawImageSource) {
+                derror("%s: Could not load background image: '%s', falling "
+                       "back to default",
+                       __func__, mConfig.mFilename.c_str());
+                mRawImageSource = std::make_unique<DefaultRawImageProvider>();
             }
-            mOverlayObject = std::make_unique<SceneOverlayObject>();
-            mOverlayObject->mWidth = width;
-            mOverlayObject->mHeight = height;
-            mOverlayObject->mDataRGBA.resize(width * height * 4);
-            memcpy(mOverlayObject->mDataRGBA.data(), backgroundImageData,
-                   mOverlayObject->mDataRGBA.size());
-            free(backgroundImageData);
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
     }
+
+    mStartTimeUs = System::get()->getUnixTimeUs();
+    mFrameTimeUs = 0;
 
     mObjectsVersion++;
 
@@ -257,24 +253,29 @@ bool Scene::releaseResources() {
 
     mSceneObjects.clear();
 
-    mOverlayObject.reset();
+    mRawImageSource.reset();
 
     mObjectsVersion++;
 
     return true;
 }
 
-void Scene::update() {
+void Scene::update(bool updateTime) {
     // TODO(virtualscene-video): this should play the video in video mode
     for (auto& poster : mPosters) {
         poster.second.sceneObject->update();
+    }
+
+    if (updateTime) {
+        // TODO(virtualscene): use ThreadLooper::nowNs(ClockType::kVirtual) ?
+        mFrameTimeUs = System::get()->getUnixTimeUs() - mStartTimeUs;
     }
 }
 
 uint64_t Scene::getVersionHashForView(
         const RendererView* /*lockedView*/) const {
-    // TODO(virtualscene-perf): check if the objects inside the view frustum includes
-    // any changes/animations
+    // TODO(virtualscene-perf): check if the objects inside the view frustum
+    // includes any changes/animations
     return mObjectsVersion;
 }
 
@@ -383,6 +384,16 @@ void Scene::getRenderableObjectsFromSceneObject(
             outRenderableObjects.push_back({mvp, renderable});
         }
     }
+}
+
+// TODO(virtualscene-perf): implement load/unload user resources functions
+// to reduce memory usage of the scene when there are no users of it
+void Scene::loadUserResources() {
+    dprint("%s", __FUNCTION__);
+}
+
+void Scene::unloadUserResources() {
+    dprint("%s", __FUNCTION__);
 }
 
 }  // namespace virtualscene

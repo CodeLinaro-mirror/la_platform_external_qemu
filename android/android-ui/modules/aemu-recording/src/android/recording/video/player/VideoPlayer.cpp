@@ -1232,7 +1232,14 @@ int VideoPlayerImpl::play() {
 
     if (audioStream != -1) {
         mAudioOutputEngine = AudioOutputEngine::get();
+        if (!mAudioOutputEngine) {
+            LOG(INFO) << "No audio output engine found. Video playback will be "
+                         "silent.";
+            audioStream = -1;
+        }
+    }
 
+    if (audioStream != -1) {
         mAudioStreamIdx = audioStream;
 
         // Find the decoder for the video stream
@@ -1506,7 +1513,9 @@ void VideoPlayerImpl::audioCallback(void* opaque, int len) {
             if (audio_size < 0) {
                 // if error, we output silent buffer
                 std::string silent(len, '\0');
-                pThis->mAudioOutputEngine->write((void*)silent.data(), len);
+                if (pThis->mAudioOutputEngine) {
+                    pThis->mAudioOutputEngine->write((void*)silent.data(), len);
+                }
                 break;
             } else {
                 pThis->mAudioBufSize = audio_size;
@@ -1519,8 +1528,10 @@ void VideoPlayerImpl::audioCallback(void* opaque, int len) {
             len1 = len;
         }
 
-        pThis->mAudioOutputEngine->write(
-                pThis->mAudioBuf + pThis->mAudioBufIndex, len1);
+        if (pThis->mAudioOutputEngine) {
+            pThis->mAudioOutputEngine->write(
+                    pThis->mAudioBuf + pThis->mAudioBufIndex, len1);
+        }
         len -= len1;
         pThis->mAudioBufIndex += len1;
     }

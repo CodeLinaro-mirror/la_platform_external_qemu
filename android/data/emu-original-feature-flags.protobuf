@@ -1,4 +1,36 @@
-# From CL: 199566821
+# Use Swiftshader on old GPUs on Windows, where we don't get a good Vulkan support
+pattern {
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0412" } } # Intel HD Graphics 4600 (4th Gen)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "1616" } } # Intel HD Graphics 5500 (5th Gen)
+  hwconfig { hostgpuinfo { make: "1414" device_id: "008c" } } # Microsoft Basic Render Driver
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0416" } } # Intel HD Graphics 4600 (Mobile)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "041e" } } # Intel HD Graphics 4400 (Desktop)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0126" } } # Intel HD Graphics 3000 (Mobile)
+  hwconfig { hostgpuinfo { make: "10de" device_id: "0a65" } } # NVIDIA GeForce 210
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0102" } } # Intel HD Graphics 2000 (Desktop)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0166" } } # Intel HD Graphics 4000 (Mobile)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "1916" } } # Intel HD Graphics 520 (Skylake)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0152" } } # Intel HD Graphics 2500 (Desktop)
+  hwconfig { hostgpuinfo { make: "1002" device_id: "68f9" } } # AMD Radeon HD 5450
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0402" } } # Intel HD Graphics (Haswell GT1)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "5916" } } # Intel HD Graphics 620 (Kaby Lake)
+  hwconfig { hostgpuinfo { make: "10de" device_id: "0dfc" } } # NVIDIA NVS 5200M
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0f31" } } # Intel HD Graphics (Atom Z36xxx/Z37xxx)
+  hwconfig { hostgpuinfo { make: "1002" device_id: "6840" } } # AMD Radeon HD 7600M / 7670M
+  hwconfig { hostgpuinfo { make: "8086" device_id: "22b1" } } # Intel HD Graphics (Braswell)
+  hwconfig { hostgpuinfo { make: "8086" device_id: "0046" } } # Intel HD Graphics (1st Gen Core)
+  hwconfig { hostgpuinfo { make: "1002" device_id: "6779" } } # AMD Radeon HD 6450 / R5 230
+
+  featureaction {
+    feature: ForceSwiftshader
+    enable: true
+    min_version {
+      major: 36
+      minor: 1
+    }
+  }
+}
+
 # Disable OpenGL ES 3.x on Mac until core profile renderer is in a polished state.
 pattern {
   hwconfig {
@@ -465,4 +497,19 @@ pattern {
       feature: ForceANGLE
       enable: false
     }
+}
+
+# Disable Vulkan on certain GPUs that we find are buggy. The drivers may or may
+# not be the problem, but we need time to investigate it.
+pattern {
+  hwconfig {
+    hostinfo {
+      os_platform: "Windows"
+    }
+    hostgpuinfo { make: "10de", device_id: "139a" } # NVIDIA GTX 950M
+  }
+  featureaction {
+    feature: Vulkan
+    enable: false
+  }
 }

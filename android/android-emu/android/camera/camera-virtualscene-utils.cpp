@@ -15,6 +15,8 @@
  */
 
 #include "android/camera/camera-virtualscene-utils.h"
+
+#include "android/camera/camera-virtualscene.h"
 #include "android/virtualscene/Renderer.h"
 #include "android/virtualscene/Scene.h"
 
@@ -50,9 +52,12 @@ RenderedCameraDevice::RenderedCameraDevice(std::string_view name) {
     mHeader.opaque = this;
 
     // "environment" means the camera will use the global environment
-    // scene, defined in environment.ini, to render the frames
-    // Otherwise, it'll create it's own scene
+    // scene, defined in environment.ini file
     mUseEnvironmentScene = (name == "environment");
+    mName = name;
+    mScene = nullptr;  // Set at startCapturing
+
+    LOG(INFO) << "Initialized camera with name: " << name;
 }
 
 RenderedCameraDevice::~RenderedCameraDevice() {
@@ -64,30 +69,44 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
                                          int frameHeight) {
     VLOG(camera) << "Start capturing at " << frameWidth << " x " << frameHeight;
 
-    // TODO(virtualscene-manager): support multiple scenes
-    if (!mUseEnvironmentScene) {
-        // If the camera mode is not set to "environment", the camera
-        // needs to create a scene that it'll own.
-        SceneConfig::Mode mode = SceneConfig::Mode::Mesh3dScene;
-        SceneConfig defaultSceneConfig(
-                mode, SceneConfig::defaultFilenameForMode(mode));
-        if (VirtualSceneManager::initialize(defaultSceneConfig)) {
-            LOG(INFO) << "Initialized VirtualSceneManager for the camera";
+    if (mUseEnvironmentScene) {
+        mScene = VirtualSceneManager::addSceneUser();
+    } else {
+        // Create and own the scene
+        std::string sceneMode;
+        std::string sceneFilename;
+        const size_t sepPos =
+                mName.find(camera_virtualscene_name_argument_separator());
+        if (sepPos != std::string::npos) {
+            sceneMode = mName.substr(0, sepPos);
+            sceneFilename = mName.substr(sepPos + 1);
+        } else {
+            sceneMode = mName;
         }
+        SceneConfig::Mode mode = SceneConfig::modeFromString(sceneMode);
+        if (sceneFilename.empty()) {
+            // Create with default content if a filename is not given
+            sceneFilename = SceneConfig::defaultFilenameForMode(mode);
+        }
+        SceneConfig sceneConfig(mode, sceneFilename);
+        mScene = ScenesManager::createScene(mName, sceneConfig);
     }
 
-    if (!VirtualSceneManager::isInitialized()) {
-        LOG(ERROR) << "Virtual scene is not initialized!";
+    if (!mScene) {
+        LOG(ERROR) << "Camera scene could not be not initialized!";
         stopCapturing();
         return -1;
     }
 
     mSceneCamera.setAspectRatio(static_cast<float>(frameWidth) / frameHeight);
 
-    mActiveView = VirtualSceneManager::createView(
-            formatFromCameraFormat(pixelFormat), frameWidth, frameHeight);
+    mActiveView = std::make_unique<RendererView>();
+    mActiveView->updateTarget(formatFromCameraFormat(pixelFormat), frameWidth,
+                              frameHeight);
 
-    VirtualSceneManager::setSceneControlsParameters(true);
+    if (mUseEnvironmentScene) {
+        VirtualSceneManager::setSceneControlsParameters(true);
+    }
 
     return 0;
 }
@@ -98,7 +117,18 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 // frame properties (different from the previous one) may fail.
 void RenderedCameraDevice::stopCapturing() {
     mActiveView.reset();
-    VirtualSceneManager::setSceneControlsParameters(false);
+
+    if (!mScene) {
+        return;
+    }
+
+    if (mUseEnvironmentScene) {
+        VirtualSceneManager::setSceneControlsParameters(false);
+        VirtualSceneManager::removeSceneUser();
+    } else {
+        ScenesManager::removeScene(mScene.get());
+    }
+    mScene.reset();
 }
 
 int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
@@ -108,35 +138,62 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
                                     float expComp,
                                     const char* direction,
                                     int orientation) {
+    if (!mScene) {
+        LOG(ERROR) << "Virtual scene is not initialized!";
+        return -1;
+    }
     // TODO(virtualscene-perf): update the view here to avoid resizing?
-    // TODO(virtualscene-manager): should be updated once, externally
-    VirtualSceneManager::update();
+    if (!mUseEnvironmentScene) {
+        mScene->update();
+    }
 
     // Update camera based on physical model and set view projection accordingly
     mSceneCamera.update();
     mActiveView->updateViewProjection(mSceneCamera.getViewProjection());
 
-    resultFrame->frame_time = mSceneCamera.getTimestamp();
-
-    float renderTime = 0.0f;
-    if (VirtualSceneManager::getAnimationState()) {
-        renderTime = resultFrame->frame_time / 1000000000.0f;
-    }
-
     int conversionResult = -1;
-    VirtualSceneManager::renderView(mActiveView.get(), renderTime, [&]() {
+    auto onRenderComplete = [&]() {
         const std::vector<uint8_t>& fbData =
                 mActiveView->getFramebufferLocked();
 
         uint32_t pixelFormat =
                 cameraFormatFromFormat(mActiveView->getFormatLocked());
+
+        // Do not rotate during the conversion if the view is already handling
+        const bool viewHandlesRotation =
+                SceneConfig::modeSupportViewRotations(mScene->getSceneMode());
+        const char* convertDirection = direction;
+        int convertOrientation = orientation;
+        if (viewHandlesRotation) {
+            convertDirection = "front";
+            convertOrientation = 1;
+        }
+        // Convert frame to the receiving buffers.
         conversionResult = convert_frame(
                 fbData.data(), pixelFormat, fbData.size(),
                 mActiveView->getWidthLocked(), mActiveView->getHeightLocked(),
-                resultFrame, rScale, gScale, bScale, expComp, "front", 1);
-    });
+                resultFrame, rScale, gScale, bScale, expComp, convertDirection,
+                convertOrientation);
+    };
 
-    // Convert frame to the receiving buffers.
+    uint64_t frameTime = 0;
+    bool renderResult = false;
+    if (mUseEnvironmentScene) {
+        renderResult = VirtualSceneManager::renderView(
+                mActiveView.get(), onRenderComplete, &frameTime);
+    } else {
+        renderResult = ScenesManager::renderView(
+                mScene.get(), mActiveView.get(), onRenderComplete, &frameTime);
+    }
+
+    if (!renderResult) {
+        LOG(ERROR) << "Virtual scene could not be rendered!";
+        return -1;
+    }
+
+    // Set the frame time used in the render
+    resultFrame->frame_time = static_cast<int64_t>(frameTime);
+
     return conversionResult;
 }
 

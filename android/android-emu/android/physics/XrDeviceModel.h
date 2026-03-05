@@ -82,6 +82,20 @@ public:
                                 float z,
                                 PhysicalInterpolation mode);
 
+    // Send Hand Event to the guest operating system.
+    void setXrHandEvent(float x,
+                        float y,
+                        float buttons,
+                        float display,
+                        PhysicalInterpolation mode);
+
+    // Send Eye Event to the guest operating system.
+    void setXrEyeEvent(float x,
+                       float y,
+                       float buttons,
+                       float display,
+                       PhysicalInterpolation mode);
+
     // Send and receive Passthrough state to the guest operating system.
     // Passthrough state can also be set in guest OS, thus requiring both getter and setter.
     // This is currently used in Android Studio integrated emulator path.

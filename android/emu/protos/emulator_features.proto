@@ -124,4 +124,14 @@ enum Feature {
     Uwb = 68;
 
     AndroidVirtualizationFramework = 69;
+
+    GuestAngle = 70;
+
+    ForceGpuSoftware = 71;
+
+    ForceGpuHost = 72;
+
+    ForceLavapipeForSoftwareRendering = 73;
+
+    ForceLavapipe = 74;
 }

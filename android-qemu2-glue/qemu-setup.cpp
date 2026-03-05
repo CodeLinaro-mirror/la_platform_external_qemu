@@ -384,6 +384,8 @@ int qemu_setup_grpc() {
             {"avd.name", displayName},
             {"avd.id", avdInfo_getId(getConsoleAgents()->settings->avdInfo())},
             {"avd.dir", canonical_contentPath.c_str()},
+            {"launcher.dir",
+             android::base::System::get()->getLauncherDirectory()},
             {"cmdline", getConsoleAgents()->settings->android_cmdLine()}};
 
     int grpc_start = android_serial_number_port + 3000;
@@ -581,8 +583,8 @@ int qemu_setup_grpc() {
         CRUMB(grpc) << "no-grpc,";
         if (userWantsGrpc) {
             derror("Failed to start grpc service, even though it was "
-                    "explicitly "
-                    "requested.");
+                   "explicitly "
+                   "requested.");
             exit(1);
         }
     }

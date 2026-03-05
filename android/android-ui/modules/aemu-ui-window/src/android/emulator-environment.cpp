@@ -12,17 +12,9 @@
 
 #include "android/emulator-window.h"
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include "aemu/base/logging/CLog.h"
 #include "android/android.h"
@@ -32,26 +24,25 @@
 #include "android/console.h"
 #include "android/hw-sensors.h"
 #include "android/network/globals.h"
-#include "android/skin/keycode.h"
-#include "android/skin/window.h"
-#include "android/skin/winsys.h"
 #include "android/ui-emu-agent.h"
 #include "android/utils/debug.h"
 #include "android/utils/path.h"
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/Scene.h"
-#include "android/virtualscene/SceneCamera.h"
-#include "android/virtualscene/VirtualSceneManager.h"
 #include "host-common/display_agent.h"
 #include "host-common/hw-config-helper.h"
 #include "host-common/opengles.h"
 #include "host-common/vm_operations.h"
 #include "host-common/window_agent.h"
 
+#include "android/virtualscene/Renderer.h"
+#include "android/virtualscene/Scene.h"
+#include "android/virtualscene/SceneCamera.h"
+#include "android/virtualscene/VirtualSceneManager.h"
+
 using android::virtualscene::RendererView;
 using android::virtualscene::SceneCamera;
 using android::virtualscene::SceneConfig;
 using android::virtualscene::VirtualSceneManager;
+using android::virtualscene::BackgroundUpdateService;
 
 static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
                                      const bool transparentDisplay) {
@@ -75,9 +66,8 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
 
     // Check if the camera is set to 'environment' or 'virtualscene'
     const bool cameraUsesEnvironment = (hwCameraBack == "environment") ||
-                                       (hwCameraFront == "environment");
-
-    // Check if the camera is set to 'environment'
+                                       (hwCameraFront == "environment") ||
+                                       (hwCameraBack == "virtualscene");
     const bool backgroundUsesEnvironment = transparentDisplay;
     const bool environmentRequired =
             cameraUsesEnvironment || backgroundUsesEnvironment;
@@ -87,17 +77,31 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         return true;
     }
 
+    struct ScopeTimer {
+        ScopeTimer() { mStartTime = get_uptime_ms(); }
+        ~ScopeTimer() {
+            const uint64_t scopeTime = get_uptime_ms() - mStartTime;
+            dprint("emulatorSetupEnvironment: took %llu ms", __func__, scopeTime);
+        }
+        int64_t mStartTime;
+    } timer;
+
     // Environment is required, set it up
     CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
     if (!environmentIni) {
-        // Not having an environment file is unexpected, defaults will be used
-        dwarning("%s: No environment config is provided", __func__);
+        // Not having an environment file is unexpected if it's not in
+        // 'virtualscene' mode, defaults will be used
+        if (hwCameraBack != "virtualscene") {
+            dwarning("%s: No environment config is provided", __func__);
+        } else {
+            dinfo("%s: No environment config is provided", __func__);
+        }
     }
 
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
     std::string sceneFilename;
-    const double defaultBackgroundBlur = 5.0f;
-    double backgroundBlur = defaultBackgroundBlur;
+    const float defaultBackgroundBlur = 5.0f;
+    float backgroundBlur = defaultBackgroundBlur;
 
     if (environmentIni) {
         std::string backgroundImageFilename = iniFile_getString(
@@ -113,19 +117,18 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
             sceneMode = SceneConfig::Mode::VideoPlayback;
             sceneFilename = backgroundVideoFilename;
         } else if (!backgroundSceneFilename.empty()) {
-            // If nothing is given, load default virtual scene
             sceneMode = SceneConfig::Mode::Mesh3dScene;
             sceneFilename = backgroundSceneFilename;
         }
 
         // Update blur amount from config, if given
-        backgroundBlur = iniFile_getInteger(
+        backgroundBlur = (float)iniFile_getDouble(
                 environmentIni, "background.blurAmount", defaultBackgroundBlur);
     }
 
     if (sceneMode == SceneConfig::Mode::Unknown || sceneFilename.empty()) {
-        // If the input is invalid, load default virtual scene
-        dinfo("%s: Using default environment config", __func__);
+        dinfo("%s: Using default virtual scene contents for the environment.",
+              __func__);
         sceneMode = SceneConfig::Mode::Mesh3dScene;
         sceneFilename = SceneConfig::defaultFilenameForMode(sceneMode);
     }
@@ -141,40 +144,13 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
     if (backgroundUsesEnvironment) {
         dinfo("%s: Setting up screen background view", __func__);
         const int displayWidth = hwCfg->hw_lcd_width;
-        const int displayheight = hwCfg->hw_lcd_height;
+        const int displayHeight = hwCfg->hw_lcd_height;
 
-        SceneCamera sceneCamera;
-        sceneCamera.setAspectRatio(static_cast<float>(displayWidth) /
-                                   displayheight);
-        sceneCamera.update();
-
-        // SceneCamera uses 90 degrees rotated views by default for
-        // the camera rendering, rotate it back to correct for background
-        glm::mat4 cameraView =
-                glm::rotate(sceneCamera.getView(), glm::radians(-90.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f));
-        glm::mat4 viewProjection = sceneCamera.getProjection() * cameraView;
-
-        std::unique_ptr<RendererView> backgroundView =
-                VirtualSceneManager::createView(RendererView::Format::RGBA8,
-                                                displayWidth, displayheight);
-        backgroundView->updateViewProjection(viewProjection);
-        backgroundView->setBlurFactor(backgroundBlur);
-
-        // TODO(virtualscene-manager): this should be called regularly at ~30fps,
-        // should be configurable through environment.ini based on scene
-        // type
-        VirtualSceneManager::update();
-
-        VirtualSceneManager::renderView(
-                backgroundView.get(), 0.0f, [&backgroundView]() {
-                    const std::vector<uint8_t>& fbData =
-                            backgroundView->getFramebufferLocked();
-
-                    android_setOpenglesScreenBackground(
-                            backgroundView->getWidthLocked(),
-                            backgroundView->getHeightLocked(), fbData.data());
-                });
+        if (!BackgroundUpdateService::start(displayWidth, displayHeight,
+                                            backgroundBlur)) {
+            derror("%s: Cannot initialize background update service", __func__);
+            return false;
+        }
     }
 
     return true;

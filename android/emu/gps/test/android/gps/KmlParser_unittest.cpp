@@ -21,6 +21,34 @@ using android::base::TestTempDir;
 
 namespace android_gps {
 
+TEST(KmlParser, ParseNetworkLink) {
+    {
+        TestTempDir myDir("parse_location_tests");
+        ASSERT_TRUE(myDir.path());
+        std::string path = myDir.makeSubPath("test.kml");
+
+        std::ofstream myfile;
+        myfile.open(path.c_str());
+        myfile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+             "<kml xmlns=\"http://www.opengis.net/kml/2.2\">"
+             "<Document>"
+             "  <NetworkLink>"
+             "    <Link>"
+             "      <href>http://example.com/route.kml</href>"
+             "    </Link>"
+             "  </NetworkLink>"
+             "</Document>"
+             "</kml>";
+        myfile.close();
+
+        GpsFixArray locations;
+        std::string error;
+        ASSERT_TRUE(KmlParser::parseFile(path.c_str(), &locations, &error));
+        EXPECT_EQ(0U, locations.size());
+        EXPECT_EQ("", error);
+    }
+}
+
 TEST(KmlParser, ParseNonexistentFile) {
     GpsFixArray locations;
     std::string error;

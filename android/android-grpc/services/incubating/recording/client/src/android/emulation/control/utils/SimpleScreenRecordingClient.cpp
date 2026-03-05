@@ -37,7 +37,7 @@ void SimpleScreenRecordingClient::startRecordingAsync(
     *request = std::move(info);
     mService->async()->StartRecording(
             context.get(), request, response,
-            grpcCallCompletionHandler(std::move(context), request, response,
+            grpcCallCompletionHandler(context, request, response,
                                       std::move(onDone)));
 }
 
@@ -49,7 +49,7 @@ void SimpleScreenRecordingClient::stopRecordingAsync(
     *request = std::move(info);
     mService->async()->StopRecording(
             context.get(), request, response,
-            grpcCallCompletionHandler(std::move(context), request, response,
+            grpcCallCompletionHandler(context, request, response,
                                       std::move(onDone)));
 }
 

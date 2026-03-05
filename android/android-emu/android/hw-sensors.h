@@ -184,6 +184,8 @@ typedef enum{
     PHYSICAL_PARAMETER_(XR_HEAD_VELOCITY, "xr_head_velocity", XrHeadVelocity, vec3) \
     PHYSICAL_PARAMETER_(XR_OPTIONS, "xr_options", XrOptions, vec3) \
     PHYSICAL_PARAMETER_(XR_HAND_GESTURE, "xr_hand_gesture", XrHandGesture, float) \
+    PHYSICAL_PARAMETER_(XR_HAND_EVENT, "xr_hand_event", XrHandEvent, vec4) \
+    PHYSICAL_PARAMETER_(XR_EYE_EVENT, "xr_eye_event", XrEyeEvent, vec4) \
 // clang-format on
 typedef enum {
 #define PHYSICAL_PARAMETER_(x,y,z,w)  PHYSICAL_PARAMETER_##x,
@@ -450,6 +452,8 @@ bool android_xr_set_head_movement(float delta_x, float delta_y,
 bool android_xr_set_head_angular_velocity(float omega_x, float omega_y,
                                                 float omega_z);
 bool android_xr_set_head_velocity(float x, float y, float z);
+bool android_xr_set_hand_event(int32_t x, int32_t y, int32_t buttons, int32_t display);
+bool android_xr_set_eye_event(int32_t x, int32_t y, int32_t buttons, int32_t display);
 bool android_xr_set_options(int environment, float passthroughCoefficient);
 bool android_xr_get_options(int* environment, float* passthroughCoefficient);
 bool android_xr_set_hand_gesture(int gesture);

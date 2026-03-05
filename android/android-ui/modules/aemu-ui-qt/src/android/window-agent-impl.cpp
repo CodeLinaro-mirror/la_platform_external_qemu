@@ -419,6 +419,12 @@ static const QAndroidEmulatorWindowAgent sQAndroidEmulatorWindowAgent = {
                 [](float x, float y, float z) -> bool {
             return android_xr_set_head_velocity(x, y, z);
         },
+        .sendXrHandEvent = [](int32_t x, int32_t y, int32_t buttons, int32_t display) -> bool {
+            return android_xr_set_hand_event(x, y, buttons, display);
+        },
+        .sendXrEyeEvent = [](int32_t x, int32_t y, int32_t buttons, int32_t display) -> bool {
+            return android_xr_set_eye_event(x, y, buttons, display);
+        },
         .setXrOptions = [](int environment,
                            float passthroughCoefficient) -> bool {
             return android_xr_set_options(environment, passthroughCoefficient);

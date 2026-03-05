@@ -35,6 +35,10 @@ ANDROID_BEGIN_HEADER
 // Returns a V4L2_PIX_FMT_* pixel format.
 uint32_t camera_virtualscene_preferred_format();
 
+// Get the separator character to be used in the camera device name
+// when a filename argument is passed for the virtual scene
+char camera_virtualscene_name_argument_separator();
+
 // Initializes camera device descriptor, and connects to the camera device.
 //
 // Returns null on failure. On success, the CameraDevice must be closed with

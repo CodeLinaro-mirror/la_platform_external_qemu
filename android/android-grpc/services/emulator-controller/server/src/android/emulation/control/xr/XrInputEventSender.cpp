@@ -58,6 +58,18 @@ void XrInputEventSender::sendXrHeadVelocity(const Velocity velocity) {
     });
 }
 
+void XrInputEventSender::sendXrHandEvent(int32_t x, int32_t y, int32_t buttons, int32_t display) {
+    android::base::ThreadLooper::runOnMainLooper([this, x, y, buttons, display] {
+        doSendXrHandEvent(x, y, buttons, display);
+    });
+}
+
+void XrInputEventSender::sendXrEyeEvent(int32_t x, int32_t y, int32_t buttons, int32_t display) {
+    android::base::ThreadLooper::runOnMainLooper([this, x, y, buttons, display] {
+        doSendXrEyeEvent(x, y, buttons, display);
+    });
+}
+
 //TODO(b/396429645): extract a template function for this and the other doSendXrEvent functions
 void XrInputEventSender::doSendXrCommand(const XrCommand command) {
     auto agent = mAgents->emu;
@@ -101,6 +113,20 @@ void XrInputEventSender::doSendXrHeadVelocity(float x, float y, float z) {
     auto agent = mAgents->emu;
     if (agent->sendXrHeadVelocityEvent(x, y, z) == false) {
         LOG(ERROR) << "Unable to set XrHeadVelocityEvent.";
+    }
+}
+
+void XrInputEventSender::doSendXrHandEvent(int32_t x, int32_t y, int32_t buttons, int32_t display) {
+    auto agent = mAgents->emu;
+    if (agent->sendXrHandEvent(x, y, buttons, display) == false) {
+        LOG(ERROR) << "Unable to set XrHandEvent.";
+    }
+}
+
+void XrInputEventSender::doSendXrEyeEvent(int32_t x, int32_t y, int32_t buttons, int32_t display) {
+    auto agent = mAgents->emu;
+    if (agent->sendXrEyeEvent(x, y, buttons, display) == false) {
+        LOG(ERROR) << "Unable to set XrEyeEvent.";
     }
 }
 

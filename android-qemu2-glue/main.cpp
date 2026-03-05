@@ -1355,6 +1355,8 @@ static int startEmulatorWithMinConfig(int argc,
     skin_winsys_enter_main_loop(opts->no_window);
     android::crashreport::CrashReporter::get()->hangDetector().pause(true);
 
+    android::virtualscene::ScenesManager::removeAll();
+
     stopRenderer();
     emulator_finiUserInterface();
 
@@ -3605,6 +3607,8 @@ extern "C" int main(int argc, char** argv) {
     android::crashreport::CrashReporter::get()->hangDetector().pause(false);
     skin_winsys_enter_main_loop(opts->no_window);
     android::crashreport::CrashReporter::get()->hangDetector().pause(true);
+
+    android::virtualscene::ScenesManager::removeAll();
 
     stopRenderer();
     emulator_finiUserInterface();
