@@ -219,10 +219,7 @@ EXPORTS
     qemu_in_coroutine
     qemu_in_vcpu_thread
     qemu_input_event_sync
-    qemu_input_map_linux_to_qcode
-    qemu_input_map_linux_to_qcode_len
-    qemu_input_map_qcode_to_linux
-    qemu_input_map_qcode_to_linux_len
+    qemu_input_linux_to_qcode
     qemu_input_queue_abs
     qemu_input_update_buttons
     qemu_log
