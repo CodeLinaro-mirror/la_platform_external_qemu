@@ -5,6 +5,7 @@
  */
 #include "qemu/osdep.h"
 #include "qemu/bitmap.h"
+#include "qemu/error-report.h"
 #include "ui/console.h"
 #include "ui/input.h"
 #include "ui/kbd-state.h"
@@ -39,6 +40,10 @@ bool qkbd_state_key_get(QKbdState *kbd, QKeyCode qcode)
 
 void qkbd_state_key_event(QKbdState *kbd, QKeyCode qcode, bool down)
 {
+    if (qcode >= Q_KEY_CODE__MAX) {
+        error_report("qkbd_state_key_event: Error, qcode too large, skipping - %d / %d", qcode, Q_KEY_CODE__MAX);
+        return;
+    }
     bool state = test_bit(qcode, kbd->keys);
 
     if (down == false  /* got key-up event   */ &&
