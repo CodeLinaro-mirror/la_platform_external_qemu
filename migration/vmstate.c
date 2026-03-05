@@ -400,6 +400,7 @@ int vmstate_save_state_v(QEMUFile *f, const VMStateDescription *vmsd,
 {
     int ret = 0;
     const VMStateField *field = vmsd->fields;
+    assert(field);
 
     trace_vmstate_save_state_top(vmsd->name);
 
