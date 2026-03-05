@@ -120,7 +120,7 @@ SelectedRenderer emuglConfig_get_renderer(const char* gpu_mode) {
         return SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
     } else if (!strcmp(gpu_mode, "swangle")) {
         return SELECTED_RENDERER_ANGLE_INDIRECT;
-    } else if (!strcmp(gpu_mode, "lavapipe")) {
+    } else if (!strcmp(gpu_mode, "lavapipe") || !strcmp(gpu_mode, "llvmpipe")) {
         return SELECTED_RENDERER_LAVAPIPE;
     } else if (!strcmp(gpu_mode, "error")) {
         return SELECTED_RENDERER_ERROR;
@@ -761,8 +761,17 @@ bool emuglConfig_init(EmuglConfig* config,
     // Select GLES mode
     std::string gles_mode_selected = gpu_mode_requested;
     if (gles_mode_selected == "lavapipe") {
-        // There is no 'lavapipe' gles mode, use swangle by default
+        // By default, use swangle
         gles_mode_selected = "swangle";
+
+#if defined(__linux__)
+        const char* EnvVarSelectLLVMPipe = "ANDROID_EMU_LAVAPIPE_GL_MODE_LLVMPIPE";
+        if (android::base::getEnvironmentVariable(EnvVarSelectLLVMPipe) == "1") {
+            gles_mode_selected = "llvmpipe";
+            dinfo("Forcing 'llvmpipe' mode for GLES");
+        }
+#endif
+
         const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
         const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
         if (force_swiftshader || android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
@@ -782,13 +791,13 @@ bool emuglConfig_init(EmuglConfig* config,
     }
 
 #ifdef _WIN32
-    // swangle is not supported on Windows
-    if (gles_mode_selected == "swangle") {
+    // swangle / llvmpipe are not supported on Windows
+    if (gles_mode_selected == "swangle" || gles_mode_selected == "llvmpipe") {
         gles_mode_selected = "swiftshader";
     }
 #elif defined(__APPLE__)
-    // swiftshader is not supported on macOS
-    if (gles_mode_selected == "swiftshader") {
+    // swiftshader / llvmpipe are not supported on macOS
+    if (gles_mode_selected == "swiftshader" || gles_mode_selected == "llvmpipe") {
         gles_mode_selected = "swangle";
     }
 #endif
