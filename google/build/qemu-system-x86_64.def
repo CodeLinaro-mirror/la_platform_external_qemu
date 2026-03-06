@@ -54,6 +54,7 @@ EXPORTS
     dpy_gl_scanout_disable
     dpy_gl_update
     dpy_mouse_set
+    dpy_set_ui_info
     error_abort
     error_append_hint
     error_copy
@@ -189,6 +190,7 @@ EXPORTS
     qemu_cpu_kick
     qemu_cpu_list_lock
     qemu_create
+    qemu_create_displaysurface
     qemu_create_displaysurface_pixman
     qemu_del_net_client
     qemu_del_nic
@@ -204,6 +206,7 @@ EXPORTS
     qemu_flush_or_purge_queued_packets
     qemu_flush_queued_packets
     qemu_format_nic_info_str
+    qemu_free_displaysurface
     qemu_get_aio_context
     qemu_get_be32
     qemu_get_be64
