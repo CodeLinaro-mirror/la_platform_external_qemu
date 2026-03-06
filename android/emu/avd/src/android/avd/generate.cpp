@@ -118,6 +118,8 @@ void generateAvd(const AvdGenerateInfo& genInfo) {
     configIni.setString("tag.display", genInfo.tagDisplay);
     configIni.setString("tag.id", genInfo.tagId);
     configIni.setInt("vm.heapSize", genInfo.vmHeapSize);
+    configIni.setInt("environment.width", genInfo.environmentWidth);
+    configIni.setInt("environment.height", genInfo.environmentHeight);
 
     configIni.write();
 }
@@ -219,6 +221,8 @@ void generateAvdWithDefaults(std::string_view avdName,
         /* tag.display */ "Google APIs",
         /* tag.id */ "google_apis",
         /* vm.heapSize */ 16,
+        /* environment.width */ 0,
+        /* environment.height */ 0,
     };
 
     generateAvd(genInfo);

@@ -78,6 +78,8 @@ struct AvdGenerateInfo {
     const char* tagDisplay; // tag.display=Google Play
     const char* tagId; // tag.id=google_apis_playstore
     int vmHeapSize; // vm.heapSize=228
+    int environmentWidth; // environment.width=0
+    int environmentHeight; // environment.height=0
 };
 
 void generateAvd(const AvdGenerateInfo& avdGenerateInfo);
