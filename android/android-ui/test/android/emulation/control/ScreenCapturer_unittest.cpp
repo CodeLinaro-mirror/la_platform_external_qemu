@@ -213,6 +213,7 @@ public:
 
     void setScreenMask(int width, int height, const uint8_t* rgbaData) { }
     void setScreenBackground(int width, int height, const uint8_t* rgbaData) { }
+    void setDisplayLayout(int screenWidth, int screenHeight, const gfxstream::Rect& rect) {}
     void setMultiDisplay(uint32_t id,
                          int32_t x,
                          int32_t y,
