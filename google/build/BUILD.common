@@ -1,6 +1,24 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
+load("@rules_license//rules:license.bzl", "license")
+
+package(
+    default_applicable_licenses = [":license"],
+)
+
+license(
+    name = "license",
+    package_name = "qemu",
+    copyright_notice = "Copyright (C) 1989, 1991 Free Software Foundation, Inc.",
+    license_kinds = ["@rules_license//licenses/spdx:GPL-2.0-only"],
+    license_text = "COPYING",
+    package_url = "https://www.qemu.org/",
+    visibility = ["//visibility:public"],
+)
+
+exports_files(["COPYING"])
+
 
 cc_library(
     name = "aemu_func_defs",
