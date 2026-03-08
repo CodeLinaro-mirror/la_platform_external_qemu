@@ -383,6 +383,8 @@ OPT_PARAM(crash_report_mode,
           "Override crash reporting mode. Available options: disabled, never, "
           "always, ask")
 
+OPT_FLAG ( no_display_layout, "Disable display layout from the environment configuration." )
+
 #undef CFG_FLAG
 #undef CFG_PARAM
 #undef OPT_FLAG
