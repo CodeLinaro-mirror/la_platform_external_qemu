@@ -48,6 +48,19 @@ def get_tasks(args) -> List[BuildTask]:
         list[BuildTask]: List of tasks that need to be executed.
     """
     run_tests = not Toolchain(args.aosp, args.target).is_crosscompile()
+    fishtank_unstripped = args.fishtank_unstripped or (
+        args.feature
+        and any(
+            f.lower().replace("-", "_") == "no_fishtank_strip" for f in args.feature
+        )
+    )
+    features = args.feature
+    if features:
+        features = [
+            f
+            for f in features
+            if f.lower().replace("-", "_") not in ["no_fishtank_strip", "fishtank_strip"]
+        ]
     tasks = [
         # A task can be disabled, or explicitly enabled by calling
         # .enable(False) <- Disable the task
@@ -74,12 +87,14 @@ def get_tasks(args) -> List[BuildTask]:
             ccache=args.ccache,
             thread_safety=args.thread_safety,
             dist=args.dist,
-            features=args.feature,
+            features=features,
+            fishtank_unstripped=fishtank_unstripped,
         ),
         CompileTask(
             args.aosp,
             args.out,
             args.target,
+            fishtank_unstripped=fishtank_unstripped,
         ),
     ]
     if not args.gfxstream_only:
@@ -238,6 +253,12 @@ def launch():
         dest="gfxstream_only",
         action="store_true",
         help="Build only gfxstream libs/tests",
+    )
+    parser.add_argument(
+        "--fishtank-unstripped",
+        dest="fishtank_unstripped",
+        action="store_true",
+        help="Do not strip the fishtank distribution.",
     )
     parser.add_argument(
         "--prebuilts",
