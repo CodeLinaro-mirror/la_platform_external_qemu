@@ -2323,8 +2323,11 @@ void EmulatorQtWindow::slot_requestClose(QSemaphore* semaphore) {
     QSemaphoreReleaser semReleaser(semaphore);
     mToolWindow->shouldClose();
     if (isMainThreadRunning()) {
-        using android::snapshot::Snapshotter;
-        Snapshotter::get().stopVulkanAppsIfApplicable();
+        if (!getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+            // TODO: This should be a backend operation, and moved out of Qt codebase.
+            using android::snapshot::Snapshotter;
+            Snapshotter::get().stopVulkanAppsIfApplicable();
+        }
         queueQuitEvent();
     }
     System::get()->waitAndKillSelf();
