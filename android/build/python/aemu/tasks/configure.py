@@ -63,6 +63,7 @@ class ConfigureTask(BuildTask):
         thread_safety: bool,
         dist: str,
         features: List[str],
+        fishtank_unstripped: bool = False,
     ):
         super().__init__()
         self.toolchain = Toolchain(aosp, target)
@@ -93,6 +94,7 @@ class ConfigureTask(BuildTask):
             "CMAKE_TOOLCHAIN_FILE", self.toolchain.cmake_toolchain()
         )
         self.add_option("OPTION_SDK_TOOLS_BUILD_NUMBER", build_number)
+        self.add_option("OPTION_FISHTANK_STRIP", not fishtank_unstripped)
 
         if webengine:
             self.with_webengine()
@@ -143,7 +145,7 @@ class ConfigureTask(BuildTask):
         Returns:
             Self.
         """
-        if key and val:
+        if key and val is not None:
             self.cmake_cmd += [f"-D{key}={val}"]
         return self
 

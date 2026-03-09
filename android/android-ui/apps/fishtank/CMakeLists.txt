@@ -121,7 +121,7 @@ android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 function(fishtank_strip FNAME)
   if(NOT WINDOWS_MSVC_X86_64)
     install(
-      CODE "if(CMAKE_INSTALL_DO_STRIP)
+      CODE "if(CMAKE_INSTALL_DO_STRIP AND OPTION_FISHTANK_STRIP)
               execute_process(COMMAND \"${CMAKE_STRIP}\" \"$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${FNAME}\")
             endif()"
       COMPONENT fishtank
