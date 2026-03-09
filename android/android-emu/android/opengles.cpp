@@ -742,6 +742,25 @@ void android_setOpenglesScreenBackground(int width,
     }
 }
 
+void android_setOpenglesDisplayLayout(int screenWidth,
+                                      int screenHeight,
+                                      int displayPosX,
+                                      int displayPosY,
+                                      int displayWidth,
+                                      int displayHeight) {
+    if (sRenderer) {
+        dprint("%s: screen:%dx%d, display:%d %d %dx%d", __func__, screenWidth,
+               screenHeight, displayPosX, displayPosY, displayWidth,
+               displayHeight);
+        gfxstream::Rect displayRect;
+        displayRect.pos.x = displayPosX;
+        displayRect.pos.y = displayPosY;
+        displayRect.size.w = displayWidth;
+        displayRect.size.h = displayHeight;
+        sRenderer->setDisplayLayout(screenWidth, screenHeight, displayRect);
+    }
+}
+
 int android_hideOpenglesWindow(void) {
     if (!sRenderer) {
         return -1;
