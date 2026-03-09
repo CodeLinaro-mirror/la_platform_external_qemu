@@ -145,6 +145,9 @@ public:
 
     static void setUpdateCallback(std::function<void()> callback);
 
+    // Returns false on error.
+    static bool reloadEnvironment(const char* environmentData) { return false; }
+
 private:
     static android::base::StaticLock mLock;
     static std::shared_ptr<Scene> mEnvironmentScene;
