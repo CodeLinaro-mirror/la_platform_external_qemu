@@ -105,6 +105,14 @@ auto iniFile_getBoolean(CIniFile* f, const char* key, const char* defaultValue)
     return static_cast<int>(asBaseIniFile(f)->getBool(key, defaultValue));
 }
 
+bool iniFile_reload(CIniFile* f, const char* fromData) {
+    if (fromData) {
+        return asBaseIniFile(f)->readFromMemory(fromData);
+    }
+    return asBaseIniFile(f)->read();
+}
+
+
 auto iniFile_getDiskSize(CIniFile* f, const char* key, const char* defaultValue)
         -> int64_t {
     return asBaseIniFile(f)->getDiskSize(key, defaultValue);
