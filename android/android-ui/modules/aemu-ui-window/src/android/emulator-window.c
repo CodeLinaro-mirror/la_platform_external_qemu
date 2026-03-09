@@ -359,14 +359,17 @@ void emulator_window_setup(EmulatorWindow* emulator) {
         }
     }
 
-    // The environment file initializes the virtual scene system which is used
-    // when the display is transparent  to make the background visible through
-    // host composition.
-    const bool transparentDisplay =
-            getConsoleAgents()->settings->hw()->hw_lcd_transparent;
-    if (!emulator_window_load_environment(
-                getConsoleAgents()->settings->avdInfo(), transparentDisplay)) {
-        derror("%s: Could not setup environment", __func__);
+    // Disable virtualscene in fishtank
+    if (!getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+        // The environment file initializes the virtual scene system which is used
+        // when the display is transparent  to make the background visible through
+        // host composition.
+        const bool transparentDisplay =
+                getConsoleAgents()->settings->hw()->hw_lcd_transparent;
+        if (!emulator_window_load_environment(
+                    getConsoleAgents()->settings->avdInfo(), transparentDisplay)) {
+            derror("%s: Could not setup environment", __func__);
+        }
     }
 
     emulator->ui = skin_ui_create(
