@@ -42,7 +42,6 @@ using android::virtualscene::RendererView;
 using android::virtualscene::SceneCamera;
 using android::virtualscene::SceneConfig;
 using android::virtualscene::VirtualSceneManager;
-using android::virtualscene::BackgroundUpdateService;
 
 static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
                                      const bool transparentDisplay) {
@@ -81,76 +80,17 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         ScopeTimer() { mStartTime = get_uptime_ms(); }
         ~ScopeTimer() {
             const uint64_t scopeTime = get_uptime_ms() - mStartTime;
-            dprint("emulatorSetupEnvironment: took %llu ms", __func__, scopeTime);
+            dprint("emulatorSetupEnvironment: took %llu ms", __func__,
+                   scopeTime);
         }
         int64_t mStartTime;
     } timer;
 
-    // Environment is required, set it up
-    CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
-    if (!environmentIni) {
-        // Not having an environment file is unexpected if it's not in
-        // 'virtualscene' mode, defaults will be used
-        if (hwCameraBack != "virtualscene") {
-            dwarning("%s: No environment config is provided", __func__);
-        } else {
-            dinfo("%s: No environment config is provided", __func__);
-        }
-    }
-
-    SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
-    std::string sceneFilename;
-    const float defaultBackgroundBlur = 5.0f;
-    float backgroundBlur = defaultBackgroundBlur;
-
-    if (environmentIni) {
-        std::string backgroundImageFilename = iniFile_getString(
-                environmentIni, "background.image.filename", "");
-        std::string backgroundVideoFilename = iniFile_getString(
-                environmentIni, "background.video.filename", "");
-        std::string backgroundSceneFilename = iniFile_getString(
-                environmentIni, "background.scene.filename", "");
-        if (!backgroundImageFilename.empty()) {
-            sceneMode = SceneConfig::Mode::ImageFile;
-            sceneFilename = backgroundImageFilename;
-        } else if (!backgroundVideoFilename.empty()) {
-            sceneMode = SceneConfig::Mode::VideoPlayback;
-            sceneFilename = backgroundVideoFilename;
-        } else if (!backgroundSceneFilename.empty()) {
-            sceneMode = SceneConfig::Mode::Mesh3dScene;
-            sceneFilename = backgroundSceneFilename;
-        }
-
-        // Update blur amount from config, if given
-        backgroundBlur = (float)iniFile_getDouble(
-                environmentIni, "background.blurAmount", defaultBackgroundBlur);
-    }
-
-    if (sceneMode == SceneConfig::Mode::Unknown || sceneFilename.empty()) {
-        dinfo("%s: Using default virtual scene contents for the environment.",
-              __func__);
-        sceneMode = SceneConfig::Mode::Mesh3dScene;
-        sceneFilename = SceneConfig::defaultFilenameForMode(sceneMode);
-    }
-
     // Initialize virtual scene and background view
-    SceneConfig sceneConfig(sceneMode, sceneFilename);
-    if (!VirtualSceneManager::initialize(sceneConfig)) {
+    if (!VirtualSceneManager::initialize(backgroundUsesEnvironment)) {
         derror("%s: Cannot initialize virtual scene for the environment",
                __func__);
         return false;
-    }
-
-    if (backgroundUsesEnvironment) {
-        dinfo("%s: Setting up screen background view", __func__);
-        const int displayWidth = hwCfg->hw_lcd_width;
-        const int displayHeight = hwCfg->hw_lcd_height;
-
-        if (!BackgroundUpdateService::start(displayWidth, displayHeight,
-                                            backgroundBlur)) {
-            derror("%s: Cannot initialize background update service", __func__);
-            return false;
-        }
     }
 
     return true;
