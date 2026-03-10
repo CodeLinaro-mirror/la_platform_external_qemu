@@ -142,8 +142,8 @@ static VirtIOSoundPCMStream *virtio_snd_pcm_get_stream(VirtIOSound *s,
  * @s: VirtIOSound device
  * @stream_id: stream id
  */
-static virtio_snd_pcm_set_params *virtio_snd_pcm_get_params(VirtIOSound *s,
-                                                            uint32_t stream_id)
+static VirtIOPcmParams *virtio_snd_pcm_get_params(VirtIOSound *s,
+                                                  uint32_t stream_id)
 {
     return stream_id >= s->snd_conf.streams ? NULL
         : &s->pcm.pcm_params[stream_id];
@@ -244,7 +244,7 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
                                    uint32_t stream_id,
                                    virtio_snd_pcm_set_params *params)
 {
-    virtio_snd_pcm_set_params *st_params;
+    VirtIOPcmParams *st_params;
 
     if (stream_id >= s->snd_conf.streams || s->pcm.pcm_params == NULL) {
         /*
@@ -376,7 +376,7 @@ static uint32_t virtio_snd_get_qemu_freq(uint32_t rate)
  * params.
  */
 static void virtio_snd_get_qemu_audsettings(audsettings *as,
-                                            virtio_snd_pcm_set_params *params)
+                                            VirtIOPcmParams *params)
 {
     as->nchannels = MIN(AUDIO_MAX_CHANNELS, params->channels);
     as->fmt = virtio_snd_get_qemu_format(params->format);
@@ -413,7 +413,7 @@ static void virtio_snd_pcm_close(VirtIOSoundPCMStream *stream)
 static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
 {
     audsettings as;
-    virtio_snd_pcm_set_params *params;
+    VirtIOPcmParams *params;
     VirtIOSoundPCMStream *stream;
 
     if (s->pcm.streams == NULL ||
@@ -1062,7 +1062,7 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
     vsnd->pcm.streams =
         g_new0(VirtIOSoundPCMStream *, vsnd->snd_conf.streams);
     vsnd->pcm.pcm_params =
-        g_new0(virtio_snd_pcm_set_params, vsnd->snd_conf.streams);
+        g_new0(VirtIOPcmParams, vsnd->snd_conf.streams);
 
     virtio_init(vdev, VIRTIO_ID_SOUND, sizeof(virtio_snd_config));
     virtio_add_feature(&vsnd->features, VIRTIO_F_VERSION_1);
