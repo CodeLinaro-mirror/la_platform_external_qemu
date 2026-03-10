@@ -164,12 +164,6 @@ private:
     std::shared_ptr<EmulatorGrpcClient> mClient;
     SimpleClientWriter<InputEvent>* mInputEventWriter{nullptr};
 
-    // Synchronization primitives for clean shutdown
-    std::atomic<int> mOutstandingRpcs{0};
-    std::mutex mOutstandingMutex;
-    std::condition_variable mOutstandingCondition;
-    OnFinally mOnFinally;
-
     std::mutex mInputWriterAccess;
 };
 

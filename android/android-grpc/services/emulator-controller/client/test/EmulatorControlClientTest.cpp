@@ -100,7 +100,18 @@ public:
         return grpc::Status::OK;
     }
 
+    grpc::Status streamClipboard(grpc::ServerContext* context,
+                                 const Empty* request,
+                                 grpc::ServerWriter<ClipData>* writer) override {
+        mClipboardStartedPromise.set_value();
+        while (!context->IsCancelled()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return grpc::Status::OK;
+    }
+
     std::promise<void> mStreamStartedPromise;
+    std::promise<void> mClipboardStartedPromise;
 
     std::mutex streamInputMutex;
     std::condition_variable streamInputCv;
@@ -175,8 +186,8 @@ protected:
                                      .withDiscoveryFile(mDiscoveryFile->path())
                                      .build();
         ASSERT_TRUE(emuGrpcClient.ok());
-        mClient = std::make_unique<EmulatorControlClient>(
-                std::move(*emuGrpcClient));
+        mClient = std::shared_ptr<EmulatorControlClient>(
+                new EmulatorControlClient(std::move(*emuGrpcClient)));
     }
 
     void TearDown() override {
@@ -184,7 +195,7 @@ protected:
         EmulatorGrpcClientTest::TearDown();
     }
 
-    std::unique_ptr<EmulatorControlClient> mClient;
+    std::shared_ptr<EmulatorControlClient> mClient;
     std::unique_ptr<TmpDiscoveryFile> mDiscoveryFile;
 };
 
@@ -283,5 +294,41 @@ TEST_F(EmulatorControlClientTest, AsyncInputEventWriterCanWrite) {
             lock, std::chrono::seconds(1),
             [&] { return service.streamInputEventCounter == 1; }))
             << "Failed to write input event";
+}
+
+TEST_F(EmulatorControlClientTest, RegisterNotificationListenerDoesNotHangOnDestruction) {
+    auto future = service.mStreamStartedPromise.get_future();
+    mClient->registerNotificationListener([](const Notification* n) {},
+                                          [](auto s) {});
+
+    // Wait for the stream to actually start
+    ASSERT_EQ(future.wait_for(std::chrono::seconds(1)),
+              std::future_status::ready);
+
+    // Resetting the client should trigger cancellation and wait for completion.
+    // If there's a hang, this test will time out.
+    mClient.reset();
+}
+
+TEST_F(EmulatorControlClientTest, StreamClipboardDoesNotHangOnDestruction) {
+    auto future = service.mClipboardStartedPromise.get_future();
+    mClient->streamClipboardAsync([](const ClipData* n) {}, [](auto s) {});
+
+    // Wait for the stream to actually start
+    ASSERT_EQ(future.wait_for(std::chrono::seconds(1)),
+              std::future_status::ready);
+
+    // Resetting the client should trigger cancellation and wait for completion.
+    // If there's a hang, this test will time out.
+    mClient.reset();
+}
+
+TEST_F(EmulatorControlClientTest, AsyncInputEventWriterDoesNotHangOnDestruction) {
+    auto writer = mClient->asyncInputEventWriter();
+    EXPECT_NE(writer, nullptr);
+
+    // Resetting the client should trigger cancellation and wait for completion.
+    // If there's a hang, this test will time out.
+    mClient.reset();
 }
 }  // namespace
