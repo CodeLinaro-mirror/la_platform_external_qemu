@@ -156,8 +156,9 @@ protected:
 };
 
 TEST_F(SharedStreamEmulatorTest, StartAndStop) {
-    mStreamer = std::make_unique<SharedStreamEmulator>("test_handle", nullptr,
-                                                       1920, 1080, mClient);
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            "test_handle", nullptr, 1920, 1080,
+            StreamTransport::MMAP, mClient);
     mStreamer->startStream();
 
     // Wait for the stream to be established on the server side.
@@ -174,8 +175,9 @@ TEST_F(SharedStreamEmulatorTest, CorrectRequestParameters) {
     const int height = 600;
     const std::string handle = "my_test_handle";
 
-    mStreamer = std::make_unique<SharedStreamEmulator>(handle, nullptr, width,
-                                                       height, mClient);
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            handle, nullptr, width, height,
+            StreamTransport::MMAP, mClient);
     mStreamer->startStream();
 
     auto future = mService.mStreamStartedPromise.get_future();
@@ -191,20 +193,42 @@ TEST_F(SharedStreamEmulatorTest, CorrectRequestParameters) {
     mStreamer->stopStream();
 }
 
+TEST_F(SharedStreamEmulatorTest, StandardTransportRequest) {
+    const int width = 1280;
+    const int height = 720;
+
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            "", nullptr, width, height,
+            StreamTransport::Standard, mClient);
+    mStreamer->startStream();
+
+    auto future = mService.mStreamStartedPromise.get_future();
+    ASSERT_EQ(future.wait_for(std::chrono::seconds(5)),
+              std::future_status::ready);
+
+    EXPECT_EQ(mService.mRequest.width(), width);
+    EXPECT_EQ(mService.mRequest.height(), height);
+    EXPECT_EQ(mService.mRequest.transport().channel(),
+              ImageTransport::TRANSPORT_CHANNEL_UNSPECIFIED);
+
+    mStreamer->stopStream();
+}
+
 TEST_F(SharedStreamEmulatorTest, FrameCallbackIsInvoked) {
     const int numFrames = 5;
     std::mutex mu;
     std::condition_variable cv;
     int frameCount = 0;
 
-    auto callback = [&]() {
+    auto callback = [&](const Image* img) {
         std::lock_guard<std::mutex> lock(mu);
         frameCount++;
         cv.notify_one();
     };
 
-    mStreamer = std::make_unique<SharedStreamEmulator>("test_handle", callback,
-                                                       1920, 1080, mClient);
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            "test_handle", callback, 1920, 1080,
+            StreamTransport::MMAP, mClient);
     mStreamer->startStream();
 
     auto future = mService.mStreamStartedPromise.get_future();
@@ -223,15 +247,17 @@ TEST_F(SharedStreamEmulatorTest, FrameCallbackIsInvoked) {
 }
 
 TEST_F(SharedStreamEmulatorTest, StopWithoutStart) {
-    mStreamer = std::make_unique<SharedStreamEmulator>("test_handle", nullptr,
-                                                       1920, 1080, mClient);
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            "test_handle", nullptr, 1920, 1080,
+            StreamTransport::MMAP, mClient);
     mStreamer->stopStream();
     // Test passes if it doesn't crash or hang.
 }
 
 TEST_F(SharedStreamEmulatorTest, DoubleStartIsHandled) {
-    mStreamer = std::make_unique<SharedStreamEmulator>("test_handle", nullptr,
-                                                       1920, 1080, mClient);
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            "test_handle", nullptr, 1920, 1080,
+            StreamTransport::MMAP, mClient);
     mStreamer->startStream();
 
     auto future = mService.mStreamStartedPromise.get_future();

@@ -505,9 +505,15 @@ int main(int argc, char* argv[]) {
     android::files::TemporaryFile pixels;
     EmulatorQtWindow* window = EmulatorQtWindow::getInstance();
     if (!opts->qt_hide_window) {
-        LOG(INFO) << "Visible ui, initializng pixel streamer at: "
-                  << pixels.path();
-        window->initializeStreamer("file:///" + pixels.path());
+        if (opts->grpc_ui) {
+            LOG(INFO) << "Visible ui, initializing pixel streamer via gRPC";
+            window->initializeStreamer("", StreamTransport::Standard);
+        } else {
+            LOG(INFO) << "Visible ui, initializing pixel streamer at: "
+                      << pixels.path();
+            window->initializeStreamer("file:///" + pixels.path(),
+                                       StreamTransport::MMAP);
+        }
     } else {
         LOG(INFO) << "No visible ui, not initializing pixel streamer";
     }

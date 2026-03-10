@@ -68,7 +68,7 @@ class CarClusterWindow;
 class CarClusterConnector;
 class MultiDisplayWidget;
 class SharedMemoryRenderer;
-class SharedStreamEmulator;
+#include "android/skin/qt/SharedStreamEmulator.h"
 
 
 using RunOnUiThreadFunc = std::function<void()>;
@@ -444,7 +444,16 @@ public:
         return mMainLoopThread && mMainLoopThread->isRunning();
     }
 
-    void initializeStreamer(std::string_view shm_handle);
+    void initializeStreamer(std::string_view shm_handle,
+                            StreamTransport transport = StreamTransport::MMAP);
+
+signals:
+    /**
+     * @brief Emitted when a new frame has been rendered.
+     *
+     * @param frame A QImage containing the new frame.
+     */
+    void frameReady(const QImage& frame);
 
 private:
     std::unique_ptr<SharedMemoryRenderer> mSharedMemoryRenderer;
