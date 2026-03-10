@@ -524,9 +524,11 @@ bool VirtualSceneManager::initialize(bool initBackgroundService) {
     lock.unlock();
 
     if (initBackgroundService) {
-        dinfo("%s: Setting up screen background view", __func__);
-        const int displayWidth = hwCfg->hw_lcd_width;
-        const int displayHeight = hwCfg->hw_lcd_height;
+        int displayWidth, displayHeight;
+        androidHwConfig_getScreenDimensions(hwCfg, &displayWidth,
+                                            &displayHeight);
+        dinfo("%s: Setting up screen background view at %dx%d", __func__,
+              displayWidth, displayHeight);
 
         if (!BackgroundUpdateService::start(displayWidth, displayHeight,
                                             envConfig.backgroundBlur)) {

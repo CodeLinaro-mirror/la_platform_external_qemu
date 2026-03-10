@@ -196,6 +196,7 @@ static int adisplay_init(ADisplay* disp,
 
     disp->gpu_frame = NULL;
 
+    dprint("%s: Creating skin display surface %dx%d", __func__, disp->rect.size.w, disp->rect.size.h);
     disp->surface = getConsoleAgents()->surface->skin_surface_create(disp->rect.size.w, disp->rect.size.h,
                                         disp->rect.size.w, disp->rect.size.h);
     return (disp->data == NULL) ? -1 : 0;
