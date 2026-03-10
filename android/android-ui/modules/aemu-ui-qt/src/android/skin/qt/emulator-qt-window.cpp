@@ -2330,6 +2330,16 @@ void EmulatorQtWindow::slot_requestClose(QSemaphore* semaphore) {
         }
         queueQuitEvent();
     }
+
+    // In Fishtank mode, we should notify the emulator to shut down
+    // if we are not in embedded mode.
+    auto opts = getConsoleAgents()->settings->android_cmdLineOptions();
+    if (opts->grpc_ui && !opts->qt_hide_window) {
+        if (getConsoleAgents()->vm) {
+            getConsoleAgents()->vm->vmShutdown();
+        }
+    }
+
     System::get()->waitAndKillSelf();
 }
 
