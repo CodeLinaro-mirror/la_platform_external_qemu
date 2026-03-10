@@ -153,7 +153,7 @@ public:
      *
      * There is a single shared inputEvent writer to the emulator.
      */
-    std::shared_ptr<SimpleClientWriter<InputEvent>> asyncInputEventWriter();
+    SimpleClientWriter<InputEvent>* asyncInputEventWriter();
 
     EmulatorController::StubInterface* service() { return mService.get(); }
 
@@ -162,7 +162,7 @@ public:
 private:
     std::unique_ptr<EmulatorController::StubInterface> mService;
     std::shared_ptr<EmulatorGrpcClient> mClient;
-    std::shared_ptr<SimpleClientWriter<InputEvent>> mInputEventWriter;
+    SimpleClientWriter<InputEvent>* mInputEventWriter{nullptr};
 
     // Synchronization primitives for clean shutdown
     std::atomic<int> mOutstandingRpcs{0};

@@ -56,7 +56,10 @@ EmulatorControlClient::~EmulatorControlClient() {
         mOutstandingCondition.wait(lock,
                                    [this] { return mOutstandingRpcs == 0; });
     }
-    mInputEventWriter.reset();
+    {
+        std::lock_guard<std::mutex> lock(mInputWriterAccess);
+        mInputEventWriter = nullptr;
+    }
     mService.reset();
     mClient.reset();
 }
@@ -245,7 +248,7 @@ absl::StatusOr<GpsState> EmulatorControlClient::getGps() {
     return response;
 }
 
-std::shared_ptr<SimpleClientWriter<InputEvent>>
+SimpleClientWriter<InputEvent>*
 EmulatorControlClient::asyncInputEventWriter() {
     std::lock_guard<std::mutex> lock(mInputWriterAccess);
     if (mInputEventWriter)
@@ -253,10 +256,9 @@ EmulatorControlClient::asyncInputEventWriter() {
 
     static Empty empty;
     auto context = mClient->newContext();
-    mInputEventWriter = std::make_shared<SimpleClientWriter<InputEvent>>(
-            std::move(context));
+    mInputEventWriter = new SimpleClientWriter<InputEvent>(std::move(context));
     mService->async()->streamInputEvent(mInputEventWriter->context(), &empty,
-                                        mInputEventWriter.get());
+                                        mInputEventWriter);
     mInputEventWriter->StartCall();
     return mInputEventWriter;
 }
