@@ -425,8 +425,11 @@ bool startRenderer(RendererConfig* config_inout) {
     config_inout->gles_major_version = 2;
     config_inout->gles_minor_version = 0;
 
+    int rendererWidth, rendererHeight;
+    androidHwConfig_getLcdDimensions(hw, &rendererWidth, &rendererHeight);
+
     int renderer_startup_res = android_startOpenglesRenderer(
-            hw->hw_lcd_width, hw->hw_lcd_height,
+            rendererWidth, rendererHeight,
             avdInfo_getAvdFlavor(avd) == AVD_PHONE,
             avdInfo_getApiLevel(avd), vm_operations, window_agent,
             multi_display_agent, NULL, &config_inout->gles_major_version,
@@ -469,7 +472,7 @@ bool startRenderer(RendererConfig* config_inout) {
     // Use the conservative value for bytes per pixel (RGBA8)
     uint64_t pixelSizeBytes = 4;
     config_inout->glFramebufferSizeBytes =
-            hw->hw_lcd_width * hw->hw_lcd_height * pixelSizeBytes;
+            rendererWidth * rendererHeight * pixelSizeBytes;
 
     config_inout->rendererStarted = 1;
 

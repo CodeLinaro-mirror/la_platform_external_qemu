@@ -63,6 +63,26 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
     dprint("%s: cameraBack:%s cameraFront:%s", __func__, hwCameraBack.c_str(),
            hwCameraFront.c_str());
 
+    int envWidth, envHeight;
+    androidHwConfig_getScreenDimensions(hwCfg, &envWidth, &envHeight);
+    int hwLcdWidth, hwLcdHeight;
+    androidHwConfig_getLcdDimensions(hwCfg, &hwLcdWidth, &hwLcdHeight);
+    dinfo("%s: Setting up screen background view and display layout at "
+            "env:%dx%d, lcd:%dx%d",
+            __func__, envWidth, envHeight, hwLcdWidth, hwLcdHeight);
+
+    // Send layout parameters to the compositor when display position and size
+    // should be adjusted, note that this should be done even when there are
+    // errors with environment setup
+    if (hwLcdWidth < envWidth && hwLcdHeight < envHeight) {
+        // Center the display at it's original size
+        int displayPosX = (envWidth - hwLcdWidth) / 2;
+        int displayPosY = (envHeight - hwLcdHeight) / 2;
+        android_setOpenglesDisplayLayout(envWidth, envHeight, displayPosX,
+                                            displayPosY, hwLcdWidth,
+                                            hwLcdHeight);
+    }
+
     // Check if the camera is set to 'environment' or 'virtualscene'
     const bool cameraUsesEnvironment = (hwCameraBack == "environment") ||
                                        (hwCameraFront == "environment") ||

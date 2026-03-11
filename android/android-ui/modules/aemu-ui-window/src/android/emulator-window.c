@@ -352,9 +352,13 @@ void emulator_window_setup(EmulatorWindow* emulator) {
             resizableInit();
         } else {
             // only one display setting
-            android_setOpenglesDisplayConfigs(
-                    0, getConsoleAgents()->settings->hw()->hw_lcd_width, getConsoleAgents()->settings->hw()->hw_lcd_height,
-                    getConsoleAgents()->settings->hw()->hw_lcd_density, getConsoleAgents()->settings->hw()->hw_lcd_density);
+            const AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
+            int density = hwCfg->hw_lcd_density;
+            int width, height;
+            androidHwConfig_getLcdDimensions(hwCfg, &width, &height);
+
+            android_setOpenglesDisplayConfigs(0, width, height, density,
+                                              density);
             android_setOpenglesDisplayActiveConfig(0);
         }
     }
@@ -464,6 +468,7 @@ static void emulator_window_framebuffer_free(void* opaque) {
 static void* emulator_window_framebuffer_create(int width,
                                                 int height,
                                                 int bpp) {
+    D("%s: %dx%d\n", __func__, width, height);
     QFrameBuffer* fb = calloc(1, sizeof(*fb));
 
     qframebuffer_init(
@@ -654,6 +659,32 @@ int emulator_window_init(EmulatorWindow* emulator,
     emulator->win_y = y;
     *(emulator->opts) = *opts;
     *(emulator->uiEmuAgent) = *uiEmuAgent;
+
+    // Apply environment resolution override if needed
+    if (!opts->no_window && emulator->layout_file &&
+        emulator->layout_file->parts && emulator->layout_file->parts->display) {
+        const AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
+        if (hwCfg->hw_lcd_width < hwCfg->environment_width &&
+            hwCfg->hw_lcd_height < hwCfg->environment_height) {
+            // Apply full environment scale for the screen when needed
+            dinfo("%s: Adjusting layout for the environment configuration - "
+                  "lcd:%dx%d, env:%dx%d ",
+                  __func__, hwCfg->hw_lcd_width, hwCfg->hw_lcd_height,
+                  hwCfg->environment_width, hwCfg->environment_height);
+
+            // Adjust size to increase the window size
+            SKIN_FILE_LOOP_LAYOUTS(emulator->layout_file, layout)
+            layout->size.w = hwCfg->environment_width;
+            layout->size.h = hwCfg->environment_height;
+            SKIN_FILE_LOOP_END_LAYOUTS
+
+            // Adjust display rectangle to cover the whole window
+            emulator->layout_file->parts->display->rect.size.w =
+                    hwCfg->environment_width;
+            emulator->layout_file->parts->display->rect.size.h =
+                    hwCfg->environment_height;
+        }
+    }
 
     /* register as a framebuffer clients for all displays defined in the skin
      * file */
