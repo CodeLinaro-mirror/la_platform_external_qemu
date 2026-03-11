@@ -77,9 +77,9 @@ typedef struct VirtIOSoundPCMStream VirtIOSoundPCMStream;
 
 typedef struct virtio_snd_ctrl_command virtio_snd_ctrl_command;
 
-typedef struct VirtIOSoundPCM VirtIOSoundPCM;
-
 typedef struct VirtIOSoundPCMBuffer VirtIOSoundPCMBuffer;
+
+typedef struct VirtIOSoundPCMItem VirtIOSoundPCMItem;
 
 /*
  * The VirtIO sound spec reuses layouts and values from the High Definition
@@ -132,18 +132,6 @@ struct VirtIOPcmParams {
     uint8_t rate;
 };
 
-struct VirtIOSoundPCM {
-    /*
-     * PCM parameters are a separate field instead of a VirtIOSoundPCMStream
-     * field, because the operation of PCM control requests is first
-     * VIRTIO_SND_R_PCM_SET_PARAMS and then VIRTIO_SND_R_PCM_PREPARE; this
-     * means that some times we get parameters without having an allocated
-     * stream yet.
-     */
-    VirtIOPcmParams *pcm_params;
-    VirtIOSoundPCMStream **streams;
-};
-
 struct VirtIOSoundPCMStream {
     virtio_snd_pcm_info info;
     uint32_t id;
@@ -158,6 +146,18 @@ struct VirtIOSoundPCMStream {
     QemuMutex queue_mutex;
     bool active;
     QSIMPLEQ_HEAD(, VirtIOSoundPCMBuffer) queue;
+};
+
+struct VirtIOSoundPCMItem {
+    /*
+     * PCM parameters are a separate field instead of a VirtIOSoundPCMStream
+     * field, because the operation of PCM control requests is first
+     * VIRTIO_SND_R_PCM_SET_PARAMS and then VIRTIO_SND_R_PCM_PREPARE; this
+     * means that some times we get parameters without having an allocated
+     * stream yet.
+     */
+    VirtIOPcmParams params;
+    VirtIOSoundPCMStream* stream;
 };
 
 /*
@@ -222,7 +222,7 @@ struct VirtIOSound {
 
     VirtQueue *queues[VIRTIO_SND_VQ_MAX];
     uint64_t features;
-    VirtIOSoundPCM pcm;
+    VirtIOSoundPCMItem *pcm_items;
     QEMUSoundCard card;
     VMChangeStateEntry *vmstate;
     virtio_snd_config snd_conf;
