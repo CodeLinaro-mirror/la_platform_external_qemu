@@ -153,6 +153,9 @@ static void hci_pio_xfer(MIPIHCIState *hci)
     RespStatus status;
     RespDescr resp = {0};
     switch (cmd.shared_fields.cmd_attr) {
+    case CMD_ATTR_ADDR_ASSIGN:
+        status = hci_cmd_addr_assign(hci, &cmd.addr_cmd, &resp);
+        break;
     case CMD_ATTR_IMMEDIATE_XFER:
         status = hci_cmd_immediate_xfer(hci, &cmd.immediate_xfer, &resp);
         break;
