@@ -123,4 +123,5 @@ hci_cmd_send(const char *name, uint8_t tid, uint8_t cmd, uint8_t cp, uint8_t dev
 # hci-pio.c
 hci_pio_read(const char *name, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
 hci_pio_write(const char *name, uint64_t offset, uint32_t data) "%s: write: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
-
+hci_pio_xfer(const char *name, uint64_t xfer) "%s: Transfer started: 0x%.16" PRIx64
+hci_pio_push_resp(const char *name, uint32_t resp) "%s: response 0x%.8" PRIx32 " pushed to response queue"

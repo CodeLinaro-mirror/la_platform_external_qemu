@@ -27,6 +27,7 @@
 #include "hw/i3c/hci-pio.h"
 #include "hci-pio-internal.h"
 #include "hw/core/irq.h"
+#include "qemu/fifo32.h"
 
 static uint8_t mipi_hci_get_next_dynamic_addr(MIPIHCIState *s,
                                               uint8_t dat_index)
@@ -186,11 +187,12 @@ static const Property mipi_hci_properties[] = {
     DEFINE_PROP_UINT32("ibi-stat", MIPIHCIState,
                        dma.cfg.ibi_status_struct_size, 0),
     DEFINE_PROP_UINT32("num-irqs", MIPIHCIState, cfg.num_irqs, 1),
-    /* Buffer and status sizes are 2^(n+1) DWORDs. */
+    /* TXRX data buffer sizes are 2^(n+1) DWORDs. */
     DEFINE_PROP_UINT8("tx-data-buffer-size", MIPIHCIState,
                       pio.cfg.tx_data_buffer_size, 0),
     DEFINE_PROP_UINT8("rx-data-buffer-size", MIPIHCIState,
                       pio.cfg.rx_data_buffer_size, 0),
+    /* IBI status size is in DWORDS. */
     DEFINE_PROP_UINT8("ibi-status-size", MIPIHCIState,
                       pio.cfg.ibi_status_size, 0),
     /* Each command entry is 2 DWORDs, and each response is 1 DWORD. */
@@ -214,6 +216,13 @@ static void mipi_hci_realize(DeviceState *dev, Error **errp)
     for (int i = 0; i < s->cfg.num_irqs; i++) {
         sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq[i]);
     }
+
+    /* Command queue size is 2 DWORDs per entry. */
+    fifo32_create(&pio->cmd_fifo, (pio->cfg.cr_queue_entries + 1) * 2);
+    fifo32_create(&pio->resp_fifo, pio->cfg.cr_queue_entries + 1);
+    fifo32_create(&pio->tx_data_fifo, 1 << (pio->cfg.tx_data_buffer_size + 1));
+    fifo32_create(&pio->rx_data_fifo, 1 << (pio->cfg.rx_data_buffer_size + 1));
+    fifo32_create(&pio->ibi_fifo, pio->cfg.ibi_status_size);
 
     memory_region_init(&s->iomem, OBJECT(s), TYPE_MIPI_HCI"-mmio",
                        MIPI_HCI_MMIO_SIZE);

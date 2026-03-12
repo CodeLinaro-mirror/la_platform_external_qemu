@@ -11,6 +11,7 @@
 
 #include "hw/core/registerfields.h"
 #include "system/memory.h"
+#include "qemu/fifo32.h"
 
 #define HCI_PIO_NUM_REGS 12
 
@@ -76,6 +77,11 @@ typedef struct HCIPIOState {
         uint8_t cr_queue_entries;
     } cfg;
 
+    Fifo32 cmd_fifo;
+    Fifo32 resp_fifo;
+    Fifo32 ibi_fifo;
+    Fifo32 tx_data_fifo;
+    Fifo32 rx_data_fifo;
     MemoryRegion mmio;
 } HCIPIOState;
 
