@@ -5,8 +5,15 @@ android_qt_lib(
       android/skin/qt/extended-pages/telephony-page.ui
       android/skin/qt/extended-pages/telephony-controller.cpp
       android/skin/qt/extended-pages/legacy-telephony-controller.cpp
-  DEPS android-emu qemu-host-common-headers Qt${QT_VERSION_MAJOR}::Core
-       Qt${QT_VERSION_MAJOR}::Widgets ui::gl-qt-bridge ui::widgets)
+      android/skin/qt/extended-pages/grpc-telephony-controller.cpp
+  DEPS android-emu
+       modem-service-client
+       protobuf::libprotobuf
+       qemu-host-common-headers
+       Qt${QT_VERSION_MAJOR}::Core
+       Qt${QT_VERSION_MAJOR}::Widgets
+       ui::gl-qt-bridge
+       ui::widgets)
 
 if(ENABLE_QT_TESTS)
   target_compile_definitions(ext-page-telephony PRIVATE ENABLE_QT_TESTS)
@@ -17,10 +24,13 @@ android_add_test(
   SOURCE_DIR src
   SRC android/skin/qt/extended-pages/legacy-telephony-controller_test.cpp
       android/skin/qt/extended-pages/telephony-controller_test.cpp
+      android/skin/qt/extended-pages/grpc-telephony-controller_test.cpp
   DEPS android-emu
        android-emu-test-launcher
        ext-page-telephony
        gmock
+       modem-service-client
+       protobuf::libprotobuf
        qemu-host-common-headers
        Qt${QT_VERSION_MAJOR}::Core
        Qt${QT_VERSION_MAJOR}::Widgets

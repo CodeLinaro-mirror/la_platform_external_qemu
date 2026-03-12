@@ -15,6 +15,7 @@
 
 #include "android/cmdline-definitions.h"
 #include "android/console.h"
+#include "android/skin/qt/extended-pages/grpc-telephony-controller.h"
 #include "android/skin/qt/extended-pages/legacy-telephony-controller.h"
 
 #ifdef _WIN32
@@ -74,9 +75,7 @@ TelephonyController* TelephonyController::get() {
                             agents->settings->android_cmdLineOptions()->grpc_ui;
 
             if (isGrpcUi) {
-                // Note: GrpcTelephonyController is added in a subsequent
-                // commit.
-                sInstance = new NoOpTelephonyController();
+                sInstance = new GrpcTelephonyController();
             } else if (agents->telephony) {
                 sInstance = new LegacyTelephonyController(agents->telephony);
             } else {
