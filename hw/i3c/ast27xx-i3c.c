@@ -373,17 +373,21 @@ static void ast27xx_i3c_update_irq(MIPIHCIState *hci, MIPIHCIIRQContext ctx)
     AST27xxI3CState *s = container_of(hci, AST27xxI3CState, parent);
     HCICoreState *core = &hci->core;
     HCIDMAState *dma = &hci->dma;
+    HCIPIOState *pio = &hci->pio;
 
     s->ctrl_regs[R_I3C_INTR_STATUS_F0] = 0;
 
     /* INTR_STATUS is masked before setting the IRQ line. */
     core->regs[R_INTR_STATUS] &= core->regs[R_INTR_SIGNAL_ENABLE];
     dma->regs[R_RH_INTR_STATUS] &= dma->regs[R_RH_INTR_SIGNAL_ENABLE];
+    pio->regs[R_PIO_INTR_STATUS] &= pio->regs[R_PIO_INTR_SIGNAL_ENABLE];
 
     bool level = !!(core->regs[R_INTR_STATUS] &
                     core->regs[R_INTR_SIGNAL_ENABLE]);
     level |= !!(dma->regs[R_RH_INTR_STATUS] &
                 dma->regs[R_RH_INTR_SIGNAL_ENABLE]);
+    level |= !!(pio->regs[R_PIO_INTR_STATUS] &
+                pio->regs[R_PIO_INTR_SIGNAL_ENABLE]);
 
     if (level) {
         switch (ctx) {
