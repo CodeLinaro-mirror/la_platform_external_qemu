@@ -1306,11 +1306,12 @@ static void virtio_snd_unrealize(DeviceState *dev)
     qemu_del_vm_change_state_handler(vsnd->vmstate);
     trace_virtio_snd_unrealize(vsnd);
 
+    virtio_snd_process_cmdq(vsnd);
+
     if (vsnd->pcm_items) {
         for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
             VirtIOSoundPCMStream *stream = vsnd->pcm_items[i].stream;
             if (stream) {
-                virtio_snd_process_cmdq(stream->s);
                 virtio_snd_pcm_close(stream);
                 qemu_mutex_destroy(&stream->queue_mutex);
                 g_free(stream);
