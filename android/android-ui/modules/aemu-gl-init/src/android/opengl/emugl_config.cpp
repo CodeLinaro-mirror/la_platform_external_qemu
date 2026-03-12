@@ -1089,13 +1089,32 @@ bool emuglConfig_init(EmuglConfig* config,
     // based on some other parameters and prefer host
     if (gles_mode_selected == "auto") {
         bool switchToSoftwareGles = false;
-#ifdef __APPLE__
-        // TODO(b/479126903): New macOS system update leaks memory when host
-        // OpenGL driver is used, always use software rendering for GL
-        switchToSoftwareGles = true;
-#else
         if (no_window || async_query_host_gpu_blacklisted()) {
             switchToSoftwareGles = true;
+        }
+#ifdef __APPLE__
+        if (!switchToSoftwareGles) {
+            const int hostGpuMemoryLimitMB = 5 * 1024; // 5GB
+            int freeRamMB = 0;
+            System::isUnderMemoryPressure(&freeRamMB);
+    
+            // TODO(b/479126903): New macOS system update (Tahoe) leaks memory when
+            // host OpenGL driver is used, which is deprecated on macOS for some
+            // time. Check memory usage and decide to use software rendering for GL
+            // emulation if there is possibly a leak that may have cause system
+            // restarts.
+            if (freeRamMB < hostGpuMemoryLimitMB) {
+                dwarning(
+                        "Software GL rendering will be used due to system memory "
+                        "pressure, performance will be affected!"
+                        " (Available Memory: %d MB, Required: %d MB)",
+                        freeRamMB, hostGpuMemoryLimitMB);
+                switchToSoftwareGles = true;
+            } else {
+                dprint("System has sufficient memory available (%d MB) for "
+                       "hardware GL rendering",
+                       freeRamMB);
+            }
         }
 #endif
 
