@@ -99,6 +99,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 
         if (mOwnedScene) {
             sceneMode = mOwnedScene->getSceneMode();
+            mOwnedScene->loadUserResources();
         }
     }
 
@@ -128,6 +129,7 @@ void RenderedCameraDevice::stopCapturing() {
         VirtualSceneManager::setSceneControlsParameters(false);
         VirtualSceneManager::removeSceneUser();
     } else if (mOwnedScene) {
+        mOwnedScene->unloadUserResources();
         ScenesManager::removeScene(mOwnedScene.get());
         mOwnedScene.reset();
     }

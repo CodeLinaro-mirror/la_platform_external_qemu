@@ -27,6 +27,7 @@
 #include "android/virtualscene/Renderer.h"
 
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 
 using namespace android::base;
@@ -156,7 +157,7 @@ Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
 
 Scene::~Scene() {
     D("%s: destroying Scene", __func__);
-    if (mSceneObjects.size() || mRawImageSource) {
+    if (mSceneObjects.size() || mRawImageSource || mOverlayObject) {
         // releaseResources should have been called!
         E("%s: Scene resources are not released!", __func__);
     }
@@ -268,6 +269,7 @@ bool Scene::releaseResources() {
     mSceneObjects.clear();
 
     mRawImageSource.reset();
+    mOverlayObject.reset();
 
     mObjectsVersion++;
 
@@ -283,6 +285,33 @@ void Scene::update(bool updateTime) {
     if (updateTime) {
         // TODO(virtualscene): use ThreadLooper::nowNs(ClockType::kVirtual) ?
         mFrameTimeUs = System::get()->getUnixTimeUs() - mStartTimeUs;
+    }
+
+    if (mRawImageSource) {
+        if (!mOverlayObject) {
+            mOverlayObject = std::make_unique<SceneOverlayObject>();
+        }
+        auto func = __FUNCTION__;
+        int res = mRawImageSource->AccessImage([&](RawImageBuffer* buffer) {
+            if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
+                derror("%s: Unsupported pixel format from image provider:%d",
+                       func, buffer->pixel_format);
+                return -1;
+            }
+
+            if (mOverlayObject->mDataRGBA.size() < buffer->buffer_size) {
+                mOverlayObject->mDataRGBA.resize(buffer->buffer_size);
+                mOverlayObject->mWidth = buffer->width;
+                mOverlayObject->mHeight = buffer->height;
+            }
+
+            std::memcpy(mOverlayObject->mDataRGBA.data(), buffer->buffer,
+                        buffer->buffer_size);
+            return 0;
+        });
+        if (res < 0) {
+            E("Failed to update image source");
+        }
     }
 }
 
@@ -405,10 +434,19 @@ void Scene::getRenderableObjectsFromSceneObject(
 // to reduce memory usage of the scene when there are no users of it
 void Scene::loadUserResources() {
     dprint("%s", __FUNCTION__);
+    if (mRawImageSource) {
+        // TODO(virtualscene) Determine if we need these input values.
+        // Currently they are just hints that we may use to better initialize
+        // the webcam to a sensible resolution.
+        mRawImageSource->Start(0, 0, 0);
+    }
 }
 
 void Scene::unloadUserResources() {
     dprint("%s", __FUNCTION__);
+    if (mRawImageSource) {
+        mRawImageSource->Stop();
+    }
 }
 
 }  // namespace virtualscene

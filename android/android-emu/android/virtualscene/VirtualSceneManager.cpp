@@ -354,32 +354,20 @@ bool ScenesManager::renderView(Scene* scene,
             }
         } break;
         case SceneConfig::Mode::ImageFile: {
-            RawImageSource* imageSource = scene->getRawImageSource();
-            if (!imageSource) {
+            const SceneOverlayObject* overlay = scene->getOverlayObject();
+            if (!overlay || !overlay->isValid()) {
                 E("Scene rendering failed");
                 return false;
             }
-            auto func = __FUNCTION__;
-            int res = imageSource->AccessImage([&](RawImageBuffer* buffer) {
-                if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
-                    derror("%s: Unsupported pixel format from image provider: "
-                           "%d",
-                           func, buffer->pixel_format);
-                    return -1;
-                }
-                std::vector<uint8_t>& fbData = view->getFramebufferLocked();
-                ImageScaler scaler(view->getWidthLocked(),
-                                   view->getHeightLocked(), fbData.data());
-                if (!scaler.updateImage(buffer->width, buffer->height,
-                                        buffer->buffer,
-                                        ImageScaler::ScaleMode::ScaleToFill)) {
-                    E("%s: Failed to resize the framebuffer for the view",
-                      func);
-                    return -1;
-                }
-                return 0;
-            });
-            if (res != 0) {
+            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
+
+            ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
+                               fbData.data());
+            if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
+                                    overlay->mDataRGBA.data(),
+                                    ImageScaler::ScaleMode::ScaleToFill)) {
+                E("%s: Failed to resize the framebuffer for the view",
+                  __FUNCTION__);
                 return false;
             }
         } break;
@@ -791,6 +779,15 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
         ScenesManager::removeScene(mEnvironmentScene.get());
         mEnvironmentScene.reset();
     }
+
+    // If we're currently running, we need to load resources
+    if (mNumUsers > 0) {
+        scene->loadUserResources();
+    }
+
+    // TODO(virtualscene) Handle virtual scene controls. Those should move
+    // out of the camera callback and be controlled here, since the camera
+    // has no knowledge of what the scene is when it changes.
 
     // Replace the scene, not that this is safe because we don't expose the
     // scene to the outside users and all operations are done in-sync through
