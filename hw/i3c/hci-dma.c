@@ -274,22 +274,19 @@ void hci_dma_xfer(MIPIHCIState *hci)
         TransferDescr desc;
         RespDescr resp;
         RespStatus status;
-        bool roc = true;
         hci_dma_read_descr(hci, &desc);
+        bool roc = desc.cmd.shared_fields.roc;
 
-        switch (desc.cmd.cmd_attr) {
+        switch (desc.cmd.shared_fields.cmd_attr) {
         case CMD_ATTR_ADDR_ASSIGN:
             status = hci_cmd_addr_assign(hci, &desc.cmd.addr_cmd, &resp);
-            roc = desc.cmd.addr_cmd.roc;
             break;
         case CMD_ATTR_REGULAR_XFER:
             status = hci_dma_regular_xfer(hci, &desc, &resp);
-            roc = desc.cmd.regular_xfer.roc;
             break;
         case CMD_ATTR_IMMEDIATE_XFER:
             status = hci_cmd_immediate_xfer(hci, &desc.cmd.immediate_xfer,
                                             &resp);
-            roc = desc.cmd.immediate_xfer.roc;
             break;
         case CMD_ATTR_INTERNAL_CONTROL:
             status = hci_dma_internal_control_xfer(hci,
@@ -306,7 +303,7 @@ void hci_dma_xfer(MIPIHCIState *hci)
             {
                 g_autofree char *path = object_get_canonical_path(OBJECT(hci));
                 qemu_log_mask(LOG_UNIMP, "%s: Unimplemented command 0x%x\n",
-                              path, desc.cmd.cmd_attr);
+                              path, desc.cmd.shared_fields.cmd_attr);
             }
             status = RESP_STATUS_ERROR_NOT_SUPPORTED;
             break;
@@ -314,7 +311,7 @@ void hci_dma_xfer(MIPIHCIState *hci)
             {
                 g_autofree char *path = object_get_canonical_path(OBJECT(hci));
                 qemu_log_mask(LOG_UNIMP, "%s: Unknown command 0x%x\n",
-                              path, desc.cmd.cmd_attr);
+                              path, desc.cmd.shared_fields.cmd_attr);
             }
             status = RESP_STATUS_ERROR_NOT_SUPPORTED;
             break;

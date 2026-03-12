@@ -113,6 +113,25 @@ typedef struct InternalControl {
 } __attribute__((packed)) InternalControl;
 QEMU_BUILD_BUG_ON(sizeof(InternalControl) != sizeof(uint64_t));
 
+typedef struct SharedFields {
+  uint8_t cmd_attr:3;
+  uint8_t tid:4; /* Transaction ID. */
+  uint16_t cmd:8;
+  uint8_t rsvd:1;
+  uint8_t dev_index:5;
+  uint16_t rsvd2:8;
+  /*
+   * Technically not a shared field for address assignment, but we know the RnW
+   * state for address assignment commands, so we only use this field on every
+   * other command, where the field is shared.
+   */
+  uint8_t rnw:1;
+  uint8_t roc:1; /* Response on completion. */
+  uint8_t toc:1; /* Terminate on completion (STOP). */
+  uint32_t rsvd3;
+} __attribute__((packed)) SharedFields;
+QEMU_BUILD_BUG_ON(sizeof(SharedFields) != sizeof(uint64_t));
+
 typedef union CmdDescr {
   AddrCmd addr_cmd;
   ImmediateXfer immediate_xfer;
@@ -120,7 +139,7 @@ typedef union CmdDescr {
   ComboXfer combo_xfer;
   InternalControl internal_control;
 
-  uint8_t cmd_attr:3;
+  SharedFields shared_fields;
   uint32_t val32[2];
   uint64_t val64;
 } __attribute__((packed)) CmdDescr;
