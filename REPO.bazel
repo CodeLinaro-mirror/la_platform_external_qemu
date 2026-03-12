@@ -1,0 +1,4 @@
+"""Enable warnings for every package"""
+repo(
+    features = ["warnings"],
+)
