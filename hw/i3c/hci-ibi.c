@@ -14,6 +14,7 @@
 #include "hw/core/registerfields.h"
 #include "hci-dat-internal.h"
 #include "hci-dma-internal.h"
+#include "hci-pio-internal.h"
 #include "hw/i3c/hci-dat.h"
 #include "trace.h"
 
@@ -25,9 +26,7 @@ static void hci_ibi_report_ibi(MIPIHCIState *hci)
 
     if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, MODE_SELECTOR) ==
         MODE_SELECTOR_PIO) {
-        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
-        qemu_log_mask(LOG_UNIMP, "%s: Tried to store IBI in PIO mode, but PIO "
-                      "is not supported.", path);
+        hci_pio_report_ibi(hci);
     } else {
         hci_dma_report_ibi(hci);
     }
@@ -55,16 +54,6 @@ int hci_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
         goto done;
     }
     hci->ibi_in_progress = g_new0(IbiStatus, 1);
-
-    /* We don't support PIO, just NACK and tell the user. */
-    if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, MODE_SELECTOR) ==
-        MODE_SELECTOR_PIO) {
-        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
-        qemu_log_mask(LOG_UNIMP, "%s: IBI was received in PIO mode, but PIO is "
-                     "not supported.", path);
-        hci->ibi_in_progress->ibi.error = 1;
-        goto done;
-    }
 
     /*
      * If it's a hot-join, the device index isn't pointing to a real device
@@ -123,16 +112,6 @@ int hci_ibi_recv(I3CBus *bus, uint8_t data)
 
     uint8_t addr = hci->ibi_in_progress->ibi.ibi_id >> 1;
     uint32_t dev_index = mhc->dat_dev_index_from_addr(hci, addr);
-
-    /* We don't support PIO, just NACK and tell the user. */
-    if (ARRAY_FIELD_EX32(hci->core.regs, HC_CONTROL, MODE_SELECTOR) ==
-        MODE_SELECTOR_PIO) {
-        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
-        qemu_log_mask(LOG_UNIMP, "%s: IBI data was received in PIO mode, but "
-                      "PIO is not supported.", path);
-        hci->ibi_in_progress->ibi.error = 1;
-        goto done;
-    }
 
     if (!FIELD_EX32(hci->dat.regs[dev_index + R_TARGET_DAT], TARGET_DAT,
                     TARGET_IBI_PAYLOAD)) {

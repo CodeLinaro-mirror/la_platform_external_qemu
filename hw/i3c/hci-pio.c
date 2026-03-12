@@ -102,6 +102,27 @@ static uint32_t hci_pio_xfer_data_port_r(MIPIHCIState *hci)
     return value;
 }
 
+static uint32_t hci_ibi_port_r(MIPIHCIState *hci)
+{
+    HCIPIOState *s = &hci->pio;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    if (fifo32_is_empty(&s->ibi_fifo)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: IBI FIFO is empty.\n", path);
+        return 0;
+    }
+
+    uint32_t value = fifo32_pop(&s->ibi_fifo);
+    if (fifo32_num_used(&s->ibi_fifo) < ARRAY_FIELD_EX32(s->regs,
+            QUEUE_THLD_CTRL, IBI_STATUS_THLD)) {
+        ARRAY_FIELD_DP32(s->regs, PIO_INTR_STATUS, IBI_STATUS_THLD_STAT, 0);
+        c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+    }
+
+    return value;
+}
+
 uint64_t hci_pio_read(void *opaque, hwaddr offset, unsigned size)
 {
     MIPIHCIState *hci = MIPI_HCI(opaque);
@@ -125,6 +146,9 @@ uint64_t hci_pio_read(void *opaque, hwaddr offset, unsigned size)
         break;
     case R_XFER_DATA_PORT:
         value = hci_pio_xfer_data_port_r(hci);
+        break;
+    case R_IBI_PORT:
+        value = hci_ibi_port_r(hci);
         break;
     default:
         value = s->regs[offset];
@@ -516,3 +540,47 @@ void hci_pio_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
     }
 }
 
+static void hci_pio_ibi_push_fifo(MIPIHCIState *hci, IbiStatus *ibi)
+{
+    HCIPIOState *s = &hci->pio;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    uint32_t segment_size = ARRAY_FIELD_EX32(s->regs, QUEUE_THLD_CTRL,
+                                             IBI_DATA_SEGMENT_SIZE);
+
+    if (ibi->num_bytes == 0) {
+        fifo32_push(&s->ibi_fifo, *(uint32_t *)&ibi->ibi);
+    } else {
+        for (int i = 0; i < ibi->num_bytes; i += segment_size) {
+            /*
+             * If we received more bytes than we're allowed to fit in a segment,
+             * we need to split the IBI so there's multiple statuses.
+             */
+            uint32_t num_bytes = MIN(ibi->num_bytes - i, segment_size);
+            IbiDescriptor status_copy = ibi->ibi;
+            status_copy.data_length = num_bytes;
+
+            fifo32_push(&s->ibi_fifo, *(uint32_t *)&status_copy);
+            for (int j = 0; j < num_bytes; j += 4) {
+                fifo32_push(&s->ibi_fifo,
+                            htole32(*((uint32_t *)&ibi->data[j])));
+            }
+        }
+    }
+
+    bool thld_met = fifo32_num_used(&s->ibi_fifo) >= ARRAY_FIELD_EX32(s->regs,
+                                    QUEUE_THLD_CTRL, IBI_STATUS_THLD);
+    ARRAY_FIELD_DP32(s->regs, PIO_INTR_STATUS, IBI_STATUS_THLD_STAT, thld_met);
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+}
+
+int hci_pio_report_ibi(MIPIHCIState *hci)
+{
+    int ret = 0;
+
+    g_assert(hci->ibi_in_progress != NULL);
+
+    hci_pio_ibi_push_fifo(hci, hci->ibi_in_progress);
+
+    return ret;
+}
