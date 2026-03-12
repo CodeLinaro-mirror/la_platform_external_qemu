@@ -190,3 +190,10 @@ def isSHA1Same(git_src_dir: Path, sha1_file: Path) -> bool:
         raise IOError(f"Failed to read SHA1 from file {sha1_file}: {e}")
 
     return latest_git_sha1 == file_sha1
+
+def getHostArchitecture() -> str:
+    hostArch = platform.machine().lower()
+    if hostArch == "arm64":
+        # always use 'aarch64' for consistency in filename/folder checks
+        hostArch = "aarch64"
+    return hostArch

@@ -26,7 +26,7 @@ import platform
 
 AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
-HOST_ARCH = platform.machine().lower()
+HOST_ARCH = deps_common.getHostArchitecture()
 
 AOSP_ANGLE_SRC_PATH = AOSP_ROOT / "external" / "angle"
 DEPOT_TOOLS_DIRNAME = "_depot_tools"
