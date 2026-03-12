@@ -2314,6 +2314,10 @@ static void help_crash_report_mode(stralloc_t* out) {
            "never, always, ask\n");
 }
 
+static void help_no_display_layout(stralloc_t* out) {
+    PRINTF("  Disable display layout from the environment configuration.\n");
+}
+
 #define  help_no_skin   NULL
 #define  help_netspeed  help_shaper
 #define  help_netdelay  help_shaper

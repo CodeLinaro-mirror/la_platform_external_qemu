@@ -45,6 +45,7 @@
 #include "android/skin/qt/QtLooper.h"
 #include "android/skin/qt/SharedMemoryRenderer.h"
 #include "android/skin/qt/SharedStreamEmulator.h"
+#include "emulator_controller.pb.h"
 #include "android/skin/qt/car-cluster-window.h"
 #include "android/skin/qt/event-serializer.h"
 #include "android/skin/qt/extended-pages/car-cluster-connector/car-cluster-connector.h"
@@ -1796,21 +1797,72 @@ void EmulatorQtWindow::setSharedMemoryRenderer(SharedMemoryRenderer* renderer) {
     }
 }
 
-void EmulatorQtWindow::initializeStreamer(std::string_view shm_handle) {
+void EmulatorQtWindow::initializeStreamer(std::string_view shm_handle,
+                                          StreamTransport transport_type) {
+    using android::emulation::control::Image;
+    using android::emulation::control::ImageFormat;
+
     int width = getConsoleAgents()->settings->hw()->hw_lcd_width;
     int height = getConsoleAgents()->settings->hw()->hw_lcd_height;
 
-    mSharedMemoryRenderer = std::make_unique<SharedMemoryRenderer>(
-            std::string(shm_handle), width, height,
-            SharedMemoryRenderer::ImgFormat::RGB888);
-    mSharedMemoryRenderer->initialize();
+    connect(this, &EmulatorQtWindow::frameReady, this,
+            &EmulatorQtWindow::slot_updateGuestScreen);
 
-    connect(mSharedMemoryRenderer.get(), &SharedMemoryRenderer::frameReady,
-            this, &EmulatorQtWindow::slot_updateGuestScreen);
+    if (transport_type == StreamTransport::MMAP && !shm_handle.empty()) {
+        mSharedMemoryRenderer = std::make_unique<SharedMemoryRenderer>(
+                std::string(shm_handle), width, height,
+                SharedMemoryRenderer::ImgFormat::RGB888);
+        mSharedMemoryRenderer->initialize();
+
+        connect(mSharedMemoryRenderer.get(), &SharedMemoryRenderer::frameReady,
+                this, &EmulatorQtWindow::slot_updateGuestScreen);
+    }
 
     mStreamer = std::make_unique<SharedStreamEmulator>(
-            shm_handle, [this]() { mSharedMemoryRenderer->update(); }, width,
-            height);
+            shm_handle,
+            [this, transport_type](const Image* image) {
+                if (transport_type == StreamTransport::MMAP) {
+                    if (mSharedMemoryRenderer) {
+                        mSharedMemoryRenderer->update();
+                    }
+                } else {
+                    const std::string& data = image->image();
+                    if (data.empty()) {
+                        return;
+                    }
+
+                    QImage qimage;
+                    switch (image->format().format()) {
+                        case ImageFormat::PNG:
+                            qimage.loadFromData(
+                                    reinterpret_cast<const uchar*>(data.data()),
+                                    static_cast<int>(data.size()), "PNG");
+                            break;
+                        case ImageFormat::RGBA8888:
+                            qimage = QImage(
+                                    reinterpret_cast<const uchar*>(data.data()),
+                                    image->format().width(),
+                                    image->format().height(),
+                                    QImage::Format_RGBA8888);
+                            qimage = qimage.copy();
+                            break;
+                        case ImageFormat::RGB888:
+                            qimage = QImage(
+                                    reinterpret_cast<const uchar*>(data.data()),
+                                    image->format().width(),
+                                    image->format().height(),
+                                    QImage::Format_RGB888);
+                            qimage = qimage.copy();
+                            break;
+                        default:
+                            return;
+                    }
+                    if (!qimage.isNull()) {
+                        emit frameReady(qimage);
+                    }
+                }
+            },
+            width, height, transport_type);
     mStreamer->startStream();
 }
 
@@ -2323,10 +2375,23 @@ void EmulatorQtWindow::slot_requestClose(QSemaphore* semaphore) {
     QSemaphoreReleaser semReleaser(semaphore);
     mToolWindow->shouldClose();
     if (isMainThreadRunning()) {
-        using android::snapshot::Snapshotter;
-        Snapshotter::get().stopVulkanAppsIfApplicable();
+        if (!getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+            // TODO: This should be a backend operation, and moved out of Qt codebase.
+            using android::snapshot::Snapshotter;
+            Snapshotter::get().stopVulkanAppsIfApplicable();
+        }
         queueQuitEvent();
     }
+
+    // In Fishtank mode, we should notify the emulator to shut down
+    // if we are not in embedded mode.
+    auto opts = getConsoleAgents()->settings->android_cmdLineOptions();
+    if (opts->grpc_ui && !opts->qt_hide_window) {
+        if (getConsoleAgents()->vm) {
+            getConsoleAgents()->vm->vmShutdown();
+        }
+    }
+
     System::get()->waitAndKillSelf();
 }
 

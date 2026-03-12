@@ -298,14 +298,22 @@ const FileData* avdInfo_getBootProperties(const AvdInfo* i);
 const FileData* avdInfo_getBuildProperties(const AvdInfo* i);
 
 /* Return a reference to the avd/config.ini file for this AVD.
- * Note that this vaue could be NULL.
+ * Note that this value could be NULL.
  */
 CIniFile* avdInfo_getConfigIni(const AvdInfo* i);
 
 /* Return a reference to the avd/environment.ini file for this AVD.
- * Note that this vaue could be NULL.
+ * Note that this value could be NULL.
  */
 CIniFile* avdInfo_getEnvironmentIni(const AvdInfo* i);
+
+/* Reload avd/environment.ini contents for this AVD. If a valid data pointer is
+ * given, it'll be reloaded with that string data and return a reference.
+ * Otherwise, environment.ini file will be reloaded from the disk.
+ * Note that the return value could be NULL.
+ */
+CIniFile* avdInfo_reloadEnvironmentIni(const AvdInfo* i, const char* data);
+
 
 /* Returns the path to a given AVD image file. This will return NULL if
  * the file cannot be found / does not exist.

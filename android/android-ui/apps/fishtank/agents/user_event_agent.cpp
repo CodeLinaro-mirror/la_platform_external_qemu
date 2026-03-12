@@ -32,7 +32,7 @@ using android::emulation::control::TouchEvent;
 using android::emulation::control::TouchpadEvent;
 using android::emulation::control::WheelEvent;
 
-static std::shared_ptr<SimpleClientWriter<InputEvent>> sInputEventWriter;
+static SimpleClientWriter<InputEvent>* sInputEventWriter = nullptr;
 
 void initializeGrpcUserEventAgent(EmulatorControlClient* client) {
     if (client) {

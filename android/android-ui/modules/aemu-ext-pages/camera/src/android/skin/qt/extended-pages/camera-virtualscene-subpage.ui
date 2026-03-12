@@ -151,6 +151,13 @@
        </property>
       </widget>
      </item>
+     <item>
+      <widget class="QPushButton" name="reloadEnvironment">
+       <property name="text">
+        <string>Reload Environment</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
    <item>

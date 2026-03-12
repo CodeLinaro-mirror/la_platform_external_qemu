@@ -168,7 +168,19 @@ public:
                              AnimationState* response) override {
         response->set_tvon(mVirtualSceneAgent->getAnimationState());
         return Status::OK;
-    };
+    }
+
+    virtual ::grpc::Status reloadEnvironment(
+            ::grpc::ServerContext* context,
+            const ::android::emulation::control::incubating::
+                    ReloadEnvironmentRequest* request,
+            ::android::emulation::control::incubating::
+                    ReloadEnvironmentResponse* response) override {
+        const std::string& envDataStr = request->environment_config();
+        const char* envData = envDataStr.empty() ? nullptr : envDataStr.c_str();
+        response->set_success(mVirtualSceneAgent->reloadEnvironment(envData));
+        return Status::OK;
+    }
 
 private:
     const QAndroidVirtualSceneAgent* mVirtualSceneAgent;

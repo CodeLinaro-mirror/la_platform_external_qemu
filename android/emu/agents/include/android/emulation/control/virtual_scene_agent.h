@@ -72,6 +72,13 @@ typedef struct QAndroidVirtualSceneAgent {
     //
     // Returns true for enabled, false for disabled.
     bool (*getAnimationState)();
+
+    // Reloads the environment, the scene and the settings.
+    //
+    // |environmentData| - String data for environment.ini file. If invalid,
+    // AVD's file will be used.
+    // Returns true on success, false for failure.
+    bool (*reloadEnvironment)(const char* environmentData);
 } QAndroidVirtualSceneAgent;
 
 ANDROID_END_HEADER

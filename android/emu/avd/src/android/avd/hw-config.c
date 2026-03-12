@@ -589,3 +589,21 @@ int androidHwConfig_hasEnvironmentBackCamera(AndroidHwConfig* config) {
 int androidHwConfig_hasEnvironmentFrontCamera(AndroidHwConfig* config) {
     return strcmp(config->hw_camera_front, "environment") == 0;
 }
+
+void androidHwConfig_getLcdDimensions(const AndroidHwConfig* config,
+                                 int* outWidth,
+                                 int* outHeight) {
+    *outWidth = config->hw_lcd_width;
+    *outHeight = config->hw_lcd_height;
+}
+
+void androidHwConfig_getScreenDimensions(const AndroidHwConfig* config,
+                                    int* outWidth,
+                                    int* outHeight) {
+    *outWidth = (config->hw_lcd_width < config->environment_width)
+                        ? config->environment_width
+                        : config->hw_lcd_width;
+    *outHeight = (config->hw_lcd_height < config->environment_height)
+                         ? config->environment_height
+                         : config->hw_lcd_height;
+}
