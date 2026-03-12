@@ -170,24 +170,28 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
         } else {
             dinfo("%s: No environment config is provided", __func__);
         }
-        return ret;
-    }
+    } else {
+        std::string backgroundImageFilename =
+                iniFile_getString(environmentIni, "background.image.filename", "");
+        std::string backgroundVideoFilename =
+                iniFile_getString(environmentIni, "background.video.filename", "");
+        std::string backgroundSceneFilename =
+                iniFile_getString(environmentIni, "background.scene.filename", "");
+        if (!backgroundImageFilename.empty()) {
+            ret.sceneMode = SceneConfig::Mode::ImageFile;
+            ret.sceneFilename = backgroundImageFilename;
+        } else if (!backgroundVideoFilename.empty()) {
+            ret.sceneMode = SceneConfig::Mode::VideoPlayback;
+            ret.sceneFilename = backgroundVideoFilename;
+        } else if (!backgroundSceneFilename.empty()) {
+            ret.sceneMode = SceneConfig::Mode::Mesh3dScene;
+            ret.sceneFilename = backgroundSceneFilename;
+        }
 
-    std::string backgroundImageFilename =
-            iniFile_getString(environmentIni, "background.image.filename", "");
-    std::string backgroundVideoFilename =
-            iniFile_getString(environmentIni, "background.video.filename", "");
-    std::string backgroundSceneFilename =
-            iniFile_getString(environmentIni, "background.scene.filename", "");
-    if (!backgroundImageFilename.empty()) {
-        ret.sceneMode = SceneConfig::Mode::ImageFile;
-        ret.sceneFilename = backgroundImageFilename;
-    } else if (!backgroundVideoFilename.empty()) {
-        ret.sceneMode = SceneConfig::Mode::VideoPlayback;
-        ret.sceneFilename = backgroundVideoFilename;
-    } else if (!backgroundSceneFilename.empty()) {
-        ret.sceneMode = SceneConfig::Mode::Mesh3dScene;
-        ret.sceneFilename = backgroundSceneFilename;
+        // Update blur amount from config, if given
+        ret.backgroundBlur =
+                (float)iniFile_getDouble(environmentIni, "background.blurAmount",
+                                         EnvironmentConfig::defaultBackgroundBlur);
     }
 
     if (ret.sceneMode == SceneConfig::Mode::Unknown ||
@@ -197,11 +201,6 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
         ret.sceneMode = SceneConfig::Mode::Mesh3dScene;
         ret.sceneFilename = SceneConfig::defaultFilenameForMode(ret.sceneMode);
     }
-
-    // Update blur amount from config, if given
-    ret.backgroundBlur =
-            (float)iniFile_getDouble(environmentIni, "background.blurAmount",
-                                     EnvironmentConfig::defaultBackgroundBlur);
 
     return ret;
 }
