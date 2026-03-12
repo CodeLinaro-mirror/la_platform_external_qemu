@@ -144,6 +144,11 @@ bool SceneConfig::modeSupportViewRotations(SceneConfig::Mode mode) {
     return (mode == SceneConfig::Mode::Mesh3dScene);
 }
 
+bool SceneConfig::modeSupportAnimations(SceneConfig::Mode mode) {
+    // Output of the ImageFile mode won't be affected by the animations
+    return (mode != SceneConfig::Mode::ImageFile);
+}
+
 Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
     : mRenderer(std::move(renderer)), mConfig(config) {
     D("%s: creating Scene", __func__);
@@ -274,9 +279,10 @@ void Scene::update(bool updateTime) {
 
 uint64_t Scene::getVersionHashForView(
         const RendererView* /*lockedView*/) const {
+    const uint64_t sceneHash = reinterpret_cast<uint64_t>(this);
     // TODO(virtualscene-perf): check if the objects inside the view frustum
     // includes any changes/animations
-    return mObjectsVersion;
+    return (mObjectsVersion ^ sceneHash);
 }
 
 std::vector<RenderableObject> Scene::getRenderableObjects(

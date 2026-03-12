@@ -134,7 +134,7 @@
      <item>
       <widget class="QLabel" name="labelTV">
        <property name="text">
-        <string>Enable TV animation</string>
+        <string>Enable Animations</string>
        </property>
       </widget>
      </item>
