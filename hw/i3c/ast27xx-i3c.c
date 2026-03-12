@@ -650,6 +650,10 @@ static void ast27xx_i3c_instance_init(Object *obj)
     qdev_prop_set_uint32(dev, "xfer-struct-size", 0x14);
     qdev_prop_set_uint32(dev, "resp-struct-size", 0x04);
     qdev_prop_set_uint32(dev, "ibi-stat", 0x04);
+    qdev_prop_set_uint8(dev, "tx-data-buffer-size", 0x04);
+    qdev_prop_set_uint8(dev, "rx-data-buffer-size", 0x04);
+    qdev_prop_set_uint8(dev, "ibi-status-size", 0x20);
+    qdev_prop_set_uint8(dev, "cr-queue-entries", 0x08);
 }
 
 static void ast27xx_i3c_realize(DeviceState *dev, Error **errp)
