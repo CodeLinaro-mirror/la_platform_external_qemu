@@ -251,6 +251,21 @@ static RespStatus hci_pio_regular_xfer(MIPIHCIState *hci,
     return hci_pio_i3c_send(hci, cmd, resp);
 }
 
+static RespStatus hci_pio_internal_control_xfer(MIPIHCIState *hci,
+                                                const InternalControl *desc,
+                                                RespDescr *resp)
+{
+    /*
+     * We don't implement this, but if we tell the guest that it succeeded,
+     * everything will be fine.
+     */
+    g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+    qemu_log_mask(LOG_UNIMP, "%s: Internal control transfers are not "
+                  "implemented\n", path);
+    resp->resp.err = RESP_STATUS_SUCCESS;
+    return RESP_STATUS_SUCCESS;
+}
+
 static void hci_pio_xfer(MIPIHCIState *hci)
 {
     HCIPIOState *s = &hci->pio;
@@ -266,6 +281,7 @@ static void hci_pio_xfer(MIPIHCIState *hci)
     /* And execute it. */
     RespStatus status;
     RespDescr resp = {0};
+    bool roc = cmd.shared_fields.roc;
     switch (cmd.shared_fields.cmd_attr) {
     case CMD_ATTR_ADDR_ASSIGN:
         status = hci_cmd_addr_assign(hci, &cmd.addr_cmd, &resp);
@@ -275,6 +291,16 @@ static void hci_pio_xfer(MIPIHCIState *hci)
         break;
     case CMD_ATTR_REGULAR_XFER:
         status = hci_pio_regular_xfer(hci, &cmd, &resp);
+        break;
+    case CMD_ATTR_INTERNAL_CONTROL:
+        status = hci_pio_internal_control_xfer(hci, &cmd.internal_control,
+                                               &resp);
+        /*
+         * Not documented, nor is it a part of the internal control data
+         * structure, but the driver always expects a response to internal
+         * control commands.
+         */
+        roc = true;
         break;
     default: {
         g_autofree char *path = object_get_canonical_path(OBJECT(hci));
@@ -291,7 +317,7 @@ static void hci_pio_xfer(MIPIHCIState *hci)
         c->enter_halt(hci);
     }
 
-    if (cmd.shared_fields.roc || status != RESP_STATUS_SUCCESS) {
+    if (roc || status != RESP_STATUS_SUCCESS) {
         hci_pio_push_resp(hci, &resp);
     }
 }
