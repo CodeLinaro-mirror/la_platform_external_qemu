@@ -385,22 +385,47 @@ static void virtio_snd_get_qemu_audsettings(audsettings *as,
 }
 
 /*
- * Close a stream and free all its resources.
+ * Creates a new blank stream with a reference to VirtIOSound.
+ *
+ * NOTE: the id field is zero and must be set outside.
+ *
+ * @s: VirtIOSound *s
+ */
+static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s)
+{
+    VirtIOSoundPCMStream *stream = g_new0(VirtIOSoundPCMStream, 1);
+
+    stream->s = s;
+    stream->active = false;
+    qemu_mutex_init(&stream->queue_mutex);
+    QSIMPLEQ_INIT(&stream->queue);
+
+    return stream;
+}
+
+/*
+ * Releases all resources owned by VirtIOSoundPCMStream and
+ * frees its memory. The stream pointer must be non-NULL.
  *
  * @stream: VirtIOSoundPCMStream *stream
  */
-static void virtio_snd_pcm_close(VirtIOSoundPCMStream *stream)
+static void virtio_snd_destroy_stream(VirtIOSoundPCMStream *stream)
 {
-    if (stream) {
-        virtio_snd_pcm_flush(stream);
-        if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+    g_assert(stream);
+
+    virtio_snd_pcm_flush(stream);
+    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+        if (stream->voice.out) {
             audio_be_close_out(stream->s->audio_be, stream->voice.out);
-            stream->voice.out = NULL;
-        } else if (stream->info.direction == VIRTIO_SND_D_INPUT) {
+        }
+    } else if (stream->info.direction == VIRTIO_SND_D_INPUT) {
+        if (stream->voice.in) {
             audio_be_close_in(stream->s->audio_be, stream->voice.in);
-            stream->voice.in = NULL;
         }
     }
+
+    qemu_mutex_destroy(&stream->queue_mutex);
+    g_free(stream);
 }
 
 /*
@@ -428,13 +453,9 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
 
     stream = virtio_snd_pcm_get_stream(s, stream_id);
     if (stream == NULL) {
-        stream = g_new0(VirtIOSoundPCMStream, 1);
-        stream->active = false;
+        stream = virtio_snd_create_new_stream(s);
         stream->id = stream_id;
-        stream->s = s;
         stream->latency_bytes = 0;
-        qemu_mutex_init(&stream->queue_mutex);
-        QSIMPLEQ_INIT(&stream->queue);
 
         /*
          * stream_id >= s->snd_conf.streams was checked before so this is
@@ -1287,9 +1308,7 @@ static void virtio_snd_unrealize(DeviceState *dev)
         for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
             VirtIOSoundPCMStream *stream = vsnd->pcm_items[i].stream;
             if (stream) {
-                virtio_snd_pcm_close(stream);
-                qemu_mutex_destroy(&stream->queue_mutex);
-                g_free(stream);
+                virtio_snd_destroy_stream(stream);
             }
         }
         g_free(vsnd->pcm_items);
