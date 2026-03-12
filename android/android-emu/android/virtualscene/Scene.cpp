@@ -16,12 +16,15 @@
 
 #include "android/virtualscene/Scene.h"
 
+#include "absl/status/status.h"
+#include "absl/strings/str_format.h"
 #include "android/avd/info.h"  // to resolve avd path for resources
 #include "android/base/system/System.h"
 #include "android/camera/camera-metrics.h"
 #include "android/console.h"
 #include "android/loadpng.h"
 #include "android/raw_image_sources/image_file/raw_image_file_source.h"
+#include "android/raw_image_sources/raw_image_source.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
 #include "android/virtualscene/Renderer.h"
@@ -287,30 +290,34 @@ void Scene::update(bool updateTime) {
         mFrameTimeUs = System::get()->getUnixTimeUs() - mStartTimeUs;
     }
 
-    if (mRawImageSource) {
+    if (mRawImageSource && mRawImageSource->HasUpdate(mRawImageSourceToken)) {
         if (!mOverlayObject) {
             mOverlayObject = std::make_unique<SceneOverlayObject>();
         }
-        auto func = __FUNCTION__;
-        int res = mRawImageSource->AccessImage([&](RawImageBuffer* buffer) {
-            if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
-                derror("%s: Unsupported pixel format from image provider:%d",
-                       func, buffer->pixel_format);
-                return -1;
-            }
+        absl::StatusOr<RawImageToken> res =
+                mRawImageSource->AccessImage([&](RawImageBuffer* buffer) {
+                    if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
+                        return absl::InvalidArgumentError(absl::StrFormat(
+                                "Unsupported pixel format from image source: %d",
+                                buffer->pixel_format));
+                    }
 
-            if (mOverlayObject->mDataRGBA.size() < buffer->buffer_size) {
-                mOverlayObject->mDataRGBA.resize(buffer->buffer_size);
-                mOverlayObject->mWidth = buffer->width;
-                mOverlayObject->mHeight = buffer->height;
-            }
+                    if (mOverlayObject->mDataRGBA.size() <
+                        buffer->buffer_size) {
+                        mOverlayObject->mDataRGBA.resize(buffer->buffer_size);
+                        mOverlayObject->mWidth = buffer->width;
+                        mOverlayObject->mHeight = buffer->height;
+                    }
 
-            std::memcpy(mOverlayObject->mDataRGBA.data(), buffer->buffer,
-                        buffer->buffer_size);
-            return 0;
-        });
-        if (res < 0) {
-            E("Failed to update image source");
+                    std::memcpy(mOverlayObject->mDataRGBA.data(),
+                                buffer->buffer, buffer->buffer_size);
+                    return absl::OkStatus();
+                });
+
+        if (res.ok()) {
+            mRawImageSourceToken = *res;
+        } else {
+            E("Failed to Update Image Source: %s", res.status().message());
         }
     }
 }

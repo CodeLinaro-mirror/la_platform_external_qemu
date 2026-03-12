@@ -187,6 +187,7 @@ private:
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;
     std::unique_ptr<RawImageSource> mRawImageSource;
+    RawImageToken mRawImageSourceToken = {0};
     std::unique_ptr<SceneOverlayObject> mOverlayObject;
     uint64_t mObjectsVersion = 0;
     uint64_t mFrameTimeUs = 0;
