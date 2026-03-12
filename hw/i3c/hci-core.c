@@ -22,6 +22,7 @@
 #include "hci-dat-internal.h"
 #include "hci-dct-internal.h"
 #include "hci-dma-internal.h"
+#include "hci-pio-internal.h"
 
 static const uint32_t hci_core_ro_mask[HCI_CORE_NUM_REGS] = {
     [R_HCI_VERSION]                 = 0xffffffff,
@@ -134,6 +135,7 @@ static void hci_core_reset_control_w(MIPIHCIState *hci, uint32_t val)
         hci_dma_reset(&hci->dma);
         hci_dat_reset(&hci->dat, hci->core.cfg.dat_table_size);
         hci_dct_reset(&hci->dct, hci->core.cfg.dct_table_size);
+        hci_pio_reset(&hci->pio);
     }
 }
 

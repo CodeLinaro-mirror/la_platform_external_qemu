@@ -67,6 +67,15 @@ REG32(PIO_INTR_FORCE, 0x2c)
     FIELD(PIO_INTR_FORCE, TRANSFER_ERR_FORCE,    9, 1)
 
 typedef struct HCIPIOState {
+    uint32_t regs[HCI_PIO_NUM_REGS];
+
+    struct {
+        uint8_t tx_data_buffer_size;
+        uint8_t rx_data_buffer_size;
+        uint8_t ibi_status_size;
+        uint8_t cr_queue_entries;
+    } cfg;
+
     MemoryRegion mmio;
 } HCIPIOState;
 

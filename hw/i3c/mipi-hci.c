@@ -181,6 +181,16 @@ static const Property mipi_hci_properties[] = {
     DEFINE_PROP_UINT32("ibi-stat", MIPIHCIState,
                        dma.cfg.ibi_status_struct_size, 0),
     DEFINE_PROP_UINT32("num-irqs", MIPIHCIState, cfg.num_irqs, 1),
+    /* Buffer and status sizes are 2^(n+1) DWORDs. */
+    DEFINE_PROP_UINT8("tx-data-buffer-size", MIPIHCIState,
+                      pio.cfg.tx_data_buffer_size, 0),
+    DEFINE_PROP_UINT8("rx-data-buffer-size", MIPIHCIState,
+                      pio.cfg.rx_data_buffer_size, 0),
+    DEFINE_PROP_UINT8("ibi-status-size", MIPIHCIState,
+                      pio.cfg.ibi_status_size, 0),
+    /* Each command entry is 2 DWORDs, and each response is 1 DWORD. */
+    DEFINE_PROP_UINT8("cr-queue-entries", MIPIHCIState,
+                      pio.cfg.cr_queue_entries, 0),
 };
 
 static void mipi_hci_realize(DeviceState *dev, Error **errp)
@@ -265,6 +275,7 @@ static void mipi_hci_enter_reset(Object *obj, ResetType type)
     hci_dma_reset(&s->dma);
     hci_dat_reset(&s->dat, s->core.cfg.dat_table_size);
     hci_dct_reset(&s->dct, s->core.cfg.dct_table_size);
+    hci_pio_reset(&s->pio);
 }
 
 static void mipi_hci_class_init(ObjectClass *klass, const void *data)

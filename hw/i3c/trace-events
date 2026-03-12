@@ -120,3 +120,7 @@ hci_cmd_immediate_xfer(const char *name, uint8_t tid, uint8_t cmd, uint8_t cp, u
 hci_cmd_read(const char *name, uint8_t tid, uint8_t cmd, uint8_t cp, uint8_t dev_index, uint8_t roc, uint8_t toc, uint8_t dbp, uint8_t def_byte, uint16_t len) "%s: regular transfer read with tid: 0x%.2" PRIx8 ", cmd: 0x%.2" PRIx8 ", cp: %" PRId8 ", dev_index: %" PRId8 ", roc: %" PRId8 ", toc: %" PRId8 ", dbp: %" PRId8 ", def_byte: %" PRId8 ", len: %" PRId16
 hci_cmd_send(const char *name, uint8_t tid, uint8_t cmd, uint8_t cp, uint8_t dev_index, uint8_t roc, uint8_t toc, uint8_t dbp, uint8_t def_byte, uint16_t len) "%s: regular transfer write with tid: 0x%.2" PRIx8 ", cmd: 0x%.2" PRIx8 ", cp: %" PRId8 ", dev_index: %" PRId8 ", roc: %" PRId8 ", toc: %" PRId8 ", dbp: %" PRId8 ", def_byte: %" PRId8 ", len: %" PRId16
 
+# hci-pio.c
+hci_pio_read(const char *name, uint64_t offset, uint32_t data) "%s: read: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
+hci_pio_write(const char *name, uint64_t offset, uint32_t data) "%s: write: offset 0x%.8" PRIx64 " data 0x%.8" PRIx32
+
