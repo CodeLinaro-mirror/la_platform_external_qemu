@@ -74,7 +74,19 @@ REG32(I3C_SLV_CTL_0CC, 0xcc)
 REG32(I3C_SLV_CTL_0D0, 0xd0)
 REG32(I3C_SLV_CTL_0D4, 0xd4)
 REG32(I3C_QUEUE_PTR_0D8, 0xd8)
+    FIELD(I3C_QUEUE_PTR_0D8, CMD_W,  0, 2)
+    FIELD(I3C_QUEUE_PTR_0D8, CMD_R,  2, 2)
+    FIELD(I3C_QUEUE_PTR_0D8, RESP_W, 4, 2)
+    FIELD(I3C_QUEUE_PTR_0D8, RESP_R, 6, 2)
+    FIELD(I3C_QUEUE_PTR_0D8, IBI_W,  8, 2)
+    FIELD(I3C_QUEUE_PTR_0D8, IBI_R,  10, 2)
+    FIELD(I3C_QUEUE_PTR_0D8, TX_W,   12, 5)
+    FIELD(I3C_QUEUE_PTR_0D8, TX_R,   24, 5)
 REG32(I3C_QUEUE_PTR_0DC, 0xdc)
+    FIELD(I3C_QUEUE_PTR_0DC, RX_W, 0, 5)
+    FIELD(I3C_QUEUE_PTR_0DC, RX_R, 12, 5)
+    FIELD(I3C_QUEUE_PTR_0DC, IBI_DATA_W, 20, 5)
+    FIELD(I3C_QUEUE_PTR_0DC, IBI_DATA_R, 24, 5)
 REG32(I3C_INTR_STATUS, 0xe0)
 REG32(I3C_INTR_STATUS_ENABLE, 0xe4)
 REG32(I3C_INTR_SIGNAL_ENABLE, 0xe8)
@@ -336,6 +348,29 @@ static const uint32_t ast27xx_i3c_phy_reset[AST27XX_I3C_PHY_NUM_REGS] = {
     [R_I3C_PHY_BUS_CONTENTION_CHK0]            = 0x00000f90,
 };
 
+/*
+ * Each FIFO register doesn't actually have enough bits to report if it's
+ * completely full or empty. It's unclear what should happen in this case,
+ * but we'll just report as many entries as we can and hope for the best.
+ */
+static inline uint32_t ast27xx_i3c_fifo_num_used(Fifo32 *fifo, uint32_t max)
+{
+    uint32_t num_used = fifo32_num_used(fifo);
+    if (num_used > max) {
+        return max;
+    }
+    return num_used;
+}
+
+static inline uint32_t ast27xx_i3c_fifo_num_free(Fifo32 *fifo, uint32_t max)
+{
+    uint32_t num_free = fifo32_num_free(fifo);
+    if (num_free > max) {
+        return max;
+    }
+    return num_free;
+}
+
 static uint8_t ast27xx_i3c_get_dev_dynamic_addr(MIPIHCIState *hci,
                                                 uint8_t dat_index)
 {
@@ -408,6 +443,38 @@ static void ast27xx_i3c_update_irq(MIPIHCIState *hci, MIPIHCIIRQContext ctx)
     qemu_set_irq(hci->irq[0], level);
 }
 
+static uint32_t ast27xx_i3c_queue_ptr_0d8_r(AST27xxI3CState *s)
+{
+    HCIPIOState *pio = &s->parent.pio;
+    uint32_t ret = 0;
+
+    ret = FIELD_DP32(ret, I3C_QUEUE_PTR_0D8, CMD_W,
+            ast27xx_i3c_fifo_num_used(&pio->cmd_fifo,
+                    1 << R_I3C_QUEUE_PTR_0D8_CMD_W_LENGTH));
+    ret = FIELD_DP32(ret, I3C_QUEUE_PTR_0D8, RESP_W,
+            ast27xx_i3c_fifo_num_used(&pio->resp_fifo,
+                    1 << R_I3C_QUEUE_PTR_0D8_RESP_W_LENGTH));
+    ret = FIELD_DP32(ret, I3C_QUEUE_PTR_0D8, IBI_W,
+            ast27xx_i3c_fifo_num_used(&pio->ibi_fifo,
+                    1 << R_I3C_QUEUE_PTR_0D8_IBI_W_LENGTH));
+    return  FIELD_DP32(ret, I3C_QUEUE_PTR_0D8, TX_W,
+            ast27xx_i3c_fifo_num_free(&pio->tx_data_fifo,
+                    1 << R_I3C_QUEUE_PTR_0D8_TX_W_LENGTH));
+}
+
+static uint32_t ast27xx_i3c_queue_ptr_0dc_r(AST27xxI3CState *s)
+{
+    HCIPIOState *pio = &s->parent.pio;
+    uint32_t ret = 0;
+
+    ret = FIELD_DP32(ret, I3C_QUEUE_PTR_0DC, IBI_DATA_W,
+            ast27xx_i3c_fifo_num_used(&pio->ibi_fifo,
+                    1 << R_I3C_QUEUE_PTR_0DC_IBI_DATA_W_LENGTH));
+    return  FIELD_DP32(ret, I3C_QUEUE_PTR_0DC, RX_W,
+            ast27xx_i3c_fifo_num_used(&pio->rx_data_fifo,
+                    1 << R_I3C_QUEUE_PTR_0DC_RX_W_LENGTH));
+}
+
 static uint64_t ast27xx_i3c_ctrl_read(void *opaque, hwaddr offset,
                                       unsigned size)
 {
@@ -417,7 +484,20 @@ static uint64_t ast27xx_i3c_ctrl_read(void *opaque, hwaddr offset,
     /* MMIO region size should prevent this from happening. */
     g_assert(offset < ARRAY_SIZE(s->ctrl_regs));
 
-    return s->ctrl_regs[offset];
+    uint32_t val;
+    switch (offset) {
+    case R_I3C_QUEUE_PTR_0D8:
+        val = ast27xx_i3c_queue_ptr_0d8_r(s);
+        break;
+    case R_I3C_QUEUE_PTR_0DC:
+        val = ast27xx_i3c_queue_ptr_0dc_r(s);
+        break;
+    default:
+        val = s->ctrl_regs[offset];
+        break;
+    }
+
+    return val;
 }
 
 static void ast27xx_i3c_ctrl_write(void *opaque, hwaddr offset, uint64_t value,
