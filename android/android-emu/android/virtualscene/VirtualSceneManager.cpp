@@ -572,13 +572,12 @@ void VirtualSceneManager::update() {
     // virtualscene and animation is controlled by renderTime in shaders. Always
     // update the scene and timer in other modes.
     bool updateTime = true;
-    if (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::ImageFile) {
-        // Static scene, no need to update which may invalidate view caches
-        updateTime = false;
-    } else if (mEnvironmentScene->getSceneMode() ==
-               SceneConfig::Mode::Mesh3dScene) {
+    if (SceneConfig::modeSupportAnimations(mEnvironmentScene->getSceneMode())) {
         // Use virtualscene settings for animation control
         updateTime = sSettings->getAnimationState();
+    } else {
+        // Static scene, no need to update which may invalidate view caches
+        updateTime = false;
     }
     mEnvironmentScene->update(updateTime);
 

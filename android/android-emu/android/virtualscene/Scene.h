@@ -63,6 +63,9 @@ struct SceneConfig {
     // Check if the scene mode supports view rotations, otherwise a seperate
     // rotation operation will be required
     static bool modeSupportViewRotations(SceneConfig::Mode mode);
+
+    // Check if the scene mode supports animated content
+    static bool modeSupportAnimations(SceneConfig::Mode mode);
 };
 
 class Scene {
