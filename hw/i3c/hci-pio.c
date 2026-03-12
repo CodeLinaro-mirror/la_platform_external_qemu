@@ -204,6 +204,43 @@ static RespStatus hci_pio_i3c_read(MIPIHCIState *hci, const CmdDescr *cmd,
     return status;
 }
 
+static void hci_pio_pop_tx_fifo(MIPIHCIState *hci, uint8_t *data, uint32_t len)
+{
+    HCIPIOState *s = &hci->pio;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    uint32_t num_words = (len / 4) + (len % 4 != 0);
+    for (uint32_t i = 0; i < num_words; ++i) {
+        if (fifo32_is_empty(&s->tx_data_fifo)) {
+            g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: TX data FIFO is empty.\n",
+                          path);
+            break;
+        }
+
+        uint32_t value = fifo32_pop(&s->tx_data_fifo);
+        /* We only support little-endian byte ordering. */
+        *((uint32_t *)&data[i * 4]) = le32toh(value);
+    }
+
+    if (fifo32_num_used(&s->tx_data_fifo) < tx_buf_thld(s)) {
+        ARRAY_FIELD_DP32(s->regs, PIO_INTR_STATUS, TX_THLD_STAT, 0);
+        c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+    }
+}
+
+static RespStatus hci_pio_i3c_send(MIPIHCIState *hci, const CmdDescr *cmd,
+                                   RespDescr *resp)
+{
+    uint32_t len = cmd->regular_xfer.data_length;
+    /* Round the data buffer up to the nearest DWORD to make storing easier. */
+    g_autofree uint8_t *data = g_new0(uint8_t, len +
+                                      (sizeof(uint32_t) - (len % 4)));
+
+    hci_pio_pop_tx_fifo(hci, data, len);
+    return hci_cmd_send(hci, &cmd->regular_xfer, resp, data, len);
+}
+
 static RespStatus hci_pio_regular_xfer(MIPIHCIState *hci,
                                         const CmdDescr *cmd,
                                         RespDescr *resp)
@@ -211,7 +248,7 @@ static RespStatus hci_pio_regular_xfer(MIPIHCIState *hci,
     if (cmd->regular_xfer.rnw) {
         return hci_pio_i3c_read(hci, cmd, resp);
     }
-    return RESP_STATUS_ERROR_NOT_SUPPORTED;
+    return hci_pio_i3c_send(hci, cmd, resp);
 }
 
 static void hci_pio_xfer(MIPIHCIState *hci)
@@ -389,6 +426,24 @@ static void hci_pio_intr_signal_enable_w(MIPIHCIState *hci, uint32_t val)
     hci_pio_update_queue_thld(hci);
 }
 
+static void hci_pio_xfer_data_port_w(MIPIHCIState *hci, uint32_t val)
+{
+    HCIPIOState *s = &hci->pio;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    if (fifo32_is_full(&s->tx_data_fifo)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: TX data FIFO is full.\n", path);
+        return;
+    }
+
+    fifo32_push(&s->tx_data_fifo, val);
+    if (fifo32_num_used(&s->rx_data_fifo) >= tx_buf_thld(s)) {
+        ARRAY_FIELD_DP32(s->regs, PIO_INTR_STATUS, TX_THLD_STAT, 1);
+        c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+    }
+}
+
 void hci_pio_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
     MIPIHCIState *hci = MIPI_HCI(opaque);
@@ -409,7 +464,7 @@ void hci_pio_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
         hci_pio_cmd_queue_w(hci, val32);
         break;
     case R_XFER_DATA_PORT:
-        /* WO on writes. */
+        hci_pio_xfer_data_port_w(hci, val32);
         break;
     case R_QUEUE_THLD_CTRL:
         hci_pio_queue_thld_ctrl_w(hci, val32);
