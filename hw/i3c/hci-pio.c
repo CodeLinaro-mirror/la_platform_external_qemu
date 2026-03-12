@@ -83,6 +83,25 @@ static uint32_t hci_pio_response_queue_r(MIPIHCIState *hci)
     return value;
 }
 
+static uint32_t hci_pio_xfer_data_port_r(MIPIHCIState *hci)
+{
+    HCIPIOState *s = &hci->pio;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    if (fifo32_is_empty(&s->rx_data_fifo)) {
+        g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: RX data FIFO is empty.\n", path);
+        return 0;
+    }
+
+    uint32_t value = fifo32_pop(&s->rx_data_fifo);
+    if (fifo32_num_used(&s->rx_data_fifo) < rx_buf_thld(s)) {
+        ARRAY_FIELD_DP32(s->regs, PIO_INTR_STATUS, RX_THLD_STAT, 0);
+        c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+    }
+    return value;
+}
+
 uint64_t hci_pio_read(void *opaque, hwaddr offset, unsigned size)
 {
     MIPIHCIState *hci = MIPI_HCI(opaque);
@@ -103,6 +122,9 @@ uint64_t hci_pio_read(void *opaque, hwaddr offset, unsigned size)
         break;
     case R_RESPONSE_QUEUE_PORT:
         value = hci_pio_response_queue_r(hci);
+        break;
+    case R_XFER_DATA_PORT:
+        value = hci_pio_xfer_data_port_r(hci);
         break;
     default:
         value = s->regs[offset];
@@ -137,6 +159,61 @@ static void hci_pio_push_resp(MIPIHCIState *hci, RespDescr *resp)
     }
 }
 
+static void hci_pio_push_rx_fifo(MIPIHCIState *hci, const uint8_t *data,
+                                 uint32_t len)
+{
+    HCIPIOState *s = &hci->pio;
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    /*
+     * Round up to the nearest DWORD if there's a partial one. We allocated
+     * and zeroed extra bytes if they're present, so we can safely do this.
+     */
+    uint32_t num_words = (len / 4) + (len % 4 != 0);
+    for (uint32_t i = 0; i < num_words; ++i) {
+        if (fifo32_is_full(&s->rx_data_fifo)) {
+            g_autofree char *path = object_get_canonical_path(OBJECT(hci));
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: RX data FIFO is full.\n", path);
+            break;
+        }
+
+        /* We only support little-endian byte ordering. */
+        fifo32_push(&s->rx_data_fifo, htole32(*((uint32_t *)&data[i * 4])));
+    }
+
+    if (fifo32_num_used(&s->rx_data_fifo) >= rx_buf_thld(s)) {
+        ARRAY_FIELD_DP32(s->regs, PIO_INTR_STATUS, RX_THLD_STAT, 1);
+        c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+    }
+}
+
+static RespStatus hci_pio_i3c_read(MIPIHCIState *hci, const CmdDescr *cmd,
+                                   RespDescr *resp)
+{
+    uint32_t len = cmd->regular_xfer.data_length;
+    /* Round the data buffer up to the nearest DWORD to make storing easier. */
+    g_autofree uint8_t *data = g_new0(uint8_t, len +
+                                      (sizeof(uint32_t) - (len % 4)));
+    uint32_t num_read = 0;
+    RespStatus status = hci_cmd_read(hci, &cmd->regular_xfer, resp, data, len,
+                                     &num_read);
+
+    if (status == RESP_STATUS_SUCCESS) {
+        hci_pio_push_rx_fifo(hci, data, num_read);
+    }
+    return status;
+}
+
+static RespStatus hci_pio_regular_xfer(MIPIHCIState *hci,
+                                        const CmdDescr *cmd,
+                                        RespDescr *resp)
+{
+    if (cmd->regular_xfer.rnw) {
+        return hci_pio_i3c_read(hci, cmd, resp);
+    }
+    return RESP_STATUS_ERROR_NOT_SUPPORTED;
+}
+
 static void hci_pio_xfer(MIPIHCIState *hci)
 {
     HCIPIOState *s = &hci->pio;
@@ -158,6 +235,9 @@ static void hci_pio_xfer(MIPIHCIState *hci)
         break;
     case CMD_ATTR_IMMEDIATE_XFER:
         status = hci_cmd_immediate_xfer(hci, &cmd.immediate_xfer, &resp);
+        break;
+    case CMD_ATTR_REGULAR_XFER:
+        status = hci_pio_regular_xfer(hci, &cmd, &resp);
         break;
     default: {
         g_autofree char *path = object_get_canonical_path(OBJECT(hci));
