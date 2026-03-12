@@ -85,7 +85,7 @@ hci_dma_ibi_data_write(const char *name, uint64_t addr, size_t num_bytes)  "%s: 
 
 # mipi-hci.c
 mipi_hci_enter_halt(const char *name) "%s: enter halt"
-mipi_hci_update_irq(const char *name, uint32_t core_irq, uint32_t dma_irq, uint8_t level) "%s: update irq core: 0x%.8" PRIx32 ", dma: 0x%.8" PRIx32 ", level %" PRId8
+mipi_hci_update_irq(const char *name, uint32_t core_irq, uint32_t dma_irq, uint32_t pio_irq, uint8_t level) "%s: update irq core: 0x%.8" PRIx32 ", dma: 0x%.8" PRIx32 ", pio: 0x%.8" PRIx32 ", level %" PRId8
 
 # hci-ibi.c
 hci_ibi_handle(const char *name, uint8_t addr, bool is_recv) "%s: IBI from address 0x%.2" PRIx8 ", RnW=%d"

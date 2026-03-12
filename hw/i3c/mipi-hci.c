@@ -46,20 +46,25 @@ static void mipi_hci_update_irq(MIPIHCIState *s, MIPIHCIIRQContext ctx)
 {
     HCICoreState *core = &s->core;
     HCIDMAState *dma = &s->dma;
+    HCIPIOState *pio = &s->pio;
     g_assert(s->cfg.num_irqs == 1);
 
     /* INTR_STATUS is masked before setting the IRQ line. */
     core->regs[R_INTR_STATUS] &= core->regs[R_INTR_SIGNAL_ENABLE];
     dma->regs[R_RH_INTR_STATUS] &= dma->regs[R_RH_INTR_SIGNAL_ENABLE];
+    pio->regs[R_PIO_INTR_STATUS] &= pio->regs[R_PIO_INTR_SIGNAL_ENABLE];
 
     bool level = !!(core->regs[R_INTR_STATUS] &
                     core->regs[R_INTR_SIGNAL_ENABLE]);
     level |= !!(dma->regs[R_RH_INTR_STATUS] &
                 dma->regs[R_RH_INTR_SIGNAL_ENABLE]);
+    level |= !!(pio->regs[R_PIO_INTR_STATUS] &
+                pio->regs[R_PIO_INTR_SIGNAL_ENABLE]);
 
     trace_mipi_hci_update_irq(DEVICE(s)->canonical_path,
                               core->regs[R_INTR_STATUS],
-                              dma->regs[R_RH_INTR_STATUS], level);
+                              dma->regs[R_RH_INTR_STATUS],
+                              pio->regs[R_PIO_INTR_STATUS], level);
     qemu_set_irq(s->irq[0], level);
 }
 

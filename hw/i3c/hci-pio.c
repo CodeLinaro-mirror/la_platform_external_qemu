@@ -66,6 +66,53 @@ uint64_t hci_pio_read(void *opaque, hwaddr offset, unsigned size)
     return s->regs[offset];
 }
 
+static void hci_pio_intr_status_w(MIPIHCIState *hci, uint32_t val)
+{
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    hci->pio.regs[R_PIO_INTR_STATUS] &= ~val; /* W1C */
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+}
+
+static void hci_pio_intr_force_w(MIPIHCIState *hci, uint32_t val)
+{
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    /*
+     * Set the interrupt status. If it's not masked, it will be cleared during
+     * IRQ updating. PIO_INTR_FORCE is WO, so we only need to update
+     * PIO_INTR_STATUS.
+     */
+    hci->pio.regs[R_PIO_INTR_STATUS] = val;
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+}
+
+static void hci_pio_intr_status_enable_w(MIPIHCIState *hci, uint32_t val)
+{
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    hci->pio.regs[R_PIO_INTR_STATUS_ENABLE] = val;
+
+    /*
+     * There could be pending threshold interrupts that could now be present if
+     * the mask is set.
+     */
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+}
+
+static void hci_pio_intr_signal_enable_w(MIPIHCIState *hci, uint32_t val)
+{
+    MIPIHCIClass *c = MIPI_HCI_GET_CLASS(hci);
+
+    hci->pio.regs[R_PIO_INTR_SIGNAL_ENABLE] = val;
+
+    /*
+     * There could be pending threshold interrupts that could now be present if
+     * the mask is set.
+     */
+    c->update_irq(hci, MIPI_HCI_IRQ_CONTEXT_PIO);
+}
+
 void hci_pio_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
 {
     MIPIHCIState *hci = MIPI_HCI(opaque);
@@ -89,11 +136,16 @@ void hci_pio_write(void *opaque, hwaddr offset, uint64_t value, unsigned size)
         /* WO on writes. */
         break;
     case R_PIO_INTR_STATUS:
-        /* W1C fields. */
-        s->regs[R_PIO_INTR_STATUS] &= ~val32;
+        hci_pio_intr_status_w(hci, val32);
+        break;
+    case R_PIO_INTR_STATUS_ENABLE:
+        hci_pio_intr_status_enable_w(hci, val32);
+        break;
+    case R_PIO_INTR_SIGNAL_ENABLE:
+        hci_pio_intr_signal_enable_w(hci, val32);
         break;
     case R_PIO_INTR_FORCE:
-        /* WO. */
+        hci_pio_intr_force_w(hci, val32);
         break;
     default:
         s->regs[offset] = val32;
