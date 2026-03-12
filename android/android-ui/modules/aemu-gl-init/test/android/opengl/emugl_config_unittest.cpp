@@ -48,7 +48,7 @@ namespace base {
 #endif
 #  define SWIFTSHADER_RESULT "swangle" // Mac redirects swiftshader to swangle
 #  define SWANGLE_RESULT "swangle"
-#  define AUTO_GLES_RESULT "swangle"   // TODO(b/479126903)
+#  define AUTO_GLES_RESULT "host" //TODO: depends on memory usage, avoid possible flakes
 #else
 #  define LIB_NAME(x)  "lib" x ".so"
 #  define LAVAPIPE_RESULT "lavapipe"
