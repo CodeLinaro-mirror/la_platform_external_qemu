@@ -35,6 +35,7 @@
 
 #include <deque>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 
 #include <glm/glm.hpp>
@@ -845,6 +846,8 @@ void VirtualSceneManager::updateSceneWorker() {
         if (now >= nextUpdateTime) {
             // update took longer than the interval, skip missed frames
             nextUpdateTime = now;
+            // We must still yield, or we risk starving out other threads
+            std::this_thread::yield();
         } else {
             std::this_thread::sleep_until(nextUpdateTime);
         }
