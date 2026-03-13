@@ -24,7 +24,7 @@ import platform
 
 AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
-HOST_ARCH = platform.machine().lower()
+HOST_ARCH = deps_common.getHostArchitecture()
 
 # This is where moltenvk lives
 AOSP_MOLTENVK_SRC_PATH = AOSP_ROOT / "external" / "moltenvk"

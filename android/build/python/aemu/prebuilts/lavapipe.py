@@ -29,7 +29,7 @@ import json
 
 AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
-HOST_ARCH = platform.machine().lower()
+HOST_ARCH = deps_common.getHostArchitecture()
 PREBUILTS_ARCH = "x86_64" if HOST_ARCH == "x86_64" else "aarch64"
 PLATFORM_NAME = f"{HOST_OS}-{PREBUILTS_ARCH}"
 

@@ -22,9 +22,10 @@ import aemu.prebuilts.lavapipe as lavapipe
 import aemu.prebuilts.moltenvk as moltenvk
 import aemu.prebuilts.qt as qt
 import aemu.prebuilts.vulkan_loader as vulkan_loader
+import aemu.prebuilts.deps.common as deps_common
 
 HOST_OS = platform.system().lower()
-HOST_ARCH = platform.machine().lower()
+HOST_ARCH = deps_common.getHostArchitecture()
 
 _prebuilts_dir_name = "prebuilts"
 _prebuilts_zip_name = "PREBUILT-{prebuilt_name}-{build_number}.zip"
