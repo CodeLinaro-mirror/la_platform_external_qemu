@@ -45,7 +45,6 @@
 #include "android/skin/qt/QtLooper.h"
 #include "android/skin/qt/SharedMemoryRenderer.h"
 #include "android/skin/qt/SharedStreamEmulator.h"
-#include "emulator_controller.pb.h"
 #include "android/skin/qt/car-cluster-window.h"
 #include "android/skin/qt/event-serializer.h"
 #include "android/skin/qt/extended-pages/car-cluster-connector/car-cluster-connector.h"
@@ -54,6 +53,7 @@
 #include "android/skin/qt/extended-pages/multi-display-page.h"
 #include "android/skin/qt/extended-pages/settings-page.h"
 #include "android/skin/qt/extended-pages/snapshot-page.h"
+#include "android/skin/qt/extended-pages/telephony-controller.h"
 #include "android/skin/qt/extended-pages/telephony-page.h"
 #include "android/skin/qt/multi-display-widget.h"
 #include "android/skin/qt/qt-keycode.h"
@@ -70,6 +70,7 @@
 #include "android/utils/x86_cpuid.h"
 #include "android/virtualscene/TextureUtils.h"
 #include "android_modem_v2.h"
+#include "emulator_controller.pb.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/Features.h"
 #include "host-common/MultiDisplay.h"
@@ -2056,7 +2057,7 @@ bool EmulatorQtWindow::event(QEvent* ev) {
                             [this](const android::emulation::
                                            OptionalAdbCommandResult&) { ; },
                             5000);
-            TelephonyPage::updateModemTime();
+            TelephonyController::get()->updateTimeAsync();
         }
 #ifndef _WIN32
         // When we minimized, we re-enabled the window frame (because Mac won't

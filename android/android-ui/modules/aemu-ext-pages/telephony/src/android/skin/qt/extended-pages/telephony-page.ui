@@ -74,7 +74,7 @@
     <string>Start call</string>
    </property>
    <property name="text">
-    <string>Call Device</string>
+    <string>Call device</string>
    </property>
    <property name="icon">
     <iconset resource="../resources.qrc">

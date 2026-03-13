@@ -1,6 +1,10 @@
 android_qt_lib(
   TARGET ext-page-telephony
   INCLUDES src
+           ../../../android-grpc/services/incubating/modem/client/include
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../android-grpc/services/incubating/modem
+           ../../../android-grpc/client/include
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../android-grpc/client
   SRC android/skin/qt/extended-pages/telephony-page.cpp
       android/skin/qt/extended-pages/telephony-page.ui
       android/skin/qt/extended-pages/telephony-controller.cpp
@@ -8,7 +12,6 @@ android_qt_lib(
       android/skin/qt/extended-pages/grpc-telephony-controller.cpp
   DEPS android-emu
        modem-service-client
-       protobuf::libprotobuf
        qemu-host-common-headers
        Qt${QT_VERSION_MAJOR}::Core
        Qt${QT_VERSION_MAJOR}::Widgets
@@ -25,12 +28,12 @@ android_add_test(
   SRC android/skin/qt/extended-pages/legacy-telephony-controller_test.cpp
       android/skin/qt/extended-pages/telephony-controller_test.cpp
       android/skin/qt/extended-pages/grpc-telephony-controller_test.cpp
+      android/skin/qt/extended-pages/telephony-page_test.cpp
   DEPS android-emu
        android-emu-test-launcher
        ext-page-telephony
        gmock
        modem-service-client
-       protobuf::libprotobuf
        qemu-host-common-headers
        Qt${QT_VERSION_MAJOR}::Core
        Qt${QT_VERSION_MAJOR}::Widgets

@@ -1,4 +1,4 @@
-// Copyright (C) 2015 The Android Open Source Project
+// Copyright (C) 2015-2016 The Android Open Source Project
 //
 // This software is licensed under the terms of the GNU General Public
 // License version 2, as published by the Free Software Foundation, and
@@ -35,16 +35,14 @@ class TelephonyPage;
 }  // namespace Ui
 struct QAndroidTelephonyAgent;
 
-class TelephonyPage : public QWidget
-{
+class TelephonyPage : public QWidget {
     Q_OBJECT
 
 public:
-    explicit TelephonyPage(QWidget *parent = 0);
+    explicit TelephonyPage(QWidget* parent = 0);
     ~TelephonyPage();
 
     static void setTelephonyAgent(const QAndroidTelephonyAgent* agent);
-    static void updateModemTime();
     void eventLauncher(int);
 
 private slots:
@@ -54,24 +52,24 @@ private slots:
 
     void customEvent(QEvent*);
 
+protected:
+    void showEvent(QShowEvent* event) override;
+
 private:
-    class PhoneNumberValidator : public QValidator
-    {
+    class PhoneNumberValidator : public QValidator {
     public:
         // Validate the input of a telephone number.
         // We allow '+' only in the first position.
         // One or more digits (0-9) are required.
         // Some additional characters are allowed, but ignored.
-        State validate(QString &input, int &pos) const;
+        State validate(QString& input, int& pos) const;
 
     private:
-        static State validateAsDigital(const QString &input);
-        static State validateAsAlphanumeric(const QString &input);
+        static State validateAsDigital(const QString& input);
+        static State validateAsAlphanumeric(const QString& input);
     };
 
-    enum class CallActivity {
-        Inactive, Active, Held
-    };
+    enum class CallActivity { Inactive, Active, Held };
 
     std::unique_ptr<Ui::TelephonyPage> mUi;
     std::shared_ptr<UiEventTracker> mPhoneTracker;
