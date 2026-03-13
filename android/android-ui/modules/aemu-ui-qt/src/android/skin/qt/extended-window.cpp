@@ -157,11 +157,6 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
     connect(mToolWindow, SIGNAL(haveClipboardSharingKnown(bool)),
             mExtendedUi->settingsPage, SLOT(setHaveClipboardSharing(bool)));
 
-    connect(mToolWindow, SIGNAL(microphoneEnabledChanged()),
-            mExtendedUi->microphonePage, SLOT(onMicrophoneEnabledChanged()));
-    connect(mExtendedUi->microphonePage, SIGNAL(microphoneEnabledChanged()),
-            mToolWindow, SLOT(onMicrophoneEnabledChanged()));
-
     connect(mExtendedUi->recordAndPlaybackPage,
             SIGNAL(ensureVirtualSceneWindowCreated()), mToolWindow,
             SLOT(ensureVirtualSceneWindowCreated()));
