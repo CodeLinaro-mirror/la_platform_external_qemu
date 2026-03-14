@@ -1359,6 +1359,10 @@ static void virtio_snd_reset(VirtIODevice *vdev)
         while (!QTAILQ_EMPTY(&vsnd->cmdq)) {
             cmd = QTAILQ_FIRST(&vsnd->cmdq);
             QTAILQ_REMOVE(&vsnd->cmdq, cmd, next);
+
+            g_assert(cmd->elem);
+            virtqueue_detach_element(vsnd->queues[VIRTIO_SND_VQ_CONTROL],
+                                     cmd->elem, 0);
             virtio_snd_ctrl_cmd_free(cmd);
         }
     }
