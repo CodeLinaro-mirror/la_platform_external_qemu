@@ -103,7 +103,7 @@ SceneConfig::SceneConfig(Mode mode, std::string_view filename) {
 
 SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
     if (sceneModeStr == "virtualscene") {
-        return SceneConfig::Mode::Mesh3dScene;
+        return SceneConfig::Mode::Mesh3D;
     } else if (sceneModeStr == "videoplayback") {
         return SceneConfig::Mode::VideoPlayback;
     } else if (sceneModeStr == "videofile") {
@@ -117,8 +117,8 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
 }
 
 const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
-    if (mode == SceneConfig::Mode::Mesh3dScene) {
-        return "mesh3dscene";
+    if (mode == SceneConfig::Mode::Mesh3D) {
+        return "mesh3d";
     } else if (mode == SceneConfig::Mode::VideoPlayback) {
         return "videoplayback";
     } else if (mode == SceneConfig::Mode::VideoFile) {
@@ -131,7 +131,7 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
 }
 
 const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
-    if (mode == SceneConfig::Mode::Mesh3dScene) {
+    if (mode == SceneConfig::Mode::Mesh3D) {
         return kDefaultSceneObj;
     } else if (mode == SceneConfig::Mode::VideoPlayback ||
                mode == SceneConfig::Mode::VideoFile) {
@@ -145,13 +145,13 @@ const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
 }
 
 bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
-    // Currently, only Mesh3dScene requires a renderer
-    return (mode == SceneConfig::Mode::Mesh3dScene);
+    // Currently, only Mesh3D requires a renderer
+    return (mode == SceneConfig::Mode::Mesh3D);
 }
 
 bool SceneConfig::modeSupportViewRotations(SceneConfig::Mode mode) {
-    // Currently, only Mesh3dScene supports view rotations
-    return (mode == SceneConfig::Mode::Mesh3dScene);
+    // Currently, only Mesh3D supports view rotations
+    return (mode == SceneConfig::Mode::Mesh3D);
 }
 
 bool SceneConfig::modeSupportAnimations(SceneConfig::Mode mode) {
@@ -202,7 +202,7 @@ bool Scene::initialize() {
         case SceneConfig::Mode::Unknown: {
             derror("%s: Unknown scene mode!", __func__);
         } break;
-        case SceneConfig::Mode::Mesh3dScene: {
+        case SceneConfig::Mode::Mesh3D: {
             if (mRenderer == nullptr) {
                 derror("%s: No renderer for scene: %s", __func__,
                        sceneFilename.c_str());
@@ -361,7 +361,7 @@ std::vector<RenderableObject> Scene::getRenderableObjects(
 }
 
 bool Scene::createPosterLocation(const PosterInfo& info) {
-    if (mConfig.mSceneMode != SceneConfig::Mode::Mesh3dScene) {
+    if (mConfig.mSceneMode != SceneConfig::Mode::Mesh3D) {
         // Scene mode doesn't support poster locations, not an error
         return true;
     }

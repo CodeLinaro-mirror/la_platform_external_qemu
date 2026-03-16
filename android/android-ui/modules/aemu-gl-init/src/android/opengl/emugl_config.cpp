@@ -1263,7 +1263,7 @@ bool emuglConfig_init(EmuglConfig* config,
                 if (fc::isEnabled(fc::VulkanAllocateHostMemory)) {
                     dinfo("Enabled VulkanAllocateHostMemory feature for "
                           "gpu "
-                          "vendor %s on Linux\n",
+                          "vendor %s",
                           vkVendor);
                 }
             }

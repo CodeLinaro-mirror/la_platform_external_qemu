@@ -185,7 +185,7 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             ret.sceneMode = SceneConfig::Mode::VideoFile;
             ret.sceneFilename = backgroundVideoFilename;
         } else if (!backgroundSceneFilename.empty()) {
-            ret.sceneMode = SceneConfig::Mode::Mesh3dScene;
+            ret.sceneMode = SceneConfig::Mode::Mesh3D;
             ret.sceneFilename = backgroundSceneFilename;
         }
 
@@ -199,7 +199,7 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
         ret.sceneFilename.empty()) {
         dinfo("%s: Using default virtual scene contents for the environment.",
               __func__);
-        ret.sceneMode = SceneConfig::Mode::Mesh3dScene;
+        ret.sceneMode = SceneConfig::Mode::Mesh3D;
         ret.sceneFilename = SceneConfig::defaultFilenameForMode(ret.sceneMode);
     }
 
@@ -310,7 +310,7 @@ bool ScenesManager::renderView(Scene* scene,
     view->preRenderLocked();
 
     switch (mode) {
-        case SceneConfig::Mode::Mesh3dScene: {
+        case SceneConfig::Mode::Mesh3D: {
             const auto renderables =
                     scene->getRenderableObjects(view->mViewProjection);
             if (!renderer || !renderer->render(view, renderables, renderTime)) {
@@ -704,7 +704,7 @@ void VirtualSceneManager::setSceneControlsParameters(bool show) {
 
     // Only allow showing scene controls if it's a mesh3d scene
     if (!show ||
-        (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::Mesh3dScene)) {
+        (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::Mesh3D)) {
         D("%s: show=%s", __func__, (show ? "true" : "false"));
         skin_winsys_show_virtual_scene_controls(show);
     }
