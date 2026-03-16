@@ -147,7 +147,7 @@ struct VirtIOSoundPCMStream {
     } voice;
     QemuMutex queue_mutex;
     bool active;
-    QSIMPLEQ_HEAD(, VirtIOSoundPCMBuffer) queue;
+    VirtIOSoundPCMBufferQueue queue;
 };
 
 struct VirtIOSoundPCMItem {
