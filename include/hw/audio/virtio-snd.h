@@ -230,9 +230,6 @@ struct VirtIOSound {
     QEMUSoundCard card;
     VMChangeStateEntry *vmstate;
     virtio_snd_config snd_conf;
-    QemuMutex cmdq_mutex;
-    QTAILQ_HEAD(, virtio_snd_ctrl_command) cmdq;
-    bool processing_cmdq;
 };
 
 struct virtio_snd_ctrl_command {
@@ -240,6 +237,5 @@ struct virtio_snd_ctrl_command {
     virtio_snd_hdr ctrl;
     virtio_snd_hdr resp;
     size_t payload_size;
-    QTAILQ_ENTRY(virtio_snd_ctrl_command) next;
 };
 #endif
