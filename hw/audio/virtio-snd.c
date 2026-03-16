@@ -61,26 +61,6 @@ static uint32_t supported_rates = BIT(VIRTIO_SND_PCM_RATE_5512)
                                 | BIT(VIRTIO_SND_PCM_RATE_192000)
                                 | BIT(VIRTIO_SND_PCM_RATE_384000);
 
-static const VMStateDescription vmstate_virtio_snd_device = {
-    .name = TYPE_VIRTIO_SND,
-    .version_id = VIRTIO_SOUND_VM_VERSION,
-    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
-    .fields = (const VMStateField[]) {
-        VMSTATE_END_OF_LIST()
-    },
-};
-
-static const VMStateDescription vmstate_virtio_snd = {
-    .name = TYPE_VIRTIO_SND "-base",
-    .unmigratable = 1,
-    .version_id = VIRTIO_SOUND_VM_VERSION,
-    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
-    .fields = (const VMStateField[]) {
-        VMSTATE_VIRTIO_DEVICE,
-        VMSTATE_END_OF_LIST()
-    },
-};
-
 static const Property virtio_snd_properties[] = {
     DEFINE_AUDIO_PROPERTIES(VirtIOSound, card),
     DEFINE_PROP_UINT32("jacks", VirtIOSound, snd_conf.jacks,
@@ -1383,6 +1363,25 @@ static void virtio_snd_reset(VirtIODevice *vdev)
         }
     }
 }
+
+static const VMStateDescription vmstate_virtio_snd = {
+    .name = TYPE_VIRTIO_SND "-base",
+    .version_id = VIRTIO_SOUND_VM_VERSION,
+    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
+    .fields = (const VMStateField[]) {
+        VMSTATE_VIRTIO_DEVICE,
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+static const VMStateDescription vmstate_virtio_snd_device = {
+    .name = TYPE_VIRTIO_SND,
+    .version_id = VIRTIO_SOUND_VM_VERSION,
+    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
+    .fields = (const VMStateField[]) {
+        VMSTATE_END_OF_LIST()
+    },
+};
 
 static void virtio_snd_class_init(ObjectClass *klass, void *data)
 {
