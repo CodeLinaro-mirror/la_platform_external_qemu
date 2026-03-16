@@ -429,6 +429,39 @@ static void virtio_snd_destroy_stream(VirtIOSoundPCMStream *stream)
 }
 
 /*
+ * Initializes the voice field in VirtIOSoundPCMStream. It assumes
+ * that the `s` (the VirtIOSound pointer) and `as` (audsettings)
+ * are already initilized.
+ *
+ * @stream: VirtIOSoundPCMStream *stream
+ */
+static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream)
+{
+    g_assert(stream->s);
+    g_assert(stream->s->audio_be);
+    g_assert(stream->as.freq > 0);
+    g_assert(stream->as.nchannels > 0);
+
+    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+        stream->voice.out = audio_be_open_out(stream->s->audio_be,
+                                         stream->voice.out,
+                                         "virtio-sound.out",
+                                         stream,
+                                         virtio_snd_pcm_out_cb,
+                                         &stream->as);
+        audio_be_set_volume_out_lr(stream->s->audio_be, stream->voice.out, 0, 255, 255);
+    } else {
+        stream->voice.in = audio_be_open_in(stream->s->audio_be,
+                                        stream->voice.in,
+                                        "virtio-sound.in",
+                                        stream,
+                                        virtio_snd_pcm_in_cb,
+                                        &stream->as);
+        audio_be_set_volume_in_lr(stream->s->audio_be, stream->voice.in, 0, 255, 255);
+    }
+}
+
+/*
  * Prepares a VirtIOSound card stream.
  * Returns the response status code. (VIRTIO_SND_S_*).
  *
@@ -476,23 +509,7 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
     stream->period_bytes = params->period_bytes;
     stream->as = as;
 
-    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
-        stream->voice.out = audio_be_open_out(s->audio_be,
-                                         stream->voice.out,
-                                         "virtio-sound.out",
-                                         stream,
-                                         virtio_snd_pcm_out_cb,
-                                         &as);
-        audio_be_set_volume_out_lr(s->audio_be, stream->voice.out, 0, 255, 255);
-    } else {
-        stream->voice.in = audio_be_open_in(s->audio_be,
-                                        stream->voice.in,
-                                        "virtio-sound.in",
-                                        stream,
-                                        virtio_snd_pcm_in_cb,
-                                        &as);
-        audio_be_set_volume_in_lr(s->audio_be, stream->voice.in, 0, 255, 255);
-    }
+    virtio_snd_init_stream_voice(stream);
 
     return cpu_to_le32(VIRTIO_SND_S_OK);
 }
