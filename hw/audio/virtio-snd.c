@@ -405,6 +405,37 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s)
 }
 
 /*
+ * Initializes the voice field in VirtIOSoundPCMStream. It assumes
+ * that the `s` (the VirtIOSound pointer) and `as` (audsettings)
+ * are already initilized.
+ *
+ * @stream: VirtIOSoundPCMStream *stream
+ */
+static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream) {
+    g_assert(stream->s);
+    g_assert(stream->as.freq > 0);
+    g_assert(stream->as.nchannels > 0);
+
+    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+        stream->voice.out = AUD_open_out(&stream->s->card,
+                                         stream->voice.out,
+                                         "virtio-sound.out",
+                                         stream,
+                                         virtio_snd_pcm_out_cb,
+                                         &stream->as);
+        AUD_set_volume_out(stream->voice.out, 0, 255, 255);
+    } else {
+        stream->voice.in = AUD_open_in(&stream->s->card,
+                                       stream->voice.in,
+                                       "virtio-sound.in",
+                                       stream,
+                                       virtio_snd_pcm_in_cb,
+                                       &stream->as);
+        AUD_set_volume_in(stream->voice.in, 0, 255, 255);
+    }
+}
+
+/*
  * Releases all resources owned by VirtIOSoundPCMStream and
  * frees its memory. The stream pointer must be non-NULL.
  *
@@ -478,23 +509,7 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
     stream->period_bytes = params->period_bytes;
     stream->as = as;
 
-    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
-        stream->voice.out = AUD_open_out(&s->card,
-                                         stream->voice.out,
-                                         "virtio-sound.out",
-                                         stream,
-                                         virtio_snd_pcm_out_cb,
-                                         &as);
-        AUD_set_volume_out(stream->voice.out, 0, 255, 255);
-    } else {
-        stream->voice.in = AUD_open_in(&s->card,
-                                        stream->voice.in,
-                                        "virtio-sound.in",
-                                        stream,
-                                        virtio_snd_pcm_in_cb,
-                                        &as);
-        AUD_set_volume_in(stream->voice.in, 0, 255, 255);
-    }
+    virtio_snd_init_stream_voice(stream);
 
     return cpu_to_le32(VIRTIO_SND_S_OK);
 }
