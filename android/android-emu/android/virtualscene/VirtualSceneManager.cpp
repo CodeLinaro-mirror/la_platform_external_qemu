@@ -456,7 +456,7 @@ void VirtualSceneManager::parseCmdline() {
         return;
     }
 
-    if (!androidHwConfig_hasVirtualSceneCamera(
+    if (!androidHwConfig_hasVirtualSceneOrEnvironmentCamera(
                 getConsoleAgents()->settings->hw()) &&
         getConsoleAgents()
                 ->settings->android_cmdLineOptions()

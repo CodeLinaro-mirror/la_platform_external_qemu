@@ -2184,7 +2184,7 @@ void ToolWindow::showOrRaiseExtendedWindow(ExtendedWindowPane pane) {
             return;
         }
     }
-    if (!androidHwConfig_hasVirtualSceneCamera(
+    if (!androidHwConfig_hasVirtualSceneOrEnvironmentCamera(
                 getConsoleAgents()->settings->hw()) &&
         pane == PANE_IDX_CAMERA) {
         return;

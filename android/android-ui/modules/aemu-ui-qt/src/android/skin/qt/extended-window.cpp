@@ -253,15 +253,13 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
     }
     mSidebarButtons.addButton(mExtendedUi->microphoneButton);
 
-    // Currently, the camera page only contains options for the virtual scene
-    // camera.  Hide the button if the virtual scene camera is not enabled, or
+    // The camera page contains options for the virtual scene and environment
+    // cameras. Hide the button if the virtual scene camera is not enabled, or
     // if we are using an Android Auto image because that does not have
-    // camera support at the moment. Or XR and Glasses images because
-    // those images are not using VirtualScene.
-    if (androidHwConfig_hasVirtualSceneCamera(
+    // camera support at the moment.
+    if (androidHwConfig_hasVirtualSceneOrEnvironmentCamera(
                 getConsoleAgents()->settings->hw()) &&
-        (!avdInfo || (avdFlavor != AVD_ANDROID_AUTO
-            && avdFlavor != AVD_XR && avdFlavor != AVD_GLASSES ))) {
+        (!avdInfo || (avdFlavor != AVD_ANDROID_AUTO && avdFlavor != AVD_XR))) {
         mSidebarButtons.addButton(mExtendedUi->cameraButton);
         mExtendedUi->cameraButton->setVisible(true);
     } else {
