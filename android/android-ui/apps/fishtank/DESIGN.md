@@ -20,9 +20,14 @@ Fishtank's primary goal is to provide a rich, native UI experience for the Andro
 ### Emulator Discovery and Connection
 
 Fishtank can connect to an emulator in three ways:
--   `--fishtank default`: Automatically picks the first running emulator it finds.
--   `--fishtank <serial>`: Connects to the emulator with the specified serial port (e.g., 5554).
--   `--fishtank <file.ini>`: Uses a specific gRPC discovery file.
+-   `-fishtank default`: Automatically picks the first running emulator it finds.
+-   `-fishtank <serial>`: Connects to the emulator with the specified serial port (e.g., 5554).
+-   `-fishtank <file.ini>`: Uses a specific gRPC discovery file.
+
+Fishtank now automatically configures the AVD name and necessary environment
+variables (`ANDROID_EMULATOR_LAUNCHER_DIR`, `ANDROID_AVD_HOME`) from the
+emulator's discovery file. This makes it possible to run fishtank using only the
+serial number without needing `-avd` or manual environment setup.
 
 Discovery is handled by the `EmulatorAdvertisement` class, which looks for `.ini` files in the emulator's runtime directory.
 
@@ -58,7 +63,15 @@ Because some gRPC backends do not yet support streaming notifications for physic
 
 Fishtank is designed to be lightweight and compatible. It typically uses **SwiftShader** (a software GL implementation) for its own UI rendering to avoid dependencies on host GPU drivers, ensuring consistent behavior across different environments. This is configured in `main.cpp` by setting the library search paths and renderer configuration.
 
-## Agent Implementation Status
+## Limitations and Future Work
+
+### Audio Playback
+
+Fishtank currently lacks a native host audio backend. In the standalone emulator, audio is handled by QEMU's internal audio system. Since Fishtank is decoupled from QEMU, `AudioOutputEngine::get()` returns `nullptr`.
+
+The **Video Player** (used for recording playback) is designed to handle this gracefully by falling back to silent mode. To enable audio in Fishtank, a new implementation of `AudioOutputEngine` using a host-side library like **SDL2** or **Qt Audio** would need to be integrated into the Fishtank process.
+
+### Agent Implementation Status
 
 Fishtank is an ongoing project, and not all emulator agents are fully implemented. The following table summarizes the current status of the major agents:
 

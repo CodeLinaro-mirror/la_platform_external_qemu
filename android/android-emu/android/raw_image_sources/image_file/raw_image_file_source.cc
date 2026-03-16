@@ -1,27 +1,22 @@
-/*
- * Copyright (C) 2025 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Copyright 2026 The Android Open Source Project
+//
+// This software is licensed under the terms of the GNU General Public
+// License version 2, as published by the Free Software Foundation, and
+// may be copied, distributed, and modified under those terms.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+#include "android/raw_image_sources/image_file/raw_image_file_source.h"
 
-#include "android/camera/camera-imagefile.h"
-
-#ifdef USE_LEGACY_IMAGEFILE_CAMERA
 #include <png.h>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
 #include "aemu/base/logging/Log.h"
+#include "android/raw_image_sources/raw_image_source.h"
 
 // jpeglib.h needs to be included. It's a C library.
 extern "C" {
@@ -30,22 +25,13 @@ extern "C" {
 
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/ScopedStdioFile.h"
-#include "android/camera/camera-format-converters.h"
+#include "android/camera/camera-common.h"
 #include "android/utils/debug.h"
 #include "android/utils/file_io.h"
 
 using android::base::Optional;
 using android::base::PathUtils;
 using android::base::ScopedStdioFile;
-
-struct ImageData {
-    unsigned int width;
-    unsigned int height;
-    int num_components;
-    int line_size;
-    std::vector<unsigned char> data;
-    uint8_t* data_ptr;
-};
 
 static void pngWarningCallback(png_structp readPtr,
                                png_const_charp warningMessage) {
@@ -57,8 +43,8 @@ static inline T alignRowBytes(T value) {
     return (value + 3) / 4 * 4;
 }
 
-std::optional<ImageData> loadPNGImage(const char* filename) {
-    ScopedStdioFile fp(android_fopen(filename, "rb"));
+std::optional<ImageData> loadPNGImage(std::string& filename) {
+    ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
         derror("%s: Failed to open file %s", __FUNCTION__, filename);
         return {};
@@ -122,6 +108,12 @@ std::optional<ImageData> loadPNGImage(const char* filename) {
         png_set_tRNS_to_alpha(png);
     }
 
+    // If we still don't have an alpha channel, add a full alpha channel.
+    if (!(colorType & PNG_COLOR_MASK_ALPHA) &&
+        !png_get_valid(png, pngInfo, PNG_INFO_tRNS)) {
+        png_set_add_alpha(png, 0xFF, PNG_FILLER_AFTER);
+    }
+
     // At this point, the bit depth is either 8 or 16, ensure 8 bpp.
     if (bitDepth == 16) {
         png_set_strip_16(png);
@@ -138,8 +130,7 @@ std::optional<ImageData> loadPNGImage(const char* filename) {
                newColorType);
     }
 
-    if (newColorType != PNG_COLOR_TYPE_RGB &&
-        newColorType != PNG_COLOR_TYPE_RGB_ALPHA) {
+    if (newColorType != PNG_COLOR_TYPE_RGB_ALPHA) {
         derror("%s: Unsupported color type: %d", __FUNCTION__, newColorType);
         png_destroy_read_struct(&png, &pngInfo, 0);
         return {};
@@ -162,19 +153,17 @@ std::optional<ImageData> loadPNGImage(const char* filename) {
     img.data_ptr = &img.data[0];
     img.width = width;
     img.height = height;
-    img.num_components = (newColorType == PNG_COLOR_TYPE_RGB) ? 3 : 4;
+    img.num_components = 4;
     img.line_size = img.width * img.num_components;
 
     return img;
 }
 
-std::optional<ImageData> loadJPEGImage(const char* filename) {
+std::optional<ImageData> loadJPEGImage(std::string& filename) {
     struct jpeg_decompress_struct cinfo;
     struct jpeg_error_mgr jerr;
 
-    derror("Loading: %s", filename);
-
-    ScopedStdioFile fp(android_fopen(filename, "rb"));
+    ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
         derror("%s: Failed to open file %s", __FUNCTION__, filename);
         return std::nullopt;
@@ -192,7 +181,7 @@ std::optional<ImageData> loadJPEGImage(const char* filename) {
 
     jpeg_stdio_src(&cinfo, fp.get());
     (void)jpeg_read_header(&cinfo, TRUE);
-    cinfo.out_color_space = JCS_RGB;  // Force RGB format.
+    cinfo.out_color_space = JCS_RGBA_8888;  // Force RGBA format.
     (void)jpeg_start_decompress(&cinfo);
 
     const uint32_t width = cinfo.output_width;
@@ -218,7 +207,7 @@ std::optional<ImageData> loadJPEGImage(const char* filename) {
     return img;
 }
 
-std::optional<ImageData> loadImageFromFile(const char* filename) {
+std::optional<ImageData> loadImageFromFile(std::string& filename) {
     const std::string filename_str{filename};
     const std::string_view extension{PathUtils::extension(filename_str)};
 
@@ -234,119 +223,36 @@ std::optional<ImageData> loadImageFromFile(const char* filename) {
     }
 }
 
-struct ImagefileCameraDevice {
-    explicit ImagefileCameraDevice(ImageData image)
-        : mImage(std::move(image)) {
-        mHeader.opaque = this;
+std::unique_ptr<RawImageFileSource> RawImageFileSource::Create(
+        std::string filename) {
+    std::optional<ImageData> maybeImage = loadImageFromFile(filename);
+    if (maybeImage) {
+        return std::unique_ptr<RawImageFileSource>(
+                new RawImageFileSource(filename, std::move(maybeImage.value())));
     }
+    return nullptr;
+}
 
-    static CameraDevice* open(const char* args, int) {
-        std::optional<ImageData> maybeImage = loadImageFromFile(args);
-        if (maybeImage) {
-            return &(new ImagefileCameraDevice(std::move(maybeImage.value())))
-                            ->mHeader;
-        } else {
-            return nullptr;
-        }
-    }
+RawImageFileSource::RawImageFileSource(std::string filename, ImageData&& image)
+    : file_(std::move(filename)), image_(std::move(image)) {}
 
-    static int startCapturingStatic(CameraDevice* cd,
-                                    uint32_t /*pixelFormat*/,
-                                    int width,
-                                    int height) {
-        return myselfFrom(cd)->startCapturing();
-    }
-
-    static int readFrameStatic(CameraDevice* cd,
-                               ClientFrame* frame,
-                               float rScale,
-                               float gScale,
-                               float bScale,
-                               float expComp,
-                               const char* direction,
-                               int sensor_orientation) {
-        return myselfFrom(cd)->readFrame(*frame, rScale, gScale, bScale,
-                                         expComp, direction, sensor_orientation);
-    }
-
-    static int stopCapturingStatic(CameraDevice* cd) {
-        return myselfFrom(cd)->stopCapturing();
-    }
-
-    static void closeStatic(CameraDevice* cd) { delete myselfFrom(cd); }
-
-private:
-    int startCapturing() { return 0; }
-
-    int readFrame(ClientFrame& cframe,
-                  const float rScale,
-                  const float gScale,
-                  const float bScale,
-                  const float expComp,
-                  const char* direction,
-                  const int sensor_orientation) {
-        const bool backFacing = !strcmp(direction, "back");
-
-        for (uint32_t i = 0; i < cframe.framebuffers_count; ++i) {
-            if (const int err = convert_frame(mImage.data_ptr,
-                            mImage.num_components == 3 ? V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB32,
-                            mImage.line_size * mImage.height,
-                            mImage.width,
-                            mImage.height, &cframe,
-                            rScale, gScale, bScale, expComp, direction,
-                            get_coarse_orientation(sensor_orientation))) {
-                return err;
-            }
-        }
-
-        return 0;
-    }
-
-    int stopCapturing() {
-        return 0;
-    }
-
-    static ImagefileCameraDevice* myselfFrom(CameraDevice* c) {
-        return static_cast<ImagefileCameraDevice*>(c->opaque);
-    }
-
-    CameraDevice mHeader;
-    ImageData mImage;
-};
-
-int camera_imagefile_init_CameraInfo(CameraInfo* ci,
-                                     const char* direction,
-                                     const char* args) {
-    static const CameraInfoVtbl vtbl = {
-        .open = &ImagefileCameraDevice::open,
-        .start_capturing = &ImagefileCameraDevice::startCapturingStatic,
-        .read_frame = &ImagefileCameraDevice::readFrameStatic,
-        .stop_capturing = &ImagefileCameraDevice::stopCapturingStatic,
-        .close = &ImagefileCameraDevice::closeStatic,
-        .camera_source = kImagefile,
-    };
-
-    static const CameraFrameDim kDims[] = {
-        {640, 480},
-        {352, 288},
-        {320, 240},
-        {176, 144},
-        {1280, 720},
-        {1280, 960},
-    };
-
-    ci->frame_sizes = static_cast<CameraFrameDim*>(::malloc(sizeof(kDims)));
-    memcpy(ci->frame_sizes, kDims, sizeof(kDims));
-    ci->frame_sizes_num = sizeof(kDims) / sizeof(kDims[0]);
-    ci->vtbl = &vtbl;
-    ci->display_name = ::strdup(args);
-    ci->device_name = ::strdup(args);
-    ci->camera_name = ::strdup(args);
-    ci->inp_channel = 0;
-    ci->pixel_format = V4L2_PIX_FMT_RGB32;
-    ci->direction = ::strdup(direction);
-    ci->in_use = 0;
-
+int RawImageFileSource::Start(uint32_t pixel_format,
+                                     int width,
+                                     int height) {
     return 0;
 }
-#endif
+int RawImageFileSource::AccessImage(std::function<int(RawImageBuffer*)> accessor) {
+    size_t buffer_size;
+    uint32_t pixel_format;
+    int width;
+    int height;
+    struct RawImageBuffer im = {image_.data_ptr,
+                       static_cast<size_t>(image_.line_size) * image_.height,
+                       V4L2_PIX_FMT_RGB32, image_.width, image_.height};
+
+    return accessor(&im);
+}
+
+int RawImageFileSource::Stop() {
+    return 0;
+}

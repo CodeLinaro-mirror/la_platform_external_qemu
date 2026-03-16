@@ -81,16 +81,28 @@ QString LocationPage::toJsonString(const GpsFixArray* arr) {
     }
     // The first point will always have 0 sec delay.
     time_t prevTime = (*arr)[0].time;
+    time_t lastDelay = 0;
 
     ret.append("{\"path\":[");
     for (int i = 0; i < arr->size(); ++i) {
         const GpsFix& fix = (*arr)[i];
         time_t delay = fix.time - prevTime;
-        // Ensure all other delays are > 0, even if multiple points have
+        // Ensure all other delays are strictly increasing, even if multiple points have
         // the same timestamp.
-        if (delay == 0 && i != 0) {
-            delay = 2;
+        if (i != 0 && delay <= lastDelay) {
+            const double kDefaultSpeedMetersPerSecond = 10.0; // 36 km/h
+            const double kMinCalculatedDelaySeconds = 2.0;
+
+            double distMeters = LocationPage::getDistanceMeters(
+                    (*arr)[i - 1].latitude, (*arr)[i - 1].longitude,
+                    fix.latitude, fix.longitude);
+            double calculatedDelay = distMeters / kDefaultSpeedMetersPerSecond;
+            if (calculatedDelay < kMinCalculatedDelaySeconds) {
+                calculatedDelay = kMinCalculatedDelaySeconds;
+            }
+            delay = lastDelay + std::round(calculatedDelay);
         }
+        lastDelay = delay;
         ret.append(QString("{\"lat\":%1,\"lng\":%2,\"elevation\":%3,\"delay_sec\":%4},")
                 .arg(QString::number(fix.latitude, 'f', 15))
                 .arg(QString::number(fix.longitude, 'f', 15))
@@ -603,6 +615,9 @@ void LocationPage::writeRouteJsonFile(const std::string& pathOfProtoFile,
 void LocationPage::routeSendingFinished(bool ok) {
     mRouteSender.reset();
     mUi->loc_playRouteButton->setEnabled(ok);
+    if (!ok) {
+        setLoadingOverlayVisible(false);
+    }
     // Wait until the route has drawn on the map before hiding the overlay.
     // When onSavedRouteDrawn() gets called.
 }
@@ -657,7 +672,9 @@ void LocationPage::finishGeoDataLoading_v2(
         return;
     }
     const GpsFixArray& fixes = mGpsFixesArray;
-    if (fixes.size() == 1) {
+    if (fixes.size() == 0) {
+        showErrorDialog(tr("No valid locations found in the file."), tr("Geo Data Parser"));
+    } else if (fixes.size() == 1) {
         mUi->locationTabs->setCurrentIndex(0);
         savePoint(fixes[0].latitude,
                   fixes[0].longitude,
@@ -673,6 +690,7 @@ void LocationPage::finishGeoDataLoading_v2(
     setButtonEnabled(mUi->loc_importGpxKmlButton, theme, true);
     setButtonEnabled(mUi->loc_importGpxKmlButton_route, theme, true);
     setButtonEnabled(mUi->loc_playRouteButton, theme, true);
+    mNowLoadingGeoData = false;
 }
 
 #endif // USE_WEBENGINE

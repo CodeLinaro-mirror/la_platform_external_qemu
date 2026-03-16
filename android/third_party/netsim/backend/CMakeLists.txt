@@ -8,6 +8,8 @@ android_add_library(
        android-emu-base-process
        android-emu-metrics
        android-grpc-interceptors
+       android-emu-feature
+       aemu-host-common.headers
        grpc++
        packet-streamer-proto-lib
        protobuf::libprotobuf

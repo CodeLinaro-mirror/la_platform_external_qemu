@@ -573,7 +573,17 @@ int androidHwConfig_hasVideoPlaybackBackCamera(AndroidHwConfig* config) {
 }
 
 int androidHwConfig_hasEnvironmentBackCamera(AndroidHwConfig* config) {
-    return strcmp(config->hw_camera_back, "environment") == 0;
+    if (strcmp(config->hw_camera_back, "environment") == 0) {
+        return 1;
+    }
+
+    // Legacy behavior for AI glasses, camera is set to 'virtualscene', actually
+    // means 'environment'
+    if (config->hw_lcd_transparent) {
+        return androidHwConfig_hasVirtualSceneCamera(config);
+    }
+
+    return 0;
 }
 
 int androidHwConfig_hasEnvironmentFrontCamera(AndroidHwConfig* config) {

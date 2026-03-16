@@ -98,6 +98,7 @@ public:
         };
 
         auto info = toRecordingInfo(&mActiveRecording);
+        info.set_state(toProtoState(mRecordAgent->getRecorderState().state));
         response->CopyFrom(info);
         VERBOSE_INFO(grpc, "Recording to: %s", response->ShortDebugString());
         return ::grpc::Status::OK;
@@ -112,6 +113,7 @@ public:
         VERBOSE_INFO(grpc, "Stopping the recording agent.");
         mRecordAgent->stopRecording();
         auto info = toRecordingInfo(&mActiveRecording);
+        info.set_state(toProtoState(mRecordAgent->getRecorderState().state));
         response->CopyFrom(info);
         VERBOSE_INFO(grpc, "Current state: %s", response->ShortDebugString());
         return ::grpc::Status::OK;
@@ -126,6 +128,7 @@ public:
         auto currentState = mRecordAgent->getRecorderState();
         if (currentState.state == RECORDER_RECORDING) {
             auto info = toRecordingInfo(&mActiveRecording);
+            info.set_state(toProtoState(currentState.state));
             response->add_recordings()->CopyFrom(info);
         }
 
@@ -142,6 +145,21 @@ public:
     }
 
 private:
+    static RecordingInfo::RecorderState toProtoState(RecorderState state) {
+        switch (state) {
+            case RECORDER_STARTING:
+                return RecordingInfo::RECORDER_STATE_STARTING;
+            case RECORDER_RECORDING:
+                return RecordingInfo::RECORDER_STATE_RECORDING;
+            case RECORDER_STOPPING:
+                return RecordingInfo::RECORDER_STATE_STOPPING;
+            case RECORDER_STOPPED:
+                return RecordingInfo::RECORDER_STATE_STOPPED;
+            default:
+                return RecordingInfo::RECORDER_STATE_UNKOWN;
+        }
+    }
+
     static std::string recorderStateToString(RecorderState state) {
         switch (state) {
             case RECORDER_STARTING:

@@ -59,7 +59,7 @@ struct HwControlState {
     uint8_t keyboard_brightness = 0;
 
     // Screen LCD brightness. Ranged from 0-255.
-    uint8_t lcd_brightness;
+    uint8_t lcd_brightness = 128;
 };
 
 QemudClient* _hw_control_qemud_connect(void* opaque,
@@ -119,7 +119,17 @@ HwControl::HwControl(void* client, AndroidHwControlFuncs clientFuncs)
 
 void HwControl::setClient(void* client, AndroidHwControlFuncs clientFuncs) {
     std::lock_guard<std::mutex> guard(*mClientCallbacksLock);
+    D("%s: Registering client %p. Syncing state: lcd=%d",
+                  __func__, client, mHwState.lcd_brightness);
     mClientCallbacks.push_back({client, clientFuncs});
+    if (clientFuncs.light_brightness) {
+        clientFuncs.light_brightness(client, "lcd_backlight",
+                                     mHwState.lcd_brightness);
+        clientFuncs.light_brightness(client, "keyboard_backlight",
+                                     mHwState.keyboard_brightness);
+        clientFuncs.light_brightness(client, "button_backlight",
+                                     mHwState.button_brightness);
+    }
 }
 
 void HwControl::onQuery(std::string_view msg, HwControlClient* client) {
@@ -171,6 +181,8 @@ void HwControl::setBrightness(const std::string& name, uint8_t value) {
 }
 
 void HwControl::setBrightness(std::string_view args) {
+    D("%s: args='%.*s'", __func__,
+                  static_cast<int>(args.size()), args.data());
     if (auto colon = args.find(':'); colon != std::string_view::npos) {
         std::string name(args.substr(0, colon));
         std::string valueStr(args.substr(colon + 1));
@@ -292,6 +304,10 @@ QemudClient* _hw_control_qemud_connect(void* opaque,
 }  // namespace
 
 void android_hw_control_init(void) {
+    if (sHwControl) {
+        D("%s: hw-control qemud handler already initialized, skipping", __FUNCTION__);
+        return;
+    }
     sHwControl = std::make_optional<HwControl>();
     D("%s: hw-control qemud handler initialized", __FUNCTION__);
 }

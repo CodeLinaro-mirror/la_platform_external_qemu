@@ -28,6 +28,7 @@
 #include <QTimer>
 
 #include "aemu/base/Compiler.h"
+#include "aemu/base/EventNotificationSupport.h"
 #include "aemu/base/containers/CircularBuffer.h"
 #include "aemu/base/memory/OnDemand.h"
 #include "aemu/base/synchronization/ConditionVariable.h"
@@ -159,8 +160,8 @@ signals:
     void guestClipboardChanged(QString text);
     void haveClipboardSharingKnown(bool have);
     void themeChanged(SettingsTheme theme);
-    // Signal to indicate the host microphone input setting has changed
-    void microphoneEnabledChanged();
+    // Signal for callback to trigger the state to change;
+    void _externalMicrophoneEnabledChanged(bool enabled);
 
 private:
     bool eventFilter(QObject* o, QEvent* event) override;
@@ -184,7 +185,7 @@ private:
 
     bool getMicrophoneEnabled();
     void setMicrophoneEnabled(bool enabled);
-    void updateMicrophoneUI();
+    void updateMicrophoneUI(bool enabled);
 
     void showOrRaiseExtendedWindow(ExtendedWindowPane pane);
     void updateButtonUiCommand(QPushButton* button, const char* uiCommand);
@@ -292,16 +293,21 @@ private:
     PresetEmulatorSizeType mDesiredNewSize {PRESET_SIZE_PHONE};
     void startUnfoldTimer(PresetEmulatorSizeType newSize);
 
+    std::unique_ptr<android::base::RaiiEventListener<
+            android::base::EventNotificationSupport<bool>,
+            bool>>
+            mRealAudioEventListener;
+
 public slots:
     void raise();
     void switchClipboardSharing(bool enabled);
     void showVirtualSceneControls(bool show);
     void ensureVirtualSceneWindowCreated();
     void on_close_button_clicked();
-    // Signal handler for host microphone input toggle changes
-    void onMicrophoneEnabledChanged();
 
 private slots:
+    // Signal handler for host microphone input toggle changes
+    void onExternalMicrophoneEnabledChanged(bool enabled);
     void on_back_button_pressed();
     void on_back_button_released();
     void on_home_button_pressed();

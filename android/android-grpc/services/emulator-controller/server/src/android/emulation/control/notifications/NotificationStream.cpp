@@ -155,6 +155,14 @@ std::optional<Notification> NotificationStream::getXrOptionsNotificationEvent() 
     }
 }
 
+std::optional<Notification>
+NotificationStream::getMicrophoneStateNotificationEvent(bool allow) {
+    Notification event;
+
+    event.mutable_microphonestate()->set_realaudioenabled(allow);
+    return event;
+}
+
 NotificationStreamWriter* NotificationStream::notificationStream() {
     if (!mRegisteredListeners.test_and_set()) {
         registerListeners();
@@ -164,6 +172,8 @@ NotificationStreamWriter* NotificationStream::notificationStream() {
     stream->eventArrived(getCameraNotificationEvent());
     stream->eventArrived(getPostureNotificationEvent());
     stream->eventArrived(getBootedNotificationEvent());
+    stream->eventArrived(getMicrophoneStateNotificationEvent(
+            mAgents->vm->isRealAudioAllowed()));
     if (android_is_xr_mode()) {
         stream->eventArrived(getXrOptionsNotificationEvent());
     }
@@ -234,6 +244,16 @@ void NotificationStream::registerListeners() {
         eventDetails->set_passthrough_coefficient(options.passthrough_coefficient());
         mNotificationListeners.fireEvent(event);
     });
+
+    auto microphoneStatePublisher =
+            static_cast<base::EventNotificationSupport<bool>*>(
+                    mAgents->vm->getRealAudioEventListener());
+    if (microphoneStatePublisher) {
+        microphoneStatePublisher->registerOnce([&](bool allow) {
+            mNotificationListeners.fireEvent(
+                    getMicrophoneStateNotificationEvent(allow));
+        });
+    }
 }
 }  // namespace control
 }  // namespace emulation

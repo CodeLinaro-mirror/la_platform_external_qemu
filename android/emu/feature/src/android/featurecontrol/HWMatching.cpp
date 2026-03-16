@@ -87,23 +87,29 @@ static bool tryParseFeaturePatternsProtobuf(
     std::ifstream in(PathUtils::asUnicodePath(filename.data()).c_str(),
                      std::ios::binary);
 
-    if (out_patterns->ParseFromIstream(&in)) {
-        D("successfully parsed as binary.");
-        return true;
+    if (!in.is_open()) {
+        D("could not open %s.", filename.c_str());
+    } else {
+        if (out_patterns->ParseFromIstream(&in)) {
+            D("successfully parsed as binary.");
+            return true;
+        }
+        dprint("Failed to parse '%s' file in binary mode, retrying in text "
+               "mode",
+               filename.c_str());
     }
-
-    D("failed to parse protobuf file in binary mode, retrying in text mode");
     in.close();
 
     auto asText = android::readFileIntoString(filename);
 
     if (!asText) {
-        D("could not read file into string, failed");
+        dprint("Could not read feature patterns file %s into string, failed.",
+               filename.c_str());
         return false;
     }
 
     if (!google::protobuf::TextFormat::ParseFromString(*asText, out_patterns)) {
-        D("could not parse in text mode, failed");
+        dwarning("Could not parse %s in text mode, failed", filename.c_str());
         return false;
     }
 
@@ -146,13 +152,14 @@ public:
             return true;
         }
 
-        D("Could not find downloaded feature flags, trying origin %s\n",
-          mOriginalFileName.c_str());
+        dprint("Could not find downloaded feature flags, trying %s",
+               mOriginalFileName.c_str());
         return tryParseFeaturePatternsProtobuf(mOriginalFileName, patterns);
     }
 
     bool write(emulator_features::EmulatorFeaturePatterns& patterns) {
         if (!acquire()) {
+            dprint("Could not acquire file lock to save: %s", mFilename.c_str());
             return false;
         }
 
@@ -161,7 +168,7 @@ public:
                                   std::ios_base::binary | std::ios_base::trunc);
 
             if (!outFile) {
-                D("not valid file: %s\n", mFilename.c_str());
+                dprint("Not a valid file: %s", mFilename.c_str());
                 return false;
             }
 
@@ -172,7 +179,7 @@ public:
         // Check if we wrote a parseable protobuf, if not, delete immediately.
         emulator_features::EmulatorFeaturePatterns test_pattern;
         if (!tryParseFeaturePatternsProtobuf(mFilename, &test_pattern)) {
-            D("we have invalid protobuf, delete it");
+            dprint("Invalid protobuf file found, deleting %s", mFilename.c_str());
             System::get()->deleteFile(mFilename);
             return false;
         }
@@ -183,14 +190,14 @@ public:
 private:
     bool acquire() {
         if (mFileLock) {
-            D("acquire() called twice by same process.");
+            dprint("acquire() called twice by same process.");
             return false;
         }
 
         mFileLock = filelock_create(mFilename.c_str());
 
         if (!mFileLock) {
-            D("another emulator process has lock or path is RO");
+            dprint("Another emulator process has lock or path is RO");
             return false;
         }
 
@@ -340,7 +347,7 @@ static void doFeatureAction(const FeatureAction& action) {
     Feature feature = stringToFeature(action.name);
 
     if (stringToFeature(action.name) == Feature::Feature_unknown) {
-        D("Unknown feature action.");
+        dwarning("Unknown feature action: %s", action.name.c_str());
         return;
     }
 
@@ -348,17 +355,26 @@ static void doFeatureAction(const FeatureAction& action) {
     // If the server wants to enable: enable if guest didn't disable
     // If the server wants to disable: disable if user did not override
     if (action.enable) {
-        setIfNotOverridenOrGuestDisabled(feature, action.enable);
-        D("server has tried to enable %s", action.name.c_str());
+        if (!isEnabled(feature)) {
+            setIfNotOverridenOrGuestDisabled(feature, action.enable);
+            if (isEnabled(feature)) {
+                dprint("Server flags enabled %s", action.name.c_str());
+            }else {
+                dprint("Server flags could not enable %s", action.name.c_str());
+            }
+        }
     } else {
-        setIfNotOverriden(feature, action.enable);
-        D("server has tried to disable %s", action.name.c_str());
+        if (isEnabled(feature)) {
+            setIfNotOverriden(feature, action.enable);
+            if (!isEnabled(feature)) {
+                dprint("Server flags disabled %s", action.name.c_str());
+            }else {
+                dprint("Server flags could not disable %s", action.name.c_str());
+            }
+        }
     }
 }
 
-static const char kFeaturePatternsUrl[] =
-        "https://dl.google.com/dl/android/studio/metadata/"
-        "emulator-feature-flags.protobuf.bin";
 static const char kFeaturePatternsUrlText[] =
         "https://dl.google.com/dl/android/studio/metadata/"
         "emulator-feature-flags.protobuf";
@@ -384,7 +400,7 @@ bool downloadFeaturePatternsText(
     if (!curl_download(kFeaturePatternsUrlText, nullptr,
                        &curlDownloadFeaturePatternsCallback, &res,
                        &curlError)) {
-        D("failed to download feature flags from server: %s.\n", curlError);
+        dprint("Failed to download feature flags from server: %s.", curlError);
         free(curlError);
         return false;
     }
@@ -392,32 +408,9 @@ bool downloadFeaturePatternsText(
     D("got: %s", res.c_str());
 
     if (!google::protobuf::TextFormat::ParseFromString(res, patternsOut)) {
-        D("failed to parse text feature flags\n");
+        dprint("Failed to parse text feature flags.");
         return false;
     }
-    return true;
-}
-
-bool downloadFeaturePatternsBinary(
-        emulator_features::EmulatorFeaturePatterns* patternsOut) {
-    D("load: %s\n", kFeaturePatternsUrl);
-
-    char* curlError = nullptr;
-    std::string res;
-    if (!curl_download(kFeaturePatternsUrl, nullptr,
-                       &curlDownloadFeaturePatternsCallback, &res,
-                       &curlError)) {
-        D("failed to download feature flags from server: %s.\n", curlError);
-        free(curlError);
-        return false;
-    }
-
-    D("got: %s", res.c_str());
-
-    if (!patternsOut->ParseFromString(res)) {
-        D("failed to parse binary feature flags\n");
-    }
-
     return true;
 }
 
@@ -457,16 +450,13 @@ static void queryFeaturePatternFn() {
           sCachedFeaturePatterns->last_download_time(), currTime);
         return;
     } else {
-        D("Downloading new feature patterns.");
+        dprint("Downloading new feature patterns.");
     }
 
     emulator_features::EmulatorFeaturePatterns patterns;
-    if (!downloadFeaturePatternsBinary(&patterns)) {
-        D("Could not find binary protobuf, trying text.");
-        if (!downloadFeaturePatternsText(&patterns)) {
-            D("Downloaded protobuf file corrupt.");
-            return;
-        }
+    if (!downloadFeaturePatternsText(&patterns)) {
+        dwarning("Downloaded protobuf file is corrupt.");
+        return;
     }
 
     outputCachedFeaturePatterns(patterns);

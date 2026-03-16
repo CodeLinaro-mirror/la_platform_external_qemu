@@ -537,8 +537,13 @@ public:
                                 mXrInputEventSender.sendXrHeadAngularVelocity(
                                         request->xr_head_angular_velocity_event());
                             } else if (request->has_xr_head_velocity_event()) {
-                                mXrInputEventSender.sendXrHeadVelocity(
-                                        request->xr_head_velocity_event());
+                                mXrInputEventSender.sendXrHeadVelocity(request->xr_head_velocity_event());
+                            } else if (request->has_xr_hand_event()) {
+                                const MouseEvent& handEvent = request->xr_hand_event();
+                                mXrInputEventSender.sendXrHandEvent(handEvent.x(), handEvent.y(), handEvent.buttons(), handEvent.display());
+                            } else if (request->has_xr_eye_event()) {
+                                const MouseEvent& eyeEvent = request->xr_eye_event();
+                                mXrInputEventSender.sendXrEyeEvent(eyeEvent.x(), eyeEvent.y(), eyeEvent.buttons(), eyeEvent.display());
                             } else {
                                 return Status(
                                         ::grpc::StatusCode::INVALID_ARGUMENT,
@@ -710,6 +715,23 @@ public:
             }
             clientAlive = clientAlive && !context->IsCancelled();
         } while (clientAlive);
+
+        return Status::OK;
+    }
+
+    Status setMicrophoneState(ServerContext* context,
+                              const MicrophoneState* requestPtr,
+                              ::google::protobuf::Empty* reply) override {
+        getConsoleAgents()->vm->allowRealAudio(requestPtr->realaudioenabled());
+
+        return Status::OK;
+    }
+
+    Status getMicrophoneState(ServerContext* context,
+                              const Empty* request,
+                              MicrophoneState* reply) override {
+        reply->set_realaudioenabled(
+                getConsoleAgents()->vm->isRealAudioAllowed());
 
         return Status::OK;
     }

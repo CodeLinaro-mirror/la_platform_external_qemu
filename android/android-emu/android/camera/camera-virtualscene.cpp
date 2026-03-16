@@ -52,6 +52,10 @@ uint32_t camera_virtualscene_preferred_format() {
     return VIRTUALSCENE_PIXEL_FORMAT;
 }
 
+char camera_virtualscene_name_argument_separator() {
+    return '|';
+}
+
 CameraDevice* camera_virtualscene_open(const char* name, int inp_channel) {
     RenderedCameraDevice* cd = new RenderedCameraDevice(name);
     return cd->getCameraDevice();

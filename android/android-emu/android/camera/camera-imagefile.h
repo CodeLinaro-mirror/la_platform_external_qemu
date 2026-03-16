@@ -16,6 +16,9 @@
 
 #pragma once
 
+// TODO(virtualscene): finalize imagefile mode and remove
+// USE_LEGACY_IMAGEFILE_CAMERA code
+#ifdef USE_LEGACY_IMAGEFILE_CAMERA
 #include "android/camera/camera-common.h"
 #include "android/utils/compiler.h"
 
@@ -26,3 +29,4 @@ int camera_imagefile_init_CameraInfo(CameraInfo* ci,
                                      const char* args);
 
 ANDROID_END_HEADER
+#endif
