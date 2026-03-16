@@ -920,6 +920,8 @@ std::shared_ptr<Scene> VirtualSceneManager::createEnvironmentScene(
  ******************************************************************************/
 std::unique_ptr<SceneCamera> BackgroundUpdateService::mSceneCamera;
 std::unique_ptr<RendererView> BackgroundUpdateService::mBackgroundView;
+std::vector<uint8_t> BackgroundUpdateService::mReadbackDataCopy;
+
 bool BackgroundUpdateService::mStarted = false;
 
 bool BackgroundUpdateService::start(int displayWidth,
@@ -935,10 +937,11 @@ bool BackgroundUpdateService::start(int displayWidth,
     mBackgroundView->updateTarget(RendererView::Format::RGBA8, displayWidth,
                                   displayHeight);
     mBackgroundView->setBlurFactor(backgroundBlur);
+    mReadbackDataCopy.resize(displayWidth * displayHeight * 4);
 
     // Set update callback, to update the background image after each
     // scene update
-    VirtualSceneManager::setUpdateCallback([&]() {
+    VirtualSceneManager::setUpdateCallback([displayWidth, displayHeight]() {
         mSceneCamera->update();
 
         // TODO(virtualscene) Handle rotation properly for all scenes.
@@ -954,18 +957,20 @@ bool BackgroundUpdateService::start(int displayWidth,
 
         if (VirtualSceneManager::viewCacheRequiresUpdate(
                     mBackgroundView.get())) {
-            VirtualSceneManager::renderView(
-                    mBackgroundView.get(),
-                    [&]() {
-                        const std::vector<uint8_t>& fbData =
-                                mBackgroundView->getFramebufferLocked();
-
-                        android_setOpenglesScreenBackground(
-                                mBackgroundView->getWidthLocked(),
-                                mBackgroundView->getHeightLocked(),
-                                fbData.data());
-                    },
-                    nullptr);
+            if (VirtualSceneManager::renderView(
+                        mBackgroundView.get(),
+                        []() {
+                            mReadbackDataCopy =
+                                    mBackgroundView->getFramebufferLocked();
+                        },
+                        nullptr)) {
+                // Update the background image for the display composition
+                // TODO(virtualscene-perf): Avoid copy of the data by making
+                // android_setOpenglesScreenBackground call lighter weight and
+                // callable inside the lock
+                android_setOpenglesScreenBackground(displayWidth, displayHeight,
+                                                    mReadbackDataCopy.data());
+            }
         }
     });
 
