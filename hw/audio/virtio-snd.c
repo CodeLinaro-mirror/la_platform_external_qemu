@@ -30,6 +30,7 @@
 #define VIRTIO_SOUND_STREAM_DEFAULT 2
 #define VIRTIO_SOUND_CHMAP_DEFAULT 0
 #define VIRTIO_SOUND_HDA_FN_NID 0
+#define STREAM_AS_ENDIANNESS 0 /* Conforming to VIRTIO 1.0: always little endian. */
 
 static void virtio_snd_pcm_out_cb(void *data, int available);
 static void virtio_snd_process_cmdq(VirtIOSound *s);
@@ -381,7 +382,7 @@ static void virtio_snd_get_qemu_audsettings(audsettings *as,
     as->nchannels = MIN(AUDIO_MAX_CHANNELS, params->channels);
     as->fmt = virtio_snd_get_qemu_format(params->format);
     as->freq = virtio_snd_get_qemu_freq(params->rate);
-    as->endianness = 0; /* Conforming to VIRTIO 1.0: always little endian. */
+    as->endianness = STREAM_AS_ENDIANNESS;
 }
 
 /*
