@@ -135,19 +135,21 @@ struct VirtIOPcmParams {
 };
 
 struct VirtIOSoundPCMStream {
-    virtio_snd_pcm_info info;
-    uint32_t id;
-    uint32_t period_bytes;  /* from virtio_snd_pcm_set_params */
     VirtIOSound *s;
-    bool flushing;
-    audsettings as;
     union {
         SWVoiceIn *in;
         SWVoiceOut *out;
     } voice;
     QemuMutex queue_mutex;
-    bool active;
+
+    /* All the fields below are migratable. */
     VirtIOSoundPCMBufferQueue queue;
+    virtio_snd_pcm_info info;
+    audsettings as;
+    uint32_t id;
+    uint32_t period_bytes;  /* from virtio_snd_pcm_set_params */
+    bool active;
+    bool flushing;
 };
 
 struct VirtIOSoundPCMItem {
