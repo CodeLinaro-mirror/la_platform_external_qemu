@@ -1592,10 +1592,11 @@ public:
         unsigned int count = HOST_VM_INFO64_COUNT;
         if (host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&vm_stat,
                               &count) == KERN_SUCCESS) {
-                res.avail_phys_memory =
-                        (vm_stat.free_count - vm_stat.speculative_count) *
-                        pageSize;
-            }
+            res.avail_phys_memory =
+                    ((vm_stat.free_count + vm_stat.inactive_count) -
+                     vm_stat.speculative_count) *
+                    pageSize;
+        }
 #endif
         return res;
     }
