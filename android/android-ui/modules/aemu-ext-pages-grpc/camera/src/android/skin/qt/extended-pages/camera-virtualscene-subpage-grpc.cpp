@@ -13,6 +13,7 @@
 
 #include <QByteArray>    // for QByteArray
 #include <QCheckBox>     // for QCheckBox
+#include <QPushButton>
 #include <QFileInfo>     // for QFileInfo
 #include <QMap>          // for QMap
 #include <QMapIterator>  // for QMapIterator
@@ -93,6 +94,12 @@ void CameraVirtualSceneSubpageGrpc::on_toggleTV_toggled(bool value) {
     AnimationState animation;
     animation.set_tvon(value);
     mServiceClient.setAnimationStateAsync(animation, [](auto ignored) {});
+}
+
+void CameraVirtualSceneSubpageGrpc::on_reloadEnvironment_clicked() {
+    if (getConsoleAgents() && getConsoleAgents()->virtual_scene) {
+        getConsoleAgents()->virtual_scene->reloadScene(nullptr);
+    }
 }
 
 void CameraVirtualSceneSubpageGrpc::reportInteraction() {

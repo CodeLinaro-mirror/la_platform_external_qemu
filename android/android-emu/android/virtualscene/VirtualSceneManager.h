@@ -33,12 +33,12 @@
 #include "android/emulation/control/virtual_scene_agent.h"
 #include "android/utils/compiler.h"
 #include "android/virtualscene/Renderer.h"
+#include "android/virtualscene/Scene.h"
 
 namespace android {
 namespace virtualscene {
 
 // Forward declarations.
-struct SceneConfig;
 class SceneCamera;
 
 // ScenesManager is responsible for creating, rendering and destroying
@@ -47,8 +47,7 @@ class SceneCamera;
 class ScenesManager {
 public:
     // Parse command line options for the virtual scene.
-    static std::shared_ptr<Scene> createScene(std::string_view sceneName,
-                                              const SceneConfig& config);
+    static std::shared_ptr<Scene> createScene(const SceneConfig& config);
 
     // Render the virtual scene to the given view.
     static bool renderView(Scene* scene,
@@ -74,7 +73,7 @@ public:
 
     // Initialize virtual scene rendering.
     // Returns true if initialization succeeded.
-    static bool initialize(const SceneConfig& config);
+    static bool initialize(bool initBackgroundService);
 
     // Uninitialize virtual scene rendering, may be called on any thread, but
     // the same EGL context that was active when initialize() was called must be
@@ -140,10 +139,15 @@ public:
 
     static void setSceneControlsParameters(bool show);
 
-    static std::shared_ptr<Scene> addSceneUser();
+    static bool addSceneUser();
     static void removeSceneUser();
 
     static void setUpdateCallback(std::function<void()> callback);
+
+    static SceneConfig::Mode getSceneMode();
+
+    // Returns false on error.
+    static bool reloadEnvironment(const char* environmentData);
 
 private:
     static android::base::StaticLock mLock;
@@ -157,6 +161,9 @@ private:
     static void updateSceneWorker();
     static void startSceneUpdateThread();
     static void stopSceneUpdateThread();
+    static bool reloadScene(const SceneConfig& config);
+    static std::shared_ptr<Scene> createEnvironmentScene(
+            const SceneConfig& config);
 };
 
 // TODO(virtualscene): move into a regular service
@@ -166,6 +173,8 @@ public:
                       int displayHeight,
                       float backgroundBlur);
     static void stop();
+
+    static void updateBlurAmount(float blurAmount);
 
 private:
     static std::unique_ptr<SceneCamera> mSceneCamera;

@@ -21,7 +21,8 @@ static const QAndroidVirtualSceneAgent sQAndroidVirtualSceneAgent = {
     VirtualSceneManager::enumeratePosters,
     VirtualSceneManager::setPosterScale,
     VirtualSceneManager::setAnimationState,
-    VirtualSceneManager::getAnimationState
+    VirtualSceneManager::getAnimationState,
+    VirtualSceneManager::reloadEnvironment,
 };
 
 extern "C" const QAndroidVirtualSceneAgent* const gQAndroidVirtualSceneAgent =

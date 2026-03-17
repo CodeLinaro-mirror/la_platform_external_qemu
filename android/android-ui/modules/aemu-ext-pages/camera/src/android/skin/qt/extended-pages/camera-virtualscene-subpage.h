@@ -47,6 +47,7 @@ private slots:
     void on_imageTable_scaleChanged(float value);
 
     void on_toggleTV_toggled(bool value);
+    void on_reloadEnvironment_clicked();
 
     // Report metrics for the first interaction to this page.
     void reportInteraction();

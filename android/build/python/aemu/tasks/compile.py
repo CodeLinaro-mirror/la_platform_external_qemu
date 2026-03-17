@@ -31,7 +31,7 @@ class CompileTask(BuildTask):
 
     NINJA_FILTER = re.compile(r"^\[\d+/\d+\]")
 
-    def __init__(self, aosp: Path, destination: Path, target: str):
+    def __init__(self, aosp: Path, destination: Path, target: str, fishtank_unstripped: bool = False):
         super().__init__()
         self.toolchain = Toolchain(aosp, target)
         self.target = self.toolchain.distribution()
@@ -81,7 +81,7 @@ class CompileTask(BuildTask):
             "--prefix",
             fishtank_dist_dir,
         ]
-        if platform.system() != "Windows":
+        if platform.system() != "Windows" and not fishtank_unstripped:
             self.cmake_cmd_fishtank.append("--strip")
         self.env = get_default_environment(aosp, self.toolchain.visual_studio_version())
 

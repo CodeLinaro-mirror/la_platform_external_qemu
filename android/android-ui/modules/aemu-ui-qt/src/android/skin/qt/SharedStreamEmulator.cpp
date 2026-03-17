@@ -14,19 +14,33 @@
 #include "android/skin/qt/SharedStreamEmulator.h"
 
 #include "aemu/base/logging/Log.h"
+#include "android/emulation/control/utils/EmulatorGrcpClient.h"
+#include "emulator_controller.grpc.pb.h"
+
+using android::emulation::control::EmulatorController;
+
+struct SharedStreamEmulator::Stub {
+    std::unique_ptr<EmulatorController::Stub> stub;
+};
 
 SharedStreamEmulator::SharedStreamEmulator(
         std::string_view handle,
         FrameCallback callback,
         int width,
         int height,
+        StreamTransport transport,
         std::shared_ptr<android::emulation::control::EmulatorGrpcClient> client)
     : mWidth(width),
       mHeight(height),
       mClient(client),
       mHandle(handle),
+      mTransport(transport),
       mFrameCallback(std::move(callback)) {
-    mStub = mClient->stub<android::emulation::control::EmulatorController>();
+    if (!mClient) {
+        mClient = android::emulation::control::EmulatorGrpcClient::me();
+    }
+    mStub = std::make_unique<SharedStreamEmulator::Stub>();
+    mStub->stub = mClient->stub<EmulatorController>();
 }
 
 SharedStreamEmulator::~SharedStreamEmulator() {
@@ -38,7 +52,7 @@ void SharedStreamEmulator::startStream() {
         return;
     }
 
-    if (!mClient || !mStub) {
+    if (!mClient || !mStub || !mStub->stub) {
         LOG(ERROR) << "gRPC client not initialized.";
         return;
     }
@@ -71,15 +85,21 @@ void SharedStreamEmulator::streamLoop() {
     request.set_height(mHeight);
 
     auto* transport = request.mutable_transport();
-    transport->set_channel(android::emulation::control::ImageTransport::MMAP);
-    transport->set_handle(mHandle);
+    if (mTransport == StreamTransport::MMAP) {
+        transport->set_channel(
+                android::emulation::control::ImageTransport::MMAP);
+        transport->set_handle(mHandle);
+    } else {
+        transport->set_channel(android::emulation::control::ImageTransport::
+                                       TRANSPORT_CHANNEL_UNSPECIFIED);
+    }
 
-    mReader = mStub->streamScreenshot(mContext.get(), request);
+    mReader = mStub->stub->streamScreenshot(mContext.get(), request);
 
     android::emulation::control::Image image;
     while (mIsStreaming && mReader->Read(&image)) {
         if (mFrameCallback) {
-            mFrameCallback();
+            mFrameCallback(&image);
         }
     }
 

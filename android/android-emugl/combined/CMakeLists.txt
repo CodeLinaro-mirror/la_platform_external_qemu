@@ -8,6 +8,7 @@ function(add_opengl_dependencies TGT)
     android_target_dependency(${TGT} windows SWIFTSHADER_DEPENDENCIES)
     # b/257077718 Linux presubmit is flaky with SwANGLE
     android_target_dependency(${TGT} linux SWIFTSHADER_DEPENDENCIES)
+    android_target_dependency(${TGT} linux LLVMPIPE_DEPENDENCIES)
     android_target_dependency(${TGT} darwin ANGLE_RENDERER_DEPENDENCIES)
     android_target_dependency(${TGT} all ANGLE_DEPENDENCIES)
     android_target_dependency(${TGT} all VULKAN_DEPENDENCIES)

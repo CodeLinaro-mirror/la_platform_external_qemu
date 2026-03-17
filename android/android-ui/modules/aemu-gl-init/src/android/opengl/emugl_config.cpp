@@ -120,7 +120,7 @@ SelectedRenderer emuglConfig_get_renderer(const char* gpu_mode) {
         return SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
     } else if (!strcmp(gpu_mode, "swangle")) {
         return SELECTED_RENDERER_ANGLE_INDIRECT;
-    } else if (!strcmp(gpu_mode, "lavapipe")) {
+    } else if (!strcmp(gpu_mode, "lavapipe") || !strcmp(gpu_mode, "llvmpipe")) {
         return SELECTED_RENDERER_LAVAPIPE;
     } else if (!strcmp(gpu_mode, "error")) {
         return SELECTED_RENDERER_ERROR;
@@ -1066,8 +1066,17 @@ bool emuglConfig_init(EmuglConfig* config,
     // Select GLES mode
     std::string gles_mode_selected = gpu_mode_requested;
     if (gles_mode_selected == "lavapipe") {
-        // There is no 'lavapipe' gles mode, use swangle by default
+        // By default, use swangle
         gles_mode_selected = "swangle";
+
+#if defined(__linux__)
+        const char* EnvVarSelectLLVMPipe = "ANDROID_EMU_LAVAPIPE_GL_MODE_LLVMPIPE";
+        if (android::base::getEnvironmentVariable(EnvVarSelectLLVMPipe) == "1") {
+            gles_mode_selected = "llvmpipe";
+            dinfo("Forcing 'llvmpipe' mode for GLES");
+        }
+#endif
+
         const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
         const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
         if (force_swiftshader || android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
@@ -1080,13 +1089,32 @@ bool emuglConfig_init(EmuglConfig* config,
     // based on some other parameters and prefer host
     if (gles_mode_selected == "auto") {
         bool switchToSoftwareGles = false;
-#ifdef __APPLE__
-        // TODO(b/479126903): New macOS system update leaks memory when host
-        // OpenGL driver is used, always use software rendering for GL
-        switchToSoftwareGles = true;
-#else
         if (no_window || async_query_host_gpu_blacklisted()) {
             switchToSoftwareGles = true;
+        }
+#ifdef __APPLE__
+        if (!switchToSoftwareGles) {
+            const int hostGpuMemoryLimitMB = 5 * 1024; // 5GB
+            int freeRamMB = 0;
+            System::isUnderMemoryPressure(&freeRamMB);
+    
+            // TODO(b/479126903): New macOS system update (Tahoe) leaks memory when
+            // host OpenGL driver is used, which is deprecated on macOS for some
+            // time. Check memory usage and decide to use software rendering for GL
+            // emulation if there is possibly a leak that may have cause system
+            // restarts.
+            if (freeRamMB < hostGpuMemoryLimitMB) {
+                dwarning(
+                        "Software GL rendering will be used due to system memory "
+                        "pressure, performance will be affected!"
+                        " (Available Memory: %d MB, Required: %d MB)",
+                        freeRamMB, hostGpuMemoryLimitMB);
+                switchToSoftwareGles = true;
+            } else {
+                dprint("System has sufficient memory available (%d MB) for "
+                       "hardware GL rendering",
+                       freeRamMB);
+            }
         }
 #endif
 
@@ -1098,13 +1126,13 @@ bool emuglConfig_init(EmuglConfig* config,
     }
 
 #ifdef _WIN32
-    // swangle is not supported on Windows
-    if (gles_mode_selected == "swangle") {
+    // swangle / llvmpipe are not supported on Windows
+    if (gles_mode_selected == "swangle" || gles_mode_selected == "llvmpipe") {
         gles_mode_selected = "swiftshader";
     }
 #elif defined(__APPLE__)
-    // swiftshader is not supported on macOS
-    if (gles_mode_selected == "swiftshader") {
+    // swiftshader / llvmpipe are not supported on macOS
+    if (gles_mode_selected == "swiftshader" || gles_mode_selected == "llvmpipe") {
         gles_mode_selected = "swangle";
     }
 #endif
