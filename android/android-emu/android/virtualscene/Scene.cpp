@@ -104,6 +104,8 @@ SceneConfig::SceneConfig(Mode mode, std::string_view filename) {
 SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
     if (sceneModeStr == "virtualscene") {
         return SceneConfig::Mode::Mesh3D;
+    } else if (sceneModeStr == "mesh3d") {
+        return SceneConfig::Mode::Mesh3D;
     } else if (sceneModeStr == "videoplayback") {
         return SceneConfig::Mode::VideoPlayback;
     } else if (sceneModeStr == "videofile") {

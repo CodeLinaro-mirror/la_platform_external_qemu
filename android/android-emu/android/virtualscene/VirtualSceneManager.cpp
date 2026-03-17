@@ -152,9 +152,11 @@ static LazyInstance<Settings> sSettings = LAZY_INSTANCE_INIT;
 // Structured data loaded from environment.ini file
 struct EnvironmentConfig {
     static const float defaultBackgroundBlur = 5.0f;
+    static const int defaultFps = 30;
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
     std::string sceneFilename;
     float backgroundBlur = defaultBackgroundBlur;
+    int fps;
 };
 
 static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
@@ -162,6 +164,7 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
     EnvironmentConfig ret;
 
     // Environment is required, set it up
+    bool modeSet = false;
     CIniFile* environmentIni = avdInfo_getEnvironmentIni(avdInfo);
     if (!environmentIni) {
         // Not having an environment file is unexpected if it's not in
@@ -172,34 +175,53 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             dinfo("%s: No environment config is provided", __func__);
         }
     } else {
-        std::string backgroundImageFilename =
-                iniFile_getString(environmentIni, "background.image.filename", "");
-        std::string backgroundVideoFilename =
-                iniFile_getString(environmentIni, "background.video.filename", "");
-        std::string backgroundSceneFilename =
-                iniFile_getString(environmentIni, "background.scene.filename", "");
-        if (!backgroundImageFilename.empty()) {
-            ret.sceneMode = SceneConfig::Mode::ImageFile;
-            ret.sceneFilename = backgroundImageFilename;
-        } else if (!backgroundVideoFilename.empty()) {
-            ret.sceneMode = SceneConfig::Mode::VideoFile;
-            ret.sceneFilename = backgroundVideoFilename;
-        } else if (!backgroundSceneFilename.empty()) {
-            ret.sceneMode = SceneConfig::Mode::Mesh3D;
-            ret.sceneFilename = backgroundSceneFilename;
+        std::string mode = iniFile_getString(environmentIni, "scene.mode", "");
+        if (!mode.empty()) {
+            modeSet = true;
+            int separator = mode.find(':');
+            int argpos;
+            if (separator == std::string::npos) {
+                argpos = mode.length();
+            } else {
+                argpos = separator + 1;
+            }
+            ret.sceneMode =
+                    SceneConfig::modeFromString(mode.substr(0, separator));
+            if (ret.sceneMode == SceneConfig::Mode::Unknown) {
+                // TODO(virtualscene) Do we want to use the default magenta
+                // color here instead?
+                dinfo("%s: Invalid mode set. Using default virtual scene mode for the environment.",
+                      __func__);
+                ret.sceneMode = SceneConfig::Mode::Mesh3D;
+                ret.sceneFilename =
+                        SceneConfig::defaultFilenameForMode(ret.sceneMode);
+            }
+            ret.sceneFilename = mode.substr(argpos);
+        } else {
+            // Handle legacy image file specification
+            std::string backgroundImageFilename = iniFile_getString(
+                    environmentIni, "background.image.filename", "");
+            if (!backgroundImageFilename.empty()) {
+                modeSet = true;
+                ret.sceneMode = SceneConfig::Mode::ImageFile;
+                ret.sceneFilename = backgroundImageFilename;
+            }
         }
 
         // Update blur amount from config, if given
-        ret.backgroundBlur =
-                (float)iniFile_getDouble(environmentIni, "background.blurAmount",
-                                         EnvironmentConfig::defaultBackgroundBlur);
+        ret.backgroundBlur = static_cast<float>(
+                iniFile_getDouble(environmentIni, "background.blurAmount",
+                                  EnvironmentConfig::defaultBackgroundBlur));
     }
 
-    if (ret.sceneMode == SceneConfig::Mode::Unknown ||
-        ret.sceneFilename.empty()) {
-        dinfo("%s: Using default virtual scene contents for the environment.",
+    if (!modeSet) {
+        dinfo("%s: Using default virtual scene mode for the environment.",
               __func__);
         ret.sceneMode = SceneConfig::Mode::Mesh3D;
+    }
+    if (ret.sceneFilename.empty()) {
+        dinfo("%s: Using default configuration for mode %s for the environment.",
+              __func__, SceneConfig::modeToString(ret.sceneMode));
         ret.sceneFilename = SceneConfig::defaultFilenameForMode(ret.sceneMode);
     }
 
