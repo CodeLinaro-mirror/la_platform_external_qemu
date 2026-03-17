@@ -69,6 +69,11 @@ struct SceneConfig {
     static bool modeSupportAnimations(SceneConfig::Mode mode);
 };
 
+inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {
+    return (lhs.mSceneMode == rhs.mSceneMode) &&
+           (lhs.mFilename == rhs.mFilename);
+}
+
 // TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
 // will be removed once the 2d quad objects are used directly instead
 struct SceneOverlayObject {
@@ -102,6 +107,7 @@ public:
     const SceneCamera& getCamera() const;
 
     const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
+    const SceneConfig& getSceneConfig() const { return mConfig; }
 
     int getSceneRotation() { return mBaseRotation; }
 

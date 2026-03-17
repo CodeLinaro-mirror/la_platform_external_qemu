@@ -766,6 +766,12 @@ SceneConfig::Mode VirtualSceneManager::getSceneMode() {
 bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
     AutoLock lock(mLock);
 
+    // Only reload if the config has changed
+    if (mEnvironmentScene && mEnvironmentScene->getSceneConfig() == config) {
+        D("%s: no changes to the scene config.", __func__);
+        return true;
+    }
+
     D("%s: Reloading with mode:%s, filename:%s", __func__,
       SceneConfig::modeToString(config.mSceneMode), config.mFilename.c_str());
 
@@ -794,6 +800,8 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
     // scene to the outside users and all operations are done in-sync through
     // VirtualSceneManager interface
     mEnvironmentScene = scene;
+
+    D("%s: finished", __func__);
 
     return true;
 }
