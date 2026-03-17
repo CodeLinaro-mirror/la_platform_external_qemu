@@ -16,17 +16,22 @@
 
 #include "android/virtualscene/Scene.h"
 
+#include "absl/status/status.h"
+#include "absl/strings/str_format.h"
 #include "android/avd/info.h"  // to resolve avd path for resources
 #include "android/base/system/System.h"
 #include "android/camera/camera-metrics.h"
 #include "android/console.h"
 #include "android/loadpng.h"
 #include "android/raw_image_sources/image_file/raw_image_file_source.h"
+#include "android/raw_image_sources/raw_image_source.h"
+#include "android/raw_image_sources/video_file/raw_video_file_source.h"
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
 #include "android/virtualscene/Renderer.h"
 
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 
 using namespace android::base;
@@ -101,6 +106,8 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
         return SceneConfig::Mode::Mesh3dScene;
     } else if (sceneModeStr == "videoplayback") {
         return SceneConfig::Mode::VideoPlayback;
+    } else if (sceneModeStr == "videofile") {
+        return SceneConfig::Mode::VideoFile;
     } else if (sceneModeStr == "imagefile") {
         return SceneConfig::Mode::ImageFile;
     } else {
@@ -114,6 +121,8 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
         return "mesh3dscene";
     } else if (mode == SceneConfig::Mode::VideoPlayback) {
         return "videoplayback";
+    } else if (mode == SceneConfig::Mode::VideoFile) {
+        return "videofile";
     } else if (mode == SceneConfig::Mode::ImageFile) {
         return "imagefile";
     } else {
@@ -124,7 +133,8 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
 const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
     if (mode == SceneConfig::Mode::Mesh3dScene) {
         return kDefaultSceneObj;
-    } else if (mode == SceneConfig::Mode::VideoPlayback) {
+    } else if (mode == SceneConfig::Mode::VideoPlayback ||
+               mode == SceneConfig::Mode::VideoFile) {
         return kDefaultVideoFile;
     } else if (mode == SceneConfig::Mode::ImageFile) {
         return kDefaultImageFile;
@@ -156,7 +166,7 @@ Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
 
 Scene::~Scene() {
     D("%s: destroying Scene", __func__);
-    if (mSceneObjects.size() || mRawImageSource) {
+    if (mSceneObjects.size() || mRawImageSource || mOverlayObject) {
         // releaseResources should have been called!
         E("%s: Scene resources are not released!", __func__);
     }
@@ -187,6 +197,7 @@ bool Scene::initialize() {
     const std::string sceneFilename = resolveSceneFilename(mConfig.mFilename);
     const auto sceneMode = getSceneMode();
 
+    bool needsRawImageSource = false;
     switch (sceneMode) {
         case SceneConfig::Mode::Unknown: {
             derror("%s: Unknown scene mode!", __func__);
@@ -207,6 +218,10 @@ bool Scene::initialize() {
 
             mSceneObjects.push_back(
                     std::move(static_unique_cast<SceneObject>(sceneObject)));
+
+            // TODO (virtualScene) The virtual scene by default renders the
+            // image rotated 90 degrees
+            mBaseRotation = 90;
         } break;
         case SceneConfig::Mode::VideoPlayback: {
             // TODO(virtualscene-video): actually load sceneFilename video,
@@ -217,17 +232,25 @@ bool Scene::initialize() {
                 return false;
             }
         } break;
+        case SceneConfig::Mode::VideoFile: {
+            needsRawImageSource = true;
+            mRawImageSource = RawVideofileSource::Create(sceneFilename);
+        } break;
         case SceneConfig::Mode::ImageFile: {
+            needsRawImageSource = true;
             mRawImageSource = RawImageFileSource::Create(sceneFilename);
-            if (!mRawImageSource) {
-                derror("%s: Could not load background image: '%s', falling "
-                       "back to default",
-                       __func__, mConfig.mFilename.c_str());
-                mRawImageSource = std::make_unique<DefaultRawImageProvider>();
-            }
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
+    }
+
+    if (needsRawImageSource) {
+        if (!mRawImageSource) {
+            derror("%s: Could not load background image: '%s', falling back to default",
+                   __func__, mConfig.mFilename.c_str());
+            mRawImageSource = std::make_unique<DefaultRawImageProvider>();
+        }
+        mBaseRotation = mRawImageSource->GetBaseRotation();
     }
 
     mStartTimeUs = System::get()->getUnixTimeUs();
@@ -259,6 +282,7 @@ bool Scene::releaseResources() {
     mSceneObjects.clear();
 
     mRawImageSource.reset();
+    mOverlayObject.reset();
 
     mObjectsVersion++;
 
@@ -274,6 +298,37 @@ void Scene::update(bool updateTime) {
     if (updateTime) {
         // TODO(virtualscene): use ThreadLooper::nowNs(ClockType::kVirtual) ?
         mFrameTimeUs = System::get()->getUnixTimeUs() - mStartTimeUs;
+    }
+
+    if (mRawImageSource && mRawImageSource->HasUpdate(mRawImageSourceToken)) {
+        if (!mOverlayObject) {
+            mOverlayObject = std::make_unique<SceneOverlayObject>();
+        }
+        absl::StatusOr<RawImageToken> res =
+                mRawImageSource->AccessImage([&](RawImageBuffer* buffer) {
+                    if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
+                        return absl::InvalidArgumentError(absl::StrFormat(
+                                "Unsupported pixel format from image source: %d",
+                                buffer->pixel_format));
+                    }
+
+                    if (mOverlayObject->mDataRGBA.size() <
+                        buffer->buffer_size) {
+                        mOverlayObject->mDataRGBA.resize(buffer->buffer_size);
+                        mOverlayObject->mWidth = buffer->width;
+                        mOverlayObject->mHeight = buffer->height;
+                    }
+
+                    std::memcpy(mOverlayObject->mDataRGBA.data(),
+                                buffer->buffer, buffer->buffer_size);
+                    return absl::OkStatus();
+                });
+
+        if (res.ok()) {
+            mRawImageSourceToken = *res;
+        } else {
+            E("Failed to Update Image Source: %s", res.status().message());
+        }
     }
 }
 
@@ -396,10 +451,19 @@ void Scene::getRenderableObjectsFromSceneObject(
 // to reduce memory usage of the scene when there are no users of it
 void Scene::loadUserResources() {
     dprint("%s", __FUNCTION__);
+    if (mRawImageSource) {
+        // TODO(virtualscene) Determine if we need these input values.
+        // Currently they are just hints that we may use to better initialize
+        // the webcam to a sensible resolution.
+        mRawImageSource->Start(0, 0, 0);
+    }
 }
 
 void Scene::unloadUserResources() {
     dprint("%s", __FUNCTION__);
+    if (mRawImageSource) {
+        mRawImageSource->Stop();
+    }
 }
 
 }  // namespace virtualscene

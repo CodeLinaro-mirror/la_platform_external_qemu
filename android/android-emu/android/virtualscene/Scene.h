@@ -43,6 +43,7 @@ struct SceneConfig {
         Unknown = 0,
         Mesh3dScene,
         VideoPlayback,
+        VideoFile,
         ImageFile,
     };
 
@@ -68,6 +69,19 @@ struct SceneConfig {
     static bool modeSupportAnimations(SceneConfig::Mode mode);
 };
 
+// TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
+// will be removed once the 2d quad objects are used directly instead
+struct SceneOverlayObject {
+    uint32_t mWidth;
+    uint32_t mHeight;
+    std::vector<uint8_t> mDataRGBA;
+
+    bool isValid() const {
+        return (mWidth > 0) && (mHeight > 0) &&
+               (mDataRGBA.size() == (mWidth * mHeight * 4));
+    }
+};
+
 class Scene {
     DISALLOW_COPY_AND_ASSIGN(Scene);
 
@@ -88,6 +102,8 @@ public:
     const SceneCamera& getCamera() const;
 
     const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
+
+    int getSceneRotation() { return mBaseRotation; }
 
     // Update the scene for the next frame.
     // updateTime: Some animations are controlled by the global renderTime, use
@@ -134,7 +150,9 @@ public:
     //           clamped.
     void updatePosterScale(const char* posterName, float scale);
 
-    RawImageSource* getRawImageSource() const { return mRawImageSource.get(); }
+    const SceneOverlayObject* getOverlayObject() const {
+        return mOverlayObject.get();
+    }
 
     Renderer* getRenderer() { return mRenderer.get(); }
 
@@ -170,9 +188,12 @@ private:
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;
     std::unique_ptr<RawImageSource> mRawImageSource;
+    RawImageToken mRawImageSourceToken = {0};
+    std::unique_ptr<SceneOverlayObject> mOverlayObject;
     uint64_t mObjectsVersion = 0;
     uint64_t mFrameTimeUs = 0;
     uint64_t mStartTimeUs = 0;
+    int mBaseRotation = 0;
 };
 
 }  // namespace virtualscene

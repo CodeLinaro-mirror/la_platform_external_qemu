@@ -182,7 +182,7 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             ret.sceneMode = SceneConfig::Mode::ImageFile;
             ret.sceneFilename = backgroundImageFilename;
         } else if (!backgroundVideoFilename.empty()) {
-            ret.sceneMode = SceneConfig::Mode::VideoPlayback;
+            ret.sceneMode = SceneConfig::Mode::VideoFile;
             ret.sceneFilename = backgroundVideoFilename;
         } else if (!backgroundSceneFilename.empty()) {
             ret.sceneMode = SceneConfig::Mode::Mesh3dScene;
@@ -353,33 +353,22 @@ bool ScenesManager::renderView(Scene* scene,
                 }
             }
         } break;
-        case SceneConfig::Mode::ImageFile: {
-            RawImageSource* imageSource = scene->getRawImageSource();
-            if (!imageSource) {
+        case SceneConfig::Mode::ImageFile:
+        case SceneConfig::Mode::VideoFile: {
+            const SceneOverlayObject* overlay = scene->getOverlayObject();
+            if (!overlay || !overlay->isValid()) {
                 E("Scene rendering failed");
                 return false;
             }
-            auto func = __FUNCTION__;
-            int res = imageSource->AccessImage([&](RawImageBuffer* buffer) {
-                if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
-                    derror("%s: Unsupported pixel format from image provider: "
-                           "%d",
-                           func, buffer->pixel_format);
-                    return -1;
-                }
-                std::vector<uint8_t>& fbData = view->getFramebufferLocked();
-                ImageScaler scaler(view->getWidthLocked(),
-                                   view->getHeightLocked(), fbData.data());
-                if (!scaler.updateImage(buffer->width, buffer->height,
-                                        buffer->buffer,
-                                        ImageScaler::ScaleMode::ScaleToFill)) {
-                    E("%s: Failed to resize the framebuffer for the view",
-                      func);
-                    return -1;
-                }
-                return 0;
-            });
-            if (res != 0) {
+            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
+
+            ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
+                               fbData.data());
+            if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
+                                    overlay->mDataRGBA.data(),
+                                    ImageScaler::ScaleMode::ScaleToFill)) {
+                E("%s: Failed to resize the framebuffer for the view",
+                  __FUNCTION__);
                 return false;
             }
         } break;
@@ -792,6 +781,15 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
         mEnvironmentScene.reset();
     }
 
+    // If we're currently running, we need to load resources
+    if (mNumUsers > 0) {
+        scene->loadUserResources();
+    }
+
+    // TODO(virtualscene) Handle virtual scene controls. Those should move
+    // out of the camera callback and be controlled here, since the camera
+    // has no knowledge of what the scene is when it changes.
+
     // Replace the scene, not that this is safe because we don't expose the
     // scene to the outside users and all operations are done in-sync through
     // VirtualSceneManager interface
@@ -943,10 +941,12 @@ bool BackgroundUpdateService::start(int displayWidth,
     VirtualSceneManager::setUpdateCallback([&]() {
         mSceneCamera->update();
 
+        // TODO(virtualscene) Handle rotation properly for all scenes.
         // SceneCamera uses 90 degrees rotated views by default for
         // the camera rendering, rotate it back to correct for background
+        float angle = VirtualSceneManager::getSceneBaseRotation();
         glm::mat4 rollRotation =
-                glm::rotate(glm::mat4(1.0f), glm::radians(90.0f),
+                glm::rotate(glm::mat4(1.0f), glm::radians(angle),
                             glm::vec3(0.0f, 0.0f, 1.0f));
         glm::mat4 cameraView = rollRotation * mSceneCamera->getView();
         glm::mat4 viewProjection = mSceneCamera->getProjection() * cameraView;
@@ -991,6 +991,20 @@ void BackgroundUpdateService::updateBlurAmount(float blurAmount) {
     if (mBackgroundView) {
         mBackgroundView->setBlurFactor(blurAmount);
     }
+}
+
+int VirtualSceneManager::getSceneBaseRotationLocked() {
+    if (!mEnvironmentScene) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
+        return 0;
+    } else {
+        return mEnvironmentScene->getSceneRotation();
+    }
+}
+
+int VirtualSceneManager::getSceneBaseRotation() {
+    AutoLock lock(mLock);
+    return getSceneBaseRotationLocked();
 }
 
 }  // namespace virtualscene
