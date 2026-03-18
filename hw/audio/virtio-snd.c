@@ -33,7 +33,6 @@
 #define STREAM_AS_ENDIANNESS 0 /* Conforming to VIRTIO 1.0: always little endian. */
 
 static void virtio_snd_pcm_out_cb(void *data, int available);
-static void virtio_snd_process_cmdq(VirtIOSound *s);
 static void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream);
 static void virtio_snd_pcm_in_cb(void *data, int available);
 static void virtio_snd_unrealize(DeviceState *dev);
@@ -94,13 +93,6 @@ virtio_snd_pcm_buffer_free(VirtIOSoundPCMBuffer *buffer)
 {
     g_free(buffer->elem);
     g_free(buffer);
-}
-
-static void
-virtio_snd_ctrl_cmd_free(virtio_snd_ctrl_command *cmd)
-{
-    g_free(cmd->elem);
-    g_free(cmd);
 }
 
 /*
@@ -669,13 +661,13 @@ static void virtio_snd_handle_pcm_release(VirtIOSound *s,
 }
 
 /*
- * The actual processing done in virtio_snd_process_cmdq().
+ * Processes a command from the VIRTIO_SND_VQ_CONTROL queue.
  *
  * @s: VirtIOSound device
  * @cmd: control command request
  */
 static inline void
-process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd)
+process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
 {
     uint32_t code;
     size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
@@ -740,44 +732,12 @@ process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd)
                  0,
                  &cmd->resp,
                  sizeof(virtio_snd_hdr));
-    virtqueue_push(s->queues[VIRTIO_SND_VQ_CONTROL], cmd->elem,
+    virtqueue_push(vq, cmd->elem,
                    sizeof(virtio_snd_hdr) + cmd->payload_size);
-    virtio_notify(VIRTIO_DEVICE(s), s->queues[VIRTIO_SND_VQ_CONTROL]);
 }
 
 /*
- * Consume all elements in command queue.
- *
- * @s: VirtIOSound device
- */
-static void virtio_snd_process_cmdq(VirtIOSound *s)
-{
-    virtio_snd_ctrl_command *cmd;
-
-    if (unlikely(qatomic_read(&s->processing_cmdq))) {
-        return;
-    }
-
-    WITH_QEMU_LOCK_GUARD(&s->cmdq_mutex) {
-        qatomic_set(&s->processing_cmdq, true);
-        while (!QTAILQ_EMPTY(&s->cmdq)) {
-            cmd = QTAILQ_FIRST(&s->cmdq);
-
-            /* process command */
-            process_cmd(s, cmd);
-
-            QTAILQ_REMOVE(&s->cmdq, cmd, next);
-
-            virtio_snd_ctrl_cmd_free(cmd);
-        }
-        qatomic_set(&s->processing_cmdq, false);
-    }
-}
-
-/*
- * The control message handler. Pops an element from the control virtqueue,
- * and stores them to VirtIOSound's cmdq queue and finally calls
- * virtio_snd_process_cmdq() for processing.
+ * The control message handler.
  *
  * @vdev: VirtIOSound device
  * @vq: Control virtqueue
@@ -786,8 +746,7 @@ static void virtio_snd_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
 {
     VirtIOSound *s = VIRTIO_SND(vdev);
     VirtQueueElement *elem;
-    virtio_snd_ctrl_command *cmd;
-    g_assert(vq == s->queues[VIRTIO_SND_VQ_CONTROL]);
+    virtio_snd_ctrl_command cmd;
 
     trace_virtio_snd_handle_ctrl(vdev, vq);
 
@@ -797,15 +756,17 @@ static void virtio_snd_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
 
     elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
     while (elem) {
-        cmd = g_new0(virtio_snd_ctrl_command, 1);
-        cmd->elem = elem;
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_OK);
-        /* implicit cmd->payload_size = 0; */
-        QTAILQ_INSERT_TAIL(&s->cmdq, cmd, next);
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.elem = elem;
+        cmd.resp.code = cpu_to_le32(VIRTIO_SND_S_OK);
+
+        process_cmd(s, &cmd, vq);
+        g_free(elem);
+
         elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
     }
 
-    virtio_snd_process_cmdq(s);
+    virtio_notify(vdev, vq);
 }
 
 /*
@@ -1098,8 +1059,6 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
         virtio_add_queue(vdev, 64, virtio_snd_handle_tx_xfer);
     vsnd->queues[VIRTIO_SND_VQ_RX] =
         virtio_add_queue(vdev, 64, virtio_snd_handle_rx_xfer);
-    qemu_mutex_init(&vsnd->cmdq_mutex);
-    QTAILQ_INIT(&vsnd->cmdq);
 
     for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
         status = virtio_snd_set_pcm_params(vsnd, i, &default_params);
@@ -1324,8 +1283,6 @@ static void virtio_snd_unrealize(DeviceState *dev)
     qemu_del_vm_change_state_handler(vsnd->vmstate);
     trace_virtio_snd_unrealize(vsnd);
 
-    virtio_snd_process_cmdq(vsnd);
-
     if (vsnd->pcm_items) {
         for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
             VirtIOSoundPCMStream *stream = vsnd->pcm_items[i].stream;
@@ -1337,31 +1294,11 @@ static void virtio_snd_unrealize(DeviceState *dev)
     }
 
     AUD_remove_card(&vsnd->card);
-    qemu_mutex_destroy(&vsnd->cmdq_mutex);
     virtio_delete_queue(vsnd->queues[VIRTIO_SND_VQ_CONTROL]);
     virtio_delete_queue(vsnd->queues[VIRTIO_SND_VQ_EVENT]);
     virtio_delete_queue(vsnd->queues[VIRTIO_SND_VQ_TX]);
     virtio_delete_queue(vsnd->queues[VIRTIO_SND_VQ_RX]);
     virtio_cleanup(vdev);
-}
-
-
-static void virtio_snd_reset(VirtIODevice *vdev)
-{
-    VirtIOSound *vsnd = VIRTIO_SND(vdev);
-    virtio_snd_ctrl_command *cmd;
-
-    WITH_QEMU_LOCK_GUARD(&vsnd->cmdq_mutex) {
-        while (!QTAILQ_EMPTY(&vsnd->cmdq)) {
-            cmd = QTAILQ_FIRST(&vsnd->cmdq);
-            QTAILQ_REMOVE(&vsnd->cmdq, cmd, next);
-
-            g_assert(cmd->elem);
-            virtqueue_detach_element(vsnd->queues[VIRTIO_SND_VQ_CONTROL],
-                                     cmd->elem, 0);
-            virtio_snd_ctrl_cmd_free(cmd);
-        }
-    }
 }
 
 static const VMStateDescription vmstate_virtio_snd = {
@@ -1398,7 +1335,6 @@ static void virtio_snd_class_init(ObjectClass *klass, void *data)
     vdc->unrealize = virtio_snd_unrealize;
     vdc->get_config = virtio_snd_get_config;
     vdc->get_features = get_features;
-    vdc->reset = virtio_snd_reset;
     vdc->legacy_features = 0;
 }
 
