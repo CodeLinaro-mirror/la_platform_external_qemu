@@ -52,9 +52,7 @@ static uint32_t cameraFormatFromFormat(RendererView::Format format) {
 RenderedCameraDevice::RenderedCameraDevice(std::string_view name) {
     mHeader.opaque = this;
 
-    // "environment" means the camera will use the global environment
-    // scene, defined in environment.ini file
-    mUseEnvironmentScene = (name == "environment");
+    mUsingEnvironmentScene = false; // set later, at capture start
     mName = name;
 
     LOG(INFO) << "Initialized camera with name: " << name;
@@ -71,7 +69,10 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
 
-    if (mUseEnvironmentScene) {
+    // "environment" means the camera is using the global environment
+    // scene, defined in environment.ini file
+    mUsingEnvironmentScene = (mName == "environment");
+    if (mUsingEnvironmentScene) {
         mOwnedScene = nullptr;
         sceneMode = VirtualSceneManager::getSceneMode();
 
@@ -125,9 +126,10 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 void RenderedCameraDevice::stopCapturing() {
     mActiveView.reset();
 
-    if (mUseEnvironmentScene) {
+    if (mUsingEnvironmentScene) {
         VirtualSceneManager::setSceneControlsParameters(false);
         VirtualSceneManager::removeSceneUser();
+        mUsingEnvironmentScene = false;
     } else if (mOwnedScene) {
         mOwnedScene->unloadUserResources();
         ScenesManager::removeScene(mOwnedScene.get());
@@ -144,7 +146,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
                                     int orientation) {
 
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
-    if (mUseEnvironmentScene) {
+    if (mUsingEnvironmentScene) {
         sceneMode = VirtualSceneManager::getSceneMode();
     } else if (mOwnedScene) {
         sceneMode = mOwnedScene->getSceneMode();
@@ -154,7 +156,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
         LOG(ERROR) << "Virtual scene is not initialized!";
         return -1;
     }
-    if (!mUseEnvironmentScene) {
+    if (!mUsingEnvironmentScene) {
         if (!mOwnedScene) {
             LOG(ERROR) << "Virtual scene is not initialized!";
             return -1;
@@ -185,7 +187,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
             convertOrientation = 1;
         } else {
             int rotation = 0;
-            if (mUseEnvironmentScene) {
+            if (mUsingEnvironmentScene) {
                 rotation = VirtualSceneManager::getSceneBaseRotationLocked();
             } else {
                 rotation = mOwnedScene->getSceneRotation();
@@ -209,7 +211,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
 
     uint64_t frameTime = 0;
     bool renderResult = false;
-    if (mUseEnvironmentScene) {
+    if (mUsingEnvironmentScene) {
         renderResult = VirtualSceneManager::renderView(
                 mActiveView.get(), onRenderComplete, &frameTime);
     } else {

@@ -68,7 +68,7 @@ private:
     std::shared_ptr<Scene> mOwnedScene;
     int mBaseRotation;
     std::string mName;
-    bool mUseEnvironmentScene;
+    bool mUsingEnvironmentScene;
 };
 
 }  // namespace virtualscene
