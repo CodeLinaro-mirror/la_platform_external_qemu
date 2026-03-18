@@ -194,4 +194,9 @@ const QAndroidVmOperations sFishtankQAndroidVmOperations = {
                 []() {
                     NOT_IMPLEMENTED("QAndroidVmOperations.snapshotUseVulkan");
                     return false;
-                }};
+                },
+        .addCrashReporterLog =
+                [](const char* message) {
+                    NOT_IMPLEMENTED("QAndroidVmOperations.addCrashReporterLog");
+                },
+        };
