@@ -812,6 +812,7 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
     // If we're currently running, we need to load resources
     if (mNumUsers > 0) {
         scene->loadUserResources();
+        scene->update(false);
     }
 
     // TODO(virtualscene) Handle virtual scene controls. Those should move
