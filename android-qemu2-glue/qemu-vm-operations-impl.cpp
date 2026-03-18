@@ -43,6 +43,7 @@ extern "C" {
 #include "host-common/snapshot_common.h"     // for SnapshotRamBlock
 #include "host-common/snapshot_interface.h"  // for androidSnapshot...
 #include "host-common/vm_operations.h"       // for SnapshotCallbacks
+#include "host-common/crash-handler.h"
 
 extern "C" {
 
@@ -1042,6 +1043,10 @@ static bool snapshot_use_vulkan() {
     return does_snapshot_use_vulkan;
 }
 
+static void add_crash_reporter_log(const char* message) {
+    crashhandler_append_message_format("%s\n", message);
+}
+
 static void system_reset_request() {
     qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
 }
@@ -1329,6 +1334,7 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
         .getSkipSnapshotSaveReason = get_skip_snapshot_save_reason,
         .setStatSnapshotUseVulkan = set_stat_snasphot_use_vulkan,
         .snapshotUseVulkan = snapshot_use_vulkan,
+        .addCrashReporterLog = add_crash_reporter_log,
 };
 
 extern "C" const QAndroidVmOperations* const gQAndroidVmOperations =

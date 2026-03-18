@@ -1318,7 +1318,7 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         // backend directory.
         std::string dir = sBackendList->getLibDirPath(config->gles_backend);
         if (dir.size()) {
-            D("Adding to the library search path: %s\n", dir.c_str());
+            dprint("Adding to the library search path: %s\n", dir.c_str());
             system->addLibrarySearchDir(dir);
         }
     }
