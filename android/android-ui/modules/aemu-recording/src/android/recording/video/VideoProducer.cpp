@@ -176,7 +176,7 @@ bool getScreenshotSimple() {
         size_t cPixels = mPixels.size();
         const int ret = renderer.get()->getScreenshot(
                        bpp, &finalWidth, &finalHeight, pixels, &cPixels, displayId,
-                       fbWidth, fbHeight, desiredRotation,
+                       effectiveW, effectiveH, desiredRotation,
                        {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
         if (ret == 0) {
             return true;
