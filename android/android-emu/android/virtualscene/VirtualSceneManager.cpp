@@ -366,7 +366,7 @@ bool ScenesManager::renderView(Scene* scene,
                                fbData.data());
             if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
                                     overlay->mDataRGBA.data(),
-                                    ImageScaler::ScaleMode::ScaleToFill)) {
+                                    ImageScaler::ScaleMode::AspectFitZoom)) {
                 E("%s: Failed to resize the framebuffer for the view",
                   __FUNCTION__);
                 return false;
