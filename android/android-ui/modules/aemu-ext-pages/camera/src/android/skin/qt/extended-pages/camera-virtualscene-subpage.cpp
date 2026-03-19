@@ -13,6 +13,7 @@
 
 #include <QByteArray>                                       // for QByteArray
 #include <QCheckBox>                                        // for QCheckBox
+#include <QPushButton>
 #include <QFileInfo>                                        // for QFileInfo
 #include <QMap>                                             // for QMap
 #include <QMapIterator>                                     // for QMapIterator
@@ -96,6 +97,12 @@ void CameraVirtualSceneSubpage::on_toggleTV_toggled(bool value) {
     // Update the scene.
     if (sVirtualSceneAgent) {
         sVirtualSceneAgent->setAnimationState(value);
+    }
+}
+
+void CameraVirtualSceneSubpage::on_reloadEnvironment_clicked() {
+    if (sVirtualSceneAgent) {
+        sVirtualSceneAgent->reloadEnvironment(nullptr);
     }
 }
 

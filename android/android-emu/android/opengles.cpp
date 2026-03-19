@@ -447,6 +447,7 @@ int android_startOpenglesRenderer(
             .set_skip_snapshot_save = vm_operations->setSkipSnapshotSave,
             .set_skip_snapshot_save_reason = vm_operations->setSkipSnapshotSaveReason,
             .set_snapshot_uses_vulkan = vm_operations->setStatSnapshotUseVulkan,
+            .add_crash_reporter_log = vm_operations->addCrashReporterLog,
     });
     sRenderLib->setAddressSpaceDeviceControlOps(
             get_address_space_device_control_ops());
@@ -739,6 +740,25 @@ void android_setOpenglesScreenBackground(int width,
                                          const uint8_t* rgbaData) {
     if (sRenderer) {
         sRenderer->setScreenBackground(width, height, rgbaData);
+    }
+}
+
+void android_setOpenglesDisplayLayout(int screenWidth,
+                                      int screenHeight,
+                                      int displayPosX,
+                                      int displayPosY,
+                                      int displayWidth,
+                                      int displayHeight) {
+    if (sRenderer) {
+        dprint("%s: screen:%dx%d, display:%d %d %dx%d", __func__, screenWidth,
+               screenHeight, displayPosX, displayPosY, displayWidth,
+               displayHeight);
+        gfxstream::Rect displayRect;
+        displayRect.pos.x = displayPosX;
+        displayRect.pos.y = displayPosY;
+        displayRect.size.w = displayWidth;
+        displayRect.size.h = displayHeight;
+        sRenderer->setDisplayLayout(screenWidth, screenHeight, displayRect);
     }
 }
 

@@ -1010,9 +1010,14 @@ void android_metrics_fill_vulkan_gpu_info(void* opaque) {
     uint32_t device_type = 0;
     uint64_t device_memory = 0;
 
-    renderer->getVulkanEmulationDeviceInfo(
-            &device_name, &driver_info, &driver_version, &api_version,
-            &vendor_id, &device_id, &device_type, &device_memory);
+    if (!renderer->getVulkanEmulationDeviceInfo(
+                &device_name, &driver_info, &driver_version, &api_version,
+                &vendor_id, &device_id, &device_type, &device_memory)) {
+        dwarning("%s: Could not retrieve Vulkan device info", __func__);
+        event->mutable_emulator_details()->set_vulkan_icd(
+                android_studio::EmulatorDetails::DISABLED_VK);
+        return;
+    }
 
     std::string device_name_str;
     std::string driver_info_str;

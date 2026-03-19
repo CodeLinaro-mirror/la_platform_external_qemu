@@ -23,6 +23,7 @@
 #include <vector>                                         // for vector
 
 #include "host-common/hw-config.h"
+#include "host-common/hw-config-helper.h"
 #include "host-common/hw-lcd.h"
 #include "aemu/base/Optional.h"                        // for Optional
 #include "aemu/base/synchronization/MessageChannel.h"  // for MessageChannel
@@ -125,15 +126,15 @@ bool getDisplayWidthHeightRotation(int displayId, uint32_t* displayWidth, uint32
     return true;
 }
 
-    bool getScreenshotSimple() {
+bool getScreenshotSimple() {
     // Screenshots can come from either the gl renderer, or the guest.
     const auto& renderer = android_getOpenglesRenderer();
     SkinRotation desiredRotation = SKIN_ROTATION_0;
     unsigned int effectiveW = 0;
     unsigned int effectiveH = 0;
     int displayId = mDisplayId;
-    uint32_t fbWidth = mFbWidth;
-    uint32_t fbHeight = mFbHeight;
+    int fbWidth = mFbWidth;
+    int fbHeight = mFbHeight;
     if (android_foldable_is_pixel_fold()) {
         auto hw = getConsoleAgents()->settings->hw();
         if (android_foldable_is_folded()) {
@@ -148,8 +149,7 @@ bool getDisplayWidthHeightRotation(int displayId, uint32_t* displayWidth, uint32
             fbWidth = info.width;
             fbHeight = info.height;
         } else {
-            fbWidth = hw->hw_lcd_width;
-            fbHeight = hw->hw_lcd_height;
+            androidHwConfig_getScreenDimensions(hw, &fbWidth, &fbHeight);
             displayId = 0;
         }
     }
@@ -176,7 +176,7 @@ bool getDisplayWidthHeightRotation(int displayId, uint32_t* displayWidth, uint32
         size_t cPixels = mPixels.size();
         const int ret = renderer.get()->getScreenshot(
                        bpp, &finalWidth, &finalHeight, pixels, &cPixels, displayId,
-                       fbWidth, fbHeight, desiredRotation,
+                       effectiveW, effectiveH, desiredRotation,
                        {{rect.pos.x, rect.pos.y}, {rect.size.w, rect.size.h}});
         if (ret == 0) {
             return true;

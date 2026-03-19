@@ -33,6 +33,7 @@
 
 #include "android/avd/info.h"
 #include "aemu/base/files/PathUtils.h"
+#include "host-common/hw-config-helper.h"
 #include "host-common/record_screen_agent.h"
 #include "android/console.h"
 #include "android/hw-sensors.h"
@@ -196,31 +197,35 @@ void RecordScreenPage::setRecordUiState(RecordUiState newState) {
             mUi->rec_playStopButton->setProperty("themeIconName", "stop");
             mUi->rec_recordAgainOverlay->hide();
             break;
-        case RecordUiState::Stopped:
+        case RecordUiState::Stopped: {
+            const auto* hwCfg = getConsoleAgents()->settings->hw();
+            int screenWidth, screenHeight;
+            androidHwConfig_getScreenDimensions(hwCfg, &screenWidth,
+                                                &screenHeight);
             mUi->subpage->setCurrentIndex(1);
             // Get the video duration from the video's metadata.
             mSec = mVideoInfo->getDurationSecs();
-            mUi->rec_timeResLabel->setText(
-                         tr("%1s / %2 x %3")
-                            .arg(mSec)
-                            .arg(getConsoleAgents()->settings->hw()->hw_lcd_width)
-                            .arg(getConsoleAgents()->settings->hw()->hw_lcd_height));
+            mUi->rec_timeResLabel->setText(tr("%1s / %2 x %3")
+                                                   .arg(mSec)
+                                                   .arg(screenWidth)
+                                                   .arg(screenHeight));
             mUi->rec_recordAgainOverlay->show();
             mUi->rec_playStopButton->setEnabled(true);
             mUi->rec_formatSwitch->setEnabled(true);
             mUi->rec_saveButton->setEnabled(true);
-            mUi->rec_playStopButton->setIcon(getIconForCurrentTheme("play_arrow"));
+            mUi->rec_playStopButton->setIcon(
+                    getIconForCurrentTheme("play_arrow"));
             mUi->rec_playStopButton->setProperty("themeIconName", "play_arrow");
-            // Tell accessiblity screen readers to include the time and resolution
-            // when describing the Play button
+            // Tell accessiblity screen readers to include the time and
+            // resolution when describing the Play button
             mUi->rec_playStopButton->setAccessibleDescription(
                     tr("Play Stop, %1 seconds, %2 by %3")
                             .arg(mSec)
-                            .arg(getConsoleAgents()->settings->hw()->hw_lcd_width)
-                            .arg(getConsoleAgents()->settings->hw()->hw_lcd_height));
+                            .arg(screenWidth)
+                            .arg(screenHeight));
             // Display preview frame
             mVideoInfo->show();
-            break;
+        } break;
         case RecordUiState::Converting: {
             SettingsTheme theme = getSelectedTheme();
             QMovie* movie = new QMovie(this);

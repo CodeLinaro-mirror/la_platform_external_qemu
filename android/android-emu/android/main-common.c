@@ -2195,6 +2195,12 @@ bool emulator_parseFeatureCommandLineOptions(AndroidOptions* opts,
         str_reset(&hw->hw_camera_front, opts->camera_front);
     }
 
+    if (opts->no_display_layout) {
+        // Set them to zero, which will make them ineffective
+        hw->environment_width = 0;
+        hw->environment_height = 0;
+    }
+
     return true;
 }
 

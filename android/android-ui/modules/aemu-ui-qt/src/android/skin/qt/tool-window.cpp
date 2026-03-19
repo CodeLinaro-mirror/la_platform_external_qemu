@@ -56,9 +56,10 @@
 #include <thread>
 
 #include "absl/time/time.h"
+#include "aemu/base/EventNotificationSupport.h"
+#include "aemu/base/Stopwatch.h"
 #include "aemu/base/logging/Log.h"
 #include "aemu/base/logging/LogSeverity.h"
-#include "aemu/base/Stopwatch.h"
 #include "android/avd/info.h"
 #include "android/avd/util.h"
 #include "android/base/system/System.h"
@@ -76,7 +77,6 @@
 #include "android/skin/android_keycodes.h"
 #include "android/skin/event.h"
 #include "android/skin/linux_keycodes.h"
-#include "android/skin/qt/avd-settings-helper.h"
 #include "android/skin/qt/emulator-qt-window.h"
 #include "android/skin/qt/extended-pages/common.h"
 #include "android/skin/qt/extended-pages/virtual-sensors-page.h"
@@ -378,7 +378,23 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     if (!fc::isEnabled(fc::MicrophoneToggleUI)) {
        mToolsUi->microphone_button->setHidden(true);
     }
-    updateMicrophoneUI();
+
+    connect(this, SIGNAL(_externalMicrophoneEnabledChanged(bool)), this,
+            SLOT(onExternalMicrophoneEnabledChanged(bool)));
+
+    auto notifier = static_cast<android::base::EventNotificationSupport<bool>*>(
+            getConsoleAgents()->vm->getRealAudioEventListener());
+    if (notifier) {
+        mRealAudioEventListener =
+                std::make_unique<android::base::RaiiEventListener<
+                        android::base::EventNotificationSupport<bool>, bool>>(
+                        notifier, [this](bool enabled) {
+                            emit this->_externalMicrophoneEnabledChanged(
+                                    enabled);
+                        });
+    }
+
+    updateMicrophoneUI(getMicrophoneEnabled());
 
     if (avdFlavor != AVD_TV) {
         if (avdFlavor != AVD_XR && !avdIsDesktopApi36OrHigher) {
@@ -614,6 +630,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 }
 
 ToolWindow::~ToolWindow() {
+    auto notifier = static_cast<android::base::EventNotificationSupport<bool>*>(
+            getConsoleAgents()->vm->getRealAudioEventListener());
     mFoldableSyncToAndroid.enqueue({
             SEND_EXIT,
     });
@@ -1411,32 +1429,25 @@ void ToolWindow::resizableChangeIcon(PresetEmulatorSizeType type) {
     }
 }
 
+// Fetch from the agent.
+// MicrophonePage::loadSettings and the listener keep this up to date
 bool ToolWindow::getMicrophoneEnabled() {
-    return getSavedSetting(Ui::Settings::PER_AVD_MIC_ALLOW_READ_AUDIO,
-                           Ui::Settings::MIC_ALLOW_READ_AUDIO, false)
-            .toBool();
+    return getConsoleAgents()->vm->isRealAudioAllowed();
 }
 
 void ToolWindow::setMicrophoneEnabled(bool enabled) {
     // Enable or disable host audio into the AVD
     getConsoleAgents()->vm->allowRealAudio(enabled);
 
-    // Save the setting into persistent storage
-    saveSetting(Ui::Settings::PER_AVD_MIC_ALLOW_READ_AUDIO,
-                Ui::Settings::MIC_ALLOW_READ_AUDIO, enabled);
-
-    updateMicrophoneUI();
-
-    // Emit the signal to allow the microphone page to update its UI
-    emit microphoneEnabledChanged();
+    updateMicrophoneUI(enabled);
 }
 
-void ToolWindow::onMicrophoneEnabledChanged() {
-    updateMicrophoneUI();
+void ToolWindow::onExternalMicrophoneEnabledChanged(bool enabled) {
+    updateMicrophoneUI(enabled);
 }
 
-void ToolWindow::updateMicrophoneUI() {
-    if (getMicrophoneEnabled()) {
+void ToolWindow::updateMicrophoneUI(bool enabled) {
+    if (enabled) {
         ChangeIcon(mToolsUi->microphone_button, "mic_enabled",
                    "Microphone: Enabled");
     } else {
@@ -2173,7 +2184,7 @@ void ToolWindow::showOrRaiseExtendedWindow(ExtendedWindowPane pane) {
             return;
         }
     }
-    if (!androidHwConfig_hasVirtualSceneCamera(
+    if (!androidHwConfig_hasVirtualSceneOrEnvironmentCamera(
                 getConsoleAgents()->settings->hw()) &&
         pane == PANE_IDX_CAMERA) {
         return;

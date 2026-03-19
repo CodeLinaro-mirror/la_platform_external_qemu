@@ -27,12 +27,14 @@
 
 #include "android/avd/info.h"  // for avdInfo_getAv...
 #include "android/avd/util.h"  // for AVD_ANDROID_AUTO
+#include "android/cmdline-definitions.h"
 #include "android/console.h"   // for getConsoleAgents()->settings->avdInfo()
 #include "android/emulation/control/telephony_agent.h"  // for QAndroidTelep...
 #include "android/metrics/UiEventTracker.h"
 #include "android/settings-agent.h"                 // for SettingsTheme
 #include "android/skin/qt/error-dialog.h"           // for showErrorDialog
 #include "android/skin/qt/extended-pages/common.h"  // for setButtonEnabled
+#include "android/skin/qt/extended-pages/telephony-controller.h"
 #include "android/skin/qt/function-runner.h"
 #include "android/skin/qt/raised-material-button.h"  // for RaisedMateria...
 #include "android/telephony/modem.h"                 // for amodem_get_ra...
@@ -58,15 +60,6 @@ public:
     int numActiveCalls;
 };
 
-extern "C" {
-static void telephony_callback(void* userData, int numActiveCalls) {
-    TelephonyPage* tpInst = (TelephonyPage*)userData;
-    if (tpInst) {
-        tpInst->eventLauncher(numActiveCalls);
-    }
-}
-}
-
 TelephonyPage::TelephonyPage(QWidget* parent)
     : QWidget(parent),
       mUi(new Ui::TelephonyPage()),
@@ -78,18 +71,10 @@ TelephonyPage::TelephonyPage(QWidget* parent)
     mUi->tel_numberBox->setValidator(new PhoneNumberValidator());
     mCustomEventType = (QEvent::Type)QEvent::registerEventType();
 
-    if (sTelephonyAgent && sTelephonyAgent->setNotifyCallback) {
-        // Notify the agent that we want call-backs to tell us when the
-        // telephone state changes
-        const auto* agent = sTelephonyAgent;
-        android::base::ThreadLooper::runOnMainLooper([agent, this]() {
-            agent->setNotifyCallback(telephony_callback, (void*)this);
-        });
-    }
-
     // Disable sms button and box for Automotive, since it's not supported
     if ((getConsoleAgents()->settings->avdInfo() &&
-         (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_ANDROID_AUTO))) {
+         (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
+          AVD_ANDROID_AUTO))) {
         SettingsTheme theme = getSelectedTheme();
         setButtonEnabled(mUi->sms_sendButton, theme, false);
         mUi->sms_messageBox->setReadOnly(true);
@@ -97,189 +82,197 @@ TelephonyPage::TelephonyPage(QWidget* parent)
 }
 
 TelephonyPage::~TelephonyPage() {
-    if (sTelephonyAgent && sTelephonyAgent->setNotifyCallback) {
-        // Tell the agent that we do not want any more call-backs
-        sTelephonyAgent->setNotifyCallback(0, 0);
-    }
+    TelephonyController::get()->setCallStateCallback(nullptr);
+}
+
+void TelephonyPage::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
+    TelephonyController::get()->setCallStateCallback(
+            [this](int numActiveCalls) { eventLauncher(numActiveCalls); });
 }
 
 void TelephonyPage::on_tel_startEndButton_clicked() {
     mPhoneTracker->increment("CALL");
-    SettingsTheme theme = getSelectedTheme();
+
     if (mCallActivity == CallActivity::Inactive) {
         // Start a call
-        if (sTelephonyAgent && sTelephonyAgent->telephonyCmd) {
-            // Command the emulator
+        // Get rid of spurious characters from the phone number
+        // (Allow only '+' and '0'..'9')
+        // Note: phoneNumberValidator validates the user's input, but
+        // allows some human-readable characters like '.' and ')'.
+        // Here we remove that meaningless punctuation.
+        QString cleanNumber = mUi->tel_numberBox->currentText().remove(
+                QRegularExpression("[^+0-9]"));
 
-            // Get rid of spurious characters from the phone number
-            // (Allow only '+' and '0'..'9')
-            // Note: phoneNumberValidator validates the user's input, but
-            // allows some human-readable characters like '.' and ')'.
-            // Here we remove that meaningless punctuation.
-            QString cleanNumber = mUi->tel_numberBox->currentText().remove(
-                    QRegularExpression("[^+0-9]"));
-
-            const auto* agent = sTelephonyAgent;
-            android::base::ThreadLooper::runOnMainLooper([this, agent,
-                                                          cleanNumber,
-                                                          theme]() {
-                auto tResp = agent->telephonyCmd(
-                        Tel_Op_Init_Call, cleanNumber.toStdString().c_str());
-                // need to show on ui thread
-                runOnEmuUiThread([this, tResp, theme] {
-                    if (tResp != Tel_Resp_OK) {
-                        const char* errMsg = NULL;
-                        if (tResp == Tel_Resp_Radio_Off) {
-                            errMsg = "The call failed: radio is off.";
-                        } else {
-                            errMsg = "The call failed.";
+        TelephonyController::get()->initCallAsync(
+                cleanNumber.toStdString(), [this, cleanNumber](auto status) {
+                    runOnEmuUiThread([this, status, cleanNumber] {
+                        if (status != TelephonyResponseStatus::OK) {
+                            const char* errMsg =
+                                    (status ==
+                                     TelephonyResponseStatus::RADIO_OFF)
+                                            ? "The call failed: radio is off."
+                                            : "The call failed.";
+                            showErrorDialog(tr(errMsg), tr("Telephony"));
+                            return;
                         }
-                        showErrorDialog(tr(errMsg), tr("Telephony"));
-                        return;
-                    }
-                    // Success: Update the state and the UI buttons
-                    mCallActivity = CallActivity::Active;
-                    mPhoneNumber = mUi->tel_numberBox->currentText();
 
-                    mUi->tel_numberBox->setEnabled(false);
+                        // Success: Update the state and the UI buttons
+                        mCallActivity = CallActivity::Active;
+                        mPhoneNumber = cleanNumber;
 
-                    setButtonEnabled(mUi->tel_holdCallButton, theme, true);
-                    // Change the icon and text to "END CALL"
-                    QIcon theIcon = getIconForCurrentTheme("call_end");
-                    mUi->tel_startEndButton->setIcon(theIcon);
-                    mUi->tel_startEndButton->setText(tr("END CALL"));
+                        mUi->tel_numberBox->setEnabled(false);
+
+                        SettingsTheme theme = getSelectedTheme();
+                        mUi->tel_startEndButton->setIcon(
+                                QIcon(":/resources/phone_hangup_white.png"));
+                        mUi->tel_startEndButton->setText(tr("Hang up"));
+                        mUi->tel_startEndButton->setToolTip(tr("Hang up"));
+                        setButtonEnabled(mUi->tel_holdCallButton, theme, true);
+                    });
                 });
-            });
-        }
     } else {
-        // End a call
-        // Update the state and the UI buttons
-        mCallActivity = CallActivity::Inactive;
+        // Hang up (all) active calls
+        TelephonyController::get()->disconnectCallAsync(
+                mPhoneNumber.toStdString(), [this](auto status) {
+                    runOnEmuUiThread([this, status] {
+                        if (status != TelephonyResponseStatus::OK) {
+                            showErrorDialog(tr("The call could not be ended."),
+                                            tr("Telephony"));
+                            return;
+                        }
 
-        mUi->tel_numberBox->setEnabled(true);
+                        // Success: Update the state and the UI buttons
+                        mCallActivity = CallActivity::Inactive;
+                        mPhoneNumber = "";
 
-        mUi->tel_holdCallButton->setProperty("themeIconName", "phone_paused");
+                        mUi->tel_numberBox->setEnabled(true);
 
-        setButtonEnabled(mUi->tel_holdCallButton, theme, false);
-        // Change the icon and text to "CALL DEVICE"
-        QIcon theIcon = getIconForCurrentTheme("phone_button");
-        mUi->tel_startEndButton->setIcon(theIcon);
-        mUi->tel_startEndButton->setText(tr("CALL DEVICE"));
-
-        {
-            if (sTelephonyAgent && sTelephonyAgent->telephonyCmd) {
-                // Command the emulator
-                QString cleanNumber = mUi->tel_numberBox->currentText().remove(
-                        QRegularExpression("[^+0-9]"));
-                const auto* agent = sTelephonyAgent;
-                android::base::ThreadLooper::runOnMainLooper(
-                        [this, agent, cleanNumber]() {
-                            auto tResp = agent->telephonyCmd(
-                                    Tel_Op_Disconnect_Call,
-                                    cleanNumber.toStdString().c_str());
-                            if (tResp != Tel_Resp_OK &&
-                                tResp != Tel_Resp_Invalid_Action) {
-                                // Don't show an error for Invalid Action: that
-                                // just means that the AVD already hanged up.
-                                runOnEmuUiThread([this] {
-                                    showErrorDialog(tr("The end-call failed."),
-                                                    tr("Telephony"));
-                                });
-                            }
-                        });
-            }
-        }  // end of lock
+                        SettingsTheme theme = getSelectedTheme();
+                        mUi->tel_startEndButton->setIcon(
+                                QIcon(":/resources/phone_white.png"));
+                        mUi->tel_startEndButton->setText(tr("Call device"));
+                        mUi->tel_startEndButton->setToolTip(tr("Call device"));
+                        mUi->tel_holdCallButton->setText(tr("Hold call"));
+                        mUi->tel_holdCallButton->setToolTip(tr("Hold call"));
+                        setButtonEnabled(mUi->tel_holdCallButton, theme, false);
+                    });
+                });
     }
 }
 
 void TelephonyPage::on_tel_holdCallButton_clicked() {
     mPhoneTracker->increment("HOLD");
-    SettingsTheme theme = getSelectedTheme();
-    switch (mCallActivity) {
-        case CallActivity::Active:
-            // Active --> On hold
-            mCallActivity = CallActivity::Held;
+    if (mCallActivity == CallActivity::Active) {
+        // Place call on hold
+        TelephonyController::get()->holdCallAsync(
+                mPhoneNumber.toStdString(), [this](auto status) {
+                    runOnEmuUiThread([this, status] {
+                        if (status != TelephonyResponseStatus::OK) {
+                            showErrorDialog(tr("The call could not be held."),
+                                            tr("Telephony"));
+                            return;
+                        }
 
-            mUi->tel_holdCallButton->setProperty("themeIconName",
-                                                 "phone_in_talk");
-
-            setButtonEnabled(mUi->tel_holdCallButton, theme, true);
-            break;
-        case CallActivity::Held:
-            // On hold --> Active
-            mCallActivity = CallActivity::Active;
-
-            mUi->tel_holdCallButton->setProperty("themeIconName",
-                                                 "phone_paused");
-            mUi->tel_holdCallButton->setProperty("themeIconName_disabled",
-                                                 "phone_paused_disabled");
-
-            setButtonEnabled(mUi->tel_holdCallButton, theme, true);
-            break;
-        default:;
-    }
-    if (sTelephonyAgent && sTelephonyAgent->telephonyCmd) {
-        // Command the emulator
-        QString cleanNumber = mUi->tel_numberBox->currentText().remove(
-                QRegularExpression("[^+0-9]"));
-        TelephonyResponse tResp;
-        TelephonyOperation tOp = (mCallActivity == CallActivity::Held)
-                                         ? Tel_Op_Place_Call_On_Hold
-                                         : Tel_Op_Take_Call_Off_Hold;
-
-        const auto* agent = sTelephonyAgent;
-        android::base::ThreadLooper::runOnMainLooper([this, agent, tOp,
-                                                      cleanNumber]() {
-            auto tResp =
-                    agent->telephonyCmd(tOp, cleanNumber.toStdString().c_str());
-            if (tResp != Tel_Resp_OK) {
-                runOnEmuUiThread([this] {
-                    showErrorDialog(tr("The call hold failed."),
-                                    tr("Telephony"));
+                        mCallActivity = CallActivity::Held;
+                        mUi->tel_holdCallButton->setText(tr("Resume call"));
+                        mUi->tel_holdCallButton->setToolTip(tr("Resume call"));
+                    });
                 });
-            }
-        });
+    } else if (mCallActivity == CallActivity::Held) {
+        // Take call off hold
+        TelephonyController::get()->unholdCallAsync(
+                mPhoneNumber.toStdString(), [this](auto status) {
+                    runOnEmuUiThread([this, status] {
+                        if (status != TelephonyResponseStatus::OK) {
+                            showErrorDialog(
+                                    tr("The call could not be resumed."),
+                                    tr("Telephony"));
+                            return;
+                        }
+
+                        mCallActivity = CallActivity::Active;
+                        mUi->tel_holdCallButton->setText(tr("Hold call"));
+                        mUi->tel_holdCallButton->setToolTip(tr("Hold call"));
+                    });
+                });
     }
 }
 
-QValidator::State TelephonyPage::PhoneNumberValidator::validate(
-        QString& input,
-        int& pos) const {
-    bool intermediate = false;
-
-    switch (validateAsDigital(input)) {
-        case QValidator::Acceptable:
-            return QValidator::Acceptable;
-
-        case QValidator::Intermediate:
-            intermediate = true;
-            break;
-
-        case QValidator::Invalid:
-            break;
+void TelephonyPage::on_sms_sendButton_clicked() {
+    mPhoneTracker->increment("SMS");
+    QString theMessage = mUi->sms_messageBox->toPlainText();
+    if (theMessage.length() > MAX_SMS_MSG_SIZE) {
+        showErrorDialog(
+                tr("The message was not sent because it was over " MAX_SMS_MSG_SIZE_STRING
+                   " characters."),
+                tr("Telephony"));
+        return;
     }
 
-    switch (validateAsAlphanumeric(input)) {
-        case QValidator::Acceptable:
-            return QValidator::Acceptable;
+    TelephonyController::get()->sendSmsAsync(
+            mUi->tel_numberBox->currentText().toStdString(),
+            theMessage.toStdString(), [this](auto status) {
+                runOnEmuUiThread([this, status] {
+                    if (status != TelephonyResponseStatus::OK) {
+                        showErrorDialog(tr("The SMS message was not sent."),
+                                        tr("Telephony"));
+                    }
+                });
+            });
+}
 
-        case QValidator::Intermediate:
-            intermediate = true;
-            break;
+void TelephonyPage::customEvent(QEvent* event) {
+    if (event->type() == mCustomEventType) {
+        TelephonyEvent* telEvent = (TelephonyEvent*)event;
+        if (telEvent) {
+            bool hasActive = (telEvent->numActiveCalls > 0);
+            if (!hasActive && mCallActivity != CallActivity::Inactive) {
+                // If there are no more active calls, and our UI thinks there
+                // are, update the UI to show everything is inactive.
+                mCallActivity = CallActivity::Inactive;
+                mPhoneNumber = "";
 
-        case QValidator::Invalid:
-            break;
+                mUi->tel_numberBox->setEnabled(true);
+
+                SettingsTheme theme = getSelectedTheme();
+                mUi->tel_startEndButton->setIcon(
+                        QIcon(":/resources/phone_white.png"));
+                mUi->tel_startEndButton->setText(tr("Call device"));
+                mUi->tel_startEndButton->setToolTip(tr("Call device"));
+                mUi->tel_holdCallButton->setText(tr("Hold call"));
+                mUi->tel_holdCallButton->setToolTip(tr("Hold call"));
+                setButtonEnabled(mUi->tel_holdCallButton, theme, false);
+            }
+        }
     }
+}
 
-    if (intermediate) {
+void TelephonyPage::eventLauncher(int numActiveCalls) {
+    QCoreApplication::postEvent(
+            this, new TelephonyEvent(mCustomEventType, numActiveCalls));
+}
+
+// static
+void TelephonyPage::setTelephonyAgent(const QAndroidTelephonyAgent* agent) {
+    sTelephonyAgent = agent;
+}
+
+TelephonyPage::PhoneNumberValidator::State
+TelephonyPage::PhoneNumberValidator::validate(QString& input, int& pos) const {
+    if (input.isEmpty()) {
         return QValidator::Intermediate;
     }
 
-    return QValidator::Invalid;
+    if (input.at(0).isDigit() || input.at(0) == '+') {
+        return validateAsDigital(input);
+    } else {
+        return validateAsAlphanumeric(input);
+    }
 }
 
-QValidator::State TelephonyPage::PhoneNumberValidator::validateAsDigital(
-        const QString& input) {
+TelephonyPage::PhoneNumberValidator::State
+TelephonyPage::PhoneNumberValidator::validateAsDigital(const QString& input) {
     int numDigits = 0;
     const int MAX_DIGITS = 16;
     static const QString acceptable_non_digits = "-.()/ +";
@@ -307,7 +300,8 @@ QValidator::State TelephonyPage::PhoneNumberValidator::validateAsDigital(
                             : QValidator::Intermediate);
 }
 
-QValidator::State TelephonyPage::PhoneNumberValidator::validateAsAlphanumeric(
+TelephonyPage::PhoneNumberValidator::State
+TelephonyPage::PhoneNumberValidator::validateAsAlphanumeric(
         const QString& input) {
     // Alphanumeric address is BITS_PER_SMS_CHAR bits per symbol
 
@@ -327,122 +321,4 @@ QValidator::State TelephonyPage::PhoneNumberValidator::validateAsAlphanumeric(
     }
 
     return QValidator::Acceptable;
-}
-
-void TelephonyPage::on_sms_sendButton_clicked() {
-    // Get the "from" number
-    mPhoneTracker->increment("SMS");
-    SmsAddressRec sender;
-    int retVal = sms_address_from_str(
-            &sender, mUi->tel_numberBox->currentText().toStdString().c_str(),
-            mUi->tel_numberBox->currentText().length());
-    if (retVal < 0 || sender.len <= 0) {
-        showErrorDialog(tr("The \"From\" number is invalid."), tr("SMS"));
-        return;
-    }
-
-    // Get the text of the message
-    const std::string theMessage =
-            mUi->sms_messageBox->toPlainText().toStdString();
-
-    // Convert the message text to UTF-8
-    const QByteArray utf8 = mUi->sms_messageBox->toPlainText().toUtf8();
-    const unsigned char* utf8Message =
-            reinterpret_cast<const unsigned char*>(utf8.data());
-    int nUtf8Chars = utf8.size();
-
-    if (nUtf8Chars == 0) {
-        showErrorDialog(tr("The message is empty.<br>Please enter a message."),
-                        tr("SMS"));
-        return;
-    }
-
-    if (nUtf8Chars < 0) {
-        showErrorDialog(tr("The message contains invalid characters."),
-                        tr("SMS"));
-        return;
-    }
-
-    if (nUtf8Chars > MAX_SMS_MSG_SIZE) {
-        // Note: 'sms_utf8_from_message_str' did not overwrite our buffer
-        showErrorDialog(tr("Android Emulator truncated this message "
-                           "to " MAX_SMS_MSG_SIZE_STRING " characters."),
-                        tr("SMS"));
-        nUtf8Chars = MAX_SMS_MSG_SIZE;
-    }
-
-    // Create a list of SMS PDUs, then send them
-    SmsPDU* pdus =
-            smspdu_create_deliver_utf8(utf8Message, nUtf8Chars, &sender, NULL);
-    if (pdus == NULL) {
-        showErrorDialog(tr("The message contains invalid characters."),
-                        tr("SMS"));
-        return;
-    }
-
-    {
-        if (sTelephonyAgent && sTelephonyAgent->getModem) {
-            AModem modem = sTelephonyAgent->getModem();
-            if (modem == NULL) {
-                showErrorDialog(
-                        tr("Cannot send message, modem emulation not running."),
-                        tr("SMS"));
-                return;
-            }
-
-            for (int idx = 0; pdus[idx] != NULL; idx++) {
-                amodem_receive_sms_vx(modem, pdus[idx]);
-            }
-        }
-    }
-
-    smspdu_free_list(pdus);
-}
-
-// static
-void TelephonyPage::setTelephonyAgent(const QAndroidTelephonyAgent* agent) {
-    sTelephonyAgent = agent;
-}
-
-void TelephonyPage::updateModemTime() {
-    if (!sTelephonyAgent) return;
-
-    AModem modem = sTelephonyAgent->getModem();
-    if (!modem)
-        return;
-
-    amodem_update_time(modem);
-}
-
-void TelephonyPage::eventLauncher(int numActiveCalls) {
-    QEvent* newTelephonyEvent =
-            new TelephonyEvent(mCustomEventType, numActiveCalls);
-    QCoreApplication::postEvent(this, newTelephonyEvent);
-}
-
-void TelephonyPage::customEvent(QEvent* cEvent) {
-    assert(cEvent->type() == mCustomEventType);
-    TelephonyEvent* tEvent = (TelephonyEvent*)cEvent;
-    if (tEvent->numActiveCalls == 0) {
-        if (mCallActivity != CallActivity::Inactive) {
-            // The device has no calls but we're active.
-            // They must have hung up on us. Push the
-            // END CALL button on our side.
-            on_tel_startEndButton_clicked();
-        }
-        // No 'else': If both we and the device have
-        // no calls active, there is nothing to do.
-        //  } else {
-        //      // The device has a call active. If we are
-        //      // also active, there's nothing to do.
-        //      //
-        //      // If we are not active, the device is probably
-        //      // initiating a call. Maybe we should give the
-        //      // option to accept or reject that call.
-        //      //
-        //      // Note that the device can deal with multiple
-        //      // calls (e.g., call waiting), but our modem
-        //      // interface only tells us how many are active.
-        //      // We cannot tell which call was ended.
-    }
 }

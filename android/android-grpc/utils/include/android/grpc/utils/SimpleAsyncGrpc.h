@@ -237,13 +237,22 @@ template <typename W>
 class SimpleClientWriter
     : public WithSimpleQueueWriter<grpc::ClientWriteReactor<W>> {
 public:
-    SimpleClientWriter(std::shared_ptr<::grpc::ClientContext> context)
-        : mContext(std::move(context)) {}
+    using OnDoneCallback = std::function<void(const grpc::Status&)>;
+
+    SimpleClientWriter(std::shared_ptr<::grpc::ClientContext> context,
+                       OnDoneCallback onDone = [](auto s) {})
+        : mContext(std::move(context)), mOnDone(onDone) {}
 
     ::grpc::ClientContext* context() { return mContext.get(); }
 
+    virtual void OnDone(const grpc::Status& status) override {
+        mOnDone(status);
+        delete this;
+    }
+
 private:
     std::shared_ptr<::grpc::ClientContext> mContext;
+    OnDoneCallback mOnDone;
 };
 // A bi directional serverstream constructed from a simple reader and
 // queuewriter.

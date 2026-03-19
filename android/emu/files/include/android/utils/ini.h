@@ -97,6 +97,12 @@ double iniFile_getDouble(CIniFile* f, const char* key, double defaultValue);
  */
 int iniFile_getBoolean(CIniFile* f, const char* key, const char* defaultValue);
 
+/* Reload an ini file. If fromData argument is given, it'll be used as the file
+ * data to update the ini contents. Otherwise, original data source file will be
+ * reloaded. Not thread safe, the file object must be externally synced.
+ */
+bool iniFile_reload(CIniFile* f, const char* fromData);
+
 /* parses a key value as a disk size. this means it can be an integer followed
  * by a suffix that can be one of "mMkKgG" which correspond to KiB, MiB and GiB
  * multipliers.

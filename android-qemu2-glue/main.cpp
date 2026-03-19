@@ -1462,9 +1462,10 @@ static bool checkConfigIniCompatible(std::string srcConfig,
     }
 
     std::unordered_set<std::string> important{
-            "abi.type",     "hw.cpu.arch", "hw.lcd.density", "hw.lcd.height",
-            "hw.lcd.width", "skin.name",   "hw.camera.back", "hw.camera.front",
-            "hw.keyboard",  "hw.arc"};
+            "abi.type",       "hw.cpu.arch",       "hw.lcd.density",
+            "hw.lcd.height",  "hw.lcd.width",      "skin.name",
+            "hw.camera.back", "hw.camera.front",   "hw.keyboard",
+            "hw.arc",         "environment.width", "environment.height"};
     for (auto&& key : srcConfigIni) {
         if (important.count(key) == 0) {
             continue;  // not important, ignore
@@ -3402,13 +3403,16 @@ extern "C" int main(int argc, char** argv) {
             return 1;
         }
 
+        int rendererWidth = hw->hw_lcd_width;
+        int rendererHeight = hw->hw_lcd_height;
+
         // Gpu configuration is set, now initialize the multi display, screen
         // recorder and screenshot callback
         bool isGuestMode =
                 (!hw->hw_gpu_enabled || !strcmp(hw->hw_gpu_mode, "guest"));
         getConsoleAgents()->multi_display->setGpuMode(
-                isGuestMode, hw->hw_lcd_width, hw->hw_lcd_height);
-        screen_recorder_init(hw->hw_lcd_width, hw->hw_lcd_height,
+                isGuestMode, rendererWidth, rendererHeight);
+        screen_recorder_init(rendererWidth, rendererHeight,
                              isGuestMode ? uiEmuAgent.display : nullptr,
                              getConsoleAgents()->multi_display);
         android_registerScreenshotFunc(

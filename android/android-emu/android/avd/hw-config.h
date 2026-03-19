@@ -102,6 +102,10 @@ void androidHwConfig_stripDefaults(CIniFile* source, CIniFile* target);
 // Checks if the hw config has the virtual scene camera enabled.
 int androidHwConfig_hasVirtualSceneCamera(AndroidHwConfig* config);
 
+// Checks if the hw config has either virtual scene or environment camera
+// enabled.
+int androidHwConfig_hasVirtualSceneOrEnvironmentCamera(AndroidHwConfig* config);
+
 // Checks if the hw config has the video playback camera enabled.
 int androidHwConfig_hasVideoPlaybackCamera(AndroidHwConfig* config);
 

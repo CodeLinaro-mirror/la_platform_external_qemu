@@ -66,6 +66,7 @@ include(android)
 include(prebuilts)
 include(qemu2-src-gen)
 set(ENABLE_QT_TESTS FALSE CACHE BOOL "Enable QT tests.")
+set(OPTION_FISHTANK_STRIP TRUE CACHE BOOL "Strip the fishtank distribution.")
 set(OPTION_BAZEL TRUE CACHE BOOL "Enable bazel compilation (Linux only).")
 set(OPTION_CRASHUPLOAD "NONE" CACHE STRING "Destination of crash reports.")
 set(OPTION_TRACE
@@ -519,6 +520,27 @@ android_license(
   LICENSE
     "https://android.googlesource.com/platform/external/swiftshader/+/refs/heads/emu-master-dev/LICENSE.txt"
   LOCAL "${ANDROID_QEMU2_TOP_DIR}/LICENSES/LICENSE.APACHE2")
+
+set(LLVMPIPE_DEPENDENCIES
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/libEGL${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/libEGL${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/libGLES_CM${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/libGLES_CM${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/libGLESv2${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/libGLESv2${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/libgallium-25.2.4${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/libgallium-25.2.4${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/libgbm${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/libgbm${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/libGL${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/libGL${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/dri/kms_swrast_dri${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/dri/kms_swrast_dri${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/dri/swrast_dri${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/dri/swrast_dri${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/dri/libdril_dri${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/dri/libdril_dri${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    "${ANDROID_QEMU2_TOP_DIR}/../../prebuilts/android-emulator-build/common/gles_llvmpipe/gbm/dri_gbm${CMAKE_SHARED_LIBRARY_SUFFIX}>lib64/gles_llvmpipe/gbm/dri_gbm${CMAKE_SHARED_LIBRARY_SUFFIX}"
+)
+
+android_license(
+  TARGET LLVMPIPE_DEPENDENCIES
+  LIBNAME gles_llvmpipe
+  URL "https://gitlab.freedesktop.org/mesa/mesa"
+  SPDX "MIT"
+  LICENSE "https://docs.mesa3d.org/license.html"
+  LOCAL "${ANDROID_QEMU2_TOP_DIR}/LICENSES/LICENSE.MESA")
 
 if(NOT LINUX_AARCH64)
   # Angle shader translator (and possibly also vk renderer) dependencies

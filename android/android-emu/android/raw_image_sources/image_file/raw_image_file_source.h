@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "android/raw_image_sources/raw_image_source.h"
 
 struct ImageData {
@@ -59,7 +61,9 @@ class RawImageFileSource : public RawImageSource {
 public:
     static std::unique_ptr<RawImageFileSource> Create(std::string filename);
     int Start(uint32_t pixel_format, int width, int height) override;
-    int AccessImage(std::function<int(RawImageBuffer*)> accessor) override;
+    bool HasUpdate(RawImageToken token) override;
+    absl::StatusOr<RawImageToken> AccessImage(
+            std::function<absl::Status(RawImageBuffer*)> accessor) override;
     int Stop() override;
 
 private:

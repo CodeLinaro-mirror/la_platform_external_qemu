@@ -20,8 +20,37 @@
 #include <string_view>
 #include <thread>
 
-#include "android/emulation/control/utils/EmulatorGrcpClient.h"
-#include "emulator_controller.grpc.pb.h"
+namespace android {
+namespace emulation {
+namespace control {
+class EmulatorGrpcClient;
+class Image;
+class EmulatorController;
+}  // namespace control
+}  // namespace emulation
+}  // namespace android
+
+namespace grpc {
+class ClientContext;
+template <typename R>
+class ClientReader;
+}  // namespace grpc
+
+/**
+ * @brief Defines the transport mechanism for the image stream.
+ */
+enum class StreamTransport {
+    /**
+     * @brief Standard gRPC transport, where image data is sent in the gRPC
+     * response.
+     */
+    Standard = 0,
+    /**
+     * @brief Shared memory transport, where image data is written to a
+     * shared memory region.
+     */
+    MMAP = 1,
+};
 
 /**
  * @brief Manages a gRPC stream to receive screenshot frames from the emulator.
@@ -36,20 +65,22 @@ public:
     /**
      * @brief A callback function that is invoked when a new frame is available.
      *
-     * The consumer is responsible for reading the frame data from the
-     * corresponding shared memory region when this callback is triggered.
+     * @param image A pointer to the Image protobuf message containing frame
+     *              metadata and potentially pixel data (if using Standard
+     *              transport).
      */
-    using FrameCallback = std::function<void()>;
+    using FrameCallback =
+            std::function<void(const android::emulation::control::Image*)>;
 
     /**
      * @brief Constructs a SharedStreamEmulator object.
      *
-     * @param handle The handle for the shared memory region. This can be a named
-     *               handle for a shared memory object, or a URI for a
-     *               memory-mapped file (e.g., "file:///path/to/file").
+     * @param handle The handle for the shared memory region (only used for MMAP
+     *               transport).
      * @param callback The function to call when a new frame is ready.
      * @param w The width of the stream.
      * @param h The height of the stream.
+     * @param transport The transport mechanism to use. Defaults to MMAP.
      * @param client A shared pointer to the EmulatorGrpcClient instance.
      *               Defaults to the singleton instance.
      */
@@ -58,9 +89,9 @@ public:
             FrameCallback callback,
             int w,
             int h,
-            std::shared_ptr<
-                    android::emulation::control::EmulatorGrpcClient> client =
-                    android::emulation::control::EmulatorGrpcClient::me());
+            StreamTransport transport = StreamTransport::MMAP,
+            std::shared_ptr<android::emulation::control::EmulatorGrpcClient>
+                    client = nullptr);
     ~SharedStreamEmulator();
 
     // This class manages a thread and raw pointers, it is not safe to copy or
@@ -91,9 +122,14 @@ private:
     int mHeight;
     std::shared_ptr<android::emulation::control::EmulatorGrpcClient> mClient;
     std::string mHandle;
+    StreamTransport mTransport;
     FrameCallback mFrameCallback;
-    std::unique_ptr<android::emulation::control::EmulatorController::Stub>
-            mStub;
+
+    // We use a pimpl-like approach for the gRPC stub to avoid including
+    // heavy headers in this header.
+    struct Stub;
+    std::unique_ptr<Stub> mStub;
+
     std::shared_ptr<grpc::ClientContext> mContext;
     std::unique_ptr<grpc::ClientReader<android::emulation::control::Image>>
             mReader;

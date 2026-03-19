@@ -27,21 +27,23 @@ extern "C" {
 #include "aemu/base/Optional.h"                    // for Optional
 #include "aemu/base/StringFormat.h"                // for StringFormatWit...
 
-#include "aemu/base/files/PathUtils.h"             // for pj, PathUtils
-#include "android/base/system/System.h"               // for System
-#include "android/emulation/CpuAccelerator.h"         // for GetCurrentCpuAc...
-#include "host-common/FeatureControl.h"  // for isEnabled
-#include "host-common/HostmemIdMapping.h"       // for android_emulati...
-#include "host-common/VmLock.h"                 // for RecursiveScoped...
-#include "android/emulation/control/callbacks.h"      // for LineConsumerCal...
-#include "host-common/vm_operations.h"  // for SnapshotCallbacks
-#include "android/snapshot/MemoryWatch.h"             // for set_address_tra...
-#include "android/snapshot/PathUtils.h"               // for getSnapshotBaseDir
-#include "android/snapshot/Snapshotter.h"             // for Snapshotter
-#include "host-common/snapshot_common.h"                  // for SnapshotRamBlock
-#include "host-common/snapshot_interface.h"               // for androidSnapshot...
-#include "android/utils/path.h"                       // for path_copy_file
+#include "aemu/base/EventNotificationSupport.h"
+#include "aemu/base/files/PathUtils.h"            // for pj, PathUtils
+#include "android/base/system/System.h"           // for System
+#include "android/emulation/CpuAccelerator.h"     // for GetCurrentCpuAc...
+#include "android/emulation/control/callbacks.h"  // for LineConsumerCal...
+#include "android/snapshot/MemoryWatch.h"         // for set_address_tra...
+#include "android/snapshot/PathUtils.h"           // for getSnapshotBaseDir
+#include "android/snapshot/Snapshotter.h"         // for Snapshotter
 #include "android/utils/debug.h"
+#include "android/utils/path.h"              // for path_copy_file
+#include "host-common/FeatureControl.h"      // for isEnabled
+#include "host-common/HostmemIdMapping.h"    // for android_emulati...
+#include "host-common/VmLock.h"              // for RecursiveScoped...
+#include "host-common/snapshot_common.h"     // for SnapshotRamBlock
+#include "host-common/snapshot_interface.h"  // for androidSnapshot...
+#include "host-common/vm_operations.h"       // for SnapshotCallbacks
+#include "host-common/crash-handler.h"
 
 extern "C" {
 
@@ -86,6 +88,7 @@ extern "C" {
 #include <algorithm>  // for find_if
 #include <cstdio>     // for NULL, rename
 #include <memory>
+#include <mutex>
 #include <string>     // for string, operator+
 #include <string_view>
 #include <unordered_map>
@@ -999,12 +1002,37 @@ static void set_exiting() {
     sExiting = true;
 }
 
-static void allow_real_audio(bool allow) {
-    qemu_allow_real_audio(allow);
+// This is currently used to both provide grpc notifications of the setting
+// change and to save the setting to QSettings. This WILL NOT work on headless.
+
+namespace {
+class RealAudioStatePublisher
+    : public android::base::EventNotificationSupport<bool> {
+public:
+    void notifyListeners(bool allow) { fireEvent(allow); }
+};
+
+}  // namespace
+
+static RealAudioStatePublisher sRealAudioEventSupport;
+static std::mutex sRealAudioLock;
+
+static void* get_real_audio_event_listener() {
+    return &sRealAudioEventSupport;
 }
 
 static bool is_real_audio_allowed() {
     return qemu_is_real_audio_allowed();
+}
+
+static void allow_real_audio(bool allow) {
+    std::lock_guard<std::mutex> lock(sRealAudioLock);
+    bool changed = is_real_audio_allowed() != allow;
+    qemu_allow_real_audio(allow);
+
+    if (changed) {
+        sRealAudioEventSupport.notifyListeners(allow);
+    }
 }
 
 static void set_stat_snasphot_use_vulkan() {
@@ -1013,6 +1041,10 @@ static void set_stat_snasphot_use_vulkan() {
 
 static bool snapshot_use_vulkan() {
     return does_snapshot_use_vulkan;
+}
+
+static void add_crash_reporter_log(const char* message) {
+    crashhandler_append_message_format("%s\n", message);
 }
 
 static void system_reset_request() {
@@ -1281,6 +1313,7 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
         .setFailureReason = set_failure_reason,
         .setExiting = set_exiting,
         .allowRealAudio = allow_real_audio,
+        .getRealAudioEventListener = get_real_audio_event_listener,
         .physicalMemoryGetAddr = physical_memory_get_addr,
         .isRealAudioAllowed = is_real_audio_allowed,
         .setSkipSnapshotSave = set_skip_snapshot_save,
@@ -1301,6 +1334,7 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
         .getSkipSnapshotSaveReason = get_skip_snapshot_save_reason,
         .setStatSnapshotUseVulkan = set_stat_snasphot_use_vulkan,
         .snapshotUseVulkan = snapshot_use_vulkan,
+        .addCrashReporterLog = add_crash_reporter_log,
 };
 
 extern "C" const QAndroidVmOperations* const gQAndroidVmOperations =

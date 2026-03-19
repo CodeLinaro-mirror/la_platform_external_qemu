@@ -564,6 +564,13 @@ int androidHwConfig_hasVirtualSceneCamera(AndroidHwConfig* config) {
     return strcmp(config->hw_camera_back, "virtualscene") == 0;
 }
 
+int androidHwConfig_hasVirtualSceneOrEnvironmentCamera(
+        AndroidHwConfig* config) {
+    return androidHwConfig_hasVirtualSceneCamera(config) ||
+           androidHwConfig_hasEnvironmentBackCamera(config) ||
+           androidHwConfig_hasEnvironmentFrontCamera(config);
+}
+
 int androidHwConfig_hasVideoPlaybackFrontCamera(AndroidHwConfig* config) {
     return strcmp(config->hw_camera_front, "videoplayback") == 0;
 }
@@ -588,4 +595,22 @@ int androidHwConfig_hasEnvironmentBackCamera(AndroidHwConfig* config) {
 
 int androidHwConfig_hasEnvironmentFrontCamera(AndroidHwConfig* config) {
     return strcmp(config->hw_camera_front, "environment") == 0;
+}
+
+void androidHwConfig_getLcdDimensions(const AndroidHwConfig* config,
+                                 int* outWidth,
+                                 int* outHeight) {
+    *outWidth = config->hw_lcd_width;
+    *outHeight = config->hw_lcd_height;
+}
+
+void androidHwConfig_getScreenDimensions(const AndroidHwConfig* config,
+                                    int* outWidth,
+                                    int* outHeight) {
+    *outWidth = (config->hw_lcd_width < config->environment_width)
+                        ? config->environment_width
+                        : config->hw_lcd_width;
+    *outHeight = (config->hw_lcd_height < config->environment_height)
+                         ? config->environment_height
+                         : config->hw_lcd_height;
 }

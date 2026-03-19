@@ -1877,6 +1877,31 @@ CIniFile* avdInfo_getEnvironmentIni(const AvdInfo* i) {
     return i->environmentIni;
 }
 
+CIniFile* avdInfo_reloadEnvironmentIni(const AvdInfo* i, const char* data) {
+    if (!i->environmentIni) {
+        // No environmentIni config on this AVD. We cannot overwrite environment
+        // if a backing file is not present.
+        dwarning("%s: Cannot reload, AVD didn't load environment.ini",
+                 __func__);
+        return NULL;
+    }
+
+    // Reload, if 'data' is a valid pointer, it'll be used to update ini
+    // configuration from memory
+    if (!iniFile_reload(i->environmentIni, data)) {
+        if (data) {
+            derror("%s: failed to reload from memory data", __func__);
+        } else {
+            derror("%s: failed to reload environment.ini", __func__);
+        }
+        return NULL;
+    }
+
+    // TODO(b/473742723): save ini file if 'data' is given?
+
+    return i->environmentIni;
+}
+
 int avdInfo_getSysImgIncrementalVersion(const AvdInfo* i) {
     return i->incrementalVersion;
 }

@@ -18,6 +18,10 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#ifdef _WIN32
+#include <windows.h>
+#include <dismapi.h>
+#endif
 
 #include "aemu/base/Optional.h"
 #include "android/cpu_accelerator.h"
@@ -213,6 +217,107 @@ static CommandReturn getDesktopEnv() {
     return std::make_pair(name.empty() ? kGenericError : 0, name);
 }
 
+#ifdef _WIN32
+static CommandReturn dismOpen(DismSession *session) {
+    HRESULT hr;
+
+    hr = DismInitialize(DismLogErrorsWarningsInfo, NULL, NULL);
+    if (hr == __HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED))
+        return std::make_pair(hr, "emulator-check whpx commands require administrator privilege.");
+    else if (hr != S_OK)
+        return std::make_pair(hr, "Could not initialize Dism API.");
+
+    *session = DISM_SESSION_DEFAULT;
+    hr = DismOpenSession(DISM_ONLINE_IMAGE, NULL, NULL, session);
+    if (hr != S_OK) {
+        DismShutdown();
+        return std::make_pair(hr, "Could not open Dism session.");
+    }
+    return std::make_pair(0, "dismOpen succeeded.");
+}
+
+static void dismClose(DismSession *session) {
+    if (!session)
+        return;
+
+    DismCloseSession(*session);
+    DismShutdown();
+}
+
+static char *dism_feature_state[] = {
+    "NotPresent",
+    "UninstallPending",
+    "Staged",
+    "Removed",
+    "Installed",
+    "InstallPending",
+    "Superseded",
+    "PartiallyInstalled"
+};
+
+static CommandReturn checkWHPX() {
+    HRESULT hr;
+    CommandReturn ret;
+    DismSession Session = DISM_SESSION_DEFAULT;
+
+    ret = dismOpen(&Session);
+    if (ret.first != 0)
+        return ret;
+
+    DismFeatureInfo *FeatureInfo;
+    hr = DismGetFeatureInfo(Session, L"HypervisorPlatform", NULL, DismPackageNone, &FeatureInfo);
+
+    dismClose(&Session);
+
+    if (hr == S_OK) {
+        std::stringstream message;
+	message << "Feature state of Windows Hypervisor Platform: " << FeatureInfo->FeatureState
+                << "(" << dism_feature_state[FeatureInfo->FeatureState] << ").";
+        return std::make_pair(0, message.str());
+    }
+    else
+        return std::make_pair(hr, "DismGetFeatureInfo failed.");
+}
+
+static CommandReturn enableWHPX() {
+    HRESULT hr;
+    CommandReturn ret;
+    DismSession Session = DISM_SESSION_DEFAULT;
+
+    ret = dismOpen(&Session);
+    if (ret.first != 0)
+        return ret;
+
+    hr = DismEnableFeature(Session, L"HypervisorPlatform", NULL, DismPackageNone, FALSE, NULL, 0, FALSE, NULL, NULL, NULL);
+
+    dismClose(&Session);
+
+    if (hr == S_OK || hr == (HRESULT)ERROR_SUCCESS_REBOOT_REQUIRED)
+        return std::make_pair(0, "Windows Hypervisor Platform is enabled in Windows Features. Reboot is required to take effect.");
+    else
+        return std::make_pair(hr, "DismEnableFeature Failed.");
+}
+
+static CommandReturn disableWHPX() {
+    HRESULT hr;
+    CommandReturn ret;
+    DismSession Session = DISM_SESSION_DEFAULT;
+
+    ret = dismOpen(&Session);
+    if (ret.first != 0)
+        return ret;
+
+    hr = DismDisableFeature(Session, L"HypervisorPlatform", NULL, TRUE, NULL, NULL, NULL);
+
+    dismClose(&Session);
+
+    if (hr == S_OK || hr == (HRESULT)ERROR_SUCCESS_REBOOT_REQUIRED)
+        return std::make_pair(0, "Windows Hypervisor Platform is disabled in Windows Features. Reboot is required to take effect.");
+    else
+        return std::make_pair(hr, "DismDisableFeature Failed.");
+}
+#endif
+
 constexpr struct Option {
     const char* arg;
     const char* help;
@@ -230,6 +335,14 @@ constexpr struct Option {
          &getWindowManager},
         {"desktop-env", "Return the current desktop environment name",
          &getDesktopEnv},
+#ifdef _WIN32
+        {"whpx", "Check if WHPX is installed and running (Windows)",
+         &checkWHPX},
+        {"enable-whpx", "Enable Windows Hypervisor Platform in Windows Features (Windows)",
+         &enableWHPX},
+        {"disable-whpx", "Disable Windows Hypervisor Platform in Windows Features (Windows)",
+         &disableWHPX},
+#endif
 };
 
 static std::string usage() {

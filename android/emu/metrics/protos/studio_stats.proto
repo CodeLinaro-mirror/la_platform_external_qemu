@@ -883,6 +883,17 @@ message AndroidStudioEvent {
   // set when kind = EMULATOR_CONSOLE_EVENTS
   repeated EmulatorConsoleEvent emulator_console_events = 247;
 
+  // set when kind = STUDIO_BOT_TOOL_WINDOW_AUTO_OPEN_EVENT
+  optional StudioBotToolWindowAutoOpenEvent
+      studio_bot_tool_window_auto_open_event = 248 [lazy = true];
+
+  // set when kind = SKILLS_EVENT
+  optional SkillsEvent skills_event = 249 [lazy = true];
+
+  // set when kind = EMULATOR_WINDOWS_HYPERVISOR_MIGRATION_EVENT
+  optional EmulatorWindowsHypervisorMigrationEvent
+      emulator_windows_hypervisor_migration_event = 250 [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1889,6 +1900,15 @@ message AndroidStudioEvent {
 
     // Event related to console emulator events.
     EMULATOR_CONSOLE_EVENTS = 367;
+
+    // Event related to auto opening the Studio Bot tool window on first run.
+    STUDIO_BOT_TOOL_WINDOW_AUTO_OPEN_EVENT = 368;
+
+    // Event related to Skills
+    SKILLS_EVENT = 369;
+
+    // Event related to emulator Windows Hypervisor migration.
+    EMULATOR_WINDOWS_HYPERVISOR_MIGRATION_EVENT = 370;
   }
 
   // Represents different Performance Monitoring types.
@@ -2263,6 +2283,9 @@ message AndroidStudioEvent {
     // Failure setting up Gradle Daemon JVM to trigger sync given unable to
     // locate or download matching toolchain
     GRADLE_DAEMON_JVM_CRITERIA_ERROR = 52;
+    // Failure because Gradle JVM is not compatible with a project's dependency
+    // required JVM runtime version
+    GRADLE_JVM_NOT_COMPATIBLE_WITH_DEPENDENCY = 53;
   }
 
   // IDE brand containing the android plugin
@@ -2281,6 +2304,8 @@ message AndroidStudioEvent {
     ANDROID_STUDIO_FOR_PLATFORM = 7;
     // Android Studio for Platform (ASfP) - Internal
     ANDROID_STUDIO_FOR_PLATFORM_INTERNAL = 8;
+    // Standalone Android Studio profiler (codename Sherlock)
+    SHERLOCK = 9;
   }
 
   // Gradle sync issue type.
@@ -2491,6 +2516,209 @@ message AndroidStudioEvent {
     // Disabling the library constraints results in better sync performance,
     // this will be surfaced to the user via this issue.
     TYPE_LIBRARY_CONSTRAINTS_SHOULD_BE_DISABLED = 67;
+
+    // Project uses RenderScript which is not supported on Riscv.
+    TYPE_RENDERSCRIPT_NOT_SUPPORTED_ON_RISCV = 68;
+
+    // Using kotlin.sourceSets DSL to add Kotlin sources is not allowed with
+    // built-in Kotlin.
+    TYPE_KOTLIN_SOURCE_SET_NOT_ALLOWED = 69;
+
+    // Found non-apk file in a configuration that should only contain apks.
+    TYPE_NON_APK_RUNTIME_DEP = 70;
+
+    // Unable to find connectedCheck task name for a component.
+    TYPE_CONNECTED_CHECK_TASK_NOT_FOUND = 71;
+
+    // Failed to parse XML in manifest.
+    TYPE_MANIFEST_PARSE_FAILED = 72;
+
+    // User is using me.tatarka.retrolambda which is deprecated.
+    TYPE_RETROLAMBDA_USED = 73;
+
+    // User is using FlatDirectoryArtifactRepository which is discouraged.
+    TYPE_FLAT_DIR_REPOSITORY_USED = 74;
+
+    // Access to deprecated legacy model requires compatibility mode.
+    TYPE_ACCESSING_DEPRECATED_LEGACY_MODEL = 75;
+
+    // Property cannot be set on a mergedFlavor directly.
+    TYPE_CANNOT_SET_ON_MERGED_FLAVOR = 76;
+
+    // Invalid value for compileSdkPreview or compileSdkMinor.
+    TYPE_COMPILE_SDK_PREVIEW_INVALID = 77;
+
+    // Invalid value for namespace.
+    TYPE_NAMESPACE_INVALID = 78;
+
+    // Invalid Proguard file provided.
+    TYPE_PROGUARD_FILE_INVALID = 79;
+
+    // targetSdk is set in testOptions for non-library module.
+    TYPE_TEST_OPTIONS_TARGET_SDK_INVALID = 80;
+
+    // KGP is loaded in a different classloader than AGP.
+    TYPE_KGP_LOADED_IN_DIFFERENT_CLASSLOADER = 81;
+
+    // Selected execution profile does not exist or none selected.
+    TYPE_UNSUPPORTED_EXECUTION_PROFILE = 82;
+
+    // Invalid value for lint version override.
+    TYPE_LINT_VERSION_OVERRIDE_INVALID = 83;
+
+    // Namespace and testNamespace have the same value.
+    TYPE_NAMESPACE_CONFLICT = 84;
+
+    // Invalid value for version code.
+    TYPE_INVALID_VERSION_CODE = 85;
+
+    // Pure splits are not supported.
+    TYPE_PURE_SPLITS_NOT_SUPPORTED = 86;
+
+    // Minify is enabled in dynamic feature module.
+    TYPE_MINIFY_ENABLED_IN_DYNAMIC_FEATURE = 87;
+
+    // ABI filters are declared in dynamic feature module.
+    TYPE_ABI_FILTERS_IN_DYNAMIC_FEATURE = 88;
+
+    // Invalid publishing configuration.
+    TYPE_INVALID_PUBLISHING_CONFIG = 89;
+
+    // Resource shrinking is not supported for this component type.
+    TYPE_RESOURCE_SHRINK_NOT_SUPPORTED = 90;
+
+    // resValue is being replaced.
+    TYPE_RES_VALUE_REPLACED = 91;
+
+    // BuildConfig is used when the feature is disabled.
+    TYPE_BUILD_CONFIG_USED_WHEN_DISABLED = 92;
+
+    // resource values are used when the feature is disabled.
+    TYPE_RES_VALUES_USED_WHEN_DISABLED = 93;
+
+    // Unrecognized SourceSet name.
+    TYPE_UNRECOGNIZED_SOURCE_SET = 94;
+
+    // applicationIdSuffix is ignored because applicationId is null.
+    TYPE_APPLICATION_ID_SUFFIX_IGNORED = 95;
+
+    // applicationId is set in library project.
+    TYPE_APPLICATION_ID_NOT_ALLOWED_IN_LIBRARY = 96;
+
+    // applicationIdSuffix is set in library project.
+    TYPE_APPLICATION_ID_SUFFIX_NOT_ALLOWED_IN_LIBRARY = 97;
+
+    // Conflicting ABI configuration.
+    TYPE_CONFLICTING_ABI_CONFIG = 98;
+
+    // Cannot build selected target ABI.
+    TYPE_CANNOT_BUILD_SELECTED_TARGET_ABI = 99;
+
+    // BuildType is both debuggable and has minifyEnabled set to true.
+    TYPE_DEBUGGABLE_AND_MINIFIED_ENABLED = 100;
+
+    // minSdkVersion is greater than targetSdkVersion.
+    TYPE_MIN_SDK_VERSION_GREATER_THAN_TARGET_SDK = 101;
+
+    // Test suite ignored because variant does not support it.
+    TYPE_TEST_SUITE_IGNORED = 102;
+
+    // Java 9+ compilation requires compileSdkVersion 30 or above.
+    TYPE_JAVA9_COMPILATION_REQUIRES_COMPILE_SDK30 = 103;
+
+    // '--release' option for JavaCompile is not supported.
+    TYPE_JAVA_COMPILE_RELEASE_OPTION_NOT_SUPPORTED = 104;
+
+    // Java compiler has deprecated or removed support for source/target
+    // version.
+    TYPE_JAVA_COMPILE_DEPRECATED_SOURCE_TARGET = 105;
+
+    // Problems found when resolving SDK location.
+    TYPE_SDK_RESOLUTION_WARNING = 106;
+
+    // Unable to find matching projects for Asset Packs.
+    TYPE_ASSET_PACK_PROJECT_NOT_FOUND = 107;
+
+    // R8 version mismatch.
+    TYPE_R8_VERSION_MISMATCH = 108;
+
+    // R8 gradual API flag required.
+    TYPE_R8_GRADUAL_API_FLAG_REQUIRED = 109;
+
+    // Unable to find matching projects for Dynamic Features.
+    TYPE_DYNAMIC_FEATURE_PROJECT_NOT_FOUND = 110;
+
+    // Fused Library Plugin is using Publication Only Mode.
+    TYPE_FUSED_LIBRARY_PUBLICATION_ONLY_MODE = 111;
+
+    // Invalid asset pack bundle configuration.
+    TYPE_ASSET_PACK_BUNDLE_INVALID_CONFIG = 112;
+
+    // Test suite support is experimental.
+    TYPE_TEST_SUITE_SUPPORT_EXPERIMENTAL = 113;
+
+    // lint.targetSdk is smaller than android.targetSdk.
+    TYPE_LINT_TARGET_SDK_LESS_THAN_ANDROID_TARGET_SDK = 114;
+
+    // Access to deprecated legacy API requires compatibility mode.
+    TYPE_ACCESS_TO_DEPRECATED_LEGACY_API_REQUIRES_COMPATIBILITY_MODE = 115;
+
+    // Unknown SourceKind value.
+    TYPE_UNKNOWN_SOURCE_KIND = 116;
+
+    // variant.getApplicationId() is not supported by dynamic-feature plugins.
+    TYPE_GET_APPLICATION_ID_NOT_SUPPORTED_IN_DYNAMIC_FEATURE = 117;
+
+    // aidl support is disabled via buildFeatures.
+    TYPE_AIDL_DISABLED_VIA_BUILD_FEATURES = 118;
+
+    // renderscript support is disabled via buildFeatures.
+    TYPE_RENDERSCRIPT_DISABLED_VIA_BUILD_FEATURES = 119;
+
+    // android.dataBinding.addKtx has no effect.
+    TYPE_DATABINDING_KTX_NO_EFFECT = 120;
+
+    // Data Binding annotation processor version mismatch.
+    TYPE_DATABINDING_ANNOTATION_PROCESSOR_VERSION_MISMATCH = 121;
+
+    // Multidex library is not needed.
+    TYPE_MULTIDEX_NOT_NEEDED = 122;
+
+    // Relative path is not supported in outputFileName.
+    TYPE_RELATIVE_PATH_NOT_SUPPORTED_IN_OUTPUT_FILE_NAME = 123;
+
+    // Core library desugaring requires D8 or R8.
+    TYPE_CORE_LIBRARY_DESUGARING_REQUIRES_D8_OR_R8 = 124;
+
+    // Core library desugaring requires multidex.
+    TYPE_CORE_LIBRARY_DESUGARING_REQUIRES_MULTIDEX = 125;
+
+    // Default Proguard file should not be specified in non-base module.
+    TYPE_DEFAULT_PROGUARD_FILE_IN_NON_BASE_MODULE = 126;
+
+    // Default Proguard file should not be used as consumer configuration file.
+    TYPE_DEFAULT_PROGUARD_FILE_AS_CONSUMER_FILE = 127;
+
+    // Resource shrinking requires code shrinking to be turned on.
+    TYPE_RESOURCE_SHRINK_REQUIRES_CODE_SHRINK = 128;
+
+    // Multiple identical calls to Android Components API is not supported.
+    TYPE_MULTIPLE_IDENTICAL_CALLS_TO_ANDROID_COMPONENTS_API = 129;
+
+    // Proguard android-optimize.txt is disallowed.
+    TYPE_PROGUARD_ANDROID_OPTIMIZE_TXT_DISALLOWED = 130;
+
+    // Unknown Proguard file.
+    TYPE_UNKNOWN_PROGUARD_FILE = 131;
+
+    // Variant can only have debuggable or profileable enabled.
+    TYPE_DEBUGGABLE_AND_PROFILEABLE_ENABLED = 132;
+
+    // androidTest test suite not defined for this variant.
+    TYPE_ANDROID_TEST_NOT_DEFINED = 133;
+
+    // Native multidex is always used for dynamic features.
+    TYPE_DYNAMIC_FEATURE_MULTIDEX_SET_IN_DSL = 134;
 
     // NOTE: When adding a new type here, increment the index by 1. This index
     // may not be consistent with the corresponding value in the Android Gradle
@@ -9042,6 +9270,8 @@ message GradleSyncStats {
     TRIGGER_QF_MIN_COMPILE_SDK_UPDATED = 430;
     // Compose Compiler Gradle plugin is added using a quickfix
     TRIGGER_QF_ADD_COMPOSE_COMPILER_GRADLE_PLUGIN = 431;
+    // Gradle JVM is set to a compatible version using a quickfix
+    TRIGGER_QF_APPLY_COMPATIBLE_GRADLE_JVM = 432;
     // Last marker for syncs caused by quickfixes
     TRIGGER_QF_LAST_MARKER = 999;
 
@@ -14843,6 +15073,9 @@ message AppQualityInsightsUsageEvent {
 
     // Track deprecation notification information
     SERVICE_DEPRECATION = 16;
+
+    // Track when an aiplugin-provided action is taken
+    AGENT_ACTION = 17;
   }
 
   enum CrashType {
@@ -15143,6 +15376,15 @@ message AppQualityInsightsUsageEvent {
     optional AiInsightSource source = 4;
     optional CodeContextDetails code_context_details = 5 [lazy = true];
   }
+  message AgentActionDetails {
+    enum ActionType {
+      UNKNOWN_ACTION = 0;
+      SHOW_MORE = 1;
+      FIX = 2;
+    }
+    optional ActionType action_type = 1;
+    optional CrashType crash_type = 2;
+  }
   message ServiceDeprecationInfo {
     enum Panel {
       UNKNOWN_PANEL = 0;
@@ -15220,6 +15462,9 @@ message AppQualityInsightsUsageEvent {
 
   // set when type = SERVICE_DEPRECATION
   optional ServiceDeprecationInfo service_deprecation_info = 20 [lazy = true];
+
+  // set when type = AGENT_ACTION
+  optional AgentActionDetails agent_action_details = 21 [lazy = true];
 }
 
 message FastPreviewEvent {
@@ -16126,6 +16371,7 @@ message SmlChatBotEvent {
     LOGCAT = 11;
     REFACTORING_MENU = 12;
     UPDATE_DEPENDENCY_ACTION = 13;
+    QUICK_EDIT_ACTION = 14;
   }
 
   message BotInvoked {
@@ -16273,9 +16519,10 @@ message SmlChatBotEvent {
       TOOLS = 3;
       PROMPT_LIBRARY = 4;
       REMOTE_CONTEXT = 5;
+      SKILLS = 6;
     }
     // The type of attachment, e.g. "FILES, FOLDERS, TOOLS, PROMPT_LIBRARY,
-    // REMOTE_CONTEXT"
+    // REMOTE_CONTEXT, SKILLS"
     optional AttachmentType attachment_type = 1;
     // The number of attachments of the given type.
     optional int32 attachment_count = 2;
@@ -16444,6 +16691,13 @@ message SmlChatBotEvent {
     GRADLE_ERR_WRONG_ARTIFACT = 20;
     // Requested data was missing.
     GRADLE_ERR_MISSING_DATA = 21;
+    // The build task was not found.
+    BUILD_TASK_NOT_FOUND = 22;
+    // This is a successful response from a sub-agent call and embedded in the
+    // response is the result of the sub-agent call.
+    SUB_AGENT_RESULT = 23;
+    // Sub-agent terminated without a proper response.
+    SUB_AGENT_ENDED_WITHOUT_RESPONSE = 24;
   }
 
   message ToolCallResponse {
@@ -17371,11 +17625,42 @@ message ScreenshotTestComposePreviewEvent {
     TYPE_UNKNOWN = 0;
     PREVIEW_DISCOVERY = 1;
     PREVIEW_RENDERING = 2;
+    // Number of times the screenshot tests were run.
     VALIDATE_CLICKED = 3;
+    // Number of times the update action was successfully
+    // completed from the dialog.
     UPDATE_CLICKED = 4;
+    // Number of times the dialog was opened.
     SCREENSHOT_DIALOG_OPEN = 5;
+    // Number of times the dialog was closed without
+    // completing the update flow.
     SCREENSHOT_DIALOG_CLOSE = 6;
+    // Number of times the user tried to open the dialog
+    // when it was already open.
     SCREENSHOT_DIALOG_ALREADY_OPEN = 7;
+    // Number of times the copying of reference images
+    // action failed after clicking the 'Add' button.
+    SCREENSHOT_DIALOG_UPDATE_ACTION_FAILURE = 8;
+    // Number of times an image failed to load or
+    // render within the preview details panel of the dialog.
+    SCREENSHOT_DIALOG_RENDER_FAILURE = 9;
+    // Number of times when the test suite finished execution
+    // but no screenshot test results were discovered.
+    SCREENSHOT_DIALOG_TEST_RESULTS_EMPTY = 10;
+    // Number of times the build failed before the dialog
+    // can be populated with any test results.
+    SCREENSHOT_DIALOG_BUILD_FAILURE = 11;
+    // Number of times the user switched the view type.
+    SCREENSHOT_VIEW_TYPE_CHANGED = 12;
+    // Number of times the user viewed the attributes
+    // panel in the test panel.
+    SCREENSHOT_ATTRIBUTES_VIEWED = 13;
+    // Number of times the user opened the dialog from
+    // the test results.
+    SCREENSHOT_DIALOG_SOURCE_TEST_RESULTS = 14;
+    // Number of times the user clicked the toolbar
+    // action in the test panel.
+    SCREENSHOT_TOOLBAR_ACTION = 15;
   }
 
   optional Type type = 1;
@@ -18590,6 +18875,19 @@ message NextEditPredictionEvent {
     // Add fields specific to the REJECTED event here, if any.
   }
 
+  message PredictionFailure {
+    enum Reason {
+      UNKNOWN = 0;
+      // The content lines surrounding an edit do not match the document.
+      CONTENT_LINE_MISMATCH = 1;
+      // The line to be replaced was not found in the document.
+      EXPECTED_LINE_NOT_FOUND = 2;
+      // The prediction response was invalid and could not be parsed.
+      INVALID_RESPONSE = 3;
+    }
+    optional Reason reason = 1;
+  }
+
   message EnabledStatus {
     enum Status {
       UNKNOWN_STATUS = 0;
@@ -18600,10 +18898,187 @@ message NextEditPredictionEvent {
     optional Status status = 1;
   }
 
+  // Represents a complete prediction session, containing multiple events
+  // that describe the session's lifecycle.
+  message Session {
+    optional int64 start_wall_time_ms = 1;
+    optional string model_id = 2;
+    // Deprecated. Use editor_file_type instead.
+    optional string language = 3 [deprecated = true];
+    // True if the prediction was forced by a user action (e.g., a specific
+    // keyboard shortcut), as opposed to being triggered automatically.
+    optional bool forced = 4;
+    repeated SessionEvent events = 5;
+    optional EditorFileType editor_file_type = 6;
+
+    message SessionEvent {
+      enum EventType {
+        UNKNOWN_EVENT_TYPE = 0;
+        REQUEST_SENT = 1;
+        // The prediction response was received from the model.
+        RESPONSE_RECEIVED = 2;
+        // The prediction was shown to the user. A single prediction can contain
+        // multiple controls (e.g., diff chunks).
+        PREDICTION_SHOWN = 3;
+        // The prediction was accepted by the user (i.e., at least one
+        // code-modifying control was accepted).
+        PREDICTION_ACCEPTED = 4;
+        // The prediction was rejected by the user (i.e., all code-modifying
+        // controls were rejected or dismissed).
+        PREDICTION_REJECTED = 5;
+        SESSION_CANCELLED = 6;
+        // A specific control within the prediction was shown to the user.
+        // A single prediction can have multiple controls.
+        CONTROL_SHOWN = 7;
+        // A specific control was accepted by the user.
+        CONTROL_ACCEPTED = 8;
+        // A specific control was rejected by the user.
+        CONTROL_REJECTED = 9;
+        // A specific control was hidden from the user.
+        CONTROL_HIDDEN = 10;
+        // The prediction attempt failed.
+        PREDICTION_FAILED = 11;
+        // A specific control was disposed before being shown to the user.
+        CONTROL_DISPOSED_UNSEEN = 12;
+      }
+      message ControlDetails {
+        enum ControlType {
+          UNKNOWN_CONTROL_TYPE = 0;
+          MODIFICATION = 1;
+          NAVIGATION = 2;
+        }
+        optional ControlType type = 1;
+        optional int32 offset = 2;
+        optional int32 original_length = 3;
+        optional int32 new_length = 4;
+      }
+      message FailureDetails {
+        enum FailureReason {
+          UNKNOWN_FAILURE_REASON = 0;
+          NO_HISTORY = 1;
+          MODEL_ERROR = 2;
+          PARSE_ERROR = 3;
+          REPAIR_ERROR = 4;
+          APPLY_ERROR = 5;
+          EMPTY_RESPONSE = 6;
+          CONTENT_LINE_MISMATCH = 7;
+          EXPECTED_LINE_NOT_FOUND = 8;
+          OUTDATED_PREDICTION = 9;
+          NO_MODEL = 10;
+        }
+        optional FailureReason reason = 1;
+      }
+      optional EventType type = 1;
+      // The time of this event relative to Session.start_wall_time_ms.
+      optional int64 relative_time_ms = 2;
+
+      // Deprecated in CL/868211533
+      optional int32 offset = 3 [deprecated = true];
+      optional int32 original_length = 4 [deprecated = true];
+      optional int32 new_length = 5 [deprecated = true];
+
+      message MetadataEntry {
+        option deprecated = true;
+
+        optional string key = 1;
+        oneof value {
+          string string_value = 2;
+          int64 int_value = 3;
+          double double_value = 4;
+        }
+      }
+      // Deprecated. Do not use.
+      repeated MetadataEntry metadata = 6 [deprecated = true];
+
+      optional ControlDetails control_details = 7;
+      optional FailureDetails failure_details = 8;
+    }
+  }
+
   oneof next_edit_prediction {
     PredictionShown shown = 1 [lazy = true];
     PredictionAccepted accepted = 2 [lazy = true];
     PredictionRejected rejected = 3 [lazy = true];
     EnabledStatus enabled_status = 4 [lazy = true];
+    PredictionFailure failure = 5 [lazy = true];
+    Session session = 6 [lazy = true];
   }
+}
+
+message StudioBotToolWindowAutoOpenEvent {
+  enum Type {
+    UNKNOWN_TYPE = 0;
+    // Agent/Chat tool window is automatically opened the first time after
+    // installation/upgrade.
+    AUTO_OPEN = 1;
+  }
+
+  optional Type type = 1;
+}
+
+// Event for capturing skills metrics.
+message SkillsEvent {
+  // Common metadata for all skills events.
+  optional SmlResponseMetadata metadata = 1 [lazy = true];
+
+  oneof event {
+    Activation activation = 2 [lazy = true];
+    Discovery discovery = 3 [lazy = true];
+  }
+
+  // Details about the skill activated by the agent.
+  message Activation {
+    optional SkillType type = 1;
+    // Status of reading skill file.
+    optional SmlChatBotEvent.ToolCallResponseStatus status = 2;
+    // Name of the pre-built skill being activated.
+    optional SkillName skill_name = 3;
+  }
+
+  // Metrics for discovering and parsing skills.
+  message Discovery {
+    // Latency in milliseconds for finding and reading skill definition files.
+    optional int64 latency_ms = 1;
+    // Number of skills successfully parsed.
+    optional int32 parsed_successful_count = 2;
+    // Number of skills that failed to parse.
+    optional int32 parsed_failed_count = 3;
+    // Token count of parsed skills.
+    optional int64 token_count = 4;
+  }
+
+  // The type of skill.
+  enum SkillType {
+    UNKNOWN = 0;
+    // Curated skills from DAC.
+    PRE_BUILT = 1;
+    // Local project skills directory.
+    USER_DEFINED = 2;
+  }
+
+  // Pre-built skill names.
+  enum SkillName {
+    UNKNOWN_SKILL_NAME = 0;
+  }
+}
+
+// Metrics for the emulator windows hypervisor migration.
+message EmulatorWindowsHypervisorMigrationEvent {
+  enum Action {
+    UNKNOWN_ACTION = 0;
+    // The banner was shown
+    BANNER_SHOW = 1;
+    // The WHPX update dialog was shown
+    WHPX_UPDATE_DIALOG_SHOW = 2;
+    // User accepted the WHPX update suggestion
+    WHPX_UPDATE_ACCEPTED = 3;
+    // User rejected the WHPX update suggestion
+    WHPX_UPDATE_REJECTED = 4;
+    // emulator-check enable-whpx succeeded
+    ENABLE_WHPX_SUCCESS = 5;
+    // emulator-check enable-whpx failed
+    ENABLE_WHPX_FAILURE = 6;
+  }
+
+  optional Action action = 1;
 }

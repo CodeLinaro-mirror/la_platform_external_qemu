@@ -14,8 +14,10 @@
 #include <QObject>               // for Q_OBJECT, slots
 #include <QString>               // for QString
 #include <QWidget>               // for QWidget
+#include <functional>
 #include <memory>                // for shared_ptr, unique_ptr
 
+#include "aemu/base/EventNotificationSupport.h"
 #include "ui_microphone-page.h"  // for MicrophonePage
 
 namespace android {
@@ -40,14 +42,11 @@ public:
     static void loadSettings();
 
 signals:
-    // Signal to indicate the host microphone input setting has changed
-    void microphoneEnabledChanged();
-
-public slots:
-    // Signal handler for host microphone input toggle changes
-    void onMicrophoneEnabledChanged();
+    void _externalMicrophoneEnabledChanged(bool enabled);
 
 private slots:
+    // Signal handler for host microphone input toggle changes
+    void onExternalMicrophoneEnabledChanged(bool enabled);
     void on_mic_hasMic_toggled(bool checked);
     void on_mic_hookButton_pressed();
     void on_mic_hookButton_released();
@@ -61,6 +60,10 @@ private slots:
 private:
     void forwardGenericEventToEmulator(int type, int code, int value);
     void forwardKeyToEmulator(uint32_t keycode, bool down);
+    std::unique_ptr<android::base::RaiiEventListener<
+            android::base::EventNotificationSupport<bool>,
+            bool>>
+            mRealAudioEventListener;
 
 private:
     std::unique_ptr<Ui::MicrophonePage> mUi;

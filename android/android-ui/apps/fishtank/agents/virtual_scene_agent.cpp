@@ -37,4 +37,9 @@ const QAndroidVirtualSceneAgent sFishtankQAndroidVirtualSceneAgent = {
                     NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.getAnimationState");
                     return false;
                 },
+        .reloadEnvironment = [](const char* environmentData) {
+                    NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.reloadScene(environmentData: %s)", environmentData);
+                    return false;
+                },
+
 };

@@ -134,7 +134,7 @@
      <item>
       <widget class="QLabel" name="labelTV">
        <property name="text">
-        <string>Enable TV animation</string>
+        <string>Enable Animations</string>
        </property>
       </widget>
      </item>
@@ -148,6 +148,13 @@
        </property>
        <property name="ColorGroup" stdset="0">
         <string>Toggle</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="reloadEnvironment">
+       <property name="text">
+        <string>Reload Environment</string>
        </property>
       </widget>
      </item>

@@ -1308,6 +1308,22 @@ int hvf_smp_cpu_exec(CPUState * cpu)
     return ret;
 }
 
+static void hvf_exit_notifier(Notifier *notifier, void *data) {
+    pthread_rwlock_wrlock(&mem_lock);
+    for (uint32_t i = 0; i < HVF_MAX_SLOTS; i++) {
+        struct mac_slot *mslot = &mac_slots[i];
+        if (mslot->present && mslot->size > 0) {
+            DPRINTF("%s: Explicitly unmapping gpa [0x%llx 0x%llx]\n", __func__,
+                    (unsigned long long)mslot->gpa_start,
+                    (unsigned long long)(mslot->gpa_start + mslot->size));
+            hv_vm_unmap(mslot->gpa_start, mslot->size);
+            mslot->present = 0;
+        }
+    }
+    pthread_rwlock_unlock(&mem_lock);
+    hv_vm_destroy();
+}
+
 static int hvf_accel_init(MachineState *ms) {
     int x;
     DPRINTF("%s: call. hv vm create?\n", __func__);
@@ -1334,6 +1350,12 @@ static int hvf_accel_init(MachineState *ms) {
     qemu_set_user_backed_mapping_funcs(
         hvf_user_backed_ram_map,
         hvf_user_backed_ram_unmap);
+
+    static Notifier hvf_exit_notif = {
+        .notify = hvf_exit_notifier,
+    };
+    qemu_add_exit_notifier(&hvf_exit_notif);
+
     return 0;
 }
 
