@@ -10,6 +10,7 @@
 // GNU General Public License for more details.
 #include "android/raw_image_sources/raw_image_source.h"
 #include <cstdint>
+#include <optional>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -28,13 +29,15 @@ int DefaultRawImageProvider::Start(uint32_t pixel_format,
     return 0;
 }
 
-bool DefaultRawImageProvider::HasUpdate(RawImageToken token) {
-    return token.token != 1;
-}
-
-absl::StatusOr<RawImageToken> DefaultRawImageProvider::AccessImage(
-        std::function<absl::Status(RawImageBuffer*)> accessor) {
-    absl::Status ret = accessor(&defaultImage);
+absl::StatusOr<std::optional<RawImageToken>>
+DefaultRawImageProvider::UpdateImage(
+        int64_t target_time_us,
+        std::optional<RawImageToken> token,
+        std::function<absl::Status(const RawImageBuffer*)> updater) {
+    if (token.has_value() && token.value().token == 1) {
+        return std::nullopt;
+    }
+    absl::Status ret = updater(&defaultImage);
     if (ret.ok()) {
         return RawImageToken{1};
     } else {
