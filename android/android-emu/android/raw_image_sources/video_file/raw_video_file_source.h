@@ -33,15 +33,19 @@ class RawVideofileSource : public RawImageSource {
 public:
     static std::unique_ptr<RawVideofileSource> Create(std::string filename);
     int Start(uint32_t pixel_format, int width, int height) override;
+    void UpdateTime(int64_t nextTimeUs) override;
     bool HasUpdate(RawImageToken token) override;
     absl::StatusOr<RawImageToken> AccessImage(
             std::function<absl::Status(RawImageBuffer*)> accessor) override;
     int Stop() override;
     int GetBaseRotation() override;
+    int64_t GetAnimationLengthUs() override;
 
 private:
     std::string file_;
     int64_t us_per_frame_;
+    int64_t last_update_time_us_;
+    bool paused_;
 
     struct AVFormatContextDeleter {
         void operator()(AVFormatContext* p) const {
