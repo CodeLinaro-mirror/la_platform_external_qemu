@@ -251,7 +251,9 @@ bool Scene::initialize() {
         if (!mRawImageSource) {
             derror("%s: Could not load background image: '%s', falling back to default",
                    __func__, mConfig.mFilename.c_str());
-            mRawImageSource = std::make_unique<DefaultRawImageProvider>();
+            mRawImageSource =
+                    std::make_unique<SolidColorImageProvider>(kErrorColor);
+            mConfig.mSceneMode = SceneConfig::Mode::ImageFile;
         }
         mBaseRotation = mRawImageSource->GetBaseRotation();
 
