@@ -49,6 +49,9 @@ private:
     int64_t last_update_time_pts_;
     bool paused_;
 
+    int64_t GetUsFromPts(int64_t pts) const;
+    int64_t GetPtsFromUs(int64_t us) const;
+
     struct AVFormatContextDeleter {
         void operator()(AVFormatContext* p) const {
             ::avformat_close_input(&p);

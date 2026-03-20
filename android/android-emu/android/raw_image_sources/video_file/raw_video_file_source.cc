@@ -208,6 +208,7 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
         int64_t target_time_us,
         std::optional<RawImageToken> token,
         std::function<absl::Status(const RawImageBuffer*)> updater) {
+    int64_t target_time_pts = GetPtsFromUs(target_time_us);
     // If the time has not changed, we're probably paused
     paused_ = (last_update_time_us_ == target_time_us);
     // TODO(virtualscene-video) Handle seek
@@ -269,6 +270,24 @@ int64_t RawVideofileSource::GetAnimationLengthUs() {
     }
     return mVideoFile.formatCtx->duration;
 }
+
+// Converts from the stream specific pts units to a microsecond value
+int64_t RawVideofileSource::GetUsFromPts(int64_t pts) const {
+    AVRational stream_time_base =
+            mVideoFile.formatCtx->streams[mVideoFile.videoStreamIndex]
+                    ->time_base;
+
+    return av_rescale_q(pts, stream_time_base, AV_TIME_BASE_Q);
+};
+
+// Converts from the stream specific pts units to a microsecond value
+int64_t RawVideofileSource::GetPtsFromUs(int64_t us) const {
+    AVRational stream_time_base =
+            mVideoFile.formatCtx->streams[mVideoFile.videoStreamIndex]
+                    ->time_base;
+
+    return av_rescale_q(us, AV_TIME_BASE_Q, stream_time_base);
+};
 
 const AVFrame* RawVideofileSource::decodeNextFrame() {
     AVPacket packet;
