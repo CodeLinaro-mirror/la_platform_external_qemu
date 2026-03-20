@@ -33,8 +33,10 @@ class RawImageSource {
 public:
     /* The arguments are suggestions, must check Image for resulting values */
     virtual int Start(uint32_t pixel_format, int width, int height) = 0;
-    /* Image is only guaranteed to be valid within the scope of the accessor
-     * function */
+    /* The timestamp for the next frame. This is used by the source to infer
+     * video control type operations
+     */
+    virtual void UpdateTime(int64_t nextTimeUs) {};
     /* Checks if there is an update to the image, provided a token. The token is
      * an opaque value provided from a previous call to AccessImage. For the
      * first call, users should provide 0 here.
@@ -51,6 +53,10 @@ public:
      * source to have them oriented in the natural way.
      */
     virtual int GetBaseRotation() { return 0; }
+    /* This returns the length of any animation from the source,
+     * or 0 if there is no meaninful finite length
+     */
+    virtual int64_t GetAnimationLengthUs() { return 0; }
 };
 
 // DefaultImageProvider provides a 1x1 magenta image to serve as a default when

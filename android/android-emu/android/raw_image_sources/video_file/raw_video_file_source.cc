@@ -175,6 +175,8 @@ RawVideofileSource::RawVideofileSource(RawVideofileSource::VideoFile videoFile)
     : mVideoFile(std::move(videoFile)) {
     // Assuming 30 fps for the moment
     us_per_frame_ = 33333;
+    last_update_time_us_ = 0;
+    paused_ = false;
 }
 
 std::unique_ptr<RawVideofileSource> RawVideofileSource::Create(
@@ -202,9 +204,16 @@ int RawVideofileSource::Start(uint32_t pixel_format, int width, int height) {
     }
 };
 
+void RawVideofileSource::UpdateTime(int64_t nextTimeUs) {
+    // If the time has not changed, we're probably paused
+    paused_ = (last_update_time_us_ == nextTimeUs);
+    // TODO(virtualscene-video) Handle seek
+    last_update_time_us_ = nextTimeUs;
+}
+
 bool RawVideofileSource::HasUpdate(RawImageToken token) {
     int64_t current_time = android::base::System::get()->getUnixTimeUs();
-    return std::abs(current_time - token.token) > us_per_frame_;
+    return !paused_ && std::abs(current_time - token.token) > us_per_frame_;
 }
 
 absl::StatusOr<RawImageToken> RawVideofileSource::AccessImage(
@@ -244,6 +253,13 @@ int RawVideofileSource::Stop() {
 
 int RawVideofileSource::GetBaseRotation() {
     return mVideoFile.baseRotation;
+}
+
+int64_t RawVideofileSource::GetAnimationLengthUs() {
+    if (mVideoFile.formatCtx->duration == AV_NOPTS_VALUE) {
+        return 0;
+    }
+    return mVideoFile.formatCtx->duration;
 }
 
 const AVFrame* RawVideofileSource::decodeNextFrame() {

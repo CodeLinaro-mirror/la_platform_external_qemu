@@ -300,36 +300,49 @@ void Scene::update(bool updateTime) {
     if (updateTime) {
         // TODO(virtualscene): use ThreadLooper::nowNs(ClockType::kVirtual) ?
         mFrameTimeUs = System::get()->getUnixTimeUs() - mStartTimeUs;
+        if (mRawImageSource) {
+            int64_t animationLength = mRawImageSource->GetAnimationLengthUs();
+            if (animationLength > 0 && mFrameTimeUs > animationLength) {
+                mFrameTimeUs %= mRawImageSource->GetAnimationLengthUs();
+            }
+        }
+    } else {
+        // While paused, move our start time so we resume with the same value;
+        mStartTimeUs = System::get()->getUnixTimeUs() - mFrameTimeUs;
     }
 
-    if (mRawImageSource && mRawImageSource->HasUpdate(mRawImageSourceToken)) {
-        if (!mOverlayObject) {
-            mOverlayObject = std::make_unique<SceneOverlayObject>();
-        }
-        absl::StatusOr<RawImageToken> res =
-                mRawImageSource->AccessImage([&](RawImageBuffer* buffer) {
-                    if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
-                        return absl::InvalidArgumentError(absl::StrFormat(
-                                "Unsupported pixel format from image source: %d",
-                                buffer->pixel_format));
-                    }
+    if (mRawImageSource) {
+        mRawImageSource->UpdateTime(mFrameTimeUs);
+        if (mRawImageSource->HasUpdate(mRawImageSourceToken)) {
+            if (!mOverlayObject) {
+                mOverlayObject = std::make_unique<SceneOverlayObject>();
+            }
+            absl::StatusOr<RawImageToken> res =
+                    mRawImageSource->AccessImage([&](RawImageBuffer* buffer) {
+                        if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
+                            return absl::InvalidArgumentError(absl::StrFormat(
+                                    "Unsupported pixel format from image source: %d",
+                                    buffer->pixel_format));
+                        }
 
-                    if (mOverlayObject->mDataRGBA.size() <
-                        buffer->buffer_size) {
-                        mOverlayObject->mDataRGBA.resize(buffer->buffer_size);
-                        mOverlayObject->mWidth = buffer->width;
-                        mOverlayObject->mHeight = buffer->height;
-                    }
+                        if (mOverlayObject->mDataRGBA.size() <
+                            buffer->buffer_size) {
+                            mOverlayObject->mDataRGBA.resize(
+                                    buffer->buffer_size);
+                            mOverlayObject->mWidth = buffer->width;
+                            mOverlayObject->mHeight = buffer->height;
+                        }
 
-                    std::memcpy(mOverlayObject->mDataRGBA.data(),
-                                buffer->buffer, buffer->buffer_size);
-                    return absl::OkStatus();
-                });
+                        std::memcpy(mOverlayObject->mDataRGBA.data(),
+                                    buffer->buffer, buffer->buffer_size);
+                        return absl::OkStatus();
+                    });
 
-        if (res.ok()) {
-            mRawImageSourceToken = *res;
-        } else {
-            E("Failed to Update Image Source: %s", res.status().message());
+            if (res.ok()) {
+                mRawImageSourceToken = *res;
+            } else {
+                E("Failed to Update Image Source: %s", res.status().message());
+            }
         }
     }
 }
