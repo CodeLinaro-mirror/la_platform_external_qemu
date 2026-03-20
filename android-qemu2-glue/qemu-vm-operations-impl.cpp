@@ -245,15 +245,15 @@ static void set_skip_snapshot_save_reason(uint32_t reason) {
 static void android_vulkan_instance_register(uint64_t id, const char* name) {
     const std::lock_guard<std::mutex> lock(s_vulkanTableLock);
     s_vulkanTable[id] = name;
-    LOG(DEBUG) << "Registering VkInstance " << id << " name " << name
-               << ", total is " << s_vulkanTable.size();
+    LOG(DEBUG) << "Registering VkInstance 0x" << std::hex << id << " name "
+               << name << ", total is " << s_vulkanTable.size();
 }
 
 static void android_vulkan_instance_unregister(uint64_t id) {
     const std::lock_guard<std::mutex> lock(s_vulkanTableLock);
     s_vulkanTable.erase(id);
-    LOG(DEBUG) << "Unregistering VkInstance " << id << ", total is "
-               << s_vulkanTable.size();
+    LOG(DEBUG) << "Unregistering VkInstance 0x" << std::hex << id
+               << ", total is " << s_vulkanTable.size();
 }
 
 static void android_vulkan_instance_enumerate(uint32_t* pCount,
