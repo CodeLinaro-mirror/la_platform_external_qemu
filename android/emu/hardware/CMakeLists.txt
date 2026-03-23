@@ -9,7 +9,6 @@ android_add_library(
   SOURCE_DIR
   src
   SRC android/boot-properties.c
-      android/cros.c
       android/emulation/android_pipe_host.cpp
       android/emulation/android_pipe_pingpong.c
       android/emulation/android_pipe_throttle.c

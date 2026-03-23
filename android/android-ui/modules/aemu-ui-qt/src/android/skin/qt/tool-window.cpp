@@ -469,14 +469,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     updateLeftHandButton(mCurrentLeftHandGesture);
     updateRightHandButton(mCurrentRightHandGesture);
 
-    if (getConsoleAgents()->settings->hw()->hw_arc) {
-        // Chrome OS doesn't support rotation now.
-        mToolsUi->prev_layout_button->setHidden(true);
-        mToolsUi->next_layout_button->setHidden(true);
-    } else {
-        // Android doesn't support tablet mode now.
-        mToolsUi->tablet_mode_button->setHidden(true);
-    }
+    // Android doesn't support tablet mode now.
+    mToolsUi->tablet_mode_button->setHidden(true);
 
     if (avdFlavor == AVD_TV) {
         // Android TV should not rotate
@@ -1076,10 +1070,7 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
             forwardKeyToEmulator(ANDROID_KEY_STEM_1, down);
             break;
         case QtUICommand::TABLET_MODE:
-            if (getConsoleAgents()->settings->hw()->hw_arc) {
-                forwardGenericEventToEmulator(EV_SW, SW_TABLET_MODE, down);
-                forwardGenericEventToEmulator(EV_SYN, 0, 0);
-            }
+            // no-op, legacy usage for ChromeOS
             break;
         case QtUICommand::MENU:
             forwardKeyToEmulator(LINUX_KEY_SOFT1, down);
@@ -2257,8 +2248,7 @@ void ToolWindow::hideRotationButton(bool hide) {
         avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
                 AVD_ANDROID_AUTO ||
         avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
-                AVD_DESKTOP ||
-        getConsoleAgents()->settings->hw()->hw_arc) {
+                AVD_DESKTOP) {
         // already hide, do not bother its settings
         return;
     } else {

@@ -100,15 +100,6 @@ static pixman_image_t* get_pixman_image_from_qframebuffer(QFrameBuffer* qf) {
 static void android_display_switch(DisplayChangeListener* dcl,
                                    DisplaySurface* new_surface) {
     if (QFrameBuffer* qfbuff = asDcl(dcl)->fb) {
-        if (getConsoleAgents()->settings->hw()->hw_arc) {
-            static pixman_image_t * qfb_image =
-                    get_pixman_image_from_qframebuffer(qfbuff);
-            pixman_image_composite(PIXMAN_OP_OVER,
-                                   new_surface->image, NULL,
-                                   qfb_image,
-                                   0, 0, 0, 0, 0, 0,
-                                   qfbuff->width, qfbuff->height);
-        }
         qframebuffer_rotate(qfbuff, 0);
     }
 }
@@ -117,19 +108,6 @@ static void android_display_refresh(DisplayChangeListener* dcl) {
     if (QFrameBuffer* qfbuff = asDcl(dcl)->fb) {
         qframebuffer_poll(qfbuff);
     }
-}
-
-extern void * android_gl_create_context(DisplayChangeListener*, QEMUGLParams *);
-extern void android_gl_destroy_context(DisplayChangeListener*, void *);
-extern int android_gl_make_context_current(DisplayChangeListener*, void *);
-extern void android_gl_scanout_texture(DisplayChangeListener*, uint32_t, bool,
-                                       uint32_t, uint32_t, uint32_t, uint32_t,
-                                       uint32_t, uint32_t);
-extern void android_gl_scanout_flush(DisplayChangeListener *, uint32_t,
-                                     uint32_t, uint32_t, uint32_t);
-
-static void android_gl_scanout_disable(DisplayChangeListener *dcl) {
-    dinfo("stub %s", __func__);
 }
 
 static QemuConsole* find_graphic_console() {
@@ -175,23 +153,6 @@ bool android_display_init(DisplayState* ds, QFrameBuffer* qf) {
     if (!con) {
         return false;
     }
-    if (getConsoleAgents()->settings->hw()->hw_arc) {
-        /* We don't use goldfish_fb in cros now. so
-         * just pick up last graphic console */
-        int index = last_graphic_console_index();
-        if (index < 0) {
-            return false;
-        }
-        console_select(index);
-        con = qemu_console_lookup_by_index(index);
-        QemuUIInfo info = {
-            0, 0,
-            (uint32_t)qf->width,
-            (uint32_t)qf->height,
-            0,
-        };
-        dpy_set_ui_info(con, &info);
-    }
     const auto dcl = new DCLExtra();
 
     qframebuffer_set_producer(qf, dcl,
@@ -216,17 +177,6 @@ bool android_display_init(DisplayState* ds, QFrameBuffer* qf) {
     dclOps.dpy_gfx_update = &android_display_update;
     dclOps.dpy_gfx_switch = &android_display_switch;
 
-    if (getConsoleAgents()->settings->hw()->hw_arc) {
-        dclOps.dpy_gl_ctx_create       = &android_gl_create_context;
-        dclOps.dpy_gl_ctx_destroy      = &android_gl_destroy_context;
-        dclOps.dpy_gl_ctx_make_current = &android_gl_make_context_current;
-        dclOps.dpy_gl_scanout_disable  = &android_gl_scanout_disable;
-        dclOps.dpy_gl_scanout_texture  = &android_gl_scanout_texture;
-        dclOps.dpy_gl_update           = &android_gl_scanout_flush;
-
-        dcl->con = con;
-    }
-
     dcl->ops = &dclOps;
     register_displaychangelistener(dcl);
 
@@ -235,9 +185,8 @@ bool android_display_init(DisplayState* ds, QFrameBuffer* qf) {
 
 #if defined(__APPLE__) && defined(__arm64)
 extern "C" void android_sdl_display_early_init(DisplayOptions* opts) {
-    if (opts->gl && getConsoleAgents()->settings->hw()->hw_arc) {
-        display_opengl = 1;
-    }
+    (void)opts;
+    // no-op
 }
 
 extern "C" int android_sdl_display_init(DisplayState* ds, DisplayOptions* opts) {
@@ -260,9 +209,8 @@ static QemuDisplay qemu_display_android = {
 #else
 
 extern "C" void sdl_display_early_init(DisplayOptions* opts) {
-    if (opts->gl && getConsoleAgents()->settings->hw()->hw_arc) {
-        display_opengl = 1;
-    }
+    (void)opts;
+    // no-op
 }
 
 extern "C" int sdl_display_init(DisplayState* ds, DisplayOptions* opts) {

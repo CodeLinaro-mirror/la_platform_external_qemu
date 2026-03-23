@@ -74,7 +74,6 @@ void generateAvd(const AvdGenerateInfo& genInfo) {
     configIni.setString("fastboot.forceColdBoot", genInfo.fastbootForceColdBoot);
     configIni.setString("fastboot.forceFastBoot", genInfo.fastbootForceFastBoot);
     configIni.setString("hw.accelerometer", genInfo.hwAccelerometer);
-    configIni.setString("hw.arc", genInfo.hwArc);
     configIni.setString("hw.audioInput", genInfo.hwAudioInput);
     configIni.setString("hw.audioOutput", genInfo.hwAudioOutput);
     configIni.setString("hw.battery", genInfo.hwBattery);
@@ -177,7 +176,6 @@ void generateAvdWithDefaults(std::string_view avdName,
         /* fastboot.forceColdBoot */ "no",
         /* fastboot.forceFastBoot */ "yes",
         /* hw.accelerometer */ "yes",
-        /* hw.arc */ "false",
         /* hw.audioInput */ "yes",
         /* hw.audioOutput */ "yes",
         /* hw.battery */ "yes",

@@ -92,7 +92,7 @@ SkinUI* skin_ui_create(SkinFile* layout_file,
     ui->keyboard = skin_keyboard_create(
             ui->ui_params.keyboard_charmap, ui->layout->dpad_rotation,
             ui_funcs->keyboard_flush,
-            getConsoleAgents()->settings->hw()->hw_arc);
+            false);
     ui->generic_events =
             skin_generic_event_create(ui_funcs->generic_event_flush);
     ui->window = NULL;
