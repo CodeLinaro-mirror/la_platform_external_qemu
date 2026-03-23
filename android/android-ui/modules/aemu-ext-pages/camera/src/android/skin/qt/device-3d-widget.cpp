@@ -61,16 +61,6 @@ static glm::vec3 clampPosition(glm::vec3 position) {
                                 Device3DWidget::MaxZ));
 }
 
-// reduce the animation interval from 33ms to 330ms
-// to reduce cpu usage, it is still reasonably responsive
-// bug: 299824177
-
-#if defined(__aarch64__) && defined(__APPLE__)
-static constexpr int kAnimationIntervalMs = 330;
-#else
-static constexpr int kAnimationIntervalMs = 33;
-#endif
-
 Device3DWidget::Device3DWidget(QWidget* parent)
     : GLWidget(parent),
       mUseAbstractDevice(android_foldable_hinge_configured() ||
@@ -79,19 +69,9 @@ Device3DWidget::Device3DWidget(QWidget* parent)
                          android_is_automotive()) {
     toggleAA();
     setFocusPolicy(Qt::ClickFocus);
-
-    if (mUseAbstractDevice) {
-        mAnimationTimer.setTimerType(Qt::PreciseTimer);
-        mAnimationTimer.setInterval(kAnimationIntervalMs);
-        connect(&mAnimationTimer, SIGNAL(timeout()), this, SLOT(animate()));
-    }
 }
 
 Device3DWidget::~Device3DWidget() {
-    if (mUseAbstractDevice && mAnimationTimer.isActive()) {
-        mAnimationTimer.stop();
-    }
-
     // Free up allocated resources.
     if (!mGLES2) {
         return;
@@ -1353,14 +1333,9 @@ bool Device3DWidget::updateHingeAngles() {
 
 void Device3DWidget::showEvent(QShowEvent* event) {
     GLWidget::showEvent(event);
-    if (mUseAbstractDevice && !mAnimationTimer.isActive()) {
-        mAnimationTimer.start();
-    }
+    update();
 }
 
 void Device3DWidget::hideEvent(QHideEvent* event) {
     QWidget::hideEvent(event);
-    if (mUseAbstractDevice && mAnimationTimer.isActive()) {
-        mAnimationTimer.stop();
-    }
 }

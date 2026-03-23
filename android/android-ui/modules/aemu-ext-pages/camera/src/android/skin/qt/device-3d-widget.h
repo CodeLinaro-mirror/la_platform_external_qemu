@@ -82,9 +82,6 @@ public slots:
     // to mose dragging. It may either rotate the model or move it around.
     void setOperationMode(OperationMode mode) { mOperationMode = mode; }
 
-    // Slot for constant animation
-    void animate() { renderFrame(); }
-
 public:
     // Getters for the rotation quaternion and delta.
     const glm::quat& targetRotation() const { return mTargetRotation; }
@@ -180,8 +177,6 @@ private:
     glm::vec3 mPrevDragOrigin;
     bool mTracking = false;
     OperationMode mOperationMode = OperationMode::Rotate;
-
-    QTimer mAnimationTimer;
 
     bool mUseAbstractDevice = false;
     bool mFirstAbstractDeviceRepaint = true;
