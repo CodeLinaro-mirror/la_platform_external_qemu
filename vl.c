@@ -4726,14 +4726,8 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
 
             RendererConfig rendererConfig = getLastRendererConfig();
 
-            if (avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) >= 27) {
-                // api27 and up hardcoded pixel format ast RGBA8888, so only use 32bit
-                // todo: once api26 is refreshed, force 32bit on it as well. right now
-                // it is using 16bit hardcoded
-                goldfish_fb_set_display_depth(32);
-            } else {
-                goldfish_fb_set_display_depth(depth);
-            }
+            goldfish_fb_set_display_depth(depth);
+
             goldfish_fb_set_use_host_gpu(true);
             is_opengl_alive = rendererConfig.rendererStarted;
 
