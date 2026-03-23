@@ -23,16 +23,6 @@ if(NOT WIN32)
   add_c_flag("-Wno-reorder-init-list")
 endif()
 
-if(NOT OPTION_GFXSTREAM_BACKEND)
-  add_subdirectory(shared/OpenglCodecCommon)
-endif()
-
 add_subdirectory(shared/emugl/common)
-
-if(NOT WINDOWS AND NOT BUILDING_FOR_AARCH64)
-  if (NOT OPTION_GFXSTREAM_BACKEND)
-    add_subdirectory(guest)
-  endif()
-endif()
 
 add_subdirectory(combined)

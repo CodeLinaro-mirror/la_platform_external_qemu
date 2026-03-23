@@ -22,7 +22,8 @@ function(add_opengl_dependencies TGT)
         ${TGT} darwin "${RUNTIME_OS_PROPERTIES};INSTALL_RPATH>=@loader_path/lib64/gles_angle")
 endfunction()
 
-if(OPTION_GFXSTREAM_BACKEND)
+# GFXSTREAM BACKEND
+if(TRUE)
     set(GFXSTREAM_REPO_ROOT ${ANDROID_QEMU2_TOP_DIR}/../../hardware/google/gfxstream)
     set(AEMU_COMMON_REPO_ROOT ${ANDROID_QEMU2_TOP_DIR}/../../hardware/google/aemu)
     set(ANGLE_REPO_ROOT ${ANDROID_QEMU2_TOP_DIR}/../../external/angle)

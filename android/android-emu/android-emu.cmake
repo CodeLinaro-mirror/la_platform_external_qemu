@@ -377,10 +377,6 @@ if(WEBRTC)
   target_compile_definitions(android-emu PUBLIC ANDROID_WEBRTC)
 endif()
 
-if(OPTION_GFXSTREAM_BACKEND)
-  target_compile_definitions(android-emu PUBLIC AEMU_GFXSTREAM_BACKEND=1)
-endif()
-
 # The dependent target os specific sources, they are pretty much the same as
 # above, excluding camera support, because that brings in a whole slew of
 # dependencies Shared version of the library. Note that this only has the set of
@@ -572,11 +568,7 @@ endif()
 
 target_compile_definitions(android-emu-shared PUBLIC -DAEMU_MIN=1)
 
-if(OPTION_GFXSTREAM_BACKEND)
-  target_compile_definitions(android-emu-shared
-                             PUBLIC -DAEMU_GFXSTREAM_BACKEND=1)
-  android_install_shared_library(TARGET android-emu-shared)
-endif()
+android_install_shared_library(TARGET android-emu-shared)
 
 # This library contains a main entry point that injects fake console agents into
 # your unit tests. you usually want to link against this library if you need to
