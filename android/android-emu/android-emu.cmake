@@ -266,7 +266,6 @@ target_link_libraries(
          emulator-tinyobjloader
          emulator-libkeymaster3
          emulator-murmurhash
-         emulator-tinyepoxy
          aemu-recording
          webrtc-yuv
          android-emu-curl
