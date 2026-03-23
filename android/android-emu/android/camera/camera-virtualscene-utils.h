@@ -24,7 +24,6 @@
 #include "android/virtualscene/Scene.h"
 #include "android/virtualscene/SceneCamera.h"
 #include "android/virtualscene/VirtualSceneManager.h"
-#include "emugl/common/OpenGLDispatchLoader.h"
 #include "host-common/opengles.h"
 
 namespace android {

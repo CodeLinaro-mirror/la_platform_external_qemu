@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "android/utils/compiler.h"
 
 #include <glm/glm.hpp>

@@ -20,7 +20,6 @@
  * The Scene container for the Virtual Scene.
  */
 
-#include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "android/raw_image_sources/raw_image_source.h"
 #include "android/utils/compiler.h"
 #include "android/virtualscene/PosterInfo.h"
