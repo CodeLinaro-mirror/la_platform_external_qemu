@@ -183,10 +183,17 @@ void FeatureControlImpl::init(const std::string& defaultIniHostPath,
                 if (!unexpectedGuestFeatures.empty()) {
                     std::string missing =
                             absl::StrJoin(unexpectedGuestFeatures, ", ");
-                    dwarning(
-                            "Please update the emulator to one that supports "
-                            "the feature(s): %s",
-                            missing.c_str());
+
+                    if (missing == "VulkanVirtualQueue") {
+                        // TODO(b/490061827): Remove VulkanVirtualQueue from
+                        // guest flags
+                        dinfo("Guest usage of host flag 'VulkanVirtualQueue' will be ignored.");
+                    } else {
+                        dwarning(
+                                "Please update the emulator to one that supports "
+                                "the feature(s): %s",
+                                missing.c_str());
+                    }
                 }
 #define FEATURE_CONTROL_ITEM(item, idx)                                    \
     initGuestFeatureAndParseDefault(defaultIniHost, defaultIniGuest, item, \
