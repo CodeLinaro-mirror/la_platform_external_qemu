@@ -429,7 +429,7 @@ FOUND_SKIN:
 
             /* only depth values of 16 and 32 are correct. 16 is the default. */
             if (depth != 32 && depth != 16) {
-                depth = 16;
+                depth = 32;
                 D("adjusting LCD bit depth to %d", depth);
             }
 
