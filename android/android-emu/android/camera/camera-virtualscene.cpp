@@ -20,7 +20,6 @@
 #include "android/camera/camera-format-converters.h"
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/virtualscene/VirtualSceneManager.h"
-#include "emugl/common/OpenGLDispatchLoader.h"
 
 #include <vector>
 

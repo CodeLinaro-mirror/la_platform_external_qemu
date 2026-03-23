@@ -27,7 +27,6 @@
 #include "android/skin/qt/gl-canvas.h"          // for GLCanvas
 #include "android/skin/qt/gl-texture-draw.h"    // for TextureDraw
 #include "android/utils/debug.h"
-#include "emugl/common/OpenGLDispatchLoader.h"  // for LazyLoadedEGLDispatch
 
 using namespace gfxstream::host::gl;
 
