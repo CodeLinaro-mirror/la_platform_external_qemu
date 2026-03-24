@@ -15,6 +15,7 @@
  */
 
 #include "android/raw_image_sources/video_file/raw_video_file_source.h"
+#include <libavutil/error.h>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -152,11 +153,19 @@ std::optional<RawVideofileSource::VideoFile> RawVideofileSource::openVideoFile(
         return std::nullopt;
     }
 
+    // Set up multithreading. ffmpeg will determine the thread count
+    codecCtxWeak->thread_count = 0;
+    codecCtxWeak->thread_type = FF_THREAD_FRAME;
+
     err = avcodec_open2(codecCtxWeak, codec, nullptr);
     if (err < 0) {
         derror("Could not open the codec (id=%d) for '%s'", err, filename);
         ::avcodec_free_context(&codecCtxWeak);
         return std::nullopt;
+    }
+
+    if (codecCtxWeak->active_thread_type != FF_THREAD_FRAME) {
+        dwarning("%s: Video codec is not using FF_THREAD_FRAME", __func__);
     }
 
     AVCodecContextPtr codecCtx(codecCtxWeak);
@@ -176,6 +185,7 @@ RawVideofileSource::RawVideofileSource(RawVideofileSource::VideoFile videoFile)
     // Assuming 30 fps for the moment
     us_per_frame_ = 33333;
     last_update_time_us_ = 0;
+    last_update_time_pts_ = 0;
     paused_ = false;
 }
 
@@ -222,7 +232,7 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
         avFrame = convertFrameToRGBA(*avFrame);
         if (!avFrame) {
             derror("Could not convert frame");
-            return absl::UnavailableError("Could not decode the frame");
+            return absl::UnavailableError("Could not convert the frame");
         }
 
         RawImageBuffer img;
@@ -290,31 +300,33 @@ int64_t RawVideofileSource::GetPtsFromUs(int64_t us) const {
 };
 
 const AVFrame* RawVideofileSource::decodeNextFrame() {
+    int err;
+
+    // First, try to receive a frame that might already be decoded.
+    // This is important because a single packet can contain multiple frames,
+    // or the decoder might have buffered frames.
+    err = ::avcodec_receive_frame(mVideoFile.codecCtx.get(), mFrameCache.get());
+    if (err >= 0) {
+        return mFrameCache.get();
+    } else if (err == AVERROR_EOF) {
+        err = ::av_seek_frame(mVideoFile.formatCtx.get(), -1, 0,
+                              AVSEEK_FLAG_BACKWARD);
+        if (err < 0) {
+            derror("%s:%d av_seek_frame: err=%d", __func__, __LINE__, err);
+            return nullptr;
+        }
+        avcodec_flush_buffers(mVideoFile.codecCtx.get());
+    } else if (err != AVERROR(EAGAIN)) {
+        derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__, err);
+        return nullptr;
+    }
+
     AVPacket packet;
     av_init_packet(&packet);
     packet.data = nullptr;
     packet.size = 0;
 
-    for (int n = 100; n > 0; --n) {
-        int err = ::av_read_frame(mVideoFile.formatCtx.get(), &packet);
-        if (err < 0) {
-            if (err == AVERROR_EOF) {
-                err = ::av_seek_frame(mVideoFile.formatCtx.get(), -1, 0,
-                                      AVSEEK_FLAG_BACKWARD);
-                if (err >= 0) {
-                    continue;
-                } else {
-                    derror("%s:%d av_seek_frame: err=%d", __func__, __LINE__,
-                           err);
-                    return nullptr;
-                }
-            } else if (err == AVERROR(EAGAIN)) {
-                continue;
-            } else {
-                derror("%s:%d av_read_frame: err=%d", __func__, __LINE__, err);
-                continue;
-            }
-        }
+    while ((err = ::av_read_frame(mVideoFile.formatCtx.get(), &packet)) >= 0) {
 
         if (packet.stream_index != mVideoFile.videoStreamIndex) {
             ::av_packet_unref(&packet);
@@ -322,16 +334,16 @@ const AVFrame* RawVideofileSource::decodeNextFrame() {
         }
 
         err = ::avcodec_send_packet(mVideoFile.codecCtx.get(), &packet);
+        ::av_packet_unref(&packet);
+
         if (err < 0) {
             derror("%s:%d avcodec_send_packet: err=%d", __func__, __LINE__,
                    err);
-            ::av_packet_unref(&packet);
             continue;
         }
 
         err = ::avcodec_receive_frame(mVideoFile.codecCtx.get(),
                                       mFrameCache.get());
-        ::av_packet_unref(&packet);
         if (err >= 0) {
             return mFrameCache.get();
         } else if (err != AVERROR(EAGAIN)) {
@@ -340,6 +352,21 @@ const AVFrame* RawVideofileSource::decodeNextFrame() {
         }
     }
 
+    // When we hit EOF, we must drain the remainder of the frames to actually
+    // decode to the end of the file Subsequent calls will be caught by the
+    // avcodec_receive_frame at the top of the function
+    if (err == AVERROR_EOF) {
+        avcodec_send_packet(mVideoFile.codecCtx.get(), nullptr);
+        err = ::avcodec_receive_frame(mVideoFile.codecCtx.get(),
+                                      mFrameCache.get());
+        if (err >= 0) {
+            return mFrameCache.get();
+        } else if (err != AVERROR(EAGAIN) && err != AVERROR_EOF) {
+            derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__,
+                   err);
+            return nullptr;
+        }
+    }
     return nullptr;
 }
 
@@ -358,6 +385,10 @@ const AVFrame* RawVideofileSource::convertFrameToRGBA(const AVFrame& avFrame) {
     if (!mConvertedFrameCache || mConvertedFrameCache->width != avFrame.width ||
         mConvertedFrameCache->height != avFrame.height) {
         mConvertedFrameCache.reset(::av_frame_alloc());
+        if (!mConvertedFrameCache) {
+            derror("Could not allocate converted frame");
+            return nullptr;
+        }
         mConvertedFrameCache->format = AV_PIX_FMT_RGBA;
         mConvertedFrameCache->width = avFrame.width;
         mConvertedFrameCache->height = avFrame.height;
