@@ -186,6 +186,7 @@ RawVideofileSource::RawVideofileSource(RawVideofileSource::VideoFile videoFile)
     : mVideoFile(std::move(videoFile)) {
     // Assuming 30 fps for the moment
     us_per_frame_ = 33333;
+    seek_threshold_pts_ = this->GetPtsFromUs(us_per_frame_) * 10;
     last_update_time_us_ = 0;
     last_update_time_pts_ = 0;
     paused_ = false;
@@ -223,14 +224,54 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
     int64_t target_time_pts = GetPtsFromUs(target_time_us);
     // If the time has not changed, we're probably paused
     paused_ = (last_update_time_us_ == target_time_us);
-    // TODO(virtualscene-video) Handle seek
+
+    // If our requested target time has gone backwards, or is suitably far
+    // ahead, seek
+    if (target_time_us < last_update_time_us_ ||
+        target_time_pts - last_update_time_pts_ > seek_threshold_pts_) {
+        int err = ::av_seek_frame(mVideoFile.formatCtx.get(),
+                                  mVideoFile.videoStreamIndex, target_time_pts,
+                                  AVSEEK_FLAG_BACKWARD);
+        if (err < 0) {
+            return absl::UnavailableError(absl::StrFormat(
+                    "%s:%d av_seek_frame: err=%d", __func__, __LINE__, err));
+        }
+        avcodec_flush_buffers(mVideoFile.codecCtx.get());
+    } else if (last_update_time_pts_ > target_time_pts) {
+        // We're actually already ahead, nothing to do.
+        return std::nullopt;
+    }
     last_update_time_us_ = target_time_us;
+    // If we're paused and up to date, we don't need to do anything.
+    // Otherwise the requestor either has no current image, or has
+    // an image that is not up to date with what we're providing
     if (paused_ && token.has_value() &&
         token.value().token == last_update_time_pts_) {
         return std::nullopt;
     }
 
-    int err = decodeNextFrame();
+    int err = 0;
+    int max_skip = 100;
+    int64_t last_frame_pts;
+    int64_t curr_frame_pts = last_update_time_pts_;
+    do {
+        last_frame_pts = curr_frame_pts;
+        err = decodeNextFrame();
+        curr_frame_pts = mFrameCache->best_effort_timestamp;
+        if (mFrameCache->best_effort_timestamp > target_time_pts ||
+            mFrameCache->best_effort_timestamp == AV_NOPTS_VALUE) {
+            break;
+        }
+        // Skip frames to catch up. If our pts goes backwards, we probably
+        // looped the video, and should give up
+        max_skip--;
+        dprint("%s: Video source dropping frame at %.3f", __func__,
+                 GetUsFromPts(mFrameCache->best_effort_timestamp) / 1000000.0);
+    } while (!err && max_skip > 0 && curr_frame_pts > last_frame_pts);
+
+    if (err == AVERROR_EOF) {
+        return std::nullopt;
+    }
     if (err >= 0) {
         err = convertFrameToRGBA();
         if (err < 0) {
@@ -313,13 +354,7 @@ int RawVideofileSource::decodeNextFrame() {
     if (err >= 0) {
         return 0;
     } else if (err == AVERROR_EOF) {
-        err = ::av_seek_frame(mVideoFile.formatCtx.get(), -1, 0,
-                              AVSEEK_FLAG_BACKWARD);
-        if (err < 0) {
-            derror("%s:%d av_seek_frame: err=%d", __func__, __LINE__, err);
-            return err;
-        }
-        avcodec_flush_buffers(mVideoFile.codecCtx.get());
+        return err;
     } else if (err != AVERROR(EAGAIN)) {
         derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__, err);
         return err;

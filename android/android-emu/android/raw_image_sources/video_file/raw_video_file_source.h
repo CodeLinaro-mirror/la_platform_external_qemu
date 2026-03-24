@@ -45,6 +45,7 @@ public:
 private:
     std::string file_;
     int64_t us_per_frame_;
+    int64_t seek_threshold_pts_;
     int64_t last_update_time_us_;
     int64_t last_update_time_pts_;
     bool paused_;
