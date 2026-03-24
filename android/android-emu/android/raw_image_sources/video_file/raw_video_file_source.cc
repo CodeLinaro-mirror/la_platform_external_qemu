@@ -19,11 +19,13 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_format.h"
 #include "android/base/system/System.h"
 #include "android/raw_image_sources/raw_image_source.h"
 
 #include "android/camera/camera-common.h"
 
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -217,7 +219,7 @@ int RawVideofileSource::Start(uint32_t pixel_format, int width, int height) {
 absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
         int64_t target_time_us,
         std::optional<RawImageToken> token,
-        std::function<absl::Status(const RawImageBuffer*)> updater) {
+        std::function<absl::Status(const RawImageBufferView*)> updater) {
     int64_t target_time_pts = GetPtsFromUs(target_time_us);
     // If the time has not changed, we're probably paused
     paused_ = (last_update_time_us_ == target_time_us);
@@ -228,14 +230,16 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
         return std::nullopt;
     }
 
-    if (const AVFrame* avFrame = decodeNextFrame()) {
-        avFrame = convertFrameToRGBA(*avFrame);
-        if (!avFrame) {
-            derror("Could not convert frame");
-            return absl::UnavailableError("Could not convert the frame");
+    int err = decodeNextFrame();
+    if (err >= 0) {
+        err = convertFrameToRGBA();
+        if (err < 0) {
+            return absl::UnavailableError(
+                    absl::StrFormat("Could not convert the frame: %d", err));
         }
 
-        RawImageBuffer img;
+        const AVFrame* avFrame = mConvertedFrameCache.get();
+        RawImageBufferView img;
         img.buffer = avFrame->data[0];
         img.buffer_size = avFrame->width * avFrame->height * 4;
         img.width = avFrame->width;
@@ -259,7 +263,7 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
             return ret;
         }
     } else {
-        return absl::UnavailableError("Could not decode the frame");
+        return absl::UnavailableError(absl::StrFormat("Could not decode the frame: %d", err));
     }
 }
 
@@ -299,7 +303,7 @@ int64_t RawVideofileSource::GetPtsFromUs(int64_t us) const {
     return av_rescale_q(us, AV_TIME_BASE_Q, stream_time_base);
 };
 
-const AVFrame* RawVideofileSource::decodeNextFrame() {
+int RawVideofileSource::decodeNextFrame() {
     int err;
 
     // First, try to receive a frame that might already be decoded.
@@ -307,18 +311,18 @@ const AVFrame* RawVideofileSource::decodeNextFrame() {
     // or the decoder might have buffered frames.
     err = ::avcodec_receive_frame(mVideoFile.codecCtx.get(), mFrameCache.get());
     if (err >= 0) {
-        return mFrameCache.get();
+        return 0;
     } else if (err == AVERROR_EOF) {
         err = ::av_seek_frame(mVideoFile.formatCtx.get(), -1, 0,
                               AVSEEK_FLAG_BACKWARD);
         if (err < 0) {
             derror("%s:%d av_seek_frame: err=%d", __func__, __LINE__, err);
-            return nullptr;
+            return err;
         }
         avcodec_flush_buffers(mVideoFile.codecCtx.get());
     } else if (err != AVERROR(EAGAIN)) {
         derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__, err);
-        return nullptr;
+        return err;
     }
 
     AVPacket packet;
@@ -345,7 +349,7 @@ const AVFrame* RawVideofileSource::decodeNextFrame() {
         err = ::avcodec_receive_frame(mVideoFile.codecCtx.get(),
                                       mFrameCache.get());
         if (err >= 0) {
-            return mFrameCache.get();
+            return 0;
         } else if (err != AVERROR(EAGAIN)) {
             derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__,
                    err);
@@ -360,53 +364,54 @@ const AVFrame* RawVideofileSource::decodeNextFrame() {
         err = ::avcodec_receive_frame(mVideoFile.codecCtx.get(),
                                       mFrameCache.get());
         if (err >= 0) {
-            return mFrameCache.get();
+            return 0;
         } else if (err != AVERROR(EAGAIN) && err != AVERROR_EOF) {
             derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__,
                    err);
-            return nullptr;
+            return err;
         }
     }
-    return nullptr;
+    return err;
 }
 
-const AVFrame* RawVideofileSource::convertFrameToRGBA(const AVFrame& avFrame) {
+int RawVideofileSource::convertFrameToRGBA() {
     SwsContext* swsCtx =
-            getSwsContext(avFrame.width, avFrame.height,
-                          static_cast<AVPixelFormat>(avFrame.format),
-                          avFrame.width, avFrame.height, AV_PIX_FMT_RGBA);
+            getSwsContext(mFrameCache->width, mFrameCache->height,
+                          static_cast<AVPixelFormat>(mFrameCache->format),
+                          mFrameCache->width, mFrameCache->height, AV_PIX_FMT_RGBA);
     if (!swsCtx) {
         derror("Could not allocate SwsContext for src={ %dx%d, fmt=%d }, "
                "dst={ %dx%d, fmt=%d }",
-               avFrame.width, avFrame.height, avFrame.format, avFrame.width,
-               avFrame.height, AV_PIX_FMT_RGBA);
-        return nullptr;
+               mFrameCache->width, mFrameCache->height, mFrameCache->format, mFrameCache->width,
+               mFrameCache->height, AV_PIX_FMT_RGBA);
+        return -ENOMEM;
     }
-    if (!mConvertedFrameCache || mConvertedFrameCache->width != avFrame.width ||
-        mConvertedFrameCache->height != avFrame.height) {
+    if (!mConvertedFrameCache || mConvertedFrameCache->width != mFrameCache->width ||
+        mConvertedFrameCache->height != mFrameCache->height) {
         mConvertedFrameCache.reset(::av_frame_alloc());
         if (!mConvertedFrameCache) {
             derror("Could not allocate converted frame");
-            return nullptr;
+            return -ENOMEM;
         }
         mConvertedFrameCache->format = AV_PIX_FMT_RGBA;
-        mConvertedFrameCache->width = avFrame.width;
-        mConvertedFrameCache->height = avFrame.height;
+        mConvertedFrameCache->width = mFrameCache->width;
+        mConvertedFrameCache->height = mFrameCache->height;
         int bufferSize = av_image_get_buffer_size(
-                AV_PIX_FMT_RGBA, avFrame.width, avFrame.height, 1);
+                AV_PIX_FMT_RGBA, mFrameCache->width, mFrameCache->height, 1);
         mConvertedFrameBuffer.resize(bufferSize);
-        if (av_image_fill_arrays(mConvertedFrameCache->data,
+        int ret = av_image_fill_arrays(mConvertedFrameCache->data,
                                  mConvertedFrameCache->linesize,
                                  mConvertedFrameBuffer.data(), AV_PIX_FMT_RGBA,
-                                 avFrame.width, avFrame.height, 1) < 0) {
-            return nullptr;
+                                 mFrameCache->width, mFrameCache->height, 1);
+        if (ret < 0) {
+            return ret;
         }
     }
 
-    ::sws_scale(swsCtx, avFrame.data, avFrame.linesize, 0, avFrame.height,
+    ::sws_scale(swsCtx, mFrameCache->data, mFrameCache->linesize, 0, mFrameCache->height,
                 mConvertedFrameCache->data, mConvertedFrameCache->linesize);
-    mConvertedFrameCache->best_effort_timestamp = avFrame.best_effort_timestamp;
-    return mConvertedFrameCache.get();
+    mConvertedFrameCache->best_effort_timestamp = mFrameCache->best_effort_timestamp;
+    return 0;
 }
 
 SwsContext* RawVideofileSource::getSwsContext(const int srcWidth,

@@ -36,7 +36,7 @@ public:
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
             std::optional<RawImageToken> token,
-            std::function<absl::Status(const RawImageBuffer*)> updater)
+            std::function<absl::Status(const RawImageBufferView*)> updater)
             override;
     int Stop() override;
     int GetBaseRotation() override;
@@ -111,8 +111,8 @@ private:
     };
 
     explicit RawVideofileSource(VideoFile videoFile);
-    const AVFrame* decodeNextFrame();
-    const AVFrame* convertFrameToRGBA(const AVFrame& avFrame);
+    int decodeNextFrame();
+    int convertFrameToRGBA();
     static std::optional<VideoFile> openVideoFile(const char* filename);
 
     std::vector<std::pair<ConversionKey, SwsContextPtr>> mConverterCache;
