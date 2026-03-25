@@ -195,23 +195,97 @@ Pass the generated token in using the --token option.
         raise_if_none(build_target, "build_target")
         raise_if_none(artifact, "artifact")
 
-        request = self.service.buildartifact().get(
-            buildId=bid, target=build_target, attemptId="latest", resourceId=artifact
-        )
-        response = request.execute()
+        # Get the artifact metadata first, this will give us the actual
+        # size and name, and check if it exists.
+        try:
+            request = self.service.buildartifact().get(
+                buildId=bid,
+                target=build_target,
+                attemptId="latest",
+                resourceId=artifact,
+            )
+            response = request.execute()
+        except googleapiclient.errors.HttpError as e:
+            if e.resp.status in [400, 404]:
+                logging.error(
+                    "Failed to retrieve metadata for artifact %s/%s/%s. It might have been deleted or the target/build ID is incorrect. (%s)",
+                    bid,
+                    build_target,
+                    artifact,
+                    e,
+                )
+                from aemu.bisect import BuildUnavailableError
+
+                raise BuildUnavailableError(
+                    f"Artifact {artifact} is unavailable."
+                ) from e
+            raise
+
         total_size = int(response.get("size", 0))
+        # Use name from response, it might be correctly encoded/cased
+        resource_id = response.get("name", artifact)
 
         request = self.service.buildartifact().get_media(
-            buildId=bid, target=build_target, attemptId="latest", resourceId=artifact
+            buildId=bid, target=build_target, attemptId="latest", resourceId=resource_id
         )
 
-        with tqdm(
-            total=total_size, unit="B", unit_scale=True, unit_divisor=1024, miniters=1
-        ) as progress_bar:
-            with io.FileIO(dst, mode="wb") as fh:
-                downloader = googleapiclient.http.MediaIoBaseDownload(fh, request)
-                done = False
-                while not done:
-                    status, done = downloader.next_chunk(num_retries=3)
-                    if status:
-                        progress_bar.update(status.resumable_progress - progress_bar.n)
+        # Download to a temporary file first, and rename it to the destination
+        # when we are done. This avoids leaving corrupted artifacts if the
+        # process is interrupted.
+        tmp_dst = Path(str(dst) + ".tmp")
+        try:
+            with tqdm(
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+                miniters=1,
+            ) as progress_bar:
+                # MediaIoBaseDownload can sometimes fail with 400 for some artifacts.
+                # We will try it, and if it fails, we will try to download it in one go.
+                try:
+                    with io.FileIO(str(tmp_dst), mode="wb") as fh:
+                        downloader = googleapiclient.http.MediaIoBaseDownload(
+                            fh, request, chunksize=10 * 1024 * 1024
+                        )
+                        done = False
+                        while not done:
+                            status, done = downloader.next_chunk(num_retries=3)
+                            if status:
+                                progress_bar.update(
+                                    status.resumable_progress - progress_bar.n
+                                )
+                except googleapiclient.errors.HttpError as e:
+                    if e.resp.status == 400:
+                        logging.warning(
+                            "Chunked download failed with 400, falling back to direct download. (Artifact might be deleted or partially available)"
+                        )
+                        # Try direct download. This might consume more memory, but it is
+                        # more likely to succeed.
+                        try:
+                            with open(str(tmp_dst), "wb") as fh:
+                                fh.write(request.execute())
+                            progress_bar.update(total_size - progress_bar.n)
+                        except googleapiclient.errors.HttpError as e2:
+                            if e2.resp.status in [400, 404]:
+                                logging.error(
+                                    "Direct download failed for %s. The artifact has likely been deleted from the server. (%s)",
+                                    artifact,
+                                    e2,
+                                )
+                                from aemu.bisect import BuildUnavailableError
+
+                                raise BuildUnavailableError(
+                                    f"Artifact {artifact} is unavailable."
+                                ) from e2
+                            raise e2
+                    else:
+                        raise
+
+            # Atomic rename
+            import os
+
+            os.replace(str(tmp_dst), str(dst))
+        finally:
+            if tmp_dst.exists():
+                tmp_dst.unlink()
