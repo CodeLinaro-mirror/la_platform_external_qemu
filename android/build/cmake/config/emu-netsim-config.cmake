@@ -46,10 +46,10 @@ set(NETSIM_UI_DEPENDENCIES
 
 if(WINDOWS_MSVC_X86_64)
   set(NETSIM_DEPENDENCIES
-      ${PREBUILT_ROOT}/netsim.exe>netsim.exe;${PREBUILT_ROOT}/netsimd.exe>netsimd.exe;
+      ${PREBUILT_ROOT}/netsim.exe>netsim.exe;${PREBUILT_ROOT}/netsimd.exe>netsimd.exe;${PREBUILT_ROOT}/netsimdx.exe>netsimdx.exe;
   )
 
-install(PROGRAMS ${PREBUILT_ROOT}/netsim.exe ${PREBUILT_ROOT}/netsimd.exe DESTINATION .)
+install(PROGRAMS ${PREBUILT_ROOT}/netsim.exe ${PREBUILT_ROOT}/netsimd.exe ${PREBUILT_ROOT}/netsimdx.exe DESTINATION .)
 else()
   set(NETSIM_DEPENDENCIES
       ${PREBUILT_ROOT}/netsim>netsim;${PREBUILT_ROOT}/netsimd>netsimd;
