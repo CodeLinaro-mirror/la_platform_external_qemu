@@ -26,6 +26,7 @@ android_add_executable(
       fishtank_agents.cpp
       fishtank_window_agent.cpp
       grpc/FishtankGrpcServer.cpp
+      opengles.cpp
       main.cpp)
 
 if(APPLE)
@@ -62,6 +63,7 @@ target_link_libraries(
   PRIVATE aemu-ui-qt
           aemu-ui-qt-base
           android-emu
+          gfxstream_openglesdispatch
           qemu-host-common-headers
           Qt${QT_VERSION_MAJOR}::Core
           Qt${QT_VERSION_MAJOR}::Svg
@@ -70,7 +72,6 @@ target_link_libraries(
           aemu-ui-headless # Yes! The QT ui depends on the headless one..
           aemu-ui-qt-base
           aemu::recording
-          android-emu
           android-emu-base-process
           android-grpc-client
           android-grpc-interceptors
@@ -341,6 +342,7 @@ android_add_test(
 target_link_libraries(
   fishtank_unittests
   PRIVATE android-emu
+          gfxstream_openglesdispatch
           android-grpc-client
           android-grpc-services-stack
           android-grpc-certificate-factory

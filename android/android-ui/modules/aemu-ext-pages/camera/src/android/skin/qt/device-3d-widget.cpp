@@ -1061,7 +1061,10 @@ void Device3DWidget::repaintGL() {
         mGLES2->glActiveTexture(GL_TEXTURE0);
         mGLES2->glBindTexture(GL_TEXTURE_2D, mDiffuseMap);
         struct AndroidVirtioGpuOps* ops = android_getVirtioGpuOps();
-        ops->bind_color_buffer_to_texture(ops->get_last_posted_color_buffer());
+        if (ops) {
+            ops->bind_color_buffer_to_texture(ops->get_last_posted_color_buffer());
+        }
+
         i = 0;
         const bool is_pixel_fold = android_foldable_is_pixel_fold();
         for (auto iter : mDisplaySegments) {

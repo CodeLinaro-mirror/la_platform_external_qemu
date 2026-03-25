@@ -32,6 +32,7 @@
 #include "android/main-common-ui.h"
 #include "android/main-common.h"
 #include "android/opengl/gpuinfo.h"
+#include "OpenGLESDispatch/OpenGLDispatchLoader.h"
 #include "android/process_setup.h"
 #include "android/qt/qt_path.h"
 #include "android/skin/qt/QtLogger.h"
@@ -58,11 +59,11 @@ using android::emulation::control::EmulatorAdvertisement;
 namespace fc = android::featurecontrol;
 
 extern void injectFishtankConsoleAgents();
+extern "C" void injectFishtankOpenglesFuncs();
 
 // HACK ATTACK
 extern "C" void emulator_window_setup(EmulatorWindow* emulator);
 extern void skin_winsys_setup_library_paths();
-extern void android_set_external_renderer_active(bool active);
 extern void myMessageOutput(QtMsgType type,
                             const QMessageLogContext& context,
                             const QString& msg);
@@ -287,24 +288,23 @@ static void setupRenderer(AndroidHwConfig* hw, const std::string& program_dir) {
         str_reset(&hw->hw_gpu_mode, "swiftshader_indirect");
     }
 
-    android_set_external_renderer_active(true);
+    // Override default OpenGLES behavior with fishtank-specific functions.
+    injectFishtankOpenglesFuncs();
 
-    RendererConfig rendererConfig;
-    if (!configureRenderer(WINSYS_GLESBACKEND_PREFERENCE_SWIFTSHADER_DEPRECATED,
-                           &rendererConfig)) {
-        derror("Error: could not configure renderer!");
-    }
-
+    bool isSwiftshader = false;
     if (!strcmp(hw->hw_gpu_mode, "swiftshader_indirect") ||
         !strcmp(hw->hw_gpu_mode, "swiftshader")) {
+        isSwiftshader = true;
         auto swiftshader_dir = pj({program_dir, "lib64", "gles_swiftshader"});
         LOG(INFO) << "Adding swiftshader library search path: "
                   << swiftshader_dir;
         add_library_search_dir(swiftshader_dir.c_str());
     }
 
-    if (!startRenderer(&rendererConfig)) {
-        derror("Could not start renderer");
+    auto egl = gfxstream::host::gl::LazyLoadedEGLDispatch::get();
+    if (egl && egl->eglUseOsEglApi) {
+        LOG(INFO) << "Configuring EGL-on-EGL: " << (isSwiftshader ? "on" : "off");
+        egl->eglUseOsEglApi(isSwiftshader ? EGL_TRUE : EGL_FALSE, EGL_FALSE);
     }
 }
 
@@ -527,7 +527,6 @@ int main(int argc, char* argv[]) {
     skin_winsys_enter_main_loop(false);
 
     LOG(INFO) << "Completed main loop";
-    stopRenderer();
     emulator_finiUserInterface();
     process_late_teardown();
     LOG(INFO) << "Bye bye!";

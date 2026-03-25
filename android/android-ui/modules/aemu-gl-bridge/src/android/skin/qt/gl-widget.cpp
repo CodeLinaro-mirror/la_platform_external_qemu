@@ -141,7 +141,7 @@ bool GLWidget::ensureInit() {
     mEGLState->context = mEGL->eglCreateContext(
         mEGLState->display,
         egl_config,
-        (EGLContext)ops->get_global_egl_context(),
+        (EGLContext)(ops ? ops->get_global_egl_context() : 0),
         context_attribs);
 
     if (mEGLState->context == EGL_NO_CONTEXT) {
