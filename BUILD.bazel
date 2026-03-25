@@ -20,7 +20,10 @@ license(
     visibility = ["//visibility:public"],
 )
 
-exports_files(["COPYING"])
+exports_files([
+    "COPYING",
+    "google/build/darwin-entitlements.plist",
+])
 
 cc_binary(
     name = "qemu-img",
