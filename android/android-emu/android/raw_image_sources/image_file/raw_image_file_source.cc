@@ -15,6 +15,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "absl/status/status.h"
 #include "aemu/base/logging/Log.h"
 #include "android/raw_image_sources/raw_image_source.h"
 
@@ -241,7 +242,13 @@ int RawImageFileSource::Start(uint32_t pixel_format,
                                      int height) {
     return 0;
 }
-int RawImageFileSource::AccessImage(std::function<int(RawImageBuffer*)> accessor) {
+
+bool RawImageFileSource::HasUpdate(RawImageToken token) {
+    return token.token != 1;
+}
+
+absl::StatusOr<RawImageToken> RawImageFileSource::AccessImage(
+        std::function<absl::Status(RawImageBuffer*)> accessor) {
     size_t buffer_size;
     uint32_t pixel_format;
     int width;
@@ -249,8 +256,12 @@ int RawImageFileSource::AccessImage(std::function<int(RawImageBuffer*)> accessor
     struct RawImageBuffer im = {image_.data_ptr,
                        static_cast<size_t>(image_.line_size) * image_.height,
                        V4L2_PIX_FMT_RGB32, image_.width, image_.height};
-
-    return accessor(&im);
+    absl::Status ret = accessor(&im);
+    if (ret.ok()) {
+        return RawImageToken{1};
+    } else {
+        return ret;
+    }
 }
 
 int RawImageFileSource::Stop() {

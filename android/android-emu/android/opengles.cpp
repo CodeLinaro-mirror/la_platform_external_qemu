@@ -447,6 +447,7 @@ int android_startOpenglesRenderer(
             .set_skip_snapshot_save = vm_operations->setSkipSnapshotSave,
             .set_skip_snapshot_save_reason = vm_operations->setSkipSnapshotSaveReason,
             .set_snapshot_uses_vulkan = vm_operations->setStatSnapshotUseVulkan,
+            .add_crash_reporter_log = vm_operations->addCrashReporterLog,
     });
     sRenderLib->setAddressSpaceDeviceControlOps(
             get_address_space_device_control_ops());

@@ -149,6 +149,12 @@ public:
     // Returns false on error.
     static bool reloadEnvironment(const char* environmentData);
 
+    // Returns the rotation amount needed to display the scene upright.
+    static int getSceneBaseRotation();
+
+    // Same, but called already holding the lock.
+    static int getSceneBaseRotationLocked();
+
 private:
     static android::base::StaticLock mLock;
     static std::shared_ptr<Scene> mEnvironmentScene;
@@ -179,6 +185,7 @@ public:
 private:
     static std::unique_ptr<SceneCamera> mSceneCamera;
     static std::unique_ptr<RendererView> mBackgroundView;
+    static std::vector<uint8_t> mReadbackDataCopy;
     static bool mStarted;
 };
 

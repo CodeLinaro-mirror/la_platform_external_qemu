@@ -19,6 +19,7 @@
 #include "android/camera/camera-virtualscene.h"
 #include "android/virtualscene/Renderer.h"
 #include "android/virtualscene/Scene.h"
+#include "android/virtualscene/VirtualSceneManager.h"
 
 #define VIRTUALSCENE_PIXEL_FORMAT V4L2_PIX_FMT_RGB32
 
@@ -98,6 +99,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 
         if (mOwnedScene) {
             sceneMode = mOwnedScene->getSceneMode();
+            mOwnedScene->loadUserResources();
         }
     }
 
@@ -127,6 +129,7 @@ void RenderedCameraDevice::stopCapturing() {
         VirtualSceneManager::setSceneControlsParameters(false);
         VirtualSceneManager::removeSceneUser();
     } else if (mOwnedScene) {
+        mOwnedScene->unloadUserResources();
         ScenesManager::removeScene(mOwnedScene.get());
         mOwnedScene.reset();
     }
@@ -180,6 +183,21 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
         if (viewHandlesRotation) {
             convertDirection = "front";
             convertOrientation = 1;
+        } else {
+            int rotation = 0;
+            if (mUseEnvironmentScene) {
+                rotation = VirtualSceneManager::getSceneBaseRotationLocked();
+            } else {
+                rotation = mOwnedScene->getSceneRotation();
+            }
+            if (rotation) {
+                // Apply the required base rotation to the image
+                convertOrientation += rotation / 90;
+                convertOrientation %= 4;
+                if (convertOrientation < 0) {
+                    convertOrientation += 4;
+                }
+            }
         }
         // Convert frame to the receiving buffers.
         conversionResult = convert_frame(

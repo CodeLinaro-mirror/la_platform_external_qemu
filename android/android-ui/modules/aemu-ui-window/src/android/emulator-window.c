@@ -743,10 +743,13 @@ void android_emulator_set_base_port(int port) {
 }
 
 SkinLayout* emulator_window_get_layout(EmulatorWindow* emulator) {
+    if (!emulator) {
+        return NULL;
+    }
     if (emulator->ui) {
         return skin_ui_get_current_layout(emulator->ui);
     } else {
-        if (emulator->opts->no_window) {
+        if (emulator->opts->no_window || !emulator->layout_file) {
             // in no-window mode there is no skin layout
             return NULL;
         } else {

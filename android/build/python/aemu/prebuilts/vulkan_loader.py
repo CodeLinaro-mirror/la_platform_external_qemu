@@ -26,7 +26,7 @@ import aemu.prebuilts.deps.common as deps_common
 
 AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
-HOST_ARCH = platform.machine().lower()
+HOST_ARCH = deps_common.getHostArchitecture()
 
 VULKAN_LOADER_REPO_URL = "https://github.com/KhronosGroup/Vulkan-Loader.git"
 VULKAN_LOADER_GIT_SHA = "bac4131"

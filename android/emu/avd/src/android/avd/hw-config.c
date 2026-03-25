@@ -564,6 +564,13 @@ int androidHwConfig_hasVirtualSceneCamera(AndroidHwConfig* config) {
     return strcmp(config->hw_camera_back, "virtualscene") == 0;
 }
 
+int androidHwConfig_hasVirtualSceneOrEnvironmentCamera(
+        AndroidHwConfig* config) {
+    return androidHwConfig_hasVirtualSceneCamera(config) ||
+           androidHwConfig_hasEnvironmentBackCamera(config) ||
+           androidHwConfig_hasEnvironmentFrontCamera(config);
+}
+
 int androidHwConfig_hasVideoPlaybackFrontCamera(AndroidHwConfig* config) {
     return strcmp(config->hw_camera_front, "videoplayback") == 0;
 }

@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <functional>
 #include <memory>
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 struct RawImageBuffer {
     uint8_t *buffer;
@@ -23,14 +25,32 @@ struct RawImageBuffer {
     int height;
 };
 
+struct RawImageToken {
+    int64_t token;
+};
+
 class RawImageSource {
 public:
     /* The arguments are suggestions, must check Image for resulting values */
     virtual int Start(uint32_t pixel_format, int width, int height) = 0;
     /* Image is only guaranteed to be valid within the scope of the accessor
      * function */
-    virtual int AccessImage(std::function<int(RawImageBuffer*)> accessor) = 0;
+    /* Checks if there is an update to the image, provided a token. The token is
+     * an opaque value provided from a previous call to AccessImage. For the
+     * first call, users should provide 0 here.
+     */
+    virtual bool HasUpdate(RawImageToken token) = 0;
+    /* Provides access to an image, to be used only within the provided accessor
+     * function. returns a negative value on error, or a token to be provided to
+     * HasUpdate
+     */
+    virtual absl::StatusOr<RawImageToken> AccessImage(
+            std::function<absl::Status(RawImageBuffer*)> accessor) = 0;
     virtual int Stop() = 0;
+    /* This is the rotation that must be applied to the images produced by this
+     * source to have them oriented in the natural way.
+     */
+    virtual int GetBaseRotation() { return 0; }
 };
 
 // DefaultImageProvider provides a 1x1 magenta image to serve as a default when
@@ -39,6 +59,8 @@ class DefaultRawImageProvider : public RawImageSource {
 public:
     DefaultRawImageProvider() = default;
     int Start(uint32_t pixel_format, int width, int height) override;
-    int AccessImage(std::function<int(RawImageBuffer*)> accessor) override;
+    bool HasUpdate(RawImageToken token) override;
+    absl::StatusOr<RawImageToken> AccessImage(
+            std::function<absl::Status(RawImageBuffer*)> accessor) override;
     int Stop() override;
 };

@@ -11,6 +11,8 @@
 #include "android/raw_image_sources/raw_image_source.h"
 #include <cstdint>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "android/camera/camera-common.h"
 
 static uint8_t defaultImageData[4] = {
@@ -25,9 +27,21 @@ int DefaultRawImageProvider::Start(uint32_t pixel_format,
                                         int height) {
     return 0;
 }
-int DefaultRawImageProvider::AccessImage(std::function<int(RawImageBuffer*)> accessor) {
-    return accessor(&defaultImage);
+
+bool DefaultRawImageProvider::HasUpdate(RawImageToken token) {
+    return token.token != 1;
 }
+
+absl::StatusOr<RawImageToken> DefaultRawImageProvider::AccessImage(
+        std::function<absl::Status(RawImageBuffer*)> accessor) {
+    absl::Status ret = accessor(&defaultImage);
+    if (ret.ok()) {
+        return RawImageToken{1};
+    } else {
+        return ret;
+    }
+}
+
 int DefaultRawImageProvider::Stop() {
     return 0;
 }

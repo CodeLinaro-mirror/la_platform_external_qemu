@@ -27,16 +27,16 @@
 #include "android/avd/info.h"
 #include "android/base/system/System.h"
 #include "android/console.h"
+#include "android/cpu_accelerator.h"
 #include "android/opengl/EmuglBackendList.h"
 #include "android/opengl/gpuinfo.h"
 #include "android/skin/backend-defs.h"
-#include "android/cpu_accelerator.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/crash-handler.h"
 #include "host-common/feature_control.h"
 #include "host-common/opengles.h"
-#include "vulkan/vulkan.h"
 #include "vulkan/vk_enum_string_helper.h"
+#include "vulkan/vulkan.h"
 
 #if defined(__APPLE__)
 #if (VK_HEADER_VERSION > 216)
@@ -72,8 +72,8 @@ static EmuglBackendList* sBackendList = NULL;
 
 static void resetBackendList() {
     delete sBackendList;
-    sBackendList = new EmuglBackendList(
-            System::get()->getLauncherDirectory().c_str());
+    sBackendList =
+            new EmuglBackendList(System::get()->getLauncherDirectory().c_str());
 }
 
 static bool stringVectorContains(const std::vector<std::string>& list,
@@ -113,8 +113,7 @@ emugl_host_gpu_prop_list emuglConfig_get_host_gpu_props() {
 SelectedRenderer emuglConfig_get_renderer(const char* gpu_mode) {
     if (!gpu_mode) {
         return SELECTED_RENDERER_UNKNOWN;
-    } else if (!strcmp(gpu_mode, "host") ||
-        !strcmp(gpu_mode, "on")) {
+    } else if (!strcmp(gpu_mode, "host") || !strcmp(gpu_mode, "on")) {
         return SELECTED_RENDERER_HOST;
     } else if (!strcmp(gpu_mode, "swiftshader")) {
         return SELECTED_RENDERER_SWIFTSHADER_INDIRECT;
@@ -129,10 +128,8 @@ SelectedRenderer emuglConfig_get_renderer(const char* gpu_mode) {
     }
 }
 
-static SelectedRenderer sCurrentGlesRenderer =
-    SELECTED_RENDERER_UNKNOWN;
-static SelectedRenderer sCurrentVulkanRenderer =
-    SELECTED_RENDERER_UNKNOWN;
+static SelectedRenderer sCurrentGlesRenderer = SELECTED_RENDERER_UNKNOWN;
+static SelectedRenderer sCurrentVulkanRenderer = SELECTED_RENDERER_UNKNOWN;
 static bool sCurrentRendererSet = false;
 
 SelectedRenderer emuglConfig_get_current_gles_renderer() {
@@ -187,7 +184,7 @@ void free_emugl_host_gpu_props(emugl_host_gpu_prop_list proplist) {
         free(proplist.props[i].version);
         free(proplist.props[i].renderer);
     }
-    delete [] proplist.props;
+    delete[] proplist.props;
 }
 
 static void setCurrentRenderer(const char* glesMode, const char* vulkanMode) {
@@ -214,7 +211,8 @@ struct DeviceSupportInfo {
     uint64_t getDeviceLocalMemorySize() const {
         uint64_t deviceLocalMemorySize = 0;
         for (uint32_t i = 0; i < memProperties.memoryHeapCount; i++) {
-            if (memProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+            if (memProperties.memoryHeaps[i].flags &
+                VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
                 deviceLocalMemorySize += memProperties.memoryHeaps[i].size;
             }
         }
@@ -251,8 +249,12 @@ struct DeviceSupportInfo {
         }
 
         // Use regular VK_API_VERSION encoding to print the version.
-        return std::to_string(VK_API_VERSION_MAJOR(physdevProps.driverVersion)) + "." +
-               std::to_string(VK_API_VERSION_MINOR(physdevProps.driverVersion)) + "." +
+        return std::to_string(
+                       VK_API_VERSION_MAJOR(physdevProps.driverVersion)) +
+               "." +
+               std::to_string(
+                       VK_API_VERSION_MINOR(physdevProps.driverVersion)) +
+               "." +
                std::to_string(VK_API_VERSION_PATCH(physdevProps.driverVersion));
     }
 };
@@ -270,7 +272,8 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
     }
 
     const char* EnvVarSelectGpu = "ANDROID_EMU_VK_SELECT_GPU";
-    std::string enforcedGpuStr = android::base::getEnvironmentVariable(EnvVarSelectGpu);
+    std::string enforcedGpuStr =
+            android::base::getEnvironmentVariable(EnvVarSelectGpu);
     int enforceGpuIndex = -1;
     if (enforcedGpuStr.size()) {
         dinfo("%s is set to %s", EnvVarSelectGpu, enforcedGpuStr.c_str());
@@ -280,16 +283,21 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
         } else {
             enforceGpuIndex = (atoi(enforcedGpuStr.c_str()));
             if (enforceGpuIndex == 0) {
-                // Could not convert to an integer, try searching with device name
-                // Do the comparison case insensitive as vendor names don't have consistency
+                // Could not convert to an integer, try searching with device
+                // name Do the comparison case insensitive as vendor names don't
+                // have consistency
                 enforceGpuIndex = -1;
-                std::transform(enforcedGpuStr.begin(), enforcedGpuStr.end(), enforcedGpuStr.begin(),
+                std::transform(enforcedGpuStr.begin(), enforcedGpuStr.end(),
+                               enforcedGpuStr.begin(),
                                [](unsigned char c) { return std::tolower(c); });
 
                 for (int i = 0; i < physdevCount; ++i) {
-                    std::string deviceName = std::string(deviceInfos[i].physdevProps.deviceName);
-                    std::transform(deviceName.begin(), deviceName.end(), deviceName.begin(),
-                                   [](unsigned char c) { return std::tolower(c); });
+                    std::string deviceName =
+                            std::string(deviceInfos[i].physdevProps.deviceName);
+                    std::transform(deviceName.begin(), deviceName.end(),
+                                   deviceName.begin(), [](unsigned char c) {
+                                       return std::tolower(c);
+                                   });
                     dinfo("Physical device [%d] = %s", i, deviceName.c_str());
 
                     if (deviceName.find(enforcedGpuStr) != std::string::npos) {
@@ -299,11 +307,14 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
             }
         }
 
-        if (enforceGpuIndex != -1 && enforceGpuIndex >= 0 && enforceGpuIndex < deviceInfos.size()) {
+        if (enforceGpuIndex != -1 && enforceGpuIndex >= 0 &&
+            enforceGpuIndex < deviceInfos.size()) {
             dinfo("Selecting GPU (%s) at index %d.",
-                 deviceInfos[enforceGpuIndex].physdevProps.deviceName, enforceGpuIndex);
+                  deviceInfos[enforceGpuIndex].physdevProps.deviceName,
+                  enforceGpuIndex);
         } else {
-            dwarning("Could not select the GPU with ANDROID_EMU_VK_GPU_SELECT.");
+            dwarning(
+                    "Could not select the GPU with ANDROID_EMU_VK_GPU_SELECT.");
             enforceGpuIndex = -1;
         }
     }
@@ -324,23 +335,27 @@ int getSelectedGpuIndex(const std::vector<DeviceSupportInfo>& deviceInfos) {
 
         // Matches the ordering in VkPhysicalDeviceType
         const uint32_t deviceTypeScoreTable[] = {
-            100,   // VK_PHYSICAL_DEVICE_TYPE_OTHER = 0,
-            1000,  // VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU = 1,
-            2000,  // VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU = 2,
-            500,   // VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU = 3,
-            600,   // VK_PHYSICAL_DEVICE_TYPE_CPU = 4,
+                100,   // VK_PHYSICAL_DEVICE_TYPE_OTHER = 0,
+                1000,  // VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU = 1,
+                2000,  // VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU = 2,
+                500,   // VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU = 3,
+                600,   // VK_PHYSICAL_DEVICE_TYPE_CPU = 4,
         };
 
         // Prefer discrete GPUs, then integrated and then others..
         const int deviceType = deviceInfo.physdevProps.deviceType;
         deviceScore += deviceTypeScoreTable[deviceInfo.physdevProps.deviceType];
 
-        // Prefer higher level of Vulkan API support, restrict version numbers to
-        // common limits to ensure an always increasing scoring change
-        const uint32_t major = VK_API_VERSION_MAJOR(deviceInfo.physdevProps.apiVersion);
-        const uint32_t minor = VK_API_VERSION_MINOR(deviceInfo.physdevProps.apiVersion);
-        const uint32_t patch = VK_API_VERSION_PATCH(deviceInfo.physdevProps.apiVersion);
-        deviceScore += major * 5000 + std::min(minor, 10u) * 500 + std::min(patch, 400u);
+        // Prefer higher level of Vulkan API support, restrict version numbers
+        // to common limits to ensure an always increasing scoring change
+        const uint32_t major =
+                VK_API_VERSION_MAJOR(deviceInfo.physdevProps.apiVersion);
+        const uint32_t minor =
+                VK_API_VERSION_MINOR(deviceInfo.physdevProps.apiVersion);
+        const uint32_t patch =
+                VK_API_VERSION_PATCH(deviceInfo.physdevProps.apiVersion);
+        deviceScore += major * 5000 + std::min(minor, 10u) * 500 +
+                       std::min(patch, 400u);
 
         return deviceScore;
     };
@@ -364,7 +379,8 @@ const char* emuglConfig_get_vulkan_runtime_full_path() {
         return sVkRuntimePath.c_str();
     }
 
-    const std::string explicitPath = System::getEnvironmentVariable("ANDROID_EMU_VK_LOADER_PATH");
+    const std::string explicitPath =
+            System::getEnvironmentVariable("ANDROID_EMU_VK_LOADER_PATH");
     if (!explicitPath.empty()) {
         sVkRuntimePath = explicitPath;
         return sVkRuntimePath.c_str();
@@ -486,7 +502,7 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
         *deviceMemBytes = vkProps.getDeviceLocalMemorySize();
     }
     if (deviceMaxAllocationCount) {
-        *deviceMaxAllocationCount= vkProps.getDeviceMaxAllocationCount();
+        *deviceMaxAllocationCount = vkProps.getDeviceMaxAllocationCount();
     }
     if (driverVersion) {
         *driverVersion = physicalProp.driverVersion;
@@ -502,8 +518,9 @@ void emuglConfig_get_vulkan_hardware_gpu(char** vendor,
     }
 }
 
-static bool vulkanExtensionSupported(const std::vector<VkExtensionProperties>& currentProps,
-                        const char* wantedExtName) {
+static bool vulkanExtensionSupported(
+        const std::vector<VkExtensionProperties>& currentProps,
+        const char* wantedExtName) {
     for (uint32_t i = 0; i < currentProps.size(); ++i) {
         if (!strcmp(wantedExtName, currentProps[i].extensionName)) {
             return true;
@@ -512,8 +529,9 @@ static bool vulkanExtensionSupported(const std::vector<VkExtensionProperties>& c
     return false;
 }
 
-static bool vulkanExtensionsSupported(const std::vector<VkExtensionProperties>& currentProps,
-                        const std::vector<const char*>& wantedExtNames) {
+static bool vulkanExtensionsSupported(
+        const std::vector<VkExtensionProperties>& currentProps,
+        const std::vector<const char*>& wantedExtNames) {
     for (size_t i = 0; i < wantedExtNames.size(); ++i) {
         if (!vulkanExtensionSupported(currentProps, wantedExtNames[i])) {
             return false;
@@ -717,14 +735,16 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
         dwarning("%s: cannot open vulkan lib %s\n", __func__, mylibname);
         return false;
     }
-    auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(library, "vkGetInstanceProcAddr"));
+    auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+            GetProcAddress(library, "vkGetInstanceProcAddr"));
 #else
     auto library = dlopen(mylibname, RTLD_NOW);
     if (!library) {
         dwarning("%s: failed to open %s", __func__, mylibname);
         return false;
     }
-    auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(library, "vkGetInstanceProcAddr"));
+    auto* pvkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+            dlsym(library, "vkGetInstanceProcAddr"));
 #endif
 
     if (!pvkGetInstanceProcAddr) {
@@ -775,7 +795,8 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
     }
     dprint("%s: Successfully created vulkan instance\n", __func__);
 
-    auto* pvkDestroyInstance = GET_VK_INSTANCE_PROC(instance, vkDestroyInstance);
+    auto* pvkDestroyInstance =
+            GET_VK_INSTANCE_PROC(instance, vkDestroyInstance);
     auto* pvkEnumeratePhysicalDevices =
             GET_VK_INSTANCE_PROC(instance, vkEnumeratePhysicalDevices);
     auto* pvkGetPhysicalDeviceProperties =
@@ -788,8 +809,8 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
             instance, vkEnumerateInstanceExtensionProperties);
     auto* pvkEnumerateDeviceExtensionProperties = GET_VK_INSTANCE_PROC(
             instance, vkEnumerateDeviceExtensionProperties);
-    auto* pvkGetPhysicalDeviceFeatures2 = GET_VK_INSTANCE_PROC(
-            instance, vkGetPhysicalDeviceFeatures2);
+    auto* pvkGetPhysicalDeviceFeatures2 =
+            GET_VK_INSTANCE_PROC(instance, vkGetPhysicalDeviceFeatures2);
 
 #undef GET_VK_INSTANCE_PROC
 
@@ -923,11 +944,12 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
                     availableDeviceExtensions,
                     VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME)) {
             VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcrFeatures = {
-                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES,
+                    .sType =
+                            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES,
             };
             VkPhysicalDeviceFeatures2 features2 = {
-                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-                .pNext = &ycbcrFeatures,
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+                    .pNext = &ycbcrFeatures,
             };
             pvkGetPhysicalDeviceFeatures2(devices[i], &features2);
 
@@ -966,7 +988,8 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
 bool emuglConfig_init(EmuglConfig* config,
                       const char* gpu_mode_requested,
                       bool no_window) {
-    D("%s: gpu_mode_requested: %s, no_window: %d\n", __FUNCTION__, gpu_mode_requested, no_window);
+    D("%s: gpu_mode_requested: %s, no_window: %d\n", __FUNCTION__,
+      gpu_mode_requested, no_window);
 
     // zero all fields first.
     memset(config, 0, sizeof(*config));
@@ -974,11 +997,7 @@ bool emuglConfig_init(EmuglConfig* config,
     const char DEFAULT_SOFTWARE_VULKAN_MODE[] = "lavapipe";
 
     std::vector<std::string> allowedOptions = {
-        "auto",
-        "host",
-        "lavapipe",
-        "swiftshader",
-        "swangle",
+            "auto", "host", "lavapipe", "swiftshader", "swangle",
     };
     bool isValid = false;
     for (auto& option : allowedOptions) {
@@ -999,10 +1018,11 @@ bool emuglConfig_init(EmuglConfig* config,
         derror("%s: %s", __func__, error);
 
         const char* gpu_mode_out = "error";
-        snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s", gpu_mode_out);
-        snprintf(config->gles_backend, sizeof(config->gles_backend), "%s", gpu_mode_out);
-        snprintf(config->status, sizeof(config->status), "%s",
-                    error.c_str());
+        snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s",
+                 gpu_mode_out);
+        snprintf(config->gles_backend, sizeof(config->gles_backend), "%s",
+                 gpu_mode_out);
+        snprintf(config->status, sizeof(config->status), "%s", error.c_str());
         setCurrentRenderer(gpu_mode_out, gpu_mode_out);
         return false;
     }
@@ -1070,8 +1090,10 @@ bool emuglConfig_init(EmuglConfig* config,
         gles_mode_selected = "swangle";
 
 #if defined(__linux__)
-        const char* EnvVarSelectLLVMPipe = "ANDROID_EMU_LAVAPIPE_GL_MODE_LLVMPIPE";
-        if (android::base::getEnvironmentVariable(EnvVarSelectLLVMPipe) == "1") {
+        const char* EnvVarSelectLLVMPipe =
+                "ANDROID_EMU_LAVAPIPE_GL_MODE_LLVMPIPE";
+        if (android::base::getEnvironmentVariable(EnvVarSelectLLVMPipe) ==
+            "1") {
             gles_mode_selected = "llvmpipe";
             dinfo("Forcing 'llvmpipe' mode for GLES");
         }
@@ -1079,7 +1101,8 @@ bool emuglConfig_init(EmuglConfig* config,
 
         const bool force_swiftshader = fc::isEnabled(fc::ForceSwiftshader);
         const char* EnvVarSelectGL = "ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER";
-        if (force_swiftshader || android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
+        if (force_swiftshader ||
+            android::base::getEnvironmentVariable(EnvVarSelectGL) == "1") {
             gles_mode_selected = "swiftshader";
             dinfo("Forcing 'swiftshader' mode for GLES");
         }
@@ -1094,15 +1117,15 @@ bool emuglConfig_init(EmuglConfig* config,
         }
 #ifdef __APPLE__
         if (!switchToSoftwareGles) {
-            const int hostGpuMemoryLimitMB = 5 * 1024; // 5GB
+            const int hostGpuMemoryLimitMB = 5 * 1024;  // 5GB
             int freeRamMB = 0;
             System::isUnderMemoryPressure(&freeRamMB);
-    
-            // TODO(b/479126903): New macOS system update (Tahoe) leaks memory when
-            // host OpenGL driver is used, which is deprecated on macOS for some
-            // time. Check memory usage and decide to use software rendering for GL
-            // emulation if there is possibly a leak that may have cause system
-            // restarts.
+
+            // TODO(b/479126903): New macOS system update (Tahoe) leaks memory
+            // when host OpenGL driver is used, which is deprecated on macOS for
+            // some time. Check memory usage and decide to use software
+            // rendering for GL emulation if there is possibly a leak that may
+            // have cause system restarts.
             if (freeRamMB < hostGpuMemoryLimitMB) {
                 dwarning(
                         "Software GL rendering will be used due to system memory "
@@ -1132,7 +1155,8 @@ bool emuglConfig_init(EmuglConfig* config,
     }
 #elif defined(__APPLE__)
     // swiftshader / llvmpipe are not supported on macOS
-    if (gles_mode_selected == "swiftshader" || gles_mode_selected == "llvmpipe") {
+    if (gles_mode_selected == "swiftshader" ||
+        gles_mode_selected == "llvmpipe") {
         gles_mode_selected = "swangle";
     }
 #endif
@@ -1166,8 +1190,8 @@ bool emuglConfig_init(EmuglConfig* config,
             derror("%s: %s", __func__, error);
 
             const char* gpu_mode_out = "error";
-            snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s",
-                     gpu_mode_out);
+            snprintf(config->vulkan_backend, sizeof(config->vulkan_backend),
+                     "%s", gpu_mode_out);
             snprintf(config->gles_backend, sizeof(config->gles_backend), "%s",
                      gpu_mode_out);
             snprintf(config->status, sizeof(config->status), "%s",
@@ -1178,11 +1202,15 @@ bool emuglConfig_init(EmuglConfig* config,
     }
 
     // GPU mode should not change after this point
-    snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s", vulkan_mode_selected.c_str());
-    snprintf(config->gles_backend, sizeof(config->gles_backend), "%s", gles_mode_selected.c_str());
+    snprintf(config->vulkan_backend, sizeof(config->vulkan_backend), "%s",
+             vulkan_mode_selected.c_str());
+    snprintf(config->gles_backend, sizeof(config->gles_backend), "%s",
+             gles_mode_selected.c_str());
     snprintf(config->status, sizeof(config->status),
-             "GPU emulation enabled using Vulkan:'%s' GLES:'%s' modes", vulkan_mode_selected.c_str(), gles_mode_selected.c_str());
-    setCurrentRenderer(gles_mode_selected.c_str(), vulkan_mode_selected.c_str());
+             "GPU emulation enabled using Vulkan:'%s' GLES:'%s' modes",
+             vulkan_mode_selected.c_str(), gles_mode_selected.c_str());
+    setCurrentRenderer(gles_mode_selected.c_str(),
+                       vulkan_mode_selected.c_str());
 
 #if defined(__linux__) || defined(_WIN32)
     const bool hwGpuRequested = (emuglConfig_get_current_vulkan_renderer() ==
@@ -1235,7 +1263,7 @@ bool emuglConfig_init(EmuglConfig* config,
                 if (fc::isEnabled(fc::VulkanAllocateHostMemory)) {
                     dinfo("Enabled VulkanAllocateHostMemory feature for "
                           "gpu "
-                          "vendor %s on Linux\n",
+                          "vendor %s",
                           vkVendor);
                 }
             }
@@ -1290,7 +1318,7 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         // backend directory.
         std::string dir = sBackendList->getLibDirPath(config->gles_backend);
         if (dir.size()) {
-            D("Adding to the library search path: %s\n", dir.c_str());
+            dprint("Adding to the library search path: %s\n", dir.c_str());
             system->addLibrarySearchDir(dir);
         }
     }
@@ -1318,25 +1346,27 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
     //    ANDROID_GLESv2_LIB
     //
     // If a backend provides one of these libraries, use it.
-    const char* gles_library = (strcmp(config->gles_backend, "swangle")==0) ? "angle" : config->gles_backend;
+    const char* gles_library = (strcmp(config->gles_backend, "swangle") == 0)
+                                       ? "angle"
+                                       : config->gles_backend;
     std::string lib;
-    if (sBackendList->getBackendLibPath(
-            gles_library, EmuglBackendList::LIBRARY_EGL, &lib)) {
+    if (sBackendList->getBackendLibPath(gles_library,
+                                        EmuglBackendList::LIBRARY_EGL, &lib)) {
         system->envSet("ANDROID_EGL_LIB", lib);
     }
     if (sBackendList->getBackendLibPath(
-            gles_library, EmuglBackendList::LIBRARY_GLESv1, &lib)) {
+                gles_library, EmuglBackendList::LIBRARY_GLESv1, &lib)) {
         system->envSet("ANDROID_GLESv1_LIB", lib);
     } else {
         derror("OpenGL backend '%s' without OpenGL ES 1.x library detected. "
-                        "Using GLESv2 only.",
-                        gles_library);
+               "Using GLESv2 only.",
+               gles_library);
         // A GLESv1 lib is optional---we can deal with a GLESv2 only
         // backend by using CoreProfileEngine in the Translator.
     }
 
     if (sBackendList->getBackendLibPath(
-            gles_library, EmuglBackendList::LIBRARY_GLESv2, &lib)) {
+                gles_library, EmuglBackendList::LIBRARY_GLESv2, &lib)) {
         system->envSet("ANDROID_GLESv2_LIB", lib);
     }
 }

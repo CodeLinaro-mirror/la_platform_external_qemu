@@ -304,7 +304,7 @@ public:
     }
 
 private:
-    static constexpr int kBufferSize = 128;
+    static constexpr int kBufferSize = 256;
     char mBuffer[kBufferSize];
     int mPos = 0;
 };

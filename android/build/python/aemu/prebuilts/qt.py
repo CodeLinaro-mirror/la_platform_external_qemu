@@ -32,7 +32,7 @@ import platform
 
 AOSP_ROOT = Path(__file__).resolve().parents[7]
 HOST_OS = platform.system().lower()
-HOST_ARCH = platform.machine().lower()
+HOST_ARCH = deps_common.getHostArchitecture()
 
 QT_VERSION = "6.5.3"
 QT_SUBMODULES = [

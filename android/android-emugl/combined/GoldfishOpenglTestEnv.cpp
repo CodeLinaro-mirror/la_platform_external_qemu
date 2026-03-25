@@ -379,6 +379,12 @@ static const QAndroidVmOperations sQAndroidVmOperations = {
                             "Vulkan"
                             "skipped\n");
                 },
+        .addCrashReporterLog =
+                [](const char* message) {
+                    fprintf(stderr,
+                            "goldfish-opengl vm ops: add crash reporter log '%s'\n",
+                            message);
+                },
         .hostmemRegister = android_emulation_hostmem_register,
         .hostmemUnregister = android_emulation_hostmem_unregister,
         .hostmemGetInfo = android_emulation_hostmem_get_info,
