@@ -163,7 +163,6 @@ int main(int argc, char **argv)
 #include "android/console.h"
 #include "host-common/crash-handler.h"
 #include "host-common/hw-config-helper.h"
-#include "android/cros.h"
 #include "android/emulation/bufprint_config_dirs.h"
 #include "android/emulation/QemuMiscPipe.h"
 #include "android/error-messages.h"
@@ -4790,13 +4789,6 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
             }
         }
 
-        if (getConsoleAgents()->settings->hw()->hw_arc) {
-            if (cros_pipe_init() < 0) {
-                error_report("could not initialize qemud 'cros' channel");
-                return 1;
-            }
-        }
-
         if (lcd_density) {
             boot_property_add_qemu_sf_lcd_density(lcd_density);
         }
@@ -5428,7 +5420,7 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
             strcmp(getConsoleAgents()->settings->hw()->hw_camera_front, "none")) \
     X("have-keyboard", have_keyboard) \
     X("have-lidswitch", getConsoleAgents()->settings->hw()->hw_keyboard_lid) \
-    X("have-tabletmode", getConsoleAgents()->settings->hw()->hw_arc) \
+    X("have-tabletmode", false) \
     X("have-touch", androidHwConfig_isScreenTouch(getConsoleAgents()->settings->hw())) \
     X("have-multitouch", have_multitouch)
 

@@ -34,7 +34,6 @@ struct AvdGenerateInfo {
     const char* fastbootForceColdBoot; // fastboot.forceColdBoot=no
     const char* fastbootForceFastBoot; // fastboot.forceFastBoot=yes
     const char* hwAccelerometer; // hw.accelerometer=yes
-    const char* hwArc; // hw.arc=false
     const char* hwAudioInput; // hw.audioInput=yes
     const char* hwAudioOutput; // hw.audioOutput=yes
     const char* hwBattery; // hw.battery=yes
