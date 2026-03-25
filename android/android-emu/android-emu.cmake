@@ -266,7 +266,6 @@ target_link_libraries(
          emulator-tinyobjloader
          emulator-libkeymaster3
          emulator-murmurhash
-         emulator-tinyepoxy
          aemu-recording
          webrtc-yuv
          android-emu-curl
@@ -376,10 +375,6 @@ target_compile_definitions(android-emu PRIVATE "-D_LIBCPP_VERSION=__GLIBCPP__")
 
 if(WEBRTC)
   target_compile_definitions(android-emu PUBLIC ANDROID_WEBRTC)
-endif()
-
-if(OPTION_GFXSTREAM_BACKEND)
-  target_compile_definitions(android-emu PUBLIC AEMU_GFXSTREAM_BACKEND=1)
 endif()
 
 # The dependent target os specific sources, they are pretty much the same as
@@ -573,11 +568,7 @@ endif()
 
 target_compile_definitions(android-emu-shared PUBLIC -DAEMU_MIN=1)
 
-if(OPTION_GFXSTREAM_BACKEND)
-  target_compile_definitions(android-emu-shared
-                             PUBLIC -DAEMU_GFXSTREAM_BACKEND=1)
-  android_install_shared_library(TARGET android-emu-shared)
-endif()
+android_install_shared_library(TARGET android-emu-shared)
 
 # This library contains a main entry point that injects fake console agents into
 # your unit tests. you usually want to link against this library if you need to
