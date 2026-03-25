@@ -204,20 +204,20 @@ int RawVideofileSource::Start(uint32_t pixel_format, int width, int height) {
     }
 };
 
-void RawVideofileSource::UpdateTime(int64_t nextTimeUs) {
+absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
+        int64_t target_time_us,
+        std::optional<RawImageToken> token,
+        std::function<absl::Status(const RawImageBuffer*)> updater) {
+    int64_t target_time_pts = GetPtsFromUs(target_time_us);
     // If the time has not changed, we're probably paused
-    paused_ = (last_update_time_us_ == nextTimeUs);
+    paused_ = (last_update_time_us_ == target_time_us);
     // TODO(virtualscene-video) Handle seek
-    last_update_time_us_ = nextTimeUs;
-}
+    last_update_time_us_ = target_time_us;
+    if (paused_ && token.has_value() &&
+        token.value().token == last_update_time_pts_) {
+        return std::nullopt;
+    }
 
-bool RawVideofileSource::HasUpdate(RawImageToken token) {
-    int64_t current_time = android::base::System::get()->getUnixTimeUs();
-    return !paused_ && std::abs(current_time - token.token) > us_per_frame_;
-}
-
-absl::StatusOr<RawImageToken> RawVideofileSource::AccessImage(
-        std::function<absl::Status(RawImageBuffer*)> accessor) {
     if (const AVFrame* avFrame = decodeNextFrame()) {
         avFrame = convertFrameToRGBA(*avFrame);
         if (!avFrame) {
@@ -232,9 +232,18 @@ absl::StatusOr<RawImageToken> RawVideofileSource::AccessImage(
         img.height = avFrame->height;
         img.pixel_format = V4L2_PIX_FMT_RGB32;
 
-        int64_t frame_time = android::base::System::get()->getUnixTimeUs();
-        absl::Status ret = accessor(&img);
+        int64_t frame_time;
+        if (avFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
+            frame_time = avFrame->best_effort_timestamp;
+        } else {
+            dwarning(
+                    "No best effort time available. Using provided time of %" PRId64,
+                    last_update_time_us_);
+            frame_time = target_time_us;
+        }
+        absl::Status ret = updater(&img);
         if (ret.ok()) {
+            last_update_time_pts_ = frame_time;
             return RawImageToken{frame_time};
         } else {
             return ret;
@@ -261,6 +270,24 @@ int64_t RawVideofileSource::GetAnimationLengthUs() {
     }
     return mVideoFile.formatCtx->duration;
 }
+
+// Converts from the stream specific pts units to a microsecond value
+int64_t RawVideofileSource::GetUsFromPts(int64_t pts) const {
+    AVRational stream_time_base =
+            mVideoFile.formatCtx->streams[mVideoFile.videoStreamIndex]
+                    ->time_base;
+
+    return av_rescale_q(pts, stream_time_base, AV_TIME_BASE_Q);
+};
+
+// Converts from the stream specific pts units to a microsecond value
+int64_t RawVideofileSource::GetPtsFromUs(int64_t us) const {
+    AVRational stream_time_base =
+            mVideoFile.formatCtx->streams[mVideoFile.videoStreamIndex]
+                    ->time_base;
+
+    return av_rescale_q(us, AV_TIME_BASE_Q, stream_time_base);
+};
 
 const AVFrame* RawVideofileSource::decodeNextFrame() {
     AVPacket packet;
@@ -347,6 +374,7 @@ const AVFrame* RawVideofileSource::convertFrameToRGBA(const AVFrame& avFrame) {
 
     ::sws_scale(swsCtx, avFrame.data, avFrame.linesize, 0, avFrame.height,
                 mConvertedFrameCache->data, mConvertedFrameCache->linesize);
+    mConvertedFrameCache->best_effort_timestamp = avFrame.best_effort_timestamp;
     return mConvertedFrameCache.get();
 }
 

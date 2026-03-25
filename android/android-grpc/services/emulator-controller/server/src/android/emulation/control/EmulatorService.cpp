@@ -1570,6 +1570,21 @@ public:
         return true;
     }
 
+    Status setEnvironment(ServerContext* context,
+                          const Environment* environmentPtr,
+                          ::google::protobuf::Empty* empty) {
+        const auto& env = environmentPtr->environment();
+        std::stringstream ss;
+        for (const auto& [key, value] : env) {
+            ss << key << "=" << value << "\n";
+        }
+        const std::string newEnv = ss.str();
+        bool ret = mAgents->virtual_scene->reloadEnvironment(newEnv.c_str());
+        return ret ? Status::OK
+                   : Status(::grpc::StatusCode::INVALID_ARGUMENT,
+                            "Unable to load environment");
+    }
+
 private:
     const AndroidConsoleAgents* mAgents;
     keyboard::KeyEventSender mKeyEventSender;

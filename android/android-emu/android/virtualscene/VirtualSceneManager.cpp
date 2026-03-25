@@ -386,9 +386,14 @@ bool ScenesManager::renderView(Scene* scene,
 
             ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
                                fbData.data());
+            auto mode = ImageScaler::ScaleMode::AspectFitZoom;
+            // AspectFitZoom requires a minimum size.
+            // For a single color image, just use ScaleToFill
+            if (overlay->mWidth == 1 && overlay->mHeight == 1) {
+                mode = ImageScaler::ScaleMode::ScaleToFill;
+            }
             if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
-                                    overlay->mDataRGBA.data(),
-                                    ImageScaler::ScaleMode::AspectFitZoom)) {
+                                    overlay->mDataRGBA.data(), mode)) {
                 E("%s: Failed to resize the framebuffer for the view",
                   __FUNCTION__);
                 return false;
