@@ -2171,3 +2171,48 @@ AvdInfo* avdInfo_new_for_testing(AvdFlavor flavor) {
     info->flavor = flavor;
     return info;
 }
+
+/* find and parse the environment.ini file from the content directory */
+int avdInfo_getLastRunQemuVersion(const AvdInfo* info) {
+    char* qemuVersionPath =
+            _avdInfo_getContentFilePath(info, AVD_QEMU_VERSION_FILENAME);
+    if (qemuVersionPath == NULL) {
+        // file is not present, no problem
+        return 0;
+    }
+
+    int out_value = 0;
+
+    FILE* f = fopen(qemuVersionPath, "r");
+    if (f) {
+        // Try to parse an integer
+        if (fscanf(f, "%d", &out_value) != 1) {
+            // error, not a number or empty file
+            derror("Could not load %s", qemuVersionPath);
+            out_value = 0;
+        }
+        fclose(f);
+    }
+    AFREE(qemuVersionPath);
+
+    return out_value;
+}
+
+void avdInfo_setLastRunQemuVersion(AvdInfo* info, int version) {
+    char qemuVersionPath[MAX_PATH];
+    char *p = qemuVersionPath, *end = p + sizeof(qemuVersionPath);
+    p = bufprint(p, end, "%s" PATH_SEP "%s", info->contentPath, AVD_QEMU_VERSION_FILENAME);
+    if (p >= end) {
+        derror("%s: can't access virtual device content directory", __func__);
+        return;
+    }
+
+    FILE* f = fopen(qemuVersionPath, "w");
+    if (!f) {
+        derror("%s: Could not write file: %s", __func__, qemuVersionPath);
+        return;
+    }
+
+    fprintf(f, "%d", version);
+    fclose(f);
+}
