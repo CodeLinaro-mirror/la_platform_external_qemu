@@ -173,10 +173,6 @@ set(android_emu_dependent_src
     android/camera/camera-service.cpp
     android/camera/camera-sws-format-converter.cpp
     android/camera/camera-videofile.cpp
-    android/camera/camera-videoplayback-default-renderer.cpp
-    android/camera/camera-videoplayback-render-multiplexer.cpp
-    android/camera/camera-videoplayback-video-renderer.cpp
-    android/camera/camera-videoplayback.cpp
     android/camera/camera-virtualscene-utils.cpp
     android/camera/camera-virtualscene.cpp
     android/console.cpp

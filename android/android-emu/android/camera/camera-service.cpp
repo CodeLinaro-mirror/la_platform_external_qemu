@@ -34,7 +34,6 @@
 #include "android/camera/camera-imagefile.h"
 #include "android/camera/camera-metrics.h"
 #include "android/camera/camera-videofile.h"
-#include "android/camera/camera-videoplayback.h"
 #include "android/camera/camera-virtualscene.h"
 #include "android/console.h" /* for android_hw */
 #include "android/emulation/android_qemud.h"
