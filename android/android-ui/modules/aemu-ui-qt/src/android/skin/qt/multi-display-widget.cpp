@@ -255,7 +255,10 @@ void MultiDisplayWidget::repaintGL() {
     mGLES2->glActiveTexture(GL_TEXTURE0);
     mGLES2->glBindTexture(GL_TEXTURE_2D, mFrameTexture);
     struct AndroidVirtioGpuOps* ops = android_getVirtioGpuOps();
-    ops->bind_color_buffer_to_texture(mColorBufferId);
+    if (ops) {
+        ops->bind_color_buffer_to_texture(mColorBufferId);
+    }
+
     mGLES2->glUniform1i(mTextureSlot, 0);
     mGLES2->glUniform2f(mTranslationSlot, 0, 0);
 

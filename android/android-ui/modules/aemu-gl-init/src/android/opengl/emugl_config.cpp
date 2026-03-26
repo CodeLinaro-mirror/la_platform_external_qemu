@@ -1043,6 +1043,7 @@ bool emuglConfig_init(EmuglConfig* config,
 
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
+    bool sufficientHostVulkanDriver = true;
     if (vulkan_mode_selected == "auto") {
         bool switchToSoftwareVulkan = false;
         if (!is_xr_mode) {
@@ -1059,6 +1060,7 @@ bool emuglConfig_init(EmuglConfig* config,
             // Check if the driver is compatible
             if (!hasSufficientHostVulkanDriver(is_xr_mode)) {
                 dinfo("Host Vulkan driver is not supported.");
+                sufficientHostVulkanDriver = false;
                 switchToSoftwareVulkan = true;
             }
         }
@@ -1112,7 +1114,14 @@ bool emuglConfig_init(EmuglConfig* config,
     // based on some other parameters and prefer host
     if (gles_mode_selected == "auto") {
         bool switchToSoftwareGles = false;
-        if (no_window || async_query_host_gpu_blacklisted()) {
+
+        // If the host GPU is not good enough to support Vulkan in auto mode,
+        // use software rendering for GLES as well. This is mainly related to
+        // the lack of OpenGL related checks we can do at this point, and
+        // the longtail of old drivers causing problems on GLES rendering which
+        // are not added into the server side deny list.
+        if (no_window || async_query_host_gpu_blacklisted() ||
+            !sufficientHostVulkanDriver) {
             switchToSoftwareGles = true;
         }
 #ifdef __APPLE__

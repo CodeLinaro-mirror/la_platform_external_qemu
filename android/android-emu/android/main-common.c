@@ -61,6 +61,8 @@ struct QAndroidEmulatorWindowAgent;
 
 static const int DEFAULT_PARTITION_SIZE_IN_MB = 800;
 
+static const int EMULATOR_QEMU_VERSION = 2;
+
 /***********************************************************************/
 /***********************************************************************/
 /*****                                                             *****/
@@ -1811,6 +1813,23 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
     }
 
     apply_skin_quirks(avd);
+
+    int lastVersion = avdInfo_getLastRunQemuVersion(avd);
+    if (lastVersion != EMULATOR_QEMU_VERSION) {
+        if (lastVersion > 0) {
+            // File exists, and there is a mismatch
+            derror("AVD %s is not compatible with this emulator."
+                   "Last run QEMU version: %d, compatible QEMU version: %d",
+                   avdInfo_getName(avd), lastVersion, EMULATOR_QEMU_VERSION);
+            return false;
+        } else {
+            // Invalid version (e.g. missing file, first run), save the last
+            // version file for future qemu2 or qemu-next runs
+            dinfo("Saving last run QEMU version for the AVD to %d",
+                  EMULATOR_QEMU_VERSION);
+            avdInfo_setLastRunQemuVersion(avd, EMULATOR_QEMU_VERSION);
+        }
+    }
 
     /* update the avd hw config from this new skin */
     avdInfo_getSkinHardwareIni(avd, opts->skin, opts->skindir);

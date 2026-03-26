@@ -148,11 +148,6 @@ else()
                              PUBLIC "-DAEMU_TCMALLOC_ENABLED=0")
 endif()
 
-if(OPTION_GFXSTREAM_BACKEND)
-  target_compile_definitions(android-emu-base
-                             PUBLIC "-DAEMU_GFXSTREAM_BACKEND=1")
-endif()
-
 android_target_link_libraries(
   android-emu-base windows PUBLIC psapi::psapi iphlpapi::iphlpapi
                                   ws2_32::ws2_32 shlwapi::shlwapi

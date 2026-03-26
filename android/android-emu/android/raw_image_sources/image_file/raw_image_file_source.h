@@ -61,9 +61,11 @@ class RawImageFileSource : public RawImageSource {
 public:
     static std::unique_ptr<RawImageFileSource> Create(std::string filename);
     int Start(uint32_t pixel_format, int width, int height) override;
-    bool HasUpdate(RawImageToken token) override;
-    absl::StatusOr<RawImageToken> AccessImage(
-            std::function<absl::Status(RawImageBuffer*)> accessor) override;
+    absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
+            int64_t target_time_us,
+            std::optional<RawImageToken> token,
+            std::function<absl::Status(const RawImageBuffer*)> updater)
+            override;
     int Stop() override;
 
 private:

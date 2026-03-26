@@ -1549,14 +1549,10 @@ int avdInfo_initHwConfig(const AvdInfo* i, AndroidHwConfig* hw, bool isQemu2) {
      */
     if (ret == 0 && i->configIni != NULL) {
         ret = androidHwConfig_read(hw, i->configIni);
-        /* We will set hw.arc in avd manager when creating new avd.
-         * Before new avd manager released, we check tag.id to see
-         * if it's a Chrome OS image.
-         */
-        if (ret == 0 && !hw->hw_arc) {
+        if (ret == 0) {
             char* tag = iniFile_getString(i->configIni, TAG_ID, "default");
             if (!strcmp(tag, TAG_ID_CHROMEOS)) {
-                hw->hw_arc = true;
+                dfatal("ChromeOS images are not supported.");
             }
             AFREE(tag);
         }
@@ -1586,15 +1582,6 @@ int avdInfo_initHwConfig(const AvdInfo* i, AndroidHwConfig* hw, bool isQemu2) {
     // https://code.google.com/p/android/issues/detail?id=200332
     if (i->apiLevel <= 10 || (!isQemu2 && i->apiLevel <= 21)) {
         str_reset(&hw->hw_screen, "touch");
-    }
-
-    if (hw->hw_arc) {
-        // Chrome OS GPU acceleration is not perfect now, disable it
-        // in "default" mode, it still can be enabled with explicit
-        // setting.
-        if (hw->hw_gpu_mode == NULL || !strcmp(hw->hw_gpu_mode, "auto"))
-            str_reset(&hw->hw_gpu_mode, "off");
-        str_reset(&hw->hw_cpu_arch, "x86_64");
     }
 
     return ret;
@@ -2183,4 +2170,49 @@ AvdInfo* avdInfo_new_for_testing(AvdFlavor flavor) {
     AvdInfo* info = (AvdInfo*)calloc(1, sizeof(AvdInfo));
     info->flavor = flavor;
     return info;
+}
+
+/* find and parse the environment.ini file from the content directory */
+int avdInfo_getLastRunQemuVersion(const AvdInfo* info) {
+    char* qemuVersionPath =
+            _avdInfo_getContentFilePath(info, AVD_QEMU_VERSION_FILENAME);
+    if (qemuVersionPath == NULL) {
+        // file is not present, no problem
+        return 0;
+    }
+
+    int out_value = 0;
+
+    FILE* f = fopen(qemuVersionPath, "r");
+    if (f) {
+        // Try to parse an integer
+        if (fscanf(f, "%d", &out_value) != 1) {
+            // error, not a number or empty file
+            derror("Could not load %s", qemuVersionPath);
+            out_value = 0;
+        }
+        fclose(f);
+    }
+    AFREE(qemuVersionPath);
+
+    return out_value;
+}
+
+void avdInfo_setLastRunQemuVersion(AvdInfo* info, int version) {
+    char qemuVersionPath[MAX_PATH];
+    char *p = qemuVersionPath, *end = p + sizeof(qemuVersionPath);
+    p = bufprint(p, end, "%s" PATH_SEP "%s", info->contentPath, AVD_QEMU_VERSION_FILENAME);
+    if (p >= end) {
+        derror("%s: can't access virtual device content directory", __func__);
+        return;
+    }
+
+    FILE* f = fopen(qemuVersionPath, "w");
+    if (!f) {
+        derror("%s: Could not write file: %s", __func__, qemuVersionPath);
+        return;
+    }
+
+    fprintf(f, "%d", version);
+    fclose(f);
 }

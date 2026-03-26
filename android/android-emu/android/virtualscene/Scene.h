@@ -20,7 +20,6 @@
  * The Scene container for the Virtual Scene.
  */
 
-#include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "android/raw_image_sources/raw_image_source.h"
 #include "android/utils/compiler.h"
 #include "android/virtualscene/PosterInfo.h"
@@ -194,7 +193,7 @@ private:
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;
     std::unique_ptr<RawImageSource> mRawImageSource;
-    RawImageToken mRawImageSourceToken = {0};
+    std::optional<RawImageToken> mRawImageSourceToken;
     std::unique_ptr<SceneOverlayObject> mOverlayObject;
     uint64_t mObjectsVersion = 0;
     uint64_t mFrameTimeUs = 0;

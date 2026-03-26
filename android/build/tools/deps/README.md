@@ -453,8 +453,6 @@ $ emu-deps $HOME/src/android/emu-master-dev/out/mydot.dot --target android-emu_u
     │   ├── "emulator-libsparse"
     │   ├── "emulator-libwebp"
     │   ├── "emulator-murmurhash"
-    │   ├── "emulator-tinyepoxy"
-    │   │   └── "qemu-host-common-headers"
     │   ├── "emulator-tinyobjloader"
     │   ├── "gnss_proxy_lib"
     │   │   ├── "android-emu"

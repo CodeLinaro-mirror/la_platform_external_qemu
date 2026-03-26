@@ -141,18 +141,8 @@ static bool parseQemuOptForQcow2(bool wipeData) {
             {"sdcard", getConsoleAgents()->settings->hw()->hw_sdCard_path},
             {"encrypt", getConsoleAgents()->settings->hw()->disk_encryptionKeyPartition_path},
     };
-    /* List of paths to all images for cros.*/
-    const DriveBackingPair image_paths_hw_arc[] = {
-            {"system", getConsoleAgents()->settings->hw()->disk_systemPartition_initPath},
-            {"vendor", getConsoleAgents()->settings->hw()->disk_vendorPartition_initPath},
-            {"userdata", getConsoleAgents()->settings->hw()->disk_dataPartition_path},
-    };
     int count = sizeof(image_paths) / sizeof(image_paths[0]);
     const DriveBackingPair* images = image_paths;
-    if (getConsoleAgents()->settings->hw()->hw_arc) {
-        count = sizeof(image_paths_hw_arc) / sizeof(image_paths_hw_arc[0]);
-        images = image_paths_hw_arc;
-    }
     int p;
     QemuOptsList* optList = qemu_find_opts("drive");
     for (p = 0; p < count; p++) {
@@ -170,56 +160,22 @@ static bool parseQemuOptForQcow2(bool wipeData) {
         }
         char* image_basename = path_basename(backing_image_path);
         char* qcow2_path_buffer = nullptr;
-        bool need_create_tmp = false;
-        // ChromeOS and Android pass parameters differently
-        if (getConsoleAgents()->settings->hw()->hw_arc) {
-            if (p < 2) {
-                /* System & vendor image are special cases, the backing image is
-                 * in the SDK folder, but the QCoW2 image that the emulator
-                 * uses is created on a per-AVD basis and is placed in the
-                 * AVD's data folder.
-                 */
-                const char qcow2_suffix[] = "." QCOW2_SUFFIX;
-                size_t path_size =
-                        strlen(image_basename) + sizeof(qcow2_suffix) + 1;
-                char* image_qcow2_basename = (char*)malloc(path_size);
-                bufprint(image_qcow2_basename, image_qcow2_basename + path_size,
-                         "%s%s", image_basename, qcow2_suffix);
-                qcow2_path_buffer =
-                        path_join(avd_data_dir, image_qcow2_basename);
-                free(image_qcow2_basename);
+        const char qcow2_suffix[] = "." QCOW2_SUFFIX;
+        if (!qcow2_image_path ||
+            strcmp(qcow2_suffix, qcow2_image_path +
+                                        strlen(qcow2_image_path) -
+                                        strlen(qcow2_suffix))) {
+            // We are not using qcow2
+            continue;
+        }
+        if (!android::base::PathUtils::isAbsolute(qcow2_image_path)) {
+            qcow2_path_buffer = path_join(avd_data_dir, qcow2_image_path);
+            // bug: 130353176
+            // bug: 130724870
+            if (path_exists(qcow2_path_buffer)) {
+                sDriveShare->srcImagePaths[images[p].drive] = qcow2_path_buffer;
             } else {
-                /* For all the other images except system image,
-                 * just create another file alongside them
-                 * with a 'qcow2' extension
-                 */
-                const char qcow2_suffix[] = "." QCOW2_SUFFIX;
-                size_t path_size =
-                        strlen(backing_image_path) + sizeof(qcow2_suffix) + 1;
-                qcow2_path_buffer = (char*)malloc(path_size);
-                bufprint(qcow2_path_buffer, qcow2_path_buffer + path_size,
-                         "%s%s", backing_image_path, qcow2_suffix);
-            }
-            qcow2_image_path = qcow2_path_buffer;
-            sDriveShare->srcImagePaths[images[p].drive] = qcow2_image_path;
-        } else {
-            const char qcow2_suffix[] = "." QCOW2_SUFFIX;
-            if (!qcow2_image_path ||
-                strcmp(qcow2_suffix, qcow2_image_path +
-                                            strlen(qcow2_image_path) -
-                                            strlen(qcow2_suffix))) {
-                // We are not using qcow2
-                continue;
-            }
-            if (!android::base::PathUtils::isAbsolute(qcow2_image_path)) {
-                qcow2_path_buffer = path_join(avd_data_dir, qcow2_image_path);
-                // bug: 130353176
-                // bug: 130724870
-                if (path_exists(qcow2_path_buffer)) {
-                    sDriveShare->srcImagePaths[images[p].drive] = qcow2_path_buffer;
-                } else {
-                    sDriveShare->srcImagePaths[images[p].drive] = qcow2_image_path;
-                }
+                sDriveShare->srcImagePaths[images[p].drive] = qcow2_image_path;
             }
         }
 

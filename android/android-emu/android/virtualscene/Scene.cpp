@@ -33,6 +33,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <memory>
 
 using namespace android::base;
 using android::camera::CameraMetrics;
@@ -250,9 +251,17 @@ bool Scene::initialize() {
         if (!mRawImageSource) {
             derror("%s: Could not load background image: '%s', falling back to default",
                    __func__, mConfig.mFilename.c_str());
-            mRawImageSource = std::make_unique<DefaultRawImageProvider>();
+            mRawImageSource =
+                    std::make_unique<SolidColorImageProvider>(kErrorColor);
+            mConfig.mSceneMode = SceneConfig::Mode::ImageFile;
         }
         mBaseRotation = mRawImageSource->GetBaseRotation();
+
+        // Set up an initial black image
+        mOverlayObject = std::make_unique<SceneOverlayObject>();
+        mOverlayObject->mHeight = 1;
+        mOverlayObject->mWidth = 1;
+        mOverlayObject->mDataRGBA = {0x00, 0x00, 0x00, 0xFF};
     }
 
     mStartTimeUs = System::get()->getUnixTimeUs();
@@ -300,14 +309,21 @@ void Scene::update(bool updateTime) {
     if (updateTime) {
         // TODO(virtualscene): use ThreadLooper::nowNs(ClockType::kVirtual) ?
         mFrameTimeUs = System::get()->getUnixTimeUs() - mStartTimeUs;
+        if (mRawImageSource) {
+            int64_t animationLength = mRawImageSource->GetAnimationLengthUs();
+            if (animationLength > 0 && mFrameTimeUs > animationLength) {
+                mFrameTimeUs %= mRawImageSource->GetAnimationLengthUs();
+            }
+        }
+    } else {
+        // While paused, move our start time so we resume with the same value;
+        mStartTimeUs = System::get()->getUnixTimeUs() - mFrameTimeUs;
     }
 
-    if (mRawImageSource && mRawImageSource->HasUpdate(mRawImageSourceToken)) {
-        if (!mOverlayObject) {
-            mOverlayObject = std::make_unique<SceneOverlayObject>();
-        }
-        absl::StatusOr<RawImageToken> res =
-                mRawImageSource->AccessImage([&](RawImageBuffer* buffer) {
+    if (mRawImageSource) {
+        auto res = mRawImageSource->UpdateImage(
+                mFrameTimeUs, mRawImageSourceToken,
+                [&](const RawImageBuffer* buffer) {
                     if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
                         return absl::InvalidArgumentError(absl::StrFormat(
                                 "Unsupported pixel format from image source: %d",
@@ -325,9 +341,11 @@ void Scene::update(bool updateTime) {
                                 buffer->buffer, buffer->buffer_size);
                     return absl::OkStatus();
                 });
-
         if (res.ok()) {
-            mRawImageSourceToken = *res;
+            if (res->has_value()) {
+                mRawImageSourceToken = res.value();
+                mObjectsVersion++;
+            }
         } else {
             E("Failed to Update Image Source: %s", res.status().message());
         }

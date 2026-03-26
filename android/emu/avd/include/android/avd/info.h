@@ -169,6 +169,13 @@ const char*  avdInfo_getId( const AvdInfo*  i );
 static const int kUnknownApiLevel = 1000;
 int    avdInfo_getApiLevel( const AvdInfo*  i );
 
+
+/* Return the last QEMU version of the emulator used to run this AVD. */
+int  avdInfo_getLastRunQemuVersion( const AvdInfo*  i );
+
+/* Set the last run QEMU version used to run this AVD. */
+void avdInfo_setLastRunQemuVersion( AvdInfo*  i, int version);
+
 /* Return the target string originated from rootIni. */
 const char* avdInfo_getTarget(const AvdInfo* i);
 

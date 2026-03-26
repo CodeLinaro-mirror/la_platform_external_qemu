@@ -78,12 +78,7 @@ std::unique_ptr<android::base::ObservableProcess> RunNetsimd(
     NetsimdOptions options) {
   std::string executable = "netsimd";
   if (android::featurecontrol::isEnabled(android::featurecontrol::NetsimX)) {
-#ifdef _WIN32
-    // TODO: remove this once netsimdx.exe is available on windows.
-    BtsLogWarn("NetsimX is enabled but netsimdx is not yet available on Windows.");
-#else
     executable = "netsimdx";
-#endif
   }
   auto exe = android::base::System::get()->findBundledExecutable(executable);
   std::vector<std::string> program_with_args{exe};

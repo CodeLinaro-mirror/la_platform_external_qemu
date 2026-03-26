@@ -621,14 +621,12 @@ static int createUserData(AvdInfo* avd,
                 return 1;
             }
 
-            if (!hw->hw_arc) {
-                resizeExt4Partition(getConsoleAgents()
-                                            ->settings->hw()
-                                            ->disk_dataPartition_path,
-                                    getConsoleAgents()
-                                            ->settings->hw()
-                                            ->disk_dataPartition_size);
-            }
+            resizeExt4Partition(getConsoleAgents()
+                                        ->settings->hw()
+                                        ->disk_dataPartition_path,
+                                getConsoleAgents()
+                                        ->settings->hw()
+                                        ->disk_dataPartition_size);
         }
     }
 
@@ -1465,7 +1463,7 @@ static bool checkConfigIniCompatible(std::string srcConfig,
             "abi.type",       "hw.cpu.arch",       "hw.lcd.density",
             "hw.lcd.height",  "hw.lcd.width",      "skin.name",
             "hw.camera.back", "hw.camera.front",   "hw.keyboard",
-            "hw.arc",         "environment.width", "environment.height"};
+            "environment.width", "environment.height"};
     for (auto&& key : srcConfigIni) {
         if (important.count(key) == 0) {
             continue;  // not important, ignore
@@ -2552,7 +2550,7 @@ extern "C" int main(int argc, char** argv) {
             crashhandler_die("Failed to initialize userdata.img.");
             return ret;
         }
-    } else if (!hw->hw_arc) {
+    } else {
         // Resize userdata-qemu.img if the size is smaller than what
         // config.ini says and also delete userdata-qemu.img.qcow2.
         // This can happen as user wants a larger data
@@ -2608,14 +2606,13 @@ extern "C" int main(int argc, char** argv) {
 
     // Make sure there's a temp cache partition if there wasn't a permanent one
     if ((!hw->disk_cachePartition_path ||
-         strcmp(hw->disk_cachePartition_path, "") == 0) &&
-        !hw->hw_arc) {
+         strcmp(hw->disk_cachePartition_path, "") == 0)) {
         str_reset(&hw->disk_cachePartition_path,
                   tempfile_path(tempfile_create()));
         createEmptyCacheFile = true;
     }
 
-    if (!path_exists(hw->disk_cachePartition_path) && !hw->hw_arc) {
+    if (!path_exists(hw->disk_cachePartition_path)) {
         createEmptyCacheFile = true;
     }
 
@@ -2855,41 +2852,25 @@ extern "C" int main(int argc, char** argv) {
 
     std::string bootconfigInitrdPath;
 
-    if (hw->hw_arc) {
+    if (hw->disk_ramdisk_path) {
         args.add2("-kernel", hw->kernel_path);
 
-        // hw->hw_arc: ChromeOS single disk image, use regular block device
-        // instead of virtio block device
-        args.add("-drive");
-        const char* avd_dir = avdInfo_getContentPath(avd);
-
-        args.addFormat("format=raw,file=cat:%s" PATH_SEP
-                       "system.img.qcow2|"
-                       "%s" PATH_SEP
-                       "userdata-qemu.img.qcow2|"
-                       "%s" PATH_SEP "vendor.img.qcow2",
-                       avd_dir, avd_dir, avd_dir);
-    } else {
-        if (hw->disk_ramdisk_path) {
-            args.add2("-kernel", hw->kernel_path);
-
-            if (fc::isEnabled(fc::AndroidbootProps) ||
-                fc::isEnabled(fc::AndroidbootProps2)) {
-                bootconfigInitrdPath = getWriteableFilename(
-                        hw->disk_dataPartition_path, "initrd");
-                args.add2("-initrd", bootconfigInitrdPath.c_str());
-            } else {
-                args.add2("-initrd", hw->disk_ramdisk_path);
-            }
+        if (fc::isEnabled(fc::AndroidbootProps) ||
+            fc::isEnabled(fc::AndroidbootProps2)) {
+            bootconfigInitrdPath = getWriteableFilename(
+                    hw->disk_dataPartition_path, "initrd");
+            args.add2("-initrd", bootconfigInitrdPath.c_str());
         } else {
-            android_panic("disk_ramdisk_path is required but missing");
-            return 1;
+            args.add2("-initrd", hw->disk_ramdisk_path);
         }
-
-        // add partition parameters with the sequence pre-defined in
-        // targetInfo.imagePartitionTypes
-        args.add(PartitionParameters::create(hw, avd));
+    } else {
+        android_panic("disk_ramdisk_path is required but missing");
+        return 1;
     }
+
+    // add partition parameters with the sequence pre-defined in
+    // targetInfo.imagePartitionTypes
+    args.add(PartitionParameters::create(hw, avd));
 
     if (fc::isEnabled(fc::KernelDeviceTreeBlobSupport)) {
         const std::string dtbFileName = getWriteableFilename(
@@ -3528,7 +3509,7 @@ extern "C" int main(int argc, char** argv) {
                 systemImageKernelCommandLine.c_str(), hw->kernel_parameters,
                 hw->kernel_path, &verified_boot_params,
                 rendererConfig.glFramebufferSizeBytes, pstore,
-                hw->hw_arc /* isCros */,
+                false /* isCros */,
                 std::move(kernelCmdLineUserspaceBootOpts));
 
         if (append_arg.empty()) {
@@ -3545,18 +3526,6 @@ extern "C" int main(int argc, char** argv) {
             } else {
                 args.add(argv[i]);
             }
-        }
-
-        if (hw->hw_arc) {
-            /* We don't use goldfish_fb in cros. Just use virtio vga now */
-            args.add2("-vga", "virtio");
-
-            /* We don't use goldfish_events for touch events in cros.
-             * Just use usb device now.
-             */
-            args.add2("-usbdevice", "tablet");
-            if (!isGuestMode)
-                args.add2("-display", "sdl,gl=on");
         }
 
         args.add("-append");

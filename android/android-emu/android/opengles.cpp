@@ -11,6 +11,7 @@
 */
 
 #include "host-common/opengles.h"
+#include "android/opengles-overrides.h"
 
 #include "aemu/base/CpuUsage.h"
 #include "aemu/base/async/ThreadLooper.h"
@@ -68,6 +69,25 @@ using gfxstream::ConsumerInterface;
 
 /* Name of the GLES rendering library we're going to use */
 #define RENDERER_LIB_NAME "libgfxstream_backend"
+
+static struct AndroidOpenglesFuncs* sActiveOpenglesFuncs = nullptr;
+static struct AndroidOpenglesFuncs* getDefaultOpenglesFuncs();
+
+/**
+ * @brief Retrieves the active OpenGLES function dispatch table.
+ *
+ * This function ensures that sActiveOpenglesFuncs is initialized. If no backend
+ * has called android_setOpenglesFuncs, it defaults to the standard
+ * gfxstream-based implementation.
+ *
+ * @return Pointer to the active AndroidOpenglesFuncs struct.
+ */
+static struct AndroidOpenglesFuncs* getActiveOpenglesFuncs() {
+    if (sActiveOpenglesFuncs) {
+        return sActiveOpenglesFuncs;
+    }
+    return getDefaultOpenglesFuncs();
+}
 
 static void (*gfxstream_android_setOpenglesRenderer)(
         gfxstream::RendererPtr* ptr) = NULL;
@@ -131,21 +151,37 @@ static const EGLDispatch* sEgl = nullptr;
 static const GLESv2Dispatch* sGlesv2 = nullptr;
 
 static bool sRunningInGfxstreamBackend = false;
+
+void android_setOpenglesFuncs(struct AndroidOpenglesFuncs* funcs) {
+    sActiveOpenglesFuncs = funcs;
+}
+
 // The two functions below only are called in gfxstream backend, which assumes
 // RenderLib is a static library.
-int android_prepareOpenglesEmulation(void) {
+static int prepareOpenglesEmulationImpl(void) {
     sRunningInGfxstreamBackend = true;
     return android_initOpenglesEmulation();
+}
+
+int android_prepareOpenglesEmulation(void) {
+    return getActiveOpenglesFuncs()->prepareOpenglesEmulation();
+}
+
+static int setOpenglesEmulationImpl(void* renderLib,
+                                    void* eglDispatch,
+                                    void* glesv2Dispatch) {
+    sRunningInGfxstreamBackend = true;
+    return 0;
 }
 
 int android_setOpenglesEmulation(void* renderLib,
                                  void* eglDispatch,
                                  void* glesv2Dispatch) {
-    sRunningInGfxstreamBackend = true;
-    return 0;
+    return getActiveOpenglesFuncs()->setOpenglesEmulation(
+            renderLib, eglDispatch, glesv2Dispatch);
 }
 
-int android_initOpenglesEmulation() {
+static int initOpenglesEmulationImpl() {
     char* error = NULL;
 
     if (sRenderLib != NULL)
@@ -213,6 +249,10 @@ BAD_EXIT:
     return -1;
 }
 
+int android_initOpenglesEmulation() {
+    return getActiveOpenglesFuncs()->initOpenglesEmulation();
+}
+
 namespace android {
 namespace featurecontrol {
 extern bool isEnabledLocal(Feature feature);
@@ -263,7 +303,7 @@ void RendererUnmapMemoryAsyncCallback(uint64_t gpa, uint64_t size) {
 }
 
 
-int android_startOpenglesRenderer(
+static int startOpenglesRendererImpl(
         int width,
         int height,
         bool guestPhoneApi,
@@ -569,7 +609,24 @@ int android_startOpenglesRenderer(
     return 0;
 }
 
-bool android_asyncReadbackSupported() {
+int android_startOpenglesRenderer(
+        int width,
+        int height,
+        bool guestPhoneApi,
+        int guestApiLevel,
+        const QAndroidVmOperations* vm_operations,
+        const QAndroidEmulatorWindowAgent* window_agent,
+        const QAndroidMultiDisplayAgent* multi_display_agent,
+        const void* gfxstreamFeatureSet,
+        int* glesMajorVersion_out,
+        int* glesMinorVersion_out) {
+    return getActiveOpenglesFuncs()->startOpenglesRenderer(
+            width, height, guestPhoneApi, guestApiLevel, vm_operations,
+            window_agent, multi_display_agent, gfxstreamFeatureSet,
+            glesMajorVersion_out, glesMinorVersion_out);
+}
+
+static bool asyncReadbackSupportedImpl() {
     if (sRenderer) {
         return sRenderer->asyncReadbackSupported();
     } else {
@@ -579,17 +636,29 @@ bool android_asyncReadbackSupported() {
     }
 }
 
-void android_setPostCallback(OnPostFunc onPost,
-                             void* onPostContext,
-                             bool useBgraReadback,
-                             uint32_t displayId) {
+bool android_asyncReadbackSupported() {
+    return getActiveOpenglesFuncs()->asyncReadbackSupported();
+}
+
+static void setPostCallbackImpl(OnPostFunc onPost,
+                                void* onPostContext,
+                                bool useBgraReadback,
+                                uint32_t displayId) {
     if (sRenderer) {
         sRenderer->setPostCallback(onPost, onPostContext, useBgraReadback,
                                    displayId);
     }
 }
 
-ReadPixelsFunc android_getReadPixelsFunc() {
+void android_setPostCallback(OnPostFunc onPost,
+                             void* onPostContext,
+                             bool useBgraReadback,
+                             uint32_t displayId) {
+    getActiveOpenglesFuncs()->setPostCallback(onPost, onPostContext,
+                                                  useBgraReadback, displayId);
+}
+
+static ReadPixelsFunc getReadPixelsFuncImpl() {
     if (sRenderer) {
         return sRenderer->getReadPixelsCallback();
     } else {
@@ -597,12 +666,20 @@ ReadPixelsFunc android_getReadPixelsFunc() {
     }
 }
 
-FlushReadPixelPipeline android_getFlushReadPixelPipeline() {
+ReadPixelsFunc android_getReadPixelsFunc() {
+    return getActiveOpenglesFuncs()->getReadPixelsFunc();
+}
+
+static FlushReadPixelPipeline getFlushReadPixelPipelineImpl() {
     if (sRenderer) {
         return sRenderer->getFlushReadPixelPipeline();
     } else {
         return nullptr;
     }
+}
+
+FlushReadPixelPipeline android_getFlushReadPixelPipeline() {
+    return getActiveOpenglesFuncs()->getFlushReadPixelPipeline();
 }
 
 static char* strdupBaseString(const char* src) {
@@ -632,9 +709,9 @@ static char* strdupBaseString(const char* src) {
     return result;
 }
 
-void android_getOpenglesHardwareStrings(char** vendor,
-                                        char** renderer,
-                                        char** version) {
+static void getOpenglesHardwareStringsImpl(char** vendor,
+                                           char** renderer,
+                                           char** version) {
     assert(vendor != NULL && renderer != NULL && version != NULL);
     assert(*vendor == NULL && *renderer == NULL && *version == NULL);
     if (!sRenderer) {
@@ -662,12 +739,23 @@ void android_getOpenglesHardwareStrings(char** vendor,
     }
 }
 
-void android_getOpenglesVersion(int* maj, int* min) {
+void android_getOpenglesHardwareStrings(char** vendor,
+                                        char** renderer,
+                                        char** version) {
+    getActiveOpenglesFuncs()->getOpenglesHardwareStrings(vendor, renderer,
+                                                             version);
+}
+
+static void getOpenglesVersionImpl(int* maj, int* min) {
     sRenderLib->getGlesVersion(maj, min);
     dinfo("%s: maj min %d %d", __func__, *maj, *min);
 }
 
-void android_stopOpenglesRenderer(bool wait) {
+void android_getOpenglesVersion(int* maj, int* min) {
+    getActiveOpenglesFuncs()->getOpenglesVersion(maj, min);
+}
+
+static void stopOpenglesRendererImpl(bool wait) {
     if (sRenderer) {
         sRenderer->stop(wait);
         if (wait) {
@@ -679,20 +767,45 @@ void android_stopOpenglesRenderer(bool wait) {
     }
 }
 
-void android_finishOpenglesRenderer() {
+void android_stopOpenglesRenderer(bool wait) {
+    getActiveOpenglesFuncs()->stopOpenglesRenderer(wait);
+}
+
+static void finishOpenglesRendererImpl() {
     if (sRenderer) {
         sRenderer->finish();
     }
+}
+
+void android_finishOpenglesRenderer() {
+    getActiveOpenglesFuncs()->finishOpenglesRenderer();
 }
 
 static gfxstream::RenderOpt sOpt;
 static int sWidth, sHeight;
 static int sNewWidth, sNewHeight;
 
-static bool sExternalRendererActive = false;
-
-void android_set_external_renderer_active(bool active) {
-    sExternalRendererActive = active;
+static int showOpenglesWindowImpl(void* window,
+                                  int wx,
+                                  int wy,
+                                  int ww,
+                                  int wh,
+                                  int fbw,
+                                  int fbh,
+                                  float dpr,
+                                  float rotation,
+                                  bool deleteExisting,
+                                  bool hideWindow) {
+    if (!sRenderer) {
+        return -1;
+    }
+    FBNativeWindowType win = (FBNativeWindowType)(uintptr_t)window;
+    bool success = sRenderer->showOpenGLSubwindow(win, wx, wy, ww, wh, fbw, fbh,
+                                                  dpr, rotation, deleteExisting,
+                                                  hideWindow);
+    sNewWidth = ww * dpr;
+    sNewHeight = wh * dpr;
+    return success ? 0 : -1;
 }
 
 int android_showOpenglesWindow(void* window,
@@ -706,49 +819,56 @@ int android_showOpenglesWindow(void* window,
                                float rotation,
                                bool deleteExisting,
                                bool hideWindow) {
-    if (sExternalRendererActive) {
-        return 0;
+    return getActiveOpenglesFuncs()->showOpenglesWindow(
+            window, wx, wy, ww, wh, fbw, fbh, dpr, rotation, deleteExisting,
+            hideWindow);
+}
+
+static void setOpenglesTranslationImpl(float px, float py) {
+    if (sRenderer) {
+        sRenderer->setOpenGLDisplayTranslation(px, py);
     }
-    if (!sRenderer) {
-        return -1;
-    }
-    FBNativeWindowType win = (FBNativeWindowType)(uintptr_t)window;
-    bool success = sRenderer->showOpenGLSubwindow(win, wx, wy, ww, wh, fbw, fbh,
-                                                  dpr, rotation, deleteExisting,
-                                                  hideWindow);
-    sNewWidth = ww * dpr;
-    sNewHeight = wh * dpr;
-    return success ? 0 : -1;
 }
 
 void android_setOpenglesTranslation(float px, float py) {
+    getActiveOpenglesFuncs()->setOpenglesTranslation(px, py);
+}
+
+static void setOpenglesScreenMaskImpl(int width,
+                                      int height,
+                                      const uint8_t* rgbaData) {
     if (sRenderer) {
-        sRenderer->setOpenGLDisplayTranslation(px, py);
+        sRenderer->setScreenMask(width, height, rgbaData);
     }
 }
 
 void android_setOpenglesScreenMask(int width,
                                    int height,
                                    const uint8_t* rgbaData) {
+    getActiveOpenglesFuncs()->setOpenglesScreenMask(width, height, rgbaData);
+}
+
+static void setOpenglesScreenBackgroundImpl(int width,
+                                            int height,
+                                            const uint8_t* rgbaData) {
     if (sRenderer) {
-        sRenderer->setScreenMask(width, height, rgbaData);
+        sRenderer->setScreenBackground(width, height, rgbaData);
     }
 }
 
 void android_setOpenglesScreenBackground(int width,
                                          int height,
                                          const uint8_t* rgbaData) {
-    if (sRenderer) {
-        sRenderer->setScreenBackground(width, height, rgbaData);
-    }
+    getActiveOpenglesFuncs()->setOpenglesScreenBackground(width, height,
+                                                              rgbaData);
 }
 
-void android_setOpenglesDisplayLayout(int screenWidth,
-                                      int screenHeight,
-                                      int displayPosX,
-                                      int displayPosY,
-                                      int displayWidth,
-                                      int displayHeight) {
+static void setOpenglesDisplayLayoutImpl(int screenWidth,
+                                         int screenHeight,
+                                         int displayPosX,
+                                         int displayPosY,
+                                         int displayWidth,
+                                         int displayHeight) {
     if (sRenderer) {
         dprint("%s: screen:%dx%d, display:%d %d %dx%d", __func__, screenWidth,
                screenHeight, displayPosX, displayPosY, displayWidth,
@@ -762,7 +882,18 @@ void android_setOpenglesDisplayLayout(int screenWidth,
     }
 }
 
-int android_hideOpenglesWindow(void) {
+void android_setOpenglesDisplayLayout(int screenWidth,
+                                      int screenHeight,
+                                      int displayPosX,
+                                      int displayPosY,
+                                      int displayWidth,
+                                      int displayHeight) {
+    getActiveOpenglesFuncs()->setOpenglesDisplayLayout(
+            screenWidth, screenHeight, displayPosX, displayPosY, displayWidth,
+            displayHeight);
+}
+
+static int hideOpenglesWindowImpl(void) {
     if (!sRenderer) {
         return -1;
     }
@@ -770,49 +901,81 @@ int android_hideOpenglesWindow(void) {
     return success ? 0 : -1;
 }
 
-void android_redrawOpenglesWindow(void) {
+int android_hideOpenglesWindow(void) {
+    return getActiveOpenglesFuncs()->hideOpenglesWindow();
+}
+
+static void redrawOpenglesWindowImpl(void) {
     if (sRenderer) {
         sRenderer->repaintOpenGLDisplay();
     }
 }
 
-void android_setShouldSkipDraw(bool skip) {
+void android_redrawOpenglesWindow(void) {
+    getActiveOpenglesFuncs()->redrawOpenglesWindow();
+}
+
+static void setShouldSkipDrawImpl(bool skip) {
     if (sRenderer) {
         sRenderer->setShouldSkipDraw(skip);
     }
 }
 
-bool android_getShouldSkipDraw(void) {
+void android_setShouldSkipDraw(bool skip) {
+    getActiveOpenglesFuncs()->setShouldSkipDraw(skip);
+}
+
+static bool getShouldSkipDrawImpl(void) {
     if (sRenderer) {
         return sRenderer->getShouldSkipDraw();
     }
     return false;
 }
 
-bool android_hasGuestPostedAFrame(void) {
+bool android_getShouldSkipDraw(void) {
+    return getActiveOpenglesFuncs()->getShouldSkipDraw();
+}
+
+static bool hasGuestPostedAFrameImpl(void) {
     if (sRenderer) {
         return sRenderer->hasGuestPostedAFrame();
     }
     return false;
 }
 
-void android_resetGuestPostedAFrame(void) {
+bool android_hasGuestPostedAFrame(void) {
+    return getActiveOpenglesFuncs()->hasGuestPostedAFrame();
+}
+
+static void resetGuestPostedAFrameImpl(void) {
     if (sRenderer) {
         sRenderer->resetGuestPostedAFrame();
     }
 }
 
+void android_resetGuestPostedAFrame(void) {
+    getActiveOpenglesFuncs()->resetGuestPostedAFrame();
+}
+
 static ScreenshotFunc sScreenshotFunc = nullptr;
 
-void android_registerScreenshotFunc(ScreenshotFunc f) {
+static void registerScreenshotFuncImpl(ScreenshotFunc f) {
     sScreenshotFunc = f;
 }
 
-bool android_screenShot(const char* dirname, uint32_t displayId) {
+void android_registerScreenshotFunc(ScreenshotFunc f) {
+    getActiveOpenglesFuncs()->registerScreenshotFunc(f);
+}
+
+static bool screenShotImpl(const char* dirname, uint32_t displayId) {
     if (sScreenshotFunc) {
         return sScreenshotFunc(dirname, displayId);
     }
     return false;
+}
+
+bool android_screenShot(const char* dirname, uint32_t displayId) {
+    return getActiveOpenglesFuncs()->screenShot(dirname, displayId);
 }
 
 extern "C" {
@@ -874,28 +1037,38 @@ void android_setOpenglesRenderer(gfxstream::RendererPtr* ptr) {
 }
 }  // extern "C"
 
-void android_onGuestGraphicsProcessCreate(uint64_t puid) {
+static void onGuestGraphicsProcessCreateImpl(uint64_t puid) {
     if (sRenderer) {
         sRenderer->onGuestGraphicsProcessCreate(puid);
     }
 }
 
-void android_cleanupProcGLObjects(uint64_t puid) {
+void android_onGuestGraphicsProcessCreate(uint64_t puid) {
+    getActiveOpenglesFuncs()->onGuestGraphicsProcessCreate(puid);
+}
+
+static void cleanupProcGLObjectsImpl(uint64_t puid) {
     if (sRenderer) {
         sRenderer->cleanupProcGLObjects(puid);
     }
 }
 
+void android_cleanupProcGLObjects(uint64_t puid) {
+    getActiveOpenglesFuncs()->cleanupProcGLObjects(puid);
+}
+
 void android_cleanupProcGLObjectsAndWaitFinished(uint64_t puid) {
+    getActiveOpenglesFuncs()->cleanupProcGLObjects(puid);
+}
+
+static void waitForOpenglesProcessCleanupImpl() {
     if (sRenderer) {
-        sRenderer->cleanupProcGLObjects(puid);
+        sRenderer->waitForProcessCleanup();
     }
 }
 
 void android_waitForOpenglesProcessCleanup() {
-    if (sRenderer) {
-        sRenderer->waitForProcessCleanup();
-    }
+    getActiveOpenglesFuncs()->waitForOpenglesProcessCleanup();
 }
 
 static void *sContext, *sRenderContext, *sSurface;
@@ -903,12 +1076,20 @@ static EGLint s_gles_attr[5];
 
 extern void tinyepoxy_init(const GLESv2Dispatch* gles, int version);
 
+static const EGLDispatch* getEgl() {
+    return (const EGLDispatch*)android_getEGLDispatch();
+}
+
+static const GLESv2Dispatch* getGles2() {
+    return (const GLESv2Dispatch*)android_getGLESv2Dispatch();
+}
+
 static bool prepare_epoxy(void) {
     if (!sRenderLib->getOpt(&sOpt)) {
         LOG(ERROR) << "Options not available";
         return false;
     }
-    if (!sEgl) {
+    if (!getEgl()) {
         derror("%s: invalid call, EGL emulation is not enabled", __func__);
         return false;
     }
@@ -916,21 +1097,21 @@ static bool prepare_epoxy(void) {
     sRenderLib->getGlesVersion(&major, &minor);
     EGLint attr[] = {EGL_CONTEXT_CLIENT_VERSION, major,
                      EGL_CONTEXT_MINOR_VERSION_KHR, minor, EGL_NONE};
-    sContext = sEgl->eglCreateContext(sOpt.display, sOpt.config, EGL_NO_CONTEXT,
+    sContext = getEgl()->eglCreateContext(sOpt.display, sOpt.config, EGL_NO_CONTEXT,
                                       attr);
     if (sContext == nullptr) {
         LOG(ERROR) << "Unable to create context";
         return false;
     }
     sRenderContext =
-            sEgl->eglCreateContext(sOpt.display, sOpt.config, sContext, attr);
+            getEgl()->eglCreateContext(sOpt.display, sOpt.config, sContext, attr);
     if (sRenderContext == nullptr) {
         LOG(ERROR) << "Unable to create  render context";
         return false;
     }
     static constexpr EGLint surface_attr[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1,
                                               EGL_NONE};
-    sSurface = sEgl->eglCreatePbufferSurface(sOpt.display, sOpt.config,
+    sSurface = getEgl()->eglCreatePbufferSurface(sOpt.display, sOpt.config,
                                              surface_attr);
     if (sSurface == EGL_NO_SURFACE) {
         LOG(ERROR) << "No egl surface";
@@ -938,136 +1119,55 @@ static bool prepare_epoxy(void) {
     }
     static_assert(sizeof(attr) == sizeof(s_gles_attr), "Mismatch");
     memcpy(s_gles_attr, attr, sizeof(s_gles_attr));
-    tinyepoxy_init(sGlesv2, major * 10 + minor);
+    tinyepoxy_init(getGles2(), major * 10 + minor);
     return true;
 }
 
-struct DisplayChangeListener;
-struct QEMUGLParams;
-
-void* android_gl_create_context(DisplayChangeListener* unuse1,
-                                QEMUGLParams* unuse2) {
-    static bool ok = prepare_epoxy();
-    if (!ok) {
-        return nullptr;
-    }
-    sEgl->eglMakeCurrent(sOpt.display, sSurface, sSurface, sContext);
-    return sEgl->eglCreateContext(sOpt.display, sOpt.config, sContext,
-                                  s_gles_attr);
-}
-
-void android_gl_destroy_context(DisplayChangeListener* unused, void* ctx) {
-    if (!sEgl) {
-        derror("%s: invalid call, EGL emulation is not enabled", __func__);
-        return;
-    }
-    sEgl->eglDestroyContext(sOpt.display, ctx);
-}
-
-int android_gl_make_context_current(DisplayChangeListener* unused, void* ctx) {
-    if (!sEgl) {
-        // Note that this won't set an error code, but since there is no sEgl object,
-        // calling eglGetError won't be possible as well.
-        derror("%s: invalid call, EGL emulation is not enabled", __func__);
-        return EGL_FALSE;
-    }
-    return sEgl->eglMakeCurrent(sOpt.display, sSurface, sSurface, ctx);
-}
-
-static GLuint s_tex_id, s_fbo_id;
-static uint32_t s_gfx_h, s_gfx_w;
-static bool s_y0_top;
-
-// ui/gtk-egl.c:gd_egl_scanout_texture as reference.
-void android_gl_scanout_texture(DisplayChangeListener* unuse,
-                                uint32_t backing_id,
-                                bool backing_y_0_top,
-                                uint32_t backing_width,
-                                uint32_t backing_height,
-                                uint32_t x,
-                                uint32_t y,
-                                uint32_t w,
-                                uint32_t h) {
-    if (!sEgl || !sGlesv2) {
-        derror("%s: invalid call, GLES emulation is not enabled", __func__);
-        return;
-    }
-    s_tex_id = backing_id;
-    s_gfx_h = h;
-    s_gfx_w = w;
-    s_y0_top = backing_y_0_top;
-    if (sNewWidth != sWidth || sNewHeight != sHeight) {
-        sRenderLib->getOpt(&sOpt);
-        sWidth = sNewWidth;
-        sHeight = sNewHeight;
-    }
-    sEgl->eglMakeCurrent(sOpt.display, sOpt.surface, sOpt.surface,
-                         sRenderContext);
-    if (!s_fbo_id) {
-        sGlesv2->glGenFramebuffers(1, &s_fbo_id);
-    }
-    sGlesv2->glBindFramebuffer(GL_FRAMEBUFFER_EXT, s_fbo_id);
-    sGlesv2->glViewport(0, 0, h, w);
-    sGlesv2->glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0,
-                                    GL_TEXTURE_2D, backing_id, 0);
-}
-
-// ui/gtk-egl.c:gd_egl_scanout_flush as reference.
-void android_gl_scanout_flush(DisplayChangeListener* unuse,
-                              uint32_t x,
-                              uint32_t y,
-                              uint32_t w,
-                              uint32_t h) {
-    if (!s_fbo_id) {
-        return;
-    }
-    if (!sEgl || !sGlesv2) {
-        derror("%s: invalid call, GLES emulation is not enabled", __func__);
-        return;
-    }
-    sEgl->eglMakeCurrent(sOpt.display, sOpt.surface, sOpt.surface,
-                         sRenderContext);
-
-    unsigned long long count = *(unsigned long long*)unuse;
-        if (count % 3 == 0) {
-            sGlesv2->glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-        } else if (count % 3 == 1) {
-            sGlesv2->glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-        } else {
-            sGlesv2->glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
-        }
-    sGlesv2->glBindFramebuffer(GL_READ_FRAMEBUFFER, s_fbo_id);
-    sGlesv2->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-    int y1 = s_y0_top ? 0 : s_gfx_h;
-    int y2 = s_y0_top ? s_gfx_h : 0;
-
-    sGlesv2->glViewport(0, 0, sWidth, sHeight);
-    sGlesv2->glBlitFramebuffer(0, y1, s_gfx_w, y2, 0, 0, sWidth, sHeight,
-                               GL_COLOR_BUFFER_BIT, GL_NEAREST);
-    sGlesv2->glClear(GL_COLOR_BUFFER_BIT);
-    sEgl->eglSwapBuffers(sOpt.display, sOpt.surface);
-    sGlesv2->glBindFramebuffer(GL_FRAMEBUFFER_EXT, s_fbo_id);
-}
-
-struct AndroidVirtioGpuOps* android_getVirtioGpuOps() {
+static struct AndroidVirtioGpuOps* getVirtioGpuOpsImpl() {
     if (sRenderer) {
         return sRenderer->getVirtioGpuOps();
     }
     return nullptr;
 }
 
-const void* android_getEGLDispatch() {
+struct AndroidVirtioGpuOps* android_getVirtioGpuOps() {
+    return getActiveOpenglesFuncs()->getVirtioGpuOps();
+}
+
+static const void* getEGLDispatchImpl() {
     return sEgl;
 }
 
-const void* android_getGLESv2Dispatch() {
+const void* android_getEGLDispatch() {
+    return getActiveOpenglesFuncs()->getEGLDispatch();
+}
+
+static const void* getGLESv2DispatchImpl() {
     return sGlesv2;
 }
 
-void android_setVsyncHz(int vsyncHz) {
+const void* android_getGLESv2Dispatch() {
+    return getActiveOpenglesFuncs()->getGLESv2Dispatch();
+}
+
+
+static void setVsyncHzImpl(int vsyncHz) {
     if (sRenderer) {
         sRenderer->setVsyncHz(vsyncHz);
+    }
+}
+
+void android_setVsyncHz(int vsyncHz) {
+    getActiveOpenglesFuncs()->setVsyncHz(vsyncHz);
+}
+
+static void setOpenglesDisplayConfigsImpl(int configId,
+                                          int w,
+                                          int h,
+                                          int dpiX,
+                                          int dpiY) {
+    if (sRenderer) {
+        sRenderer->setDisplayConfigs(configId, w, h, dpiX, dpiY);
     }
 }
 
@@ -1076,13 +1176,65 @@ void android_setOpenglesDisplayConfigs(int configId,
                                        int h,
                                        int dpiX,
                                        int dpiY) {
+    getActiveOpenglesFuncs()->setOpenglesDisplayConfigs(configId, w, h, dpiX,
+                                                            dpiY);
+}
+
+static void setOpenglesDisplayActiveConfigImpl(int configId) {
     if (sRenderer) {
-        sRenderer->setDisplayConfigs(configId, w, h, dpiX, dpiY);
+        sRenderer->setDisplayActiveConfig(configId);
     }
 }
 
 void android_setOpenglesDisplayActiveConfig(int configId) {
-    if (sRenderer) {
-        sRenderer->setDisplayActiveConfig(configId);
-    }
+    getActiveOpenglesFuncs()->setOpenglesDisplayActiveConfig(configId);
+}
+
+/**
+ * @brief Provides the default OpenGLES implementation.
+ *
+ * This implementation is based on the standard gfxstream renderer and is
+ * used unless a custom backend overrides it via android_setOpenglesFuncs.
+ *
+ * @return Pointer to a static AndroidOpenglesFuncs struct containing the
+ * default implementations.
+ */
+static struct AndroidOpenglesFuncs* getDefaultOpenglesFuncs() {
+    static struct AndroidOpenglesFuncs sDefaultOpenglesFuncs = {
+        .prepareOpenglesEmulation = prepareOpenglesEmulationImpl,
+        .setOpenglesEmulation = setOpenglesEmulationImpl,
+        .initOpenglesEmulation = initOpenglesEmulationImpl,
+        .startOpenglesRenderer = startOpenglesRendererImpl,
+        .asyncReadbackSupported = asyncReadbackSupportedImpl,
+        .setPostCallback = setPostCallbackImpl,
+        .getReadPixelsFunc = getReadPixelsFuncImpl,
+        .getFlushReadPixelPipeline = getFlushReadPixelPipelineImpl,
+        .getOpenglesHardwareStrings = getOpenglesHardwareStringsImpl,
+        .getOpenglesVersion = getOpenglesVersionImpl,
+        .showOpenglesWindow = showOpenglesWindowImpl,
+        .hideOpenglesWindow = hideOpenglesWindowImpl,
+        .setOpenglesTranslation = setOpenglesTranslationImpl,
+        .setOpenglesScreenMask = setOpenglesScreenMaskImpl,
+        .setOpenglesScreenBackground = setOpenglesScreenBackgroundImpl,
+        .setOpenglesDisplayLayout = setOpenglesDisplayLayoutImpl,
+        .redrawOpenglesWindow = redrawOpenglesWindowImpl,
+        .setShouldSkipDraw = setShouldSkipDrawImpl,
+        .getShouldSkipDraw = getShouldSkipDrawImpl,
+        .hasGuestPostedAFrame = hasGuestPostedAFrameImpl,
+        .resetGuestPostedAFrame = resetGuestPostedAFrameImpl,
+        .registerScreenshotFunc = registerScreenshotFuncImpl,
+        .screenShot = screenShotImpl,
+        .stopOpenglesRenderer = stopOpenglesRendererImpl,
+        .finishOpenglesRenderer = finishOpenglesRendererImpl,
+        .onGuestGraphicsProcessCreate = onGuestGraphicsProcessCreateImpl,
+        .cleanupProcGLObjects = cleanupProcGLObjectsImpl,
+        .waitForOpenglesProcessCleanup = waitForOpenglesProcessCleanupImpl,
+        .getVirtioGpuOps = getVirtioGpuOpsImpl,
+        .getEGLDispatch = getEGLDispatchImpl,
+        .getGLESv2Dispatch = getGLESv2DispatchImpl,
+        .setVsyncHz = setVsyncHzImpl,
+        .setOpenglesDisplayConfigs = setOpenglesDisplayConfigsImpl,
+        .setOpenglesDisplayActiveConfig = setOpenglesDisplayActiveConfigImpl,
+    };
+    return &sDefaultOpenglesFuncs;
 }

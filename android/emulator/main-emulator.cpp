@@ -227,7 +227,8 @@ static void clean_up_avd_contents_except_config_ini(const char* avd_folder) {
             "read-snapshot.txt",
             "data",
             "modem_simulator",
-            "default.dtb"};
+            "default.dtb",
+            "qemu-version.txt"};
     delete_files(avd_folder, files_to_delete, ARRAY_SIZE(files_to_delete));
 }
 
