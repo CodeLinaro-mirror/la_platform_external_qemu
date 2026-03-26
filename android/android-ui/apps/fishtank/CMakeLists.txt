@@ -238,7 +238,6 @@ if(NOT LINUX_AARCH64)
                               glib2_${ANDROID_TARGET_TAG}
                               libprotobuf
                               abseil_dll
-                              gfxstream_backend
                               ${RUNTIME_OS_DEPENDENCIES}
                               ${ANGLE_DEPENDENCIES}
                               ${SWIFTSHADER_DEPENDENCIES})
