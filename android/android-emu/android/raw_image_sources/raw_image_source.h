@@ -19,8 +19,8 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
-struct RawImageBuffer {
-    uint8_t *buffer;
+struct RawImageBufferView {
+    const uint8_t *buffer;
     size_t buffer_size;
     uint32_t pixel_format;
     int width;
@@ -47,7 +47,7 @@ public:
     virtual absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
             std::optional<RawImageToken> token,
-            std::function<absl::Status(const RawImageBuffer*)> updater) = 0;
+            std::function<absl::Status(const RawImageBufferView*)> updater) = 0;
     virtual int Stop() = 0;
     /* This is the rotation that must be applied to the images produced by this
      * source to have them oriented in the natural way.
@@ -77,11 +77,11 @@ public:
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
             std::optional<RawImageToken> token,
-            std::function<absl::Status(const RawImageBuffer*)> updater)
+            std::function<absl::Status(const RawImageBufferView*)> updater)
             override;
     int Stop() override;
 
 private:
     uint8_t image_[4];
-    RawImageBuffer buffer_;
+    RawImageBufferView buffer_;
 };

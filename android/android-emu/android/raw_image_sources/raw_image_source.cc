@@ -37,7 +37,7 @@ absl::StatusOr<std::optional<RawImageToken>>
 SolidColorImageProvider::UpdateImage(
         int64_t target_time_us,
         std::optional<RawImageToken> token,
-        std::function<absl::Status(const RawImageBuffer*)> updater) {
+        std::function<absl::Status(const RawImageBufferView*)> updater) {
     if (token.has_value() && token.value().token == 1) {
         return std::nullopt;
     }
