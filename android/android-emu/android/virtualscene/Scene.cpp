@@ -110,8 +110,6 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
         return SceneConfig::Mode::Mesh3D;
     } else if (sceneModeStr == "mesh3d") {
         return SceneConfig::Mode::Mesh3D;
-    } else if (sceneModeStr == "videoplayback") {
-        return SceneConfig::Mode::VideoPlayback;
     } else if (sceneModeStr == "videofile") {
         return SceneConfig::Mode::VideoFile;
     } else if (sceneModeStr == "imagefile") {
@@ -127,8 +125,6 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
 const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
     if (mode == SceneConfig::Mode::Mesh3D) {
         return "mesh3d";
-    } else if (mode == SceneConfig::Mode::VideoPlayback) {
-        return "videoplayback";
     } else if (mode == SceneConfig::Mode::VideoFile) {
         return "videofile";
     } else if (mode == SceneConfig::Mode::ImageFile) {
@@ -143,8 +139,7 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
 const char* SceneConfig::defaultArgumentForMode(SceneConfig::Mode mode) {
     if (mode == SceneConfig::Mode::Mesh3D) {
         return kDefaultSceneObj;
-    } else if (mode == SceneConfig::Mode::VideoPlayback ||
-               mode == SceneConfig::Mode::VideoFile) {
+    } else if (mode == SceneConfig::Mode::VideoFile) {
         return kDefaultVideoFile;
     } else if (mode == SceneConfig::Mode::ImageFile) {
         return kDefaultImageFile;
@@ -240,15 +235,6 @@ bool Scene::initialize() {
             // TODO (virtualScene) The virtual scene by default renders the
             // image rotated 90 degrees
             mBaseRotation = 90;
-        } break;
-        case SceneConfig::Mode::VideoPlayback: {
-            // TODO(virtualscene-video): actually load sceneFilename video,
-            // and change render()
-            if (!fs::exists(sceneFilename)) {
-                derror("%s: Could not load video file: %s", __func__,
-                       sceneFilename.c_str());
-                return false;
-            }
         } break;
         case SceneConfig::Mode::VideoFile: {
             needsRawImageSource = true;

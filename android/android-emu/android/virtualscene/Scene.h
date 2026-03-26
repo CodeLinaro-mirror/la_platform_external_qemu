@@ -41,7 +41,6 @@ struct SceneConfig {
     enum class Mode {
         Unknown = 0,
         Mesh3D,
-        VideoPlayback,
         VideoFile,
         ImageFile,
         Color,

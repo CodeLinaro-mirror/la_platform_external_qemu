@@ -346,41 +346,6 @@ bool ScenesManager::renderView(Scene* scene,
                 return false;
             }
         } break;
-        case SceneConfig::Mode::VideoPlayback: {
-            // TODO(virtualscene-video): create video playback scene and render
-            // a view Renders a procedural animation for now..
-            const int dummyVideoWidth = view->getWidthLocked();
-            const int dummyVideoHeight = view->getHeightLocked();
-            const int stride = dummyVideoWidth * 4;
-            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
-            if (fbData.size() < dummyVideoWidth * dummyVideoHeight * 4) {
-                // preRenderLocked failed
-                E("Scene rendering failed");
-                return false;
-            }
-            for (int y = 0; y < dummyVideoHeight; y++) {
-                for (int x = 0; x < dummyVideoWidth; x++) {
-                    uint8_t& r = fbData[(y * dummyVideoWidth + x) * 4 + 0];
-                    uint8_t& g = fbData[(y * dummyVideoWidth + x) * 4 + 1];
-                    uint8_t& b = fbData[(y * dummyVideoWidth + x) * 4 + 2];
-                    uint8_t& a = fbData[(y * dummyVideoWidth + x) * 4 + 3];
-
-                    float u = (x / (float)dummyVideoWidth) * 10.0;
-                    float v = (y / (float)dummyVideoHeight) * 10.0;
-                    float local_u = u - floor(u);
-                    float local_v = v - floor(v);
-                    float dist = abs(local_u - 0.5) + abs(local_v - 0.5);
-                    float threshold =
-                            0.1 + 0.4 * (0.5 + 0.5 * sin(renderTime * 6.283));
-                    float mask = (dist < threshold) ? 1.0 : 0.0;
-
-                    r = (uint8_t)(mask * 100);
-                    g = (uint8_t)(mask * 200);
-                    b = (uint8_t)(mask * 255);
-                    a = 255;
-                }
-            }
-        } break;
         case SceneConfig::Mode::ImageFile:
         case SceneConfig::Mode::VideoFile:
         case SceneConfig::Mode::Color: {
