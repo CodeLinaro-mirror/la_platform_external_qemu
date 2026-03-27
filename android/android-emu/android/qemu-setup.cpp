@@ -61,7 +61,6 @@
 #include "android/utils/sockets.h"                            // for SOCKET_...
 #include "android/utils/system.h"                             // for sleep_ms
 #include "android/utils/timezone.h"                           // for bufprin...
-#include "android/videoinjection/VideoInjectionController.h"  // for VideoIn...
 #include "host-common/FeatureControl.h"                       // for isEnabled
 #include "host-common/Features.h"                             // for MultiDi...
 #include "host-common/MultiDisplayPipe.h"                     // for android...
@@ -495,7 +494,6 @@ bool android_emulation_setup(const AndroidConsoleAgents* agents, bool isQemu2) {
     /* initialize sensors, this must be done here due to timer issues */
     android_hw_sensors_init(agents->emu);
     android::automation::AutomationController::initialize();
-    android::videoinjection::VideoInjectionController::initialize();
     android::offworld::registerOffworldPipeService();
     android_host_memory_service_init();
 
@@ -562,7 +560,6 @@ bool android_emulation_setup(const AndroidConsoleAgents* agents, bool isQemu2) {
 
 void android_emulation_teardown() {
     android::automation::AutomationController::shutdown();
-    android::videoinjection::VideoInjectionController::shutdown();
     android::base::CpuUsage::get()->stop();
     auto adbConn = android::emulation::AdbConnection::connection(std::chrono::milliseconds(0));
     if (adbConn)

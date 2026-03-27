@@ -71,7 +71,7 @@ message Request {
   oneof module {
     SnapshotRequest snapshot = 1;
     AutomationRequest automation = 2;
-    VideoInjectionRequest video_injection = 3;
+    VideoInjectionRequest video_injection = 3 [deprecated=true];
     SensorMockRequest sensor_mock = 4;
   }
 }
@@ -257,7 +257,7 @@ message Response {
     // Sync.
     SnapshotResponse snapshot = 100;
     AutomationResponse automation = 101;
-    VideoInjectionResponse video_injection = 102;
+    VideoInjectionResponse video_injection = 102 [deprecated=true];
 
     // Async.
     // Async response.
@@ -274,7 +274,7 @@ message AsyncResponse {
 
   oneof module {
     AutomationAsyncResponse automation = 100;
-    VideoInjectionAsyncResponse video_injection = 101;
+    VideoInjectionAsyncResponse video_injection = 101 [deprecated=true];
   }
 }
 
