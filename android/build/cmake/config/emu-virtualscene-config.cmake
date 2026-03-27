@@ -8,6 +8,7 @@ set(VIRTUAL_SCENE_DEPENDENCIES
     ${PREBUILT_ROOT}/virtualscene/Toren1BD/Toren1BD.posters>resources/Toren1BD.posters;
     ${PREBUILT_ROOT}/virtualscene/Toren1BD/Toren1BD_Decor.png>resources/Toren1BD_Decor.png;
     ${PREBUILT_ROOT}/virtualscene/Toren1BD/Toren1BD_Main.png>resources/Toren1BD_Main.png;
+    ${PREBUILT_ROOT}/virtualscene/default/default360.jpg>resources/default360.jpg;
     ${PREBUILT_ROOT}/virtualscene/default/default.png>resources/default.png;
     ${PREBUILT_ROOT}/virtualscene/default/default.mp4>resources/default.mp4;
     ${PREBUILT_ROOT}/virtualscene/Toren1BD/poster.png>resources/poster.png;)

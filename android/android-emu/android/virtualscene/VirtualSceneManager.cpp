@@ -338,7 +338,9 @@ bool ScenesManager::renderView(Scene* scene,
     view->preRenderLocked();
 
     switch (mode) {
-        case SceneConfig::Mode::Mesh3D: {
+        case SceneConfig::Mode::Mesh3D:
+        case SceneConfig::Mode::Image360:
+        {
             const auto renderables =
                     scene->getRenderableObjects(view->mViewProjection);
             if (!renderer || !renderer->render(view, renderables, renderTime)) {
@@ -960,7 +962,9 @@ bool BackgroundUpdateService::start(int displayWidth,
     // Set update callback, to update the background image after each
     // scene update
     VirtualSceneManager::setUpdateCallback([displayWidth, displayHeight]() {
-        mSceneCamera->update();
+        const bool supportsPosition = (VirtualSceneManager::getSceneMode() ==
+                                       SceneConfig::Mode::Mesh3D);
+        mSceneCamera->update(supportsPosition);
 
         // TODO(virtualscene) Handle rotation properly for all scenes.
         // SceneCamera uses 90 degrees rotated views by default for

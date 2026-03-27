@@ -50,6 +50,7 @@ namespace fs = std::filesystem;
 static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
 static constexpr const char* kDefaultImageFile = "default.png";
 static constexpr const char* kDefaultVideoFile = "default.mp4";
+static constexpr const char* kDefaultImage360File = "default360.jpg";
 
 // A blank background
 static constexpr const char* kDefaultColor = "#000000";
@@ -116,6 +117,8 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
         return SceneConfig::Mode::ImageFile;
     } else if (sceneModeStr == "color") {
         return SceneConfig::Mode::Color;
+    } else if (sceneModeStr == "image360") {
+        return SceneConfig::Mode::Image360;
     } else {
         dwarning("Unknown scene mode requested: %s", sceneModeStr);
         return SceneConfig::Mode::Unknown;
@@ -131,6 +134,8 @@ const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
         return "imagefile";
     } else if (mode == SceneConfig::Mode::Color) {
         return "color";
+    } else if (mode == SceneConfig::Mode::Image360) {
+        return "image360";
     } else {
         return "unknown";
     }
@@ -145,6 +150,8 @@ const char* SceneConfig::defaultArgumentForMode(SceneConfig::Mode mode) {
         return kDefaultImageFile;
     } else if (mode == SceneConfig::Mode::Color) {
         return kDefaultColor;
+    } else if (mode == SceneConfig::Mode::Image360) {
+        return kDefaultImage360File;
     } else {
         derror("%s: Invalid mode %d", __func__, (int)mode);
         return "invalid_filename";
@@ -152,13 +159,13 @@ const char* SceneConfig::defaultArgumentForMode(SceneConfig::Mode mode) {
 }
 
 bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
-    // Currently, only Mesh3D requires a renderer
-    return (mode == SceneConfig::Mode::Mesh3D);
+    return (mode == SceneConfig::Mode::Mesh3D) ||
+           (mode == SceneConfig::Mode::Image360);
 }
 
 bool SceneConfig::modeSupportsViewRotations(SceneConfig::Mode mode) {
     // Currently, only Mesh3D supports view rotations
-    return (mode == SceneConfig::Mode::Mesh3D);
+    return (mode == SceneConfig::Mode::Mesh3D) || (mode == SceneConfig::Mode::Image360);
 }
 
 bool SceneConfig::modeSupportsAnimations(SceneConfig::Mode mode) {
@@ -170,7 +177,8 @@ bool SceneConfig::modeSupportsAnimations(SceneConfig::Mode mode) {
 
 bool SceneConfig::modeSupportsSceneControls(SceneConfig::Mode mode) {
     // These modes should enable scene controls for movement or rotation
-    return (mode == SceneConfig::Mode::Mesh3D);
+    return (mode == SceneConfig::Mode::Mesh3D) ||
+           (mode == SceneConfig::Mode::Image360);
 }
 
 Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
@@ -215,17 +223,18 @@ bool Scene::initialize() {
         sceneFilename = resolveSceneFilename(mConfig.mArgument);
     }
 
+    if (SceneConfig::modeRequiresRenderer(sceneMode) && mRenderer == nullptr) {
+        derror("%s: No renderer for scene: %s", __func__,
+                sceneFilename.c_str());
+        return false;
+    }
+
     bool needsRawImageSource = false;
     switch (sceneMode) {
         case SceneConfig::Mode::Unknown: {
             derror("%s: Unknown scene mode!", __func__);
         } break;
         case SceneConfig::Mode::Mesh3D: {
-            if (mRenderer == nullptr) {
-                derror("%s: No renderer for scene: %s", __func__,
-                       sceneFilename.c_str());
-                return false;
-            }
             std::unique_ptr<MeshSceneObject> sceneObject =
                     MeshSceneObject::load(*mRenderer, sceneFilename.c_str());
             if (!sceneObject) {
@@ -259,6 +268,17 @@ bool Scene::initialize() {
                 derror("%s: Could not parse color: %s", __func__,
                        mConfig.mArgument.c_str());
             }
+        } break;
+        case SceneConfig::Mode::Image360: {
+            std::unique_ptr<MeshSceneObject> photoSphereObject =
+                    MeshSceneObject::createSphere(*mRenderer);
+            Texture sceneTexture =
+                    mRenderer->loadTextureAsync(sceneFilename.c_str());
+            if (sceneTexture.isValid()) {
+                photoSphereObject->setTexture(0, sceneTexture);
+                mRenderer->releaseTexture(sceneTexture);
+            }
+            mSceneObjects.push_back(std::move(photoSphereObject));
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);

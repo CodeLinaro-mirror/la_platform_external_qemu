@@ -42,6 +42,8 @@ public:
     // if there was an error.
     static std::unique_ptr<MeshSceneObject> load(Renderer& renderer,
                                                  const char* filename);
+
+    static std::unique_ptr<MeshSceneObject> createSphere(Renderer& renderer);
 };
 
 }  // namespace virtualscene
