@@ -62,10 +62,13 @@ struct SceneConfig {
 
     // Check if the scene mode supports view rotations, otherwise a seperate
     // rotation operation will be required
-    static bool modeSupportViewRotations(SceneConfig::Mode mode);
+    static bool modeSupportsViewRotations(SceneConfig::Mode mode);
 
     // Check if the scene mode supports animated content
-    static bool modeSupportAnimations(SceneConfig::Mode mode);
+    static bool modeSupportsAnimations(SceneConfig::Mode mode);
+
+    // Check if the scene mode supports scene camera controls
+    static bool modeSupportsSceneControls(SceneConfig::Mode mode);
 };
 
 inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {

@@ -564,7 +564,7 @@ void VirtualSceneManager::update() {
     // virtualscene and animation is controlled by renderTime in shaders. Always
     // update the scene and timer in other modes.
     bool updateTime = true;
-    if (SceneConfig::modeSupportAnimations(mEnvironmentScene->getSceneMode())) {
+    if (SceneConfig::modeSupportsAnimations(mEnvironmentScene->getSceneMode())) {
         // Use virtualscene settings for animation control
         updateTime = sSettings->getAnimationState();
     } else {
@@ -705,9 +705,9 @@ void VirtualSceneManager::setSceneControlsParameters(bool show) {
         return;
     }
 
-    // Only allow showing scene controls if it's a mesh3d scene
-    if (!show ||
-        (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::Mesh3D)) {
+    // Only allow showing scene controls if it's a 3d scene
+    if (!show || SceneConfig::modeSupportsSceneControls(
+                         mEnvironmentScene->getSceneMode())) {
         D("%s: show=%s", __func__, (show ? "true" : "false"));
         skin_winsys_show_virtual_scene_controls(show);
     }

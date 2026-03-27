@@ -179,7 +179,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
 
         // Do not rotate during the conversion if the view is already handling
         const bool viewHandlesRotation =
-                SceneConfig::modeSupportViewRotations(sceneMode);
+                SceneConfig::modeSupportsViewRotations(sceneMode);
         const char* convertDirection = direction;
         int convertOrientation = orientation;
         if (viewHandlesRotation) {
