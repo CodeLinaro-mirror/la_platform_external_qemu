@@ -421,6 +421,10 @@ int main(int argc, char* argv[]) {
     autoConfigureFromDiscoveryFile(argc, argv, discovery_file,
                                    modified_argv_storage);
 
+    // Ensure -grpc-ui is present so it survives the options reset in
+    // emulator_parseCommonCommandLineOptions.
+    modified_argv_storage.push_back((char*)"-grpc-ui");
+
     int modified_argc = (int)modified_argv_storage.size();
     char** modified_argv = modified_argv_storage.data();
 
@@ -452,8 +456,6 @@ int main(int argc, char* argv[]) {
         str_reset(&opts->fishtank, discovery_file.c_str());
     }
 
-    // uncomment when grpc engine ready.
-    opts->grpc_ui = true;
     getConsoleAgents()->settings->inject_AvdInfo(avd);
 
     const UiEmuAgent uiEmuAgent = createUiEmuAgent();
