@@ -153,6 +153,9 @@
      </item>
      <item>
       <widget class="QPushButton" name="reloadEnvironment">
+       <property name="toolTip">
+        <string>Reloads environment.ini contents of the device.</string>
+       </property>
        <property name="text">
         <string>Reload Environment</string>
        </property>

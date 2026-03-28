@@ -68,7 +68,7 @@ static bool s_qt_hide_windw = 0;
 
 void emulator_window_refresh(EmulatorWindow* emulator);
 
-extern bool emulator_window_load_environment(const AvdInfo* avdInfo, const bool transparentDisplay);
+extern bool emulator_window_load_environment();
 
 static void write_window_name(char* buff,
                               size_t buff_len,
@@ -368,10 +368,7 @@ void emulator_window_setup(EmulatorWindow* emulator) {
         // The environment file initializes the virtual scene system which is used
         // when the display is transparent  to make the background visible through
         // host composition.
-        const bool transparentDisplay =
-                getConsoleAgents()->settings->hw()->hw_lcd_transparent;
-        if (!emulator_window_load_environment(
-                    getConsoleAgents()->settings->avdInfo(), transparentDisplay)) {
+        if (!emulator_window_load_environment()) {
             derror("%s: Could not setup environment", __func__);
         }
     }
