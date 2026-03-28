@@ -172,37 +172,15 @@ static std::string discoverEmulatorFile(int argc, char* argv[]) {
 }
 
 /**
- * @brief Auto-configures environment and arguments based on a discovery file.
+ * @brief Sets up environment variables from the discovery file.
  *
- * Reads the provided discovery file and sets necessary environment variables
- * (ANDROID_EMULATOR_LAUNCHER_DIR, ANDROID_AVD_HOME). It also injects the
- * -avd <name> argument into modified_argv if it's missing from the original
- * command line.
+ * This function extracts launcher and AVD directories from the discovery .ini
+ * and sets the corresponding environment variables.
  *
  * @param discovery_file Path to the discovery .ini file.
- * @param argc Original argument count.
- * @param argv Original argument vector.
- * @param modified_argv Reference to a vector where the potentially modified
- * argv will be stored.
  */
-static void autoConfigureFromDiscoveryFile(int argc,
-                                           char* argv[],
-                                           const std::string& discovery_file,
-                                           std::vector<char*>& modified_argv) {
+static void setupEnvFromDiscovery(const std::string& discovery_file) {
     auto system = System::get();
-    bool has_avd_arg = false;
-
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "-avd") == 0 || argv[i][0] == '@') {
-            has_avd_arg = true;
-            break;
-        }
-    }
-
-    for (int i = 0; i < argc; ++i) {
-        modified_argv.push_back(argv[i]);
-    }
-
     if (discovery_file.empty() || !system->pathIsFile(discovery_file)) {
         return;
     }
@@ -224,14 +202,28 @@ static void autoConfigureFromDiscoveryFile(int argc,
                 system->envSet("ANDROID_AVD_HOME", avdHome);
             }
         }
-
-        std::string avdId = discoveryFile.getString("avd.id", "");
-        if (!has_avd_arg && !avdId.empty()) {
-            LOG(INFO) << "Setting AVD ID from discovery: " << avdId;
-            modified_argv.push_back((char*)"-avd");
-            modified_argv.push_back((char*)avdId.c_str());
-        }
     }
+}
+
+/**
+ * @brief Extracts the AVD ID from the discovery file.
+ *
+ * This function extracts the AVD ID from the discovery .ini.
+ *
+ * @param discovery_file Path to the discovery .ini file.
+ * @return std::string The AVD ID, or an empty string if not found.
+ */
+static std::string getAvdIdFromDiscovery(const std::string& discovery_file) {
+    auto system = System::get();
+    if (discovery_file.empty() || !system->pathIsFile(discovery_file)) {
+        return "";
+    }
+
+    android::base::IniFile discoveryFile(discovery_file);
+    if (discoveryFile.read()) {
+        return discoveryFile.getString("avd.id", "");
+    }
+    return "";
 }
 
 /**
@@ -416,13 +408,36 @@ int main(int argc, char* argv[]) {
     AndroidOptions* opts = &sOpts[0];
     AndroidHwConfig* hw = getConsoleAgents()->settings->hw();
 
+    // Construct the modified argument list. We start with a copy of the
+    // original argv to preserve command-line options.
     std::vector<char*> modified_argv_storage;
+    for (int i = 0; i < argc; ++i) {
+        modified_argv_storage.push_back(argv[i]);
+    }
+
     std::string discovery_file = discoverEmulatorFile(argc, argv);
-    autoConfigureFromDiscoveryFile(argc, argv, discovery_file,
-                                   modified_argv_storage);
+    setupEnvFromDiscovery(discovery_file);
+
+    // Extract AVD ID from discovery file if not already provided on cmdline.
+    std::string avdId = getAvdIdFromDiscovery(discovery_file);
+    if (!avdId.empty()) {
+        bool has_avd_arg = false;
+        for (int i = 1; i < argc; ++i) {
+            if (strcmp(argv[i], "-avd") == 0 || argv[i][0] == '@') {
+                has_avd_arg = true;
+                break;
+            }
+        }
+        if (!has_avd_arg) {
+            LOG(INFO) << "Setting AVD ID from discovery: " << avdId;
+            modified_argv_storage.push_back((char*)"-avd");
+            modified_argv_storage.push_back((char*)avdId.c_str());
+        }
+    }
 
     // Ensure -grpc-ui is present so it survives the options reset in
-    // emulator_parseCommonCommandLineOptions.
+    // emulator_parseCommonCommandLineOptions, allowing us to skip the
+    // QEMU version check in main-common.c.
     modified_argv_storage.push_back((char*)"-grpc-ui");
 
     int modified_argc = (int)modified_argv_storage.size();
