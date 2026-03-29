@@ -137,16 +137,23 @@ absl::Status FishtankGrpcServer::registerUiController(
 
     auto stub =
             client->stub<android::emulation::forwarding::ServiceForwarder>();
-    return registerUiController(stub.get());
+    auto context = client->newContext();
+    return registerUiController(stub.get(), context.get());
 }
 
 absl::Status FishtankGrpcServer::registerUiController(
-        android::emulation::forwarding::ServiceForwarder::StubInterface* stub) {
+        android::emulation::forwarding::ServiceForwarder::StubInterface* stub,
+        grpc::ClientContext* context) {
     if (!stub) {
         return absl::InvalidArgumentError("StubInterface cannot be null.");
     }
 
-    grpc::ClientContext context;
+    std::unique_ptr<grpc::ClientContext> localContext;
+    if (!context) {
+        localContext = std::make_unique<grpc::ClientContext>();
+        context = localContext.get();
+    }
+
     ForwardingRule rule;
     rule.set_service_uri("android.emulation.control.UiController");
     auto* endpoint = rule.mutable_endpoint();
@@ -161,7 +168,7 @@ absl::Status FishtankGrpcServer::registerUiController(
     }
 
     google::protobuf::Empty response;
-    grpc::Status status = stub->registerForwarder(&context, rule, &response);
+    grpc::Status status = stub->registerForwarder(context, rule, &response);
 
     if (status.ok()) {
         LOG(INFO) << "Successfully registered UiController with main emulator "

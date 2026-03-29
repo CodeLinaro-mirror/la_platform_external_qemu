@@ -87,6 +87,17 @@ TEST_F(FishtankGrpcServerTest, RegisterUiControllerSuccess) {
     EXPECT_TRUE(status.ok());
 }
 
+TEST_F(FishtankGrpcServerTest, RegisterUiControllerWithProvidedContext) {
+    grpc::ClientContext context;
+    context.AddMetadata("test-key", "test-value");
+
+    EXPECT_CALL(mMockStub, registerForwarder(&context, _, _))
+            .WillOnce(Return(::grpc::Status::OK));
+
+    auto status = mServer.registerUiController(&mMockStub, &context);
+    EXPECT_TRUE(status.ok());
+}
+
 TEST_F(FishtankGrpcServerTest, RegisterUiControllerFailure) {
     EXPECT_CALL(mMockStub, registerForwarder(_, _, _))
             .WillOnce(Return(

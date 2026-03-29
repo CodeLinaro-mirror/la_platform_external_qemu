@@ -1815,7 +1815,7 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
     apply_skin_quirks(avd);
 
     int lastVersion = avdInfo_getLastRunQemuVersion(avd);
-    if (lastVersion != EMULATOR_QEMU_VERSION) {
+    if (!opts->grpc_ui && lastVersion != EMULATOR_QEMU_VERSION) {
         if (lastVersion > 0) {
             // File exists, and there is a mismatch
             derror("AVD %s is not compatible with this emulator."
