@@ -21,6 +21,7 @@
 #include "qemu/error-report.h"
 #include "qemu/lockable.h"
 #include "system/runstate.h"
+#include "migration/qemu-file-types.h"
 #include "trace.h"
 #include "qapi/error.h"
 #include "hw/audio/virtio-snd.h"
@@ -58,23 +59,6 @@ static uint32_t supported_rates = BIT(VIRTIO_SND_PCM_RATE_5512)
                                 | BIT(VIRTIO_SND_PCM_RATE_176400)
                                 | BIT(VIRTIO_SND_PCM_RATE_192000)
                                 | BIT(VIRTIO_SND_PCM_RATE_384000);
-
-static const VMStateDescription vmstate_virtio_snd_device = {
-    .name = TYPE_VIRTIO_SND,
-    .version_id = VIRTIO_SOUND_VM_VERSION,
-    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
-};
-
-static const VMStateDescription vmstate_virtio_snd = {
-    .name = TYPE_VIRTIO_SND,
-    .unmigratable = 1,
-    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
-    .version_id = VIRTIO_SOUND_VM_VERSION,
-    .fields = (const VMStateField[]) {
-        VMSTATE_VIRTIO_DEVICE,
-        VMSTATE_END_OF_LIST()
-    },
-};
 
 static const Property virtio_snd_properties[] = {
     DEFINE_AUDIO_PROPERTIES(VirtIOSound, audio_be),
@@ -506,8 +490,9 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
     stream->info.channels_max = as.nchannels;
     stream->info.formats = supported_formats;
     stream->info.rates = supported_rates;
-    stream->period_bytes = params->period_bytes;
     stream->as = as;
+    stream->period_bytes = params->period_bytes;
+    stream->hw_format = params->format;
 
     virtio_snd_init_stream_voice(stream);
 
@@ -1337,6 +1322,359 @@ static void virtio_snd_unrealize(DeviceState *dev)
     virtio_delete_queue(vsnd->queues[VIRTIO_SND_VQ_RX]);
     virtio_cleanup(vdev);
 }
+
+static VirtIOSoundPCMBuffer
+*virtio_snd_VirtIOSoundPCMBuffer_get(QEMUFile *f, VirtIOSound *s)
+{
+    size_t size = qemu_get_be64(f);
+    VirtIOSoundPCMBuffer *buffer =
+            g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
+    unsigned vq_index;
+
+    buffer->size = size;
+    buffer->offset = qemu_get_be64(f);
+    buffer->populated = qemu_get_byte(f);
+    vq_index = qemu_get_be16(f);
+    if (vq_index >= VIRTIO_SND_VQ_MAX) {
+        g_free(buffer);
+        return NULL;
+    }
+
+    buffer->vq = s->queues[vq_index];
+    g_assert(buffer->vq);
+
+    buffer->elem = qemu_get_virtqueue_element(&s->parent_obj, f,
+                                              sizeof(VirtQueueElement));
+    if (!buffer->elem) {
+        g_free(buffer);
+        return NULL;
+    }
+
+    if (qemu_get_buffer(f, &buffer->data[0], buffer->size) != buffer->size) {
+        g_free(buffer->elem);
+        g_free(buffer);
+        return NULL;
+    }
+
+    return buffer;
+}
+
+static void
+virtio_snd_VirtIOSoundPCMBuffer_put(QEMUFile *f,
+                                    VirtIOSoundPCMBuffer *buffer,
+                                    VirtIOSound *s)
+{
+    qemu_put_be64(f, buffer->size);
+    qemu_put_be64(f, buffer->offset);
+    qemu_put_byte(f, buffer->populated);
+    qemu_put_be16(f, virtio_get_queue_index(buffer->vq));
+    qemu_put_virtqueue_element(&s->parent_obj, f, buffer->elem);
+    qemu_put_buffer(f, &buffer->data[0], buffer->size);
+}
+
+static int
+virtio_snd_VirtIOSoundPCMBufferQueue_get(QEMUFile *f,
+                                         VirtIOSoundPCMBufferQueue *bq,
+                                         VirtIOSound *s)
+{
+    g_assert(QSIMPLEQ_EMPTY(bq));
+
+    uint32_t queue_size = qemu_get_be32(f);
+    for (; queue_size; --queue_size) {
+        VirtIOSoundPCMBuffer *buffer =
+                virtio_snd_VirtIOSoundPCMBuffer_get(f, s);
+        if (!buffer) {
+            return -EINVAL;
+        }
+
+        QSIMPLEQ_INSERT_TAIL(bq, buffer, entry);
+    }
+
+    return 0;
+}
+
+static void
+virtio_snd_VirtIOSoundPCMBufferQueue_put(QEMUFile *f,
+                                         VirtIOSoundPCMBufferQueue *bq,
+                                         VirtIOSound *s)
+{
+    VirtIOSoundPCMBuffer *buffer;
+    uint32_t queue_size = 0;
+    QSIMPLEQ_FOREACH(buffer, bq, entry) {
+        ++queue_size;
+    }
+
+    qemu_put_be32(f, queue_size);
+    QSIMPLEQ_FOREACH(buffer, bq, entry) {
+        virtio_snd_VirtIOSoundPCMBuffer_put(f, buffer, s);
+    }
+}
+
+static const VMStateDescription vmstate_virtio_snd_pcm_info = {
+    .name = "virtio_snd_pcm_info",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINT32(hdr.hda_fn_nid, virtio_snd_pcm_info),
+        VMSTATE_UINT32(features, virtio_snd_pcm_info),
+        VMSTATE_UINT64(formats, virtio_snd_pcm_info),
+        VMSTATE_UINT64(rates, virtio_snd_pcm_info),
+        VMSTATE_UINT8(direction, virtio_snd_pcm_info),
+        VMSTATE_UINT8(channels_min, virtio_snd_pcm_info),
+        VMSTATE_UINT8(channels_max, virtio_snd_pcm_info),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+static const VMStateDescription vmstate_VirtIOSoundPCMStream = {
+    .name = "VirtIOSoundPCMStream",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_STRUCT(info, VirtIOSoundPCMStream, 1,
+                       vmstate_virtio_snd_pcm_info, virtio_snd_pcm_info),
+        VMSTATE_INT32(as.freq, VirtIOSoundPCMStream),
+        VMSTATE_INT32(as.nchannels, VirtIOSoundPCMStream),
+        /*
+         * NOTE: as.fmt is handled manually in
+         * the virtio_snd_pcm_VirtIOSoundPCMStream_get functions.
+         */
+        VMSTATE_UINT32(id, VirtIOSoundPCMStream),
+        VMSTATE_UINT32(period_bytes, VirtIOSoundPCMStream),
+        VMSTATE_UINT8(hw_format, VirtIOSoundPCMStream),  /* shadows as.fmt */
+        VMSTATE_BOOL(flushing, VirtIOSoundPCMStream),
+        VMSTATE_BOOL(active, VirtIOSoundPCMStream),
+        /*
+         * NOTE: stream->queue is handled manually in
+         * the virtio_snd_pcm_VirtIOSoundPCMStream_put/get functions.
+         */
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+static VirtIOSoundPCMStream
+*virtio_snd_pcm_VirtIOSoundPCMStream_get(QEMUFile *f,
+                                         VirtIOSound *s)
+{
+    Error *err = NULL;
+    VirtIOSoundPCMStream *stream = virtio_snd_create_new_stream(s);
+    int ret;
+
+    ret = vmstate_load_state(f, &vmstate_VirtIOSoundPCMStream, stream, 1, &err);
+    if (ret < 0) {
+        error_report_err(err);
+        virtio_snd_destroy_stream(stream);
+        return NULL;
+    }
+
+    /*
+     * Locking `queue_mutex` is not required because the stream
+     * was just created here.
+     */
+    ret = virtio_snd_VirtIOSoundPCMBufferQueue_get(f, &stream->queue, s);
+    if (ret < 0) {
+        virtio_snd_destroy_stream(stream);
+        return NULL;
+    }
+
+    stream->as.fmt = virtio_snd_get_qemu_format(stream->hw_format);
+    stream->as.big_endian = false;
+
+    virtio_snd_init_stream_voice(stream);
+
+    return stream;
+}
+
+static int
+virtio_snd_pcm_VirtIOSoundPCMStream_put(QEMUFile *f,
+                                        JSONWriter *vmdes,
+                                        VirtIOSoundPCMStream *stream)
+{
+    Error *err = NULL;
+    int ret;
+
+    ret = vmstate_save_state(f, &vmstate_VirtIOSoundPCMStream,
+                             stream, vmdes, &err);
+    if (ret < 0) {
+        error_report_err(err);
+        return ret;
+    }
+
+    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+        virtio_snd_VirtIOSoundPCMBufferQueue_put(f, &stream->queue, stream->s);
+    }
+
+    return 0;
+}
+
+static int
+virtio_snd_device_remaining_get(QEMUFile *f,
+                                void *pv,
+                                size_t size,
+                                const VMStateField *field)
+{
+    VirtIOSound *s = pv;
+    VirtIOSoundPCMStream *stream;
+    uint32_t i;
+
+    for (i = 0; i < s->snd_conf.streams; ++i) {
+        g_assert(!s->pcm_items[i].stream);
+
+        if (qemu_get_byte(f)) {
+            stream = virtio_snd_pcm_VirtIOSoundPCMStream_get(f, s);
+            if (!stream) {
+                return -EINVAL;
+            }
+
+            s->pcm_items[i].stream = stream;
+        }
+    }
+
+    return 0;
+}
+
+static int
+virtio_snd_device_remaining_put(QEMUFile *f,
+                                void *pv,
+                                size_t size,
+                                const VMStateField *field,
+                                JSONWriter *vmdes) {
+    VirtIOSound *s = pv;
+    uint32_t i;
+    int ret;
+
+    for (i = 0; i < s->snd_conf.streams; ++i) {
+        VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
+
+        if (stream) {
+            qemu_put_byte(f, 1);
+            ret = virtio_snd_pcm_VirtIOSoundPCMStream_put(f, vmdes, stream);
+            if (ret < 0) {
+                return ret;
+            }
+        } else {
+            qemu_put_byte(f, 0);
+        }
+    }
+
+    return 0;
+}
+
+static const VMStateInfo vmstate_virtio_snd_device_remaining = {
+    .name = "virtio_snd_device_remaining",
+    .get  = virtio_snd_device_remaining_get,
+    .put  = virtio_snd_device_remaining_put,
+};
+
+static int virtio_snd_device_pre_load(void *opaque)
+{
+    VirtIOSound *s = opaque;
+    uint32_t i;
+
+    for (i = 0; i < s->snd_conf.streams; ++i) {
+        VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
+        if (stream) {
+            virtio_snd_destroy_stream(stream);
+            s->pcm_items[i].stream = NULL;
+        }
+    }
+
+    return 0;
+}
+
+static int virtio_snd_device_post_load(void *opaque, int version_id)
+{
+    VirtIOSound *s = opaque;
+    uint32_t i;
+
+    for (i = 0; i < s->snd_conf.streams; ++i) {
+        VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
+        if (stream && stream->active) {
+            if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+                audio_be_set_active_out(stream->s->audio_be, stream->voice.out, 1);
+            } else {
+                audio_be_set_active_in(stream->s->audio_be, stream->voice.in, 1);
+            }
+        }
+    }
+
+    return 0;
+}
+
+static const VMStateDescription vmstate_VirtIOPcmParams = {
+    .name = "VirtIOPcmParams",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINT32(buffer_bytes, VirtIOPcmParams),
+        VMSTATE_UINT32(period_bytes, VirtIOPcmParams),
+        VMSTATE_UINT32(features, VirtIOPcmParams),
+        VMSTATE_UINT8(channels, VirtIOPcmParams),
+        VMSTATE_UINT8(format, VirtIOPcmParams),
+        VMSTATE_UINT8(rate, VirtIOPcmParams),
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+static const VMStateDescription vmstate_VirtIOSoundPCMItem = {
+    .name = "VirtIOSoundPCMItem",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_STRUCT(params, VirtIOSoundPCMItem, 1,
+                       vmstate_VirtIOPcmParams, VirtIOPcmParams),
+        /*
+         * NOTE: the `stream` field is not saved/loaded here,
+         * see `vmstate_virtio_snd_device_remaining`
+         */
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+static const VMStateDescription vmstate_virtio_snd_config = {
+    .name = "virtio_snd_config",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINT32_EQUAL(jacks, virtio_snd_config, NULL),
+        VMSTATE_UINT32_EQUAL(streams, virtio_snd_config, NULL),
+        VMSTATE_UINT32_EQUAL(chmaps, virtio_snd_config, NULL),
+        VMSTATE_UINT32_EQUAL(controls, virtio_snd_config, NULL),
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+static const VMStateDescription vmstate_virtio_snd = {
+    .name = TYPE_VIRTIO_SND "-base",
+    .version_id = VIRTIO_SOUND_VM_VERSION,
+    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
+    .fields = (const VMStateField[]) {
+        VMSTATE_VIRTIO_DEVICE,
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+static const VMStateDescription vmstate_virtio_snd_device = {
+    .name = TYPE_VIRTIO_SND,
+    .version_id = VIRTIO_SOUND_VM_VERSION,
+    .minimum_version_id = VIRTIO_SOUND_VM_VERSION,
+    .pre_load = virtio_snd_device_pre_load,
+    .post_load = virtio_snd_device_post_load,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINT64(features, VirtIOSound),
+        VMSTATE_STRUCT(snd_conf, VirtIOSound, 1,
+                       vmstate_virtio_snd_config, virtio_snd_config),
+        VMSTATE_STRUCT_VARRAY_POINTER_UINT32(
+                pcm_items, VirtIOSound, snd_conf.streams,
+                vmstate_VirtIOSoundPCMItem, VirtIOSoundPCMItem),
+        {
+            .name = "remaining",
+            .info = &vmstate_virtio_snd_device_remaining,
+            .flags = VMS_SINGLE,
+        },
+        VMSTATE_END_OF_LIST()
+    },
+};
 
 static void virtio_snd_class_init(ObjectClass *klass, const void *data)
 {
