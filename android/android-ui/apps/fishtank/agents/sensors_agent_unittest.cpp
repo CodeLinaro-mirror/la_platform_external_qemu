@@ -161,6 +161,39 @@ TEST_F(SensorsAgentTest, SetPhysicalParameterTargetSuccess) {
     EXPECT_EQ(0, mAgent->setPhysicalParameterTarget(0, values, 3, 0));
 }
 
+// Verifies that setPhysicalParameterTarget correctly forwards the interpolation
+// method to the gRPC backend.
+TEST_F(SensorsAgentTest, SetPhysicalParameterTargetWithInterpolation) {
+    float values[] = {1.0f, 2.0f, 3.0f};
+
+    EXPECT_CALL(*mMockStub, setPhysicalModel(_, _, _))
+            .WillOnce([](::grpc::ClientContext* context,
+                         const android::emulation::control::PhysicalModelValue& request,
+                         ::google::protobuf::Empty* response) {
+                EXPECT_EQ(android::emulation::control::PhysicalModelValue::SMOOTH,
+                          request.interpolation());
+                return ::grpc::Status::OK;
+            });
+
+    // PHYSICAL_INTERPOLATION_SMOOTH is 0.
+    EXPECT_EQ(0, mAgent->setPhysicalParameterTarget(0, values, 3, 0));
+
+    EXPECT_CALL(*mMockStub, setPhysicalModel(_, _, _))
+            .WillOnce([](::grpc::ClientContext* context,
+                         const android::emulation::control::PhysicalModelValue& request,
+                         ::google::protobuf::Empty* response) {
+                EXPECT_EQ(android::emulation::control::PhysicalModelValue::STEP,
+                          request.interpolation());
+                return ::grpc::Status::OK;
+            });
+
+    // PHYSICAL_INTERPOLATION_STEP is 1.
+    EXPECT_EQ(0, mAgent->setPhysicalParameterTarget(0, values, 3, 1));
+
+    // Verify unknown interpolation method returns failure (-1) without calling gRPC
+    EXPECT_EQ(-1, mAgent->setPhysicalParameterTarget(0, values, 3, 999));
+}
+
 // Verifies that setPhysicalParameterTarget returns failure (-1) when the
 // underlying gRPC call fails.
 TEST_F(SensorsAgentTest, SetPhysicalParameterTargetFailure) {

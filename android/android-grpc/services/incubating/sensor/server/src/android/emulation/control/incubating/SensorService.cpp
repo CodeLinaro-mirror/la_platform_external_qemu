@@ -213,13 +213,23 @@ public:
                             Empty* reply) override {
         android::base::ThreadLooper::runOnMainLooperAndWaitForCompletion(
                 [agent = mSensorAgent, physicalValue = *request]() {
+                    PhysicalInterpolation interpolation;
+                    switch (physicalValue.interpolation()) {
+                        case PhysicalModelValue::INTERPOLATION_STEP:
+                            interpolation = PHYSICAL_INTERPOLATION_STEP;
+                            break;
+                        case PhysicalModelValue::INTERPOLATION_SMOOTH:
+                            interpolation = PHYSICAL_INTERPOLATION_SMOOTH;
+                            break;
+                        default:
+                            derror("Unknown interpolation method: %d",
+                                   (int)physicalValue.interpolation());
+                            return;
+                    }
                     agent->setPhysicalParameterTarget(
                             static_cast<int>(physicalValue.target()) - 1,
                             physicalValue.value().data().data(),
-                            physicalValue.value().data().size(),
-                            abs((static_cast<int>(
-                                        physicalValue.interpolation())) -
-                                1));
+                            physicalValue.value().data().size(), interpolation);
                 });
         return Status::OK;
     }

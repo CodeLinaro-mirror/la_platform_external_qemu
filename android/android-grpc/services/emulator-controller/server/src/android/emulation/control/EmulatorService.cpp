@@ -261,11 +261,24 @@ public:
     Status setPhysicalModel(ServerContext* context,
                             const PhysicalModelValue* request,
                             Empty* reply) override {
+        PhysicalInterpolation interpolation;
+        switch (request->interpolation()) {
+            case PhysicalModelValue::STEP:
+                interpolation = PhysicalInterpolation::PHYSICAL_INTERPOLATION_STEP;
+                break;
+            case PhysicalModelValue::SMOOTH:
+                interpolation = PhysicalInterpolation::PHYSICAL_INTERPOLATION_SMOOTH;
+                break;
+            default:
+                return Status(grpc::StatusCode::INVALID_ARGUMENT,
+                              "Unknown interpolation method: " +
+                                      std::to_string(request->interpolation()));
+        }
+
         auto values = request->value();
         mAgents->sensors->setPhysicalParameterTarget(
                 (int)request->target(), values.data().data(),
-                values.data().size(),
-                PhysicalInterpolation::PHYSICAL_INTERPOLATION_STEP);
+                values.data().size(), interpolation);
         return Status::OK;
     }
 
