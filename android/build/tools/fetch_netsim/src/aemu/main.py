@@ -82,10 +82,19 @@ def git_commit(bid, destination_dir, args):
             - reviewers: The reviewers for the commit.
             - artifact: The artifact to commit.
     """
-    # Append to the header if netsim_version and canary_version are specified
+    # Append version info to the header
     commit_header = f"Update netsim to {bid}"
-    if args.netsim_version and args.canary_version:
-        commit_header += f" (Netsim {args.netsim_version} for Canary {args.canary_version})"
+    versions = []
+    if args.netsim_version:
+        versions.append(f"Netsim {args.netsim_version}")
+    if args.netsimx_version:
+        versions.append(f"NetsimX {args.netsimx_version}")
+
+    versions_str = ", ".join(versions)
+    if versions_str and args.canary_version:
+        commit_header += f" ({versions_str} for Canary {args.canary_version})"
+    elif versions_str:
+        commit_header += f" ({versions_str})"
 
     # Add a commit_msg footer if buganizer_id is specified
     commit_footer = f"\nBug: {args.buganizer_id}" if args.buganizer_id else ""
@@ -337,6 +346,11 @@ def main():
         "--netsim-version",
         type=str,
         help="Include Netsim version in the gerrit commit description"
+    )
+    parser.add_argument(
+        "--netsimx-version",
+        type=str,
+        help="Include Netsim Next version in the gerrit commit description"
     )
     parser.add_argument(
         "--canary-version",
