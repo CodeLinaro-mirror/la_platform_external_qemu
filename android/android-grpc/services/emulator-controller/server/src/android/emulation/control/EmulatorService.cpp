@@ -13,6 +13,7 @@
 // limitations under the License.
 #include "android/emulation/control/EmulatorService.h"
 #include "android/avd/BugreportInfo.h"
+#include "host-common/hw-config-helper.h"
 
 #ifdef _MSC_VER
 #include "msvc-posix.h"
@@ -910,9 +911,13 @@ public:
         // b/248394093 Initialize the value of width and height to the
         // default hw settings regardless of the display ID when multi
         // display agent doesn't work.
-        if (!multiDisplayQueryWorks) {
-            width = getConsoleAgents()->settings->hw()->hw_lcd_width;
-            height = getConsoleAgents()->settings->hw()->hw_lcd_height;
+        // b/496625282 If we're screen 0, account for environment size.
+        // Currently, environment and multidisplay are not compatible.
+        if (!multiDisplayQueryWorks || request->display() == 0) {
+            int w, h;
+            androidHwConfig_getScreenDimensions(getConsoleAgents()->settings->hw(), &w, &h);
+            width = w;
+            height = h;
         }
 
         int myDisplayId = -1;
