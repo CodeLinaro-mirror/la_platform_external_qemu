@@ -14,8 +14,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <array>
+#include <charconv>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "../fourcc_utils.h"
@@ -168,6 +170,40 @@ WebcamSource::WebcamPixelFormat::FindBestMatchForResolution(
     }
 
     return {w, h};
+}
+
+std::string WebcamSource::ResolveWebcamId(std::string_view camera_arg) {
+    std::lock_guard<std::mutex> lock(s_webcam_info_list_lock_);
+    if (!s_webcam_info_list_) {
+        s_webcam_info_list_ = EnumerateWebcams();
+    }
+
+    if (camera_arg.empty()) {
+        if (s_webcam_info_list_->empty()) {
+            return "";
+        }
+        const auto& info = (*s_webcam_info_list_)[0];
+        return info->os_alias.empty() ? info->os_name : info->os_alias;
+    }
+
+    for (const auto& info : *s_webcam_info_list_) {
+        if (info->os_alias == camera_arg || info->os_name == camera_arg) {
+            return info->os_alias.empty() ? info->os_name : info->os_alias;
+        }
+    }
+
+    int index = -1;
+    auto [ptr, ec] = std::from_chars(
+            camera_arg.data(), camera_arg.data() + camera_arg.size(), index);
+    if (ec == std::errc() && ptr == camera_arg.data() + camera_arg.size()) {
+        if (index >= 0 &&
+            static_cast<size_t>(index) < s_webcam_info_list_->size()) {
+            const auto& info = (*s_webcam_info_list_)[index];
+            return info->os_alias.empty() ? info->os_name : info->os_alias;
+        }
+    }
+
+    return "";
 }
 
 size_t WebcamSource::GetWebcamCount() {

@@ -794,6 +794,17 @@ bool VirtualSceneManager::reloadScene(const VerSceneConfig& config) {
             }
         }
 
+        // Replace the scene, note that this is safe because we don't expose the
+        // scene to the outside users and all operations are done in-sync
+        // through VirtualSceneManager interface
+        // We destroy the old scene resources before loading the new one to
+        // avoid resource exhaustion. Multiple webcams running through the
+        // same hub could overwhelm the USB interface, leading to errors
+        ver_destroy_scene(mEnvironmentScene);
+
+        // Attempting to load another webcam without unloading the other
+        // may run into USB resource exhaustion
+
         // If we're currently running, we need to load resources
         if (mNumUsers > 0) {
             ver_scene_load_user_resources(scene, []() {});
@@ -804,10 +815,6 @@ bool VirtualSceneManager::reloadScene(const VerSceneConfig& config) {
         // out of the camera callback and be controlled here, since the camera
         // has no knowledge of what the scene is when it changes.
 
-        // Replace the scene, not that this is safe because we don't expose the
-        // scene to the outside users and all operations are done in-sync
-        // through VirtualSceneManager interface
-        ver_destroy_scene(mEnvironmentScene);
         mEnvironmentScene = scene;
 
         D("%s: finished", __func__);

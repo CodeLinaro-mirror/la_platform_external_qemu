@@ -145,7 +145,8 @@ bool ScenesManager::renderView(Scene* scene,
         } break;
         case SceneConfig::Mode::ImageFile:
         case SceneConfig::Mode::VideoFile:
-        case SceneConfig::Mode::Color: {
+        case SceneConfig::Mode::Color:
+        case SceneConfig::Mode::Webcam: {
             const SceneOverlayObject* overlay = scene->getOverlayObject();
             if (!overlay || !overlay->isValid()) {
                 derror("Scene rendering failed");

@@ -26,8 +26,9 @@
 #include "raw_image_sources/image_file/raw_image_file_source.h"
 #include "raw_image_sources/raw_image_source.h"
 #include "raw_image_sources/video_file/raw_video_file_source.h"
-#include "MeshSceneObject.h"
+#include "raw_image_sources/webcam/webcam_source.h"
 
+#include "MeshSceneObject.h"
 #include "Renderer.h"
 #include "TextureUtils.h"
 
@@ -106,6 +107,9 @@ bool Scene::configArgumentFileExists(
         // Argument is not a file
         return true;
     }
+    if (config.mSceneMode == SceneConfig::Mode::Webcam) {
+        return !WebcamSource::ResolveWebcamId(config.mArgument).empty();
+    }
     auto sceneFilename =
             resolveSceneFilename(config.mArgument, resourceBasePaths);
     if (sceneFilename.empty()) {
@@ -125,7 +129,8 @@ bool Scene::initialize() {
     // Find and validate the input file parameter, call configArgumentFileExists
     // to avoid or handle this case earlier.
     std::string sceneFilename;
-    if (sceneMode != SceneConfig::Mode::Color) {
+    if (sceneMode != SceneConfig::Mode::Color &&
+        sceneMode != SceneConfig::Mode::Webcam) {
         sceneFilename =
                 resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
         if (sceneFilename.empty()) {
@@ -182,6 +187,21 @@ bool Scene::initialize() {
 
             mRawImageSource = std::make_unique<SolidColorImageSource>(
                     Color{(uint8_t)r, (uint8_t)g, (uint8_t)b});
+        } break;
+        case SceneConfig::Mode::Webcam: {
+            std::string resolvedId =
+                    WebcamSource::ResolveWebcamId(mConfig.mArgument);
+            if (resolvedId.empty()) {
+                derror("%s: Could not resolve webcam argument: '%s'", __func__,
+                       mConfig.mArgument.c_str());
+                return false;
+            }
+            mRawImageSource = WebcamSource::Create(resolvedId);
+            if (!mRawImageSource) {
+                derror("%s: Could not load webcam: '%s' (resolved: '%s')",
+                       __func__, mConfig.mArgument.c_str(), resolvedId.c_str());
+                return false;
+            }
         } break;
         case SceneConfig::Mode::Image360: {
             // Check if the texture file is valid to be able to return error
@@ -496,8 +516,9 @@ void Scene::loadUserResources() {
     if (mRawImageSource) {
         // TODO(virtualscene) Determine if we need these input values.
         // Currently they are just hints that we may use to better initialize
-        // the webcam to a sensible resolution.
-        mRawImageSource->Start(VerImageFormat::RGBA8, 0, 0);
+        // the webcam to a sensible resolution. Using 720p for now, as that's on
+        // the high end of what virtualscene reports support for.
+        mRawImageSource->Start(VerImageFormat::RGBA8, 1280, 720);
     }
 }
 

@@ -66,6 +66,7 @@ public:
 
     static size_t GetWebcamCount();
     static std::shared_ptr<WebcamInfo> GetWebcamInfo(size_t index);
+    static std::string ResolveWebcamId(std::string_view camera_arg);
 
     static std::unique_ptr<WebcamSource> Create(std::string_view camera_arg);
     ~WebcamSource() override;
