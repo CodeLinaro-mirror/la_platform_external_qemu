@@ -43,7 +43,8 @@ public:
     // Overload for testing that accepts a StubInterface directly.
     absl::Status registerUiController(
             android::emulation::forwarding::ServiceForwarder::StubInterface*
-                    stub);
+                    stub,
+            grpc::ClientContext* context = nullptr);
 
 private:
     std::unique_ptr<android::emulation::control::EmulatorControllerService>

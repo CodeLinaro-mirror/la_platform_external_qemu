@@ -246,7 +246,7 @@ int RawImageFileSource::Start(uint32_t pixel_format,
 absl::StatusOr<std::optional<RawImageToken>> RawImageFileSource::UpdateImage(
         int64_t target_time_us,
         std::optional<RawImageToken> token,
-        std::function<absl::Status(const RawImageBuffer*)> updater) {
+        std::function<absl::Status(const RawImageBufferView*)> updater) {
     if (token.has_value() && token.value().token == 1) {
         return std::nullopt;
     }
@@ -254,9 +254,10 @@ absl::StatusOr<std::optional<RawImageToken>> RawImageFileSource::UpdateImage(
     uint32_t pixel_format;
     int width;
     int height;
-    struct RawImageBuffer im = {image_.data_ptr,
-                       static_cast<size_t>(image_.line_size) * image_.height,
-                       V4L2_PIX_FMT_RGB32, image_.width, image_.height};
+    struct RawImageBufferView im = {
+            image_.data_ptr,
+            static_cast<size_t>(image_.line_size) * image_.height,
+            V4L2_PIX_FMT_RGB32, image_.width, image_.height};
     absl::Status ret = updater(&im);
     if (ret.ok()) {
         return RawImageToken{1};

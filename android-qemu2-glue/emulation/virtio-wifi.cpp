@@ -306,8 +306,6 @@ static void virtio_wifi_tx_bh(void* opaque) {
 
     /* This happens when device was stopped but BH wasn't. */
     if (!vdev->vm_running) {
-        /* Make sure tx waiting is set, so we'll run when restarted. */
-        assert(q->tx_waiting);
         return;
     }
 

@@ -702,6 +702,7 @@ int _avdInfo_getEnvironmentIni(AvdInfo* i) {
     /* Allow non-existing environment.ini */
     if (iniPath == NULL) {
         D("virtual device has no environment file - no problem");
+        i->environmentIni = NULL;
         return 0;
     }
 

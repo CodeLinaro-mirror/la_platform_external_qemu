@@ -22,6 +22,7 @@
 #include <functional>                                       // for __base
 
 #include "android/avd/util.h"                               // for path_getA...
+#include "android/avd/info.h"
 #include "host-common/hw-config.h"
 #include "android/emulation/control/virtual_scene_agent.h"  // for QAndroidV...
 #include "android/console.h"                                // for android_hw
@@ -199,6 +200,12 @@ void CameraVirtualSceneSubpage::loadUi() {
 
     // Set UI display to correct state.
     mUi->toggleTV->setChecked(sVirtualSceneAgent->getAnimationState());
+
+    // Hide the environment button if there is no environment.ini
+    const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
+    if (!avdInfo_getEnvironmentIni(avdInfo)) {
+        mUi->reloadEnvironment->hide();
+    }
 }
 
 // static

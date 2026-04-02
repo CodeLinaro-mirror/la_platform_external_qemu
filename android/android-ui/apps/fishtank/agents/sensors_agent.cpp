@@ -115,6 +115,22 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
 
                     PhysicalModelValue request;
                     request.set_target((PhysicalModelValue::PhysicalType)parameter);
+
+                    PhysicalModelValue::Interpolation interpolation;
+                    switch (interpolation_method) {
+                        case PHYSICAL_INTERPOLATION_STEP:
+                            interpolation = PhysicalModelValue::STEP;
+                            break;
+                        case PHYSICAL_INTERPOLATION_SMOOTH:
+                            interpolation = PhysicalModelValue::SMOOTH;
+                            break;
+                        default:
+                            derror("Unknown interpolation method: %d",
+                                   interpolation_method);
+                            return -1;
+                    }
+                    request.set_interpolation(interpolation);
+
                     auto val = request.mutable_value();
                     for (size_t i = 0; i < len; i++) {
                         val->add_data(value[i]);

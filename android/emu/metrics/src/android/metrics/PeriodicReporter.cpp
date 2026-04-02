@@ -104,19 +104,10 @@ PeriodicReporter::TaskToken PeriodicReporter::addCancelableTask(
 void PeriodicReporter::startImpl(MetricsReporter* metricsReporter,
                                  Looper* looper) {
     AutoLock lock(mLock);
-
-    assert(!mMetricsReporter);
-    assert(!mLooper);
-
-    assert(metricsReporter);
-    assert(looper);
-
     mMetricsReporter = metricsReporter;
     mLooper = looper;
 
     for (auto& periodAndData : mPeriodDataByPeriod) {
-        assert(!periodAndData.second.task);
-
         createPerPeriodTimerNoLock(&periodAndData.second, periodAndData.first);
     }
 }

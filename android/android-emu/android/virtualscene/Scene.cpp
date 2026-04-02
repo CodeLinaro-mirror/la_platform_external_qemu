@@ -323,7 +323,7 @@ void Scene::update(bool updateTime) {
     if (mRawImageSource) {
         auto res = mRawImageSource->UpdateImage(
                 mFrameTimeUs, mRawImageSourceToken,
-                [&](const RawImageBuffer* buffer) {
+                [&](const RawImageBufferView* buffer) {
                     if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
                         return absl::InvalidArgumentError(absl::StrFormat(
                                 "Unsupported pixel format from image source: %d",
