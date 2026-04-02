@@ -913,7 +913,11 @@ public:
         // display agent doesn't work.
         // b/496625282 If we're screen 0, account for environment size.
         // Currently, environment and multidisplay are not compatible.
-        if (!multiDisplayQueryWorks || request->display() == 0) {
+        // TODO(virtualscene) This should be made compatible with getMultiDisplay
+        if (!multiDisplayQueryWorks ||
+            (request->display() == 0 &&
+             (getConsoleAgents()->settings->hw()->environment_width ||
+              getConsoleAgents()->settings->hw()->environment_height))) {
             int w, h;
             androidHwConfig_getScreenDimensions(getConsoleAgents()->settings->hw(), &w, &h);
             width = w;
