@@ -858,6 +858,11 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
         return false;
     }
 
+    // Save environment.ini on success
+    if (environmentData) {
+        avdInfo_saveEnvironmentIni(avdInfo);
+    }
+
     // Update background view, if exists
     BackgroundUpdateService::updateBlurAmount(envConfig.backgroundBlur);
 
