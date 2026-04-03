@@ -44,18 +44,19 @@ struct SceneConfig {
         VideoPlayback,
         VideoFile,
         ImageFile,
+        Color,
     };
 
-    SceneConfig(Mode mode, std::string_view filename);
+    SceneConfig(Mode mode, std::string_view argument);
 
     Mode mSceneMode = Mode::Unknown;
-    std::string mFilename;
+    std::string mArgument;
 
     static Mode modeFromString(std::string_view sceneModeStr);
     static const char* modeToString(SceneConfig::Mode mode);
 
     // Returns fullpath to default file for the given scene mode
-    static const char* defaultFilenameForMode(SceneConfig::Mode mode);
+    static const char* defaultArgumentForMode(SceneConfig::Mode mode);
 
     // Check if a GPU renderer should be initialized for the scene mode
     static bool modeRequiresRenderer(SceneConfig::Mode mode);
@@ -70,7 +71,7 @@ struct SceneConfig {
 
 inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {
     return (lhs.mSceneMode == rhs.mSceneMode) &&
-           (lhs.mFilename == rhs.mFilename);
+           (lhs.mArgument == rhs.mArgument);
 }
 
 // TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
