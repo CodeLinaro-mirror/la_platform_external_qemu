@@ -26,3 +26,25 @@ android_qt_lib(
        ui::gl-bridge)
 target_include_directories(aemu-gl-qt-bridge PUBLIC src)
 target_include_directories(aemu-gl-qt-bridge PRIVATE .)
+
+android_add_test(
+  TARGET aemu-gl-bridge-tests
+  SOURCE_DIR src
+  SRC android/skin/qt/gl-widget_test.cpp
+  DEPS android-emu
+       android-emu-agents
+       android-emu-test-launcher
+       aemu-gl-qt-bridge
+       gfxstream_openglesdispatch
+       gmock
+       Qt${QT_VERSION_MAJOR}::Core
+       Qt${QT_VERSION_MAJOR}::Widgets)
+
+if(ENABLE_QT_TESTS)
+  if(APPLE)
+    set_target_properties(aemu-gl-bridge-tests PROPERTIES INSTALL_RPATH "@executable_path/lib64/qt/lib;@executable_path/lib64")
+  elseif(LINUX)
+    set_target_properties(aemu-gl-bridge-tests PROPERTIES INSTALL_RPATH "\$ORIGIN/lib64/qt/lib;\$ORIGIN/lib64")
+  endif()
+  set_target_properties(aemu-gl-bridge-tests PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+endif()
