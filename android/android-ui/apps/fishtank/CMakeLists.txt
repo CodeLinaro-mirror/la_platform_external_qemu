@@ -34,6 +34,8 @@ if(APPLE)
   android_target_properties(fishtank all "INSTALL_RPATH=@executable_path/lib64")
   android_target_properties(
     fishtank all "INSTALL_RPATH>=@executable_path/lib64/qt/lib")
+  android_target_properties(
+    fishtank all "INSTALL_RPATH>=@executable_path/lib64/gles_swiftshader")
   android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path")
   android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path/lib64")
   android_target_properties(fishtank all "BUILD_WITH_INSTALL_RPATH=ON")
@@ -108,6 +110,23 @@ target_link_libraries(
           webrtc-yuv
           zlib
           ui::widgets)
+
+if(NOT WINDOWS_MSVC_X86_64)
+  # On Linux and macOS, we avoid direct linking of SwiftShader libraries
+  # because some prebuilts have malformed symbol tables that cause LLD to
+  # fail. Instead, we rely on RPATH-based resolution at runtime. This avoids
+  # needing to set LD_LIBRARY_PATH or DYLD_LIBRARY_PATH, which can be
+  # restricted by security features like macOS System Integrity Protection (SIP).
+  # Since fishtank uses LazyLoadedEGLDispatch to load these dynamically
+  # at runtime, direct linking is not required.
+  android_target_dependency(fishtank all SWIFTSHADER_DEPENDENCIES)
+
+  if(NOT APPLE)
+    # Linux-specific RPATH (Apple RPATH is set in the block above)
+    android_target_properties(
+      fishtank all "INSTALL_RPATH>=\$ORIGIN/lib64/gles_swiftshader")
+  endif()
+endif()
 
 # Include the current directory for headers
 target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
