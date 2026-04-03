@@ -16,10 +16,10 @@
 #include "absl/status/statusor.h"
 #include "android/camera/camera-common.h"
 
-SolidColorImageProvider::SolidColorImageProvider()
-    : SolidColorImageProvider({0, 0, 0}) {}
+SolidColorImageSource::SolidColorImageSource()
+    : SolidColorImageSource({0, 0, 0}) {}
 
-SolidColorImageProvider::SolidColorImageProvider(Color c)
+SolidColorImageSource::SolidColorImageSource(Color c)
     : buffer_({image_, sizeof(image_), V4L2_PIX_FMT_RGB32, 1, 1}) {
     image_[0] = c.r;
     image_[1] = c.g;
@@ -27,14 +27,11 @@ SolidColorImageProvider::SolidColorImageProvider(Color c)
     image_[3] = 0xff;
 }
 
-int SolidColorImageProvider::Start(uint32_t pixel_format,
-                                   int width,
-                                   int height) {
+int SolidColorImageSource::Start(uint32_t pixel_format, int width, int height) {
     return 0;
 }
 
-absl::StatusOr<std::optional<RawImageToken>>
-SolidColorImageProvider::UpdateImage(
+absl::StatusOr<std::optional<RawImageToken>> SolidColorImageSource::UpdateImage(
         int64_t target_time_us,
         std::optional<RawImageToken> token,
         std::function<absl::Status(const RawImageBufferView*)> updater) {
@@ -49,6 +46,6 @@ SolidColorImageProvider::UpdateImage(
     }
 }
 
-int SolidColorImageProvider::Stop() {
+int SolidColorImageSource::Stop() {
     return 0;
 }
