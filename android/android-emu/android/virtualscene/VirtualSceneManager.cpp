@@ -160,7 +160,8 @@ struct EnvironmentConfig {
 };
 
 static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
-                                              bool warnMissing) {
+                                              bool warnMissing,
+                                              bool showBackground) {
     EnvironmentConfig ret;
 
     // Environment is required, set it up
@@ -215,9 +216,14 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
     }
 
     if (!modeSet) {
-        dinfo("%s: Using default virtual scene mode for the environment.",
-              __func__);
-        ret.sceneMode = SceneConfig::Mode::Mesh3D;
+        if (showBackground) {
+            dinfo("%s: Using blank background for the environment.", __func__);
+            ret.sceneMode = SceneConfig::Mode::Color;
+        } else {
+            dinfo("%s: Using default virtual scene mode for the environment.",
+                  __func__);
+            ret.sceneMode = SceneConfig::Mode::Mesh3D;
+        }
     }
     if (ret.sceneArgument.empty()) {
         dinfo("%s: Using default configuration for mode %s for the environment.",
@@ -472,6 +478,7 @@ std::optional<std::thread> VirtualSceneManager::mBackgroundUpdateThread;
 std::function<void()> VirtualSceneManager::mUpdateCallback;
 int VirtualSceneManager::mNumUsers = 0;
 std::atomic<bool> VirtualSceneManager::mKeepUpdating = false;
+bool VirtualSceneManager::mShowBackground = false;
 
 void VirtualSceneManager::parseCmdline() {
     AutoLock lock(mLock);
@@ -503,7 +510,8 @@ void VirtualSceneManager::parseCmdline() {
     }
 }
 
-bool VirtualSceneManager::initialize(bool initBackgroundService) {
+bool VirtualSceneManager::initialize(bool initBackgroundService,
+                                     bool transparentDisplay) {
     AutoLock lock(mLock);
     if (mEnvironmentScene) {
         E("VirtualSceneManager already initialized");
@@ -521,7 +529,8 @@ bool VirtualSceneManager::initialize(bool initBackgroundService) {
     const AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
     const bool warnIfMissing = !strcmp(hwCfg->hw_camera_back, "virtualscene");
 
-    EnvironmentConfig envConfig = getEnvironmentConfig(avdInfo, warnIfMissing);
+    EnvironmentConfig envConfig =
+            getEnvironmentConfig(avdInfo, warnIfMissing, mShowBackground);
     SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
 
     D("Initializing VirtualSceneManager with mode:%s, argument:%s",
@@ -540,6 +549,7 @@ bool VirtualSceneManager::initialize(bool initBackgroundService) {
 
     lock.unlock();
 
+    mShowBackground = transparentDisplay;
     if (initBackgroundService) {
         int displayWidth, displayHeight;
         androidHwConfig_getScreenDimensions(hwCfg, &displayWidth,
@@ -850,7 +860,8 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
         return false;
     }
 
-    EnvironmentConfig envConfig = getEnvironmentConfig(avdInfo, true);
+    EnvironmentConfig envConfig =
+            getEnvironmentConfig(avdInfo, true, mShowBackground);
 
     // Reload virtual scene
     SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
