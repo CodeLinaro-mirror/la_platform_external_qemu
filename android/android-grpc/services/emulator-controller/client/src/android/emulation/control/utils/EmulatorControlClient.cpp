@@ -38,13 +38,15 @@ EmulatorControlClient::EmulatorControlClient(
         std::shared_ptr<EmulatorGrpcClient> client,
         EmulatorController::StubInterface* service)
     : mClient(client), mService(service) {
-    if (!service) {
-        mService = client->stub<EmulatorController>();
+    if (!mService && mClient) {
+        mService = mClient->stub<EmulatorController>();
     }
 }
 
 EmulatorControlClient::~EmulatorControlClient() {
-    mClient->cancelAll();
+    if (mClient) {
+        mClient->cancelAll();
+    }
     {
         std::lock_guard<std::mutex> lock(mInputWriterAccess);
         mInputEventWriter = nullptr;

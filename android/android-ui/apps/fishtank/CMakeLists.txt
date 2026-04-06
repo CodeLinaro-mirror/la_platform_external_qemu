@@ -376,6 +376,8 @@ android_add_test(
       agents/sensors_agent.cpp
       agents/record_screen_agent_unittest.cpp
       agents/record_screen_agent.cpp
+      agents/user_event_agent_unittest.cpp
+      agents/user_event_agent.cpp
       agents/test_client_setup.cpp)
 
 target_link_libraries(
