@@ -15,6 +15,8 @@ EXPORTS
     aml_method
     aml_return
     async_run_on_cpu
+    bdrv_all_find_vmstate_bs
+    bdrv_snapshot_list
     blk_commit_all
     bql_locked
     bql_lock_impl
@@ -46,6 +48,7 @@ EXPORTS
     cpus_count
     current_accel_name
     cursor_alloc
+    delete_snapshot
     device_class_set_props_n
     dpy_cursor_define
     dpy_gfx_replace_surface
@@ -60,6 +63,7 @@ EXPORTS
     error_copy
     error_fatal
     error_free
+    error_get_pretty
     error_prepend
     error_printf
     error_propagate
@@ -85,6 +89,8 @@ EXPORTS
     iov_from_buf_full
     iov_size
     iov_to_buf_full
+    load_snapshot
+    load_snapshot_resume
     machine_current_cpu_type
     memory_region_add_subregion
     memory_region_del_subregion
@@ -330,6 +336,7 @@ EXPORTS
     replay_register_char_driver
     resettable_class_set_parent_phases
     runstate_get
+    save_snapshot
     set_logger
     socket_address_flatten
     socket_local_address
