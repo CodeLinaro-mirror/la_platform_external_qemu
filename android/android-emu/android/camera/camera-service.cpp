@@ -31,9 +31,7 @@
 #include "android/boot-properties.h"
 #include "android/camera/camera-capture.h"
 #include "android/camera/camera-format-converters.h"
-#include "android/camera/camera-imagefile.h"
 #include "android/camera/camera-metrics.h"
-#include "android/camera/camera-videofile.h"
 #include "android/camera/camera-virtualscene.h"
 #include "android/console.h" /* for android_hw */
 #include "android/emulation/android_qemud.h"
@@ -761,15 +759,6 @@ private:
         ci.orientation = sensor_orientation;
         ci.in_use = 0;
 
-        addCameraInfo(std::move(ci));
-    }
-
-    void videofilecameraSetup(const char* dir, int orientation, const char* args) {
-        CameraInfo ci;
-        if (camera_videofile_init_CameraInfo(&ci, dir, args)) {
-            return;
-        }
-        ci.orientation = orientation;
         addCameraInfo(std::move(ci));
     }
 

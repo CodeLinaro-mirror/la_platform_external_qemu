@@ -167,12 +167,10 @@ set(android_emu_dependent_src
     android/raw_image_sources/video_file/raw_video_file_source.cc
     android/camera/camera-common.cpp
     android/camera/camera-format-converters.c
-    android/camera/camera-imagefile.cpp
     android/camera/camera-list.cpp
     android/camera/camera-metrics.cpp
     android/camera/camera-service.cpp
     android/camera/camera-sws-format-converter.cpp
-    android/camera/camera-videofile.cpp
     android/camera/camera-virtualscene-utils.cpp
     android/camera/camera-virtualscene.cpp
     android/console.cpp
