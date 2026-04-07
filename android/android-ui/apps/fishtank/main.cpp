@@ -19,6 +19,10 @@
 #include "android/base/files/IniFile.h"
 #include "android/base/system/System.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "android/cmdline-definitions.h"
 #include "android/console.h"
 #include "android/crashreport/crash-initializer.h"
@@ -288,9 +292,20 @@ static void setupRenderer(AndroidHwConfig* hw, const std::string& program_dir) {
         !strcmp(hw->hw_gpu_mode, "swiftshader")) {
         isSwiftshader = true;
         auto swiftshader_dir = pj({program_dir, "lib64", "gles_swiftshader"});
-        LOG(INFO) << "Adding swiftshader library search path: "
-                  << swiftshader_dir;
-        add_library_search_dir(swiftshader_dir.c_str());
+        LOG(INFO) << "Using swiftshader from: " << swiftshader_dir;
+
+        // SwiftShader Library Resolution Strategy:
+        // - Windows: We use SetDllDirectoryA to guide the OS loader to the
+        //   swiftshader subdirectory.
+        // - macOS/Linux: We rely on RPATH-based resolution (set in
+        //   CMakeLists.txt) to find the libraries relative to the executable
+        //   path (@executable_path/lib64/gles_swiftshader or
+        //   $ORIGIN/lib64/gles_swiftshader). This avoids relying on
+        //   environment variables like LD_LIBRARY_PATH/DYLD_LIBRARY_PATH,
+        //   which can be restricted by features like macOS SIP.
+#ifdef _WIN32
+        SetDllDirectoryA(swiftshader_dir.c_str());
+#endif
     }
 
     auto egl = gfxstream::host::gl::LazyLoadedEGLDispatch::get();
