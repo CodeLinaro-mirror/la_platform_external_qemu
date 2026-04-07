@@ -192,7 +192,6 @@ set(android_emu_dependent_src
     android/sensors-port.c
     android/snapshot/Icebox.cpp
     android/snapshot/SnapshotAPI.cpp
-    android/videoinjection/VideoInjectionController.cpp
     android/virtualscene/MeshSceneObject.cpp
     android/virtualscene/PosterInfo.cpp
     android/virtualscene/PosterSceneObject.cpp
@@ -638,7 +637,6 @@ if(NOT LINUX_AARCH64)
       android/snapshot/Snapshot_unittest.cpp
       android/userspace-boot-properties_unittest.cpp
       android/verified-boot/load_config_unittest.cpp
-      android/videoinjection/VideoInjectionController_unittest.cpp
       android/virtualscene/TextureUtils_unittest.cpp)
 
   # And declare the test
