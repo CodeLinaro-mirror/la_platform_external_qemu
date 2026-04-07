@@ -137,11 +137,10 @@ bool GLWidget::ensureInit() {
     // Create a context.
     EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
     AndroidVirtioGpuOps* ops = android_getVirtioGpuOps();
-    // Share this context with the emulator framebuffer context by default.
     mEGLState->context = mEGL->eglCreateContext(
         mEGLState->display,
         egl_config,
-        (EGLContext)(ops ? ops->get_global_egl_context() : 0),
+        EGL_NO_CONTEXT,
         context_attribs);
 
     if (mEGLState->context == EGL_NO_CONTEXT) {
