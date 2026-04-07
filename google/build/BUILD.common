@@ -226,7 +226,10 @@ cc_library(
     deps = [
         "@glib//glib",
         "@glib//gmodule",
-    ],
+    ] + select({
+        "@platforms//os:windows": ["@aemu//windows:compat-hdrs"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library(
