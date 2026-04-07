@@ -144,7 +144,7 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
         renderable.mesh = renderer.createMesh(vertices, indices);
         renderable.texture = texture;
 
-        result.get()->mRenderables.emplace_back(std::move(renderable));
+        result->mRenderables.emplace_back(std::move(renderable));
     }
 
     return result;

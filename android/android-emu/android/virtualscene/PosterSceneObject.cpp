@@ -64,11 +64,6 @@ std::unique_ptr<PosterSceneObject> PosterSceneObject::create(
     return result;
 }
 
-void PosterSceneObject::setTexture(Texture texture) {
-    mRenderer.releaseTexture(mRenderables[0].texture);
-    mRenderables[0].texture = mRenderer.duplicateTexture(texture);
-}
-
 void PosterSceneObject::setScale(float value) {
     mScale = value;
     updateTransform();

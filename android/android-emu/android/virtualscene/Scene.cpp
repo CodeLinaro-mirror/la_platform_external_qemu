@@ -156,16 +156,21 @@ bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
     return (mode == SceneConfig::Mode::Mesh3D);
 }
 
-bool SceneConfig::modeSupportViewRotations(SceneConfig::Mode mode) {
+bool SceneConfig::modeSupportsViewRotations(SceneConfig::Mode mode) {
     // Currently, only Mesh3D supports view rotations
     return (mode == SceneConfig::Mode::Mesh3D);
 }
 
-bool SceneConfig::modeSupportAnimations(SceneConfig::Mode mode) {
+bool SceneConfig::modeSupportsAnimations(SceneConfig::Mode mode) {
     // Output of the ImageFile and Color modes won't be affected by the
     // animations
     return (mode != SceneConfig::Mode::ImageFile &&
             mode != SceneConfig::Mode::Color);
+}
+
+bool SceneConfig::modeSupportsSceneControls(SceneConfig::Mode mode) {
+    // These modes should enable scene controls for movement or rotation
+    return (mode == SceneConfig::Mode::Mesh3D);
 }
 
 Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
@@ -229,10 +234,9 @@ bool Scene::initialize() {
                 return false;
             }
 
-            mSceneObjects.push_back(
-                    std::move(static_unique_cast<SceneObject>(sceneObject)));
+            mSceneObjects.push_back(std::move(sceneObject));
 
-            // TODO (virtualScene) The virtual scene by default renders the
+            // TODO(virtualscene) The virtual scene by default renders the
             // image rotated 90 degrees
             mBaseRotation = 90;
         } break;
@@ -414,7 +418,7 @@ bool Scene::createPosterLocation(const PosterInfo& info) {
     if (!info.defaultFilename.empty()) {
         storage.defaultTexture =
                 mRenderer->loadTextureAsync(info.defaultFilename.c_str());
-        storage.sceneObject->setTexture(storage.defaultTexture);
+        storage.sceneObject->setTexture(0, storage.defaultTexture);
     }
 
     mPosters.insert(std::make_pair(info.name, std::move(storage)));
@@ -446,7 +450,7 @@ bool Scene::loadPoster(const char* posterName,
     }
 
     poster.sceneObject->setScale(scale);
-    poster.sceneObject->setTexture(
+    poster.sceneObject->setTexture(0,
             poster.texture.isValid() ? poster.texture : poster.defaultTexture);
 
     mObjectsVersion++;
