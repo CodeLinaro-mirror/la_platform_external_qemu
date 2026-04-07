@@ -545,7 +545,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         qemuRenderenginePropValue = opts->systemui_renderer;
 
         // Check if the skiavk can actually work if requested
-        if (!strcmp(qemuUirendererPropValue, "skiavk")) {
+        if (!strncmp(qemuUirendererPropValue, "skiavk", 6)) {
             const bool supportsMultipleQueues =
                     fc::isEnabled(fc::VulkanVirtualQueue) || isVkNVIDIA;
             if (!supportsMultipleQueues) {
@@ -577,7 +577,15 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
                 avdSupportsSkiaVk && gpuSupportsSkiaVk && systemSupportsSkiaVk;
         if (enableSkiaVk) {
             qemuUirendererPropValue = "skiavk";
-            qemuRenderenginePropValue = "skiavk";
+            if (apiLevel >= 36) {
+                // skiavkthreaded has been supported even before api 36,
+                // use that instead of skiavk, as skiavk is deprecated now
+                qemuRenderenginePropValue = "skiavkthreaded";
+                dinfo("skiavkthreaded is used for this api level %d\n",
+                      apiLevel);
+            } else {
+                qemuRenderenginePropValue = "skiavk";
+            }
         }
     }
 
