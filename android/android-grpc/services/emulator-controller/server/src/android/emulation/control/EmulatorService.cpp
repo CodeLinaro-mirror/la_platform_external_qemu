@@ -13,6 +13,7 @@
 // limitations under the License.
 #include "android/emulation/control/EmulatorService.h"
 #include "android/avd/BugreportInfo.h"
+#include "host-common/hw-config-helper.h"
 
 #ifdef _MSC_VER
 #include "msvc-posix.h"
@@ -261,11 +262,24 @@ public:
     Status setPhysicalModel(ServerContext* context,
                             const PhysicalModelValue* request,
                             Empty* reply) override {
+        PhysicalInterpolation interpolation;
+        switch (request->interpolation()) {
+            case PhysicalModelValue::STEP:
+                interpolation = PhysicalInterpolation::PHYSICAL_INTERPOLATION_STEP;
+                break;
+            case PhysicalModelValue::SMOOTH:
+                interpolation = PhysicalInterpolation::PHYSICAL_INTERPOLATION_SMOOTH;
+                break;
+            default:
+                return Status(grpc::StatusCode::INVALID_ARGUMENT,
+                              "Unknown interpolation method: " +
+                                      std::to_string(request->interpolation()));
+        }
+
         auto values = request->value();
         mAgents->sensors->setPhysicalParameterTarget(
                 (int)request->target(), values.data().data(),
-                values.data().size(),
-                PhysicalInterpolation::PHYSICAL_INTERPOLATION_STEP);
+                values.data().size(), interpolation);
         return Status::OK;
     }
 
@@ -897,9 +911,17 @@ public:
         // b/248394093 Initialize the value of width and height to the
         // default hw settings regardless of the display ID when multi
         // display agent doesn't work.
-        if (!multiDisplayQueryWorks) {
-            width = getConsoleAgents()->settings->hw()->hw_lcd_width;
-            height = getConsoleAgents()->settings->hw()->hw_lcd_height;
+        // b/496625282 If we're screen 0, account for environment size.
+        // Currently, environment and multidisplay are not compatible.
+        // TODO(virtualscene) This should be made compatible with getMultiDisplay
+        if (!multiDisplayQueryWorks ||
+            (request->display() == 0 &&
+             (getConsoleAgents()->settings->hw()->environment_width ||
+              getConsoleAgents()->settings->hw()->environment_height))) {
+            int w, h;
+            androidHwConfig_getScreenDimensions(getConsoleAgents()->settings->hw(), &w, &h);
+            width = w;
+            height = h;
         }
 
         int myDisplayId = -1;

@@ -101,9 +101,15 @@ public:
         auto annotations = std::map<std::string, std::string>{
                 {"prod", "AndroidEmulator"},
                 {"ver", EMULATOR_FULL_VERSION_STRING}};
-        bool active = mClient->StartHandler(handler_path, mDatabasePath,
-                                            metrics_path, CrashURL, annotations,
-                                            {"--no-rate-limit"}, true, false);
+
+        std::vector<std::string> args = {"--no-rate-limit"};
+#ifdef __APPLE__
+        args.emplace_back(
+                absl::StrCat("--monitor-pid=", System::get()->getCurrentProcessId()));
+#endif
+        bool active = mClient->StartHandler(
+                handler_path, mDatabasePath, metrics_path, CrashURL, annotations,
+               std::move(args) , true, false);
 
         mDatabase = CrashReportDatabase::Initialize(mDatabasePath);
         mInitialized = active && mDatabase;

@@ -447,7 +447,6 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
             // Almost all toolbar buttons are required to have a uiCommand
             // property.
             // Unfortunately, we have no way of enforcing it at compile time.
-            assert(0);
         }
 
         // All XR buttons are expected to define the `xrButtonType` property.

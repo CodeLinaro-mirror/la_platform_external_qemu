@@ -144,7 +144,7 @@ android_parse_network_type( const char*  speed )
         { "umts",  A_DATA_NETWORK_UMTS },
         { "hsdpa", A_DATA_NETWORK_UMTS },  /* not handled yet by Android GSM framework */
         { "lte",   A_DATA_NETWORK_LTE },
-        { "full",  A_DATA_NETWORK_LTE },
+        { "full",  A_DATA_NETWORK_NR  },
         { "5g",   A_DATA_NETWORK_NR   },  /* non-standalone 5g, based on lte, there is no 5g sa yet */
         { NULL, 0 }
     };

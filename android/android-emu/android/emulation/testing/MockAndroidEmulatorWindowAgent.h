@@ -29,6 +29,8 @@ public:
     // void showMessage(const char* message, WindowMessageType type, int
     //                  timeoutMs)
     WINDOW_MOCK(MOCK_METHOD3, showMessage);
+
+    WINDOW_MOCK(MOCK_METHOD1, fold);
 };
 
 }  // namespace android

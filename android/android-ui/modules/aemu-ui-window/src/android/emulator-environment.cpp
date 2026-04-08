@@ -43,13 +43,7 @@ using android::virtualscene::SceneCamera;
 using android::virtualscene::SceneConfig;
 using android::virtualscene::VirtualSceneManager;
 
-static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
-                                     const bool transparentDisplay) {
-    if (!avdInfo) {
-        derror("%s: Invalid AVD info", __func__);
-        return false;
-    }
-
+static bool emulatorSetupEnvironment() {
     AndroidHwConfig* hwCfg = getConsoleAgents() && getConsoleAgents()->settings
                                      ? getConsoleAgents()->settings->hw()
                                      : nullptr;
@@ -58,10 +52,6 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
         derror("%s: Invalid AVD config", __func__);
         return false;
     }
-    const std::string hwCameraBack = hwCfg->hw_camera_back;
-    const std::string hwCameraFront = hwCfg->hw_camera_front;
-    dprint("%s: cameraBack:%s cameraFront:%s", __func__, hwCameraBack.c_str(),
-           hwCameraFront.c_str());
 
     int envWidth, envHeight;
     androidHwConfig_getScreenDimensions(hwCfg, &envWidth, &envHeight);
@@ -84,6 +74,9 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
     }
 
     // Check if the camera is set to 'environment' or 'virtualscene'
+    const std::string hwCameraBack = hwCfg->hw_camera_back;
+    const std::string hwCameraFront = hwCfg->hw_camera_front;
+    const bool transparentDisplay = hwCfg->hw_lcd_transparent;
     const bool cameraUsesEnvironment = (hwCameraBack == "environment") ||
                                        (hwCameraFront == "environment") ||
                                        (hwCameraBack == "virtualscene");
@@ -118,8 +111,7 @@ static bool emulatorSetupEnvironment(const AvdInfo* avdInfo,
 
 extern "C" {
 
-bool emulator_window_load_environment(const AvdInfo* avdInfo,
-                                      const bool transparentDisplay) {
-    return emulatorSetupEnvironment(avdInfo, transparentDisplay);
+bool emulator_window_load_environment() {
+    return emulatorSetupEnvironment();
 }
 }

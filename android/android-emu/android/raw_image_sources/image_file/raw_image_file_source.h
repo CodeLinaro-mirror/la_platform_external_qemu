@@ -64,7 +64,7 @@ public:
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
             std::optional<RawImageToken> token,
-            std::function<absl::Status(const RawImageBuffer*)> updater)
+            std::function<absl::Status(const RawImageBufferView*)> updater)
             override;
     int Stop() override;
 

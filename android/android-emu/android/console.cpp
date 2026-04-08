@@ -4441,9 +4441,10 @@ static int do_fold(ControlClient client, char* args) {
         control_write(client, "KO: Usage: \"fold\"\n");
         return -1;
     }
-    if (client->global->emu_agent->fold(true)) {
+    if (getConsoleAgents()->emu->fold(true)) {
         return 0;
     }
+    control_write(client, "KO: Device is not foldable\r\n");
     return -1;
 }
 
@@ -4452,9 +4453,10 @@ static int do_unfold(ControlClient client, char* args) {
         control_write(client, "KO: Usage: \"unfold\"\n");
         return -1;
     }
-    if (client->global->emu_agent->fold(false)) {
+    if (getConsoleAgents()->emu->fold(false)) {
         return 0;
     }
+    control_write(client, "KO: Device is not foldable\r\n");
     return -1;
 }
 

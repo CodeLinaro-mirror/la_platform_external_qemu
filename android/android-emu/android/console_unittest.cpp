@@ -18,11 +18,7 @@
 
 #include <gtest/gtest.h>
 
-namespace android {
-
-using namespace base;
-
-namespace console {
+#include "android/emulation/testing/MockAndroidEmulatorWindowAgent.h"
 
 #ifdef __APPLE__
 // Mac linker has a lot of problems determining that modem_driver.o is
@@ -31,6 +27,12 @@ namespace console {
 // the functions defined in modem_driver.c.
 static const auto pointer = &android_modem_init;
 #endif
+
+namespace android {
+
+using namespace base;
+
+namespace console {
 
 // Android studio has a read buffer size of 1024 bytes.
 // Older versions of studio use the 'help' command to ping the
@@ -149,6 +151,58 @@ TEST(Console, rotate_xr_fails) {
     socketClose(sock[0]);
     getConsoleAgents()->settings->inject_AvdInfo(NULL);
     avdInfo_free(avdInfo);
+}
+
+TEST(Console, fold_fails_on_unsupported) {
+    const int BUFF_SIZE = STUDIO_BUFF_SIZE + 1;
+    char buff[BUFF_SIZE];
+    int sock[2];
+
+    ASSERT_EQ(0, socketCreatePair(&sock[0], &sock[1]));
+
+    void* opaque = test_control_client_create(sock[1]);
+    ASSERT_TRUE(opaque != NULL);
+
+    MockAndroidEmulatorWindowAgent mockWindowAgent;
+    MockAndroidEmulatorWindowAgent::mock = &mockWindowAgent;
+    EXPECT_CALL(mockWindowAgent, fold(true)).WillOnce(testing::Return(false));
+
+    send_test_string(opaque, "fold");
+
+    memset(buff, 0, BUFF_SIZE);
+    socketRecvAll(sock[0], buff, BUFF_SIZE);
+    EXPECT_STREQ(buff, "KO: Device is not foldable\r\n");
+
+    MockAndroidEmulatorWindowAgent::mock = nullptr;
+    test_control_client_close(opaque);
+    socketClose(sock[1]);
+    socketClose(sock[0]);
+}
+
+TEST(Console, unfold_fails_on_unsupported) {
+    const int BUFF_SIZE = STUDIO_BUFF_SIZE + 1;
+    char buff[BUFF_SIZE];
+    int sock[2];
+
+    ASSERT_EQ(0, socketCreatePair(&sock[0], &sock[1]));
+
+    void* opaque = test_control_client_create(sock[1]);
+    ASSERT_TRUE(opaque != NULL);
+
+    MockAndroidEmulatorWindowAgent mockWindowAgent;
+    MockAndroidEmulatorWindowAgent::mock = &mockWindowAgent;
+    EXPECT_CALL(mockWindowAgent, fold(false)).WillOnce(testing::Return(false));
+
+    send_test_string(opaque, "unfold");
+
+    memset(buff, 0, BUFF_SIZE);
+    socketRecvAll(sock[0], buff, BUFF_SIZE);
+    EXPECT_STREQ(buff, "KO: Device is not foldable\r\n");
+
+    MockAndroidEmulatorWindowAgent::mock = nullptr;
+    test_control_client_close(opaque);
+    socketClose(sock[1]);
+    socketClose(sock[0]);
 }
 
 static void ping_test();
