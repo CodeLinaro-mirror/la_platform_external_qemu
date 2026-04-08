@@ -382,6 +382,9 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
 
     if (api_level < 14 || (opts->gpu && !strcmp(opts->gpu, "off"))) {
         hw->hw_lcd_depth = 16;
+    } else if (api_level >= 27) {
+        // api27 and up hardcoded pixel format as RGBA8888, so only use 32bit
+        hw->hw_lcd_depth = 32;
     }
 
     hw->hw_gpu_enabled = true;

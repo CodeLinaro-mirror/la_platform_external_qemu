@@ -56,10 +56,6 @@ function(android_qt_lib)
     target_compile_definitions(${ext_TARGET} PRIVATE USE_MMX=1)
     target_compile_options(${ext_TARGET} PRIVATE "-mmmx")
   endif()
-
-  if(OPTION_GFXSTREAM_BACKEND)
-    target_compile_definitions(${ext_TARGET} PUBLIC AEMU_GFXSTREAM_BACKEND=1)
-  endif()
 endfunction()
 
 add_subdirectory(apps)

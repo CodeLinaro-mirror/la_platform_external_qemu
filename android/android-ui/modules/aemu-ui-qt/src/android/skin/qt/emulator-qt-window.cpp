@@ -266,9 +266,8 @@ static int convertKeyCode(int sym, bool& isModifier) {
         return res->second;
     }
 
-    // Only Chrome and Raw Input modes will send modifier keyup/keydowns.
-    if (!getConsoleAgents()->settings->hw()->hw_arc &&
-        !android::featurecontrol::isEnabled(
+    // Only Raw Input mode will send modifier keyup/keydowns.
+    if (!android::featurecontrol::isEnabled(
                 android::featurecontrol::QtRawKeyboardInput)) {
         return -1;
     }
@@ -1146,22 +1145,7 @@ void EmulatorQtWindow::closeEvent(QCloseEvent* event) {
             if (fastSnapshotV1) {
                 queueQuitEvent();
             } else {
-                if (getConsoleAgents()->settings->hw()->hw_arc) {
-                    // Send power key event to guest.
-                    // After 10 seconds, we force close it.
-                    mToolWindow->forwardKeyToEmulator(LINUX_KEY_POWER, true);
-                    android::base::ThreadLooper::get()
-                            ->createTimer(
-                                    [](void* opaque,
-                                       android::base::Looper::Timer* timer) {
-                                        static_cast<EmulatorQtWindow*>(opaque)
-                                                ->queueQuitEvent();
-                                    },
-                                    this)
-                            ->startRelative(10000);
-                } else {
-                    runAdbShellPowerDownAndQuit();
-                }
+                runAdbShellPowerDownAndQuit();
             }
         }
         event->ignore();

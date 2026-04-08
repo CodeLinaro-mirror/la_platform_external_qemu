@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "OpenGLESDispatch/EGLDispatch.h"
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "aemu/base/ArraySize.h"
 #include "aemu/base/files/PathUtils.h"
@@ -32,7 +33,6 @@
 #include "android/utils/system.h"
 #include "android/virtualscene/RenderTarget.h"
 #include "android/virtualscene/TextureUtils.h"
-#include "emugl/common/OpenGLDispatchLoader.h"
 #include "host-common/opengles.h"
 
 #ifdef _WIN32

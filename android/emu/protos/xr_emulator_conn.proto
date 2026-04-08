@@ -29,11 +29,11 @@ enum MsgType {
     MSG_TYPE_SET_HEAD_MOVEMENT = 6;
     MSG_TYPE_SET_HEAD_ANGULAR_VELOCITY = 7;
     MSG_TYPE_SET_HEAD_VELOCITY = 8;
-    MSG_TYPE_SET_HAND_EVENT = 9;
-    MSG_TYPE_SET_EYE_EVENT = 10;
-    MSG_TYPE_SET_OPTIONS = 11;
-    MSG_TYPE_GET_OPTIONS = 12;
-    MSG_TYPE_SET_HAND_GESTURE = 13;
+    MSG_TYPE_SET_OPTIONS = 9;
+    MSG_TYPE_GET_OPTIONS = 10;
+    MSG_TYPE_SET_HAND_GESTURE = 11;
+    MSG_TYPE_SET_HAND_EVENT = 12;
+    MSG_TYPE_SET_EYE_EVENT = 13;
 }
 enum Status {
     RESULT_UNKNOWN = 0;
@@ -159,10 +159,10 @@ message EmulatorRequest {
     optional Translation xr_head_movement_event = 6;
     optional AngularVelocity xr_head_angular_velocity_event = 7;
     optional Velocity xr_head_velocity_event = 8;
-    optional MouseEvent xr_hand_event = 9;
-    optional MouseEvent xr_eye_event = 10;
-    optional XrOptions xr_options = 11;
-    optional HandGesture hand_gesture = 12;
+    optional XrOptions xr_options = 9;
+    optional HandGesture hand_gesture = 10;
+    optional MouseEvent xr_hand_event = 11;
+    optional MouseEvent xr_eye_event = 12;
 }
 
 message EmulatorResponse {

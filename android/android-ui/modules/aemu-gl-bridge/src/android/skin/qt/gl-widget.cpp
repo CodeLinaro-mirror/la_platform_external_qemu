@@ -27,7 +27,6 @@
 #include "android/skin/qt/gl-canvas.h"          // for GLCanvas
 #include "android/skin/qt/gl-texture-draw.h"    // for TextureDraw
 #include "android/utils/debug.h"
-#include "emugl/common/OpenGLDispatchLoader.h"  // for LazyLoadedEGLDispatch
 
 using namespace gfxstream::host::gl;
 
@@ -142,7 +141,7 @@ bool GLWidget::ensureInit() {
     mEGLState->context = mEGL->eglCreateContext(
         mEGLState->display,
         egl_config,
-        (EGLContext)ops->get_global_egl_context(),
+        (EGLContext)(ops ? ops->get_global_egl_context() : 0),
         context_attribs);
 
     if (mEGLState->context == EGL_NO_CONTEXT) {

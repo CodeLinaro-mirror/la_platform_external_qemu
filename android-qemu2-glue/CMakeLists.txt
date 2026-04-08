@@ -76,12 +76,8 @@ set(android-qemu2-glue_src
     utils/register_crash_info.cpp
     utils/stream.cpp)
 
-if(OPTION_GFXSTREAM_BACKEND)
-  set(android-qemu2-virtio_src emulation/virtio-gpu-gfxstream-renderer.cpp)
-  set(android-qemu2-virtio_hdr gfxstream_backend_headers)
-else()
-  set(android-qemu2-virtio_src emulation/virtio-goldfish-pipe.cpp)
-endif()
+set(android-qemu2-virtio_src emulation/virtio-gpu-gfxstream-renderer.cpp)
+set(android-qemu2-virtio_hdr gfxstream_backend_headers)
 
 android_add_library(TARGET libqemu2-glue LICENSE Apache-2.0
                     SRC ${android-qemu2-glue_src} ${android-qemu2-virtio_src})

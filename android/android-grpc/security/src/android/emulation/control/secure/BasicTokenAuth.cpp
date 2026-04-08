@@ -88,7 +88,6 @@ StaticTokenAuth::StaticTokenAuth(std::string token,
     : BasicTokenAuth(DEFAULT_HEADER, list),
       mStaticToken(DEFAULT_BEARER + token),
       mIssuer(iss) {
-    dwarning("*** Basic token auth should only be used by android-studio ***");
 };
 
 bool StaticTokenAuth::canHandleToken(std::string_view token) {

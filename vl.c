@@ -163,7 +163,6 @@ int main(int argc, char **argv)
 #include "android/console.h"
 #include "host-common/crash-handler.h"
 #include "host-common/hw-config-helper.h"
-#include "android/cros.h"
 #include "android/emulation/bufprint_config_dirs.h"
 #include "android/emulation/QemuMiscPipe.h"
 #include "android/error-messages.h"
@@ -4726,14 +4725,8 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
 
             RendererConfig rendererConfig = getLastRendererConfig();
 
-            if (avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()) >= 27) {
-                // api27 and up hardcoded pixel format ast RGBA8888, so only use 32bit
-                // todo: once api26 is refreshed, force 32bit on it as well. right now
-                // it is using 16bit hardcoded
-                goldfish_fb_set_display_depth(32);
-            } else {
-                goldfish_fb_set_display_depth(depth);
-            }
+            goldfish_fb_set_display_depth(depth);
+
             goldfish_fb_set_use_host_gpu(true);
             is_opengl_alive = rendererConfig.rendererStarted;
 
@@ -4792,13 +4785,6 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
             if (android_qemud_get_channel(ANDROID_QEMUD_GPS,
                                           &android_gps_serial_line) < 0) {
                 error_report("could not initialize qemud 'gps' channel");
-                return 1;
-            }
-        }
-
-        if (getConsoleAgents()->settings->hw()->hw_arc) {
-            if (cros_pipe_init() < 0) {
-                error_report("could not initialize qemud 'cros' channel");
                 return 1;
             }
         }
@@ -5434,7 +5420,7 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
             strcmp(getConsoleAgents()->settings->hw()->hw_camera_front, "none")) \
     X("have-keyboard", have_keyboard) \
     X("have-lidswitch", getConsoleAgents()->settings->hw()->hw_keyboard_lid) \
-    X("have-tabletmode", getConsoleAgents()->settings->hw()->hw_arc) \
+    X("have-tabletmode", false) \
     X("have-touch", androidHwConfig_isScreenTouch(getConsoleAgents()->settings->hw())) \
     X("have-multitouch", have_multitouch)
 

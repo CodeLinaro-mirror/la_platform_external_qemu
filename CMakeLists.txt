@@ -122,11 +122,6 @@ set(OPTION_TCMALLOC
       BOOL
       "Use TCMalloc on supported platforms (currently, linux)."
 )
-set(OPTION_GFXSTREAM_BACKEND
-    FALSE
-    CACHE
-      BOOL
-      "Build the gfxstream backend (plus everything else).")
 
 set(OPTION_TEST_LOGS "${CMAKE_BINARY_DIR}/testlogs" CACHE
     STRING "Directory where all the unit test xml files will be stored.")
@@ -156,28 +151,14 @@ set(OPTION_ENABLE_SYSTEM_RUST
       "Use the system rust compiler, only needed on Mac M1 or Windows."
 )
 
-if(GFXSTREAM_ONLY)
-  set(GFXSTREAM TRUE)
-endif()
+set(GFXSTREAM TRUE)
 
 if(LINUX_AARCH64)
   set(QTWEBENGINE FALSE)
-  set(GFXSTREAM TRUE)
 endif()
 
-if(DARWIN_AARCH64)
-  set(OPTION_TCMALLOC FALSE)
-endif()
-
-if(WINDOWS_MSVC_X86_64 OR DARWIN_AARCH64 OR DARWIN_X86_64)
-  if (NOT GFXSTREAM)
-    message(WARNING "--gfxstream option is now a requirement on Mac/Windows. Force-enabling gfxstream.")
-    set(GFXSTREAM TRUE)
-  endif()
-endif()
 
 if(GFXSTREAM)
-  set(OPTION_GFXSTREAM_BACKEND TRUE)
   set(OPTION_TCMALLOC FALSE)
   set(ANDROIDSTUDIO FALSE)
 endif()
@@ -698,10 +679,8 @@ target_compile_definitions(
             "-DCONFIG_MIGRATION_RAM_SINGLE_ITERATION" "${TRACE_CONFIG}")
 target_compile_definitions(android-qemu-deps INTERFACE # Enable VIRGL
                                                        "-DCONFIG_VIRGL")
-if (OPTION_GFXSTREAM_BACKEND)
-  target_compile_definitions(android-qemu-deps INTERFACE # Enable gfxstream stream renderer
-                                                         "-DCONFIG_STREAM_RENDERER")
-endif()
+target_compile_definitions(android-qemu-deps INTERFACE # Enable gfxstream stream renderer
+                                                        "-DCONFIG_STREAM_RENDERER")
 
 target_compile_options(
   android-qemu-deps
