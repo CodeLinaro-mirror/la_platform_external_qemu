@@ -339,7 +339,7 @@ static int startOpenglesRendererImpl(
 
     gfxstream::host::FeatureSet gfxstreamFeatures;
     using GfxstreamFeaturePtr =
-            gfxstream::host::FeatureInfo(gfxstream::host::FeatureSet::*);
+            gfxstream::host::BoolFeatureInfo(gfxstream::host::FeatureSet::*);
     const std::map<android::featurecontrol::Feature, GfxstreamFeaturePtr>
             kAemuToGfxstreamFeatureMap = {
                     {android::featurecontrol::AsyncComposeSupport,
@@ -428,8 +428,8 @@ static int startOpenglesRendererImpl(
     reportGfxstreamFeatures.reserve(1024);
     for (const auto& [aemuFeature, gfxstreamFeaturePtr] :
          kAemuToGfxstreamFeatureMap) {
-        (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled =
-                android::featurecontrol::isEnabled(aemuFeature);
+        (gfxstreamFeatures.*gfxstreamFeaturePtr)
+                .setEnabled(android::featurecontrol::isEnabled(aemuFeature));
 
         // TODO(b/389646068): special handling of 'GuestVulkanOnly' as we still
         // depend on flush-to-gl behavior on GL host composition (ie. when
@@ -437,15 +437,15 @@ static int startOpenglesRendererImpl(
         // separate aemu features to be checked to enable.
         if (gfxstreamFeaturePtr ==
             &gfxstream::host::FeatureSet::GuestVulkanOnly) {
-            gfxstreamFeatures.GuestVulkanOnly.enabled =
+            gfxstreamFeatures.GuestVulkanOnly.setEnabled(
                     android::featurecontrol::isEnabled(
                             android::featurecontrol::GuestAngle) &&
                     android::featurecontrol::isEnabled(
-                            android::featurecontrol::VulkanNativeSwapchain);
+                            android::featurecontrol::VulkanNativeSwapchain));
         }
 
-        const std::string& featureName = (gfxstreamFeatures.*gfxstreamFeaturePtr).name;
-        const bool featureEnabled = (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled;
+        const std::string& featureName = (gfxstreamFeatures.*gfxstreamFeaturePtr).getName();
+        const bool featureEnabled = (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled();
         dprint("gfxstreamFeature:%s = %d", featureName.c_str(), featureEnabled);
         if (featureEnabled) {
             absl::StrAppend(&reportGfxstreamFeatures, featureName);
@@ -456,7 +456,7 @@ static int startOpenglesRendererImpl(
         // reflected on the gfxstream side.
         android::featurecontrol::makeReadOnly(aemuFeature);
     }
-    gfxstreamFeatures.EglOnEgl.enabled = sEgl2egl;
+    gfxstreamFeatures.EglOnEgl.setEnabled(sEgl2egl);
     crashhandler_add_string("gfxstream_features", reportGfxstreamFeatures.c_str());
 
     sRenderLib->setSyncDevice(
