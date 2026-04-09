@@ -26,7 +26,6 @@
 #include "host-common/snapshot_common.h"
 #include "host-common/snapshot_interface.h"
 #include "android/utils/debug.h"
-#include "android/videoinjection/VideoInjectionController.h"
 
 #include <atomic>
 #include <cassert>
@@ -44,7 +43,6 @@ using android::automation::AutomationController;
 using android::base::LazyInstance;
 using android::base::Lock;
 using android::base::Optional;
-using android::videoinjection::VideoInjectionController;
 
 namespace {
 
@@ -80,23 +78,19 @@ public:
         typedef android::AndroidAsyncMessagePipe::Service<OffworldPipe> Super;
 
     public:
-        Service(AutomationController& automationController,
-                VideoInjectionController& videoInjectionController)
+        Service(AutomationController& automationController)
             : Super("OffworldPipe"),
-              mAutomationController(automationController),
-              mVideoInjectionController(videoInjectionController) {}
+              mAutomationController(automationController) {}
         ~Service() {
             android::base::AutoLock lock(sOffworldLock);
             sOffworldInstance = nullptr;
         }
 
         static std::unique_ptr<Service> create(
-            AutomationController& automationController,
-            VideoInjectionController& videoInjectionController) {
+            AutomationController& automationController) {
             android::base::AutoLock lock(sOffworldLock);
             CHECK(!sOffworldInstance) << "OffworldPipe already exists";
-            sOffworldInstance = new Service(automationController,
-                                            videoInjectionController);
+            sOffworldInstance = new Service(automationController);
             return std::unique_ptr<Service>(sOffworldInstance);
         }
 
@@ -119,10 +113,6 @@ public:
             return mAutomationController;
         }
 
-        VideoInjectionController& getVideoInjectionController() {
-            return mVideoInjectionController;
-        }
-
     private:
         // Since OffworldPipe::Service may be destroyed in unittests, we cannot
         // use LazyInstance. Instead store the pointer and clear it on destruct.
@@ -130,7 +120,6 @@ public:
         static android::base::StaticLock sOffworldLock;
 
         AutomationController& mAutomationController;
-        VideoInjectionController& mVideoInjectionController;
     };
 
     OffworldPipe(AndroidPipe::Service* service, PipeArgs&& pipeArgs)
@@ -139,7 +128,6 @@ public:
 
     virtual ~OffworldPipe() {
         getAutomationController().pipeClosed(getHandle());
-        getVideoInjectionController().pipeClosed(getHandle());
     }
 
     void onSave(android::base::Stream* stream) override {
@@ -199,7 +187,8 @@ private:
                         handleAutomationRequest(request.automation());
                         break;
                     case offworld::Request::ModuleCase::kVideoInjection:
-                        handleVideoInjectionRequest(request.video_injection());
+                        LOG(ERROR) << "VideoInjection support is deprecated.";
+                        sendError(offworld::Response::RESULT_ERROR_UNKNOWN);
                         break;
                     case offworld::Request::ModuleCase::kSensorMock:
                         handleSensorMockRequest(request.sensor_mock());
@@ -340,31 +329,6 @@ private:
         }
     }
 
-    void handleVideoInjectionRequest(
-        const offworld::VideoInjectionRequest& request) {
-
-        const uint32_t asyncId = mNextAsyncId++;
-        auto result = getVideoInjectionController().handleRequest(
-            getHandle(), request, asyncId);
-
-        if (result.ok()) {
-            offworld::Response response = createOkResponse();
-            response.set_pending_async_id(asyncId);
-            response.mutable_video_injection()->set_sequence_id(
-                request.sequence_id());
-            sendResponse(response);
-        } else {
-            std::stringstream ss;
-            ss << result.unwrapErr();
-            offworld::Response response = createErrorResponse(
-                offworld::Response::RESULT_ERROR_UNKNOWN,
-                ss.str());
-            response.mutable_video_injection()->set_sequence_id(
-                request.sequence_id());
-            sendResponse(response);
-        }
-    }
-
     void handleSensorMockRequest(
         const offworld::SensorMockRequest& request) {
       LOG(ERROR) << "Received Sensor Mock Event";
@@ -387,10 +351,6 @@ private:
         return mService->getAutomationController();
     }
 
-    VideoInjectionController& getVideoInjectionController() {
-        return mService->getVideoInjectionController();
-    }
-
     Service* const mService;
 
     bool mHandshakeComplete = false;
@@ -408,17 +368,14 @@ namespace offworld {
 void registerOffworldPipeService() {
     if (android::featurecontrol::isEnabled(android::featurecontrol::Offworld)) {
         registerAsyncMessagePipeService(
-                OffworldPipe::Service::create(
-                    AutomationController::get(),
-                    VideoInjectionController::get()));
+                OffworldPipe::Service::create(AutomationController::get()));
     }
 }
 
 void registerOffworldPipeServiceForTest(
-    AutomationController* automationController,
-    VideoInjectionController* videoInjectionController) {
-    registerAsyncMessagePipeService(OffworldPipe::Service::create(
-        *automationController, *videoInjectionController));
+        AutomationController* automationController) {
+    registerAsyncMessagePipeService(
+            OffworldPipe::Service::create(*automationController));
 }
 
 // Send a response to an Offworld pipe.

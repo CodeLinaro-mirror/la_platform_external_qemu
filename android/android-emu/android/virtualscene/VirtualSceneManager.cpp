@@ -154,13 +154,14 @@ struct EnvironmentConfig {
     static const float defaultBackgroundBlur = 5.0f;
     static const int defaultFps = 30;
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
-    std::string sceneFilename;
+    std::string sceneArgument;
     float backgroundBlur = defaultBackgroundBlur;
     int fps;
 };
 
 static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
-                                              bool warnMissing) {
+                                              bool warnMissing,
+                                              bool showBackground) {
     EnvironmentConfig ret;
 
     // Environment is required, set it up
@@ -193,10 +194,10 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
                 dinfo("%s: Invalid mode set. Using default virtual scene mode for the environment.",
                       __func__);
                 ret.sceneMode = SceneConfig::Mode::Mesh3D;
-                ret.sceneFilename =
-                        SceneConfig::defaultFilenameForMode(ret.sceneMode);
+                ret.sceneArgument =
+                        SceneConfig::defaultArgumentForMode(ret.sceneMode);
             }
-            ret.sceneFilename = mode.substr(argpos);
+            ret.sceneArgument = mode.substr(argpos);
         } else {
             // Handle legacy image file specification
             std::string backgroundImageFilename = iniFile_getString(
@@ -204,7 +205,7 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             if (!backgroundImageFilename.empty()) {
                 modeSet = true;
                 ret.sceneMode = SceneConfig::Mode::ImageFile;
-                ret.sceneFilename = backgroundImageFilename;
+                ret.sceneArgument = backgroundImageFilename;
             }
         }
 
@@ -215,14 +216,19 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
     }
 
     if (!modeSet) {
-        dinfo("%s: Using default virtual scene mode for the environment.",
-              __func__);
-        ret.sceneMode = SceneConfig::Mode::Mesh3D;
+        if (showBackground) {
+            dinfo("%s: Using blank background for the environment.", __func__);
+            ret.sceneMode = SceneConfig::Mode::Color;
+        } else {
+            dinfo("%s: Using default virtual scene mode for the environment.",
+                  __func__);
+            ret.sceneMode = SceneConfig::Mode::Mesh3D;
+        }
     }
-    if (ret.sceneFilename.empty()) {
+    if (ret.sceneArgument.empty()) {
         dinfo("%s: Using default configuration for mode %s for the environment.",
               __func__, SceneConfig::modeToString(ret.sceneMode));
-        ret.sceneFilename = SceneConfig::defaultFilenameForMode(ret.sceneMode);
+        ret.sceneArgument = SceneConfig::defaultArgumentForMode(ret.sceneMode);
     }
 
     return ret;
@@ -242,8 +248,8 @@ std::shared_ptr<Scene> ScenesManager::createScene(const SceneConfig& config) {
     }
 
     // Create a new scene
-    D("Initializing a scene with mode:%s, filename:%s",
-      SceneConfig::modeToString(config.mSceneMode), config.mFilename.c_str());
+    D("Initializing a scene with mode:%s, argument:%s",
+      SceneConfig::modeToString(config.mSceneMode), config.mArgument.c_str());
 
     // Only initialize a renderer for the scene if GL is required
     bool rendererRequired =
@@ -340,43 +346,9 @@ bool ScenesManager::renderView(Scene* scene,
                 return false;
             }
         } break;
-        case SceneConfig::Mode::VideoPlayback: {
-            // TODO(virtualscene-video): create video playback scene and render
-            // a view Renders a procedural animation for now..
-            const int dummyVideoWidth = view->getWidthLocked();
-            const int dummyVideoHeight = view->getHeightLocked();
-            const int stride = dummyVideoWidth * 4;
-            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
-            if (fbData.size() < dummyVideoWidth * dummyVideoHeight * 4) {
-                // preRenderLocked failed
-                E("Scene rendering failed");
-                return false;
-            }
-            for (int y = 0; y < dummyVideoHeight; y++) {
-                for (int x = 0; x < dummyVideoWidth; x++) {
-                    uint8_t& r = fbData[(y * dummyVideoWidth + x) * 4 + 0];
-                    uint8_t& g = fbData[(y * dummyVideoWidth + x) * 4 + 1];
-                    uint8_t& b = fbData[(y * dummyVideoWidth + x) * 4 + 2];
-                    uint8_t& a = fbData[(y * dummyVideoWidth + x) * 4 + 3];
-
-                    float u = (x / (float)dummyVideoWidth) * 10.0;
-                    float v = (y / (float)dummyVideoHeight) * 10.0;
-                    float local_u = u - floor(u);
-                    float local_v = v - floor(v);
-                    float dist = abs(local_u - 0.5) + abs(local_v - 0.5);
-                    float threshold =
-                            0.1 + 0.4 * (0.5 + 0.5 * sin(renderTime * 6.283));
-                    float mask = (dist < threshold) ? 1.0 : 0.0;
-
-                    r = (uint8_t)(mask * 100);
-                    g = (uint8_t)(mask * 200);
-                    b = (uint8_t)(mask * 255);
-                    a = 255;
-                }
-            }
-        } break;
         case SceneConfig::Mode::ImageFile:
-        case SceneConfig::Mode::VideoFile: {
+        case SceneConfig::Mode::VideoFile:
+        case SceneConfig::Mode::Color: {
             const SceneOverlayObject* overlay = scene->getOverlayObject();
             if (!overlay || !overlay->isValid()) {
                 E("Scene rendering failed");
@@ -471,6 +443,7 @@ std::optional<std::thread> VirtualSceneManager::mBackgroundUpdateThread;
 std::function<void()> VirtualSceneManager::mUpdateCallback;
 int VirtualSceneManager::mNumUsers = 0;
 std::atomic<bool> VirtualSceneManager::mKeepUpdating = false;
+bool VirtualSceneManager::mShowBackground = false;
 
 void VirtualSceneManager::parseCmdline() {
     AutoLock lock(mLock);
@@ -502,7 +475,8 @@ void VirtualSceneManager::parseCmdline() {
     }
 }
 
-bool VirtualSceneManager::initialize(bool initBackgroundService) {
+bool VirtualSceneManager::initialize(bool initBackgroundService,
+                                     bool transparentDisplay) {
     AutoLock lock(mLock);
     if (mEnvironmentScene) {
         E("VirtualSceneManager already initialized");
@@ -520,12 +494,13 @@ bool VirtualSceneManager::initialize(bool initBackgroundService) {
     const AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
     const bool warnIfMissing = !strcmp(hwCfg->hw_camera_back, "virtualscene");
 
-    EnvironmentConfig envConfig = getEnvironmentConfig(avdInfo, warnIfMissing);
-    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneFilename);
+    EnvironmentConfig envConfig =
+            getEnvironmentConfig(avdInfo, warnIfMissing, mShowBackground);
+    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
 
-    D("Initializing VirtualSceneManager with mode:%s, filename:%s",
+    D("Initializing VirtualSceneManager with mode:%s, argument:%s",
       SceneConfig::modeToString(sceneConfig.mSceneMode),
-      sceneConfig.mFilename.c_str());
+      sceneConfig.mArgument.c_str());
 
     std::shared_ptr<Scene> scene = createEnvironmentScene(sceneConfig);
 
@@ -539,6 +514,7 @@ bool VirtualSceneManager::initialize(bool initBackgroundService) {
 
     lock.unlock();
 
+    mShowBackground = transparentDisplay;
     if (initBackgroundService) {
         int displayWidth, displayHeight;
         androidHwConfig_getScreenDimensions(hwCfg, &displayWidth,
@@ -588,7 +564,7 @@ void VirtualSceneManager::update() {
     // virtualscene and animation is controlled by renderTime in shaders. Always
     // update the scene and timer in other modes.
     bool updateTime = true;
-    if (SceneConfig::modeSupportAnimations(mEnvironmentScene->getSceneMode())) {
+    if (SceneConfig::modeSupportsAnimations(mEnvironmentScene->getSceneMode())) {
         // Use virtualscene settings for animation control
         updateTime = sSettings->getAnimationState();
     } else {
@@ -729,9 +705,9 @@ void VirtualSceneManager::setSceneControlsParameters(bool show) {
         return;
     }
 
-    // Only allow showing scene controls if it's a mesh3d scene
-    if (!show ||
-        (mEnvironmentScene->getSceneMode() == SceneConfig::Mode::Mesh3D)) {
+    // Only allow showing scene controls if it's a 3d scene
+    if (!show || SceneConfig::modeSupportsSceneControls(
+                         mEnvironmentScene->getSceneMode())) {
         D("%s: show=%s", __func__, (show ? "true" : "false"));
         skin_winsys_show_virtual_scene_controls(show);
     }
@@ -799,8 +775,8 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
         return true;
     }
 
-    D("%s: Reloading with mode:%s, filename:%s", __func__,
-      SceneConfig::modeToString(config.mSceneMode), config.mFilename.c_str());
+    D("%s: Reloading with mode:%s, argument:%s", __func__,
+      SceneConfig::modeToString(config.mSceneMode), config.mArgument.c_str());
 
     // Create a new scene and check if there were any errors
     auto scene = createEnvironmentScene(config);
@@ -849,20 +825,26 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
         return false;
     }
 
-    EnvironmentConfig envConfig = getEnvironmentConfig(avdInfo, true);
+    EnvironmentConfig envConfig =
+            getEnvironmentConfig(avdInfo, true, mShowBackground);
 
     // Reload virtual scene
-    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneFilename);
+    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
     if (!reloadScene(sceneConfig)) {
         derror("%s: Cannot reload virtual scene for the environment", __func__);
         return false;
     }
 
+    // Save environment.ini on success
+    if (environmentData) {
+        avdInfo_saveEnvironmentIni(avdInfo);
+    }
+
     // Update background view, if exists
     BackgroundUpdateService::updateBlurAmount(envConfig.backgroundBlur);
 
-    dinfo("%s: Reloaded environment with scene file: %s", __func__,
-          envConfig.sceneFilename.c_str());
+    dinfo("%s: Reloaded environment with scene argument: %s", __func__,
+          envConfig.sceneArgument.c_str());
 
     return true;
 }

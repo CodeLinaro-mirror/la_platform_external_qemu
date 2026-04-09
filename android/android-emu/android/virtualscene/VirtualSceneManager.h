@@ -73,7 +73,7 @@ public:
 
     // Initialize virtual scene rendering.
     // Returns true if initialization succeeded.
-    static bool initialize(bool initBackgroundService);
+    static bool initialize(bool initBackgroundService, bool transparentDisplay);
 
     // Uninitialize virtual scene rendering, may be called on any thread, but
     // the same EGL context that was active when initialize() was called must be
@@ -162,6 +162,7 @@ private:
     static std::optional<std::thread> mBackgroundUpdateThread;
     static std::function<void()> mUpdateCallback;
     static int mNumUsers;
+    static bool mShowBackground;
     static std::atomic<bool> mKeepUpdating;
 
     static void updateSceneWorker();

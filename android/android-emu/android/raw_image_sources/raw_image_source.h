@@ -69,10 +69,10 @@ constexpr Color kErrorColor = {0xff, 0x00, 0xff};
 
 // SolidColorImageProvider provides a 1x1 color image
 // By default, this is black.
-class SolidColorImageProvider : public RawImageSource {
+class SolidColorImageSource : public RawImageSource {
 public:
-    SolidColorImageProvider();
-    explicit SolidColorImageProvider(Color c);
+    SolidColorImageSource();
+    explicit SolidColorImageSource(Color c);
     int Start(uint32_t pixel_format, int width, int height) override;
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,

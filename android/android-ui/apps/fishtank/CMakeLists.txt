@@ -34,6 +34,8 @@ if(APPLE)
   android_target_properties(fishtank all "INSTALL_RPATH=@executable_path/lib64")
   android_target_properties(
     fishtank all "INSTALL_RPATH>=@executable_path/lib64/qt/lib")
+  android_target_properties(
+    fishtank all "INSTALL_RPATH>=@executable_path/lib64/gles_swiftshader")
   android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path")
   android_target_properties(fishtank all "INSTALL_RPATH>=@loader_path/lib64")
   android_target_properties(fishtank all "BUILD_WITH_INSTALL_RPATH=ON")
@@ -109,6 +111,23 @@ target_link_libraries(
           zlib
           ui::widgets)
 
+if(NOT WINDOWS_MSVC_X86_64)
+  # On Linux and macOS, we avoid direct linking of SwiftShader libraries
+  # because some prebuilts have malformed symbol tables that cause LLD to
+  # fail. Instead, we rely on RPATH-based resolution at runtime. This avoids
+  # needing to set LD_LIBRARY_PATH or DYLD_LIBRARY_PATH, which can be
+  # restricted by security features like macOS System Integrity Protection (SIP).
+  # Since fishtank uses LazyLoadedEGLDispatch to load these dynamically
+  # at runtime, direct linking is not required.
+  android_target_dependency(fishtank all SWIFTSHADER_DEPENDENCIES)
+
+  if(NOT APPLE)
+    # Linux-specific RPATH (Apple RPATH is set in the block above)
+    android_target_properties(
+      fishtank all "INSTALL_RPATH>=\$ORIGIN/lib64/gles_swiftshader")
+  endif()
+endif()
+
 # Include the current directory for headers
 target_include_directories(fishtank PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -119,14 +138,27 @@ android_target_properties(fishtank all "${QT5_SHARED_PROPERTIES}")
 # We define this locally because android_strip_prebuilt in android.cmake
 # is currently broken for standalone distributions (it evaluates CMAKE_INSTALL_PREFIX
 # at configuration time instead of install time).
-function(fishtank_strip FNAME)
+# Strips and signs the given file during install.
+# We handle both in one function to ensure the correct order on macOS:
+# Stripping must happen BEFORE signing, or the signature will be invalidated.
+function(fishtank_post_install FNAME)
   if(NOT WINDOWS_MSVC_X86_64)
+    # 1. Strip the binary if requested
     install(
       CODE "if(CMAKE_INSTALL_DO_STRIP AND OPTION_FISHTANK_STRIP)
               execute_process(COMMAND \"${CMAKE_STRIP}\" \"$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${FNAME}\")
             endif()"
       COMPONENT fishtank
       EXCLUDE_FROM_ALL)
+
+    # 2. Sign the binary on macOS (always, even if not stripped)
+    if(APPLE)
+      install(
+        CODE "message(STATUS \"Signing   : ${FNAME}\")
+              execute_process(COMMAND codesign -s - --entitlements ${ANDROID_QEMU2_TOP_DIR}/entitlements.plist \"$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${FNAME}\")"
+        COMPONENT fishtank
+        EXCLUDE_FROM_ALL)
+    endif()
   endif()
 endfunction()
 
@@ -180,7 +212,7 @@ function(fishtank_install_dependency)
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
         if(DST_NAME MATCHES ".*\\.so.*" OR DST_NAME MATCHES ".*\\.dylib")
-          fishtank_strip("fishtank/${DST}")
+          fishtank_post_install("fishtank/${DST}")
         endif()
         # Extra logic for libc++ on Linux to support QtWebEngineProcess.
         if(LINUX_X86_64 AND (DST_NAME STREQUAL "libc++.so.1"
@@ -191,7 +223,7 @@ function(fishtank_install_dependency)
             RENAME ${DST_NAME}
             COMPONENT fishtank
             EXCLUDE_FROM_ALL)
-          fishtank_strip("fishtank/lib64/qt/lib/${DST_NAME}")
+          fishtank_post_install("fishtank/lib64/qt/lib/${DST_NAME}")
         endif()
       endif()
     elseif(TARGET ${dep})
@@ -209,6 +241,13 @@ function(fishtank_install_dependency)
           LIBRARY DESTINATION fishtank/lib64
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
+        if(APPLE)
+          if(dep MATCHES "^lib.*")
+            fishtank_post_install("fishtank/lib64/${dep}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+          else()
+            fishtank_post_install("fishtank/lib64/lib${dep}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+          endif()
+        endif()
         # We don't need android_strip_prebuilt here because targets are stripped
         # automatically by cmake --install --strip (which we added to compile.py)
       endif()
@@ -225,6 +264,7 @@ install(
   RUNTIME DESTINATION fishtank
   COMPONENT fishtank
   EXCLUDE_FROM_ALL)
+fishtank_post_install("fishtank/fishtank")
 
 if(NOT LINUX_AARCH64)
   fishtank_install_dependency(DEPS
@@ -313,7 +353,7 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
           DESTINATION fishtank/${DST_DIR}
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
-        fishtank_strip("fishtank/${DST_DIR}/QtWebEngineProcess")
+        fishtank_post_install("fishtank/${DST}")
       else()
         install(
           FILES ${SRC}
@@ -321,7 +361,7 @@ foreach(qt_dep ${QT5_SHARED_DEPENDENCIES} ${QT5_WEBENGINE_SHARED_DEPENDENCIES})
           COMPONENT fishtank
           EXCLUDE_FROM_ALL)
         if(SRC MATCHES ".*\\.so.*" OR SRC MATCHES ".*\\.dylib")
-          fishtank_strip("fishtank/${DST}")
+          fishtank_post_install("fishtank/${DST}")
         endif()
       endif()
     endif()
@@ -336,6 +376,8 @@ android_add_test(
       agents/sensors_agent.cpp
       agents/record_screen_agent_unittest.cpp
       agents/record_screen_agent.cpp
+      agents/user_event_agent_unittest.cpp
+      agents/user_event_agent.cpp
       agents/test_client_setup.cpp)
 
 target_link_libraries(

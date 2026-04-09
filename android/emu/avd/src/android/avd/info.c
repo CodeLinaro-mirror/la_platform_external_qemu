@@ -1890,6 +1890,16 @@ CIniFile* avdInfo_reloadEnvironmentIni(const AvdInfo* i, const char* data) {
     return i->environmentIni;
 }
 
+void avdInfo_saveEnvironmentIni(const AvdInfo* i) {
+    char* iniPath = _avdInfo_getContentFilePath(i, AVD_ENVIRONMENT_INI);
+
+    if (iniPath != NULL) {
+        iniFile_saveToFile(i->environmentIni, iniPath);
+    }
+
+    AFREE(iniPath);
+}
+
 int avdInfo_getSysImgIncrementalVersion(const AvdInfo* i) {
     return i->incrementalVersion;
 }

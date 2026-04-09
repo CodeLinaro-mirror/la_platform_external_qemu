@@ -716,12 +716,6 @@ void multitouch_init(AndroidMTSPort* mtsp,
 }
 
 /* Convenience functions to set and get the button state bit mask */
-typedef enum {
-    kShiftIsTouchDown = 1,
-    kShiftShouldSkipSync = 1 << 1,
-    kShiftSecondaryTouch = 1 << 2,
-} ButtonStateShiftMask;
-
 int multitouch_create_buttons_state(bool is_down,
                                     bool skip_sync,
                                     bool secondary_finger) {
