@@ -44,6 +44,7 @@ struct SceneConfig {
         VideoFile,
         ImageFile,
         Color,
+        Image360,
     };
 
     SceneConfig(Mode mode, std::string_view argument);

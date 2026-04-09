@@ -41,7 +41,7 @@ public:
     void setAspectRatio(float aspectRatio);
 
     // Update the scene camera based on the current physical state.
-    void update();
+    void update(bool supportsPosition);
 
     // Get the view projection matrix for the current frame.
     glm::mat4 getViewProjection() const;
