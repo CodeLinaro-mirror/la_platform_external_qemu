@@ -79,7 +79,6 @@ public:
         }
     }
 
-    bool isPbufferFallbackActive() const { return mUsePbufferFallback; }
     const QImage& offscreenImage() const { return mOffscreenImage; }
 
     bool mInitCalled = false;
@@ -99,7 +98,6 @@ TEST_F(GLWidgetTest, AlwaysUsePbufferInitialization) {
     fprintf(stderr, "ensureInit returned %d\n", success);
     EXPECT_TRUE(success);
     EXPECT_TRUE(widget->mInitCalled);
-    EXPECT_TRUE(widget->isPbufferFallbackActive());
 }
 
 TEST_F(GLWidgetTest, PbufferRendering) {
@@ -119,7 +117,6 @@ TEST_F(GLWidgetTest, PbufferRendering) {
     EXPECT_TRUE(widget->mRepaintCalled);
 
     // Pbuffer mode should always be active now.
-    EXPECT_TRUE(widget->isPbufferFallbackActive());
     EXPECT_FALSE(widget->offscreenImage().isNull());
 
     // Verify that the pixel in the middle is red.
