@@ -289,7 +289,7 @@ void virtio_notify(VirtIODevice *vdev, VirtQueue *vq);
 
 int virtio_save(VirtIODevice *vdev, QEMUFile *f);
 
-extern const VMStateInfo virtio_vmstate_info;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo virtio_vmstate_info;
 
 #define VMSTATE_VIRTIO_DEVICE \
     {                                         \
