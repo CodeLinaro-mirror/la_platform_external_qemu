@@ -273,7 +273,7 @@ bool Scene::initialize() {
             std::unique_ptr<MeshSceneObject> photoSphereObject =
                     MeshSceneObject::createSphere(*mRenderer);
             Texture sceneTexture =
-                    mRenderer->loadTextureAsync(sceneFilename.c_str());
+                    mRenderer->loadTexture(sceneFilename.c_str());
             if (sceneTexture.isValid()) {
                 photoSphereObject->setTexture(0, sceneTexture);
                 mRenderer->releaseTexture(sceneTexture);
