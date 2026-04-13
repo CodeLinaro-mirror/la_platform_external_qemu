@@ -181,8 +181,8 @@ bool SceneConfig::modeSupportsSceneControls(SceneConfig::Mode mode) {
            (mode == SceneConfig::Mode::Image360);
 }
 
-Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
-    : mRenderer(std::move(renderer)), mConfig(config) {
+Scene::Scene(const SceneConfig& config)
+    : mConfig(config) {
     D("%s: creating Scene", __func__);
 }
 
@@ -195,10 +195,9 @@ Scene::~Scene() {
     mRenderer.reset();
 }
 
-std::unique_ptr<Scene> Scene::create(std::unique_ptr<Renderer> renderer,
-                                     const SceneConfig& config) {
+std::unique_ptr<Scene> Scene::create(const SceneConfig& config) {
     std::unique_ptr<Scene> scene;
-    scene.reset(new Scene(std::move(renderer), config));
+    scene.reset(new Scene(config));
     if (!scene || !scene->initialize()) {
         return nullptr;
     }
@@ -207,7 +206,8 @@ std::unique_ptr<Scene> Scene::create(std::unique_ptr<Renderer> renderer,
 }
 
 bool Scene::initialize() {
-    const char* sceneModeStr = SceneConfig::modeToString(mConfig.mSceneMode);
+    const auto sceneMode = getSceneMode();
+    const char* sceneModeStr = SceneConfig::modeToString(sceneMode);
     dprint("Initializing scene with '%s' mode, argument:%s", sceneModeStr,
            mConfig.mArgument.c_str());
 
@@ -215,18 +215,10 @@ bool Scene::initialize() {
     // TODO(virtualscene): decide and add new metrics without PII
     CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
-    const auto sceneMode = getSceneMode();
-
     // Find the file, in case it's given as a local path
     std::string sceneFilename;
     if (sceneMode != SceneConfig::Mode::Color) {
         sceneFilename = resolveSceneFilename(mConfig.mArgument);
-    }
-
-    if (SceneConfig::modeRequiresRenderer(sceneMode) && mRenderer == nullptr) {
-        derror("%s: No renderer for scene: %s", __func__,
-                sceneFilename.c_str());
-        return false;
     }
 
     bool needsRawImageSource = false;
@@ -235,15 +227,7 @@ bool Scene::initialize() {
             derror("%s: Unknown scene mode!", __func__);
         } break;
         case SceneConfig::Mode::Mesh3D: {
-            std::unique_ptr<MeshSceneObject> sceneObject =
-                    MeshSceneObject::load(*mRenderer, sceneFilename.c_str());
-            if (!sceneObject) {
-                derror("%s: Could not load scene object: %s", __func__,
-                       sceneFilename.c_str());
-                return false;
-            }
-
-            mSceneObjects.push_back(std::move(sceneObject));
+            // object addition is handled in loadRendererResources
 
             // TODO(virtualscene) The virtual scene by default renders the
             // image rotated 90 degrees
@@ -270,15 +254,7 @@ bool Scene::initialize() {
             }
         } break;
         case SceneConfig::Mode::Image360: {
-            std::unique_ptr<MeshSceneObject> photoSphereObject =
-                    MeshSceneObject::createSphere(*mRenderer);
-            Texture sceneTexture =
-                    mRenderer->loadTexture(sceneFilename.c_str());
-            if (sceneTexture.isValid()) {
-                photoSphereObject->setTexture(0, sceneTexture);
-                mRenderer->releaseTexture(sceneTexture);
-            }
-            mSceneObjects.push_back(std::move(photoSphereObject));
+            // object addition is handled in loadRendererResources
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
@@ -303,6 +279,69 @@ bool Scene::initialize() {
 
     mStartTimeUs = System::get()->getUnixTimeUs();
     mFrameTimeUs = 0;
+
+    mObjectsVersion++;
+
+    return true;
+}
+
+bool Scene::loadRendererResources() {
+    if (mRenderer) {
+        // Already loaded
+        return true;
+    }
+
+    // Only initialize a renderer for the scene if GL is required
+    const auto sceneMode = getSceneMode();
+    bool rendererRequired = SceneConfig::modeRequiresRenderer(sceneMode);
+    if (!rendererRequired) {
+        // Renderer is not required
+        return true;
+    }
+
+    mRenderer = Renderer::create();
+    if (!mRenderer) {
+        E("VirtualSceneManager renderer failed to construct");
+        return false;
+    }
+
+    // Make the renderer context current for graphics operations
+    auto context = mRenderer ? mRenderer->makeCurrent() : nullptr;
+    if (context && !context->isValid()) {
+        E("%s: Cannot use EGL context", __FUNCTION__);
+        return false;
+    }
+
+    // Find the file, in case it's given as a local path
+    std::string sceneFilename;
+    if (sceneMode != SceneConfig::Mode::Color) {
+        sceneFilename = resolveSceneFilename(mConfig.mArgument);
+    }
+
+    switch (sceneMode) {
+        case SceneConfig::Mode::Mesh3D: {
+            std::unique_ptr<MeshSceneObject> sceneObject =
+                    MeshSceneObject::load(*mRenderer, sceneFilename.c_str());
+            if (!sceneObject) {
+                derror("%s: Could not load scene object: %s", __func__,
+                       sceneFilename.c_str());
+                return false;
+            }
+
+            mSceneObjects.push_back(std::move(sceneObject));
+        } break;
+        case SceneConfig::Mode::Image360: {
+            std::unique_ptr<MeshSceneObject> photoSphereObject =
+                    MeshSceneObject::createSphere(*mRenderer);
+            Texture sceneTexture =
+                    mRenderer->loadTexture(sceneFilename.c_str());
+            if (sceneTexture.isValid()) {
+                photoSphereObject->setTexture(0, sceneTexture);
+                mRenderer->releaseTexture(sceneTexture);
+            }
+            mSceneObjects.push_back(std::move(photoSphereObject));
+        } break;
+    }
 
     mObjectsVersion++;
 
@@ -504,10 +543,14 @@ void Scene::getRenderableObjectsFromSceneObject(
     }
 }
 
-// TODO(virtualscene-perf): implement load/unload user resources functions
-// to reduce memory usage of the scene when there are no users of it
 void Scene::loadUserResources() {
     dprint("%s", __FUNCTION__);
+
+    if(!loadRendererResources()) {
+        derror("%s: failed to create renderer resources", __func__);
+        return;
+    }
+
     if (mRawImageSource) {
         // TODO(virtualscene) Determine if we need these input values.
         // Currently they are just hints that we may use to better initialize
@@ -518,6 +561,10 @@ void Scene::loadUserResources() {
 
 void Scene::unloadUserResources() {
     dprint("%s", __FUNCTION__);
+
+    // Intentionally not unloading rendering resources as that'll require
+    // extra tracking of renderer objects
+
     if (mRawImageSource) {
         mRawImageSource->Stop();
     }

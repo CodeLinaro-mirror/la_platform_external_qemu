@@ -100,8 +100,7 @@ public:
 
     // Creates a scene instance if the scene was successfully created or
     // null if there was an error.
-    static std::unique_ptr<Scene> create(std::unique_ptr<Renderer> renderer,
-                                         const SceneConfig& config);
+    static std::unique_ptr<Scene> create(const SceneConfig& config);
 
     // Before teardown, release all Renderer resources and SceneObjects.
     bool releaseResources();
@@ -172,12 +171,17 @@ public:
 
 private:
     // Private constructor, use Scene::create to create an instance.
-    Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config);
+    Scene(const SceneConfig& config);
 
     // Load the scene and create SceneObjects.
     //
     // Returns true on success.
     bool initialize();
+
+    // Load renderer related resources, separated from the initialize call
+    // function be able to defer the renderer and related GPU resource
+    // creations.
+    bool loadRendererResources();
 
     // Gets RenderableObjects from a SceneObject.
     static void getRenderableObjectsFromSceneObject(
