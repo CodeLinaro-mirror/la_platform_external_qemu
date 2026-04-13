@@ -422,6 +422,8 @@ static int startOpenglesRendererImpl(
                      &gfxstream::host::FeatureSet::VulkanVirtualQueue},
                     {android::featurecontrol::VulkanRobustness,
                      &gfxstream::host::FeatureSet::VulkanRobustness},
+                    {android::featurecontrol::VulkanProtectedMemoryEmulation,
+                     &gfxstream::host::FeatureSet::VulkanProtectedMemoryEmulation},
             };
 
     std::string reportGfxstreamFeatures;
