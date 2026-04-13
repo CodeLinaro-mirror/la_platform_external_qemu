@@ -44,7 +44,7 @@ char camera_virtualscene_name_argument_separator();
 // Returns null on failure. On success, the CameraDevice must be closed with
 // camera_virtualscene_close.
 //
-// |name| - The name of the device to open. Unused for virtualscene.
+// |name| - The name of the device to open, encodes the mode for virtualscene.
 // |inp_channel| - Input channel for the webcam. Unused for virtualscene.
 //
 // Returns initialized camera device descriptor on success, or NULL on failure.

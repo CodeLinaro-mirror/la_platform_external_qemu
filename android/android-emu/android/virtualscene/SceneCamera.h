@@ -52,10 +52,18 @@ public:
     // Get the projection matrix for the current frame.
     const glm::mat4& getProjection() const;
 
+    // Set extra rotation to be applied on top of the physical mode rotation
+    // Can be used to change camera direction.
+    void setExtraRotationEulerDegrees(
+            const glm::vec3& extraRotationEulerDegrees) {
+        mExtraRotationEulerDegrees = extraRotationEulerDegrees;
+    }
+
 private:
     glm::mat4 mProjection = glm::mat4();
     glm::mat4 mCameraFromSensors = glm::mat4();
     glm::mat4 mViewFromWorld = glm::mat4();
+    glm::vec3 mExtraRotationEulerDegrees = glm::vec3();
 };
 
 }  // namespace virtualscene

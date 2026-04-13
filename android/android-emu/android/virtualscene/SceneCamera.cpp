@@ -104,8 +104,13 @@ void SceneCamera::update(bool supportsPosition) {
                                &rotationEulerDegrees.x, &rotationEulerDegrees.y,
                                &rotationEulerDegrees.z, &timestamp);
 
-    const glm::mat4 rotationMat(
-            fromEulerAnglesXYZ(glm::radians(rotationEulerDegrees)));
+    // Add extra rotation degrees to represent different camera angles
+    const glm::mat4 sensorsExtraRotation(
+            fromEulerAnglesXYZ(glm::radians(mExtraRotationEulerDegrees)));
+
+    const glm::mat4 rotationMat =
+            glm::mat4(fromEulerAnglesXYZ(glm::radians(rotationEulerDegrees))) *
+            sensorsExtraRotation;
 
     glm::mat4 inverseSensorsPose = glm::inverse(rotationMat);
 
