@@ -44,6 +44,7 @@ public:
     };
     struct WebcamPixelFormat {
         uint32_t pixel_format;
+        bool compressed;
         std::vector<WebcamResolutions> resolutions;
 
         Resolution FindBestMatchForResolution(Resolution requested);

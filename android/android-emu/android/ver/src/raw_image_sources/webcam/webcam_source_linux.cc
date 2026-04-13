@@ -212,6 +212,7 @@ WebcamSource::EnumerateWebcams() {
 
             WebcamPixelFormat wpfmt;
             wpfmt.pixel_format = fmt.pixelformat;
+            wpfmt.compressed = fmt.flags & V4L2_FMT_FLAG_COMPRESSED;
             wpfmt.resolutions =
                     _enumerate_resolutions(fd.get(), fmt.pixelformat);
             /* Sort resolutions by pixel count */
