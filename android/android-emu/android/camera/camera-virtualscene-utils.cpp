@@ -68,10 +68,23 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
     VLOG(camera) << "Start capturing at " << frameWidth << " x " << frameHeight;
 
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
+    std::string sceneModeStr;
+    std::string sceneArgument;
+    const size_t sepPos =
+            mName.find(camera_virtualscene_name_argument_separator());
+    if (sepPos != std::string::npos) {
+        sceneModeStr = mName.substr(0, sepPos);
+        sceneArgument = mName.substr(sepPos + 1);
+    } else {
+        sceneModeStr = mName;
+    }
 
     // "environment" means the camera is using the global environment
-    // scene, defined in environment.ini file
-    mUsingEnvironmentScene = (mName == "environment");
+    // scene, defined in environment.ini file.
+    // Camera name can be "environment", "environment|back" or
+    // "environment|front" depending on the emulator version and camera
+    // direction used.
+    mUsingEnvironmentScene = (sceneModeStr == "environment");
     if (mUsingEnvironmentScene) {
         mOwnedScene = nullptr;
         sceneMode = VirtualSceneManager::getSceneMode();
@@ -80,22 +93,12 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
         VirtualSceneManager::addSceneUser();
     } else {
         // Create and own the scene
-        std::string sceneModeStr;
-        std::string sceneFilename;
-        const size_t sepPos =
-                mName.find(camera_virtualscene_name_argument_separator());
-        if (sepPos != std::string::npos) {
-            sceneModeStr = mName.substr(0, sepPos);
-            sceneFilename = mName.substr(sepPos + 1);
-        } else {
-            sceneModeStr = mName;
-        }
         SceneConfig::Mode mode = SceneConfig::modeFromString(sceneModeStr);
-        if (sceneFilename.empty()) {
+        if (sceneArgument.empty()) {
             // Create with default content if a filename is not given
-            sceneFilename = SceneConfig::defaultArgumentForMode(mode);
+            sceneArgument = SceneConfig::defaultArgumentForMode(mode);
         }
-        SceneConfig sceneConfig(mode, sceneFilename);
+        SceneConfig sceneConfig(mode, sceneArgument);
         mOwnedScene = ScenesManager::createScene(sceneConfig);
 
         if (mOwnedScene) {
@@ -164,9 +167,16 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
         mOwnedScene->update();
     }
 
+    glm::vec3 extraRotationEulerDegrees = glm::vec3();
+    if (direction && strcmp(direction, "front") == 0) {
+        // Rotate scene view matrix by 180 degrees for the front camera
+        extraRotationEulerDegrees.y = 180.0f;
+    }
+
     // TODO(virtualscene-perf): update the view here to avoid resizing?
     // Update camera based on physical model and set view projection accordingly
     const bool supportsPosition = (sceneMode == SceneConfig::Mode::Mesh3D);
+    mSceneCamera.setExtraRotationEulerDegrees(extraRotationEulerDegrees);
     mSceneCamera.update(supportsPosition);
     mActiveView->updateViewProjection(mSceneCamera.getViewProjection());
 

@@ -714,6 +714,12 @@ private:
                 break;
             case kEnvironment:
                 device_name = "environment";
+
+                // Environment mode supports different camera directions
+                // add it into the device name to be able to access
+                // multiple cameras with their unique names.
+                device_name += camera_virtualscene_name_argument_separator();
+                device_name += dir;
                 break;
             case kVideoPlayback:
                 device_name = "videoplayback";
