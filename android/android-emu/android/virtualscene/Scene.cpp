@@ -29,6 +29,7 @@
 #include "android/utils/debug.h"
 #include "android/virtualscene/MeshSceneObject.h"
 #include "android/virtualscene/Renderer.h"
+#include "android/virtualscene/TextureUtils.h"
 
 #include <cmath>
 #include <cstring>
@@ -165,7 +166,8 @@ bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
 
 bool SceneConfig::modeSupportsViewRotations(SceneConfig::Mode mode) {
     // Currently, only Mesh3D supports view rotations
-    return (mode == SceneConfig::Mode::Mesh3D) || (mode == SceneConfig::Mode::Image360);
+    return (mode == SceneConfig::Mode::Mesh3D) ||
+           (mode == SceneConfig::Mode::Image360);
 }
 
 bool SceneConfig::modeSupportsAnimations(SceneConfig::Mode mode) {
@@ -181,8 +183,7 @@ bool SceneConfig::modeSupportsSceneControls(SceneConfig::Mode mode) {
            (mode == SceneConfig::Mode::Image360);
 }
 
-Scene::Scene(const SceneConfig& config)
-    : mConfig(config) {
+Scene::Scene(const SceneConfig& config) : mConfig(config) {
     D("%s: creating Scene", __func__);
 }
 
@@ -227,7 +228,15 @@ bool Scene::initialize() {
             derror("%s: Unknown scene mode!", __func__);
         } break;
         case SceneConfig::Mode::Mesh3D: {
-            // object addition is handled in loadRendererResources
+            // Just check if the obj file is vali, the object addition is
+            // handled in loadRendererResources
+            // TODO(virtualscene-perf): initialize renderer early and avoid
+            // loading content twice
+            if (!MeshSceneObject::canLoad(sceneFilename.c_str())) {
+                derror("%s: Could not load scene object: %s", __func__,
+                       sceneFilename.c_str());
+                return false;
+            }
 
             // TODO(virtualscene) The virtual scene by default renders the
             // image rotated 90 degrees
@@ -254,7 +263,18 @@ bool Scene::initialize() {
             }
         } break;
         case SceneConfig::Mode::Image360: {
-            // object addition is handled in loadRendererResources
+            // Check if the texture file is valid to be able to return error
+            // back to the caller, the object addition is handled in
+            // loadRendererResources
+            // TODO(virtualscene-perf): initialize renderer early and avoid
+            // loading content twice
+            Optional<TextureUtils::Result> result =
+                    TextureUtils::load(sceneFilename.c_str());
+            if (!result) {
+                E("%s: Could not load texture from file '%s'", __func__,
+                  sceneFilename.c_str());
+                return false;
+            }
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
@@ -509,8 +529,9 @@ bool Scene::loadPoster(const char* posterName,
     }
 
     poster.sceneObject->setScale(scale);
-    poster.sceneObject->setTexture(0,
-            poster.texture.isValid() ? poster.texture : poster.defaultTexture);
+    poster.sceneObject->setTexture(0, poster.texture.isValid()
+                                              ? poster.texture
+                                              : poster.defaultTexture);
 
     mObjectsVersion++;
 
@@ -546,7 +567,7 @@ void Scene::getRenderableObjectsFromSceneObject(
 void Scene::loadUserResources() {
     dprint("%s", __FUNCTION__);
 
-    if(!loadRendererResources()) {
+    if (!loadRendererResources()) {
         derror("%s: failed to create renderer resources", __func__);
         return;
     }

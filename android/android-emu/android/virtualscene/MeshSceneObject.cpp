@@ -20,8 +20,8 @@
 
 #include <tiny_obj_loader.h>
 
-#include <unordered_map>
 #include <filesystem>
+#include <unordered_map>
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
@@ -109,7 +109,7 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
 
             if (index.texcoord_index >= 0) {
                 if (index.texcoord_index >= texcoordCount) {
-                    E("%s: Error parsing %s, invalid vertex index %d, expected "
+                    E("%s: Error parsing %s, invalid texture coordinate index %d, expected "
                       "less than %d",
                       __FUNCTION__, filename, index.texcoord_index,
                       texcoordCount);
@@ -150,20 +150,78 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
     return result;
 }
 
-std::unique_ptr<MeshSceneObject> MeshSceneObject::createSphere(Renderer& renderer) {
+// Must match MeshSceneObject::load for the error returning paths
+bool MeshSceneObject::canLoad(const char* filename) {
+    if (!filename) {
+        E("%s: Invalid input", __FUNCTION__);
+        return false;
+    }
+    const fs::path filePath(filename);
+    const std::string resourcesDir =
+            PathUtils::addTrailingDirSeparator(filePath.parent_path().string());
+
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+
+    std::string err;
+    const bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
+                                      filename, resourcesDir.c_str());
+    if (!ret) {
+        E("%s: Error loading obj %s: %s", __FUNCTION__, filename,
+          err.empty() ? "<no message>" : err.c_str());
+        return false;
+    } else if (!err.empty()) {
+        W("%s: Warnings loading obj %s: %s", __FUNCTION__, filename,
+          err.c_str());
+    }
+
+    const size_t vertexCount = attrib.vertices.size() / 3;
+    const size_t texcoordCount = attrib.texcoords.size() / 2;
+
+    for (const tinyobj::shape_t& shape : shapes) {
+        const tinyobj::mesh_t& mesh = shape.mesh;
+
+        for (size_t i = 0; i < mesh.indices.size(); i++) {
+            tinyobj::index_t index = mesh.indices[i];
+
+            if (index.vertex_index < 0 || index.vertex_index >= vertexCount) {
+                E("%s: Error parsing %s, invalid vertex index %d, expected "
+                  "less than %d",
+                  __FUNCTION__, filename, index.vertex_index, vertexCount);
+                return false;
+            }
+
+            if (index.texcoord_index >= 0) {
+                if (index.texcoord_index >= texcoordCount) {
+                    E("%s: Error parsing %s, invalid texture coordinate index %d, expected "
+                      "less than %d",
+                      __FUNCTION__, filename, index.texcoord_index,
+                      texcoordCount);
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+std::unique_ptr<MeshSceneObject> MeshSceneObject::createSphere(
+        Renderer& renderer) {
     // Number of segments horizontally and vertically
     const int segments = 64;
 
     // Generate vertices
     std::vector<VertexPositionUV> vertices;
-    vertices.reserve((segments+1) * (segments+1));
+    vertices.reserve((segments + 1) * (segments + 1));
     for (int i = 0; i <= segments; ++i) {
         float v_coord = (float)i / segments;
         float phi = v_coord * M_PI;
 
         for (int j = 0; j <= segments; ++j) {
             float u_coord = (float)j / segments;
-            float theta = u_coord * 2.0f * M_PI; // Longitude
+            float theta = u_coord * 2.0f * M_PI;  // Longitude
 
             VertexPositionUV v;
             v.pos.x = std::sin(phi) * std::cos(theta);
@@ -211,7 +269,6 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::createSphere(Renderer& rendere
 
     return result;
 }
-
 
 }  // namespace virtualscene
 }  // namespace android
