@@ -275,6 +275,10 @@ bool Scene::initialize() {
                   sceneFilename.c_str());
                 return false;
             }
+
+            // TODO(virtualscene) The virtual scene by default renders the
+            // image rotated 90 degrees
+            mBaseRotation = 90;
         } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
