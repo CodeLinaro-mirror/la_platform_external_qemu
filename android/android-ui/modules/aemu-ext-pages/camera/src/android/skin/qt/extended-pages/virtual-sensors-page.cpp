@@ -757,7 +757,9 @@ void VirtualSensorsPage::updateResultingValues(
  */
 void VirtualSensorsPage::propagateAccelWidgetChange() {
     reportVirtualSensorsInteraction();
-    updateModelFromAccelWidget(PHYSICAL_INTERPOLATION_SMOOTH);
+    PhysicalInterpolation mode =
+            mIsDragging ? PHYSICAL_INTERPOLATION_STEP : PHYSICAL_INTERPOLATION_SMOOTH;
+    updateModelFromAccelWidget(mode);
 }
 
 /*
@@ -765,7 +767,16 @@ void VirtualSensorsPage::propagateAccelWidgetChange() {
  */
 void VirtualSensorsPage::propagateSlidersChange() {
     reportVirtualSensorsInteraction();
-    updateModelFromSliders(PHYSICAL_INTERPOLATION_SMOOTH);
+    bool anySliderDown = mUi->xRotSlider->isSliderDown() ||
+                         mUi->yRotSlider->isSliderDown() ||
+                         mUi->zRotSlider->isSliderDown() ||
+                         mUi->positionXSlider->isSliderDown() ||
+                         mUi->positionYSlider->isSliderDown() ||
+                         mUi->positionZSlider->isSliderDown();
+
+    PhysicalInterpolation mode =
+            anySliderDown ? PHYSICAL_INTERPOLATION_STEP : PHYSICAL_INTERPOLATION_SMOOTH;
+    updateModelFromSliders(mode);
 }
 
 /*
@@ -847,7 +858,7 @@ void VirtualSensorsPage::updateUIFromModelCurrentState() {
 
         mUi->accelWidget->update();
 
-        if (mSlidersUseCurrent && !mIsDragging) {
+        if (mSlidersUseCurrent) {
             mUi->xRotSlider->setValue(eulerDegrees.x, false);
             mUi->yRotSlider->setValue(eulerDegrees.y, false);
             mUi->zRotSlider->setValue(eulerDegrees.z, false);
