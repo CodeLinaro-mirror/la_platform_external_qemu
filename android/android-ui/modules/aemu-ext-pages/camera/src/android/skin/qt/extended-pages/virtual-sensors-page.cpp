@@ -104,6 +104,10 @@ VirtualSensorsPage::VirtualSensorsPage(QWidget* parent)
             SLOT(propagateAccelWidgetChange()));
     connect(mUi->accelWidget, SIGNAL(targetPositionChanged()), this,
             SLOT(propagateAccelWidgetChange()));
+    connect(mUi->accelWidget, &Device3DWidget::dragStarted, this,
+            [this]() { mIsDragging = true; });
+    connect(mUi->accelWidget, &Device3DWidget::dragStopped, this,
+            [this]() { mIsDragging = false; });
 
     connect(this, &VirtualSensorsPage::updateResultingValuesRequired, this,
             &VirtualSensorsPage::updateResultingValues);
@@ -596,8 +600,10 @@ void VirtualSensorsPage::updateTargetState() {
 
     const glm::quat rotation = fromEulerAnglesXYZ(glm::radians(eulerDegrees));
 
-    mUi->accelWidget->setTargetPosition(position);
-    mUi->accelWidget->setTargetRotation(rotation);
+    if (!mIsDragging) {
+        mUi->accelWidget->setTargetPosition(position);
+        mUi->accelWidget->setTargetRotation(rotation);
+    }
 
     // Convert the rotation to a quaternion so to simplify comparing for
     // equality.
@@ -841,7 +847,7 @@ void VirtualSensorsPage::updateUIFromModelCurrentState() {
 
         mUi->accelWidget->update();
 
-        if (mSlidersUseCurrent) {
+        if (mSlidersUseCurrent && !mIsDragging) {
             mUi->xRotSlider->setValue(eulerDegrees.x, false);
             mUi->yRotSlider->setValue(eulerDegrees.y, false);
             mUi->zRotSlider->setValue(eulerDegrees.z, false);

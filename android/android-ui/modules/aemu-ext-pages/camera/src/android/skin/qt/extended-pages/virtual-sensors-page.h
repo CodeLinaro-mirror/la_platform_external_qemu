@@ -181,6 +181,7 @@ private:
 
     QAndroidPhysicalStateAgent mQAndroidPhysicalStateAgent;
     bool mIsUIModifyingPhysicalState = false;
+    bool mIsDragging = false;
 
     bool mSlidersUseCurrent = true;
     glm::vec3 mSlidersTargetPosition;
