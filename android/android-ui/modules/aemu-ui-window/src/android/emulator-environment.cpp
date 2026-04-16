@@ -57,14 +57,13 @@ static bool emulatorSetupEnvironment() {
     androidHwConfig_getScreenDimensions(hwCfg, &envWidth, &envHeight);
     int hwLcdWidth, hwLcdHeight;
     androidHwConfig_getLcdDimensions(hwCfg, &hwLcdWidth, &hwLcdHeight);
-    dinfo("%s: Setting up screen background view and display layout at "
-            "env:%dx%d, lcd:%dx%d",
-            __func__, envWidth, envHeight, hwLcdWidth, hwLcdHeight);
 
     // Send layout parameters to the compositor when display position and size
     // should be adjusted, note that this should be done even when there are
-    // errors with environment setup
+    // errors with the environment scene setup
     if (hwLcdWidth < envWidth && hwLcdHeight < envHeight) {
+        dprint("%s: Setting up display layout at env:%dx%d, lcd:%dx%d",
+                __func__, envWidth, envHeight, hwLcdWidth, hwLcdHeight);
         // Center the display at it's original size
         int displayPosX = (envWidth - hwLcdWidth) / 2;
         int displayPosY = (envHeight - hwLcdHeight) / 2;

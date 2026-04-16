@@ -225,7 +225,7 @@ bool Device3DWidget::initGL() {
         return false;
     }
 
-    resizeGL(width(), height());
+    resizeGL(realPixelsWidth(), realPixelsHeight());
     return true;
 }
 
@@ -990,6 +990,7 @@ void Device3DWidget::repaintGL() {
                                       sizeof(float) * 8,
                                       (void*)(sizeof(float) * 6));
         mGLES2->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mVertexIndexBuffer);
+        mGLES2->glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
         mGLES2->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         GLuint diffuse_map_uniform =
                 mGLES2->glGetUniformLocation(mProgram, "diffuse_map");

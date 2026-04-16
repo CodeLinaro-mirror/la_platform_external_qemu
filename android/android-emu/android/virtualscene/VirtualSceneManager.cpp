@@ -251,27 +251,7 @@ std::shared_ptr<Scene> ScenesManager::createScene(const SceneConfig& config) {
     D("Initializing a scene with mode:%s, argument:%s",
       SceneConfig::modeToString(config.mSceneMode), config.mArgument.c_str());
 
-    // Only initialize a renderer for the scene if GL is required
-    bool rendererRequired =
-            SceneConfig::modeRequiresRenderer(config.mSceneMode);
-
-    std::unique_ptr<Renderer> renderer = nullptr;
-    if (rendererRequired) {
-        renderer = Renderer::create();
-        if (!renderer) {
-            E("VirtualSceneManager renderer failed to construct");
-            return nullptr;
-        }
-    }
-
-    // Make the renderer context current for graphics operations
-    auto context = renderer ? renderer->makeCurrent() : nullptr;
-    if (context && !context->isValid()) {
-        E("%s: Cannot use EGL context", __FUNCTION__);
-        return nullptr;
-    }
-
-    std::shared_ptr<Scene> scene = Scene::create(std::move(renderer), config);
+    std::shared_ptr<Scene> scene = Scene::create(config);
     if (!scene) {
         E("VirtualSceneManager scene failed to load");
         return nullptr;
@@ -338,7 +318,9 @@ bool ScenesManager::renderView(Scene* scene,
     view->preRenderLocked();
 
     switch (mode) {
-        case SceneConfig::Mode::Mesh3D: {
+        case SceneConfig::Mode::Mesh3D:
+        case SceneConfig::Mode::Image360:
+        {
             const auto renderables =
                     scene->getRenderableObjects(view->mViewProjection);
             if (!renderer || !renderer->render(view, renderables, renderTime)) {
@@ -720,8 +702,36 @@ bool VirtualSceneManager::addSceneUser() {
         return false;
     }
     if (mNumUsers == 0) {
-        // Make sure the scene is ready to use
+        const bool sceneHasRenderer = mEnvironmentScene->getRenderer();
+
+        // Make sure the scene is ready to use, this will also
+        // crete the renderer and load renderer resources if needed
         mEnvironmentScene->loadUserResources();
+
+        // Poster location objects must be loaded after the renderer is initialized
+        if (!sceneHasRenderer) {
+            // Add renderer related resources if it's the first time
+            // the resources are being loaded
+            if (Renderer* renderer = mEnvironmentScene->getRenderer()) {
+                auto context = renderer->makeCurrent();
+
+                //  Load the poster configuration in the scene.
+                for (const auto& it : sSettings->getPosterLocations()) {
+                    if (!mEnvironmentScene->createPosterLocation(it)) {
+                        E("VirtualSceneManager failed to create poster location");
+                        return false;
+                    }
+                }
+
+                for (const auto& it : sSettings->getPosterSettings()) {
+                    const char* posterName = it.first.c_str();
+                    const Settings::PosterSetting& setting = it.second;
+                    Scene::LoadBehavior loadBehavior = Scene::LoadBehavior::Default;
+                    mEnvironmentScene->loadPoster(posterName, setting.mFilename.c_str(),
+                                    setting.mScale, loadBehavior);
+                }
+            }
+        }
 
         startSceneUpdateThread();
     }
@@ -911,25 +921,6 @@ std::shared_ptr<Scene> VirtualSceneManager::createEnvironmentScene(
         return nullptr;
     }
 
-    if (Renderer* renderer = scene->getRenderer()) {
-        auto context = renderer->makeCurrent();
-
-        //  Load the poster configuration in the scene.
-        for (const auto& it : sSettings->getPosterLocations()) {
-            if (!scene->createPosterLocation(it)) {
-                E("VirtualSceneManager failed to create poster location");
-                return nullptr;
-            }
-        }
-
-        for (const auto& it : sSettings->getPosterSettings()) {
-            const char* posterName = it.first.c_str();
-            const Settings::PosterSetting& setting = it.second;
-            Scene::LoadBehavior loadBehavior = Scene::LoadBehavior::Default;
-            scene->loadPoster(posterName, setting.mFilename.c_str(),
-                              setting.mScale, loadBehavior);
-        }
-    }
     return scene;
 }
 
@@ -960,7 +951,9 @@ bool BackgroundUpdateService::start(int displayWidth,
     // Set update callback, to update the background image after each
     // scene update
     VirtualSceneManager::setUpdateCallback([displayWidth, displayHeight]() {
-        mSceneCamera->update();
+        const bool supportsPosition = (VirtualSceneManager::getSceneMode() ==
+                                       SceneConfig::Mode::Mesh3D);
+        mSceneCamera->update(supportsPosition);
 
         // TODO(virtualscene) Handle rotation properly for all scenes.
         // SceneCamera uses 90 degrees rotated views by default for

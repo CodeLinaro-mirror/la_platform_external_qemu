@@ -2825,14 +2825,6 @@ extern "C" int main(int argc, char** argv) {
         }
     }
 
-    if (fc::isEnabled(fc::VulkanNativeSwapchain) && fc::isEnabled(fc::VirtualScene)) {
-        // TODO(b/477193075): virtualscene cannot be used with vulkan composition
-        fc::setIfNotOverriden(fc::VirtualScene, false);
-        if (!fc::isEnabled(fc::VirtualScene)) {
-            dprint("Auto-disabled VirtualScene feature");
-        }
-    }
-
     // Support for changing default lcd-density
     if (hw->hw_lcd_density) {
         args.add("-lcd-density");

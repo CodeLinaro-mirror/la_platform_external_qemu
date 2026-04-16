@@ -89,7 +89,7 @@ void SceneCamera::setAspectRatio(float aspectRatio) {
                                                       100.0f);  // zFar
 }
 
-void SceneCamera::update() {
+void SceneCamera::update(bool supportsPosition) {
     // Note: when getting the transform, we always update the current time
     //       so that consumers of this transform get the most up-to-date
     //       value possible, and so that transform timestamps progress even when
@@ -104,11 +104,19 @@ void SceneCamera::update() {
                                &rotationEulerDegrees.x, &rotationEulerDegrees.y,
                                &rotationEulerDegrees.z, &timestamp);
 
-    const glm::mat4 rotationMat(
-            fromEulerAnglesXYZ(glm::radians(rotationEulerDegrees)));
+    // Add extra rotation degrees to represent different camera angles
+    const glm::mat4 sensorsExtraRotation(
+            fromEulerAnglesXYZ(glm::radians(mExtraRotationEulerDegrees)));
 
-    const glm::mat4 inverseSensorsPose =
-            glm::inverse(rotationMat) * glm::translate(glm::mat4(), -position);
+    const glm::mat4 rotationMat =
+            glm::mat4(fromEulerAnglesXYZ(glm::radians(rotationEulerDegrees))) *
+            sensorsExtraRotation;
+
+    glm::mat4 inverseSensorsPose = glm::inverse(rotationMat);
+
+    if (supportsPosition) {
+        inverseSensorsPose *= glm::translate(glm::mat4(), -position);
+    }
 
     mViewFromWorld = mCameraFromSensors * inverseSensorsPose;
 }

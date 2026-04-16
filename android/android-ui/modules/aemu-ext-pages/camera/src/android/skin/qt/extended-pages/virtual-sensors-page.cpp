@@ -104,6 +104,10 @@ VirtualSensorsPage::VirtualSensorsPage(QWidget* parent)
             SLOT(propagateAccelWidgetChange()));
     connect(mUi->accelWidget, SIGNAL(targetPositionChanged()), this,
             SLOT(propagateAccelWidgetChange()));
+    connect(mUi->accelWidget, &Device3DWidget::dragStarted, this,
+            [this]() { mIsDragging = true; });
+    connect(mUi->accelWidget, &Device3DWidget::dragStopped, this,
+            [this]() { mIsDragging = false; });
 
     connect(this, &VirtualSensorsPage::updateResultingValuesRequired, this,
             &VirtualSensorsPage::updateResultingValues);
@@ -596,8 +600,10 @@ void VirtualSensorsPage::updateTargetState() {
 
     const glm::quat rotation = fromEulerAnglesXYZ(glm::radians(eulerDegrees));
 
-    mUi->accelWidget->setTargetPosition(position);
-    mUi->accelWidget->setTargetRotation(rotation);
+    if (!mIsDragging) {
+        mUi->accelWidget->setTargetPosition(position);
+        mUi->accelWidget->setTargetRotation(rotation);
+    }
 
     // Convert the rotation to a quaternion so to simplify comparing for
     // equality.
@@ -751,7 +757,9 @@ void VirtualSensorsPage::updateResultingValues(
  */
 void VirtualSensorsPage::propagateAccelWidgetChange() {
     reportVirtualSensorsInteraction();
-    updateModelFromAccelWidget(PHYSICAL_INTERPOLATION_SMOOTH);
+    PhysicalInterpolation mode =
+            mIsDragging ? PHYSICAL_INTERPOLATION_STEP : PHYSICAL_INTERPOLATION_SMOOTH;
+    updateModelFromAccelWidget(mode);
 }
 
 /*
@@ -759,7 +767,16 @@ void VirtualSensorsPage::propagateAccelWidgetChange() {
  */
 void VirtualSensorsPage::propagateSlidersChange() {
     reportVirtualSensorsInteraction();
-    updateModelFromSliders(PHYSICAL_INTERPOLATION_SMOOTH);
+    bool anySliderDown = mUi->xRotSlider->isSliderDown() ||
+                         mUi->yRotSlider->isSliderDown() ||
+                         mUi->zRotSlider->isSliderDown() ||
+                         mUi->positionXSlider->isSliderDown() ||
+                         mUi->positionYSlider->isSliderDown() ||
+                         mUi->positionZSlider->isSliderDown();
+
+    PhysicalInterpolation mode =
+            anySliderDown ? PHYSICAL_INTERPOLATION_STEP : PHYSICAL_INTERPOLATION_SMOOTH;
+    updateModelFromSliders(mode);
 }
 
 /*

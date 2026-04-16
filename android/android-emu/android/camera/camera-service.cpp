@@ -491,6 +491,13 @@ struct CameraService {
             return !strncmp(name, kImagefileCamPrefix, kImagefileCamPrefixSize);
         };
 
+        constexpr const char* kImage360CamPrefix = "image360";
+        constexpr std::size_t kImage360CamPrefixSize = std::string_view(kImage360CamPrefix).length();
+        static auto isImage360Cam = [](const char* name) {
+            return !strncmp(name, kImage360CamPrefix, kImage360CamPrefixSize);
+        };
+
+
         static auto getCameraFilename =
                 [](const char* name,
                    const std::size_t prefixSize) -> const char* {
@@ -514,6 +521,9 @@ struct CameraService {
         } else if (isImagefileCam(cameraBack)) {
             const char* filename = getCameraFilename(cameraBack, kImagefileCamPrefixSize);
             virtualscenecameraSetup("back", cameraBackOrientation, kImagefile, filename);
+        } else if (isImage360Cam(cameraBack)) {
+            const char* filename = getCameraFilename(cameraBack, kImage360CamPrefixSize);
+            virtualscenecameraSetup("back", cameraBackOrientation, kImage360, filename);
         }
 
         if (androidHwConfig_hasEnvironmentFrontCamera(hwCfg)) {
@@ -527,6 +537,9 @@ struct CameraService {
         } else if (isImagefileCam(cameraFront)) {
             const char* filename = getCameraFilename(cameraFront, kImagefileCamPrefixSize);
             virtualscenecameraSetup("front", cameraFrontOrientation, kImagefile, filename);
+        } else if (isImage360Cam(cameraFront)) {
+            const char* filename = getCameraFilename(cameraFront, kImage360CamPrefixSize);
+            virtualscenecameraSetup("front", cameraFrontOrientation, kImage360, filename);
         }
 
         /* Lets see if HW config uses emulated cameras. */
@@ -701,6 +714,12 @@ private:
                 break;
             case kEnvironment:
                 device_name = "environment";
+
+                // Environment mode supports different camera directions
+                // add it into the device name to be able to access
+                // multiple cameras with their unique names.
+                device_name += camera_virtualscene_name_argument_separator();
+                device_name += dir;
                 break;
             case kVideoPlayback:
                 device_name = "videoplayback";
@@ -710,6 +729,9 @@ private:
                 break;
             case kImagefile:
                 device_name = "imagefile";
+                break;
+            case kImage360:
+                device_name = "image360";
                 break;
             default: {
                 derror("%s: unknown camera source type", __func__);

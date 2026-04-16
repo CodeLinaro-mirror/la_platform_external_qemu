@@ -1803,11 +1803,13 @@ help_camera_back(stralloc_t* out)
     "  Use -camera-back <mode> to control emulation of a camera facing back.\n"
     "  Valid values for <mode> are:\n\n"
 
-    "     emulated     -> camera will be emulated using software ('fake') camera emulation\n"
-    "     webcam<N>    -> camera will be emulated using a webcamera connected to the host\n"
-    "     virtualscene -> If the feature is enabled, camera will render a virtual scene\n"
-    "     videoplayback -> If the feature is enabled, camera will support playing back a video\n"
-    "     none         -> camera emulation will be disabled\n\n"
+    "     emulated             -> camera will be emulated using software ('fake') camera emulation\n"
+    "     webcam<N>            -> camera will be emulated using a webcamera connected to the host\n"
+    "     environment          -> If the feature is enabled, camera will render a virtual scene that's defined in environment.ini file of the AVD\n"
+    "     imagefile:<filename> -> Camera will render an image file.\n"
+    "     videofile:<filename> -> Camera will render a video file.\n"
+    "     image360:<filename>  -> Camera will render a panoramic image file.\n"
+    "     none                 -> camera emulation will be disabled\n\n"
     );
 }
 
@@ -1818,9 +1820,13 @@ help_camera_front(stralloc_t* out)
     "  Use -camera-front <mode> to control emulation of a camera facing front.\n"
     "  Valid values for <mode> are:\n\n"
 
-    "     emulated  -> camera will be emulated using software ('fake') camera emulation\n"
-    "     webcam<N> -> camera will be emulated using a webcamera connected to the host\n"
-    "     none      -> camera emulation will be disabled\n\n"
+    "     emulated             -> camera will be emulated using software ('fake') camera emulation\n"
+    "     webcam<N>            -> camera will be emulated using a webcamera connected to the host\n"
+    "     environment          -> If the feature is enabled, camera will render a virtual scene that's defined in environment.ini file of the AVD\n"
+    "     imagefile:<filename> -> Camera will render an image file.\n"
+    "     videofile:<filename> -> Camera will render a video file.\n"
+    "     image360:<filename>  -> Camera will render a panoramic image file.\n"
+    "     none                 -> camera emulation will be disabled\n\n"
     );
 }
 
