@@ -22,10 +22,15 @@
 #include "android/hw-sensors.h"
 #include "host-common/hw-config.h"
 
+namespace xr_service = android::xr::xr_service;
+
 constexpr int kSliderScale = 1000;
+void XrEnvironmentModeDialogHandleXrOptionsEvent(
+        void* user_data,
+        const xr_emulator_proto::EmulatorResponse& response);
 
 XrEnvironmentModeDialog::XrEnvironmentModeDialog(QWidget* parent)
-    : QDialog(parent), ui(new Ui::XrEnvironmentModeDialog), mKeepRunning(true) {
+    : QDialog(parent), ui(new Ui::XrEnvironmentModeDialog) {
     ui->setupUi(this);
     setWindowFlags(Qt::Popup);
 
@@ -54,33 +59,25 @@ XrEnvironmentModeDialog::XrEnvironmentModeDialog(QWidget* parent)
         // Enable the slider once we have received the initial value from the
         // guest, and will be able to respond to changes
         ui->slider_xr_dimming_value->setEnabled(false);
-        mListenerRegisterThread =
-                std::thread(&XrEnvironmentModeDialog::register_listener, this);
+        xrServiceCallbackHandle = xr_service::registerCallback(
+                XrEnvironmentModeDialogHandleXrOptionsEvent, this);
     }
 }
 
-void XrEnvironmentModeDialog::register_listener() {
-    while (mKeepRunning) {
-        // Currently, this is not available when we initialize. The codepath is
-        // being actively refactored, and the existing one can't be moved
-        // earlier, so for now, wait for it to be available.
-        auto notifier = static_cast<android::base::EventNotificationSupport<
-                xr_emulator_proto::XrOptions>*>(
-                android_get_xr_options_publisher());
-        if (notifier) {
-            mXROptionsListener =
-                    std::make_unique<android::base::RaiiEventListener<
-                            android::base::EventNotificationSupport<
-                                    xr_emulator_proto::XrOptions>,
-                            xr_emulator_proto::XrOptions>>(
-                            notifier,
-                            [this](xr_emulator_proto::XrOptions options) {
-                                emit this->_externalXROptionsChanged(options);
-                            });
-            return;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+void XrEnvironmentModeDialogHandleXrOptionsEvent(
+        void* user_data,
+        const xr_emulator_proto::EmulatorResponse& response) {
+    XrEnvironmentModeDialog* self =
+            static_cast<XrEnvironmentModeDialog*>(user_data);
+    if (response.response_case() !=
+        xr_emulator_proto::EmulatorResponse::kXrOptions) {
+        return;
     }
+
+    // Only emit when either the dimming or passthrough coefficient is
+    // changed, we dont want to notify when the environment mode changes
+    const xr_emulator_proto::XrOptions& xr_options = response.xr_options();
+    emit self->_externalXROptionsChanged(xr_options);
 }
 
 void XrEnvironmentModeDialog::setDimmingValue(float value) {
@@ -128,12 +125,12 @@ void XrEnvironmentModeDialog::on_slider_xr_dimming_value_valueChanged(
 }
 
 void XrEnvironmentModeDialog::on_btn_xr_environment_passthrough_on_clicked() {
-    emit onXrEnvironmentModeRequested(XR_ENVIRONMENT_MODE_PASSTHROUGH_ON);
+    emit onXrPassthroughCoefficientRequested(1.0f);
     accept();  // hides dialog
 }
 
 void XrEnvironmentModeDialog::on_btn_xr_environment_passthrough_off_clicked() {
-    emit onXrEnvironmentModeRequested(XR_ENVIRONMENT_MODE_PASSTHROUGH_OFF);
+    emit onXrPassthroughCoefficientRequested(0.0f);
     accept();  // hides dialog
 }
 
@@ -162,14 +159,6 @@ void XrEnvironmentModeDialog::onExternalXROptionsChanged(
 }
 
 XrEnvironmentModeDialog::~XrEnvironmentModeDialog() {
-    mKeepRunning = false;
-    if (mListenerRegisterThread.joinable()) {
-        mListenerRegisterThread.join();
-    }
-    // On reset, this unregisters the callback under lock. The callbacks on
-    // events are handled under the same lock, so it is impossible to recieve
-    // callbacks after the reset returns. This is important as the callback
-    // would access ui.
-    mXROptionsListener.reset();
+    xr_service::unregisterCallback(xrServiceCallbackHandle);
     delete ui;
 }

@@ -14,6 +14,7 @@
 
 #include "android/physics/Physics.h"
 #include "android/utils/compiler.h"
+#include "android/xr-defines.h"
 #include "host-common/misc.h"
 #include "host-common/window_agent.h"
 
@@ -175,18 +176,6 @@ typedef enum{
     PHYSICAL_PARAMETER_(RGBC_LIGHT, "rgbc-light", RgbcLight, vec4) \
     PHYSICAL_PARAMETER_(WRIST_TILT, "wrist-tilt", WristTilt, float) \
     PHYSICAL_PARAMETER_(ROTATION_UNCALIBRATED, "rotation-uncalibrated", AccelerometerUncalibrated, vec3) \
-    PHYSICAL_PARAMETER_(XR_INPUT_MODE, "xr_input_mode", XrInputMode, float) \
-    PHYSICAL_PARAMETER_(XR_ENVIRONMENT_MODE, "xr_environment_mode", XrEnvironmentMode, float) \
-    PHYSICAL_PARAMETER_(XR_SCREEN_RECENTER, "xr_screen_recenter", XrScreenRecenter, float) \
-    PHYSICAL_PARAMETER_(XR_VIEWPORT_CONTROL_MODE, "xr_viewport_mode", XrViewportControlMode, float) \
-    PHYSICAL_PARAMETER_(XR_HEAD_ROTATION, "xr_head_rotation", XrHeadRotation, vec3) \
-    PHYSICAL_PARAMETER_(XR_HEAD_MOVEMENT, "xr_head_movement", XrHeadMovement, vec3) \
-    PHYSICAL_PARAMETER_(XR_HEAD_ANGULAR_VELOCITY, "xr_head_angular_velocity", XrHeadAngularVelocity, vec3) \
-    PHYSICAL_PARAMETER_(XR_HEAD_VELOCITY, "xr_head_velocity", XrHeadVelocity, vec3) \
-    PHYSICAL_PARAMETER_(XR_OPTIONS, "xr_options", XrOptions, vec3) \
-    PHYSICAL_PARAMETER_(XR_HAND_GESTURE, "xr_hand_gesture", XrHandGesture, float) \
-    PHYSICAL_PARAMETER_(XR_HAND_EVENT, "xr_hand_event", XrHandEvent, vec4) \
-    PHYSICAL_PARAMETER_(XR_EYE_EVENT, "xr_eye_event", XrEyeEvent, vec4) \
 // clang-format on
 typedef enum {
 #define PHYSICAL_PARAMETER_(x,y,z,w)  PHYSICAL_PARAMETER_##x,
@@ -415,48 +404,8 @@ bool android_heart_rate_sensor_configured();
 bool android_foldable_posture_name(int posture, char* name);
 bool android_is_automotive();
 void* android_get_posture_listener();
-void* android_get_xr_options_publisher();
 bool android_is_xr_vst_headset_mode();
 bool android_is_xr_glasses_mode();
 bool android_is_xr_mode();
-
-enum XrInputMode {
-    XR_INPUT_MODE_UNKNOWN = 0,
-    XR_INPUT_MODE_MOUSE_KEYBOARD = 1,
-    XR_INPUT_MODE_HAND_RAYCAST = 2,
-    XR_INPUT_MODE_EYE_TRACKING = 3,
-};
-
-enum XrEnvironmentMode {
-    XR_ENVIRONMENT_MODE_UNKNOWN = 0,
-    XR_ENVIRONMENT_MODE_PASSTHROUGH_ON = 1,
-    XR_ENVIRONMENT_MODE_PASSTHROUGH_OFF = 2,
-    XR_ENVIRONMENT_MODE_LIVING_ROOM_DAY = 3,
-    XR_ENVIRONMENT_MODE_LIVING_ROOM_NIGHT = 4,
-};
-
-enum XrViewportControlMode {
-    VIEWPORT_CONTROL_MODE_UNKNOWN = 0,
-    VIEWPORT_CONTROL_MODE_PAN = 1,
-    VIEWPORT_CONTROL_MODE_ZOOM = 2,
-    VIEWPORT_CONTROL_MODE_ROTATE = 3,
-};
-
-bool android_xr_set_input_mode(int mode);
-bool android_xr_set_environment_mode(int mode);
-bool android_xr_set_screen_recenter();
-bool android_xr_set_viewport_control_mode(int mode);
-
-bool android_xr_set_head_rotation(float x, float y, float z);
-bool android_xr_set_head_movement(float delta_x, float delta_y,
-                                        float delta_z);
-bool android_xr_set_head_angular_velocity(float omega_x, float omega_y,
-                                                float omega_z);
-bool android_xr_set_head_velocity(float x, float y, float z);
-bool android_xr_set_hand_event(int32_t x, int32_t y, int32_t buttons, int32_t display);
-bool android_xr_set_eye_event(int32_t x, int32_t y, int32_t buttons, int32_t display);
-bool android_xr_set_options(int environment, float passthroughCoefficient, float dimmingValue);
-bool android_xr_get_options(int* environment, float* passthroughCoefficient, float* dimmingValue);
-bool android_xr_set_hand_gesture(int gesture);
 
 ANDROID_END_HEADER
