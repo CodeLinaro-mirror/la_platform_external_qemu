@@ -101,6 +101,7 @@ public:
     // This is currently used in Android Studio integrated emulator path.
     void setXrOptions(int environment,
                       float passthroughCoefficient,
+                      float dimmingValue,
                       PhysicalInterpolation mode);
     vec3 getXrOptions(
         ParameterValueType parameterValueType) const;
@@ -139,6 +140,7 @@ private:
     QemudService* qemud_service = nullptr;
     QemudClient* qemud_client = nullptr;
     float mPassthroughCoefficient = 0.0f;
+    float mDimmingValue = 0.0f;
 };
 
 }  // namespace physics

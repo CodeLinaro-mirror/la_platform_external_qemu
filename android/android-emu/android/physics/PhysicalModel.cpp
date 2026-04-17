@@ -921,7 +921,8 @@ void PhysicalModelImpl::setTargetInternalXrOptions(
     physicalStateChanging();
     {
         std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrOptions(static_cast<int>(value.x), value.y, mode);
+        mXrDeviceModel.setXrOptions(static_cast<int>(value.x), value.y, value.z,
+                                    mode);
     }
     targetStateChanged();
 }

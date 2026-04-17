@@ -212,12 +212,12 @@ static const QAndroidEmulatorWindowAgent sQAndroidEmulatorWindowAgent = {
             return android_xr_set_head_velocity(x, y, z);
         },
         .setXrOptions =
-                [](int environment, float passthroughCoefficient) -> bool {
-            return android_xr_set_options(environment, passthroughCoefficient);
+                [](int environment, float passthroughCoefficient, float dimmingValue) -> bool {
+            return android_xr_set_options(environment, passthroughCoefficient, dimmingValue);
         },
         .getXrOptions =
-                [](int* environment, float* passthroughCoefficient) -> bool {
-            return android_xr_get_options(environment, passthroughCoefficient);
+                [](int* environment, float* passthroughCoefficient, float* dimmingValue) -> bool {
+            return android_xr_get_options(environment, passthroughCoefficient, dimmingValue);
         },
 };
 

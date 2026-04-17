@@ -1285,7 +1285,7 @@ TEST(PhysicalModel, SetXrOptions) {
     vec3 options;
     options.x = 1.0f; // Mode
     options.y = 2.0f; // Value
-    options.z = 0.0f; // Unused
+    options.z = 3.0f; // Dimming
     physicalModel_setTargetXrOptions(
             model, options, PHYSICAL_INTERPOLATION_STEP);
 

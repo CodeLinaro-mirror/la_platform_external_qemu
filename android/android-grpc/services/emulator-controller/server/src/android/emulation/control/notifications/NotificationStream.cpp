@@ -136,17 +136,20 @@ std::optional<Notification> NotificationStream::getXrOptionsNotificationEvent() 
 
     int environment;
     float passthroughCoefficient;
-    bool success = android_xr_get_options(&environment, &passthroughCoefficient);
+    float dimmingValue;
+    bool success = android_xr_get_options(&environment, &passthroughCoefficient, &dimmingValue);
 
     if (success) {
         auto eventDetails = event.mutable_xroptions();
         eventDetails->set_environment(static_cast<XrOptions::Environment>(environment));
         eventDetails->set_passthrough_coefficient(passthroughCoefficient);
+        eventDetails->set_dimming_value(dimmingValue);
 
-        DD("XR options notification event: Environment=%d, PassthroughCoefficient=%.2f, "
+        DD("XR options notification event: Environment=%d, PassthroughCoefficient=%.2f, DimmingValue=%.2f, "
            "Full proto: %s",
            environment,
            passthroughCoefficient,
+           dimmingValue,
            event.ShortDebugString().c_str());
         return event;
     } else {
@@ -235,13 +238,15 @@ void NotificationStream::registerListeners() {
             static_cast<base::EventNotificationSupport<xr_emulator_proto::XrOptions>*>(
                     android_get_xr_options_publisher());
     xrOptionsPublisher->registerOnce([&](auto options) {
-        DD("Sending XR options notification event - environment: %d, passthrough_coefficient: %f",
+        DD("Sending XR options notification event - environment: %d, passthrough_coefficient: %f, dimming_value: %f",
           options.environment(),
-          options.passthrough_coefficient());
+          options.passthrough_coefficient(),
+          options.dimming_value());
         Notification event;
         auto eventDetails = event.mutable_xroptions();
         eventDetails->set_environment(static_cast<XrOptions::Environment>(options.environment()));
         eventDetails->set_passthrough_coefficient(options.passthrough_coefficient());
+        eventDetails->set_dimming_value(options.dimming_value());
         mNotificationListeners.fireEvent(event);
     });
 
