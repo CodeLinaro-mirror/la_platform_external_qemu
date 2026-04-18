@@ -458,7 +458,7 @@ GSource *qio_channel_add_watch_source(QIOChannel *ioc,
 
 
 ssize_t qio_channel_pwritev(QIOChannel *ioc, const struct iovec *iov,
-                            size_t niov, off_t offset, Error **errp)
+                            size_t niov, off64_t offset, Error **errp)
 {
     QIOChannelClass *klass = QIO_CHANNEL_GET_CLASS(ioc);
 
@@ -476,7 +476,7 @@ ssize_t qio_channel_pwritev(QIOChannel *ioc, const struct iovec *iov,
 }
 
 ssize_t qio_channel_pwrite(QIOChannel *ioc, char *buf, size_t buflen,
-                           off_t offset, Error **errp)
+                           off64_t offset, Error **errp)
 {
     struct iovec iov = {
         .iov_base = buf,
@@ -487,7 +487,7 @@ ssize_t qio_channel_pwrite(QIOChannel *ioc, char *buf, size_t buflen,
 }
 
 ssize_t qio_channel_preadv(QIOChannel *ioc, const struct iovec *iov,
-                           size_t niov, off_t offset, Error **errp)
+                           size_t niov, off64_t offset, Error **errp)
 {
     QIOChannelClass *klass = QIO_CHANNEL_GET_CLASS(ioc);
 
@@ -505,7 +505,7 @@ ssize_t qio_channel_preadv(QIOChannel *ioc, const struct iovec *iov,
 }
 
 ssize_t qio_channel_pread(QIOChannel *ioc, char *buf, size_t buflen,
-                          off_t offset, Error **errp)
+                          off64_t offset, Error **errp)
 {
     struct iovec iov = {
         .iov_base = buf,
@@ -565,8 +565,8 @@ int qio_channel_get_peerpid(QIOChannel *ioc,
     return 0;
 }
 
-off_t qio_channel_io_seek(QIOChannel *ioc,
-                          off_t offset,
+off64_t qio_channel_io_seek(QIOChannel *ioc,
+                          off64_t offset,
                           int whence,
                           Error **errp)
 {

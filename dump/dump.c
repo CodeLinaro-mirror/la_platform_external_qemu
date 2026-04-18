@@ -865,15 +865,15 @@ static int write_end_flat_header(DumpState *s)
     return 0;
 }
 
-static int write_buffer(DumpState *s, off_t offset, const void *buf, size_t size)
+static int write_buffer(DumpState *s, off64_t offset, const void *buf, size_t size)
 {
     size_t written_size;
     MakedumpfileDataHeader mdh;
-    off_t seek_loc;
+    off64_t seek_loc;
 
     if (s->kdump_raw) {
         seek_loc = lseek(s->fd, offset, SEEK_SET);
-        if (seek_loc == (off_t) -1) {
+        if (seek_loc == (off64_t) -1) {
             return -1;
         }
     } else {
@@ -1207,8 +1207,8 @@ static size_t dump_bitmap_get_bufsize(DumpState *s)
 static int set_dump_bitmap(uint64_t last_pfn, uint64_t pfn, bool value,
                            uint8_t *buf, DumpState *s)
 {
-    off_t old_offset, new_offset;
-    off_t offset_bitmap1, offset_bitmap2;
+    off64_t old_offset, new_offset;
+    off64_t offset_bitmap1, offset_bitmap2;
     uint32_t byte, bit;
     size_t bitmap_bufsize = dump_bitmap_get_bufsize(s);
     size_t bits_per_buf = bitmap_bufsize * CHAR_BIT;
@@ -1402,7 +1402,7 @@ out:
 }
 
 static void prepare_data_cache(DataCache *data_cache, DumpState *s,
-                               off_t offset)
+                               off64_t offset)
 {
     data_cache->state = s;
     data_cache->data_size = 0;
@@ -1479,7 +1479,7 @@ static void write_dump_pages(DumpState *s, Error **errp)
     lzo_bytep wrkmem = NULL;
 #endif
     uint8_t *buf_out = NULL;
-    off_t offset_desc, offset_data;
+    off64_t offset_desc, offset_data;
     PageDescriptor pd, pd_zero;
     uint8_t *buf;
     GuestPhysBlock *block_iter = NULL;
@@ -2167,7 +2167,7 @@ void qmp_dump_guest_memory(bool paging, const char *protocol,
                    "parameter 'protocol' must start with 'file:' or 'fd:'");
         return;
     }
-    if (kdump_raw && lseek(fd, 0, SEEK_CUR) == (off_t) -1) {
+    if (kdump_raw && lseek(fd, 0, SEEK_CUR) == (off64_t) -1) {
         close(fd);
         error_setg(errp, "kdump-raw formats require a seekable file");
         return;

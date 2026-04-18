@@ -141,7 +141,7 @@ typedef struct DataCache {
     uint8_t *buf;       /* buffer for cached data */
     size_t buf_size;    /* size of the buf */
     size_t data_size;   /* size of cached data in buf */
-    off_t offset;       /* offset of the file */
+    off64_t offset;       /* offset of the file */
 } DataCache;
 
 typedef struct QEMU_PACKED PageDescriptor {
@@ -192,8 +192,8 @@ typedef struct DumpState {
     uint64_t max_mapnr;         /* the biggest guest's phys-mem's number */
     size_t len_dump_bitmap;     /* the size of the place used to store
                                    dump_bitmap in vmcore */
-    off_t offset_dump_bitmap;   /* offset of dump_bitmap part in vmcore */
-    off_t offset_page;          /* offset of page part in vmcore */
+    off64_t offset_dump_bitmap;   /* offset of dump_bitmap part in vmcore */
+    off64_t offset_page;          /* offset of page part in vmcore */
     size_t num_dumpable;        /* number of page that can be dumped */
     uint32_t flag_compress;     /* indicate the compression format */
     DumpStatus status;          /* current dump status */

@@ -84,7 +84,7 @@ typedef struct TPRInstruction {
     unsigned int flags;
     TPRAccess access;
     size_t length;
-    off_t addr_offset;
+    off64_t addr_offset;
 } TPRInstruction;
 
 /* must be sorted by length, shortest first */
@@ -540,7 +540,7 @@ static int patch_hypercalls(VAPICROMState *s)
     uint8_t alternates[2];
     const uint8_t *pattern;
     const uint8_t *patch;
-    off_t pos;
+    off64_t pos;
     uint8_t *rom;
 
     rom = g_malloc(s->rom_size);

@@ -377,7 +377,7 @@ void build_erst(GArray *table_data, BIOSLinker *linker, Object *erst_dev,
 static uint8_t *get_nvram_ptr_by_index(ERSTDeviceState *s, unsigned index)
 {
     uint8_t *rc = NULL;
-    off_t offset = (index * le32_to_cpu(s->header->record_size));
+    off64_t offset = (index * le32_to_cpu(s->header->record_size));
 
     g_assert(offset < s->storage_size);
 

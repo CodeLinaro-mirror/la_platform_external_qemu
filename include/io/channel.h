@@ -135,12 +135,12 @@ struct QIOChannelClass {
     ssize_t (*io_pwritev)(QIOChannel *ioc,
                           const struct iovec *iov,
                           size_t niov,
-                          off_t offset,
+                          off64_t offset,
                           Error **errp);
     ssize_t (*io_preadv)(QIOChannel *ioc,
                          const struct iovec *iov,
                          size_t niov,
-                         off_t offset,
+                         off64_t offset,
                          Error **errp);
     int (*io_shutdown)(QIOChannel *ioc,
                        QIOChannelShutdown how,
@@ -149,8 +149,8 @@ struct QIOChannelClass {
                         bool enabled);
     void (*io_set_delay)(QIOChannel *ioc,
                          bool enabled);
-    off_t (*io_seek)(QIOChannel *ioc,
-                     off_t offset,
+    off64_t (*io_seek)(QIOChannel *ioc,
+                     off64_t offset,
                      int whence,
                      Error **errp);
     void (*io_set_aio_fd_handler)(QIOChannel *ioc,
@@ -561,7 +561,7 @@ int qio_channel_close(QIOChannel *ioc,
  *
  */
 ssize_t qio_channel_pwritev(QIOChannel *ioc, const struct iovec *iov,
-                            size_t niov, off_t offset, Error **errp);
+                            size_t niov, off64_t offset, Error **errp);
 
 /**
  * qio_channel_pwrite
@@ -577,7 +577,7 @@ ssize_t qio_channel_pwritev(QIOChannel *ioc, const struct iovec *iov,
  *
  */
 ssize_t qio_channel_pwrite(QIOChannel *ioc, char *buf, size_t buflen,
-                           off_t offset, Error **errp);
+                           off64_t offset, Error **errp);
 
 /**
  * qio_channel_preadv
@@ -597,7 +597,7 @@ ssize_t qio_channel_pwrite(QIOChannel *ioc, char *buf, size_t buflen,
  *
  */
 ssize_t qio_channel_preadv(QIOChannel *ioc, const struct iovec *iov,
-                           size_t niov, off_t offset, Error **errp);
+                           size_t niov, off64_t offset, Error **errp);
 
 /**
  * qio_channel_pread
@@ -613,7 +613,7 @@ ssize_t qio_channel_preadv(QIOChannel *ioc, const struct iovec *iov,
  *
  */
 ssize_t qio_channel_pread(QIOChannel *ioc, char *buf, size_t buflen,
-                          off_t offset, Error **errp);
+                          off64_t offset, Error **errp);
 
 /**
  * qio_channel_shutdown:
@@ -710,10 +710,10 @@ void qio_channel_set_cork(QIOChannel *ioc,
  * Not all implementations will support this facility,
  * so may report an error.
  *
- * Returns: the new position on success, (off_t)-1 on failure
+ * Returns: the new position on success, (off64_t)-1 on failure
  */
-off_t qio_channel_io_seek(QIOChannel *ioc,
-                          off_t offset,
+off64_t qio_channel_io_seek(QIOChannel *ioc,
+                          off64_t offset,
                           int whence,
                           Error **errp);
 

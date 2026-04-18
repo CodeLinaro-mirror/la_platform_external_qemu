@@ -56,7 +56,7 @@ struct RAMBlock {
      * offset in the file pages belonging to this ramblock are saved,
      * used only during migration to a file.
      */
-    off_t bitmap_offset;
+    off64_t bitmap_offset;
     uint64_t pages_offset;
 
     /* Bitmap of already received pages.  Only used on destination side. */
