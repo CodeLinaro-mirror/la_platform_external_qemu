@@ -36,7 +36,7 @@ qio_channel_file_new_fd(int fd)
 
     ioc->fd = fd;
 
-    if (lseek(fd, 0, SEEK_CUR) != (off_t)-1) {
+    if (lseek(fd, 0, SEEK_CUR) != (off64_t)-1) {
         qio_channel_set_feature(QIO_CHANNEL(ioc), QIO_CHANNEL_FEATURE_SEEKABLE);
     }
 
@@ -78,7 +78,7 @@ qio_channel_file_new_path(const char *path,
         return NULL;
     }
 
-    if (lseek(ioc->fd, 0, SEEK_CUR) != (off_t)-1) {
+    if (lseek(ioc->fd, 0, SEEK_CUR) != (off64_t)-1) {
         qio_channel_set_feature(QIO_CHANNEL(ioc), QIO_CHANNEL_FEATURE_SEEKABLE);
     }
 
@@ -164,7 +164,7 @@ static ssize_t qio_channel_file_writev(QIOChannel *ioc,
 static ssize_t qio_channel_file_preadv(QIOChannel *ioc,
                                        const struct iovec *iov,
                                        size_t niov,
-                                       off_t offset,
+                                       off64_t offset,
                                        Error **errp)
 {
     QIOChannelFile *fioc = QIO_CHANNEL_FILE(ioc);
@@ -190,7 +190,7 @@ static ssize_t qio_channel_file_preadv(QIOChannel *ioc,
 static ssize_t qio_channel_file_pwritev(QIOChannel *ioc,
                                         const struct iovec *iov,
                                         size_t niov,
-                                        off_t offset,
+                                        off64_t offset,
                                         Error **errp)
 {
     QIOChannelFile *fioc = QIO_CHANNEL_FILE(ioc);
@@ -231,16 +231,16 @@ static int qio_channel_file_set_blocking(QIOChannel *ioc,
 }
 
 
-static off_t qio_channel_file_seek(QIOChannel *ioc,
-                                   off_t offset,
+static off64_t qio_channel_file_seek(QIOChannel *ioc,
+                                   off64_t offset,
                                    int whence,
                                    Error **errp)
 {
     QIOChannelFile *fioc = QIO_CHANNEL_FILE(ioc);
-    off_t ret;
+    off64_t ret;
 
     ret = lseek(fioc->fd, offset, whence);
-    if (ret == (off_t)-1) {
+    if (ret == (off64_t)-1) {
         error_setg_errno(errp, errno,
                          "Unable to seek to offset %lld whence %d in file",
                          (long long int)offset, whence);

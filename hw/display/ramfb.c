@@ -78,7 +78,7 @@ static DisplaySurface *ramfb_create_display_surface(int width, int height,
     return surface;
 }
 
-static void ramfb_fw_cfg_write(void *dev, off_t offset, size_t len)
+static void ramfb_fw_cfg_write(void *dev, off64_t offset, size_t len)
 {
     RAMFBState *s = dev;
     DisplaySurface *surface;

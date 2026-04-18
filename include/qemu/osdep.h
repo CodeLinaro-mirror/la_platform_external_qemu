@@ -186,6 +186,8 @@ QEMU_EXTERN_C int daemon(int, int);
 #include "system/os-wasm.h"
 #endif
 
+typedef int64_t off64_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

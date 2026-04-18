@@ -105,9 +105,9 @@ qio_channel_null_set_blocking(QIOChannel *ioc G_GNUC_UNUSED,
 }
 
 
-static off_t
+static off64_t
 qio_channel_null_seek(QIOChannel *ioc G_GNUC_UNUSED,
-                      off_t offset G_GNUC_UNUSED,
+                      off64_t offset G_GNUC_UNUSED,
                       int whence G_GNUC_UNUSED,
                       Error **errp G_GNUC_UNUSED)
 {

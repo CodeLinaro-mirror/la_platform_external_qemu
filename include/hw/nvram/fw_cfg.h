@@ -50,7 +50,7 @@ typedef struct FWCfgFiles {
 typedef struct fw_cfg_dma_access FWCfgDmaAccess;
 
 typedef void (*FWCfgCallback)(void *opaque);
-typedef void (*FWCfgWriteCallback)(void *opaque, off_t start, size_t len);
+typedef void (*FWCfgWriteCallback)(void *opaque, off64_t start, size_t len);
 
 typedef struct FWCfgEntry FWCfgEntry;
 

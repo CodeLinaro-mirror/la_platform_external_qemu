@@ -18,7 +18,7 @@
 #include "migration/vmstate.h"
 #include "hw/misc/vmcoreinfo.h"
 
-static void fw_cfg_vmci_write(void *opaque, off_t offset, size_t len)
+static void fw_cfg_vmci_write(void *opaque, off64_t offset, size_t len)
 {
     VMCoreInfoState *s = opaque;
 

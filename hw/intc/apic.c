@@ -100,7 +100,7 @@ static void apic_sync_vapic(APICCommonState *s, int sync_type)
 {
     VAPICState vapic_state;
     size_t length;
-    off_t start;
+    off64_t start;
     int vector;
 
     if (!s->vapic_paddr) {

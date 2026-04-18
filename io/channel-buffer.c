@@ -124,8 +124,8 @@ static int qio_channel_buffer_set_blocking(QIOChannel *ioc G_GNUC_UNUSED,
 }
 
 
-static off_t qio_channel_buffer_seek(QIOChannel *ioc,
-                                     off_t offset,
+static off64_t qio_channel_buffer_seek(QIOChannel *ioc,
+                                     off64_t offset,
                                      int whence,
                                      Error **errp)
 {
