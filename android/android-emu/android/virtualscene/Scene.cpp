@@ -49,7 +49,7 @@ namespace fs = std::filesystem;
 // when the file cannot be found or loaded, all relative to
 // the emulator's 'resources' folder
 static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
-static constexpr const char* kDefaultImageFile = "default.png";
+static constexpr const char* kDefaultImageFile = "default.jpg";
 static constexpr const char* kDefaultVideoFile = "default.mp4";
 static constexpr const char* kDefaultImage360File = "default360.jpg";
 
