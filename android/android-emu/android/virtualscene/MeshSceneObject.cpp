@@ -20,8 +20,8 @@
 
 #include <tiny_obj_loader.h>
 
-#include <unordered_map>
 #include <filesystem>
+#include <unordered_map>
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
@@ -109,7 +109,7 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
 
             if (index.texcoord_index >= 0) {
                 if (index.texcoord_index >= texcoordCount) {
-                    E("%s: Error parsing %s, invalid vertex index %d, expected "
+                    E("%s: Error parsing %s, invalid texture coordinate index %d, expected "
                       "less than %d",
                       __FUNCTION__, filename, index.texcoord_index,
                       texcoordCount);
@@ -146,6 +146,126 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
 
         result->mRenderables.emplace_back(std::move(renderable));
     }
+
+    return result;
+}
+
+// Must match MeshSceneObject::load for the error returning paths
+bool MeshSceneObject::canLoad(const char* filename) {
+    if (!filename) {
+        E("%s: Invalid input", __FUNCTION__);
+        return false;
+    }
+    const fs::path filePath(filename);
+    const std::string resourcesDir =
+            PathUtils::addTrailingDirSeparator(filePath.parent_path().string());
+
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+
+    std::string err;
+    const bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
+                                      filename, resourcesDir.c_str());
+    if (!ret) {
+        E("%s: Error loading obj %s: %s", __FUNCTION__, filename,
+          err.empty() ? "<no message>" : err.c_str());
+        return false;
+    } else if (!err.empty()) {
+        W("%s: Warnings loading obj %s: %s", __FUNCTION__, filename,
+          err.c_str());
+    }
+
+    const size_t vertexCount = attrib.vertices.size() / 3;
+    const size_t texcoordCount = attrib.texcoords.size() / 2;
+
+    for (const tinyobj::shape_t& shape : shapes) {
+        const tinyobj::mesh_t& mesh = shape.mesh;
+
+        for (size_t i = 0; i < mesh.indices.size(); i++) {
+            tinyobj::index_t index = mesh.indices[i];
+
+            if (index.vertex_index < 0 || index.vertex_index >= vertexCount) {
+                E("%s: Error parsing %s, invalid vertex index %d, expected "
+                  "less than %d",
+                  __FUNCTION__, filename, index.vertex_index, vertexCount);
+                return false;
+            }
+
+            if (index.texcoord_index >= 0) {
+                if (index.texcoord_index >= texcoordCount) {
+                    E("%s: Error parsing %s, invalid texture coordinate index %d, expected "
+                      "less than %d",
+                      __FUNCTION__, filename, index.texcoord_index,
+                      texcoordCount);
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+std::unique_ptr<MeshSceneObject> MeshSceneObject::createSphere(
+        Renderer& renderer) {
+    // Number of segments horizontally and vertically
+    const int segments = 64;
+
+    // Generate vertices
+    std::vector<VertexPositionUV> vertices;
+    vertices.reserve((segments + 1) * (segments + 1));
+    for (int i = 0; i <= segments; ++i) {
+        float v_coord = (float)i / segments;
+        float phi = v_coord * M_PI;
+
+        for (int j = 0; j <= segments; ++j) {
+            float u_coord = (float)j / segments;
+            float theta = u_coord * 2.0f * M_PI;  // Longitude
+
+            VertexPositionUV v;
+            v.pos.x = std::sin(phi) * std::cos(theta);
+            v.pos.y = std::cos(phi);
+            v.pos.z = std::sin(phi) * std::sin(theta);
+            v.uv.x = u_coord;
+            v.uv.y = 1.0f - v_coord;
+
+            vertices.push_back(v);
+        }
+    }
+
+    // Generate faces
+    std::vector<GLuint> indices;
+    indices.reserve(segments * segments * 2);
+    for (int i = 0; i < segments; ++i) {
+        int row1 = i * (segments + 1);
+        int row2 = (i + 1) * (segments + 1);
+
+        for (int j = 0; j < segments; ++j) {
+            int p1 = row1 + j;
+            int p2 = p1 + 1;
+            int p3 = row2 + j;
+            int p4 = p3 + 1;
+
+            // two triangles per segment
+            indices.push_back(p1);
+            indices.push_back(p3);
+            indices.push_back(p2);
+
+            indices.push_back(p2);
+            indices.push_back(p3);
+            indices.push_back(p4);
+        }
+    }
+
+    // Generate renderable
+    Renderable renderable;
+    renderable.material = renderer.createMaterialTextured();
+    renderable.mesh = renderer.createMesh(vertices, indices);
+
+    // Generate scene object
+    std::unique_ptr<MeshSceneObject> result(new MeshSceneObject(renderer));
+    result->mRenderables.emplace_back(std::move(renderable));
 
     return result;
 }

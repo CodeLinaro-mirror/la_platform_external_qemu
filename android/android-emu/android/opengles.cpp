@@ -339,7 +339,7 @@ static int startOpenglesRendererImpl(
 
     gfxstream::host::FeatureSet gfxstreamFeatures;
     using GfxstreamFeaturePtr =
-            gfxstream::host::FeatureInfo(gfxstream::host::FeatureSet::*);
+            gfxstream::host::BoolFeatureInfo(gfxstream::host::FeatureSet::*);
     const std::map<android::featurecontrol::Feature, GfxstreamFeaturePtr>
             kAemuToGfxstreamFeatureMap = {
                     {android::featurecontrol::AsyncComposeSupport,
@@ -428,8 +428,8 @@ static int startOpenglesRendererImpl(
     reportGfxstreamFeatures.reserve(1024);
     for (const auto& [aemuFeature, gfxstreamFeaturePtr] :
          kAemuToGfxstreamFeatureMap) {
-        (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled =
-                android::featurecontrol::isEnabled(aemuFeature);
+        (gfxstreamFeatures.*gfxstreamFeaturePtr)
+                .setEnabled(android::featurecontrol::isEnabled(aemuFeature));
 
         // TODO(b/389646068): special handling of 'GuestVulkanOnly' as we still
         // depend on flush-to-gl behavior on GL host composition (ie. when
@@ -437,15 +437,15 @@ static int startOpenglesRendererImpl(
         // separate aemu features to be checked to enable.
         if (gfxstreamFeaturePtr ==
             &gfxstream::host::FeatureSet::GuestVulkanOnly) {
-            gfxstreamFeatures.GuestVulkanOnly.enabled =
+            gfxstreamFeatures.GuestVulkanOnly.setEnabled(
                     android::featurecontrol::isEnabled(
                             android::featurecontrol::GuestAngle) &&
                     android::featurecontrol::isEnabled(
-                            android::featurecontrol::VulkanNativeSwapchain);
+                            android::featurecontrol::VulkanNativeSwapchain));
         }
 
-        const std::string& featureName = (gfxstreamFeatures.*gfxstreamFeaturePtr).name;
-        const bool featureEnabled = (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled;
+        const std::string& featureName = (gfxstreamFeatures.*gfxstreamFeaturePtr).getName();
+        const bool featureEnabled = (gfxstreamFeatures.*gfxstreamFeaturePtr).enabled();
         dprint("gfxstreamFeature:%s = %d", featureName.c_str(), featureEnabled);
         if (featureEnabled) {
             absl::StrAppend(&reportGfxstreamFeatures, featureName);
@@ -456,7 +456,7 @@ static int startOpenglesRendererImpl(
         // reflected on the gfxstream side.
         android::featurecontrol::makeReadOnly(aemuFeature);
     }
-    gfxstreamFeatures.EglOnEgl.enabled = sEgl2egl;
+    gfxstreamFeatures.EglOnEgl.setEnabled(sEgl2egl);
     crashhandler_add_string("gfxstream_features", reportGfxstreamFeatures.c_str());
 
     sRenderLib->setSyncDevice(
@@ -1069,58 +1069,6 @@ static void waitForOpenglesProcessCleanupImpl() {
 
 void android_waitForOpenglesProcessCleanup() {
     getActiveOpenglesFuncs()->waitForOpenglesProcessCleanup();
-}
-
-static void *sContext, *sRenderContext, *sSurface;
-static EGLint s_gles_attr[5];
-
-extern void tinyepoxy_init(const GLESv2Dispatch* gles, int version);
-
-static const EGLDispatch* getEgl() {
-    return (const EGLDispatch*)android_getEGLDispatch();
-}
-
-static const GLESv2Dispatch* getGles2() {
-    return (const GLESv2Dispatch*)android_getGLESv2Dispatch();
-}
-
-static bool prepare_epoxy(void) {
-    if (!sRenderLib->getOpt(&sOpt)) {
-        LOG(ERROR) << "Options not available";
-        return false;
-    }
-    if (!getEgl()) {
-        derror("%s: invalid call, EGL emulation is not enabled", __func__);
-        return false;
-    }
-    int major, minor;
-    sRenderLib->getGlesVersion(&major, &minor);
-    EGLint attr[] = {EGL_CONTEXT_CLIENT_VERSION, major,
-                     EGL_CONTEXT_MINOR_VERSION_KHR, minor, EGL_NONE};
-    sContext = getEgl()->eglCreateContext(sOpt.display, sOpt.config, EGL_NO_CONTEXT,
-                                      attr);
-    if (sContext == nullptr) {
-        LOG(ERROR) << "Unable to create context";
-        return false;
-    }
-    sRenderContext =
-            getEgl()->eglCreateContext(sOpt.display, sOpt.config, sContext, attr);
-    if (sRenderContext == nullptr) {
-        LOG(ERROR) << "Unable to create  render context";
-        return false;
-    }
-    static constexpr EGLint surface_attr[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1,
-                                              EGL_NONE};
-    sSurface = getEgl()->eglCreatePbufferSurface(sOpt.display, sOpt.config,
-                                             surface_attr);
-    if (sSurface == EGL_NO_SURFACE) {
-        LOG(ERROR) << "No egl surface";
-        return false;
-    }
-    static_assert(sizeof(attr) == sizeof(s_gles_attr), "Mismatch");
-    memcpy(s_gles_attr, attr, sizeof(s_gles_attr));
-    tinyepoxy_init(getGles2(), major * 10 + minor);
-    return true;
 }
 
 static struct AndroidVirtioGpuOps* getVirtioGpuOpsImpl() {

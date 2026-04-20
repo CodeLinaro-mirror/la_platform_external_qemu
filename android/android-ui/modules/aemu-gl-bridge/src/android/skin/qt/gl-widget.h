@@ -50,7 +50,7 @@ public:
 
     virtual ~GLWidget();
 
-    QPaintEngine* paintEngine() const override { return nullptr; }
+    QPaintEngine* paintEngine() const override;
     bool readyForRendering() const { return mValid; }
 
 public slots:
@@ -91,6 +91,8 @@ protected:
     int realPixelsHeight() const { return std::ceil(height() * devicePixelRatioF()); }
     void toggleAA() { mEnableAA = !mEnableAA; }
     virtual void showEvent(QShowEvent*) override;
+
+    QImage mOffscreenImage;
 
 public:
     bool ensureInit();

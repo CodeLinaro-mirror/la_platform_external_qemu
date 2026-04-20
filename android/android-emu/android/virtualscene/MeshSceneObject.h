@@ -42,6 +42,20 @@ public:
     // if there was an error.
     static std::unique_ptr<MeshSceneObject> load(Renderer& renderer,
                                                  const char* filename);
+
+    // Checks if the .obj file can be loaded, without using a renderer
+    //
+    // |filename| - Filename to load.
+    //
+    // Returns true if the file can be loaded.
+    static bool canLoad(const char* filename);
+
+    // Creates a unit sphere mesh object
+    //
+    // |renderer| - Renderer context.
+    //
+    // Returns a MeshSceneObject instance of the sphere object
+    static std::unique_ptr<MeshSceneObject> createSphere(Renderer& renderer);
 };
 
 }  // namespace virtualscene
