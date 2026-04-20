@@ -178,16 +178,20 @@ class BackgroundUpdateService {
 public:
     static bool start(int displayWidth,
                       int displayHeight,
+                      bool backgroundEnabled,
                       float backgroundBlur);
     static void stop();
 
     static void updateBlurAmount(float blurAmount);
+    static void updateBackgroundEnabled(bool renderEnabled);
 
 private:
     static std::unique_ptr<SceneCamera> mSceneCamera;
     static std::unique_ptr<RendererView> mBackgroundView;
     static std::vector<uint8_t> mReadbackDataCopy;
     static bool mStarted;
+    static bool mBackgroundEnabled;
+    static bool mScreenBackgroundSet;
 };
 
 }  // namespace virtualscene
