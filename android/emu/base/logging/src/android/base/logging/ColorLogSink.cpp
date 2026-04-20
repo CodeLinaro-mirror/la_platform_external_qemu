@@ -9,6 +9,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 #include "android/base/logging/ColorLogSink.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/time/time.h"
 
@@ -81,28 +82,25 @@ void ColorLogSink::Send(const absl::LogEntry& entry) {
         }
     }
 
+    std::string line;
     if (mVerbose) {
         auto now = entry.timestamp();
-        auto location = absl::StrFormat("%s:%d", entry.source_basename(),
-                                        entry.source_line());
-        *mOutputStream << Color(entry.log_severity())
-                       << absl::FormatTime("%H:%M:%E6S", now,
-                                           absl::LocalTimeZone())
-                       << absl::StreamFormat(" %d %s ", entry.tid(),
-                                             TranslateSeverity(entry))
-                       << absl::StreamFormat("%s:%d | ",
-                                             entry.source_basename(),
-                                             entry.source_line())
-                       << msg;
+        line = absl::StrFormat(
+                "%s%s %d %s %s:%d | %s", Color(entry.log_severity()),
+                absl::FormatTime("%H:%M:%E6S", now, absl::LocalTimeZone()),
+                entry.tid(), TranslateSeverity(entry), entry.source_basename(),
+                entry.source_line(), msg);
 
     } else {
-        *mOutputStream << Color(entry.log_severity())
-                       << TranslateSeverity(entry) << " | " << msg;
+        line = absl::StrFormat("%s%s | %s", Color(entry.log_severity()),
+                               TranslateSeverity(entry), msg);
     }
 
     if (mUseColor) {
-        *mOutputStream << kColorNormal;
+        absl::StrAppend(&line, kColorNormal);
     }
+
+    *mOutputStream << line;
 }
 
 std::string_view ColorLogSink::Color(absl::LogSeverity severity) const {
