@@ -521,6 +521,15 @@ AdbCommandPtr AdbInterfaceImpl::runAdbCommand(
         command = std::make_shared<AdbDirect>(args, std::move(result_callback),
                                               want_output);
     } else {
+        if (mSerialString.empty() && agentsAvailable()) {
+            auto agents = getConsoleAgents();
+            if (agents && agents->settings && agents->settings->android_serial_number_port) {
+                int port = agents->settings->android_serial_number_port();
+                if (port > 0) {
+                    setSerialNumberPort(port);
+                }
+            }
+        }
         command = std::make_shared<AdbThroughExe>(
                 mLooper, adbPath(), mSerialString, args, want_output,
                 timeout_ms, std::move(result_callback));
@@ -590,14 +599,28 @@ AdbThroughExe::AdbThroughExe(Looper* looper,
             outputFolder,
             std::string("adbcommand").append(Uuid::generate().toString()));
 
-    // TODO: when run headless, the serial string won't be properly
-    // initialized, so make a best attempt by using -e. This should be updated
-    // when the headless emulator is given an AdbInterface reference.
-    if (serial_string.empty()) {
+    std::string serial = serial_string;
+    if (serial.empty() && agentsAvailable()) {
+        auto agents = getConsoleAgents();
+        if (agents && agents->settings && agents->settings->android_serial_number_port) {
+            int port = agents->settings->android_serial_number_port();
+            if (port > 0) {
+                serial = "emulator-" + std::to_string(port);
+            }
+        }
+    }
+
+    if (serial.empty()) {
+        if (VERBOSE_CHECK(adb)) {
+            LOG(INFO) << "AdbThroughExe: No serial string, using -e";
+        }
         mCommand.push_back("-e");
     } else {
+        if (VERBOSE_CHECK(adb)) {
+            LOG(INFO) << "AdbThroughExe: Using serial string " << serial;
+        }
         mCommand.push_back("-s");
-        mCommand.push_back(serial_string);
+        mCommand.push_back(serial);
     }
 
     mCommand.insert(mCommand.end(), command.begin(), command.end());

@@ -48,6 +48,12 @@ bool s_min_config_qemu_mode = false;
 // /* is android-emu running Fuchsia? */
 int s_android_snapshot_update_timer = 0;
 
+extern "C" {
+extern int android_base_port;
+extern int android_adb_port;
+extern int android_serial_number_port;
+}
+
 static const QAndroidGlobalVarsAgent globalVarsAgent = {
         .avdParams = []() { return &sAndroid_avdInfoParams; },
         .avdInfo =
@@ -166,8 +172,13 @@ static const QAndroidGlobalVarsAgent globalVarsAgent = {
                 [](int android_snapshot_update_timer) {
                     s_android_snapshot_update_timer =
                             android_snapshot_update_timer;
-                }
-
+                },
+        .android_base_port = []() { return android_base_port; },
+        .set_android_base_port = [](int port) { android_base_port = port; },
+        .android_adb_port = []() { return android_adb_port; },
+        .set_android_adb_port = [](int port) { android_adb_port = port; },
+        .android_serial_number_port = []() { return android_serial_number_port; },
+        .set_android_serial_number_port = [](int port) { android_serial_number_port = port; },
 };
 
 extern "C" const QAndroidGlobalVarsAgent* const gQAndroidGlobalVarsAgent =
