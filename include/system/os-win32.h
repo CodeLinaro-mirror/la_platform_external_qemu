@@ -270,6 +270,13 @@ win32_close_exception_handler(struct _EXCEPTION_RECORD*, void*,
 void *qemu_win32_map_alloc(size_t size, HANDLE *h, Error **errp);
 void qemu_win32_map_free(void *ptr, HANDLE h, Error **errp);
 
+/* goldfish <<< */
+struct off_t_is_broken_on_windows;
+#define off_t struct off_t_is_broken_on_windows
+#define OFF_MAX INT64_MAX
+/* goldfish >>> */
+
+
 #ifdef __cplusplus
 }
 #endif

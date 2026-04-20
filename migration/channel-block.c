@@ -110,9 +110,9 @@ qio_channel_block_set_blocking(QIOChannel *ioc,
 }
 
 
-static off_t
+static off64_t
 qio_channel_block_seek(QIOChannel *ioc,
-                       off_t offset,
+                       off64_t offset,
                        int whence,
                        Error **errp)
 {
@@ -127,7 +127,7 @@ qio_channel_block_seek(QIOChannel *ioc,
         break;
     case SEEK_END:
         error_setg(errp, "Size of VMstate region is unknown");
-        return (off_t)-1;
+        return (off64_t)-1;
     default:
         g_assert_not_reached();
     }

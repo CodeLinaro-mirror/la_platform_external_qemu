@@ -128,7 +128,7 @@ struct MultiFDRecvData {
     void *opaque;
     size_t size;
     /* for preadv */
-    off_t file_offset;
+    off64_t file_offset;
 };
 
 typedef struct {

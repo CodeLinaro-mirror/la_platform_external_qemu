@@ -531,7 +531,7 @@ void qemu_put_buffer(QEMUFile *f, const uint8_t *buf, size_t size)
 }
 
 void qemu_put_buffer_at(QEMUFile *f, const uint8_t *buf, size_t buflen,
-                        off_t pos)
+                        off64_t pos)
 {
     Error *err = NULL;
     size_t ret;
@@ -567,7 +567,7 @@ void qemu_put_buffer_at(QEMUFile *f, const uint8_t *buf, size_t buflen,
 
 
 size_t qemu_get_buffer_at(QEMUFile *f, const uint8_t *buf, size_t buflen,
-                          off_t pos)
+                          off64_t pos)
 {
     Error *err = NULL;
     size_t ret;
@@ -597,10 +597,10 @@ size_t qemu_get_buffer_at(QEMUFile *f, const uint8_t *buf, size_t buflen,
     return ret;
 }
 
-void qemu_set_offset(QEMUFile *f, off_t off, int whence)
+void qemu_set_offset(QEMUFile *f, off64_t off, int whence)
 {
     Error *err = NULL;
-    off_t ret;
+    off64_t ret;
 
     if (qemu_file_is_writable(f)) {
         qemu_fflush(f);
@@ -611,20 +611,20 @@ void qemu_set_offset(QEMUFile *f, off_t off, int whence)
     }
 
     ret = qio_channel_io_seek(f->ioc, off, whence, &err);
-    if (ret == (off_t)-1) {
+    if (ret == (off64_t)-1) {
         qemu_file_set_error_obj(f, -EIO, err);
     }
 }
 
-off_t qemu_get_offset(QEMUFile *f)
+off64_t qemu_get_offset(QEMUFile *f)
 {
     Error *err = NULL;
-    off_t ret;
+    off64_t ret;
 
     qemu_fflush(f);
 
     ret = qio_channel_io_seek(f->ioc, 0, SEEK_CUR, &err);
-    if (ret == (off_t)-1) {
+    if (ret == (off64_t)-1) {
         qemu_file_set_error_obj(f, -EIO, err);
     }
     return ret;

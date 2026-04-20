@@ -39,7 +39,7 @@ OBJECT_DECLARE_SIMPLE_TYPE(QIOChannelBlock, QIO_CHANNEL_BLOCK)
 struct QIOChannelBlock {
     QIOChannel parent;
     BlockDriverState *bs;
-    off_t offset;
+    off64_t offset;
 };
 
 
