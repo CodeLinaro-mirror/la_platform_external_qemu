@@ -101,7 +101,7 @@ git config --global user.email wrong-do-it-again@badrobot.com
 
 ### Downloading Pre-built Emulators
 
-You can obtain the latest build of the emulator from our [build servers](https://ci.android.com/builds/branches/aosp-emu-master-dev/grid?legacy=1). Look for the `sdk-repo-{architecture}-emulator-{buildid}.zip` artifact.
+You can obtain the latest build of the emulator from our [build servers](https://ci.android.com/builds/branches/aosp-emu-main-dev/grid?legacy=1). Look for the `sdk-repo-{architecture}-emulator-{buildid}.zip` artifact.
 
 ### Sending patches
 

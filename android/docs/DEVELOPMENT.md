@@ -20,18 +20,18 @@ I.2) Determine the current Android Studio development branch:
 
 See the content of http://tools.android.com/build
 
-As of this writing, the major emulator development happens on emu-master-dev
+As of this writing, the major emulator development happens on emu-main-dev
 
 I.3) Checkout the sources with 'repo':
 - - - - - - - - - - - - - - - - - - - -
 
-    mkdir emu-master-dev
-    cd emu-master-dev
+    mkdir emu-main-dev
+    cd emu-main-dev
     repo init -u https://android.googlesource.com/platform/manifest \
-            -b emu-master-dev
+            -b emu-main-dev
     repo sync
 
-Replace 'emu-master-dev' with another branch name if necessary.
+Replace 'emu-main-dev' with another branch name if necessary.
 
 
 II. Building the binaries:

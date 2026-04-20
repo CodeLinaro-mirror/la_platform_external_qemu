@@ -29,8 +29,8 @@ sudo apt-get install -y git build-essential python3 qemu-kvm ninja-build python-
 2. **Initialize Repo:**
 
     ```bash
-    mkdir -p $HOME/emu-master-dev && cd $HOME/emu-master-dev
-    repo init -u https://android.googlesource.com/platform/manifest -b emu-master-dev
+    mkdir -p $HOME/emu-main-dev && cd $HOME/emu-main-dev
+    repo init -u https://android.googlesource.com/platform/manifest -b emu-main-dev
     ```
 
 3. **Download Code:**
@@ -81,7 +81,7 @@ sudo apt-get install -y git build-essential python3 qemu-kvm ninja-build python-
 
 ### Downloading Pre-built Emulators
 
-You can obtain the latest build of the emulator from our [build servers](https://ci.android.com/builds/branches/aosp-emu-master-dev/grid?legacy=1). Look for the `sdk-repo-{architecture}-emulator-{buildid}.zip` artifact.
+You can obtain the latest build of the emulator from our [build servers](https://ci.android.com/builds/branches/aosp-emu-main-dev/grid?legacy=1). Look for the `sdk-repo-{architecture}-emulator-{buildid}.zip` artifact.
 
 ### Sending patches
 
