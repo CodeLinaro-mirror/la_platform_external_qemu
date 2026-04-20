@@ -38,8 +38,8 @@ This guide will help you set up and build the Android Emulator on your Mac for d
 2. **Initialize Repo:**
 
     ```bash
-    mkdir -p $HOME/emu-master-dev && cd $HOME/emu-master-dev
-    repo init -u https://android.googlesource.com/platform/manifest -b emu-master-dev
+    mkdir -p $HOME/emu-main-dev && cd $HOME/emu-main-dev
+    repo init -u https://android.googlesource.com/platform/manifest -b emu-main-dev
     ```
 
 3. **Download Code:**
@@ -67,7 +67,7 @@ This guide will help you set up and build the Android Emulator on your Mac for d
 - **Incremental Builds:**
 
     ```bash
-    export PATH=$PATH:$HOME/emu-master-dev/prebuilts/ninja/darwin-x86/
+    export PATH=$PATH:$HOME/emu-main-dev/prebuilts/ninja/darwin-x86/
     ninja -C objs
     ```
 
@@ -91,7 +91,7 @@ This guide will help you set up and build the Android Emulator on your Mac for d
 
 ### Downloading Pre-built Emulators
 
-You can obtain the latest build of the emulator from our [build servers](https://ci.android.com/builds/branches/aosp-emu-master-dev/grid?legacy=1). Look for the `sdk-repo-{architecture}-emulator-{buildid}.zip` artifact.
+You can obtain the latest build of the emulator from our [build servers](https://ci.android.com/builds/branches/aosp-emu-main-dev/grid?legacy=1). Look for the `sdk-repo-{architecture}-emulator-{buildid}.zip` artifact.
 
 You might need to remove a quarantine flag before running them:
 
