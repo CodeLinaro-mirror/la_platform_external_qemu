@@ -41,8 +41,12 @@ public:
     explicit EmulatorControlClient(
             std::shared_ptr<EmulatorGrpcClient> client,
             EmulatorController::StubInterface* service = nullptr);
-    ~EmulatorControlClient();
+    virtual ~EmulatorControlClient();
 
+protected:
+    EmulatorControlClient() = default;
+
+public:
     /**
      * @brief Asynchronously sets the battery state of the emulator.
      *
@@ -153,7 +157,7 @@ public:
      *
      * There is a single shared inputEvent writer to the emulator.
      */
-    SimpleClientWriter<InputEvent>* asyncInputEventWriter();
+    virtual SimpleClientWriter<InputEvent>* asyncInputEventWriter();
 
     EmulatorController::StubInterface* service() { return mService.get(); }
 

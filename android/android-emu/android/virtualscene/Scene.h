@@ -41,36 +41,39 @@ struct SceneConfig {
     enum class Mode {
         Unknown = 0,
         Mesh3D,
-        VideoPlayback,
         VideoFile,
         ImageFile,
+        Color,
     };
 
-    SceneConfig(Mode mode, std::string_view filename);
+    SceneConfig(Mode mode, std::string_view argument);
 
     Mode mSceneMode = Mode::Unknown;
-    std::string mFilename;
+    std::string mArgument;
 
     static Mode modeFromString(std::string_view sceneModeStr);
     static const char* modeToString(SceneConfig::Mode mode);
 
     // Returns fullpath to default file for the given scene mode
-    static const char* defaultFilenameForMode(SceneConfig::Mode mode);
+    static const char* defaultArgumentForMode(SceneConfig::Mode mode);
 
     // Check if a GPU renderer should be initialized for the scene mode
     static bool modeRequiresRenderer(SceneConfig::Mode mode);
 
     // Check if the scene mode supports view rotations, otherwise a seperate
     // rotation operation will be required
-    static bool modeSupportViewRotations(SceneConfig::Mode mode);
+    static bool modeSupportsViewRotations(SceneConfig::Mode mode);
 
     // Check if the scene mode supports animated content
-    static bool modeSupportAnimations(SceneConfig::Mode mode);
+    static bool modeSupportsAnimations(SceneConfig::Mode mode);
+
+    // Check if the scene mode supports scene camera controls
+    static bool modeSupportsSceneControls(SceneConfig::Mode mode);
 };
 
 inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {
     return (lhs.mSceneMode == rhs.mSceneMode) &&
-           (lhs.mFilename == rhs.mFilename);
+           (lhs.mArgument == rhs.mArgument);
 }
 
 // TODO(virtualscene-perf): temporary object type to support 2d rendering modes,

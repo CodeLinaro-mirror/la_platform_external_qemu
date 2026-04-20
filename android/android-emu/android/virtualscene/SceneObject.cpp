@@ -54,5 +54,15 @@ bool SceneObject::isVisible() const {
     return mVisible;
 }
 
+void SceneObject::setTexture(int renderableIndex, Texture texture) {
+    if (renderableIndex < 0 || renderableIndex >= mRenderables.size()) {
+        E("%s: invalid parameters", __func__);
+        return;
+    }
+
+    mRenderer.releaseTexture(mRenderables[renderableIndex].texture);
+    mRenderables[renderableIndex].texture = mRenderer.duplicateTexture(texture);
+}
+
 }  // namespace virtualscene
 }  // namespace android

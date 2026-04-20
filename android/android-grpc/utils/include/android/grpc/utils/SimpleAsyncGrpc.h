@@ -209,7 +209,7 @@ public:
     }
 
     // Writes out the given object on the gRPC thread.
-    void Write(const W& msg) {
+    virtual void Write(const W& msg) {
         {
             const std::lock_guard<std::mutex> lock(mWritelock);
             mWriteQueue.push(msg);

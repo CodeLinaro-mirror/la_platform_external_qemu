@@ -54,6 +54,10 @@ public:
     // Returns true if the SceneObject is visible.
     bool isVisible() const;
 
+
+    // Update the texture of a renderable.
+    void setTexture(int renderableIndex, Texture texture);
+
 protected:
     Renderer& mRenderer;
 

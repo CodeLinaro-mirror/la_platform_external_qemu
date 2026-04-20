@@ -93,7 +93,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
         SceneConfig::Mode mode = SceneConfig::modeFromString(sceneModeStr);
         if (sceneFilename.empty()) {
             // Create with default content if a filename is not given
-            sceneFilename = SceneConfig::defaultFilenameForMode(mode);
+            sceneFilename = SceneConfig::defaultArgumentForMode(mode);
         }
         SceneConfig sceneConfig(mode, sceneFilename);
         mOwnedScene = ScenesManager::createScene(sceneConfig);
@@ -179,7 +179,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
 
         // Do not rotate during the conversion if the view is already handling
         const bool viewHandlesRotation =
-                SceneConfig::modeSupportViewRotations(sceneMode);
+                SceneConfig::modeSupportsViewRotations(sceneMode);
         const char* convertDirection = direction;
         int convertOrientation = orientation;
         if (viewHandlesRotation) {

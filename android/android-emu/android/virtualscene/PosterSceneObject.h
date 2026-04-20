@@ -51,11 +51,6 @@ public:
                                                      float minSize,
                                                      const glm::vec2& maxSize);
 
-    // Update the texture in the PosterSceneObject.
-    //
-    // |texture| - Texture object.
-    void setTexture(Texture texture);
-
     // Set the scale of the poster, with a value between 0 and 1.  The value
     // will be clamped between the minimum poster size, 20cm and the maximum
     // poster size as defined in the scene (typically 1-2m).

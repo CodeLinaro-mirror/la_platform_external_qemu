@@ -167,16 +167,10 @@ set(android_emu_dependent_src
     android/raw_image_sources/video_file/raw_video_file_source.cc
     android/camera/camera-common.cpp
     android/camera/camera-format-converters.c
-    android/camera/camera-imagefile.cpp
     android/camera/camera-list.cpp
     android/camera/camera-metrics.cpp
     android/camera/camera-service.cpp
     android/camera/camera-sws-format-converter.cpp
-    android/camera/camera-videofile.cpp
-    android/camera/camera-videoplayback-default-renderer.cpp
-    android/camera/camera-videoplayback-render-multiplexer.cpp
-    android/camera/camera-videoplayback-video-renderer.cpp
-    android/camera/camera-videoplayback.cpp
     android/camera/camera-virtualscene-utils.cpp
     android/camera/camera-virtualscene.cpp
     android/console.cpp
@@ -198,8 +192,6 @@ set(android_emu_dependent_src
     android/sensors-port.c
     android/snapshot/Icebox.cpp
     android/snapshot/SnapshotAPI.cpp
-    android/videoinjection/VideoInjectionController.cpp
-    android/videoplayback/VideoplaybackRenderTarget.cpp
     android/virtualscene/MeshSceneObject.cpp
     android/virtualscene/PosterInfo.cpp
     android/virtualscene/PosterSceneObject.cpp
@@ -645,7 +637,6 @@ if(NOT LINUX_AARCH64)
       android/snapshot/Snapshot_unittest.cpp
       android/userspace-boot-properties_unittest.cpp
       android/verified-boot/load_config_unittest.cpp
-      android/videoinjection/VideoInjectionController_unittest.cpp
       android/virtualscene/TextureUtils_unittest.cpp)
 
   # And declare the test

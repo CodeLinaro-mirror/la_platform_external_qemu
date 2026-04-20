@@ -321,6 +321,9 @@ CIniFile* avdInfo_getEnvironmentIni(const AvdInfo* i);
  */
 CIniFile* avdInfo_reloadEnvironmentIni(const AvdInfo* i, const char* data);
 
+/* Save the current avd/environment.ini to Disk.
+ */
+void avdInfo_saveEnvironmentIni(const AvdInfo* i);
 
 /* Returns the path to a given AVD image file. This will return NULL if
  * the file cannot be found / does not exist.

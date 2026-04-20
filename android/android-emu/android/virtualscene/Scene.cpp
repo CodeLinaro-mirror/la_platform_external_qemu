@@ -51,6 +51,9 @@ static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
 static constexpr const char* kDefaultImageFile = "default.png";
 static constexpr const char* kDefaultVideoFile = "default.mp4";
 
+// A blank background
+static constexpr const char* kDefaultColor = "#000000";
+
 // Function to find fullpath from a filename for the scene
 // Scene filenames can be provided as fullpaths, AVD local,
 // or from 'in 'resources' folder.
@@ -97,9 +100,9 @@ std::unique_ptr<To> static_unique_cast(std::unique_ptr<From>& from) {
 namespace android {
 namespace virtualscene {
 
-SceneConfig::SceneConfig(Mode mode, std::string_view filename) {
+SceneConfig::SceneConfig(Mode mode, std::string_view argument) {
     mSceneMode = mode;
-    mFilename = filename;
+    mArgument = argument;
 }
 
 SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
@@ -107,12 +110,12 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
         return SceneConfig::Mode::Mesh3D;
     } else if (sceneModeStr == "mesh3d") {
         return SceneConfig::Mode::Mesh3D;
-    } else if (sceneModeStr == "videoplayback") {
-        return SceneConfig::Mode::VideoPlayback;
     } else if (sceneModeStr == "videofile") {
         return SceneConfig::Mode::VideoFile;
     } else if (sceneModeStr == "imagefile") {
         return SceneConfig::Mode::ImageFile;
+    } else if (sceneModeStr == "color") {
+        return SceneConfig::Mode::Color;
     } else {
         dwarning("Unknown scene mode requested: %s", sceneModeStr);
         return SceneConfig::Mode::Unknown;
@@ -122,25 +125,26 @@ SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
 const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
     if (mode == SceneConfig::Mode::Mesh3D) {
         return "mesh3d";
-    } else if (mode == SceneConfig::Mode::VideoPlayback) {
-        return "videoplayback";
     } else if (mode == SceneConfig::Mode::VideoFile) {
         return "videofile";
     } else if (mode == SceneConfig::Mode::ImageFile) {
         return "imagefile";
+    } else if (mode == SceneConfig::Mode::Color) {
+        return "color";
     } else {
         return "unknown";
     }
 }
 
-const char* SceneConfig::defaultFilenameForMode(SceneConfig::Mode mode) {
+const char* SceneConfig::defaultArgumentForMode(SceneConfig::Mode mode) {
     if (mode == SceneConfig::Mode::Mesh3D) {
         return kDefaultSceneObj;
-    } else if (mode == SceneConfig::Mode::VideoPlayback ||
-               mode == SceneConfig::Mode::VideoFile) {
+    } else if (mode == SceneConfig::Mode::VideoFile) {
         return kDefaultVideoFile;
     } else if (mode == SceneConfig::Mode::ImageFile) {
         return kDefaultImageFile;
+    } else if (mode == SceneConfig::Mode::Color) {
+        return kDefaultColor;
     } else {
         derror("%s: Invalid mode %d", __func__, (int)mode);
         return "invalid_filename";
@@ -152,14 +156,21 @@ bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
     return (mode == SceneConfig::Mode::Mesh3D);
 }
 
-bool SceneConfig::modeSupportViewRotations(SceneConfig::Mode mode) {
+bool SceneConfig::modeSupportsViewRotations(SceneConfig::Mode mode) {
     // Currently, only Mesh3D supports view rotations
     return (mode == SceneConfig::Mode::Mesh3D);
 }
 
-bool SceneConfig::modeSupportAnimations(SceneConfig::Mode mode) {
-    // Output of the ImageFile mode won't be affected by the animations
-    return (mode != SceneConfig::Mode::ImageFile);
+bool SceneConfig::modeSupportsAnimations(SceneConfig::Mode mode) {
+    // Output of the ImageFile and Color modes won't be affected by the
+    // animations
+    return (mode != SceneConfig::Mode::ImageFile &&
+            mode != SceneConfig::Mode::Color);
+}
+
+bool SceneConfig::modeSupportsSceneControls(SceneConfig::Mode mode) {
+    // These modes should enable scene controls for movement or rotation
+    return (mode == SceneConfig::Mode::Mesh3D);
 }
 
 Scene::Scene(std::unique_ptr<Renderer> renderer, const SceneConfig& config)
@@ -189,16 +200,20 @@ std::unique_ptr<Scene> Scene::create(std::unique_ptr<Renderer> renderer,
 
 bool Scene::initialize() {
     const char* sceneModeStr = SceneConfig::modeToString(mConfig.mSceneMode);
-    dprint("Initializing scene with '%s' mode, file:%s", sceneModeStr,
-           mConfig.mFilename.c_str());
+    dprint("Initializing scene with '%s' mode, argument:%s", sceneModeStr,
+           mConfig.mArgument.c_str());
 
     // Use scene mode name for metrics
     // TODO(virtualscene): decide and add new metrics without PII
     CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
-    // Find the file, in case it's given as a local path
-    const std::string sceneFilename = resolveSceneFilename(mConfig.mFilename);
     const auto sceneMode = getSceneMode();
+
+    // Find the file, in case it's given as a local path
+    std::string sceneFilename;
+    if (sceneMode != SceneConfig::Mode::Color) {
+        sceneFilename = resolveSceneFilename(mConfig.mArgument);
+    }
 
     bool needsRawImageSource = false;
     switch (sceneMode) {
@@ -219,21 +234,11 @@ bool Scene::initialize() {
                 return false;
             }
 
-            mSceneObjects.push_back(
-                    std::move(static_unique_cast<SceneObject>(sceneObject)));
+            mSceneObjects.push_back(std::move(sceneObject));
 
-            // TODO (virtualScene) The virtual scene by default renders the
+            // TODO(virtualscene) The virtual scene by default renders the
             // image rotated 90 degrees
             mBaseRotation = 90;
-        } break;
-        case SceneConfig::Mode::VideoPlayback: {
-            // TODO(virtualscene-video): actually load sceneFilename video,
-            // and change render()
-            if (!fs::exists(sceneFilename)) {
-                derror("%s: Could not load video file: %s", __func__,
-                       sceneFilename.c_str());
-                return false;
-            }
         } break;
         case SceneConfig::Mode::VideoFile: {
             needsRawImageSource = true;
@@ -243,16 +248,28 @@ bool Scene::initialize() {
             needsRawImageSource = true;
             mRawImageSource = RawImageFileSource::Create(sceneFilename);
         } break;
+        case SceneConfig::Mode::Color: {
+            needsRawImageSource = true;
+            unsigned int r, g, b;
+            if (sscanf(mConfig.mArgument.c_str(), "#%02x%02x%02x", &r, &g,
+                       &b) == 3) {
+                mRawImageSource = std::make_unique<SolidColorImageSource>(
+                        Color{(uint8_t)r, (uint8_t)g, (uint8_t)b});
+            } else {
+                derror("%s: Could not parse color: %s", __func__,
+                       mConfig.mArgument.c_str());
+            }
+        } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
     }
 
     if (needsRawImageSource) {
         if (!mRawImageSource) {
-            derror("%s: Could not load background image: '%s', falling back to default",
-                   __func__, mConfig.mFilename.c_str());
+            derror("%s: Could not load background source: '%s', falling back to default",
+                   __func__, mConfig.mArgument.c_str());
             mRawImageSource =
-                    std::make_unique<SolidColorImageProvider>(kErrorColor);
+                    std::make_unique<SolidColorImageSource>(kErrorColor);
             mConfig.mSceneMode = SceneConfig::Mode::ImageFile;
         }
         mBaseRotation = mRawImageSource->GetBaseRotation();
@@ -401,7 +418,7 @@ bool Scene::createPosterLocation(const PosterInfo& info) {
     if (!info.defaultFilename.empty()) {
         storage.defaultTexture =
                 mRenderer->loadTextureAsync(info.defaultFilename.c_str());
-        storage.sceneObject->setTexture(storage.defaultTexture);
+        storage.sceneObject->setTexture(0, storage.defaultTexture);
     }
 
     mPosters.insert(std::make_pair(info.name, std::move(storage)));
@@ -433,7 +450,7 @@ bool Scene::loadPoster(const char* posterName,
     }
 
     poster.sceneObject->setScale(scale);
-    poster.sceneObject->setTexture(
+    poster.sceneObject->setTexture(0,
             poster.texture.isValid() ? poster.texture : poster.defaultTexture);
 
     mObjectsVersion++;

@@ -100,7 +100,8 @@ static bool emulatorSetupEnvironment() {
     } timer;
 
     // Initialize virtual scene and background view
-    if (!VirtualSceneManager::initialize(backgroundUsesEnvironment)) {
+    if (!VirtualSceneManager::initialize(backgroundUsesEnvironment,
+                                         transparentDisplay)) {
         derror("%s: Cannot initialize virtual scene for the environment",
                __func__);
         return false;
