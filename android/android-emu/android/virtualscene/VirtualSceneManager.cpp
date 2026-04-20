@@ -155,6 +155,7 @@ struct EnvironmentConfig {
     static const int defaultFps = 30;
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
     std::string sceneArgument;
+    bool backgroundEnabled = true;
     float backgroundBlur = defaultBackgroundBlur;
     int fps;
 };
@@ -209,10 +210,14 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             }
         }
 
-        // Update blur amount from config, if given
+        // Update background view parameters from config, if given
         ret.backgroundBlur = static_cast<float>(
                 iniFile_getDouble(environmentIni, "background.blurAmount",
                                   EnvironmentConfig::defaultBackgroundBlur));
+
+        ret.backgroundEnabled =
+                iniFile_getBoolean(environmentIni, "background.enabled",
+                                   "true") != 0;
     }
 
     if (!modeSet) {
@@ -319,8 +324,7 @@ bool ScenesManager::renderView(Scene* scene,
 
     switch (mode) {
         case SceneConfig::Mode::Mesh3D:
-        case SceneConfig::Mode::Image360:
-        {
+        case SceneConfig::Mode::Image360: {
             const auto renderables =
                     scene->getRenderableObjects(view->mViewProjection);
             if (!renderer || !renderer->render(view, renderables, renderTime)) {
@@ -505,6 +509,7 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
               displayWidth, displayHeight);
 
         if (!BackgroundUpdateService::start(displayWidth, displayHeight,
+                                            envConfig.backgroundEnabled,
                                             envConfig.backgroundBlur)) {
             derror("%s: Cannot initialize background update service", __func__);
             return false;
@@ -546,7 +551,8 @@ void VirtualSceneManager::update() {
     // virtualscene and animation is controlled by renderTime in shaders. Always
     // update the scene and timer in other modes.
     bool updateTime = true;
-    if (SceneConfig::modeSupportsAnimations(mEnvironmentScene->getSceneMode())) {
+    if (SceneConfig::modeSupportsAnimations(
+                mEnvironmentScene->getSceneMode())) {
         // Use virtualscene settings for animation control
         updateTime = sSettings->getAnimationState();
     } else {
@@ -708,7 +714,8 @@ bool VirtualSceneManager::addSceneUser() {
         // crete the renderer and load renderer resources if needed
         mEnvironmentScene->loadUserResources();
 
-        // Poster location objects must be loaded after the renderer is initialized
+        // Poster location objects must be loaded after the renderer is
+        // initialized
         if (!sceneHasRenderer) {
             // Add renderer related resources if it's the first time
             // the resources are being loaded
@@ -726,9 +733,11 @@ bool VirtualSceneManager::addSceneUser() {
                 for (const auto& it : sSettings->getPosterSettings()) {
                     const char* posterName = it.first.c_str();
                     const Settings::PosterSetting& setting = it.second;
-                    Scene::LoadBehavior loadBehavior = Scene::LoadBehavior::Default;
-                    mEnvironmentScene->loadPoster(posterName, setting.mFilename.c_str(),
-                                    setting.mScale, loadBehavior);
+                    Scene::LoadBehavior loadBehavior =
+                            Scene::LoadBehavior::Default;
+                    mEnvironmentScene->loadPoster(posterName,
+                                                  setting.mFilename.c_str(),
+                                                  setting.mScale, loadBehavior);
                 }
             }
         }
@@ -850,7 +859,9 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
         avdInfo_saveEnvironmentIni(avdInfo);
     }
 
-    // Update background view, if exists
+    // Update background service parameters
+    BackgroundUpdateService::updateBackgroundEnabled(
+            envConfig.backgroundEnabled);
     BackgroundUpdateService::updateBlurAmount(envConfig.backgroundBlur);
 
     dinfo("%s: Reloaded environment with scene argument: %s", __func__,
@@ -930,11 +941,13 @@ std::shared_ptr<Scene> VirtualSceneManager::createEnvironmentScene(
 std::unique_ptr<SceneCamera> BackgroundUpdateService::mSceneCamera;
 std::unique_ptr<RendererView> BackgroundUpdateService::mBackgroundView;
 std::vector<uint8_t> BackgroundUpdateService::mReadbackDataCopy;
-
 bool BackgroundUpdateService::mStarted = false;
+bool BackgroundUpdateService::mBackgroundEnabled = true;
+bool BackgroundUpdateService::mScreenBackgroundSet = false;
 
 bool BackgroundUpdateService::start(int displayWidth,
                                     int displayHeight,
+                                    bool backgroundEnabled,
                                     float backgroundBlur) {
     const float aspectRatio = static_cast<float>(displayWidth) / displayHeight;
     mSceneCamera = std::make_unique<SceneCamera>();
@@ -948,43 +961,59 @@ bool BackgroundUpdateService::start(int displayWidth,
     mBackgroundView->setBlurFactor(backgroundBlur);
     mReadbackDataCopy.resize(displayWidth * displayHeight * 4);
 
+    mBackgroundEnabled = backgroundEnabled;
+
     // Set update callback, to update the background image after each
     // scene update
     VirtualSceneManager::setUpdateCallback([displayWidth, displayHeight]() {
-        const bool supportsPosition = (VirtualSceneManager::getSceneMode() ==
-                                       SceneConfig::Mode::Mesh3D);
-        mSceneCamera->update(supportsPosition);
+        if (mBackgroundEnabled) {
+            const bool supportsPosition =
+                    (VirtualSceneManager::getSceneMode() ==
+                     SceneConfig::Mode::Mesh3D);
+            mSceneCamera->update(supportsPosition);
 
-        // TODO(virtualscene) Handle rotation properly for all scenes.
-        // SceneCamera uses 90 degrees rotated views by default for
-        // the camera rendering, rotate it back to correct for background
-        float angle = VirtualSceneManager::getSceneBaseRotation();
-        glm::mat4 rollRotation =
-                glm::rotate(glm::mat4(1.0f), glm::radians(angle),
-                            glm::vec3(0.0f, 0.0f, 1.0f));
-        glm::mat4 cameraView = rollRotation * mSceneCamera->getView();
-        glm::mat4 viewProjection = mSceneCamera->getProjection() * cameraView;
-        mBackgroundView->updateViewProjection(viewProjection);
+            // TODO(virtualscene) Handle rotation properly for all scenes.
+            // SceneCamera uses 90 degrees rotated views by default for
+            // the camera rendering, rotate it back to correct for background
+            float angle = VirtualSceneManager::getSceneBaseRotation();
+            glm::mat4 rollRotation =
+                    glm::rotate(glm::mat4(1.0f), glm::radians(angle),
+                                glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::mat4 cameraView = rollRotation * mSceneCamera->getView();
+            glm::mat4 viewProjection =
+                    mSceneCamera->getProjection() * cameraView;
+            mBackgroundView->updateViewProjection(viewProjection);
 
-        if (VirtualSceneManager::viewCacheRequiresUpdate(
-                    mBackgroundView.get())) {
-            if (VirtualSceneManager::renderView(
-                        mBackgroundView.get(),
-                        []() {
-                            mReadbackDataCopy =
-                                    mBackgroundView->getFramebufferLocked();
-                        },
-                        nullptr)) {
-                // Update the background image for the display composition
-                // TODO(virtualscene-perf): Avoid copy of the data by making
-                // android_setOpenglesScreenBackground call lighter weight and
-                // callable inside the lock
-                android_setOpenglesScreenBackground(displayWidth, displayHeight,
-                                                    mReadbackDataCopy.data());
+            if (!mScreenBackgroundSet ||
+                VirtualSceneManager::viewCacheRequiresUpdate(
+                        mBackgroundView.get())) {
+                if (VirtualSceneManager::renderView(
+                            mBackgroundView.get(),
+                            []() {
+                                mReadbackDataCopy =
+                                        mBackgroundView->getFramebufferLocked();
+                            },
+                            nullptr)) {
+                    // Update the background image for the display composition
+                    // TODO(virtualscene-perf): Avoid copy of the data by making
+                    // android_setOpenglesScreenBackground call lighter weight
+                    // and callable inside the lock
+                    android_setOpenglesScreenBackground(
+                            displayWidth, displayHeight,
+                            mReadbackDataCopy.data());
+                }
+                mScreenBackgroundSet = true;
             }
+        } else if (mScreenBackgroundSet) {
+            // Reset the screen background if an image has been set before
+            android_setOpenglesScreenBackground(0, 0, nullptr);
+            mScreenBackgroundSet = false;
         }
     });
 
+    // A user should be added even when the background rendering is not enabled,
+    // this will ensure scene and animations are updated correctly for the
+    // camera and other users of the environment scene
     VirtualSceneManager::addSceneUser();
     mStarted = true;
 
@@ -1001,6 +1030,10 @@ void BackgroundUpdateService::stop() {
     mBackgroundView.reset();
     mSceneCamera.reset();
     mStarted = false;
+}
+
+void BackgroundUpdateService::updateBackgroundEnabled(bool renderEnabled) {
+    mBackgroundEnabled = renderEnabled;
 }
 
 void BackgroundUpdateService::updateBlurAmount(float blurAmount) {
