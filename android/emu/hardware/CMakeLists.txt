@@ -35,6 +35,7 @@ android_add_library(
       android/hw-control.cpp
       android/hw-events.c
       android/hw-fingerprint.c
+      android/hw-lights.c
       android/hw-kmsg.c
       android/hw-qemud.cpp
   DEPS android-emu-adb-interface
