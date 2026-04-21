@@ -180,7 +180,6 @@ private:
     android::metrics::PeriodicReporter::TaskToken mMetricsReportingToken;
 
     QAndroidPhysicalStateAgent mQAndroidPhysicalStateAgent;
-    bool mIsUIModifyingPhysicalState = false;
     bool mIsDragging = false;
 
     bool mSlidersUseCurrent = true;

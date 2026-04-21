@@ -829,7 +829,7 @@ void Device3DWidget::repaintGL() {
     glm::vec3 position = glm::vec3();
     glm::mat4 rotation = glm::mat4();
 
-    if (mSensorsAgent) {
+    if (mSensorsAgent && !mTracking) {
         auto outPosition = {&position.x, &position.y, &position.z};
         mSensorsAgent->getPhysicalParameter(
                 PHYSICAL_PARAMETER_POSITION, outPosition.begin(),
@@ -847,6 +847,9 @@ void Device3DWidget::repaintGL() {
         position = clampPosition(position);
 
         rotation = glm::mat4(fromEulerAnglesXYZ(glm::radians(eulerDegrees)));
+    } else {
+        position = mTargetPosition;
+        rotation = glm::mat4_cast(mTargetRotation);
     }
 
     if (mOperationMode == OperationMode::Rotate &&
@@ -1204,7 +1207,7 @@ void Device3DWidget::mouseMoveEvent(QMouseEvent* event) {
                                            glm::vec3(0.0f, 1.0f, 0.0f));
         mTargetRotation = q * mTargetRotation;
         mLastTargetRotation = mTargetRotation;
-        renderFrame();
+        update();
         emit targetRotationChanged();
         mPrevMouseX = event->x();
         mPrevMouseY = event->y();
@@ -1214,7 +1217,7 @@ void Device3DWidget::mouseMoveEvent(QMouseEvent* event) {
         mTargetPosition.x = clamp(MinX, MaxX, newLocation.x);
         mTargetPosition.y = clamp(MinY, MaxY, newLocation.y);
         mLastTargetPosition = mTargetPosition;
-        renderFrame();
+        update();
         emit targetPositionChanged();
         mPrevDragOrigin = vec;
     }
@@ -1228,7 +1231,7 @@ void Device3DWidget::wheelEvent(QWheelEvent* event) {
                 MinZ, MaxZ,
                 mTargetPosition.z + angleDeltaDegrees * InchesPerWheelDegree);
         mLastTargetPosition = mTargetPosition;
-        renderFrame();
+        update();
         emit targetPositionChanged();
     }
 }

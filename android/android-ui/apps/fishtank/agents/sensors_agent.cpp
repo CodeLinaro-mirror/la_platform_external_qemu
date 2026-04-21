@@ -223,7 +223,7 @@ const QAndroidSensorsAgent sFishtankQAndroidSensorsAgent = {
                     return sFishtankQAndroidSensorsAgent
                             .setPhysicalParameterTarget(
                                     PHYSICAL_PARAMETER_ROTATION, rotation, 3,
-                                    0);
+                                    PHYSICAL_INTERPOLATION_STEP);
                 },
         .setSensorOverride =
                 [](int sensor, const float* value, size_t len) {
