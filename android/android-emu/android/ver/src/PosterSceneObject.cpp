@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-#include "android/virtualscene/PosterSceneObject.h"
-
-#include "android/utils/debug.h"
+#include "PosterSceneObject.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
-#define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
-#define D_ACTIVE VERBOSE_CHECK(virtualscene)
+#define D(...) dprint(__VA_ARGS__)
 
 static constexpr android::virtualscene::VertexPositionUV kQuadVerts[] = {
         {glm::vec3(-0.5f, -0.5f, 0.f), glm::vec2(0.f, 0.f)},

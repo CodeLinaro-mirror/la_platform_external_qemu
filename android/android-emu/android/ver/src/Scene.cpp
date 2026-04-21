@@ -14,78 +14,48 @@
  * limitations under the License.
  */
 
-#include "android/virtualscene/Scene.h"
-
-#include "absl/status/status.h"
-#include "absl/strings/str_format.h"
-#include "android/avd/info.h"  // to resolve avd path for resources
-#include "android/base/logging/StudioMessage.h"
-#include "android/base/system/System.h"
-#include "android/camera/camera-metrics.h"
-#include "android/console.h"
-#include "android/loadpng.h"
-#include "android/raw_image_sources/image_file/raw_image_file_source.h"
-#include "android/raw_image_sources/raw_image_source.h"
-#include "android/raw_image_sources/video_file/raw_video_file_source.h"
-#include "android/utils/debug.h"
-#include "android/virtualscene/MeshSceneObject.h"
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/TextureUtils.h"
+#include "Scene.h"
 
 #include <cmath>
 #include <cstring>
-#include <filesystem>
 #include <memory>
 
+#include "absl/status/status.h"
+#include "absl/strings/str_format.h"
+#include "android/base/logging/StudioMessage.h"
+#include "android/base/system/System.h"
+#include "raw_image_sources/image_file/raw_image_file_source.h"
+#include "raw_image_sources/raw_image_source.h"
+#include "raw_image_sources/video_file/raw_video_file_source.h"
+#include "MeshSceneObject.h"
+
+#include "Renderer.h"
+#include "TextureUtils.h"
+
 using namespace android::base;
-using android::camera::CameraMetrics;
 namespace fs = std::filesystem;
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
-#define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
-#define D_ACTIVE VERBOSE_CHECK(virtualscene)
-
-// Default filenames for different scene modes, can be used
-// when the file cannot be found or loaded, all relative to
-// the emulator's 'resources' folder
-static constexpr const char* kDefaultSceneObj = "Toren1BD.obj";
-static constexpr const char* kDefaultImageFile = "default.jpg";
-static constexpr const char* kDefaultVideoFile = "default.mp4";
-static constexpr const char* kDefaultImage360File = "default360.jpg";
-
-// A blank background
-static constexpr const char* kDefaultColor = "#000000";
+#define D(...) dprint(__VA_ARGS__)
 
 // Function to find fullpath from a filename for the scene
-// Scene filenames can be provided as fullpaths, AVD local,
-// or from 'in 'resources' folder.
-std::string resolveSceneFilename(const std::string& sceneFilename) {
+// Scene filenames can be provided as fullpaths, or local
+// paths based on the basePaths argument.
+std::string resolveSceneFilename(const std::string& sceneFilename,
+                                 const std::vector<fs::path>& basePaths) {
     // Check if it's a fullpath
     fs::path inputPath(sceneFilename);
     if (fs::exists(inputPath)) {
         return inputPath.string();
     }
 
-    // If it's not a usable full path, try AVD local
-    const char* avdBasePath =
-            getConsoleAgents() && getConsoleAgents()->settings
-                    ? avdInfo_getContentPath(
-                              getConsoleAgents()->settings->avdInfo())
-                    : nullptr;
-    if (avdBasePath) {
-        fs::path avdPath = fs::path(avdBasePath) / inputPath;
-        if (fs::exists(avdPath)) {
-            return avdPath.string();
+    // Try search directories, e.g AVD folder, resources/ folder..etc
+    for (const fs::path& basePath : basePaths) {
+        fs::path searchPath = fs::path(basePath) / inputPath;
+        if (fs::exists(searchPath)) {
+            return searchPath.string();
         }
-    }
-
-    // If not in AVD folder, check 'resources' folder
-    fs::path resourcesBasePath =
-            fs::path(System::get()->getLauncherDirectory()) / "resources";
-    fs::path resourcePath = resourcesBasePath / inputPath;
-    if (fs::exists(resourcePath)) {
-        return resourcePath.string();
     }
 
     dwarning("Could not resolve environment scene filename '%s'",
@@ -103,87 +73,6 @@ std::unique_ptr<To> static_unique_cast(std::unique_ptr<From>& from) {
 namespace android {
 namespace virtualscene {
 
-SceneConfig::SceneConfig(Mode mode, std::string_view argument) {
-    mSceneMode = mode;
-    mArgument = argument;
-}
-
-SceneConfig::Mode SceneConfig::modeFromString(std::string_view sceneModeStr) {
-    if (sceneModeStr == "virtualscene") {
-        return SceneConfig::Mode::Mesh3D;
-    } else if (sceneModeStr == "mesh3d") {
-        return SceneConfig::Mode::Mesh3D;
-    } else if (sceneModeStr == "videofile") {
-        return SceneConfig::Mode::VideoFile;
-    } else if (sceneModeStr == "imagefile") {
-        return SceneConfig::Mode::ImageFile;
-    } else if (sceneModeStr == "color") {
-        return SceneConfig::Mode::Color;
-    } else if (sceneModeStr == "image360") {
-        return SceneConfig::Mode::Image360;
-    } else {
-        dwarning("Unknown scene mode requested: %s", sceneModeStr);
-        return SceneConfig::Mode::Unknown;
-    }
-}
-
-const char* SceneConfig::modeToString(SceneConfig::Mode mode) {
-    if (mode == SceneConfig::Mode::Mesh3D) {
-        return "mesh3d";
-    } else if (mode == SceneConfig::Mode::VideoFile) {
-        return "videofile";
-    } else if (mode == SceneConfig::Mode::ImageFile) {
-        return "imagefile";
-    } else if (mode == SceneConfig::Mode::Color) {
-        return "color";
-    } else if (mode == SceneConfig::Mode::Image360) {
-        return "image360";
-    } else {
-        return "unknown";
-    }
-}
-
-const char* SceneConfig::defaultArgumentForMode(SceneConfig::Mode mode) {
-    if (mode == SceneConfig::Mode::Mesh3D) {
-        return kDefaultSceneObj;
-    } else if (mode == SceneConfig::Mode::VideoFile) {
-        return kDefaultVideoFile;
-    } else if (mode == SceneConfig::Mode::ImageFile) {
-        return kDefaultImageFile;
-    } else if (mode == SceneConfig::Mode::Color) {
-        return kDefaultColor;
-    } else if (mode == SceneConfig::Mode::Image360) {
-        return kDefaultImage360File;
-    } else {
-        derror("%s: Invalid mode %d", __func__, (int)mode);
-        return "invalid_filename";
-    }
-}
-
-bool SceneConfig::modeRequiresRenderer(SceneConfig::Mode mode) {
-    return (mode == SceneConfig::Mode::Mesh3D) ||
-           (mode == SceneConfig::Mode::Image360);
-}
-
-bool SceneConfig::modeSupportsViewRotations(SceneConfig::Mode mode) {
-    // Currently, only Mesh3D supports view rotations
-    return (mode == SceneConfig::Mode::Mesh3D) ||
-           (mode == SceneConfig::Mode::Image360);
-}
-
-bool SceneConfig::modeSupportsAnimations(SceneConfig::Mode mode) {
-    // Output of the ImageFile and Color modes won't be affected by the
-    // animations
-    return (mode != SceneConfig::Mode::ImageFile &&
-            mode != SceneConfig::Mode::Color);
-}
-
-bool SceneConfig::modeSupportsSceneControls(SceneConfig::Mode mode) {
-    // These modes should enable scene controls for movement or rotation
-    return (mode == SceneConfig::Mode::Mesh3D) ||
-           (mode == SceneConfig::Mode::Image360);
-}
-
 Scene::Scene(const SceneConfig& config) : mConfig(config) {
     D("%s: creating Scene", __func__);
 }
@@ -197,37 +86,37 @@ Scene::~Scene() {
     mRenderer.reset();
 }
 
-std::unique_ptr<Scene> Scene::create(const SceneConfig& config) {
+std::unique_ptr<Scene> Scene::create(
+        const SceneConfig& config,
+        const std::vector<fs::path>& resourceBasePaths) {
     std::unique_ptr<Scene> scene;
     scene.reset(new Scene(config));
-    if (!scene || !scene->initialize()) {
+    if (!scene || !scene->initialize(resourceBasePaths)) {
         return nullptr;
     }
 
     return scene;
 }
 
-bool Scene::initialize() {
+bool Scene::initialize(const std::vector<fs::path>& basePaths) {
     auto sceneMode = getSceneMode();
     const char* sceneModeStr = SceneConfig::modeToString(sceneMode);
     dprint("Initializing scene with '%s' mode, argument:%s", sceneModeStr,
            mConfig.mArgument.c_str());
 
-    // Use scene mode name for metrics
-    // TODO(virtualscene): decide and add new metrics without PII
-    CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
+    mResourceBasePaths = basePaths;
 
     // Find the file, in case it's given as a local path
     std::string sceneFilename;
     if (sceneMode != SceneConfig::Mode::Color) {
-        sceneFilename = resolveSceneFilename(mConfig.mArgument);
+        sceneFilename = resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
         if (sceneFilename.empty()) {
             USER_MESSAGE(ERROR)
                     << "Could not find file '" << mConfig.mArgument.c_str()
                     << "' using default Environment";
             sceneMode = SceneConfig::Mode::ImageFile;
             sceneFilename = resolveSceneFilename(
-                    SceneConfig::defaultArgumentForMode(sceneMode));
+                    SceneConfig::defaultArgumentForMode(sceneMode), mResourceBasePaths);
         }
     }
 
@@ -277,8 +166,7 @@ bool Scene::initialize() {
             // loadRendererResources
             // TODO(virtualscene-perf): initialize renderer early and avoid
             // loading content twice
-            Optional<TextureUtils::Result> result =
-                    TextureUtils::load(sceneFilename.c_str());
+            auto result = TextureUtils::load(sceneFilename.c_str());
             if (!result) {
                 E("%s: Could not load texture from file '%s'", __func__,
                   sceneFilename.c_str());
@@ -297,7 +185,7 @@ bool Scene::initialize() {
         if (!mRawImageSource) {
             sceneFilename =
                     resolveSceneFilename(SceneConfig::defaultArgumentForMode(
-                            SceneConfig::Mode::ImageFile));
+                            SceneConfig::Mode::ImageFile), mResourceBasePaths);
             if (!sceneFilename.empty()) {
                 mRawImageSource = RawImageFileSource::Create(sceneFilename);
             }
@@ -361,7 +249,7 @@ bool Scene::loadRendererResources() {
     // Find the file, in case it's given as a local path
     std::string sceneFilename;
     if (sceneMode != SceneConfig::Mode::Color) {
-        sceneFilename = resolveSceneFilename(mConfig.mArgument);
+        sceneFilename = resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
         if (sceneFilename.empty()) {
             E("%s: Cannot find file '%s'", __FUNCTION__, mConfig.mArgument);
             return false;
@@ -450,10 +338,10 @@ void Scene::update(bool updateTime) {
         auto res = mRawImageSource->UpdateImage(
                 mFrameTimeUs, mRawImageSourceToken,
                 [&](const RawImageBufferView* buffer) {
-                    if (buffer->pixel_format != V4L2_PIX_FMT_RGB32) {
+                    if (buffer->pixel_format != VerImageFormat::RGBA8) {
                         return absl::InvalidArgumentError(absl::StrFormat(
                                 "Unsupported pixel format from image source: %d",
-                                buffer->pixel_format));
+                                (int)(buffer->pixel_format)));
                     }
 
                     if (mOverlayObject->mDataRGBA.size() <
@@ -606,7 +494,7 @@ void Scene::loadUserResources() {
         // TODO(virtualscene) Determine if we need these input values.
         // Currently they are just hints that we may use to better initialize
         // the webcam to a sensible resolution.
-        mRawImageSource->Start(0, 0, 0);
+        mRawImageSource->Start(VerImageFormat::RGBA8, 0, 0);
     }
 }
 

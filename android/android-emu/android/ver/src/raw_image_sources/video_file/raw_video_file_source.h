@@ -16,7 +16,7 @@
 
 #include <cstdint>
 #include "absl/status/statusor.h"
-#include "android/raw_image_sources/raw_image_source.h"
+#include "../raw_image_source.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -32,7 +32,7 @@ extern "C" {
 class RawVideofileSource : public RawImageSource {
 public:
     static std::unique_ptr<RawVideofileSource> Create(std::string filename);
-    int Start(uint32_t pixel_format, int width, int height) override;
+    int Start(VerImageFormat pixel_format, int width, int height) override;
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
             std::optional<RawImageToken> token,

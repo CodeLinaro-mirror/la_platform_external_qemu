@@ -19,15 +19,12 @@
 #include "aemu/base/files/PathUtils.h"
 #include "android/avd/info.h"
 #include "android/base/system/System.h"
+#include "android/camera/camera-metrics.h"
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/cmdline-option.h"
 #include "android/console.h"
-#include "android/raw_image_sources/raw_image_source.h"
 #include "android/skin/winsys.h"
 #include "android/utils/debug.h"
-#include "android/virtualscene/PosterInfo.h"
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/Scene.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/hw-config-helper.h"
 #include "host-common/hw-config.h"
@@ -37,9 +34,11 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <fstream>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include "android/physics/GlmHelpers.h"
 
 using namespace android::base;
 
@@ -60,8 +59,123 @@ static constexpr const char* kPosterFile = "Toren1BD.posters";
 // Update at 30 fps by default
 static constexpr int kUpdatePerSecond = 30;
 
+//TODO(virtualscene-library): use different namespace for VirtualSceneManager
 namespace android {
 namespace virtualscene {
+
+/**
+ * @brief Parses a .posters file and returns a list of PosterInfo structures.
+ *
+ * @param filename The name of the posters file to parse.
+ * @return A vector of PosterInfo containing the parsed poster data.
+ */
+std::vector<PosterInfo> parsePostersFile(const char* filename) {
+    const std::string resourcesDir =
+            android::base::PathUtils::addTrailingDirSeparator(
+                    android::base::PathUtils::join(
+                            android::base::System::get()
+                                    ->getLauncherDirectory(),
+                            "resources"));
+    const std::string filePath = android::base::PathUtils::join(
+            android::base::System::get()->getLauncherDirectory(), "resources",
+            filename);
+
+    std::ifstream in(
+            android::base::PathUtils::asUnicodePath(filePath.data()).c_str());
+    if (!in) {
+        dwarning("%s: Could not find file '%s'", __FUNCTION__, filename);
+        return {};
+    }
+
+    std::vector<PosterInfo> results;
+    PosterInfo poster;
+
+    std::string str;
+
+    for (in >> str; !in.eof(); in >> str) {
+        if (str.empty()) {
+            continue;
+        }
+
+        if (str == "poster") {
+            // New poster entry, specified with a string name.
+            if (!poster.name.empty()) {
+                // Store existing poster.
+                dprint("%s: Loaded poster %s at (%f, %f, %f)", __FUNCTION__,
+                       poster.name.c_str(), poster.position.x,
+                       poster.position.y, poster.position.z);
+                results.push_back(poster);
+            }
+
+            poster = PosterInfo();
+            in >> poster.name;
+            if (!in) {
+                dwarning("%s: Invalid name.", __FUNCTION__);
+                return {};
+            }
+
+        } else if (str == "position") {
+            // Poster center position.
+            // Specified with three floating point numbers, separated by
+            // whitespace.
+
+            in >> poster.position.x >> poster.position.y >> poster.position.z;
+            if (!in) {
+                dwarning("%s: Invalid position.", __FUNCTION__);
+                return {};
+            }
+        } else if (str == "rotation") {
+            // Poster rotation.
+            // Specified with three floating point numbers, separated by
+            // whitespace.  This represents euler angle rotation in degrees, and
+            // it is applied in XYZ order.
+
+            glm::vec3 eulerRotation;
+            in >> eulerRotation.x >> eulerRotation.y >> eulerRotation.z;
+            if (!in) {
+                dwarning("%s: Invalid rotation.", __FUNCTION__);
+                return {};
+            }
+
+            poster.rotation = fromEulerAnglesXYZ(glm::radians(eulerRotation));
+        } else if (str == "size") {
+            // Poster center position.
+            // Specified with two floating point numbers, separated by
+            // whitespace.
+
+            in >> poster.size.x >> poster.size.y;
+            if (!in) {
+                dwarning("%s: Invalid size.", __FUNCTION__);
+                return {};
+            }
+        } else if (str == "default") {
+            // Poster default filename.
+            // Specified with a string parameter.
+
+            in >> poster.defaultFilename;
+            if (!in) {
+                dwarning("%s: Invalid default filename.", __FUNCTION__);
+                return {};
+            }
+        } else {
+            dwarning("%s: Invalid input %s", __FUNCTION__, str.c_str());
+            return {};
+        }
+    }
+
+    if (poster.name.empty()) {
+        derror("%s: Posters file did not contain any entries.", __FUNCTION__);
+        return {};
+    }
+
+    // Store last poster.
+    dprint("%s: Loaded poster %s at (%f, %f, %f)", __FUNCTION__,
+           poster.name.c_str(), poster.position.x, poster.position.y,
+           poster.position.z);
+    results.push_back(poster);
+
+    return results;
+}
 
 // Stores settings for the virtual scene.
 //
@@ -245,194 +359,15 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
 }
 
 /*******************************************************************************
- *                     ScenesManager API.
- ******************************************************************************/
-
-StaticLock ScenesManager::mLock;
-std::vector<std::shared_ptr<Scene>> ScenesManager::mScenes;
-
-std::shared_ptr<Scene> ScenesManager::createScene(const SceneConfig& config) {
-    if (config.mSceneMode == SceneConfig::Mode::Unknown) {
-        E("%s: invalid config", __func__);
-        return nullptr;
-    }
-
-    // Create a new scene
-    D("Initializing a scene with mode:%s, argument:%s",
-      SceneConfig::modeToString(config.mSceneMode), config.mArgument.c_str());
-
-    std::shared_ptr<Scene> scene = Scene::create(config);
-    if (!scene) {
-        E("VirtualSceneManager scene failed to load");
-        return nullptr;
-    }
-
-    AutoLock lock(mLock);
-    mScenes.push_back(scene);
-
-    return scene;
-}
-
-bool ScenesManager::renderView(Scene* scene,
-                               RendererView* view,
-                               std::function<void()> finishCallback,
-                               uint64_t* outFrameTime) {
-    // TODO(virtualscene-perf): do not create different renderers for each scene
-    if (!scene || !view) {
-        E("%s: invalid parameters", __FUNCTION__);
-        return false;
-    }
-
-    const uint64_t frameTime = scene->getFrameTimeUs();
-    if (outFrameTime) {
-        *outFrameTime = frameTime;
-    }
-
-    std::lock_guard lock(view->mLock);
-
-    auto sceneHash = scene->getVersionHashForView(view);
-    if (view->mCache.isValidFor(sceneHash, frameTime)) {
-        // We still need to call finish callback to let caller use the existing
-        // view cache. viewCacheRequiresUpdate should be used when a final
-        // copy/conversion is not needed.
-        finishCallback();
-        return true;
-    }
-
-    // View is not up to date, render and update the cache
-    auto readbackSize = view->getWidthLocked() * view->getHeightLocked() * 4;
-    view->mCache.mSceneHash = sceneHash;
-    view->mCache.mFrameTime = frameTime;
-
-    SceneConfig::Mode mode = scene->getSceneMode();
-    Renderer* renderer = nullptr;
-    if (SceneConfig::modeRequiresRenderer(mode)) {
-        renderer = scene->getRenderer();
-
-        // This mode requires renderer
-        if (!renderer) {
-            E("%s: invalid scene renderer in mode %s", __FUNCTION__,
-              SceneConfig::modeToString(mode));
-            return false;
-        }
-    }
-
-    // Make the renderer context current for graphics operations
-    const float renderTime = frameTime / 1000000.0f;
-    auto context = renderer ? renderer->makeCurrent() : nullptr;
-    if (renderer && !context->isValid()) {
-        E("%s: Cannot use EGL context", __FUNCTION__);
-        return false;
-    }
-
-    view->preRenderLocked();
-
-    switch (mode) {
-        case SceneConfig::Mode::Mesh3D:
-        case SceneConfig::Mode::Image360: {
-            const auto renderables =
-                    scene->getRenderableObjects(view->mViewProjection);
-            if (!renderer || !renderer->render(view, renderables, renderTime)) {
-                E("Scene rendering failed");
-                return false;
-            }
-        } break;
-        case SceneConfig::Mode::ImageFile:
-        case SceneConfig::Mode::VideoFile:
-        case SceneConfig::Mode::Color: {
-            const SceneOverlayObject* overlay = scene->getOverlayObject();
-            if (!overlay || !overlay->isValid()) {
-                E("Scene rendering failed");
-                return false;
-            }
-            std::vector<uint8_t>& fbData = view->getFramebufferLocked();
-
-            ImageScaler scaler(view->getWidthLocked(), view->getHeightLocked(),
-                               fbData.data());
-            auto mode = ImageScaler::ScaleMode::AspectFitZoom;
-            // AspectFitZoom requires a minimum size.
-            // For a single color image, just use ScaleToFill
-            if (overlay->mWidth == 1 && overlay->mHeight == 1) {
-                mode = ImageScaler::ScaleMode::ScaleToFill;
-            }
-            if (!scaler.updateImage(overlay->mWidth, overlay->mHeight,
-                                    overlay->mDataRGBA.data(), mode)) {
-                E("%s: Failed to resize the framebuffer for the view",
-                  __FUNCTION__);
-                return false;
-            }
-        } break;
-        default: {
-            E("%s: Unknown scene mode: %d", __FUNCTION__,
-              static_cast<int>(mode));
-        }
-    }
-
-    view->postRenderLocked();
-
-    // This needs to be called inside the lock
-    finishCallback();
-
-    return true;
-}
-
-bool ScenesManager::removeScene(Scene* scene) {
-    D("ScenesManager::%s", __func__);
-
-    AutoLock lock(mLock);
-    if (!scene || !scene->releaseResources()) {
-        return false;
-    }
-
-    // Remove from mScenes array
-    auto it = std::find_if(
-            mScenes.begin(), mScenes.end(),
-            [&scene](const auto& iter) { return iter.get() == scene; });
-    if (it != mScenes.end()) {
-        // Warn if the caller is not the only reference
-        if (it->use_count() > 2) {
-            D("Removing scene with references");
-        }
-        mScenes.erase(it);
-    } else {
-        E("%s: could not find scene", __FUNCTION__);
-    }
-
-    return true;
-}
-
-bool ScenesManager::removeAll() {
-    D("ScenesManager::%s", __func__);
-
-    // First make sure VirtualSceneManager is uninitialized, should
-    // be done outside the lock
-    VirtualSceneManager::uninitialize();
-
-    // Release all scenes
-    AutoLock lock(mLock);
-    for (auto& it : mScenes) {
-        // Warn if there are other users of the scene
-        if (it.use_count() > 1) {
-            D("Removing scene with references");
-        }
-        it->releaseResources();
-    }
-
-    mScenes.clear();
-
-    return true;
-}
-
-/*******************************************************************************
  *                     VirtualSceneManager API.
  ******************************************************************************/
 
 StaticLock VirtualSceneManager::mLock;
-std::shared_ptr<Scene> VirtualSceneManager::mEnvironmentScene;
+VerSceneHandle VirtualSceneManager::mEnvironmentScene = nullptr;
 std::deque<std::string> VirtualSceneManager::mPosterFilenameUpdates;
 std::optional<std::thread> VirtualSceneManager::mBackgroundUpdateThread;
 std::function<void()> VirtualSceneManager::mUpdateCallback;
-int VirtualSceneManager::mNumUsers = 0;
+std::atomic<int> VirtualSceneManager::mNumUsers = 0;
 std::atomic<bool> VirtualSceneManager::mKeepUpdating = false;
 bool VirtualSceneManager::mShowBackground = false;
 
@@ -493,14 +428,17 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
       SceneConfig::modeToString(sceneConfig.mSceneMode),
       sceneConfig.mArgument.c_str());
 
-    std::shared_ptr<Scene> scene = createEnvironmentScene(sceneConfig);
+    // Use scene mode name for metrics
+    const char* sceneModeStr = SceneConfig::modeToString(sceneConfig.mSceneMode);
+    camera::CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
-    if (!scene) {
+    mEnvironmentScene = ver_create_scene(sceneConfig);
+
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("VirtualSceneManager scene could not be initialized");
         return false;
     }
 
-    mEnvironmentScene = std::move(scene);
     mKeepUpdating = false;
 
     lock.unlock();
@@ -536,10 +474,8 @@ void VirtualSceneManager::uninitialize() {
     stopSceneUpdateThread();
 
     AutoLock lock(mLock);
-    if (mEnvironmentScene) {
-        ScenesManager::removeScene(mEnvironmentScene.get());
-        mEnvironmentScene.reset();
-    }
+    ver_destroy_scene(mEnvironmentScene);
+    mEnvironmentScene = VER_INVALID_HANDLE;
     mPosterFilenameUpdates.clear();
 }
 
@@ -548,7 +484,7 @@ void VirtualSceneManager::update() {
         // Scene is in use, skip this update..
         return;
     }
-    if (!mEnvironmentScene) {
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
     }
 
@@ -557,14 +493,15 @@ void VirtualSceneManager::update() {
     // update the scene and timer in other modes.
     bool updateTime = true;
     if (SceneConfig::modeSupportsAnimations(
-                mEnvironmentScene->getSceneMode())) {
+                ver_scene_get_mode(mEnvironmentScene))) {
         // Use virtualscene settings for animation control
         updateTime = sSettings->getAnimationState();
     } else {
         // Static scene, no need to update which may invalidate view caches
         updateTime = false;
     }
-    mEnvironmentScene->update(updateTime);
+
+    ver_scene_update(mEnvironmentScene, updateTime);
 
     mLock.unlock();
 
@@ -575,7 +512,8 @@ void VirtualSceneManager::update() {
     }
 }
 
-bool VirtualSceneManager::viewCacheRequiresUpdate(const RendererView* view) {
+bool VirtualSceneManager::viewCacheRequiresUpdate(
+        const VerRenderViewHandle view) {
     if (!view) {
         E("%s: invalid parameters", __FUNCTION__);
         return false;
@@ -584,25 +522,25 @@ bool VirtualSceneManager::viewCacheRequiresUpdate(const RendererView* view) {
     uint64_t sceneHash, frameTime;
     {
         AutoLock lock(mLock);
-        sceneHash = mEnvironmentScene->getVersionHashForView(view);
-        frameTime = mEnvironmentScene->getFrameTimeUs();
+        sceneHash =
+                ver_scene_get_version_hash_for_view(mEnvironmentScene, view);
+        frameTime = ver_scene_get_frame_time_us(mEnvironmentScene);
     }
 
-    std::lock_guard lock(view->mLock);
-    return !(view->mCache.isValidFor(sceneHash, frameTime));
+    return !ver_render_view_cache_is_valid_for(view, sceneHash, frameTime);
 }
 
-bool VirtualSceneManager::renderView(RendererView* view,
-                                     std::function<void()> finishCallback,
+bool VirtualSceneManager::renderView(VerRenderViewHandle view,
+                                     VerRenderFinishCallback finishCallback,
                                      uint64_t* outFrameTime) {
     AutoLock lock(mLock);
-    if (!mEnvironmentScene) {
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
         return false;
     }
 
-    return ScenesManager::renderView(
-            mEnvironmentScene.get(), view,
+    return ver_render_view(
+            mEnvironmentScene, view,
             [&]() {
                 // Posters needs to be updated within the render context
                 // TODO(virtualscene): load posters async and avoid overwriting
@@ -613,11 +551,9 @@ bool VirtualSceneManager::renderView(RendererView* view,
                             mPosterFilenameUpdates.front().c_str();
                     const Settings::PosterSetting& setting =
                             posters.at(posterName);
-                    Scene::LoadBehavior loadBehavior =
-                            Scene::LoadBehavior::Default;
-                    mEnvironmentScene->loadPoster(posterName,
-                                                  setting.mFilename.c_str(),
-                                                  setting.mScale, loadBehavior);
+                    ver_scene_load_poster(mEnvironmentScene, posterName,
+                                          setting.mFilename.c_str(),
+                                          setting.mScale);
                     mPosterFilenameUpdates.pop_front();
                 }
 
@@ -677,7 +613,7 @@ void VirtualSceneManager::setPosterScale(const char* posterName, float scale) {
 
     // Updating the poster scale can be done on any thread, update it now.
     if (mEnvironmentScene) {
-        mEnvironmentScene->updatePosterScale(posterName, scale);
+        ver_scene_update_poster_scale(mEnvironmentScene, posterName, scale);
     }
 }
 
@@ -693,14 +629,14 @@ bool VirtualSceneManager::getAnimationState() {
 
 void VirtualSceneManager::setSceneControlsParameters(bool show) {
     AutoLock lock(mLock);
-    if (!mEnvironmentScene) {
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
         return;
     }
 
     // Only allow showing scene controls if it's a 3d scene
     if (!show || SceneConfig::modeSupportsSceneControls(
-                         mEnvironmentScene->getSceneMode())) {
+                         ver_scene_get_mode(mEnvironmentScene))) {
         D("%s: show=%s", __func__, (show ? "true" : "false"));
         skin_winsys_show_virtual_scene_controls(show);
     }
@@ -708,44 +644,29 @@ void VirtualSceneManager::setSceneControlsParameters(bool show) {
 
 bool VirtualSceneManager::addSceneUser() {
     AutoLock lock(mLock);
-    if (!mEnvironmentScene) {
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
         return false;
     }
     if (mNumUsers == 0) {
-        const bool sceneHasRenderer = mEnvironmentScene->getRenderer();
-
         // Make sure the scene is ready to use, this will also
         // crete the renderer and load renderer resources if needed
-        mEnvironmentScene->loadUserResources();
-
-        // Poster location objects must be loaded after the renderer is
-        // initialized
-        if (!sceneHasRenderer) {
-            // Add renderer related resources if it's the first time
-            // the resources are being loaded
-            if (Renderer* renderer = mEnvironmentScene->getRenderer()) {
-                auto context = renderer->makeCurrent();
-
-                //  Load the poster configuration in the scene.
-                for (const auto& it : sSettings->getPosterLocations()) {
-                    if (!mEnvironmentScene->createPosterLocation(it)) {
-                        E("VirtualSceneManager failed to create poster location");
-                        return false;
-                    }
-                }
-
-                for (const auto& it : sSettings->getPosterSettings()) {
-                    const char* posterName = it.first.c_str();
-                    const Settings::PosterSetting& setting = it.second;
-                    Scene::LoadBehavior loadBehavior =
-                            Scene::LoadBehavior::Default;
-                    mEnvironmentScene->loadPoster(posterName,
-                                                  setting.mFilename.c_str(),
-                                                  setting.mScale, loadBehavior);
+        ver_scene_load_user_resources(mEnvironmentScene, [&]() {
+            //  Load the poster configuration in the scene.
+            for (const auto& it : sSettings->getPosterLocations()) {
+                if (!ver_scene_create_poster_location(mEnvironmentScene, it)) {
+                    W("VirtualSceneManager failed to create poster location");
                 }
             }
-        }
+
+            for (const auto& it : sSettings->getPosterSettings()) {
+                const char* posterName = it.first.c_str();
+                const Settings::PosterSetting& setting = it.second;
+                ver_scene_load_poster(mEnvironmentScene, posterName,
+                                      setting.mFilename.c_str(),
+                                      setting.mScale);
+            }
+        });
 
         startSceneUpdateThread();
     }
@@ -756,14 +677,14 @@ bool VirtualSceneManager::addSceneUser() {
 
 void VirtualSceneManager::removeSceneUser() {
     AutoLock lock(mLock);
-    if (!mEnvironmentScene) {
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
-        return nullptr;
+        return;
     }
     mNumUsers--;
     if (mNumUsers == 0) {
         // Allow scene to unload resources when there are no users of it
-        mEnvironmentScene->unloadUserResources();
+        ver_scene_unload_user_resources(mEnvironmentScene);
 
         lock.unlock();
         stopSceneUpdateThread();
@@ -783,18 +704,19 @@ void VirtualSceneManager::setUpdateCallback(std::function<void()> callback) {
 
 SceneConfig::Mode VirtualSceneManager::getSceneMode() {
     AutoLock lock(mLock);
-    if (!mEnvironmentScene) {
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
         return SceneConfig::Mode::Unknown;
     }
-    return mEnvironmentScene->getSceneMode();
+    return ver_scene_get_mode(mEnvironmentScene);
 }
 
 bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
     AutoLock lock(mLock);
 
     // Only reload if the config has changed
-    if (mEnvironmentScene && mEnvironmentScene->getSceneConfig() == config) {
+    const SceneConfig* existingConfig = ver_scene_get_config(mEnvironmentScene);
+    if (mEnvironmentScene && existingConfig && *existingConfig == config) {
         D("%s: no changes to the scene config.", __func__);
         return true;
     }
@@ -803,21 +725,16 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
       SceneConfig::modeToString(config.mSceneMode), config.mArgument.c_str());
 
     // Create a new scene and check if there were any errors
-    auto scene = createEnvironmentScene(config);
+    auto scene = ver_create_scene(config);
     if (!scene) {
         E("VirtualSceneManager scene failed to reload!");
         return false;
     }
 
-    if (mEnvironmentScene) {
-        ScenesManager::removeScene(mEnvironmentScene.get());
-        mEnvironmentScene.reset();
-    }
-
     // If we're currently running, we need to load resources
     if (mNumUsers > 0) {
-        scene->loadUserResources();
-        scene->update(false);
+        ver_scene_load_user_resources(scene, []() {});
+        ver_scene_update(scene, false);
     }
 
     // TODO(virtualscene) Handle virtual scene controls. Those should move
@@ -827,6 +744,7 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
     // Replace the scene, not that this is safe because we don't expose the
     // scene to the outside users and all operations are done in-sync through
     // VirtualSceneManager interface
+    ver_destroy_scene(mEnvironmentScene);
     mEnvironmentScene = scene;
 
     D("%s: finished", __func__);
@@ -928,23 +846,26 @@ void VirtualSceneManager::stopSceneUpdateThread() {
     D("%s: Stopped update thread", __func__);
 }
 
-std::shared_ptr<Scene> VirtualSceneManager::createEnvironmentScene(
-        const SceneConfig& config) {
-    std::shared_ptr<Scene> scene = ScenesManager::createScene(config);
-
-    if (!scene) {
-        E("VirtualSceneManager scene could not be initialized");
-        return nullptr;
+int VirtualSceneManager::getSceneBaseRotationLocked() {
+    if (mEnvironmentScene == VER_INVALID_HANDLE) {
+        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
+        return 0;
+    } else {
+        return ver_scene_get_scene_rotation(mEnvironmentScene);
     }
+}
 
-    return scene;
+int VirtualSceneManager::getSceneBaseRotation() {
+    AutoLock lock(mLock);
+    return getSceneBaseRotationLocked();
 }
 
 /*******************************************************************************
- *                     ScenesManager API.
+ *                     BackgroundUpdateService API.
  ******************************************************************************/
 std::unique_ptr<SceneCamera> BackgroundUpdateService::mSceneCamera;
-std::unique_ptr<RendererView> BackgroundUpdateService::mBackgroundView;
+VerRenderViewHandle BackgroundUpdateService::mBackgroundView =
+        VER_INVALID_HANDLE;
 std::vector<uint8_t> BackgroundUpdateService::mReadbackDataCopy;
 bool BackgroundUpdateService::mStarted = false;
 bool BackgroundUpdateService::mBackgroundEnabled = true;
@@ -960,10 +881,10 @@ bool BackgroundUpdateService::start(int displayWidth,
 
     // TODO(virtualscene): do not call renderView if it's a static
     // image, adjust fps based on environment.ini
-    mBackgroundView = std::make_unique<RendererView>();
-    mBackgroundView->updateTarget(RendererView::Format::RGBA8, displayWidth,
-                                  displayHeight);
-    mBackgroundView->setBlurFactor(backgroundBlur);
+    mBackgroundView = ver_create_render_view();
+    ver_render_view_set_dimensions(mBackgroundView, displayWidth,
+                                   displayHeight);
+    ver_render_view_set_blur_factor(mBackgroundView, backgroundBlur);
     mReadbackDataCopy.resize(displayWidth * displayHeight * 4);
 
     mBackgroundEnabled = backgroundEnabled;
@@ -987,16 +908,28 @@ bool BackgroundUpdateService::start(int displayWidth,
             glm::mat4 cameraView = rollRotation * mSceneCamera->getView();
             glm::mat4 viewProjection =
                     mSceneCamera->getProjection() * cameraView;
-            mBackgroundView->updateViewProjection(viewProjection);
+            ver_render_view_set_view_projection(mBackgroundView,
+                                                &viewProjection[0][0]);
 
             if (!mScreenBackgroundSet ||
-                VirtualSceneManager::viewCacheRequiresUpdate(
-                        mBackgroundView.get())) {
+                VirtualSceneManager::viewCacheRequiresUpdate(mBackgroundView)) {
                 if (VirtualSceneManager::renderView(
-                            mBackgroundView.get(),
+                            mBackgroundView,
                             []() {
-                                mReadbackDataCopy =
-                                        mBackgroundView->getFramebufferLocked();
+                                const uint8_t* viewFbDataPtr = nullptr;
+                                uint64_t viewFbDataSize = 0;
+                                ver_render_view_get_framebuffer(
+                                        mBackgroundView, &viewFbDataPtr,
+                                        &viewFbDataSize);
+                                if (!viewFbDataPtr || viewFbDataSize == 0) {
+                                    LOG(ERROR)
+                                            << "Could not get framebuffer data for the background view.";
+                                    return;
+                                }
+
+                                mReadbackDataCopy.resize(viewFbDataSize);
+                                memcpy(mReadbackDataCopy.data(), viewFbDataPtr,
+                                       viewFbDataSize);
                             },
                             nullptr)) {
                     // Update the background image for the display composition
@@ -1006,8 +939,8 @@ bool BackgroundUpdateService::start(int displayWidth,
                     android_setOpenglesScreenBackground(
                             displayWidth, displayHeight,
                             mReadbackDataCopy.data());
+                    mScreenBackgroundSet = true;
                 }
-                mScreenBackgroundSet = true;
             }
         } else if (mScreenBackgroundSet) {
             // Reset the screen background if an image has been set before
@@ -1032,7 +965,10 @@ void BackgroundUpdateService::stop() {
     }
 
     VirtualSceneManager::removeSceneUser();
-    mBackgroundView.reset();
+    if (mBackgroundView != VER_INVALID_HANDLE) {
+        ver_destroy_render_view(mBackgroundView);
+        mBackgroundView = VER_INVALID_HANDLE;
+    }
     mSceneCamera.reset();
     mStarted = false;
 }
@@ -1042,23 +978,9 @@ void BackgroundUpdateService::updateBackgroundEnabled(bool renderEnabled) {
 }
 
 void BackgroundUpdateService::updateBlurAmount(float blurAmount) {
-    if (mBackgroundView) {
-        mBackgroundView->setBlurFactor(blurAmount);
+    if (mBackgroundView != VER_INVALID_HANDLE) {
+        ver_render_view_set_blur_factor(mBackgroundView, blurAmount);
     }
-}
-
-int VirtualSceneManager::getSceneBaseRotationLocked() {
-    if (!mEnvironmentScene) {
-        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
-        return 0;
-    } else {
-        return mEnvironmentScene->getSceneRotation();
-    }
-}
-
-int VirtualSceneManager::getSceneBaseRotation() {
-    AutoLock lock(mLock);
-    return getSceneBaseRotationLocked();
 }
 
 }  // namespace virtualscene

@@ -20,13 +20,14 @@
  * Defines PosterSceneObject, which represents a quad in the 3D scene.
  */
 
-#include "android/virtualscene/SceneObject.h"
+#include "SceneObject.h"
 
 namespace android {
 namespace virtualscene {
 
 class PosterSceneObject : public SceneObject {
-    DISALLOW_COPY_AND_ASSIGN(PosterSceneObject);
+    PosterSceneObject(const PosterSceneObject& other) = delete;
+    PosterSceneObject& operator=(const PosterSceneObject& other) = delete;
 
 protected:
     PosterSceneObject(Renderer& renderer);

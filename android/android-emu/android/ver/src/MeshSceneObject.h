@@ -19,15 +19,14 @@
  * file.
  */
 
-#include "aemu/base/Compiler.h"
-#include "android/utils/compiler.h"
-#include "android/virtualscene/SceneObject.h"
+#include "SceneObject.h"
 
 namespace android {
 namespace virtualscene {
 
 class MeshSceneObject : public SceneObject {
-    DISALLOW_COPY_AND_ASSIGN(MeshSceneObject);
+    MeshSceneObject(const MeshSceneObject& other) = delete;
+    MeshSceneObject& operator=(const MeshSceneObject& other) = delete;
 
 protected:
     MeshSceneObject(Renderer& renderer);

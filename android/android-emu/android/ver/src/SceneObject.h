@@ -22,9 +22,7 @@
  * MeshSceneObject.
  */
 
-#include "aemu/base/Compiler.h"
-#include "android/utils/compiler.h"
-#include "android/virtualscene/Renderer.h"
+#include "Renderer.h"
 
 #include <glm/glm.hpp>
 
@@ -32,7 +30,8 @@ namespace android {
 namespace virtualscene {
 
 class SceneObject {
-    DISALLOW_COPY_AND_ASSIGN(SceneObject);
+    SceneObject(const SceneObject& other) = delete;
+    SceneObject& operator=(const SceneObject& other) = delete;
 
 protected:
     SceneObject(Renderer& renderer);

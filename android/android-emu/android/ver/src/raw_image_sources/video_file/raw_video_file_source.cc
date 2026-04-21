@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-#include "android/raw_image_sources/video_file/raw_video_file_source.h"
+#include "raw_video_file_source.h"
 #include <libavutil/error.h>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
-#include "android/base/system/System.h"
-#include "android/raw_image_sources/raw_image_source.h"
-
-#include "android/camera/camera-common.h"
+#include "aemu/base/Log.h"
 
 #include <cerrno>
 #include <cmath>
@@ -43,8 +40,6 @@ extern "C" {
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }  // extern "C"
-
-#include "android/utils/debug.h"
 
 namespace {
 
@@ -203,7 +198,7 @@ std::unique_ptr<RawVideofileSource> RawVideofileSource::Create(
     }
 }
 
-int RawVideofileSource::Start(uint32_t pixel_format, int width, int height) {
+int RawVideofileSource::Start(VerImageFormat pixel_format, int width, int height) {
     const int err = ::av_seek_frame(mVideoFile.formatCtx.get(), -1, 0,
                                     AVSEEK_FLAG_BACKWARD);
     if (err >= 0) {
@@ -285,7 +280,7 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
         img.buffer_size = avFrame->width * avFrame->height * 4;
         img.width = avFrame->width;
         img.height = avFrame->height;
-        img.pixel_format = V4L2_PIX_FMT_RGB32;
+        img.pixel_format = VerImageFormat::RGBA8;
 
         int64_t frame_time;
         if (avFrame->best_effort_timestamp != AV_NOPTS_VALUE) {

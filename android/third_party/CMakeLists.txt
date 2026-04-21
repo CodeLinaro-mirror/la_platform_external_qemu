@@ -263,6 +263,7 @@ target_include_directories(gfxstream_egl_headers
 add_library(gfxstream_glm_headers INTERFACE)
 target_include_directories(gfxstream_glm_headers
                            INTERFACE ${GFXSTREAM_REPO_ROOT}/third_party/glm/include)
+target_compile_definitions(gfxstream_glm_headers INTERFACE GLM_FORCE_CXX14 GLM_ENABLE_EXPERIMENTAL)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/host/common
                  ${GFXSTREAM_PREFIX}-host-common)
 add_subdirectory(${GFXSTREAM_REPO_ROOT}/host/tracing

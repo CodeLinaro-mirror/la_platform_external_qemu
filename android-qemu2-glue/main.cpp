@@ -1356,7 +1356,10 @@ static int startEmulatorWithMinConfig(int argc,
     skin_winsys_enter_main_loop(opts->no_window);
     android::crashreport::CrashReporter::get()->hangDetector().pause(true);
 
-    android::virtualscene::ScenesManager::removeAll();
+    // Make sure VirtualSceneManager and scene service library resources are
+    // cleaned up properly
+    android::virtualscene::VirtualSceneManager::uninitialize();
+    ver_cleanup();
 
     stopRenderer();
     emulator_finiUserInterface();
@@ -3593,7 +3596,10 @@ extern "C" int main(int argc, char** argv) {
     skin_winsys_enter_main_loop(opts->no_window);
     android::crashreport::CrashReporter::get()->hangDetector().pause(true);
 
-    android::virtualscene::ScenesManager::removeAll();
+    // Make sure VirtualSceneManager and scene service library resources are
+    // cleaned up properly
+    android::virtualscene::VirtualSceneManager::uninitialize();
+    ver_cleanup();
 
     stopRenderer();
     emulator_finiUserInterface();

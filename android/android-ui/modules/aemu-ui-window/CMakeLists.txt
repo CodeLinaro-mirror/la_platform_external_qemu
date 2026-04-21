@@ -16,6 +16,7 @@ android_qt_lib(
        android-emu-metrics
        android-emu-sockets
        android-emu-utils
+       virtual_environment_renderer
        qemu-host-common-headers
        png
        gfxstream_glm_headers
