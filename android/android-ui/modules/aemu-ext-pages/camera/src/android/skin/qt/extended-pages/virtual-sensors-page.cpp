@@ -368,10 +368,8 @@ void VirtualSensorsPage::setPhysicalParameterTarget(
         const std::vector<float>& v) {
     reportVirtualSensorsInteraction();
     if (sSensorsAgent) {
-        mIsUIModifyingPhysicalState = true;
         sSensorsAgent->setPhysicalParameterTarget(parameter_id, v.data(),
                                                   v.size(), mode);
-        mIsUIModifyingPhysicalState = false;
     }
 }
 
@@ -613,9 +611,7 @@ void VirtualSensorsPage::updateTargetState() {
     mSlidersUseCurrent = !vecNearEqual(position, mSlidersTargetPosition) ||
                          !quaternionNearEqual(rotation, oldRotation);
 
-    if (!mIsUIModifyingPhysicalState) {
-        updateUIFromModelCurrentState();
-    }
+    updateUIFromModelCurrentState();
 }
 
 void VirtualSensorsPage::startSensorUpdateTimer() {
@@ -757,9 +753,7 @@ void VirtualSensorsPage::updateResultingValues(
  */
 void VirtualSensorsPage::propagateAccelWidgetChange() {
     reportVirtualSensorsInteraction();
-    PhysicalInterpolation mode =
-            mIsDragging ? PHYSICAL_INTERPOLATION_STEP : PHYSICAL_INTERPOLATION_SMOOTH;
-    updateModelFromAccelWidget(mode);
+    updateModelFromAccelWidget(PHYSICAL_INTERPOLATION_SMOOTH);
 }
 
 /*
@@ -767,16 +761,7 @@ void VirtualSensorsPage::propagateAccelWidgetChange() {
  */
 void VirtualSensorsPage::propagateSlidersChange() {
     reportVirtualSensorsInteraction();
-    bool anySliderDown = mUi->xRotSlider->isSliderDown() ||
-                         mUi->yRotSlider->isSliderDown() ||
-                         mUi->zRotSlider->isSliderDown() ||
-                         mUi->positionXSlider->isSliderDown() ||
-                         mUi->positionYSlider->isSliderDown() ||
-                         mUi->positionZSlider->isSliderDown();
-
-    PhysicalInterpolation mode =
-            anySliderDown ? PHYSICAL_INTERPOLATION_STEP : PHYSICAL_INTERPOLATION_SMOOTH;
-    updateModelFromSliders(mode);
+    updateModelFromSliders(PHYSICAL_INTERPOLATION_SMOOTH);
 }
 
 /*
