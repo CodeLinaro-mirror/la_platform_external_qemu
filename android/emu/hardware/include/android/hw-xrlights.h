@@ -17,6 +17,6 @@
 ANDROID_BEGIN_HEADER
 
 /* initialize */
-extern void  android_hw_lights_init( void );
+extern void  android_hw_xrlights_init( void );
 
 ANDROID_END_HEADER

@@ -10,7 +10,7 @@
 ** GNU General Public License for more details.
 */
 
-#include "android/hw-lights.h"
+#include "android/hw-xrlights.h"
 
 #include "android/emulation/android_qemud.h"
 #include "android/console.h"
@@ -34,40 +34,40 @@
 
 ***********************************************************************************/
 
-typedef struct HwLightsClient   HwLightsClient;
+typedef struct HwXrLightsClient   HwXrLightsClient;
 
 typedef struct {
     QemudService*       qemu_listen_service;
-    HwLightsClient*     lights_clients;
-} HwLightsService;
+    HwXrLightsClient*     lights_clients;
+} HwXrLightsService;
 
-struct HwLightsClient {
-    HwLightsClient*     next;
-    HwLightsService*    lights;
+struct HwXrLightsClient {
+    HwXrLightsClient*     next;
+    HwXrLightsService*    lights;
     QemudClient*        qemu_client;
 };
 
  static void
-_hwLightsClient_recv(void* opaque, uint8_t* msg, int msglen,
+_hwXrLightsClient_recv(void* opaque, uint8_t* msg, int msglen,
                       QemudClient*  client );
 
 static void
-_hwLightsClient_close(void* opaque);
+_hwXrLightsClient_close(void* opaque);
 
-static HwLightsClient*
-_hwLightsClient_new( HwLightsService* lights);
+static HwXrLightsClient*
+_hwXrLightsClient_new( HwXrLightsService* lights);
 
 /* the only static variable */
-static HwLightsService _lightsState[1];
+static HwXrLightsService _lightsState[1];
 
 static QemudClient*
-_hwLights_connect(void*  opaque,
+_hwXrLights_connect(void*  opaque,
                   QemudService*  service,
                   int  channel,
                   const char* client_param);
 static void
-_hwLightsClient_removeFromList(HwLightsClient** lhead,
-        HwLightsClient* target);
+_hwXrLightsClient_removeFromList(HwXrLightsClient** lhead,
+        HwXrLightsClient* target);
 
 /***********************************************************************************
 
@@ -76,16 +76,16 @@ _hwLightsClient_removeFromList(HwLightsClient** lhead,
 ***********************************************************************************/
 
 void
-android_hw_lights_init( void )
+android_hw_xrlights_init( void )
 {
-    HwLightsService* lights = _lightsState;
+    HwXrLightsService* lights = _lightsState;
 
     if (lights->qemu_listen_service == NULL) {
-        lights->qemu_listen_service = qemud_service_register("lightsservice", 0, lights,
-                _hwLights_connect,
+        lights->qemu_listen_service = qemud_service_register("xrlightsservice", 0, lights,
+                _hwXrLights_connect,
                 NULL, /* no save */
                 NULL /* no load */);
-        D("%s: lights qemud listen service initialized", __FUNCTION__);
+        D("%s: xr lights qemud listen service initialized", __FUNCTION__);
     }
 }
 
@@ -96,16 +96,16 @@ android_hw_lights_init( void )
 ***********************************************************************************/
 
 static QemudClient*
-_hwLights_connect(void*  opaque,
+_hwXrLights_connect(void*  opaque,
                   QemudService*  service,
                   int  channel,
                   const char* client_param)
 {
-    HwLightsService* lights = opaque;
-    HwLightsClient* lights_client = _hwLightsClient_new(lights);
+    HwXrLightsService* lights = opaque;
+    HwXrLightsClient* lights_client = _hwXrLightsClient_new(lights);
     QemudClient* client  = qemud_client_new(service, channel, client_param, lights_client,
-                                                _hwLightsClient_recv,
-                                                _hwLightsClient_close,
+                                                _hwXrLightsClient_recv,
+                                                _hwXrLightsClient_close,
                                                 NULL, /* no save */
                                                 NULL /* no load */ );
     qemud_client_set_framing(client, 1);
@@ -118,17 +118,17 @@ _hwLights_connect(void*  opaque,
 // TODO(b/504670848): refine the message format.
 // The color is in ARGB with the alpha channel expected to be 255, but ignored.
 static void
-_hwLightsClient_recv(void* opaque, uint8_t* msg, int msglen,
+_hwXrLightsClient_recv(void* opaque, uint8_t* msg, int msglen,
                       QemudClient*  client )
 {
     D("%s: received light status message: %s", __FUNCTION__, msg);
 }
 
 // Insert the new HwLightsClient into the current clients list. Make it the new list head.
-static HwLightsClient*
-_hwLightsClient_new(HwLightsService* lights)
+static HwXrLightsClient*
+_hwXrLightsClient_new(HwXrLightsService* lights)
 {
-    HwLightsClient*  lights_client;
+    HwXrLightsClient*  lights_client;
     ANEW0(lights_client);
     lights_client->lights = lights;
     lights_client->next = lights->lights_clients;
@@ -137,12 +137,12 @@ _hwLightsClient_new(HwLightsService* lights)
 }
 
 static void
-_hwLightsClient_close(void* opaque)
+_hwXrLightsClient_close(void* opaque)
 {
-    HwLightsClient*      lights_client = opaque;
+    HwXrLightsClient*      lights_client = opaque;
     if (lights_client->lights) {
-        HwLightsClient** pnode = &lights_client->lights->lights_clients;
-        _hwLightsClient_removeFromList(pnode, lights_client);
+        HwXrLightsClient** pnode = &lights_client->lights->lights_clients;
+        _hwXrLightsClient_removeFromList(pnode, lights_client);
         lights_client->next = NULL;
         lights_client->lights = NULL;
     }
@@ -150,10 +150,10 @@ _hwLightsClient_close(void* opaque)
 }
 
 static void
-_hwLightsClient_removeFromList(HwLightsClient** phead, HwLightsClient* target)
+_hwXrLightsClient_removeFromList(HwXrLightsClient** phead, HwXrLightsClient* target)
 {
     for (;;) {
-        HwLightsClient* node = *phead;
+        HwXrLightsClient* node = *phead;
         if (node == NULL)
             break;
         if (node == target) {
