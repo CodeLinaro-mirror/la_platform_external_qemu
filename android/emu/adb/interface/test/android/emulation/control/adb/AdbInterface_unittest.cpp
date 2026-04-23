@@ -21,11 +21,13 @@
 #include "android/base/testing/TestSystem.h"
 #include "aemu/base/threads/Async.h"
 #include "android/emulation/ConfigDirs.h"
+#include "android/console.h"
 
 #include <gtest/gtest.h>
 
 #include <fstream>
 #include <memory>
+#include <thread>
 
 using android::base::AsyncThreadWithLooper;
 using android::base::Looper;
@@ -68,11 +70,25 @@ public:
             const std::vector<std::string>& commandLine,
             System::Duration timeoutMs = kInfinite,
             System::ProcessExitCode* outExitCode = nullptr) override {
+        mLastCommand = commandLine;
         if (!mSuccess)
             return {};
 
         return Optional(std::string("Android Debug Bridge version 2.3.41"));
     }
+
+    bool runCommand(const std::vector<std::string>& commandLine,
+                    RunOptions options,
+                    System::Duration timeoutMs,
+                    System::ProcessExitCode* outExitCode,
+                    System::Pid* outChildPid,
+                    const std::string& outputFilePath) override {
+        mLastCommand = commandLine;
+        if (outExitCode) *outExitCode = 0;
+        return true;
+    }
+
+    std::vector<std::string> mLastCommand;
 
 private:
     bool mSuccess;
@@ -232,4 +248,39 @@ TEST_F(AdbInterfaceTest, selectMatchingAdb) {
 
     daemon->setProtocolVersion(android::base::makeOptional(2));
     EXPECT_EQ("v2", adb->adbPath());
+}
+
+TEST_F(AdbInterfaceTest, useSerialNumberFromAgent) {
+    AdbTestSystem system;
+    auto daemon = new FakeAdbDaemon();
+    auto locator = new StaticAdbLocator({{"adb", 40}});
+    auto adb = AdbInterface::Builder()
+                       .setLooper(mLooper)
+                       .setAdbLocator(locator)
+                       .setAdbDaemon(daemon)
+                       .build();
+
+    // Set the serial number port in the agent.
+    getConsoleAgents()->settings->set_android_serial_number_port(5556);
+
+    // Run a command.
+    auto cmd = adb->runAdbCommand({"shell", "ls"}, [](const android::emulation::OptionalAdbCommandResult&) {}, 5000);
+
+    // Wait for the command to "finish" (it's async).
+    int retries = 100;
+    while (cmd->inFlight() && retries-- > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    // Verify that the command used -s emulator-5556
+    bool foundSerial = false;
+    for (size_t i = 0; i < system.mLastCommand.size(); ++i) {
+        if (system.mLastCommand[i] == "-s" &&
+            i + 1 < system.mLastCommand.size() &&
+            system.mLastCommand[i + 1] == "emulator-5556") {
+            foundSerial = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundSerial);
 }
