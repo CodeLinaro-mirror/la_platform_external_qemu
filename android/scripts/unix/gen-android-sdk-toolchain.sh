@@ -497,6 +497,7 @@ gen_wrapper_toolchain () {
 # Configure the darwin toolchain.
 prepare_build_for_darwin() {
     get_osx_sysroot
+    log "Configuring Darwin x86_64 toolchain with libc++ availability workaround."
 
     EXTRA_ENV_SETUP="export SDKROOT=$OSX_SDK_ROOT"
     CLANG_BINDIR=$PREBUILT_TOOLCHAIN_DIR/bin
@@ -510,6 +511,29 @@ prepare_build_for_darwin() {
     EXTRA_CFLAGS="$common_FLAGS -B/usr/bin"
     EXTRA_CXXFLAGS="$common_FLAGS -B/usr/bin"
     var_append EXTRA_CXXFLAGS "-stdlib=libc++"
+    # Workaround for missing __hash_memory in system libc++ on Darwin x86_64.
+    # We block the toolchain's __config_site and provide our own configuration
+    # that enables vendor availability annotations, which in turn switches
+    # string hashing to its inline fallback implementation.
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP___CONFIG_SITE"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_ABI_VERSION=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_ABI_NAMESPACE=__1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_ABI_FORCE_ITANIUM=0"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_ABI_FORCE_MICROSOFT=0"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_THREADS=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_MONOTONIC_CLOCK=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_TERMINAL=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_MUSL_LIBC=0"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_FILESYSTEM=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_RANDOM_DEVICE=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_LOCALIZATION=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_UNICODE=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_WIDE_CHARACTERS=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HAS_TIME_ZONE_DATABASE=1"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_INSTRUMENTED_WITH_ASAN=0"
+    var_append EXTRA_CXXFLAGS "-D_LIBCPP_HARDENING_MODE_DEFAULT=2"
+
     EXTRA_LDFLAGS="$common_FLAGS"
     DST_PREFIX=
 }
@@ -1038,7 +1062,7 @@ print_info () {
             if [ "$BUILD_HOST" = "linux" -a "$BUILD_ARCH" = "aarch64" ]; then
                 printf "%s\n" "/usr/aarch64-linux-gnu/lib/libstdc++.so.6"
             else
-                printf "%s\n" "$CLANG_DIR/lib/libc++.so"
+                printf "%s\n" "$CLANG_DIR/lib/x86_64-unknown-linux-gnu/libc++.so"
             fi
             ;;
         libasan-dir)

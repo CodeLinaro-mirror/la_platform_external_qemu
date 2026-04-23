@@ -2220,6 +2220,34 @@ bool emulator_parseFeatureCommandLineOptions(AndroidOptions* opts,
         hw->environment_height = 0;
     }
 
+    if (opts->lcd_scaling_factor) {
+        // Adjust hw.lcd.width/height, mainly expected to be used for
+        // performance improvements for tests
+        const float scalingFactorMin = 0.25f;
+        const float scalingFactorMax = 2.0f;
+
+        errno = 0;  // reset previous errors
+        char* endptr = 0;
+        const float scalingFactor = strtof(opts->lcd_scaling_factor, &endptr);
+        if (errno == ERANGE || !endptr || *endptr != '\0') {
+            derror("%s: Invalid lcd scaling factor input: %s, errno=%d",
+                   __func__, opts->lcd_scaling_factor, errno);
+            return false;
+        } else if (scalingFactor < scalingFactorMin ||
+                   scalingFactor > scalingFactorMax) {
+            derror("%s: Invalid lcd scaling factor: %.3f. Supported range: [%.2f, %.2f]",
+                   __func__, scalingFactor, scalingFactorMin, scalingFactorMax);
+            return false;
+        } else {
+            hw->hw_lcd_width = (int)roundf(hw->hw_lcd_width * scalingFactor);
+            hw->hw_lcd_height = (int)roundf(hw->hw_lcd_height * scalingFactor);
+            hw->hw_lcd_density = (int)roundf(hw->hw_lcd_density * scalingFactor);
+            dinfo("%s: Applied lcd scaling factor: %.3f, new AVD dimensions: %dx%d, new lcd density: %d",
+                  __func__, scalingFactor, hw->hw_lcd_width, hw->hw_lcd_height,
+                  hw->hw_lcd_density);
+        }
+    }
+
     return true;
 }
 
