@@ -862,6 +862,10 @@ static void fini_in_device(coreaudioVoiceIn *core)
         coreaudio_logerr(status, "Could not remove IOProc\n");
     }
     core->inputDeviceID = kAudioDeviceUnknown;
+
+    g_free(core->hw.buf_emul);
+    core->hw.buf_emul = NULL;
+    core->hw.size_emul = 0;
 }
 
 static void update_device_input_state(coreaudioVoiceIn *core)
