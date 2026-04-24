@@ -1,4 +1,6 @@
-"""Enable warnings for every package"""
+"""Enable repo specific features"""
+# Enable warnings
+# Disable defining NDEBUG as Qemu doesn't support disabling assertions
 repo(
-    features = ["warnings"],
+    features = ["warnings", "no_ndebug"],
 )

@@ -56,8 +56,6 @@
         "+copts": [
           "-fwrapv",
           "-Wno-implicit-function-declaration",
-          // QEMU does not support NDEBUG (see qemu/osdep.h), so explicitly disable it
-          "-UNDEBUG",
           "-Wno-error=unguarded-availability-new"
         ]
       }

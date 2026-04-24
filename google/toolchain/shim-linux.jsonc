@@ -26,9 +26,7 @@
           // Enables clang to generate CMPXCHG16B instructions.
           "-mcx16",
           // We do not have memfd_create
-          "-Wno-implicit-function-declaration",
-          // QEMU does not support NDEBUG (see qemu/osdep.h), so explicitly disable it
-          "-UNDEBUG"
+          "-Wno-implicit-function-declaration"
         ],
         // We need a compat layer for our ye olde sysroot.
         "+deps": [

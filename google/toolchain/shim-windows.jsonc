@@ -64,9 +64,7 @@
           "-Wno-microsoft-enum-forward-reference",
           "-Wno-microsoft-include",
           "-Wno-deprecated-declarations",
-          "-fms-extensions",
-          // QEMU does not support NDEBUG (see qemu/osdep.h), so explicitly disable it
-          "-UNDEBUG"
+          "-fms-extensions"
         ],
         // We need a compat layer for some windows magic.
         "+deps": [

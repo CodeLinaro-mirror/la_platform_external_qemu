@@ -292,7 +292,7 @@ void QEMU_ERROR("code path is reachable")
  * submit patches to remove any side-effects inside an assertion, or
  * fixing error handling that should use Error instead of assert.
  */
-#ifdef NDEBUG
+#if defined(NDEBUG) && !defined(QEMU_HEADERS_EXPORT)
 #error building with NDEBUG is not supported
 #endif
 #ifdef G_DISABLE_ASSERT

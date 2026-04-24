@@ -222,7 +222,6 @@ cc_library(
         "@platforms//os:linux": ["platform/linux-x86_64"],
         "//conditions:default": [],
     }),
-    visibility = ["//visibility:public"],
     deps = [
         "@glib//glib",
         "@glib//gmodule",
@@ -230,6 +229,13 @@ cc_library(
         "@platforms//os:windows": ["@aemu//windows:compat-hdrs"],
         "//conditions:default": [],
     }),
+)
+
+cc_library(
+    name = "qemu-headers-exported",
+    defines = ["QEMU_HEADERS_EXPORT"],
+    deps = [":qemu-headers"],
+    visibility = ["//visibility:public"],
 )
 
 cc_library(
