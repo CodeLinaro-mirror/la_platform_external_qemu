@@ -842,7 +842,9 @@ void SnapshotPage::updateAfterSelectionChanged() {
     mUi->selectionInfo->setHtml(selectionInfoString);
     mUi->reduceInfoButton->setVisible(mInfoWindowIsBig);
     mUi->enlargeInfoButton->setVisible(!mInfoWindowIsBig);
-    if (!mInfoWindowIsBig && mUi->preview->isVisible() && theItem) {
+    if (!theItem || selectedItemStatus == SelectionStatus::Invalid) {
+        emit(screenshotLoaded("", selectedItemStatus));
+    } else if (!mInfoWindowIsBig && mUi->preview->isVisible()) {
         DD("Loading screenshot for %s",
            theItem->snapshot()->snapshot_id.c_str());
         mSnapshotService->getScreenshot(
@@ -852,6 +854,8 @@ void SnapshotPage::updateAfterSelectionChanged() {
                         std::string pixels(status.value().data.begin(),
                                            status.value().data.end());
                         emit(screenshotLoaded(pixels, selectedItemStatus));
+                    } else {
+                        emit(screenshotLoaded("", selectedItemStatus));
                     }
                 });
     }
