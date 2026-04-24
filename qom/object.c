@@ -673,6 +673,7 @@ static void object_property_del_all(Object *obj)
     } while (released);
 
     g_hash_table_unref(obj->properties);
+    obj->properties = NULL;
 }
 
 static void object_property_del_child(Object *obj, Object *child)
@@ -681,6 +682,7 @@ static void object_property_del_child(Object *obj, Object *child)
     GHashTableIter iter;
     gpointer key, value;
 
+    g_assert(obj->properties);
     g_hash_table_iter_init(&iter, obj->properties);
     while (g_hash_table_iter_next(&iter, &key, &value)) {
         prop = value;
@@ -730,6 +732,8 @@ static void object_finalize(void *data)
 
     g_assert(obj->ref == 0);
     g_assert(obj->parent == NULL);
+    g_assert(obj->properties == NULL);
+    obj->klass = NULL;
     if (obj->free) {
         obj->free(obj);
     }
@@ -1145,6 +1149,7 @@ static int do_object_child_foreach(Object *obj,
     ObjectProperty *prop;
     int ret = 0;
 
+    g_assert(obj->properties);
     g_hash_table_iter_init(&iter, obj->properties);
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *)&prop)) {
         if (object_property_is_child(prop)) {
@@ -1301,6 +1306,7 @@ object_property_try_add(Object *obj, const char *name, const char *type,
     prop->release = release;
     prop->opaque = opaque;
 
+    g_assert(obj->properties);
     g_hash_table_insert(obj->properties, prop->name, prop);
     return prop;
 }
@@ -1354,6 +1360,7 @@ ObjectProperty *object_property_find(Object *obj, const char *name)
         return prop;
     }
 
+    g_assert(obj->properties);
     return g_hash_table_lookup(obj->properties, name);
 }
 
@@ -1425,6 +1432,7 @@ ObjectProperty *object_class_property_find_err(ObjectClass *klass,
 
 void object_property_del(Object *obj, const char *name)
 {
+    g_assert(obj->properties);
     ObjectProperty *prop = g_hash_table_lookup(obj->properties, name);
 
     if (prop->release) {
@@ -2106,6 +2114,7 @@ const char *object_get_canonical_path_component(const Object *obj)
         return NULL;
     }
 
+    g_assert(obj->parent->properties);
     g_hash_table_iter_init(&iter, obj->parent->properties);
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *)&prop)) {
         if (!object_property_is_child(prop)) {
@@ -2195,8 +2204,10 @@ static Object *object_resolve_partial_path(Object *parent,
     GHashTableIter iter;
     ObjectProperty *prop;
 
+    g_assert(parent);
     obj = object_resolve_abs_path(parent, parts, type_name);
 
+    g_assert(parent->properties);
     g_hash_table_iter_init(&iter, parent->properties);
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *)&prop)) {
         Object *found;
