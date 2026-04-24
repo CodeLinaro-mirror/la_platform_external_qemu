@@ -585,8 +585,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         connect(mXrEnvironmentModeDialog, SIGNAL(onXrEnvironmentModeRequested(int)),
                 this, SLOT(onXrEnvironmentModeChanged(int)));
         connect(mXrEnvironmentModeDialog,
-                SIGNAL(onXrDimmingValueRequested(float)), this,
-                SLOT(onXrDimmingValueChanged(float)));
+                SIGNAL(onXrDimmingValueRequested(float, bool)), this,
+                SLOT(onXrDimmingValueChanged(float, bool)));
         connect(mXrEnvironmentModeDialog, SIGNAL(finished(int)),
                 this, SLOT(onDismissXrEnvironmentModeDialog()));
         connect(mXrInputModeDialog, SIGNAL(onXrInputModeRequested(int)), this,
@@ -1950,9 +1950,11 @@ void ToolWindow::on_xr_screen_recenter_button_clicked() {
     handleUICommand(QtUICommand::XR_SCREEN_RECENTER, true);
 }
 
-void ToolWindow::onXrDimmingValueChanged(float value) {
+void ToolWindow::onXrDimmingValueChanged(float value, bool fromGuest) {
     mLastDimmingValueRequested = value;
-    handleUICommand(QtUICommand::CHANGE_XR_DIMMING_VALUE, true);
+    if (!fromGuest) {
+        handleUICommand(QtUICommand::CHANGE_XR_DIMMING_VALUE, true);
+    }
 }
 
 void ToolWindow::onDismissXrEnvironmentModeDialog() {
