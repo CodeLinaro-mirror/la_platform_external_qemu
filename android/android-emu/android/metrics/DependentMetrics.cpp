@@ -822,6 +822,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::FORCE_GPU_SOFTWARE;
         case android::featurecontrol::QemuCameraSensorOrientation:
             return android_studio::EmulatorFeatureFlagState::QEMU_CAMERA_SENSOR_ORIENTATION;
+        case android::featurecontrol::VulkanProtectedMemoryEmulation:
+            return android_studio::EmulatorFeatureFlagState::VULKAN_PROTECTED_MEMORY_EMULATION;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;
