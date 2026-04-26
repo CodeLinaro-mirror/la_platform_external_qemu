@@ -1158,9 +1158,17 @@ void SnapshotPage::on_snapshotsList(std::vector<SnapshotInfo> snapshots) {
         // Don't auto-invalidate quickboot snapshot
         // when switching to file-backed Quickboot from older version.
         if (fc::isEnabled(fc::QuickbootFileBacked) &&
-            aSnapshot.snapshot_id == Quickboot::kDefaultBootSnapshot) {
+            aSnapshot.snapshot_id == Quickboot::kDefaultBootSnapshot &&
+            aSnapshot.size > 0) {
             snapshotIsValid = true;
         }
+
+        if (!snapshotIsValid && aSnapshot.snapshot_id == Quickboot::kDefaultBootSnapshot) {
+            // Hide invalid Quickboot snapshots, as they cannot be deleted manually
+            // and simply pollute the UI after operations like -wipe-data.
+            continue;
+        }
+
         if (!snapshotIsValid &&
             deleteInvalidsChoice != DeleteInvalidSnapshots::No) {
             invalidSnapshots.push_back(aSnapshot);
