@@ -1237,7 +1237,6 @@ static bool emulator_handleCommonEmulatorOptions(AndroidOptions* opts,
     }
 
     // enforce CDD minimums
-    int minRam = 32;
     bool isFoldable = android_foldable_any_folded_area_configured() ||
                       android_foldable_hinge_configured() ||
                       android_foldable_rollable_configured();
@@ -1245,49 +1244,46 @@ static bool emulator_handleCommonEmulatorOptions(AndroidOptions* opts,
             ((long long)(hw->hw_lcd_width) * (long long)(hw->hw_lcd_height)) >=
             3LL * 1000LL * 1000LL;
 
-    if (avdInfo_getApiLevel(avd) >= 34) {
-        minRam = 2560;  // 2.5G is required for U and up, to avoid kswapd eating
-                        // cpus
-    }
-    if (avdInfo_getAvdFlavor(avd)== AVD_TV){
-        minRam = 1024; // bug: 367746301, and rectification in 377836077
-    } else if (avdInfo_getApiLevel(avd) >= 33 && (isFoldable || isLargeScreen)) {
-        minRam = 3072; // 3G is required for U and up, to avoid kswapd eating cpus
-        D("foldable or large screen devices with api >=33 is set to have "
-          "minimum ram 3G");
-    } else if (avdInfo_getApiLevel(avd) >= 29) {
-        // bug: 129958266
-        // Q preview where API level is not 29 yet,
-        // it becomes 1000 so we still get the effect we want.
-        minRam = 2048;
-        // To avoid lmk, 4096 mb is required. but that makes it a
-        // non-starter for running on most user machines :/
-    } else if (avdInfo_getApiLevel(avd) >= 26) {
-        // bug: 112664026
-        // This isn't a CDD minimum, but could be a source of why
-        // people think the emulator is slow recently.
-        minRam = 1536;
-    } else if (avdInfo_getApiLevel(avd) >= 21) {
+    // 1. Base RAM requirement based on API Level
+    int baseRam = 32;
+    int apiLevel = avdInfo_getApiLevel(avd);
+    if (apiLevel >= 37) {
+        baseRam = 4096;
+    } else if (apiLevel >= 34) {
+        baseRam = 2560;
+    } else if (apiLevel >= 29) {
+        baseRam = 2048;
+    } else if (apiLevel >= 26) {
+        baseRam = 1536;
+    } else if (apiLevel >= 21) {
         if (guest_is_32_bit) {
-            // TODO: adjust min based on screen size, wear, 23+
-            // android wear min is actually 416 but most people boot phones
-            minRam = 512;
+            baseRam = 512;
         } else {
-            minRam = 832;
+            baseRam = 832;
         }
         if (!host_is_32_bit) {
-            // This isn't a CDD minimum but was present in earlier versions of
-            // the emulator For recent system versions, ensure a minimum of 1GB
-            // or memory, anything lower is very painful during the boot process
-            // and after that.
-            minRam = 1024;
+            baseRam = 1024;
         }
-    } else if (avdInfo_getApiLevel(avd) >= 14) {
-        minRam = 340;
-    } else if (avdInfo_getApiLevel(avd) >= 9) {
-        minRam = 128;
-    } else if (avdInfo_getApiLevel(avd) >= 7) {
-        minRam = 92;
+    } else if (apiLevel >= 14) {
+        baseRam = 340;
+    } else if (apiLevel >= 9) {
+        baseRam = 128;
+    } else if (apiLevel >= 7) {
+        baseRam = 92;
+    }
+
+    int minRam = baseRam;
+
+    // 2. Fixed memory for Foldable / Large Screen
+    if (apiLevel >= 33 && (isFoldable || isLargeScreen)) {
+        minRam = 4096;
+    }
+
+    // 3. Some times we have fixed requirements
+    if (avdInfo_getAvdFlavor(avd) == AVD_TV) {
+        minRam = 1024;
+    } else if (avdInfo_getAvdFlavor(avd) == AVD_XR) {
+        minRam = 4096;
     }
 
     /* just remove any lower bound for low ram device:
