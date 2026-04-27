@@ -110,7 +110,7 @@
       "@dtc//:libfdt"
     ],
     "rutabaga_gfx_ffi": [
-      "@crosvm//:rutabaga_c_ffi"
+      "@rutabaga_gfx//:rutabaga_c_ffi"
     ]
   },
   // The actual set of targets you wish to generate bazel targets for.

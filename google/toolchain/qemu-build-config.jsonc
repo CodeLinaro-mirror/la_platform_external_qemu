@@ -60,11 +60,11 @@
       // specifies a different Bazel target for the library archive.
       "rutabaga_gfx_ffi": {
         "lib_type": "bazel",
-        "bazel_target": "@crosvm//:rutabaga_c_ffi",
+        "bazel_target": "@rutabaga_gfx//:rutabaga_c_ffi",
         "version": "0.1.2",
         "shim": {
           "name": "rutabaga_gfx_ffi",
-          "archive_target": "@crosvm//:rutabaga_ffi"
+          "archive_target": "@rutabaga_gfx//:rutabaga_ffi"
         }
       },
       "libfdt": {
