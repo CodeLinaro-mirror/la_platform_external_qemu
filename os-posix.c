@@ -306,6 +306,7 @@ void os_setup_post(void)
 void os_set_line_buffering(void)
 {
     setvbuf(stdout, NULL, _IOLBF, 0);
+    setvbuf(stderr, NULL, _IOLBF, 0);
 }
 
 int qemu_create_pidfile(const char *filename)

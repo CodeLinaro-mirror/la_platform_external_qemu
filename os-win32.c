@@ -120,8 +120,8 @@ char *os_find_datadir(void)
 
 void os_set_line_buffering(void)
 {
-    setbuf(stdout, NULL);
-    setbuf(stderr, NULL);
+    setvbuf(stdout, NULL, _IOFBF, 4096);
+    setvbuf(stderr, NULL, _IOFBF, 4096);
 }
 
 /*

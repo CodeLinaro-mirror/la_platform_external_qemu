@@ -18,6 +18,7 @@
 #include "host-common/window_agent.h"
 
 #include <stdint.h>
+#include <stddef.h>
 #include <math.h>
 
 /* forward declaration */

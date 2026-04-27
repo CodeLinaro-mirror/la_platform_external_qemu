@@ -2324,6 +2324,11 @@ static void help_no_display_layout(stralloc_t* out) {
     PRINTF("  Disable display layout from the environment configuration.\n");
 }
 
+static void help_lcd_scaling_factor(stralloc_t* out) {
+    PRINTF("  Scale default display's resolution and density (Experimental).\n"
+           "  For example, '-lcd-scaling-factor 0.5' makes the AVD use half resolution and density.\n\n");
+}
+
 #define  help_no_skin   NULL
 #define  help_netspeed  help_shaper
 #define  help_netdelay  help_shaper

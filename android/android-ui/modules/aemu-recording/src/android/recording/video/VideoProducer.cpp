@@ -174,6 +174,13 @@ bool getScreenshotSimple() {
         rect.size.h = 0;
         uint8_t* pixels = mPixels.data();
         size_t cPixels = mPixels.size();
+
+        // Swap the dimensions back for the getScreenshot command as it requires
+        // the unrotated dimensions
+        if (desiredRotation == SKIN_ROTATION_90 ||
+            desiredRotation == SKIN_ROTATION_270) {
+            std::swap(effectiveW, effectiveH);
+        }
         const int ret = renderer.get()->getScreenshot(
                        bpp, &finalWidth, &finalHeight, pixels, &cPixels, displayId,
                        effectiveW, effectiveH, desiredRotation,

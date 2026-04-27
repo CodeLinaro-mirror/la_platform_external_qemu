@@ -231,7 +231,7 @@ CFG_PARAM(acpi_config, "<file>", "specify acpi device proprerties (hierarchical 
 
 OPT_FLAG(fuchsia, "Run Fuchsia image. Bypasses android-specific setup; args after are treated as standard QEMU args")
 
-OPT_PARAM(window_size, "<size>", "Set window size for when bypassing android-specific setup.")
+OPT_PARAM(window_size, "<size>", "Set window size for when bypassing android-specific setup. (Fuchsia only)")
 
 OPT_FLAG(allow_host_audio, "Allows sending of audio from audio input devices. Otherwise, zeroes out audio.")
 
@@ -383,7 +383,12 @@ OPT_PARAM(crash_report_mode,
           "Override crash reporting mode. Available options: disabled, never, "
           "always, ask")
 
-OPT_FLAG ( no_display_layout, "Disable display layout from the environment configuration." )
+OPT_FLAG (no_display_layout, "Disable display layout from the environment configuration." )
+
+OPT_PARAM(
+        lcd_scaling_factor,
+        "<value>",
+        "Set scaling factor for the LCD dimensions of the AVD, experimental.")
 
 #undef CFG_FLAG
 #undef CFG_PARAM
