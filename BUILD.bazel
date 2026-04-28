@@ -66,7 +66,7 @@ cc_binary(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -145,7 +145,6 @@ cc_interface_binary(
         "//conditions:default": [],
     }) + [
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
     ],
     defines = [
         "COMPILING_PER_TARGET",
@@ -232,7 +231,6 @@ cc_interface_binary(
         "//conditions:default": [],
     }) + [
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
     ],
     defines = [
         "COMPILING_PER_TARGET",
@@ -337,7 +335,7 @@ cc_interface_binary(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = [
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"x86_64-softmmu-config-devices.h\\"',
@@ -470,7 +468,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -637,7 +635,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -750,7 +748,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -869,7 +867,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -2079,7 +2077,6 @@ cc_library(
         "//conditions:default": [],
     }) + [
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
     ],
     defines = [
         "_FILE_OFFSET_BITS=64",
@@ -2925,7 +2922,6 @@ cc_library(
         "//conditions:default": [],
     }) + [
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
     ],
     defines = [
         "_FILE_OFFSET_BITS=64",
@@ -3888,7 +3884,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -4050,7 +4046,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -4125,7 +4121,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -4212,7 +4208,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -4307,7 +4303,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -4404,7 +4400,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -4510,7 +4506,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -4591,7 +4587,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -5028,7 +5024,6 @@ cc_library(
         "//conditions:default": [],
     }) + [
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
     ],
     defines = [
         "COMPILING_PER_TARGET",
@@ -5376,7 +5371,6 @@ cc_library(
         "//conditions:default": [],
     }) + [
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
     ],
     defines = [
         "COMPILING_PER_TARGET",
@@ -5861,7 +5855,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = [
         "COMPILING_PER_TARGET",
         'CONFIG_DEVICES=\\"x86_64-softmmu-config-devices.h\\"',
@@ -6626,7 +6620,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -6720,7 +6714,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -6806,7 +6800,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -6935,7 +6929,7 @@ cc_library(
             "-Wno-implicit-function-declaration",
         ],
         "//conditions:default": [],
-    }) + ["-UNDEBUG"],
+    }),
     defines = ["CONFIG_SOFTMMU"] + select({
         "@platforms//os:windows": [
             "GLIB_STATIC_COMPILATION",
@@ -10388,7 +10382,6 @@ objc_library(
     copts = [
         "-fwrapv",
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
         "-Wno-error=unguarded-availability-new",
     ],
     defines = [
@@ -10436,7 +10429,6 @@ objc_library(
     copts = [
         "-fwrapv",
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
         "-Wno-error=unguarded-availability-new",
     ],
     defines = [
@@ -10484,7 +10476,6 @@ objc_library(
     copts = [
         "-fwrapv",
         "-Wno-implicit-function-declaration",
-        "-UNDEBUG",
         "-Wno-error=unguarded-availability-new",
     ],
     defines = [
@@ -10919,7 +10910,6 @@ cc_library(
     }) + glob(["include/**"]),
     copts = [
         "-fwrapv",
-        "-UNDEBUG",
     ],
     # Note that . is needed for config-poison.h.
     includes = [
@@ -10931,7 +10921,6 @@ cc_library(
         "@platforms//os:linux": ["platform/linux-x86_64"],
         "//conditions:default": [],
     }),
-    visibility = ["//visibility:public"],
     deps = [
         "@glib//glib",
         "@glib//gmodule",
@@ -10939,6 +10928,13 @@ cc_library(
         "@platforms//os:windows": ["@aemu//windows:compat-hdrs"],
         "//conditions:default": [],
     }),
+)
+
+cc_library(
+    name = "qemu-headers-exported",
+    defines = ["QEMU_HEADERS_EXPORT"],
+    deps = [":qemu-headers"],
+    visibility = ["//visibility:public"],
 )
 
 cc_library(
