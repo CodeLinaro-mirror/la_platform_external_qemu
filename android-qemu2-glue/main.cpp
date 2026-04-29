@@ -11,18 +11,16 @@
 
 #include "aemu/base/ProcessControl.h"
 #include "aemu/base/StringFormat.h"
+#include "aemu/base/Uuid.h"
 #include "aemu/base/async/ThreadLooper.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/memory/ScopedPtr.h"
 #include "aemu/base/system/Win32Utils.h"
 #include "aemu/base/threads/Async.h"
-#include "aemu/base/Uuid.h"
 #include "aemu/base/threads/Thread.h"
 #include "android-qemu2-glue/base/files/KernelCmdLineLoader.h"
 #include "android-qemu2-glue/qemu-console-factory.h"
 #include "android/android.h"
-#include "android/metrics/MetricsReporter.h"
-#include "android/metrics/PeriodicReporter.h"
 #include "android/avd/BugreportInfo.h"
 #include "android/base/files/IniFile.h"
 #include "android/base/system/System.h"
@@ -54,6 +52,8 @@
 #include "android/main-common-ui.h"
 #include "android/main-common.h"
 #include "android/main-kernel-parameters.h"
+#include "android/metrics/MetricsReporter.h"
+#include "android/metrics/PeriodicReporter.h"
 #include "android/multi-instance.h"
 #include "android/network/wifi.h"
 #include "android/opengl/gpuinfo.h"
@@ -67,8 +67,8 @@
 #include "android/utils/file_io.h"
 #include "android/utils/filelock.h"
 #include "android/utils/lineinput.h"
-#include "android/utils/path.h"
 #include "android/utils/panic.h"
+#include "android/utils/path.h"
 #include "android/utils/property_file.h"
 #include "android/utils/stralloc.h"
 #include "android/utils/string.h"
@@ -78,6 +78,7 @@
 #include "android/verified-boot/load_config.h"
 #include "android/virtualscene/VirtualSceneManager.h"
 #include "host-common/FeatureControl.h"
+#include "host-common/Features.h"
 #include "host-common/MultiDisplay.h"
 #include "host-common/constants.h"
 #include "host-common/crash-handler.h"
@@ -89,9 +90,9 @@
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/opengles.h"
 #include "host-common/screen-recorder.h"
+#include "host-common/snapshot_interface.h"
 #include "host-common/vm_operations.h"
 #include "host-common/window_agent.h"
-#include "host-common/snapshot_interface.h"
 
 #include "android/skin/winsys.h"
 
@@ -1958,6 +1959,16 @@ extern "C" int main(int argc, char** argv) {
 
     if (!emulator_parseUiCommandLineOptions(opts, avd, hw)) {
         return 1;
+    }
+
+    // Disable dimming via hw_dimmingLevels if the guest does not support that
+    // feature
+    if (hw->hw_dimmingLevels[0] && !feature_is_enabled(kFeature_XrDimming)) {
+        str_reset(&hw->hw_dimmingLevels, "");
+    }
+    // Don't report XrDimming if we don't configure dimmingLevels
+    if (!hw->hw_dimmingLevels[0] && feature_is_enabled(kFeature_XrDimming)) {
+        fc::setIfNotOverridenOrGuestDisabled(fc::XrDimming, false);
     }
 
     if (!strcmp(hw->hw_camera_back, "virtualscene") ||
