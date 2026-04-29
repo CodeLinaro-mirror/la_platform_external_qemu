@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
-load("@rules_license//rules:license.bzl", "license")
 
 package(
     default_applicable_licenses = [":license"],
@@ -21,7 +21,6 @@ exports_files([
     "COPYING",
     "google/build/darwin-entitlements.plist",
 ])
-
 
 cc_library(
     name = "aemu_func_defs",
@@ -208,10 +207,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + glob(["include/**"]),
-    copts = [
-        "-fwrapv",
-        "-UNDEBUG",
-    ],
+    copts = ["-fwrapv"],
     # Note that . is needed for config-poison.h.
     includes = [
         ".",
@@ -234,8 +230,8 @@ cc_library(
 cc_library(
     name = "qemu-headers-exported",
     defines = ["QEMU_HEADERS_EXPORT"],
-    deps = [":qemu-headers"],
     visibility = ["//visibility:public"],
+    deps = [":qemu-headers"],
 )
 
 cc_library(
