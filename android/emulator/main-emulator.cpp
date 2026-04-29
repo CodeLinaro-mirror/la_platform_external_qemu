@@ -386,6 +386,13 @@ android::base::Version getRequiredEmulatorVersion(
 
 /* Main routine */
 int main(int argc, char** argv) {
+#ifndef _WIN32
+    if (getenv("ANDROID_CLI") && strcmp(getenv("ANDROID_CLI"), "1") == 0) {
+        if (setsid() == -1 && errno != EPERM) {
+            fprintf(stderr, "emulator-launcher: setsid() failed: %s\n", strerror(errno));
+        }
+    }
+#endif
     base_configure_logs(kLogDefaultOptions);
     const char* avdName = NULL;
     const char* avdArch = NULL;
