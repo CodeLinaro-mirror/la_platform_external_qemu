@@ -160,7 +160,6 @@ android_license(TARGET "EMULATOR_FEATURE_DEPENDENCIES" LIBNAME None SPDX None
 android_target_properties(emulator all "${RUNTIME_OS_PROPERTIES}")
 
 # Install files we need.
-install(FILES ${ANDROID_QEMU2_TOP_DIR}/android-info.txt DESTINATION .)
 install(FILES ${ANDROID_QEMU2_TOP_DIR}/LICENSES/LICENSE.APACHE2 DESTINATION .
   RENAME LICENSE)
 
