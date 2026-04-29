@@ -127,9 +127,11 @@ extern "C" {
 #endif
 
 #include <assert.h>
+#include <errno.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #ifndef _MSC_VER
 #include <unistd.h>
 #endif
@@ -1597,6 +1599,13 @@ static SnapshotCompatibleType checkCompatable(std::string srcAvdDir,
 
 extern "C" AndroidProxyCB* gAndroidProxyCB;
 extern "C" int main(int argc, char** argv) {
+#ifndef _WIN32
+    if (getenv("ANDROID_CLI") && strcmp(getenv("ANDROID_CLI"), "1") == 0) {
+        if (setsid() == -1 && errno != EPERM) {
+            fprintf(stderr, "qemu-glue: setsid() failed: %s\n", strerror(errno));
+        }
+    }
+#endif
     base_configure_logs(kLogDefaultOptions);
     if (argc < 1) {
         derror("Invalid invocation (no program path)");
