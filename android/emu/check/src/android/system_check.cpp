@@ -100,8 +100,14 @@ AvdCompatibilityCheckResult hasSufficientSystem(AvdInfo* avd) {
                 .metrics = metrics};
     }
     const uint64_t ramMB = (memUsage.total_phys_memory / (1024 * 1024));
-    const uint64_t minRamMB = 2048;
-    const uint64_t idealMinRamMB = (isXrAvd || isGlassesAvd) ? 16384 : 4096;
+    const int apiLevel = avdInfo_getApiLevel(avd);
+
+    uint64_t minRamMB = 2048;
+    uint64_t idealMinRamMB = (isXrAvd || isGlassesAvd) ? 16384 : 4096;
+    if (apiLevel >= 37) {
+        minRamMB = 4096;
+        idealMinRamMB = 16384;
+    }
     // < 5% of our users as of November 2024
     // TODO(b/376873919): Improve the reporting to account for avd requirements.
     if (ramMB < minRamMB) {

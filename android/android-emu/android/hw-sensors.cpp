@@ -1765,8 +1765,11 @@ bool android_xr_set_eye_event(int32_t x, int32_t y, int32_t buttons, int32_t dis
                 PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
 }
 
-bool android_xr_set_options(int environment, float passthroughCoefficient) {
-    float options_vector[] = {environment, passthroughCoefficient, 0.0f};
+bool android_xr_set_options(int environment,
+                            float passthroughCoefficient,
+                            float dimmingValue) {
+    float options_vector[] = {static_cast<float>(environment),
+                              passthroughCoefficient, dimmingValue};
     return static_cast<bool>(
             android_physical_model_set(
                 PHYSICAL_PARAMETER_XR_OPTIONS,
@@ -1774,8 +1777,10 @@ bool android_xr_set_options(int environment, float passthroughCoefficient) {
                 PHYSICAL_INTERPOLATION_SMOOTH) >= 0);
 }
 
-bool android_xr_get_options(int* environment, float* passthroughCoefficient) {
-    float options_vector[] = {0.0f, 0.0f, /* unused */ 0.0f};
+bool android_xr_get_options(int* environment,
+                            float* passthroughCoefficient,
+                            float* dimmingValue) {
+    float options_vector[] = {0.0f, 0.0f, 0.0f};
     float* options_ptrs[3];
     for (int i = 0; i < std::size(options_vector); i++) {
         options_ptrs[i] = &options_vector[i];
@@ -1787,6 +1792,7 @@ bool android_xr_get_options(int* environment, float* passthroughCoefficient) {
                 PARAMETER_VALUE_TYPE_CURRENT) >= 0);
     *environment = static_cast<int>(options_vector[0]);
     *passthroughCoefficient = options_vector[1];
+    *dimmingValue = options_vector[2];
     return result;
 }
 

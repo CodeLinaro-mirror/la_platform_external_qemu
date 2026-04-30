@@ -177,52 +177,57 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             dinfo("%s: No environment config is provided", __func__);
         }
     } else {
-        std::string mode = iniFile_getString(environmentIni, "scene.mode", "");
-        if (!mode.empty()) {
-            modeSet = true;
-            int separator = mode.find(':');
-            int argpos;
-            if (separator == std::string::npos) {
-                argpos = mode.length();
-            } else {
-                argpos = separator + 1;
-            }
-            ret.sceneMode =
-                    SceneConfig::modeFromString(mode.substr(0, separator));
-            if (ret.sceneMode == SceneConfig::Mode::Unknown) {
-                // TODO(virtualscene) Do we want to use the default magenta
-                // color here instead?
-                dinfo("%s: Invalid mode set. Using default virtual scene mode for the environment.",
-                      __func__);
-                ret.sceneMode = SceneConfig::Mode::Mesh3D;
-                ret.sceneArgument =
-                        SceneConfig::defaultArgumentForMode(ret.sceneMode);
-            }
-            ret.sceneArgument = mode.substr(argpos);
+        // Ensure forward compatibility by checking a version string, if it's newer
+        // the user should be using a newer version of the emulator to be able to correctly
+        // load the environment config.
+        int fileVersion = iniFile_getInteger(environmentIni, "version", 1);
+        if (fileVersion != 1) {
+            derror("%s: Invalid environment.ini version '%d' for this emulator version, "
+                   "using defaults for the environment scene configuration.",
+                   __func__, fileVersion);
         } else {
-            // Handle legacy image file specification
-            std::string backgroundImageFilename = iniFile_getString(
-                    environmentIni, "background.image.filename", "");
-            if (!backgroundImageFilename.empty()) {
-                modeSet = true;
-                ret.sceneMode = SceneConfig::Mode::ImageFile;
-                ret.sceneArgument = backgroundImageFilename;
+            std::string mode = iniFile_getString(environmentIni, "scene.mode", "");
+            if (!mode.empty()) {
+                int separator = mode.find(':');
+                int argpos;
+                if (separator == std::string::npos) {
+                    argpos = mode.length();
+                } else {
+                    argpos = separator + 1;
+                }
+                ret.sceneMode =
+                        SceneConfig::modeFromString(mode.substr(0, separator));
+                if (ret.sceneMode == SceneConfig::Mode::Unknown) {
+                    dwarning("%s: Invalid mode set.", __func__);
+                } else {
+                    ret.sceneArgument = mode.substr(argpos);
+                    modeSet = true;
+                }
+            } else {
+                // Handle legacy image file specification
+                std::string backgroundImageFilename = iniFile_getString(
+                        environmentIni, "background.image.filename", "");
+                if (!backgroundImageFilename.empty()) {
+                    ret.sceneMode = SceneConfig::Mode::ImageFile;
+                    ret.sceneArgument = backgroundImageFilename;
+                    modeSet = true;
+                }
             }
+
+            // Update background view parameters from config, if given
+            ret.backgroundBlur = static_cast<float>(
+                    iniFile_getDouble(environmentIni, "background.blurAmount",
+                                    EnvironmentConfig::defaultBackgroundBlur));
+
+            ret.backgroundEnabled =
+                    iniFile_getBoolean(environmentIni, "background.enabled",
+                                    "true") != 0;
         }
-
-        // Update background view parameters from config, if given
-        ret.backgroundBlur = static_cast<float>(
-                iniFile_getDouble(environmentIni, "background.blurAmount",
-                                  EnvironmentConfig::defaultBackgroundBlur));
-
-        ret.backgroundEnabled =
-                iniFile_getBoolean(environmentIni, "background.enabled",
-                                   "true") != 0;
     }
 
     if (!modeSet) {
         if (showBackground) {
-            dinfo("%s: Using blank background for the environment.", __func__);
+            dinfo("%s: Using default blank background for the environment.", __func__);
             ret.sceneMode = SceneConfig::Mode::Color;
         } else {
             dinfo("%s: Using default virtual scene mode for the environment.",

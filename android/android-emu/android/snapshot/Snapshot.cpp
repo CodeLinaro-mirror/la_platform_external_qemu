@@ -392,6 +392,7 @@ bool Snapshot::verifyConfig(const proto::Config& config, bool writeFailure) {
 bool Snapshot::isLoaded() {
     auto loader = android::snapshot::Snapshotter::get().hasLoader();
     return loader &&
+           android::snapshot::Snapshotter::get().loader().status() == android::snapshot::OperationStatus::Ok &&
            android::snapshot::Snapshotter::get().loader().snapshot() == *this;
 }
 

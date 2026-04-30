@@ -197,6 +197,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     const char* qemuExternalDisplays;
     const char* qemuDualModeMouseDriverProp;
     const char* qemuDualModeMouseHideGuestCursorProp;
+    const char* androidXRDimmingLevels;
 
     namespace fc = android::featurecontrol;
     if (fc::isEnabled(fc::AndroidbootProps) ||
@@ -242,6 +243,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         qemuDualModeMouseDriverProp = "androidboot.qemu.dual_mode_mouse_driver";
         qemuDualModeMouseHideGuestCursorProp =
                 "androidboot.qemu.dual_mode_mouse_hide_guest_cursor";
+        androidXRDimmingLevels = "androidboot.emulator.dev.xr.dimming_levels";
     } else {
         androidbootVerityMode = nullptr;
         checkjniProp = "android.checkjni";
@@ -282,6 +284,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         qemuDualModeMouseDriverProp = "qemu.dual_mode_mouse_driver";
         qemuDualModeMouseHideGuestCursorProp =
                 "qemu.dual_mode_mouse_hide_guest_cursor";
+        androidXRDimmingLevels = nullptr;
     }
 
     std::vector<std::pair<std::string, std::string>> params;
@@ -777,6 +780,9 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         params.push_back({emulatorCircularProp, "1"});
     }
 
+    if (androidXRDimmingLevels && android_is_xr_vst_headset_mode() && hw->hw_dimmingLevels[0]) {
+        params.push_back({androidXRDimmingLevels, hw->hw_dimmingLevels});
+    }
     if (fc::isEnabled(fc::VirtioDualModeMouse)) {
         params.push_back({qemuDualModeMouseDriverProp, "1"});
         if (fc::isEnabled(fc::DualModeMouseDisplayHostCursor)) {
