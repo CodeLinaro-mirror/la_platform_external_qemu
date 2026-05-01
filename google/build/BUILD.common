@@ -1,8 +1,8 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
 load("@rules_license//rules:license.bzl", "license")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
-load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 package(
     default_applicable_licenses = [":license"],
@@ -222,6 +222,7 @@ cc_library(
     deps = [
         "@glib//glib",
         "@glib//gmodule",
+        "@libslirp//:headers",
     ] + select({
         "@platforms//os:windows": ["@aemu//windows:compat-hdrs"],
         "//conditions:default": [],

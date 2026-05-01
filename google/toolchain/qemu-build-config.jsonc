@@ -221,7 +221,7 @@
       "-Dsdl_image": "disabled",
       "-Dseccomp": "disabled",
       "-Dselinux": "disabled",
-      "-Dslirp": "disabled",
+      "-Dslirp": "enabled",
       "-Dslirp_smbd": "disabled",
       "-Dsmartcard": "disabled",
       "-Dsnappy": "disabled",
@@ -401,7 +401,8 @@
           "-hdrs": [
             "include/.*",
             "platform/.*",
-            "qapi/.*"
+            "qapi/.*",
+            "subprojects/libslirp/.*"
           ],
           "-srcs": [
             "include/.*",
@@ -412,7 +413,8 @@
           "-includes": [
             "include",
             "platform/.*",
-            "trace"
+            "trace",
+            "subprojects/.*"
           ],
           // Add dependencies to the 'deps' attribute.
           "+deps": [
@@ -473,12 +475,13 @@
       ],
       "rutabaga_gfx_ffi": [
         "@rutabaga_gfx//:rutabaga_c_ffi"
-      ]
+      ],
+      "slirp": ["@libslirp"]
     },
     "export": [
       "qemu-img"
     ],
-    "exclude": []
+    "exclude": ["slirp"]
   },
   "platforms": {
     "linux-x64": {

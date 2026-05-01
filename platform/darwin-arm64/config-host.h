@@ -335,7 +335,7 @@
 
 #undef CONFIG_SIGNALFD
 
-#undef CONFIG_SLIRP
+#define CONFIG_SLIRP
 
 #undef CONFIG_SNAPPY
 
