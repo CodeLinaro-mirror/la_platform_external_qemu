@@ -19,6 +19,7 @@
 # It produces a single, unified build file as output.
 
 import argparse
+import ast
 import sys
 import typing as T
 import collections
@@ -110,6 +111,27 @@ class OrderedSet(T.MutableSet[_T]):
         return None
 
 
+class BazelExpression:
+    """Represents a raw Starlark expression in a Bazel file.
+
+    This is used to preserve expressions like variable references and
+    string concatenation when parsing with AST, so they are not
+    serialized as quoted strings.
+    """
+
+    def __init__(self, text: str):
+        self.text = text
+
+    def __str__(self):
+        return self.text
+
+    def __eq__(self, other):
+        return isinstance(other, BazelExpression) and self.text == other.text
+
+    def __hash__(self):
+        return hash(self.text)
+
+
 class BazelValue:
     """Class representing a Bazel value that can be merged across different configurations."""
 
@@ -140,7 +162,10 @@ class BazelValue:
             value (Union[str, Set[str]]): The value itself, either a string or a set of strings.
         """
         if not (
-            isinstance(value, str) or isinstance(value, bool) or isinstance(value, int)
+            isinstance(value, str)
+            or isinstance(value, bool)
+            or isinstance(value, int)
+            or isinstance(value, BazelExpression)
         ):
             self.value = OrderedSet(value)
         else:
@@ -154,10 +179,12 @@ class BazelValue:
         return value.replace(r"\"", r'\\"')
 
     def _to_str(self, v):
+        if isinstance(v, BazelExpression):
+            return str(v)
         if isinstance(v, str):
             return f"'{self._escape(v)}'"
         if isinstance(v, OrderedSet):
-            return "[" + ", ".join([f"'{self._escape(x)}'" for x in v]) + "]"
+            return "[" + ", ".join([self._to_str(x) for x in v]) + "]"
 
         return str(v)
 
@@ -470,23 +497,62 @@ class BuildFileFunctions:
         self.library.register(rule)
 
 
-def transform_bazel(bld_file, configuration, library):
-    """Processes a Bazel build file, creating and registering rules.
+def evaluate_ast_node(node):
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.List):
+        return [evaluate_ast_node(elt) for elt in node.elts]
+    if isinstance(node, ast.Dict):
+        return {
+            evaluate_ast_node(k): evaluate_ast_node(v)
+            for k, v in zip(node.keys, node.values)
+        }
+    return BazelExpression(ast.unparse(node))
 
-    This function reads a Bazel build file, executes its content using `exec()`, and
-    provides the `BuildFileFunctions` class as the global namespace. This allows the
-    build file's code to call the `BuildFileFunctions` methods to create and register
-    `BazelRule` objects.
+
+def transform_bazel(bld_file, configuration, library):
+    """Processes a platform-specific Bazel build file, creating and registering rules.
+
+    This function reads a Bazel build file and parses it into an Abstract Syntax Tree (AST).
+    It iterates over the top-level statements in the file, expecting them to be function calls
+    (e.g., `cc_library`, `genrule`, or `load`).
+
+    For each function call:
+    1. It extracts the function name.
+    2. It iterates over keyword arguments and evaluates their values using `evaluate_ast_node`.
+       - Literal values (strings, ints, bools) are extracted as Python types.
+       - Lists and dicts are recursively evaluated.
+       - Complex expressions (like string concatenation or variable references) are preserved
+         as raw Starlark code strings wrapped in `BazelExpression`.
+    3. It registers `load` commands directly or creates and registers `BazelRule` objects
+       for other function calls, associated with the given configuration.
 
     Args:
-        bld_file: The path to the Bazel build file.
-        configuration: The current platform configuration.
-        library: The `BazelRuleLibrary` where the created rules will be registered.
+        bld_file (str): The path to the platform-specific Bazel build file.
+        configuration (str): The platform configuration label (e.g., '@platforms//os:linux').
+        library (BazelRuleLibrary): The library where extracted rules will be registered.
     """
-    exec(
-        compile(open(bld_file, "rb").read(), bld_file, "exec"),
-        GlobalNamespace(BuildFileFunctions(library, configuration)),
-    )
+
+    with open(bld_file, "r") as f:
+        tree = ast.parse(f.read(), filename=bld_file)
+
+    for node in tree.body:
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            call_node = node.value
+            if isinstance(call_node.func, ast.Name):
+                func_name = call_node.func.id
+
+                kwargs = {}
+                for kw in call_node.keywords:
+                    kwargs[kw.arg] = evaluate_ast_node(kw.value)
+
+                if func_name == "load":
+                    args = [evaluate_ast_node(arg) for arg in call_node.args]
+                    rule = LoadCmd(args[0], args[1:])
+                    library.register(rule)
+                else:
+                    rule = BazelRule(configuration, func_name, kwargs)
+                    library.register(rule)
 
 
 def serialize(library, stream, verbatim):
