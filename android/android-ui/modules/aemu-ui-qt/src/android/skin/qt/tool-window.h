@@ -366,6 +366,11 @@ private slots:
     void on_xr_viewport_pan_button_clicked();
     void on_xr_viewport_dolly_button_clicked();
     void on_xr_viewport_rotate_button_clicked();
+    void on_default_environment_selected();
+    void on_none_selected();
+    void on_custom_image_selected();
+    void on_custom_video_selected();
+    void on_custom_360_image_selected();
     void on_glasses_button_pressed();
     void on_glasses_button_released();
 

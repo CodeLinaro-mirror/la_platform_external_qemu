@@ -157,6 +157,17 @@ QCheckBox::indicator:checked:disabled {
 QCheckBox::indicator:unchecked:disabled {
     image: url(:/%%PATH%%/check_no_disabled)
 }
+QPushButton[ToolWindowButton=true] {
+    padding: 0px;
+}
+QPushButton[ToolWindowButton=true]::menu-indicator {
+    subcontrol-origin: border;
+    subcontrol-position: right center;
+    image: url(:/%%PATH%%/arrow_drop_down);
+    width: 10px;
+    height: 10px;
+    right: 2px;
+}
 QPushButton:pressed[ToolWindowButton=true], QPushButton:checked[ToolWindowButton=true] {
     border: none;
     background: %%TOOL_ON_COLOR%%;
