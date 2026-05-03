@@ -377,6 +377,12 @@ static uint8_t ast27xx_i3c_get_dev_dynamic_addr(MIPIHCIState *hci,
     return dat_index / HCI_DAT_ENTRY_SIZE;
 }
 
+static uint32_t ast27xx_i3c_dat_dev_index_from_addr(MIPIHCIState *hci,
+                                                    uint8_t addr)
+{
+    return addr * HCI_DAT_ENTRY_SIZE;
+}
+
 static uint8_t ast27xx_i3c_get_next_dynamic_addr(MIPIHCIState *hci,
                                                  uint8_t dat_index)
 {
@@ -728,6 +734,7 @@ static void ast27xx_i3c_class_init(ObjectClass *klass, const void *data)
     mhc->update_irq = ast27xx_i3c_update_irq;
     mhc->get_next_dynamic_addr = ast27xx_i3c_get_next_dynamic_addr;
     mhc->get_dev_dynamic_addr = ast27xx_i3c_get_dev_dynamic_addr;
+    mhc->dat_dev_index_from_addr = ast27xx_i3c_dat_dev_index_from_addr;
 }
 
 static const TypeInfo ast27xx_i3c_info = {
