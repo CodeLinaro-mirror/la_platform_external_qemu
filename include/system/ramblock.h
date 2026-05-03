@@ -55,7 +55,7 @@ struct RAMBlock {
      * offset in the file pages belonging to this ramblock are saved,
      * used only during migration to a file.
      */
-    off_t bitmap_offset;
+    off64_t bitmap_offset;
     uint64_t pages_offset;
 
     /* Bitmap of already received pages.  Only used on destination side. */
@@ -261,10 +261,10 @@ typedef void (*qemu_ram_resize_cb)(const char *, uint64_t length, void *host);
 
 RAMBlock *qemu_ram_alloc_from_file(ram_addr_t size, MemoryRegion *mr,
                                    uint32_t ram_flags, const char *mem_path,
-                                   off_t offset, Error **errp);
+                                   off64_t offset, Error **errp);
 RAMBlock *qemu_ram_alloc_from_fd(ram_addr_t size, ram_addr_t max_size,
                                  qemu_ram_resize_cb resized, MemoryRegion *mr,
-                                 uint32_t ram_flags, int fd, off_t offset,
+                                 uint32_t ram_flags, int fd, off64_t offset,
                                  bool grow,
                                  Error **errp);
 

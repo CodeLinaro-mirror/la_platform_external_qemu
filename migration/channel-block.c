@@ -101,7 +101,7 @@ static ssize_t
 qio_channel_block_preadv(QIOChannel *ioc,
                          const struct iovec *iov,
                          size_t niov,
-                         off_t offset,
+                         off64_t offset,
                          Error **errp)
 {
     QIOChannelBlock *bioc = QIO_CHANNEL_BLOCK(ioc);
@@ -122,7 +122,7 @@ static ssize_t
 qio_channel_block_pwritev(QIOChannel *ioc,
                           const struct iovec *iov,
                           size_t niov,
-                          off_t offset,
+                          off64_t offset,
                           Error **errp)
 {
     QIOChannelBlock *bioc = QIO_CHANNEL_BLOCK(ioc);
