@@ -63,13 +63,13 @@ enum {
 typedef struct VFIOMmap {
     MemoryRegion mem;
     void *mmap;
-    off_t offset;
+    off64_t offset;
     size_t size;
 } VFIOMmap;
 
 typedef struct VFIORegion {
     struct VFIODevice *vbasedev;
-    off_t fd_offset; /* offset of region within device fd */
+    off64_t fd_offset; /* offset of region within device fd */
     MemoryRegion *mem; /* slow, read/write access */
     size_t size;
     uint32_t flags; /* VFIO region flags (rd/wr/mmap) */

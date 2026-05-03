@@ -144,24 +144,24 @@ static int aarch64_write_elf64_prfpreg(WriteCoreDumpFunction f,
 }
 
 #ifdef TARGET_AARCH64
-static off_t sve_zreg_offset(uint32_t vq, int n)
+static off64_t sve_zreg_offset(uint32_t vq, int n)
 {
-    off_t off = sizeof(struct aarch64_user_sve_header);
+    off64_t off = sizeof(struct aarch64_user_sve_header);
     return ROUND_UP(off, 16) + vq * 16 * n;
 }
 
-static off_t sve_preg_offset(uint32_t vq, int n)
+static off64_t sve_preg_offset(uint32_t vq, int n)
 {
     return sve_zreg_offset(vq, 32) + vq * 16 / 8 * n;
 }
 
-static off_t sve_fpsr_offset(uint32_t vq)
+static off64_t sve_fpsr_offset(uint32_t vq)
 {
-    off_t off = sve_preg_offset(vq, 17);
+    off64_t off = sve_preg_offset(vq, 17);
     return ROUND_UP(off, 16);
 }
 
-static off_t sve_fpcr_offset(uint32_t vq)
+static off64_t sve_fpcr_offset(uint32_t vq)
 {
     return sve_fpsr_offset(vq) + sizeof(uint32_t);
 }
@@ -173,7 +173,7 @@ static uint32_t sve_current_vq(CPUARMState *env)
 
 static size_t sve_size_vq(uint32_t vq)
 {
-    off_t off = sve_fpcr_offset(vq) + sizeof(uint32_t);
+    off64_t off = sve_fpcr_offset(vq) + sizeof(uint32_t);
     return ROUND_UP(off, 16);
 }
 

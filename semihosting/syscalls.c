@@ -360,7 +360,7 @@ static void host_lseek(CPUState *cs, gdb_syscall_complete_cb complete,
     QEMU_BUILD_BUG_ON(GDB_SEEK_CUR != SEEK_CUR);
     QEMU_BUILD_BUG_ON(GDB_SEEK_END != SEEK_END);
 
-    off_t ret = off;
+    off64_t ret = off;
     int err = 0;
 
     if (ret == off) {
