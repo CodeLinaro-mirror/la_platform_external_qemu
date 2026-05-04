@@ -410,9 +410,9 @@ static const QAndroidEmulatorWindowAgent sFishtankQAndroidEmulatorWindowAgent = 
         .sendXrHeadVelocityEvent = [](float x, float y, float z) -> bool {
             LOG(FATAL) << "Not yet implemented";
         },
-        .setXrOptions = [](int environment, float passthroughCoefficient)
+        .setXrOptions = [](int environment, float passthroughCoefficient, float dimmingValue)
                 -> bool { LOG(FATAL) << "Not yet implemented"; },
-        .getXrOptions = [](int* environment, float* passthroughCoefficient)
+        .getXrOptions = [](int* environment, float* passthroughCoefficient, float* dimmingValue)
                 -> bool { LOG(FATAL) << "Not yet implemented"; },
 //        .setXrHandGesture = [](int gesture) -> bool { LOG(FATAL) << "Not yet implemented"; },
 };

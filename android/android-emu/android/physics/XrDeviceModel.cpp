@@ -206,21 +206,25 @@ void XrDeviceModel::setXrEyeEvent(float x, float y, float buttons, float display
 
 void XrDeviceModel::setXrOptions(int environment,
                                 float passthroughCoefficient,
+                                float dimmingValue,
                                 PhysicalInterpolation mode) {
-    D("XrDeviceModel::setXrOptions %f %f", environment, passthroughCoefficient);
+    D("XrDeviceModel::setXrOptions %d %f %f", environment, passthroughCoefficient, dimmingValue);
     EmulatorRequest request;
     request.set_msg_type(MsgType::MSG_TYPE_SET_OPTIONS);
     auto xr_options_param = request.mutable_xr_options();
     xr_options_param->set_environment(static_cast<XrOptions::Environment>(environment));
     xr_options_param->set_passthrough_coefficient(passthroughCoefficient);
+    xr_options_param->set_dimming_value(dimmingValue);
     qemudClientSend(request);
+    mPassthroughCoefficient = passthroughCoefficient;
+    mDimmingValue = dimmingValue;
 }
 
 vec3 XrDeviceModel::getXrOptions(
         ParameterValueType parameterValueType) const {
     D("XrDeviceModel::getXrOptions");
     // TODO(b/407610938): replace the constant with a variable representing the current environment.
-    return {XrOptions::LIVING_ROOM_DAY, mPassthroughCoefficient, /*unused*/ 0};
+    return {XrOptions::LIVING_ROOM_DAY, mPassthroughCoefficient, mDimmingValue};
 }
 
 void XrDeviceModel::setXrHandGesture(int gesture, PhysicalInterpolation /*mode*/) {
@@ -344,11 +348,21 @@ void XrDeviceModel::qemudClientRecv(uint8_t* msg, int msglen) {
 
             case EmulatorResponse::kXrOptions: {
                 const auto& xr_options = response.xr_options();
+                bool needs_notification = false;
                 I("XrOptions received: %s", xr_options.ShortDebugString().c_str());
                 if (xr_options.has_passthrough_coefficient()) {
                     I("Received passthrough coefficient: %f",
                       xr_options.passthrough_coefficient());
                     mPassthroughCoefficient = xr_options.passthrough_coefficient();
+                    needs_notification = true;
+                }
+                if (xr_options.has_dimming_value()) {
+                    I("Received dimming value: %f",
+                      xr_options.dimming_value());
+                    mDimmingValue = xr_options.dimming_value();
+                    needs_notification = true;
+                }
+                if (needs_notification) {
                     mXrOptionsPublisher.fireEvent(xr_options);
                 }
                 break;

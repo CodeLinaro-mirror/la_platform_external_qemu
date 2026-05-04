@@ -1558,8 +1558,9 @@ public:
                         const XrOptions* xrOptions,
                         ::google::protobuf::Empty* reply) {
         auto agent = mAgents->emu;
-        if (agent->setXrOptions(static_cast<int>(xrOptions->environment()),
-                                xrOptions->passthrough_coefficient()) == false) {
+        if (!agent->setXrOptions(static_cast<int>(xrOptions->environment()),
+                                xrOptions->passthrough_coefficient(),
+                                xrOptions->dimming_value())) {
             return Status(::grpc::StatusCode::FAILED_PRECONDITION,
                           "Unable to set XrOptions.", "");
         }
@@ -1576,13 +1577,15 @@ public:
         auto agent = mAgents->emu;
         int environment = 0;
         float passthroughCoefficient = 0;
-        if (agent->getXrOptions(
-                &environment, &passthroughCoefficient) == false) {
+        float dimmingValue = 0;
+        if (!agent->getXrOptions(
+                &environment, &passthroughCoefficient, &dimmingValue)) {
             return Status(::grpc::StatusCode::FAILED_PRECONDITION,
                           "Unable to get XrOptions.", "");
         } else {
             reply->set_environment(static_cast<::android::emulation::control::XrOptions_Environment>(environment));
             reply->set_passthrough_coefficient(passthroughCoefficient);
+            reply->set_dimming_value(dimmingValue);
         }
         return Status::OK;
     }

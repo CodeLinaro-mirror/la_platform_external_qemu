@@ -30,7 +30,8 @@ message AndroidStudioEvent {
   // or kind = EMULATOR_PING
   // or kind = TEST_RUN
   // or kind = GAME_TOOLS_PING
-  // or kind = AGDE_PING.
+  // or kind = AGDE_PING
+  // or kind = SHERLOCK_PING
   // The version field is set for most messages.
   optional ProductDetails product_details = 4 [lazy = true];
 
@@ -150,10 +151,10 @@ message AndroidStudioEvent {
   // set when kind = STUDIO_UI_ACTION_STATS
   optional UIActionStats ui_action_stats = 34 [lazy = true];
 
-  // set when kind = STUDIO_PING
+  // set when kind = STUDIO_PING or SHERLOCK_PING.
   optional MachineDetails machine_details = 35 [lazy = true];
 
-  // set when kind = STUDIO_PING
+  // set when kind = STUDIO_PING or SHERLOCK_PING.
   optional JvmDetails jvm_details = 36 [lazy = true];
 
   // set when kind = STUDIO_PROCESS_STATS
@@ -894,6 +895,16 @@ message AndroidStudioEvent {
   optional EmulatorWindowsHypervisorMigrationEvent
       emulator_windows_hypervisor_migration_event = 250 [lazy = true];
 
+  // set when kind = ANDROID_CLI_INVOCATION
+  optional AndroidCliInvocation android_cli_invocation = 251 [lazy = true];
+
+  // set when kind = UNIT_TEST_GENERATION_EVENT
+  optional UnitTestGenerationEvent unit_test_generation_event = 252
+      [lazy = true];
+
+  // set when kind = SHERLOCK_EVENT
+  optional SherlockEvent sherlock_event = 253 [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -963,6 +974,8 @@ message AndroidStudioEvent {
     LOGCAT = 29;
     // The event is related to Google Play SDK Index
     GOOGLE_PLAY_SDK_INDEX = 30;
+    // The event is related to Gradle JVM incompatible dialog
+    GRADLE_JVM_INCOMPATIBLE_DIALOG = 31;
   }
 
   // Specific kind of event, primary separation key of all Android Studio
@@ -1909,6 +1922,22 @@ message AndroidStudioEvent {
 
     // Event related to emulator Windows Hypervisor migration.
     EMULATOR_WINDOWS_HYPERVISOR_MIGRATION_EVENT = 370;
+
+    // Events related to Gradle JVM incompatible dialog
+    GRADLE_JVM_INCOMPATIBLE_DIALOG_APPLY_COMPATIBLE_JVM = 371;
+    GRADLE_JVM_INCOMPATIBLE_DIALOG_OPEN_SETTINGS = 372;
+    GRADLE_JVM_INCOMPATIBLE_DIALOG_CANCEL = 373;
+
+    ANDROID_CLI_INVOCATION = 374;
+
+    // Event related to unit test generation.
+    UNIT_TEST_GENERATION_EVENT = 375;
+
+    // Start time and daily Sherlock ping with version & os details.
+    SHERLOCK_PING = 376;
+
+    // Sherlock event.
+    SHERLOCK_EVENT = 377;
   }
 
   // Represents different Performance Monitoring types.
@@ -2306,6 +2335,8 @@ message AndroidStudioEvent {
     ANDROID_STUDIO_FOR_PLATFORM_INTERNAL = 8;
     // Standalone Android Studio profiler (codename Sherlock)
     SHERLOCK = 9;
+    // Android CLI
+    ANDROID_CLI = 10;
   }
 
   // Gradle sync issue type.
@@ -2836,6 +2867,7 @@ message ProductDetails {
     STUDIO_PATCH_UPDATER = 5;
     VS_PLUGIN = 6;
     GAME_TOOLS = 7;
+    SHERLOCK = 8;
   }
 
   // Chip the software is running on.
@@ -3437,7 +3469,9 @@ message EmulatorFeatureFlagState {
     FORCE_GPU_HOST = 136;
     FORCE_GPU_SOFTWARE = 137;
     QEMU_CAMERA_SENSOR_ORIENTATION = 138;
-    // Next tag: 139
+    VULKAN_PROTECTED_MEMORY_EMULATION = 139;
+    XR_DIMMING = 140;
+    // Next tag: 141
   }
   // Which features were enabled by default or through the server-side config.
   repeated EmulatorFeatureFlag attempted_enabled_feature_flags = 1;
@@ -8464,6 +8498,7 @@ message TaskMetadata {
           [lazy = true];
       NativeAllocationsTaskConfig native_allocations_task_config = 4
           [lazy = true];
+      LeakCanaryTaskConfig leakcanary_task_config = 5 [lazy = true];
     }
   }
 
@@ -8482,6 +8517,16 @@ message TaskMetadata {
 
   message NativeAllocationsTaskConfig {
     optional int32 sample_interval_bytes = 1;
+  }
+
+  message LeakCanaryTaskConfig {
+    enum ExecutionMode {
+      UNKNOWN_MODE = 0;
+      ON_HOST = 1;
+      ON_DEVICE = 2;
+    }
+    optional ExecutionMode execution_mode = 1;
+    optional int32 selected_threshold = 2;
   }
 }
 
@@ -8534,6 +8579,7 @@ message TaskFailedMetadata {
       TraceStartStatus trace_start_status = 1 [lazy = true];
       AllocationTrackStatus track_status = 2 [lazy = true];
       HeapDumpStatus heap_dump_start_status = 3 [lazy = true];
+      LeakCanaryStartStatus leakcanary_start_status = 4 [lazy = true];
     }
   }
 
@@ -8547,6 +8593,32 @@ message TaskFailedMetadata {
 
   message TaskProcessingFailedMetadata {
     optional CpuCaptureMetadata cpu_capture_metadata = 1 [lazy = true];
+    optional LeakCanaryProcessingStatus leakcanary_processing_status = 2
+        [lazy = true];
+  }
+
+  message LeakCanaryStartStatus {
+    enum ErrorCode {
+      UNKNOWN_ERROR = 0;
+      AGENT_ATTACH_FAILED = 1;
+      APP_CONTEXT_NULL = 2;
+      LIBRARY_NOT_INSTALLED_TIMEOUT = 3;
+      TRANSPORT_TIMEOUT = 4;
+    }
+    optional ErrorCode error_code = 1;
+  }
+
+  message LeakCanaryProcessingStatus {
+    enum ErrorCode {
+      UNKNOWN_ERROR = 0;
+      BROADCAST_DELIVERY_FAILED = 1;
+      HEAP_DUMP_GENERATION_FAILED = 2;
+      HPROF_DOWNLOAD_FAILED = 3;
+      SHARK_ANALYSIS_OOM = 4;
+      SHARK_ANALYSIS_EXCEPTION = 5;
+      PARSING_FAILURE = 6;
+    }
+    optional ErrorCode error_code = 1;
   }
 
   message TraceStartStatus {
@@ -8722,6 +8794,39 @@ message TaskFailedMetadata {
   }
 }
 
+message LeakCanaryTaskMetadata {
+  optional int64 task_id = 1;
+  optional bool auto_inject_popup_shown = 2;
+
+  enum UiAction {
+    UNKNOWN_ACTION = 0;
+    FORCE_DUMP_CLICKED = 1;
+    STOP_RECORDING_CLICKED = 2;
+    GO_TO_DECLARATION_CLICKED = 3;
+    COPY_TRACE_CLICKED = 4;
+    EXPAND_ALL_NODES_CLICKED = 5;
+    COLLAPSE_ALL_NODES_CLICKED = 6;
+    NEW_LEAK_SELECTED = 7;
+    CANCELLED_DURING_ANALYSIS = 8;
+  }
+  optional UiAction ui_action = 3;
+
+  message LeakAnalysis {
+    optional int32 retained_objects_count = 1;
+    optional int32 occurrences_count = 2;
+    optional int64 estimated_memory_leaked_bytes = 3;
+    optional int32 leaking_no_rows = 4;
+    optional int32 leaking_maybe_rows = 5;
+    optional int32 leaking_yes_rows = 6;
+    optional int64 heap_dump_analysis_time_ms = 7;
+    optional int64 total_recording_time_ms = 8;
+    optional bool is_library_leak = 9;
+    optional int64 hprof_file_size_bytes = 10;
+    optional int64 hprof_download_duration_ms = 11;
+  }
+  optional LeakAnalysis leak_analysis = 4;
+}
+
 // Android Profiler metrics
 message AndroidProfilerEvent {
   // The current stage we're on when this event was generated
@@ -8828,6 +8933,9 @@ message AndroidProfilerEvent {
 
   // Set if |type| is |TASK_SETTINGS_OPENED|
   optional bool is_task_settings_changed = 31;
+
+  // Set if |type| is related to LeakCanary tasks
+  optional LeakCanaryTaskMetadata leakcanary_metadata = 32 [lazy = true];
 
   enum Stage {
     UNKNOWN_STAGE = 0;
@@ -9004,6 +9112,8 @@ message AndroidProfilerEvent {
 
     // Task Configuration Stats
     TASK_SETTINGS_OPENED = 810;
+
+    LEAKCANARY_EVENT = 820;
   }
 
   message Loading {
@@ -9066,6 +9176,249 @@ message AndroidProfilerDbStats {
   optional uint32 total_disk_mb = 2;
   // Entries for each table in our DB
   repeated AndroidProfilerDbTable tables = 3;
+}
+
+// Sherlock metrics.
+// These events will be logged by both Standalone Sherlock and Android Studio.
+// Use IdeBrand/IdeKind to distinguish between the two.
+message SherlockEvent {
+  // The detailed type of this event.
+  optional Type type = 1;
+
+  // Set if |type| is |SHERLOCK_PROJECT_OPENED| or |SHERLOCK_PROJECT_CLOSED|
+  optional SherlockProjectChange sherlock_project_change = 2 [lazy = true];
+
+  // Set if |type| is |DEVICE_INITIALIZED|
+  optional DeviceInitializedMetadata device_initialized_metadata = 3
+      [lazy = true];
+
+  // Set if |type| is |NEW_CAPTURE_DIALOG_PROCEED|
+  optional NewCaptureDialogMetadata new_capture_dialog_metadata = 4
+      [lazy = true];
+
+  // Set if |type| is |PERFETTO_TRACE_OPENED|
+  optional PerfettoTraceOpenedMetadata perfetto_trace_opened_metadata = 5
+      [lazy = true];
+
+  // Set if |type| is |PERFETTO_SQL_QUERY_EXECUTED|
+  optional PerfettoSqlQueryMetadata perfetto_sql_query_metadata = 6
+      [lazy = true];
+
+  enum Type {
+    UNKNOWN_TYPE = 0;
+
+    /// General.
+    DEVICE_INITIALIZED = 101;
+    SHERLOCK_PROJECT_OPENED = 102;
+    SHERLOCK_PROJECT_CLOSED = 103;
+
+    /// System Trace recording.
+
+    // Fired when the user interacts with the new system trace capture dialog.
+    NEW_CAPTURE_DIALOG_OPENED = 201;
+    NEW_CAPTURE_DIALOG_CANCELLED = 202;
+    NEW_CAPTURE_DIALOG_PROCEED = 203;
+
+    // Fired when perfetto trace recording is completed.
+    PERFETTO_TRACE_RECORDED = 204;
+
+    // Fired when the user clicks to enable/disable custom perfetto config.
+    NEW_CAPTURE_DIALOG_CUSTOM_PERFETTO_CONFIG_ENABLED = 211;
+    NEW_CAPTURE_DIALOG_CUSTOM_PERFETTO_CONFIG_DISABLED = 212;
+
+    // Fired when the user clicks to open/close the GPU counter selection
+    // dialog.
+    GPU_COUNTER_SELECTION_DIALOG_OPENED = 221;
+    GPU_COUNTER_SELECTION_DIALOG_CANCELLED = 222;
+    GPU_COUNTER_SELECTION_DIALOG_PROCEED = 223;
+
+    /// System Profiler (Perfetto) trace viewer.
+
+    // Fired when the user opens any perfetto trace file in the viewer.
+    PERFETTO_TRACE_OPENED = 301;
+
+    // Fired when the user executes a SQL query in the viewer.
+    PERFETTO_SQL_QUERY_EXECUTED = 302;
+  }
+
+  // Details around user opening or closing projects.
+  message SherlockProjectChange {
+    // Number of projects open in same Sherlock instance.
+    optional int32 projects_open = 1;
+  }
+
+  // Extended device info that includes basic device info and GPU info.
+  message ExtendedDeviceInfo {
+    // Basic information about the device.
+    optional DeviceInfo device_info = 1;
+
+    // Information about the GPU on the device.
+    optional GpuInfo gpu_info = 2;
+
+    // GPU profiling capabilities of the device.
+    optional GpuProfilingCapabilities gpu_profiling_capabilities = 3;
+
+    message GpuInfo {
+      optional string gpu_vendor = 1;
+      optional string gpu_name = 2;
+      optional string gpu_driver_version = 3;
+    }
+
+    message GpuProfilingCapabilities {
+      optional bool has_gpu_counters = 1;
+      optional int32 num_gpu_counters = 2;
+      optional int32 num_gpu_counters_selected_by_default = 3;
+      optional int32 num_gpu_counter_groups = 4;
+      optional bool has_render_stage = 5;
+      optional bool has_gpu_mem_total = 6;
+      optional bool has_frame_lifecycle = 7;
+    }
+  }
+
+  // Metadata for the |DEVICE_INITIALIZED| event.
+  message DeviceInitializedMetadata {
+    optional DeviceInitializationStatus status = 1;
+
+    // Generic information about the device.
+    optional ExtendedDeviceInfo extended_device_info = 2;
+
+    // Status of the device initialization process.
+    enum DeviceInitializationStatus {
+      DEVICE_INITIALIZATION_STATUS_UNKNOWN = 0;
+      DEVICE_INITIALIZATION_STATUS_SUCCESS = 1;
+      DEVICE_INITIALIZATION_STATUS_CANCELLED = 2;
+      DEVICE_INITIALIZATION_STATUS_ERROR = 3;
+    }
+  }
+
+  // Metadata for the |NEW_CAPTURE_DIALOG_PROCEED| event.
+  // Details when starting a new system profiler trace recording.
+  message NewCaptureDialogMetadata {
+    optional ExtendedDeviceInfo extended_device_info = 1;
+
+    // Mode of the recording: e.g., launch or attach.
+    optional LaunchMode launch_mode = 2;
+
+    // Type of activity:  e.g., default or user-selected.
+    optional ActivityType activity_type = 3;
+
+    // Whether the user provided any additional launch arguments when starting
+    // the app.
+    optional bool additional_launch_args_provided = 4;
+
+    // The trigger used to start the recording.
+    optional StartTrigger start_trigger = 5;
+
+    // The trigger used to stop the recording.
+    optional StopTrigger stop_trigger = 6;
+
+    // Details of the Perfetto config used in the recording.
+    optional TraceConfig trace_config = 7;
+
+    // Details of the Vulkan layers used in the recording.
+    optional VulkanLayers vulkan_layers = 8;
+
+    enum LaunchMode {
+      LAUNCH_MODE_UNKNOWN = 0;
+      LAUNCH_MODE_LAUNCH = 1;
+      LAUNCH_MODE_ATTACH = 2;
+    }
+
+    enum ActivityType {
+      ACTIVITY_TYPE_UNKNOWN = 0;
+      ACTIVITY_TYPE_DEFAULT = 1;
+      ACTIVITY_TYPE_USER_SELECTED = 2;
+    }
+
+    enum StartTrigger {
+      START_TRIGGER_UNKNOWN = 0;
+      START_TRIGGER_MANUAL = 1;
+      START_TRIGGER_ON_STARTUP = 2;
+      START_TRIGGER_ON_STARTUP_WITH_DELAY = 3;
+    }
+
+    enum StopTrigger {
+      STOP_TRIGGER_UNKNOWN = 0;
+      STOP_TRIGGER_MANUAL = 1;
+      STOP_TRIGGER_DURATION = 2;
+    }
+
+    // Details of the trace configuration used in recording.
+    message TraceConfig {
+      // Whether the recording used custom Perfetto config.
+      optional bool custom_perfetto_config_enabled = 1;
+
+      // CPU config.
+
+      // Whether the recording enabled these CPU data sources.
+      optional bool cpu_frequency_enabled = 11;
+      optional bool cpu_scheduling_enabled = 12;
+      optional bool cpu_syscalls_enabled = 13;
+      optional bool cpu_thread_slices_enabled = 14;
+
+      // GPU config.
+
+      // Whether the recording enabled these GPU data sources.
+      optional bool gpu_frequency_enabled = 21;
+      optional bool gpu_memory_enabled = 22;
+      optional bool gpu_work_period_enabled = 23;
+      optional bool gpu_frame_lifecycle_enabled = 24;
+      optional bool gpu_counters_enabled = 25;
+      // How many GPU counters were selected. Only applies when
+      // gpu_counters_enabled is true.
+      optional int32 num_gpu_counters_selected = 26;
+    }
+
+    // Details of the Vulkan layers used in recording.
+    message VulkanLayers {
+      // Whether the CPUTiming vulkan layer was enabled.
+      optional bool cputiming_layer_enabled = 1;
+
+      // Whether the DebugMarker vulkan layer was enabled.
+      optional bool debug_marker_layer_enabled = 2;
+
+      // Whether the Screenshot vulkan layer was enabled.
+      optional bool screenshot_layer_enabled = 3;
+
+      // If the Screenshot layer was enabled, the frequency at which frames were
+      // captured.
+      optional int32 screenshot_layer_every_n_frames = 4;
+    }
+  }
+
+  // Metadata for the |PERFETTO_TRACE_OPENED| event.
+  message PerfettoTraceOpenedMetadata {
+    // Whether the trace was from the current project or opened from an external
+    // source.
+    optional PerfettoTraceOrigin trace_origin = 1;
+
+    enum PerfettoTraceOrigin {
+      PERFETTO_TRACE_ORIGIN_UNKNOWN = 0;
+      PERFETTO_TRACE_ORIGIN_PROJECT = 1;
+      PERFETTO_TRACE_ORIGIN_EXTERNAL = 2;
+    }
+  }
+
+  // Metadata for the |PERFETTO_SQL_QUERY_EXECUTED| event.
+  message PerfettoSqlQueryMetadata {
+    // Whether the SQL query was executed successfully.
+    optional PerfettoSqlQueryStatus status = 1;
+
+    // The amount of time the SQL query took to execute in milliseconds.
+    optional int64 query_execution_time_ms = 2;
+
+    // The number of rows returned by the SQL query.
+    optional int64 query_result_num_rows = 3;
+
+    // The number of columns returned by the SQL query.
+    optional int32 query_result_num_columns = 4;
+
+    enum PerfettoSqlQueryStatus {
+      PERFETTO_SQL_QUERY_STATUS_UNKNOWN = 0;
+      PERFETTO_SQL_QUERY_STATUS_SUCCESS = 1;
+      PERFETTO_SQL_QUERY_STATUS_FAILURE = 2;
+    }
+  }
 }
 
 // APK Analyzer stats
@@ -13608,6 +13961,10 @@ message InteractivePreviewEvent {
     UNKNOWN_EVENT_TYPE = 0;
     REPORT_FPS = 1;
     REPORT_STARTUP_TIME = 2;
+    NAVIGATION_PANEL_BACK_PRESS = 3;
+    NAVIGATION_PANEL_PROGRESS_PRESS = 4;
+    NAVIGATION_PANEL_VISIBILITY_CHANGE = 5;
+    NAVIGATION_PANEL_EDGE_DROPDOWN_PRESS = 6;
   }
 
   // Type of event
@@ -13623,6 +13980,8 @@ message InteractivePreviewEvent {
   // Number of the previews on the surface the preview for this interactive
   // session belongs to
   optional int32 peer_previews = 6;
+  // Boolean to check if the interactive preview navigation panel is shown
+  optional bool navigation_panel_shown = 7;
 }
 
 // A user's response to a survey
@@ -13946,7 +14305,7 @@ message DeviceManagerEvent {
 }
 
 // Event related to Glasses emulator pairing assistant
-// Next ID: 24
+// Next ID: 32
 message GlassesPairingEvent {
   // The kind of GlassesPairingEvent
   optional EventKind kind = 1;
@@ -14000,6 +14359,22 @@ message GlassesPairingEvent {
     PAIRING_ERROR_IO_FAILED = 20;
     // Error: Generic or unknown pairing error
     PAIRING_ERROR_GENERIC = 21;
+    // Reconciliation found a bond that was not tracked
+    RECONCILIATION_BOND_DISCOVERED = 24;
+    // Reconciliation removed a bond that was no longer valid
+    RECONCILIATION_BOND_REMOVED = 25;
+    // Reconciliation resolved asymmetric state between devices
+    RECONCILIATION_ASYMMETRIC_STATE_RESOLVED = 26;
+    // User clicked unpair action
+    UNPAIR_ACTION_CLICKED = 27;
+    // Unpair successful
+    UNPAIR_SUCCESSFUL = 28;
+    // Unpair failed
+    UNPAIR_FAILED = 29;
+    // Cascading wipe initiated
+    CASCADING_WIPE_INITIATED = 30;
+    // Orphaned pairing purged
+    ORPHANED_PAIRING_PURGED = 31;
   }
 }
 
@@ -15076,6 +15451,9 @@ message AppQualityInsightsUsageEvent {
 
     // Track when an aiplugin-provided action is taken
     AGENT_ACTION = 17;
+
+    // Track when user interacts with insight generation
+    GENERATE_INSIGHTS_ACTION = 18;
   }
 
   enum CrashType {
@@ -15396,6 +15774,17 @@ message AppQualityInsightsUsageEvent {
     optional DevServiceDeprecationInfo dev_service_deprecation_info = 2;
   }
 
+  message GenerateInsightsAction {
+    enum Action {
+      UNKNOWN_ACTION = 0;
+      GENERATE_ONCE = 1;
+      ENABLE_AUTO_GENERATE = 2;
+      DISABLE_AUTO_GENERATE = 3;
+    }
+
+    optional Action action = 1;
+  }
+
   // The app_id is the id for the user's android app
   // which we salt on the client (28 day rotation) then sha256
   // so it is anonymized and is unique per user, but has a 1-N relation.
@@ -15465,6 +15854,9 @@ message AppQualityInsightsUsageEvent {
 
   // set when type = AGENT_ACTION
   optional AgentActionDetails agent_action_details = 21 [lazy = true];
+
+  // set when type = GENERATE_INSIGHTS_ACTION
+  optional GenerateInsightsAction generate_insights_action = 22 [lazy = true];
 }
 
 message FastPreviewEvent {
@@ -16327,6 +16719,7 @@ message SmlChatBotEvent {
     AGENT_MODE = 2;
     VERSION_UPGRADE_AGENT = 3;
     QUICK_EDIT = 4;
+    PLANNING = 5;
   }
 
   message BotResponse {
@@ -16698,6 +17091,10 @@ message SmlChatBotEvent {
     SUB_AGENT_RESULT = 23;
     // Sub-agent terminated without a proper response.
     SUB_AGENT_ENDED_WITHOUT_RESPONSE = 24;
+    // The arguments provided to the tool call were invalid.
+    ERR_INVALID_ARGUMENTS = 25;
+    // The URL provided to the tool call was invalid.
+    ERR_INVALID_URL = 26;
   }
 
   message ToolCallResponse {
@@ -16836,6 +17233,30 @@ message SmlChatBotEvent {
     optional ChatMode chat_mode = 3;
   }
 
+  message PlanningModeEvent {
+    // The implementation plan for this task was created for the first time
+    message PlanCreated {}
+    // The user approved the implementation plan.
+    message PlanApproved {}
+    // The user sent comments on the implementation plan
+    message CommentsSent {
+      optional int32 comments_count = 1;
+    }
+    // An artifact (implementation_plan, task_list, walkthrough, etc.) was
+    // edited by the agent.
+    message ArtifactEdited {
+      optional string artifact_name = 1;
+    }
+    // The conversation session this event happened in.
+    optional string session_id = 1;
+    oneof event {
+      PlanCreated plan_created = 2;
+      PlanApproved plan_approved = 3;
+      CommentsSent comments_sent = 4;
+      ArtifactEdited artifact_edited = 5;
+    }
+  }
+
   oneof content {
     BotResponse response = 1 [lazy = true];
     UserFeedback user_feedback = 2 [lazy = true];
@@ -16857,6 +17278,7 @@ message SmlChatBotEvent {
     RecentChatsEvent recent_chats_event = 18 [lazy = true];
     ChangesDrawerEvent changes_drawer_event = 19 [lazy = true];
     ConversationActionInvoked conversation_action_invoked = 20 [lazy = true];
+    PlanningModeEvent planning_mode_event = 21 [lazy = true];
   }
 }
 
@@ -16896,6 +17318,13 @@ message SmlConfigurationEvent {
 
   // The user account type that was fetched by the LoadCodeAssist API.
   optional UserAccountType user_account_type = 11;
+
+  // The tier ID of the onboarded user.
+  optional string tier_id = 12;
+
+  // Timestamp in ms. Can be used by various configuration events (for instance
+  // onboarding completion time)
+  optional int64 configuration_time_ms = 13;
 
   enum SmlProductVariant {
     PRODUCT_VARIANT_UNKNOWN = 0;
@@ -16946,6 +17375,23 @@ message SmlCompletionRequestErrorEvent {
 
 // Event for metrics related to Retrieval Augmented Generation (RAG).
 message SmlRagEvent {
+  message SearchArguments {
+    // Number of lines to show after the match (like grep -A).
+    optional int32 lines_after = 1;
+    // Number of lines to show before the match (like grep -B).
+    optional int32 lines_before = 2;
+    // Number of lines to show around the match (like grep -C).
+    optional int32 lines_context = 3;
+    // Pattern to filter results (like grep -E).
+    optional string filter = 4;
+    // Type to search, e.g., "all" kinds, function "call", etc.
+    optional string type = 5;
+    // Glob-like patterns to filter in results.
+    optional string include_pattern = 6;
+    // Glob-like patterns to filter out results.
+    optional string exclude_pattern = 7;
+  }
+
   message RagIndexerMetrics {
     // The type of indexer like "bm25" or "embeddings" and its version.
     optional string indexer_type = 1;
@@ -16980,6 +17426,17 @@ message SmlRagEvent {
     optional int32 total_indexed_docs = 6;
   }
 
+  message FindDeclarationMetrics {
+    // The exception the find_declaration tool encountered.
+    optional string exception = 1;
+    // The number of files in the find_declaration.
+    optional int32 result_count = 2;
+    // The time in milliseconds for find_declaration.
+    optional int64 find_declaration_time_ms = 3;
+    // The search arguments used for find_declaration.
+    optional SearchArguments search_arguments = 4;
+  }
+
   // We merged the original find_files with file path search based on BM25.
   // "find_files result" means the file search result of the original
   // find_files. "bm25 file search" means the file search result based on BM25.
@@ -16999,6 +17456,17 @@ message SmlRagEvent {
     optional int32 total_indexed_docs = 5;
   }
 
+  message FindUsagesMetrics {
+    // The exception the find_usages tool encountered.
+    optional string exception = 1;
+    // The number of files in the find_usages.
+    optional int32 result_count = 2;
+    // The time in milliseconds for find_usages.
+    optional int64 find_usages_time_ms = 3;
+    // The search arguments used for find_usages.
+    optional SearchArguments search_arguments = 4;
+  }
+
   message GrepMetrics {
     // The number of files in the grep result.
     optional int32 result_count = 1;
@@ -17011,6 +17479,8 @@ message SmlRagEvent {
     // The number of docs (a doc is a file in the current RAG indexer) that are
     // indexed.
     optional int32 total_indexed_docs = 5;
+    // The search arguments used for grep.
+    optional SearchArguments search_arguments = 6;
   }
 
   message KbRagIndexerMetrics {
@@ -17030,7 +17500,57 @@ message SmlRagEvent {
     FindFileMetrics find_file = 3 [lazy = true];
     GrepMetrics grep = 4 [lazy = true];
     KbRagIndexerMetrics kb_rag = 5 [lazy = true];
+    FindDeclarationMetrics find_declaration = 6 [lazy = true];
+    FindUsagesMetrics find_usages = 7 [lazy = true];
   }
+}
+
+// Tracks AI-powered unit test generation in Android Studio.
+message UnitTestGenerationEvent {
+  // UI entry point for test generation.
+  enum EntryPoint {
+    UNKNOWN_ENTRY_POINT = 0;
+    // Triggered via editor right-click context menu.
+    RIGHT_CLICK_MENU = 1;
+    // Triggered via Gemini chat or agent.
+    AGENT_WINDOW = 2;
+  }
+  // UI element used to initiate test generation.
+  optional EntryPoint entry_point = 1;
+
+  // Execution mode selected by the user.
+  enum UserMode {
+    UNKNOWN_USER_MODE = 0;
+    // Tests generated via chat response.
+    CHAT = 1;
+    // Tests generated via fast mode.
+    FAST = 2;
+    // Tests generated via planning mode.
+    PLANNING = 3;
+  }
+  // User-selected mode (e.g., Fast, Planning, Chat).
+  optional UserMode user_mode = 2;
+  // Number of AI attempts to fix compilation errors. Zero if the first
+  // attempt compiled successfully.
+  optional int32 self_correction_loops = 3;
+  // True if generated code compiled successfully.
+  optional bool build_success = 4;
+  // Number of generated tests that passed.
+  optional int32 tests_passed_count = 5;
+  // Number of generated tests that failed.
+  optional int32 tests_failed_count = 6;
+  // Total test methods presented to user.
+  optional int32 total_chunks_generated = 7;
+  // Number of test methods accepted by user.
+  optional int32 chunks_accepted = 8;
+  // Number of test methods rejected by user.
+  optional int32 chunks_rejected = 9;
+  // True if user accepted all tests without edits.
+  optional bool accepted_all = 10;
+  // Latency (ms) to first token of generated code.
+  optional int64 latency_to_first_token_ms = 11;
+  // Total workflow duration (ms) from trigger to resolution.
+  optional int64 total_workflow_duration_ms = 12;
 }
 
 message TestScenarioEvent {
@@ -17457,6 +17977,7 @@ message DebuggerEvent {
       APK_PROVIDER = 1;
       DEVICE_FALLBACK = 2;
       DEVICE = 3;
+      FILES = 4;
     }
 
     optional uint64 dex_fetch_time_ms = 1;
@@ -17618,6 +18139,27 @@ message AdbServerStatus {
   optional USBBackend usb_backend = 4;
   optional bool is_mdns_backend_forced = 5;
   optional bool is_usb_backend_forced = 6;
+}
+
+message AndroidCliInvocation {
+  // Note that we only log the command and sub-command name, and not the entire
+  // command line to avoid logging user data.
+  optional string command_name = 1;
+  optional string sub_command_name = 2;
+  repeated string global_flags = 3;
+  repeated string flags = 4;
+  // The name of the agent invoking android-cli
+  optional Agent agent_name = 5;
+
+  enum Agent {
+    UNKNOWN = 0;
+    AGY = 1;
+    GEMINI_CLI = 2;
+    CLAUDE_CODE = 3;
+    ANDROID_STUDIO = 4;
+    OTHER = 5;
+    CODEX = 6;
+  }
 }
 
 message ScreenshotTestComposePreviewEvent {
@@ -18690,6 +19232,8 @@ message GeminiAdvertiserEvent {
     UI_TOOLS = 13;
     // Update dependencies to latest versions.
     UPDATE_DEPENDENCIES = 14;
+    // AI insights in AQI
+    APP_QUALITY_INSIGHTS = 15;
   }
 
   enum Action {

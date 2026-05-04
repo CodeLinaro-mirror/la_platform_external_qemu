@@ -1342,6 +1342,7 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
     }
 
     if (!strcmp(config->gles_backend, "swiftshader") ||
+        !strcmp(config->gles_backend, "llvmpipe") ||
         !strcmp(config->gles_backend, "swangle")) {
         system->envSet("ANDROID_EGL_ON_EGL", "1");
         return;

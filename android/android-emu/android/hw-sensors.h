@@ -455,8 +455,8 @@ bool android_xr_set_head_angular_velocity(float omega_x, float omega_y,
 bool android_xr_set_head_velocity(float x, float y, float z);
 bool android_xr_set_hand_event(int32_t x, int32_t y, int32_t buttons, int32_t display);
 bool android_xr_set_eye_event(int32_t x, int32_t y, int32_t buttons, int32_t display);
-bool android_xr_set_options(int environment, float passthroughCoefficient);
-bool android_xr_get_options(int* environment, float* passthroughCoefficient);
+bool android_xr_set_options(int environment, float passthroughCoefficient, float dimmingValue);
+bool android_xr_get_options(int* environment, float* passthroughCoefficient, float* dimmingValue);
 bool android_xr_set_hand_gesture(int gesture);
 
 ANDROID_END_HEADER

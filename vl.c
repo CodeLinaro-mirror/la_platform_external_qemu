@@ -3370,6 +3370,13 @@ static void on_main_loop_done(void) {}
 int main(int argc, char **argv)
 #endif
 {
+#ifndef _WIN32
+    if (getenv("ANDROID_CLI") && strcmp(getenv("ANDROID_CLI"), "1") == 0) {
+        if (setsid() == -1 && errno != EPERM) {
+            fprintf(stderr, "qemu-core: setsid() failed: %s\n", strerror(errno));
+        }
+    }
+#endif
     const int res = main_impl(argc, argv, on_main_loop_done);
 
     /* make sure we run the exit notifiers deterministically if we can */

@@ -584,6 +584,9 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     if (android_is_xr_vst_headset_mode()) {
         connect(mXrEnvironmentModeDialog, SIGNAL(onXrEnvironmentModeRequested(int)),
                 this, SLOT(onXrEnvironmentModeChanged(int)));
+        connect(mXrEnvironmentModeDialog,
+                SIGNAL(onXrDimmingValueRequested(float)), this,
+                SLOT(onXrDimmingValueChanged(float)));
         connect(mXrEnvironmentModeDialog, SIGNAL(finished(int)),
                 this, SLOT(onDismissXrEnvironmentModeDialog()));
         connect(mXrInputModeDialog, SIGNAL(onXrInputModeRequested(int)), this,
@@ -1266,6 +1269,22 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
                 }
             }
             break;
+        case QtUICommand::CHANGE_XR_DIMMING_VALUE:
+            if (android_is_xr_vst_headset_mode()) {
+                if (down) {
+                    vec3 options;
+                    options.x =
+                            static_cast<float>(mLastEnvironmentModeRequested);
+                    options.y = mLastPassthroughCoefficientRequested;
+                    options.z = mLastDimmingValueRequested;
+                    LOG(DEBUG) << "Sending XR Options: " << options.x << ", "
+                               << options.y << ", " << options.z;
+                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
+                            PHYSICAL_PARAMETER_XR_OPTIONS, &options.x, 3,
+                            PHYSICAL_INTERPOLATION_SMOOTH);
+                }
+            }
+            break;
         case QtUICommand::XR_SCREEN_RECENTER:
             if (android_is_xr_vst_headset_mode()) {
                 if (down) {
@@ -1899,6 +1918,7 @@ void ToolWindow::onDismissResizableDialog() {
 }
 
 void ToolWindow::on_xr_environment_mode_button_clicked() {
+    mXrEnvironmentModeDialog->setDimmingValue(mLastDimmingValueRequested);
     mXrEnvironmentModeDialog->show();
     // Align pop-up posture selection dialog to the right of posture button
     QRect geoTool = this->geometry();
@@ -1928,6 +1948,11 @@ void ToolWindow::on_xr_input_mode_button_clicked() {
 void ToolWindow::on_xr_screen_recenter_button_clicked() {
     mEmulatorWindow->activateWindow();
     handleUICommand(QtUICommand::XR_SCREEN_RECENTER, true);
+}
+
+void ToolWindow::onXrDimmingValueChanged(float value) {
+    mLastDimmingValueRequested = value;
+    handleUICommand(QtUICommand::CHANGE_XR_DIMMING_VALUE, true);
 }
 
 void ToolWindow::onDismissXrEnvironmentModeDialog() {

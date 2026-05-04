@@ -842,7 +842,9 @@ void SnapshotPage::updateAfterSelectionChanged() {
     mUi->selectionInfo->setHtml(selectionInfoString);
     mUi->reduceInfoButton->setVisible(mInfoWindowIsBig);
     mUi->enlargeInfoButton->setVisible(!mInfoWindowIsBig);
-    if (!mInfoWindowIsBig && mUi->preview->isVisible() && theItem) {
+    if (!theItem || selectedItemStatus == SelectionStatus::Invalid) {
+        emit(screenshotLoaded("", selectedItemStatus));
+    } else if (!mInfoWindowIsBig && mUi->preview->isVisible()) {
         DD("Loading screenshot for %s",
            theItem->snapshot()->snapshot_id.c_str());
         mSnapshotService->getScreenshot(
@@ -852,6 +854,8 @@ void SnapshotPage::updateAfterSelectionChanged() {
                         std::string pixels(status.value().data.begin(),
                                            status.value().data.end());
                         emit(screenshotLoaded(pixels, selectedItemStatus));
+                    } else {
+                        emit(screenshotLoaded("", selectedItemStatus));
                     }
                 });
     }
@@ -1154,9 +1158,17 @@ void SnapshotPage::on_snapshotsList(std::vector<SnapshotInfo> snapshots) {
         // Don't auto-invalidate quickboot snapshot
         // when switching to file-backed Quickboot from older version.
         if (fc::isEnabled(fc::QuickbootFileBacked) &&
-            aSnapshot.snapshot_id == Quickboot::kDefaultBootSnapshot) {
+            aSnapshot.snapshot_id == Quickboot::kDefaultBootSnapshot &&
+            aSnapshot.size > 0) {
             snapshotIsValid = true;
         }
+
+        if (!snapshotIsValid && aSnapshot.snapshot_id == Quickboot::kDefaultBootSnapshot) {
+            // Hide invalid Quickboot snapshots, as they cannot be deleted manually
+            // and simply pollute the UI after operations like -wipe-data.
+            continue;
+        }
+
         if (!snapshotIsValid &&
             deleteInvalidsChoice != DeleteInvalidSnapshots::No) {
             invalidSnapshots.push_back(aSnapshot);

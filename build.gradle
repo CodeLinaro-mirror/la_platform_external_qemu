@@ -76,9 +76,6 @@ sdk {
             builtBy buildDefaultEmulator
             debug true
         }
-        item("$project.rootDir/../external/qemu/android-info.txt") {
-            into ''
-        }
         // This will make it end up in the Debug configuration.
         item("$buildEmulatorCodeCoverage.output/code-coverage.zip") {
             debug true
@@ -110,15 +107,9 @@ sdk {
             builtBy buildWindowsEmulator
             debug true
         }
-        item("$project.rootDir/../external/qemu/android-info.txt") {
-            into ''
-        }
         item(fprops_win) {
             name 'source.properties'
             notice null
-        }
-        item("$project.rootDir/../external/qemu/android-info.txt") {
-            into ''
         }
     }
 }

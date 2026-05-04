@@ -239,6 +239,8 @@ private:
 
     int mLastRequestedFoldablePosture = -1;
     int mLastEnvironmentModeRequested = 0;
+    float mLastDimmingValueRequested = 0.0f;
+    float mLastPassthroughCoefficientRequested = 1.0f;
     int mLastInputModeRequested = /*XR_INPUT_MODE_MOUSE_KEYBOARD*/ 1;
     QtUICommand mXrLastMouseKeyboardModeCommand = QtUICommand::CHANGE_XR_INPUT_MODE;
     std::vector<std::reference_wrapper<QPushButton>> mXrMouseKeyboardModeButtons;
@@ -351,6 +353,7 @@ private slots:
     void onHostClipboardChanged();
     void on_xr_environment_mode_button_clicked();
     void onXrEnvironmentModeChanged(int mode);
+    void onXrDimmingValueChanged(float value);
     void onDismissXrEnvironmentModeDialog();
     void on_xr_input_mode_button_clicked();
     void onXrInputModeChanged(int mode);
