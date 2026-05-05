@@ -45,6 +45,7 @@ typedef struct coreaudioVoiceOut {
     pthread_mutex_t buf_mutex;
     AudioDeviceID device_id;
     int frame_size_setting;
+    uint32_t hw_channels;
     uint32_t buffer_count;
     UInt32 device_frame_size;
     AudioDeviceIOProcID ioprocid;
@@ -310,10 +311,11 @@ static OSStatus out_device_ioproc(
     void *hwptr)
 {
     UInt32 frame_size, pending_frames;
-    void *out = outOutputData->mBuffers[0].mData;
+    float *out = (float *)outOutputData->mBuffers[0].mData;
     HWVoiceOut *hw = hwptr;
     CoreaudioVoiceOut *core = hwptr;
     size_t len;
+    uint32_t q_channels, h_channels;
 
     if (coreaudio_voice_out_buf_lock(core, "out_device_ioproc")) {
         inInputTime = 0;
@@ -336,19 +338,44 @@ static OSStatus out_device_ioproc(
     }
 
     len = frame_size * hw->info.bytes_per_frame;
+    q_channels = hw->info.nchannels;
+    h_channels = core->hw_channels;
+
     while (len) {
-        size_t write_len, start;
+        size_t write_len, start, frames;
+        const float* input;
 
         start = audio_ring_posb(hw->pos_emul, hw->pending_emul, hw->size_emul);
         assert(start < hw->size_emul);
+        write_len = MIN(MIN(hw->pending_emul, len), hw->size_emul - start);
 
-        write_len = MIN(MIN(hw->pending_emul, len),
-                        hw->size_emul - start);
+        input = (const float *)(hw->buf_emul + start);
+        frames = write_len / (q_channels * sizeof(float));
 
-        memcpy(out, hw->buf_emul + start, write_len);
+        if (q_channels == h_channels) {
+            memcpy(out, input, write_len);
+            out += write_len / sizeof(float);
+        } else if (q_channels < h_channels) {
+            const uint32_t zeroes = h_channels - q_channels;
+
+            for (; frames; --frames) {
+                memcpy(out, input, q_channels * sizeof(float));
+                input += q_channels;
+                out += q_channels;
+                for (uint32_t z = zeroes; z; --z, ++out) {
+                    *out = 0.0f;
+                }
+            }
+        } else {  /* q_channels > h_channels */
+            for (; frames; --frames) {
+                memcpy(out, input, h_channels * sizeof(float));
+                input += q_channels;
+                out += h_channels;
+            }
+        }
+
         hw->pending_emul -= write_len;
         len -= write_len;
-        out += write_len;
     }
 
     coreaudio_voice_out_buf_unlock(core, "out_device_ioproc");
@@ -384,6 +411,28 @@ static OSStatus init_out_device(CoreaudioVoiceOut *core)
         error_report("coreaudio: Could not initialize playback: "
                      "Unknown audio device");
         return status;
+    }
+
+    AudioStreamBasicDescription hw_asbd;
+    UInt32 size = sizeof(hw_asbd);
+    AudioObjectPropertyAddress addr = {
+        kAudioDevicePropertyStreamFormat,
+        kAudioDevicePropertyScopeOutput,
+        kAudioObjectPropertyElementMain
+    };
+    status = AudioObjectGetPropertyData(core->outputDeviceID, &addr, 0, NULL, &size, &hw_asbd);
+    if (status != kAudioHardwareNoError) {
+        coreaudio_playback_logerr (status, "Could not get device stream format\n");
+        return status;
+    }
+
+    core->hw_channels = hw_asbd.mChannelsPerFrame;
+    if (hw_asbd.mChannelsPerFrame != core->hw.info.nchannels) {
+        stream_basic_description.mChannelsPerFrame = hw_asbd.mChannelsPerFrame;
+        stream_basic_description.mBytesPerFrame =
+                hw_asbd.mChannelsPerFrame * (core->hw.info.bits / CHAR_BIT);
+        stream_basic_description.mBytesPerPacket =
+                stream_basic_description.mBytesPerFrame;
     }
 
     /* get minimum and maximum buffer frame sizes */
@@ -439,9 +488,7 @@ static OSStatus init_out_device(CoreaudioVoiceOut *core)
         return 0;
     }
     if (status != kAudioHardwareNoError) {
-        coreaudio_playback_logerr(status,
-                                  "Could not set samplerate %lf",
-                                  stream_basic_description.mSampleRate);
+        coreaudio_playback_logerr(status, "Could not set stream format");
         return status;
     }
 
