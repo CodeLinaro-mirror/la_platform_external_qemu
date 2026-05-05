@@ -311,6 +311,25 @@
     //   primarily for Windows.
     "shims": [
       {
+        // This will allow us to select the trace backend through bazel config settings.
+        "target": "generate_trace-.*",
+        "shims": {
+          "restrict_to": "genrule",
+          "substitutions": [
+            {
+              "attribute": "cmd",
+              "pattern": "--backend=nop",
+              "repl": "--backend=' + TRACE_BACKEND + '"
+            },
+            {
+              "attribute": "cmd_bat",
+              "pattern": "--backend=nop",
+              "repl": "--backend=' + TRACE_BACKEND + '"
+            }
+          ]
+        }
+      },
+      {
         // This shim applies to all targets matching this regex
         "target": "qemu-system-.*",
         "shims": {
@@ -397,7 +416,8 @@
           ],
           // Add dependencies to the 'deps' attribute.
           "+deps": [
-            ":qemu-headers"
+            ":qemu-headers",
+            ":trace_backend_deps"
           ]
         }
       },

@@ -2,6 +2,7 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
 load("@rules_license//rules:license.bzl", "license")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 package(
     default_applicable_licenses = [":license"],
@@ -300,4 +301,54 @@ filegroup(
         "pc-bios/keymaps/tr",
     ],
     visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "trace_backend",
+    build_setting_default = "nop",
+    values = [
+        "nop",
+        "log",
+        "simple",
+    ],
+)
+
+config_setting(
+    name = "trace_log_enabled",
+    flag_values = {":trace_backend": "log"},
+)
+
+config_setting(
+    name = "trace_simple_enabled",
+    flag_values = {":trace_backend": "simple"},
+)
+
+TRACE_BACKEND = select({
+    ":trace_log_enabled": "log",
+    ":trace_simple_enabled": "simple",
+    "//conditions:default": "nop",
+})
+
+cc_library(
+    name = "trace_backend_deps",
+    srcs = select({
+        ":trace_simple_enabled": [
+            "trace/control.h",
+            "trace/control-internal.h",
+            "trace/event-internal.h",
+            "trace/simple.c",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        ":trace_simple_enabled": ["trace/simple.h"],
+        "//conditions:default": [],
+    }),
+    defines = select({
+        ":trace_simple_enabled": ["CONFIG_TRACE_SIMPLE"],
+        ":trace_log_enabled": ["CONFIG_TRACE_LOG"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [":qemu-headers"],
 )
