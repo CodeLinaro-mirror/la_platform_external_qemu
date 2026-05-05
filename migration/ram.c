@@ -1243,7 +1243,8 @@ static int ram_save_page(RAMState *rs, PageSearchStatus *pss)
 
     /* XBZRLE overflow or normal page */
     if (pages == -1) {
-        pages = save_normal_page(pss, block, offset, p, send_async);
+        /* Force sync write to avoid QEMUFile iovcnt limit and small unaligned qcow2 writes */
+        pages = save_normal_page(pss, block, offset, p, false);
     }
 
     XBZRLE_cache_unlock();
