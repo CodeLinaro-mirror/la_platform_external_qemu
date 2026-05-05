@@ -34,8 +34,8 @@
 #include "rdma.h"
 #include "io/channel-file.h"
 
-#define IO_BUF_SIZE 32768
-#define MAX_IOV_SIZE MIN_CONST(IOV_MAX, 64)
+#define IO_BUF_SIZE (1024 * 1024)
+#define MAX_IOV_SIZE MIN_CONST(IOV_MAX, 128)
 
 typedef struct FdEntry {
     QTAILQ_ENTRY(FdEntry) entry;
