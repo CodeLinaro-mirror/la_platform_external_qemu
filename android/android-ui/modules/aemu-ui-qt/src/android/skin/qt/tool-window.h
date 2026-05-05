@@ -353,7 +353,7 @@ private slots:
     void onHostClipboardChanged();
     void on_xr_environment_mode_button_clicked();
     void onXrEnvironmentModeChanged(int mode);
-    void onXrDimmingValueChanged(float value);
+    void onXrDimmingValueChanged(float value, bool fromGuest);
     void onDismissXrEnvironmentModeDialog();
     void on_xr_input_mode_button_clicked();
     void onXrInputModeChanged(int mode);
