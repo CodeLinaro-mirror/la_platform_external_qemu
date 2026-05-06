@@ -330,6 +330,16 @@
         }
       },
       {
+        // We introduce a new 'goldfish' generator.
+        "target": "tracetool",
+        "shims": {
+          "restrict_to": "py_binary",
+          "+srcs": [
+            "scripts/tracetool/backend/goldfish.py"
+          ]
+        }
+      },
+      {
         // This shim applies to all targets matching this regex
         "target": "qemu-system-.*",
         "shims": {
@@ -452,6 +462,9 @@
           "-srcs": [
             "stubs/monitor-core.c",
             "stubs/error-printf.c"
+          ],
+          "+srcs": [
+            "google/drivers/trace/goldfish.c"
           ]
         }
       }

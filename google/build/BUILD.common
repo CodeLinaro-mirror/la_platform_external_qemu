@@ -36,6 +36,7 @@ cc_library(
     hdrs = [
         "config-poison.h",
         "generate_shared_QAPI_source_files",
+        "google/drivers/trace/goldfish.h",
         "qapi/trace.h",
         "trace/trace-accel_kvm.h",
         "trace/trace-accel_tcg.h",
@@ -213,6 +214,7 @@ cc_library(
     includes = [
         ".",
         "include",
+        "google/drivers",
     ] + select({
         "@platforms//os:windows": ["platform/windows-amd64"],
         "@platforms//os:macos": ["platform/darwin-arm64"],
@@ -311,6 +313,7 @@ string_flag(
         "nop",
         "log",
         "simple",
+        "goldfish",
     ],
 )
 
@@ -324,9 +327,15 @@ config_setting(
     flag_values = {":trace_backend": "simple"},
 )
 
+config_setting(
+    name = "goldfish_enabled",
+    flag_values = {":trace_backend": "goldfish"},
+)
+
 TRACE_BACKEND = select({
     ":trace_log_enabled": "log",
     ":trace_simple_enabled": "simple",
+    ":goldfish_enabled": "goldfish",
     "//conditions:default": "nop",
 })
 
@@ -339,15 +348,20 @@ cc_library(
             "trace/event-internal.h",
             "trace/simple.c",
         ],
+        ":goldfish_enabled": [
+            "google/drivers/trace/goldfish.c",
+        ],
         "//conditions:default": [],
     }),
     hdrs = select({
         ":trace_simple_enabled": ["trace/simple.h"],
+        ":goldfish_enabled": ["google/drivers/trace/goldfish.h"],
         "//conditions:default": [],
     }),
     defines = select({
         ":trace_simple_enabled": ["CONFIG_TRACE_SIMPLE"],
         ":trace_log_enabled": ["CONFIG_TRACE_LOG"],
+        ":goldfish_enabled": ["CONFIG_TRACE_GOLDFISH"],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
