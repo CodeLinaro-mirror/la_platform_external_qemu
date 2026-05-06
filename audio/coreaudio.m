@@ -37,6 +37,7 @@ typedef struct coreaudioVoiceOut {
     HWVoiceOut hw;
     pthread_mutex_t buf_mutex;
     AudioDeviceID outputDeviceID;
+    int hw_channels;
     int frameSizeSetting;
     uint32_t bufferCount;
     UInt32 audioDevicePropertyBufferFrameSize;
@@ -342,7 +343,7 @@ static OSStatus audioDeviceIOProcOut(
     void *hwptr)
 {
     UInt32 frameCount, pending_frames;
-    void *out = outOutputData->mBuffers[0].mData;
+    float *out_samples = (float *)outOutputData->mBuffers[0].mData;
     HWVoiceOut *hw = hwptr;
     coreaudioVoiceOut *core = (coreaudioVoiceOut *) hwptr;
     size_t len;
@@ -368,19 +369,71 @@ static OSStatus audioDeviceIOProcOut(
     }
 
     len = frameCount * hw->info.bytes_per_frame;
-    while (len) {
-        size_t write_len, start;
+    const int q_channels = hw->info.nchannels;
+    const int h_channels = core->hw_channels;
 
-        start = audio_ring_posb(hw->pos_emul, hw->pending_emul, hw->size_emul);
-        assert(start < hw->size_emul);
+    if (q_channels == h_channels) {
+        while (len) {
+            size_t write_len, start;
 
-        write_len = MIN(MIN(hw->pending_emul, len),
-                        hw->size_emul - start);
+            start = audio_ring_posb(hw->pos_emul, hw->pending_emul, hw->size_emul);
+            assert(start < hw->size_emul);
 
-        memcpy(out, hw->buf_emul + start, write_len);
-        hw->pending_emul -= write_len;
-        len -= write_len;
-        out += write_len;
+            write_len = MIN(MIN(hw->pending_emul, len),
+                            hw->size_emul - start);
+
+            memcpy(out_samples, hw->buf_emul + start, write_len);
+            hw->pending_emul -= write_len;
+            len -= write_len;
+            out_samples += write_len / sizeof(float);
+        }
+    } else if (q_channels < h_channels) {
+        // Expand
+        while (len) {
+            size_t write_len, start;
+
+            start = audio_ring_posb(hw->pos_emul, hw->pending_emul, hw->size_emul);
+            assert(start < hw->size_emul);
+
+            write_len = MIN(MIN(hw->pending_emul, len),
+                            hw->size_emul - start);
+
+            float *in_samples = (float *)(hw->buf_emul + start);
+            int frames = write_len / (q_channels * sizeof(float));
+
+            for (int i = 0; i < frames; i++) {
+                memcpy(out_samples, in_samples + i * q_channels, q_channels * sizeof(float));
+                for (int j = q_channels; j < h_channels; j++) {
+                    out_samples[j] = 0.0f;
+                }
+                out_samples += h_channels;
+            }
+
+            hw->pending_emul -= write_len;
+            len -= write_len;
+        }
+    } else {
+        // Shrink (q_channels > h_channels)
+        while (len) {
+            size_t write_len, start;
+
+            start = audio_ring_posb(hw->pos_emul, hw->pending_emul, hw->size_emul);
+            assert(start < hw->size_emul);
+
+            write_len = MIN(MIN(hw->pending_emul, len),
+                            hw->size_emul - start);
+
+            float *in_samples = (float *)(hw->buf_emul + start);
+            int frames = write_len / (q_channels * sizeof(float));
+
+            for (int i = 0; i < frames; i++) {
+                memcpy(out_samples, in_samples + i * q_channels, h_channels * sizeof(float));
+                out_samples += h_channels;
+            }
+
+            hw->pending_emul -= write_len;
+            len -= write_len;
+        }
     }
 
     coreaudio_buf_unlock (&core->buf_mutex, "audioDeviceIOProcOut");
@@ -412,6 +465,26 @@ static OSStatus init_out_device(coreaudioVoiceOut *core)
     if (core->outputDeviceID == kAudioDeviceUnknown) {
         dolog ("Could not initialize playback - Unknown Audiodevice\n");
         return status;
+    }
+
+    AudioStreamBasicDescription hw_asbd;
+    UInt32 size = sizeof(hw_asbd);
+    AudioObjectPropertyAddress addr = {
+        kAudioDevicePropertyStreamFormat,
+        kAudioDevicePropertyScopeOutput,
+        kAudioObjectPropertyElementMain
+    };
+    status = AudioObjectGetPropertyData(core->outputDeviceID, &addr, 0, NULL, &size, &hw_asbd);
+    if (status != kAudioHardwareNoError) {
+        coreaudio_playback_logerr (status, "Could not get device stream format\n");
+        return status;
+    }
+
+    core->hw_channels = hw_asbd.mChannelsPerFrame;
+    if (hw_asbd.mChannelsPerFrame != core->hw.info.nchannels) {
+        streamBasicDescription.mChannelsPerFrame = hw_asbd.mChannelsPerFrame;
+        streamBasicDescription.mBytesPerFrame = hw_asbd.mChannelsPerFrame * (core->hw.info.bits / CHAR_BIT);
+        streamBasicDescription.mBytesPerPacket = streamBasicDescription.mBytesPerFrame;
     }
 
     /* get minimum and maximum buffer frame sizes */
@@ -474,8 +547,7 @@ static OSStatus init_out_device(coreaudioVoiceOut *core)
     }
     if (status != kAudioHardwareNoError) {
         coreaudio_playback_logerr (status,
-                                   "Could not set samplerate %lf\n",
-                                   streamBasicDescription.mSampleRate);
+                                    "Could not set stream format\n");
         core->outputDeviceID = kAudioDeviceUnknown;
         return status;
     }
