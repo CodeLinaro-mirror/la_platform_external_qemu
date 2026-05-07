@@ -68,12 +68,12 @@ typedef void (*gf_shutdown_func_t)(void);
 static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func, gf_shutdown_func_t *shutdown_func) {
     char *module_dir = getenv(LIB_PATH_ENV_VAR);
     if (module_dir == NULL) {
-        fprintf(stderr, "error, can't load goldfish module as QEMU_MODULE_DIR is not set");
+        fprintf(stderr, "error: Cannot load goldfish module because environment variable %s is not set.\n", LIB_PATH_ENV_VAR);
         return false;
     }
     char full_path[PATH_MAX];
     if (snprintf(full_path, sizeof(full_path), "%s/" LIB_PREFIX "goldfish_" TARGET_NAME, module_dir) < 0) {
-      fprintf(stderr, "error, failed to generate goldfish module path - %s\n", module_dir);
+      fprintf(stderr, "error: Failed to generate goldfish module path using directory: %s\n", module_dir);
       return false;
     }
 
@@ -86,21 +86,21 @@ static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func,
     }
     g_module = g_module_open(full_path, (GModuleFlags)flags);
     if (!g_module) {
-        fprintf(stderr, "error, failed to load goldfish module - %s: %s\n", full_path, g_module_error());
+        fprintf(stderr, "error: Failed to load goldfish module from \"%s\": %s\n", full_path, g_module_error());
         return false;
     }
 
     gf_register_types_func_t gf_register_types_func = NULL;
     if (!g_module_symbol(g_module, TOSTRING(GF_REGISTER_TYPES_FUNC), (gpointer *)&gf_register_types_func)) {
-        fprintf(stderr, "error, failed to find %s function\n", TOSTRING(GF_REGISTER_TYPES_FUNC));
+        fprintf(stderr, "error: Failed to find required symbol \"%s\" in goldfish module.\n", TOSTRING(GF_REGISTER_TYPES_FUNC));
         return false;
     }
     if (!g_module_symbol(g_module, TOSTRING(GF_STARTUP_FUNC), (gpointer *)startup_func)) {
-        fprintf(stderr, "error, failed to find %s function\n", TOSTRING(GF_STARTUP_FUNC));
+        fprintf(stderr, "error: Failed to find required symbol \"%s\" in goldfish module.\n", TOSTRING(GF_STARTUP_FUNC));
         return false;
     }
     if (!g_module_symbol(g_module, TOSTRING(GF_SHUTDOWN_FUNC), (gpointer *)shutdown_func)) {
-        fprintf(stderr, "error, failed to find %s function\n", TOSTRING(GF_SHUTDOWN_FUNC));
+        fprintf(stderr, "error: Failed to find required symbol \"%s\" in goldfish module.\n", TOSTRING(GF_SHUTDOWN_FUNC));
         return false;
     }
 
