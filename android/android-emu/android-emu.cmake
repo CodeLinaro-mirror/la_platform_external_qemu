@@ -734,7 +734,12 @@ if(NOT LINUX_AARCH64)
       testdata/textureutils/rgb24_31px_golden.bmp
       testdata/textureutils/rgb24_31px.png
       testdata/textureutils/rgba32_golden.bmp
-      testdata/textureutils/rgba32.png)
+      testdata/textureutils/rgba32.png
+      testdata/ver/scene_color_golden.png
+      testdata/ver/scene_imagefile_golden.png
+      testdata/ver/scene_videofile_golden.png
+      testdata/ver/scene_mesh3d_golden.png
+      testdata/ver/scene_image360_golden.png)
 
   prebuilt(VIRTUALSCENE)
   android_copy_test_files(android-emu_unittests "${android-emu-testdata}"
@@ -745,7 +750,8 @@ if(NOT LINUX_AARCH64)
 
   # Declare virtual_environment_renderer_unittests
   android_add_test(TARGET virtual_environment_renderer_unittests
-                   SRC android/ver/test/TextureUtils_unittest.cpp)
+                   SRC android/ver/test/TextureUtils_unittest.cpp
+                       android/ver/test/SceneRendering_unittests.cpp)
 
   target_compile_options(
     virtual_environment_renderer_unittests PRIVATE -O0 -Wno-invalid-constexpr
@@ -773,7 +779,8 @@ if(NOT LINUX_AARCH64)
             virtual_environment_renderer
             android-emu-base-headers
             android-emu-test-launcher
-            qemu-host-common-headers)
+            qemu-host-common-headers
+            gfxstream_openglesdispatch)
 
   android_copy_test_files(virtual_environment_renderer_unittests
                           "${virtual_environment_renderer-testdata}" testdata)
