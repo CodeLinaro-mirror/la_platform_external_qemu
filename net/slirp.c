@@ -22,10 +22,14 @@
  * THE SOFTWARE.
  */
 
+#ifndef _WIN32
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#endif
+#include <stdbool.h>
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "net/slirp.h"
-
 
 #if defined(CONFIG_SMBD_COMMAND)
 #include <pwd.h>
