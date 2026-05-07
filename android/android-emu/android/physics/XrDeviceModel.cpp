@@ -347,23 +347,30 @@ void XrDeviceModel::qemudClientRecv(uint8_t* msg, int msglen) {
             }
 
             case EmulatorResponse::kXrOptions: {
-                const auto& xr_options = response.xr_options();
+                auto* xr_options = response.mutable_xr_options();
                 bool needs_notification = false;
-                I("XrOptions received: %s", xr_options.ShortDebugString().c_str());
-                if (xr_options.has_passthrough_coefficient()) {
+                I("XrOptions received: %s",
+                  xr_options->ShortDebugString().c_str());
+                if (xr_options->has_passthrough_coefficient()) {
                     I("Received passthrough coefficient: %f",
-                      xr_options.passthrough_coefficient());
-                    mPassthroughCoefficient = xr_options.passthrough_coefficient();
+                      xr_options->passthrough_coefficient());
+                    mPassthroughCoefficient =
+                            xr_options->passthrough_coefficient();
                     needs_notification = true;
+                } else {
+                    xr_options->set_passthrough_coefficient(
+                            mPassthroughCoefficient);
                 }
-                if (xr_options.has_dimming_value()) {
+                if (xr_options->has_dimming_value()) {
                     I("Received dimming value: %f",
-                      xr_options.dimming_value());
-                    mDimmingValue = xr_options.dimming_value();
+                      xr_options->dimming_value());
+                    mDimmingValue = xr_options->dimming_value();
                     needs_notification = true;
+                } else {
+                    xr_options->set_dimming_value(mDimmingValue);
                 }
                 if (needs_notification) {
-                    mXrOptionsPublisher.fireEvent(xr_options);
+                    mXrOptionsPublisher.fireEvent(*xr_options);
                 }
                 break;
             }

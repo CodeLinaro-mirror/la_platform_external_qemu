@@ -28,6 +28,7 @@
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QEvent>
+#include <QFileDialog>
 #include <QFlags>
 #include <QFrame>
 #include <QGuiApplication>
@@ -35,6 +36,7 @@
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QList>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPen>
@@ -253,6 +255,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 #endif
     setWindowFlags(flag | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
     mToolsUi->setupUi(this);
+
     const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
     const AvdFlavor avdFlavor = avdInfo ? avdInfo_getAvdFlavor(avdInfo) : AVD_OTHER;
     bool avdIsDesktopApi36OrHigher = avdInfo && avdInfo_isDesktopApi36OrHigher(avdInfo);
@@ -443,7 +446,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
             }
         } else if (button != mToolsUi->close_button &&
                    button != mToolsUi->minimize_button &&
-                   button != mToolsUi->more_button) {
+                   button != mToolsUi->more_button &&
+                   button != mToolsUi->environment_button) {
             // Almost all toolbar buttons are required to have a uiCommand
             // property.
             // Unfortunately, we have no way of enforcing it at compile time.
@@ -568,7 +572,22 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         if (getConsoleAgents()->settings->hw()->hw_touchpad0) {
             mTouchpadWindow->get();
         }
+
+        QMenu* envMenu = new QMenu(this);
+        envMenu->addAction(tr("Default Environment"), this,
+                           SLOT(on_default_environment_selected()));
+        envMenu->addAction(tr("None"), this, SLOT(on_none_selected()));
+        envMenu->addSeparator();
+        envMenu->addAction(tr("Custom Image..."), this,
+                           SLOT(on_custom_image_selected()));
+        envMenu->addAction(tr("Custom Video..."), this,
+                           SLOT(on_custom_video_selected()));
+        envMenu->addAction(tr("Custom 360 Image..."), this,
+                           SLOT(on_custom_360_image_selected()));
+        mToolsUi->environment_button->setMenu(envMenu);
+        mToolsUi->environment_button->setEnabled(true);
     } else {
+        mToolsUi->environment_button->setVisible(false);
         mToolsUi->glasses_button->setVisible(false);
     }
 
@@ -585,8 +604,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         connect(mXrEnvironmentModeDialog, SIGNAL(onXrEnvironmentModeRequested(int)),
                 this, SLOT(onXrEnvironmentModeChanged(int)));
         connect(mXrEnvironmentModeDialog,
-                SIGNAL(onXrDimmingValueRequested(float)), this,
-                SLOT(onXrDimmingValueChanged(float)));
+                SIGNAL(onXrDimmingValueRequested(float, bool)), this,
+                SLOT(onXrDimmingValueChanged(float, bool)));
         connect(mXrEnvironmentModeDialog, SIGNAL(finished(int)),
                 this, SLOT(onDismissXrEnvironmentModeDialog()));
         connect(mXrInputModeDialog, SIGNAL(onXrInputModeRequested(int)), this,
@@ -1950,9 +1969,11 @@ void ToolWindow::on_xr_screen_recenter_button_clicked() {
     handleUICommand(QtUICommand::XR_SCREEN_RECENTER, true);
 }
 
-void ToolWindow::onXrDimmingValueChanged(float value) {
+void ToolWindow::onXrDimmingValueChanged(float value, bool fromGuest) {
     mLastDimmingValueRequested = value;
-    handleUICommand(QtUICommand::CHANGE_XR_DIMMING_VALUE, true);
+    if (!fromGuest) {
+        handleUICommand(QtUICommand::CHANGE_XR_DIMMING_VALUE, true);
+    }
 }
 
 void ToolWindow::onDismissXrEnvironmentModeDialog() {
@@ -1987,6 +2008,45 @@ void ToolWindow::on_xr_viewport_rotate_button_clicked() {
         onXrInputModeChanged(mLastInputModeRequested);
     } else {
         handleUICommand(QtUICommand::XR_VIEWPORT_CONTROL_MODE_ROTATE, true);
+    }
+}
+
+void ToolWindow::on_default_environment_selected() {
+    getConsoleAgents()->virtual_scene->reloadEnvironment(
+            "scene.mode = imagefile");
+}
+
+void ToolWindow::on_none_selected() {
+    getConsoleAgents()->virtual_scene->reloadEnvironment(
+            "scene.mode = color:#000000");
+}
+
+void ToolWindow::on_custom_image_selected() {
+    QString fileName = QFileDialog::getOpenFileName(
+            this, tr("Select Image"), "", tr("Images (*.png *.jpg)"));
+    if (!fileName.isEmpty()) {
+        std::string command =
+                "scene.mode = imagefile:" + fileName.toStdString();
+        getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
+    }
+}
+
+void ToolWindow::on_custom_video_selected() {
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Select Video"),
+                                                    "", tr("Videos (*.mp4)"));
+    if (!fileName.isEmpty()) {
+        std::string command =
+                "scene.mode = videofile:" + fileName.toStdString();
+        getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
+    }
+}
+
+void ToolWindow::on_custom_360_image_selected() {
+    QString fileName = QFileDialog::getOpenFileName(
+            this, tr("Select 360 Image"), "", tr("Images (*.png *.jpg)"));
+    if (!fileName.isEmpty()) {
+        std::string command = "scene.mode = image360:" + fileName.toStdString();
+        getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
     }
 }
 
