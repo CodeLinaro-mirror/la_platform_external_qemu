@@ -485,6 +485,7 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
     const AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
     const bool warnIfMissing = !strcmp(hwCfg->hw_camera_back, "virtualscene");
 
+    mShowBackground = transparentDisplay;
     EnvironmentConfig envConfig =
             getEnvironmentConfig(avdInfo, warnIfMissing, mShowBackground);
     SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
@@ -505,7 +506,6 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
 
     lock.unlock();
 
-    mShowBackground = transparentDisplay;
     if (initBackgroundService) {
         int displayWidth, displayHeight;
         androidHwConfig_getScreenDimensions(hwCfg, &displayWidth,
