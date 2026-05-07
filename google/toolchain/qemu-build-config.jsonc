@@ -918,12 +918,6 @@
           }
         },
         {
-          "target": "libcommon",
-          "shims": {
-            "name": "libcommon_qemu-system-x86_64"
-          }
-        },
-        {
           "target": ".*",
           "shims": {
             "restrict_to": "py_binary",
@@ -965,7 +959,8 @@
         ]
       },
       "export": [
-        "qemu-system-x86_64"
+        "qemu-system-x86_64",
+        "qemu-system-aarch64"
       ],
       "exclude": []
     }
