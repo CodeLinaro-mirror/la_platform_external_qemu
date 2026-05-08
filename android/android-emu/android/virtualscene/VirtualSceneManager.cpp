@@ -19,6 +19,7 @@
 #include "aemu/base/files/PathUtils.h"
 #include "android/avd/info.h"
 #include "android/base/system/System.h"
+#include "android/base/logging/StudioMessage.h"
 #include "android/camera/camera-metrics.h"
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/cmdline-option.h"
@@ -400,7 +401,7 @@ void VirtualSceneManager::parseCmdline() {
 bool VirtualSceneManager::initialize(bool initBackgroundService,
                                      bool transparentDisplay) {
     AutoLock lock(mLock);
-    if (mEnvironmentScene) {
+    if (mEnvironmentScene != VER_INVALID_HANDLE) {
         E("VirtualSceneManager already initialized");
         return false;
     }
@@ -419,7 +420,7 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
     mShowBackground = transparentDisplay;
     EnvironmentConfig envConfig =
             getEnvironmentConfig(avdInfo, warnIfMissing, mShowBackground);
-    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
+    const SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
 
     D("Initializing VirtualSceneManager with mode:%s, argument:%s",
       SceneConfig::modeToString(sceneConfig.mSceneMode),
@@ -430,11 +431,39 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
             SceneConfig::modeToString(sceneConfig.mSceneMode);
     camera::CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
-    mEnvironmentScene = ver_create_scene(sceneConfig);
+    // Check if the config is valid, and provide a different error if the file
+    // is not present
+    bool configFileExists = ver_scene_config_file_exists(sceneConfig);
+    if (configFileExists) {
+        mEnvironmentScene = ver_create_scene(sceneConfig);
+    }
 
     if (mEnvironmentScene == VER_INVALID_HANDLE) {
-        E("VirtualSceneManager scene could not be initialized");
-        return false;
+        // If the config cannot be loaded, try with the fallback config
+        const SceneConfig::Mode fallbackMode = SceneConfig::Mode::ImageFile;
+        const SceneConfig fallbackConfig(
+                fallbackMode,
+                SceneConfig::defaultArgumentForMode(fallbackMode));
+        mEnvironmentScene = ver_create_scene(fallbackConfig);
+
+        if (mEnvironmentScene == VER_INVALID_HANDLE) {
+            // Even the fallback scene could not be initialized
+            USER_MESSAGE(ERROR)
+                    << "Environment scene could not be initialized with source: '"
+                    << sceneConfig.mArgument
+                    << "' and the defaults are not available";
+            return false;
+        } else if (!configFileExists) {
+            // File referenced in the config does not exist
+            USER_MESSAGE(ERROR)
+                    << "Environment scene file could not be found: '"
+                    << sceneConfig.mArgument << "', using defaults";
+        } else {
+            // Other error, e.g. video/image file cannot be parsed..etc
+            USER_MESSAGE(ERROR)
+                    << "Environment scene could not be initialized with source: '"
+                    << sceneConfig.mArgument << "', using defaults";
+        }
     }
 
     mKeepUpdating = false;
@@ -774,11 +803,23 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
 
     EnvironmentConfig envConfig =
             getEnvironmentConfig(avdInfo, true, mShowBackground);
+    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
+
+    // Check if the config is valid, and provide a different error if the file
+    // is not present
+    bool configFileExists = ver_scene_config_file_exists(sceneConfig);
+    if (!configFileExists) {
+        // File referenced in the config does not exist
+        USER_MESSAGE(ERROR)
+                << "Cannot reload environment scene, file could not be found: '"
+                << sceneConfig.mArgument << "'";
+        return false;
+    }
 
     // Reload virtual scene
-    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
     if (!reloadScene(sceneConfig)) {
-        derror("%s: Cannot reload virtual scene for the environment", __func__);
+        USER_MESSAGE(ERROR) << "Cannot reload environment scene: '"
+                            << sceneConfig.mArgument << "'";
         return false;
     }
 

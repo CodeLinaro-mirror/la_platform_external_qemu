@@ -99,6 +99,13 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
         }
         SceneConfig sceneConfig(mode, sceneArgument);
         mOwnedScene = ver_create_scene(sceneConfig);
+        if (mOwnedScene == VER_INVALID_HANDLE) {
+            // Use magenta/error color fallback for camera owned scenes
+            LOG(ERROR)
+                    << "Camera scene could not be initialized, using default configuration!";
+            mOwnedScene = ver_create_scene(
+                    SceneConfig(SceneConfig::Mode::Color, "#FF00FF"));
+        }
 
         if (mOwnedScene != VER_INVALID_HANDLE) {
             sceneMode = ver_scene_get_mode(mOwnedScene);
