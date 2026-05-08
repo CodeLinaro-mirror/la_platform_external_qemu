@@ -224,8 +224,8 @@ android_add_library(
 target_include_directories(
   virtual_environment_renderer
   PUBLIC  android/ver/include
-  PUBLIC  android/ver/src #TODO(virtualscene-library): should be private
   PRIVATE
+          android/ver/src
           ${CMAKE_CURRENT_SOURCE_DIR}
           ${ANDROID_QEMU2_TOP_DIR}
           ${ANDROID_QEMU2_TOP_DIR}/android/android-emugl/host/include
@@ -671,7 +671,6 @@ if(NOT LINUX_AARCH64)
       android/physics/InertialModel_unittest.cpp
       android/physics/PhysicalModel_unittest.cpp
       android/sensor_replay/sensor_session_playback_unittest.cpp
-      android/ver/test/TextureUtils_unittest.cpp
       android/snapshot/RamLoader_unittest.cpp
       android/snapshot/RamSaver_unittest.cpp
       android/snapshot/RamSnapshot_unittest.cpp
@@ -735,8 +734,12 @@ if(NOT LINUX_AARCH64)
       testdata/textureutils/rgb24_31px_golden.bmp
       testdata/textureutils/rgb24_31px.png
       testdata/textureutils/rgba32_golden.bmp
-      testdata/textureutils/rgba32.png)
-  list(APPEND android-emu-testdata ${virtual_environment_renderer-testdata})
+      testdata/textureutils/rgba32.png
+      testdata/ver/scene_color_golden.png
+      testdata/ver/scene_imagefile_golden.png
+      testdata/ver/scene_videofile_golden.png
+      testdata/ver/scene_mesh3d_golden.png
+      testdata/ver/scene_image360_golden.png)
 
   prebuilt(VIRTUALSCENE)
   android_copy_test_files(android-emu_unittests "${android-emu-testdata}"
@@ -744,4 +747,42 @@ if(NOT LINUX_AARCH64)
   android_target_dependency(android-emu_unittests all
                             VIRTUAL_SCENE_DEPENDENCIES)
   android_copy_test_dir(android-emu_unittests test-sdk test-sdk)
+
+  # Declare virtual_environment_renderer_unittests
+  android_add_test(TARGET virtual_environment_renderer_unittests
+                   SRC android/ver/test/TextureUtils_unittest.cpp
+                       android/ver/test/SceneRendering_unittests.cpp)
+
+  target_compile_options(
+    virtual_environment_renderer_unittests PRIVATE -O0 -Wno-invalid-constexpr
+                                  -Wno-string-plus-int)
+  target_include_directories(
+    virtual_environment_renderer_unittests
+    PRIVATE
+            android/ver/src
+            ../android-emugl/host/include/
+            android/)
+
+  # Sign unit test if needed.
+  android_sign(TARGET virtual_environment_renderer_unittests)
+
+  # Settings needed for darwin
+  android_target_compile_definitions(
+    virtual_environment_renderer_unittests darwin PRIVATE "-D_DARWIN_C_SOURCE=1")
+
+  android_target_compile_options(virtual_environment_renderer_unittests darwin
+                                 PRIVATE "-Wno-deprecated-declarations")
+
+  target_link_libraries(
+    virtual_environment_renderer_unittests
+    PRIVATE android-emu
+            virtual_environment_renderer
+            android-emu-base-headers
+            android-emu-test-launcher
+            qemu-host-common-headers
+            gfxstream_openglesdispatch)
+
+  android_copy_test_files(virtual_environment_renderer_unittests
+                          "${virtual_environment_renderer-testdata}" testdata)
+
 endif()
