@@ -17,8 +17,6 @@
 #include "android/camera/camera-virtualscene-utils.h"
 
 #include "android/camera/camera-virtualscene.h"
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/Scene.h"
 #include "android/virtualscene/VirtualSceneManager.h"
 
 #define VIRTUALSCENE_PIXEL_FORMAT V4L2_PIX_FMT_RGB32
@@ -27,22 +25,20 @@
 #undef ERROR
 #endif
 
-using namespace gfxstream::host::gl;
-
 namespace android {
 namespace virtualscene {
 
-static RendererView::Format formatFromCameraFormat(uint32_t cameraPixelFormat) {
+static VerImageFormat formatFromCameraFormat(uint32_t cameraPixelFormat) {
     if (cameraPixelFormat == V4L2_PIX_FMT_RGB32) {
-        return RendererView::Format::RGBA8;
+        return VerImageFormat::RGBA8;
     }
     derror("Unsupported camera format for virtual scene views %lu",
            cameraPixelFormat);
-    return RendererView::Format::RGBA8;
+    return VerImageFormat::RGBA8;
 }
 
-static uint32_t cameraFormatFromFormat(RendererView::Format format) {
-    if (format == RendererView::Format::RGBA8) {
+static uint32_t cameraFormatFromFormat(VerImageFormat format) {
+    if (format == VerImageFormat::RGBA8) {
         return V4L2_PIX_FMT_RGB32;
     }
     derror("Unknown view format %lu", (uint32_t)format);
@@ -60,6 +56,9 @@ RenderedCameraDevice::RenderedCameraDevice(std::string_view name) {
 
 RenderedCameraDevice::~RenderedCameraDevice() {
     stopCapturing();
+
+    ver_destroy_scene(mOwnedScene);
+    mOwnedScene = VER_INVALID_HANDLE;
 }
 
 int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
@@ -86,7 +85,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
     // direction used.
     mUsingEnvironmentScene = (sceneModeStr == "environment");
     if (mUsingEnvironmentScene) {
-        mOwnedScene = nullptr;
+        mOwnedScene = VER_INVALID_HANDLE;
         sceneMode = VirtualSceneManager::getSceneMode();
 
         VirtualSceneManager::setSceneControlsParameters(true);
@@ -99,11 +98,11 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
             sceneArgument = SceneConfig::defaultArgumentForMode(mode);
         }
         SceneConfig sceneConfig(mode, sceneArgument);
-        mOwnedScene = ScenesManager::createScene(sceneConfig);
+        mOwnedScene = ver_create_scene(sceneConfig);
 
-        if (mOwnedScene) {
-            sceneMode = mOwnedScene->getSceneMode();
-            mOwnedScene->loadUserResources();
+        if (mOwnedScene != VER_INVALID_HANDLE) {
+            sceneMode = ver_scene_get_mode(mOwnedScene);
+            ver_scene_load_user_resources(mOwnedScene, [](){});
         }
     }
 
@@ -115,9 +114,14 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 
     mSceneCamera.setAspectRatio(static_cast<float>(frameWidth) / frameHeight);
 
-    mActiveView = std::make_unique<RendererView>();
-    mActiveView->updateTarget(formatFromCameraFormat(pixelFormat), frameWidth,
-                              frameHeight);
+    if (formatFromCameraFormat(pixelFormat) != VerImageFormat::RGBA8) {
+        LOG(ERROR) << "Camera scene could not be initialized, unsupported format requested!";
+        stopCapturing();
+        return -1;
+    }
+
+    mActiveView = ver_create_render_view();
+    ver_render_view_set_dimensions(mActiveView, frameWidth, frameHeight);
 
     return 0;
 }
@@ -127,16 +131,19 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
 // reset camera device by reopening its handle. Otherwise attempts to set up new
 // frame properties (different from the previous one) may fail.
 void RenderedCameraDevice::stopCapturing() {
-    mActiveView.reset();
+    if (mActiveView != VER_INVALID_HANDLE) {
+        ver_destroy_render_view(mActiveView);
+        mActiveView = VER_INVALID_HANDLE;
+    }
 
     if (mUsingEnvironmentScene) {
         VirtualSceneManager::setSceneControlsParameters(false);
         VirtualSceneManager::removeSceneUser();
         mUsingEnvironmentScene = false;
-    } else if (mOwnedScene) {
-        mOwnedScene->unloadUserResources();
-        ScenesManager::removeScene(mOwnedScene.get());
-        mOwnedScene.reset();
+    } else if (mOwnedScene != VER_INVALID_HANDLE) {
+        ver_scene_unload_user_resources(mOwnedScene);
+        ver_destroy_scene(mOwnedScene);
+        mOwnedScene = VER_INVALID_HANDLE;
     }
 }
 
@@ -151,8 +158,8 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
     SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
     if (mUsingEnvironmentScene) {
         sceneMode = VirtualSceneManager::getSceneMode();
-    } else if (mOwnedScene) {
-        sceneMode = mOwnedScene->getSceneMode();
+    } else if (mOwnedScene != VER_INVALID_HANDLE) {
+        sceneMode = ver_scene_get_mode(mOwnedScene);
     }
 
     if (sceneMode == SceneConfig::Mode::Unknown) {
@@ -160,11 +167,11 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
         return -1;
     }
     if (!mUsingEnvironmentScene) {
-        if (!mOwnedScene) {
+        if (mOwnedScene == VER_INVALID_HANDLE) {
             LOG(ERROR) << "Virtual scene is not initialized!";
             return -1;
         }
-        mOwnedScene->update();
+        ver_scene_update(mOwnedScene, true);
     }
 
     glm::vec3 extraRotationEulerDegrees = glm::vec3();
@@ -178,15 +185,25 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
     const bool supportsPosition = (sceneMode == SceneConfig::Mode::Mesh3D);
     mSceneCamera.setExtraRotationEulerDegrees(extraRotationEulerDegrees);
     mSceneCamera.update(supportsPosition);
-    mActiveView->updateViewProjection(mSceneCamera.getViewProjection());
+
+    auto viewProj = mSceneCamera.getViewProjection();
+    ver_render_view_set_view_projection(mActiveView, &viewProj[0][0]);
 
     int conversionResult = -1;
     auto onRenderComplete = [&]() {
-        const std::vector<uint8_t>& fbData =
-                mActiveView->getFramebufferLocked();
+        const uint8_t* viewFbDataPtr = nullptr;
+        uint64_t viewFbDataSize = 0;
+        ver_render_view_get_framebuffer(mActiveView, &viewFbDataPtr, &viewFbDataSize);
+        if (!viewFbDataPtr || viewFbDataSize == 0) {
+            LOG(ERROR) << "Could not get framebuffer data for the view.";
+            return;
+        }
 
         uint32_t pixelFormat =
-                cameraFormatFromFormat(mActiveView->getFormatLocked());
+                cameraFormatFromFormat(VerImageFormat::RGBA8);
+
+        int32_t viewWidth=0, viewHeight=0;
+        ver_render_view_get_dimensions(mActiveView, &viewWidth, &viewHeight);
 
         // Do not rotate during the conversion if the view is already handling
         const bool viewHandlesRotation =
@@ -201,7 +218,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
             if (mUsingEnvironmentScene) {
                 rotation = VirtualSceneManager::getSceneBaseRotationLocked();
             } else {
-                rotation = mOwnedScene->getSceneRotation();
+                rotation = ver_scene_get_scene_rotation(mOwnedScene);
             }
             if (rotation) {
                 // Apply the required base rotation to the image
@@ -214,8 +231,8 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
         }
         // Convert frame to the receiving buffers.
         conversionResult = convert_frame(
-                fbData.data(), pixelFormat, fbData.size(),
-                mActiveView->getWidthLocked(), mActiveView->getHeightLocked(),
+                viewFbDataPtr, pixelFormat, viewFbDataSize,
+                viewWidth, viewHeight,
                 resultFrame, rScale, gScale, bScale, expComp, convertDirection,
                 convertOrientation);
     };
@@ -224,11 +241,10 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
     bool renderResult = false;
     if (mUsingEnvironmentScene) {
         renderResult = VirtualSceneManager::renderView(
-                mActiveView.get(), onRenderComplete, &frameTime);
+                mActiveView, onRenderComplete, &frameTime);
     } else {
-        renderResult =
-                ScenesManager::renderView(mOwnedScene.get(), mActiveView.get(),
-                                          onRenderComplete, &frameTime);
+        renderResult = ver_render_view(mOwnedScene, mActiveView,
+                                       onRenderComplete, &frameTime);
     }
 
     if (!renderResult) {

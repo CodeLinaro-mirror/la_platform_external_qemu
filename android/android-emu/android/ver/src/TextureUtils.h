@@ -21,11 +21,9 @@
  * file.
  */
 
-#include "aemu/base/Compiler.h"
-#include "aemu/base/Optional.h"
-#include "android/utils/compiler.h"
-
 #include <vector>
+#include <optional>
+#include <cstdint>
 
 namespace android {
 namespace virtualscene {
@@ -75,7 +73,7 @@ public:
     // |orientation| - Image orientation, match OpenGL by default.
     //
     // If the load was successful, returns a Result.
-    static android::base::Optional<Result> load(
+    static std::optional<Result> load(
             const char* filename,
             Orientation orientation = Orientation::OpenGL);
 
@@ -88,7 +86,7 @@ public:
     // |orientation| - Image orientation, match OpenGL by default.
     //
     // If the load was successful, returns a Result.
-    static android::base::Optional<Result> loadPNG(
+    static std::optional<Result> loadPNG(
             const char* filename,
             Orientation orientation = Orientation::OpenGL);
 
@@ -101,7 +99,7 @@ public:
     // |orientation| - Image orientation, match OpenGL by default.
     //
     // If the load was successful, returns a Result.
-    static android::base::Optional<Result> loadJPEG(
+    static std::optional<Result> loadJPEG(
             const char* filename,
             Orientation orientation = Orientation::OpenGL);
 };
