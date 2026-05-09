@@ -731,6 +731,14 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
         return false;
     }
 
+    // When we set a scene that animates, toggle animation on.
+    // Otherwise, a nonplaying video may cause confusion.
+    // In the future we may want to revisit this based on UI
+    // decisions.
+    if (config.modeSupportsAnimations(config.mSceneMode)) {
+        sSettings->setAnimationState(true);
+    }
+
     // If we're currently running, we need to load resources
     if (mNumUsers > 0) {
         ver_scene_load_user_resources(scene, []() {});
