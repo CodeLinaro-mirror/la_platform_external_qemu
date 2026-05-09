@@ -16,6 +16,7 @@
 
 #include "android/virtualscene/VirtualSceneManager.h"
 
+#include "aemu/base/EventNotificationSupport.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/avd/info.h"
 #include "android/base/system/System.h"
@@ -367,6 +368,18 @@ std::atomic<int> VirtualSceneManager::mNumUsers = 0;
 std::atomic<bool> VirtualSceneManager::mKeepUpdating = false;
 bool VirtualSceneManager::mShowBackground = false;
 
+class AnimationStatePublisher
+    : public android::base::EventNotificationSupport<bool> {
+public:
+    void notifyListeners(bool enabled) { fireEvent(enabled); }
+};
+
+static AnimationStatePublisher sAnimationStateEventSupport;
+
+void* VirtualSceneManager::getAnimationStateEventListener() {
+    return &sAnimationStateEventSupport;
+}
+
 void VirtualSceneManager::parseCmdline() {
     AutoLock lock(mLock);
     if (sSettings.hasInstance()) {
@@ -615,8 +628,17 @@ void VirtualSceneManager::setPosterScale(const char* posterName, float scale) {
 }
 
 void VirtualSceneManager::setAnimationState(bool state) {
-    AutoLock lock(mLock);
-    sSettings->setAnimationState(state);
+    bool changed = false;
+    {
+        AutoLock lock(mLock);
+        if (sSettings->getAnimationState() != state) {
+            sSettings->setAnimationState(state);
+            changed = true;
+        }
+    }
+    if (changed) {
+        sAnimationStateEventSupport.notifyListeners(state);
+    }
 }
 
 bool VirtualSceneManager::getAnimationState() {
@@ -709,50 +731,61 @@ SceneConfig::Mode VirtualSceneManager::getSceneMode() {
 }
 
 bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
-    AutoLock lock(mLock);
+    bool shouldNotifyAnimation = false;
+    {
+        AutoLock lock(mLock);
 
-    // Only reload if the config has changed
-    const SceneConfig* existingConfig = ver_scene_get_config(mEnvironmentScene);
-    if (mEnvironmentScene && existingConfig && *existingConfig == config) {
-        D("%s: no changes to the scene config.", __func__);
-        return true;
+        // Only reload if the config has changed
+        const SceneConfig* existingConfig =
+                ver_scene_get_config(mEnvironmentScene);
+        if (mEnvironmentScene && existingConfig && *existingConfig == config) {
+            D("%s: no changes to the scene config.", __func__);
+            return true;
+        }
+
+        D("%s: Reloading with mode:%s, argument:%s", __func__,
+          SceneConfig::modeToString(config.mSceneMode),
+          config.mArgument.c_str());
+
+        // Create a new scene and check if there were any errors
+        auto scene = ver_create_scene(config);
+        if (!scene) {
+            E("VirtualSceneManager scene failed to reload!");
+            return false;
+        }
+
+        // When we set a scene that animates, toggle animation on.
+        // Otherwise, a nonplaying video may cause confusion.
+        // In the future we may want to revisit this based on UI
+        // decisions.
+        if (config.modeSupportsAnimations(config.mSceneMode)) {
+            if (!sSettings->getAnimationState()) {
+                sSettings->setAnimationState(true);
+                shouldNotifyAnimation = true;
+            }
+        }
+
+        // If we're currently running, we need to load resources
+        if (mNumUsers > 0) {
+            ver_scene_load_user_resources(scene, []() {});
+            ver_scene_update(scene, false);
+        }
+
+        // TODO(virtualscene) Handle virtual scene controls. Those should move
+        // out of the camera callback and be controlled here, since the camera
+        // has no knowledge of what the scene is when it changes.
+
+        // Replace the scene, not that this is safe because we don't expose the
+        // scene to the outside users and all operations are done in-sync
+        // through VirtualSceneManager interface
+        ver_destroy_scene(mEnvironmentScene);
+        mEnvironmentScene = scene;
+
+        D("%s: finished", __func__);
     }
-
-    D("%s: Reloading with mode:%s, argument:%s", __func__,
-      SceneConfig::modeToString(config.mSceneMode), config.mArgument.c_str());
-
-    // Create a new scene and check if there were any errors
-    auto scene = ver_create_scene(config);
-    if (!scene) {
-        E("VirtualSceneManager scene failed to reload!");
-        return false;
+    if (shouldNotifyAnimation) {
+        sAnimationStateEventSupport.notifyListeners(true);
     }
-
-    // When we set a scene that animates, toggle animation on.
-    // Otherwise, a nonplaying video may cause confusion.
-    // In the future we may want to revisit this based on UI
-    // decisions.
-    if (config.modeSupportsAnimations(config.mSceneMode)) {
-        sSettings->setAnimationState(true);
-    }
-
-    // If we're currently running, we need to load resources
-    if (mNumUsers > 0) {
-        ver_scene_load_user_resources(scene, []() {});
-        ver_scene_update(scene, false);
-    }
-
-    // TODO(virtualscene) Handle virtual scene controls. Those should move
-    // out of the camera callback and be controlled here, since the camera
-    // has no knowledge of what the scene is when it changes.
-
-    // Replace the scene, not that this is safe because we don't expose the
-    // scene to the outside users and all operations are done in-sync through
-    // VirtualSceneManager interface
-    ver_destroy_scene(mEnvironmentScene);
-    mEnvironmentScene = scene;
-
-    D("%s: finished", __func__);
 
     return true;
 }
