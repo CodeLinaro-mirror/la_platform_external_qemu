@@ -811,7 +811,13 @@ void dpy_gfx_update_full(QemuConsole *con)
 void dpy_gfx_replace_surface(QemuConsole *con,
                              DisplaySurface *surface)
 {
-    static const char placeholder_msg[] = "Display output is not active.";
+    /* Note: the original text "Disaply output is not active"
+       is often too small on the typical android phone screen
+       that is of ten 1080p or more, it is better to show nothing
+       than forcing user to squint and read the not useful text
+       so just leave it empty
+    */
+    static const char placeholder_msg[] = "";
     DisplayState *s = con->ds;
     DisplaySurface *old_surface = con->surface;
     DisplaySurface *new_surface = surface;
