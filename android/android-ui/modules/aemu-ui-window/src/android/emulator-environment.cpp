@@ -104,16 +104,6 @@ static bool emulatorSetupEnvironment() {
         return true;
     }
 
-    struct ScopeTimer {
-        ScopeTimer() { mStartTime = get_uptime_ms(); }
-        ~ScopeTimer() {
-            const uint64_t scopeTime = get_uptime_ms() - mStartTime;
-            dprint("emulatorSetupEnvironment: took %llu ms", __func__,
-                   scopeTime);
-        }
-        int64_t mStartTime;
-    } timer;
-
     // Initialize virtual scene and background view
     if (!VirtualSceneManager::initialize(backgroundUsesEnvironment,
                                          transparentDisplay)) {
