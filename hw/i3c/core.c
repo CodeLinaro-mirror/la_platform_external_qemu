@@ -357,8 +357,8 @@ static int i3c_target_handle_ccc_write(I3CTarget *t, const uint8_t *data,
                 /* MSB first. */
                 t->mrl <<= 8;
                 t->mrl |= data[*num_sent];
-                ++*num_sent;
             }
+            ++*num_sent;
         }
         break;
     /* Ignore other CCCs it's better to handle on a device-by-device basis. */
