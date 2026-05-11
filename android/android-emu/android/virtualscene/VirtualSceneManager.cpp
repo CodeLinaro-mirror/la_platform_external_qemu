@@ -31,10 +31,10 @@
 #include "host-common/opengles.h"
 
 #include <deque>
+#include <fstream>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
-#include <fstream>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -59,7 +59,7 @@ static constexpr const char* kPosterFile = "Toren1BD.posters";
 // Update at 30 fps by default
 static constexpr int kUpdatePerSecond = 30;
 
-//TODO(virtualscene-library): use different namespace for VirtualSceneManager
+// TODO(virtualscene-library): use different namespace for VirtualSceneManager
 namespace android {
 namespace virtualscene {
 
@@ -70,12 +70,6 @@ namespace virtualscene {
  * @return A vector of PosterInfo containing the parsed poster data.
  */
 std::vector<PosterInfo> parsePostersFile(const char* filename) {
-    const std::string resourcesDir =
-            android::base::PathUtils::addTrailingDirSeparator(
-                    android::base::PathUtils::join(
-                            android::base::System::get()
-                                    ->getLauncherDirectory(),
-                            "resources"));
     const std::string filePath = android::base::PathUtils::join(
             android::base::System::get()->getLauncherDirectory(), "resources",
             filename);
@@ -291,16 +285,17 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             dinfo("%s: No environment config is provided", __func__);
         }
     } else {
-        // Ensure forward compatibility by checking a version string, if it's newer
-        // the user should be using a newer version of the emulator to be able to correctly
-        // load the environment config.
+        // Ensure forward compatibility by checking a version string, if it's
+        // newer the user should be using a newer version of the emulator to be
+        // able to correctly load the environment config.
         int fileVersion = iniFile_getInteger(environmentIni, "version", 1);
         if (fileVersion != 1) {
             derror("%s: Invalid environment.ini version '%d' for this emulator version, "
                    "using defaults for the environment scene configuration.",
                    __func__, fileVersion);
         } else {
-            std::string mode = iniFile_getString(environmentIni, "scene.mode", "");
+            std::string mode =
+                    iniFile_getString(environmentIni, "scene.mode", "");
             if (!mode.empty()) {
                 int separator = mode.find(':');
                 int argpos;
@@ -329,19 +324,20 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
             }
 
             // Update background view parameters from config, if given
-            ret.backgroundBlur = static_cast<float>(
-                    iniFile_getDouble(environmentIni, "background.blurAmount",
-                                    EnvironmentConfig::defaultBackgroundBlur));
+            ret.backgroundBlur = static_cast<float>(iniFile_getDouble(
+                    environmentIni, "background.blurAmount",
+                    EnvironmentConfig::defaultBackgroundBlur));
 
             ret.backgroundEnabled =
                     iniFile_getBoolean(environmentIni, "background.enabled",
-                                    "true") != 0;
+                                       "true") != 0;
         }
     }
 
     if (!modeSet) {
         if (showBackground) {
-            dinfo("%s: Using default blank background for the environment.", __func__);
+            dinfo("%s: Using default blank background for the environment.",
+                  __func__);
             ret.sceneMode = SceneConfig::Mode::Color;
         } else {
             dinfo("%s: Using default virtual scene mode for the environment.",
@@ -430,7 +426,8 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
       sceneConfig.mArgument.c_str());
 
     // Use scene mode name for metrics
-    const char* sceneModeStr = SceneConfig::modeToString(sceneConfig.mSceneMode);
+    const char* sceneModeStr =
+            SceneConfig::modeToString(sceneConfig.mSceneMode);
     camera::CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
     mEnvironmentScene = ver_create_scene(sceneConfig);
