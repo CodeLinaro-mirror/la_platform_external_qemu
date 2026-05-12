@@ -506,6 +506,12 @@ static void fillAvdMetrics(android_studio::AndroidStudioEvent* event) {
     }
     auto buildId = ini.getString("ro.build.fingerprint", "");
     if (buildId.empty()) {
+        buildId = ini.getString("ro.product.build.fingerprint", "");
+    }
+    if (buildId.empty()) {
+        buildId = ini.getString("ro.vendor.build.fingerprint", "");
+    }
+    if (buildId.empty()) {
         buildId = ini.getString("ro.system.build.fingerprint", "");
     }
     if (buildId.empty()) {

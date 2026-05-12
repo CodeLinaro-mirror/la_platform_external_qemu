@@ -91,5 +91,71 @@ TEST(RegisterCrashInfoTest, CollectCrashInfo) {
     ASSERT_NE(info["avd_space"], "??");
 }
 
+TEST(RegisterCrashInfoTest, FingerprintFallback) {
+    android::base::TestSystem testSystem("/bin", 64);
+    TestTempDir* tempDir = testSystem.getTempRoot();
+
+    AvdInfo avd;
+    memset(&avd, 0, sizeof(AvdInfo));
+    tempDir->makeSubFile("config.ini");
+    std::string configIniPath = pj(tempDir->path(), "config.ini");
+    IniFile configIni(configIniPath);
+    avd.configIni = reinterpret_cast<CIniFile*>(&configIni);
+    avd.coreHardwareIniPath = configIniPath.data();
+
+    std::string buildPropPath = pj(tempDir->path(), "build.prop");
+
+    // Case 1: ro.build.fingerprint is present
+    {
+        android::base::System::get()->deleteFile(buildPropPath);
+        IniFile buildProp(buildPropPath);
+        buildProp.setString("ro.build.fingerprint", "primary");
+        buildProp.setString("ro.product.build.fingerprint", "product");
+        ASSERT_TRUE(buildProp.write());
+        fileData_initFromFile(avd.buildProperties, buildPropPath.c_str());
+        auto info = collectCrashInfo(&avd);
+        EXPECT_EQ(info["ro.build.fingerprint"], "primary");
+        fileData_done(avd.buildProperties);
+    }
+
+    // Case 2: ro.build.fingerprint is missing, use ro.product.build.fingerprint
+    {
+        android::base::System::get()->deleteFile(buildPropPath);
+        IniFile buildProp(buildPropPath);
+        buildProp.setString("ro.product.build.fingerprint", "product");
+        buildProp.setString("ro.vendor.build.fingerprint", "vendor");
+        ASSERT_TRUE(buildProp.write());
+        fileData_initFromFile(avd.buildProperties, buildPropPath.c_str());
+        auto info = collectCrashInfo(&avd);
+        EXPECT_EQ(info["ro.build.fingerprint"], "product");
+        fileData_done(avd.buildProperties);
+    }
+
+    // Case 3: ro.product.build.fingerprint is missing, use ro.vendor.build.fingerprint
+    {
+        android::base::System::get()->deleteFile(buildPropPath);
+        IniFile buildProp(buildPropPath);
+        buildProp.setString("ro.vendor.build.fingerprint", "vendor");
+        buildProp.setString("ro.system.build.fingerprint", "system");
+        ASSERT_TRUE(buildProp.write());
+        fileData_initFromFile(avd.buildProperties, buildPropPath.c_str());
+        auto info = collectCrashInfo(&avd);
+        EXPECT_EQ(info["ro.build.fingerprint"], "vendor");
+        fileData_done(avd.buildProperties);
+    }
+
+    // Case 4: Only ro.system.build.fingerprint is present
+    {
+        android::base::System::get()->deleteFile(buildPropPath);
+        IniFile buildProp(buildPropPath);
+        buildProp.setString("ro.system.build.fingerprint", "system");
+        ASSERT_TRUE(buildProp.write());
+        fileData_initFromFile(avd.buildProperties, buildPropPath.c_str());
+        auto info = collectCrashInfo(&avd);
+        EXPECT_EQ(info["ro.build.fingerprint"], "system");
+        fileData_done(avd.buildProperties);
+    }
+}
+
 }  // namespace path
 }  // namespace android
