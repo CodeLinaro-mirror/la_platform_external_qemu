@@ -224,10 +224,10 @@ static void flexcomm_init(Object *obj)
 
 static void flexcomm_finalize(Object *obj)
 {
-    FlexcommState *s = FLEXCOMM(obj);
+    /* FlexcommState *s = FLEXCOMM(obj); */
 
     /* release resources allocated by the function select (e.g. fifos) */
-    flexcomm_func_select(s, false);
+    /* Use-after-free here (b/506239526): flexcomm_func_select(s, false); */
 }
 
 static void flexcomm_func_realize_and_unref(FlexcommFunction *f, Error **errp)
