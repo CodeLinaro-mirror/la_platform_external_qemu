@@ -19,6 +19,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
 #include "android/avd/info.h"  // to resolve avd path for resources
+#include "android/base/logging/StudioMessage.h"
 #include "android/base/system/System.h"
 #include "android/camera/camera-metrics.h"
 #include "android/console.h"
@@ -89,7 +90,7 @@ std::string resolveSceneFilename(const std::string& sceneFilename) {
 
     dwarning("Could not resolve environment scene filename '%s'",
              sceneFilename.c_str());
-    return sceneFilename;
+    return "";
 }
 
 // static_cast the value in a unique_ptr.
@@ -207,7 +208,7 @@ std::unique_ptr<Scene> Scene::create(const SceneConfig& config) {
 }
 
 bool Scene::initialize() {
-    const auto sceneMode = getSceneMode();
+    auto sceneMode = getSceneMode();
     const char* sceneModeStr = SceneConfig::modeToString(sceneMode);
     dprint("Initializing scene with '%s' mode, argument:%s", sceneModeStr,
            mConfig.mArgument.c_str());
@@ -220,6 +221,14 @@ bool Scene::initialize() {
     std::string sceneFilename;
     if (sceneMode != SceneConfig::Mode::Color) {
         sceneFilename = resolveSceneFilename(mConfig.mArgument);
+        if (sceneFilename.empty()) {
+            USER_MESSAGE(ERROR)
+                    << "Could not find file '" << mConfig.mArgument.c_str()
+                    << "' using default Environment";
+            sceneMode = SceneConfig::Mode::ImageFile;
+            sceneFilename = resolveSceneFilename(
+                    SceneConfig::defaultArgumentForMode(sceneMode));
+        }
     }
 
     bool needsRawImageSource = false;
@@ -286,10 +295,23 @@ bool Scene::initialize() {
 
     if (needsRawImageSource) {
         if (!mRawImageSource) {
-            derror("%s: Could not load background source: '%s', falling back to default",
-                   __func__, mConfig.mArgument.c_str());
-            mRawImageSource =
-                    std::make_unique<SolidColorImageSource>(kErrorColor);
+            sceneFilename =
+                    resolveSceneFilename(SceneConfig::defaultArgumentForMode(
+                            SceneConfig::Mode::ImageFile));
+            if (!sceneFilename.empty()) {
+                mRawImageSource = RawImageFileSource::Create(sceneFilename);
+            }
+            if (mRawImageSource) {
+                USER_MESSAGE(ERROR) << "Could not load background source: '"
+                                    << mConfig.mArgument.c_str()
+                                    << "' using default Environment";
+            } else {
+                mRawImageSource =
+                        std::make_unique<SolidColorImageSource>(kErrorColor);
+                USER_MESSAGE(ERROR) << "Could not load background source: '"
+                                    << mConfig.mArgument.c_str()
+                                    << "' and default Environment unavailable";
+            }
             mConfig.mSceneMode = SceneConfig::Mode::ImageFile;
         }
         mBaseRotation = mRawImageSource->GetBaseRotation();
@@ -340,6 +362,10 @@ bool Scene::loadRendererResources() {
     std::string sceneFilename;
     if (sceneMode != SceneConfig::Mode::Color) {
         sceneFilename = resolveSceneFilename(mConfig.mArgument);
+        if (sceneFilename.empty()) {
+            E("%s: Cannot find file '%s'", __FUNCTION__, mConfig.mArgument);
+            return false;
+        }
     }
 
     switch (sceneMode) {
