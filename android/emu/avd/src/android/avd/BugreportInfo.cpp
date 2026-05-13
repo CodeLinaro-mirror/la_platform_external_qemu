@@ -78,6 +78,12 @@ BugreportInfo::BugreportInfo() {
     android::base::IniFile ini((const char*)buildProps->data, buildProps->size);
     buildFingerprint = ini.getString("ro.build.fingerprint", "");
     if (buildFingerprint.empty()) {
+        buildFingerprint = ini.getString("ro.product.build.fingerprint", "");
+    }
+    if (buildFingerprint.empty()) {
+        buildFingerprint = ini.getString("ro.vendor.build.fingerprint", "");
+    }
+    if (buildFingerprint.empty()) {
         buildFingerprint = ini.getString("ro.system.build.fingerprint", "");
     }
     auto usage = System::get()->getMemUsage();

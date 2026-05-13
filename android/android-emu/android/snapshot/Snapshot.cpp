@@ -597,6 +597,15 @@ bool Snapshot::save() {
     android::base::IniFile ini((const char*)buildProps->data, buildProps->size);
     auto buildId = ini.getString("ro.build.fingerprint", "");
     if (buildId.empty()) {
+        buildId = ini.getString("ro.product.build.fingerprint", "");
+    }
+    if (buildId.empty()) {
+        buildId = ini.getString("ro.vendor.build.fingerprint", "");
+    }
+    if (buildId.empty()) {
+        buildId = ini.getString("ro.system.build.fingerprint", "");
+    }
+    if (buildId.empty()) {
         buildId = ini.getString("ro.build.display.id", "");
     }
     mSnapshotPb.set_system_image_build_id(buildId);
