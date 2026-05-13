@@ -367,7 +367,6 @@ rutabaga_cmd_set_scanout(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
 
     /* realloc the surface ptr */
     scanout->ds = qemu_create_displaysurface_pixman(res->image);
-    dpy_gfx_replace_surface(scanout->con, NULL);
     dpy_gfx_replace_surface(scanout->con, scanout->ds);
     res->scanout_bitmask = ss.scanout_id;
 }
