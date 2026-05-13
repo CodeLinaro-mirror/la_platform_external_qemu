@@ -459,15 +459,11 @@ static int startOpenglesRendererImpl(
         android::featurecontrol::makeReadOnly(aemuFeature);
     }
 
-#ifndef VK_API_VERSION_1_3
-    const uint32_t VK_API_VERSION_1_3 = 0x00403000;
-    const uint32_t VK_API_VERSION_1_4 = 0x00404000;
-#endif
-    uint32_t maxGuestVulkan = VK_API_VERSION_1_3;
+    std::string maxGuestVulkan = "1.3";
     if (const char* env = getenv("ANDROID_EMU_VK_ENABLE_1_4")) {
         // Allow force-enabling with env variable for tests
         if (env[0] == '1') {
-            maxGuestVulkan = VK_API_VERSION_1_4;
+            maxGuestVulkan = "1.4";
         }
     } else if (guestApiLevel >= 37) {
         // TODO(b/512021931): Issues with descriptor binding support with
@@ -475,7 +471,9 @@ static int startOpenglesRendererImpl(
         // fixed.
         dinfo("Vulkan 1.4 is not supported for the guest and won't be enabled");
     }
-    gfxstreamFeatures.guestVulkanMaxApiVersion = maxGuestVulkan;
+    if(!gfxstreamFeatures.GuestVulkanMaxApiVersion.parseValue(maxGuestVulkan)) {
+        derror("Could not set GuestVulkanMaxApiVersion to '%s'", maxGuestVulkan.c_str());
+    }
 
     gfxstreamFeatures.EglOnEgl.setEnabled(sEgl2egl);
     crashhandler_add_string("gfxstream_features", reportGfxstreamFeatures.c_str());
