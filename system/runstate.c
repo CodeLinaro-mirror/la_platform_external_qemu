@@ -835,6 +835,8 @@ int qemu_main_loop(void)
         main_loop_wait(false);
     }
 
+    try_savevm();
+
     return status;
 }
 

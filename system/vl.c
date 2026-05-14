@@ -167,6 +167,7 @@ static const char *incoming;
 static const char *incoming_str[MIGRATION_CHANNEL_TYPE__MAX];
 static MigrationChannel *incoming_channels[MIGRATION_CHANNEL_TYPE__MAX];
 static const char *loadvm;
+static const char *savevm = NULL;
 static const char *accelerators;
 static bool have_custom_ram_size;
 static const char *ram_memdev_id;
@@ -2803,6 +2804,35 @@ static bool qemu_machine_creation_done(Error **errp)
     return true;
 }
 
+static int try_loadvm(void)
+{
+    if (loadvm) {
+        RunState state = autostart ? RUN_STATE_RUNNING : runstate_get();
+        gint64 start_time = g_get_monotonic_time();
+        Error *local_err = NULL;
+
+        if (load_snapshot(loadvm, NULL, false, NULL, &local_err)) {
+            gint64 end_time = g_get_monotonic_time();
+            fprintf(stderr, "Snapshot '%s' loaded in %" PRId64 " ms\n", loadvm, (end_time - start_time) / 1000);
+            load_snapshot_resume(state);
+            return 0;
+        } else {
+            error_reportf_err(local_err, "Failed to load snapshot '%s': ", loadvm);
+            fprintf(stderr, "Falling back to cold boot...\n");
+
+            /* Issue a cold reset to clear any partial state from the failed load attempt */
+            qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+
+            /* Resume execution normally to proceed with the cold boot */
+            if (autostart) {
+                vm_start();
+            }
+            return -1;
+        }
+    }
+    return 0;
+}
+
 void qmp_x_exit_preconfig(Error **errp)
 {
     if (phase_check(PHASE_MACHINE_INITIALIZED)) {
@@ -2816,11 +2846,8 @@ void qmp_x_exit_preconfig(Error **errp)
         return;
     }
 
-    if (loadvm) {
-        RunState state = autostart ? RUN_STATE_RUNNING : runstate_get();
-        load_snapshot(loadvm, NULL, false, NULL, &error_fatal);
-        load_snapshot_resume(state);
-    }
+    try_loadvm();
+
     if (replay_mode != REPLAY_MODE_NONE) {
         replay_vmstate_init();
     }
@@ -2841,6 +2868,33 @@ void qmp_x_exit_preconfig(Error **errp)
     } else if (autostart) {
         qmp_cont(NULL);
     }
+}
+
+int try_savevm(void)
+{
+    if (!savevm) {
+        fprintf(stderr, "No -savevm provided, skipping snapshot save.\n");
+        return 0;
+    }
+
+    gint64 start_time = g_get_monotonic_time();
+    Error *err = NULL;
+
+    if (!save_snapshot(
+        savevm,         /* name: The tag/name for the snapshot */
+        true,           /* overwrite: Whether to overwrite an existing snapshot with the same name */
+        NULL,           /* vmstate: Specific block device node name to save VM state to (NULL means default) */
+        false,          /* has_devices: Whether a list of specific devices is provided */
+        NULL,           /* devices: The list of specific devices (NULL if has_devices is false) */
+        &err            /* errp: Pointer to Error** for error reporting */
+    )) {
+        error_reportf_err(err, "Failed to save snapshot '%s' at exit: ", savevm);
+        return -1;
+    }
+
+    gint64 end_time = g_get_monotonic_time();
+    fprintf(stderr, "Snapshot '%s' saved in %" PRId64 " ms\n", savevm, (end_time - start_time) / 1000);
+    return 0;
 }
 
 void qemu_init(int argc, char **argv)
@@ -3370,6 +3424,9 @@ void qemu_init(int argc, char **argv)
                 break;
             case QEMU_OPTION_loadvm:
                 loadvm = optarg;
+                break;
+            case QEMU_OPTION_savevm:
+                savevm = optarg;
                 break;
             case QEMU_OPTION_full_screen:
                 dpy.has_full_screen = true;
