@@ -11,6 +11,7 @@
 #include "raw_image_file_source.h"
 
 #include <png.h>
+#include <csetjmp>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -71,6 +72,10 @@ std::optional<ImageData> loadPNGImage(std::string& filename) {
     }
 
     png_set_error_fn(png, nullptr, nullptr, pngWarningCallback);
+
+    // These are before setjmp to ensure the deconstructors work properly
+    std::vector<uint8_t> data;
+    std::vector<uint8_t*> rowPtrs;
 
     if (setjmp(png_jmpbuf(png))) {
         derror("%s: PNG library error", __FUNCTION__);
@@ -135,8 +140,8 @@ std::optional<ImageData> loadPNGImage(std::string& filename) {
 
     const size_t rowBytes = png_get_rowbytes(png, pngInfo);
     const size_t stride = alignRowBytes(rowBytes);
-    std::vector<uint8_t> data(stride * height);
-    std::vector<uint8_t*> rowPtrs(height);
+    data.resize(stride * height);
+    rowPtrs.resize(height);
 
     for (size_t i = 0; i < height; i++) {
         rowPtrs[i] = data.data() + stride * i;
@@ -156,35 +161,52 @@ std::optional<ImageData> loadPNGImage(std::string& filename) {
     return img;
 }
 
+struct JpegErrorManager {
+    struct jpeg_error_mgr pub;  // "public" fields
+    jmp_buf setjmp_buffer;      // for return to caller
+};
+
+static void jpeg_error_exit(j_common_ptr cinfoPtr) {
+    JpegErrorManager* myerr =
+            reinterpret_cast<JpegErrorManager*>(cinfoPtr->err);
+    longjmp(myerr->setjmp_buffer, 1);
+}
+
 std::optional<ImageData> loadJPEGImage(std::string& filename) {
     struct jpeg_decompress_struct cinfo;
-    struct jpeg_error_mgr jerr;
+    JpegErrorManager jerr;
 
+    // All cpp classes must be declared before the setjmp to ensure thier
+    // deconstructors are called.
+    ImageData img;
     ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
-        derror("%s: Failed to open file %s", __FUNCTION__, filename);
+        derror("%s: Failed to open file %s", __FUNCTION__, filename.c_str());
         return std::nullopt;
     }
 
-    cinfo.err = jpeg_std_error(&jerr);
-    jpeg_create_decompress(&cinfo);
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = jpeg_error_exit;
 
-    auto destroy_decompress = [](j_decompress_ptr cinfo_ptr) {
-        if (cinfo_ptr)
-            jpeg_destroy_decompress(cinfo_ptr);
-    };
-    std::unique_ptr<jpeg_decompress_struct, decltype(destroy_decompress)>
-            cinfo_ptr(&cinfo, destroy_decompress);
+    std::unique_ptr<jpeg_decompress_struct, decltype(&jpeg_destroy_decompress)>
+            cinfo_guard(&cinfo, &jpeg_destroy_decompress);
+
+    if (setjmp(jerr.setjmp_buffer)) {
+        char buffer[JMSG_LENGTH_MAX];
+        (*cinfo.err->format_message)(
+                reinterpret_cast<jpeg_common_struct*>(&cinfo), buffer);
+        derror("%s: JPEG library error for %s: %s", __FUNCTION__,
+               filename.c_str(), buffer);
+        return std::nullopt;
+    }
+
+    jpeg_create_decompress(&cinfo);
 
     jpeg_stdio_src(&cinfo, fp.get());
     (void)jpeg_read_header(&cinfo, TRUE);
     cinfo.out_color_space = JCS_RGBA_8888;  // Force RGBA format.
     (void)jpeg_start_decompress(&cinfo);
 
-    const uint32_t width = cinfo.output_width;
-    const uint32_t height = cinfo.output_height;
-
-    ImageData img;
     img.width = cinfo.output_width;
     img.height = cinfo.output_height;
     img.num_components = cinfo.output_components;
