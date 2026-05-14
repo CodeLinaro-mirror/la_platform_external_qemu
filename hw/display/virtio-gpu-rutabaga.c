@@ -10,7 +10,7 @@
 #include "hw/virtio/virtio-gpu-pixman.h"
 #include "hw/virtio/virtio-iommu.h"
 #include "migration/qemu-file-types.h"
-#include "migration/vmstate.h"
+#include "ui/console.h"
 
 #include <glib/gmem.h>
 #include <rutabaga_gfx/rutabaga_gfx_ffi.h>
@@ -1297,6 +1297,28 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         QTAILQ_INSERT_HEAD(&g->reslist, res, next);
         resource_id = qemu_get_be32(f);
     }
+
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
+    for (i = 0; i < vb->conf.max_outputs; i++) {
+        uint32_t w = qemu_get_be32(f);
+        if (w > 0) {
+            uint32_t h = qemu_get_be32(f);
+            uint32_t stride = qemu_get_be32(f);
+            if (vb->scanout[i].con) {
+                DisplaySurface *surface = qemu_console_surface(vb->scanout[i].con);
+                if (surface && surface_data(surface) && surface_width(surface) == w && surface_height(surface) == h && surface_stride(surface) == stride) {
+                    qemu_get_buffer(f, surface_data(surface), h * stride);
+                } else {
+                    error_report("corrupted rutagaba surface data");
+                    return -EINVAL;
+                }
+            } else {
+                error_report("corrupted rutagaba surface data");
+                return -EINVAL;
+            }
+        }
+    }
+
     vmstate_load_state(f, &vmstate_virtio_gpu_scanouts, g, 1);
     return 0;
 }
@@ -1363,6 +1385,26 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
         }
     }
     qemu_put_be32(f, 0); /* end of list */
+
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
+    for (i = 0; i < vb->conf.max_outputs; i++) {
+        if (vb->scanout[i].con) {
+            DisplaySurface *surface = qemu_console_surface(vb->scanout[i].con);
+            if (surface && surface_data(surface)) {
+                int w = surface_width(surface);
+                int h = surface_height(surface);
+                int stride = surface_stride(surface);
+                qemu_put_be32(f, w);
+                qemu_put_be32(f, h);
+                qemu_put_be32(f, stride);
+                qemu_put_buffer(f, surface_data(surface), h * stride);
+            } else {
+                qemu_put_be32(f, 0);
+            }
+        } else {
+            qemu_put_be32(f, 0);
+        }
+    }
 
     vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL);
     return 0;
@@ -1516,6 +1558,7 @@ static int virtio_gpu_post_load(void* opaque, int version_id) {
   VirtIOGPURutabaga* vgr = opaque;
   VirtIOGPU* g = &(vgr->parent_obj);
   VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
+  VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
   struct virtio_gpu_simple_resource* res = NULL;
   QTAILQ_FOREACH(res, &g->reslist, next) {
     if (res->addrs) {
@@ -1536,6 +1579,13 @@ static int virtio_gpu_post_load(void* opaque, int version_id) {
                   res_ctx->resource_id);
       }
   }
+
+  for (int i = 0; i < vb->conf.max_outputs; i++) {
+      if (vb->scanout[i].con) {
+          dpy_gfx_update_full(vb->scanout[i].con);
+      }
+  }
+
   return ret;
 }
 
