@@ -21,15 +21,12 @@
 #include "aemu/base/Log.h"
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/camera/camera-format-converters.h"
-#include "android/virtualscene/Scene.h"
 #include "android/virtualscene/SceneCamera.h"
-#include "android/virtualscene/VirtualSceneManager.h"
+#include "ver/virtual_environment_renderer.h"
 #include "host-common/opengles.h"
 
 namespace android {
 namespace virtualscene {
-
-class RendererView;
 
 /*******************************************************************************
  *                     RenderedCameraDevice routines
@@ -63,8 +60,8 @@ private:
     CameraDevice mHeader;
 
     SceneCamera mSceneCamera;
-    std::unique_ptr<RendererView> mActiveView;
-    std::shared_ptr<Scene> mOwnedScene;
+    VerRenderViewHandle mActiveView = VER_INVALID_HANDLE;
+    VerSceneHandle mOwnedScene = VER_INVALID_HANDLE;
     int mBaseRotation;
     std::string mName;
     bool mUsingEnvironmentScene;

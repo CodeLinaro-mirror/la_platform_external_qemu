@@ -8,7 +8,7 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-#include "android/raw_image_sources/image_file/raw_image_file_source.h"
+#include "raw_image_file_source.h"
 
 #include <png.h>
 #include <cstddef>
@@ -16,21 +16,17 @@
 #include <string>
 #include <vector>
 #include "absl/status/status.h"
-#include "aemu/base/logging/Log.h"
-#include "android/raw_image_sources/raw_image_source.h"
 
 // jpeglib.h needs to be included. It's a C library.
 extern "C" {
 #include <jpeglib.h>
 }
 
+#include "aemu/base/Log.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/ScopedStdioFile.h"
-#include "android/camera/camera-common.h"
-#include "android/utils/debug.h"
 #include "android/utils/file_io.h"
 
-using android::base::Optional;
 using android::base::PathUtils;
 using android::base::ScopedStdioFile;
 
@@ -237,7 +233,7 @@ std::unique_ptr<RawImageFileSource> RawImageFileSource::Create(
 RawImageFileSource::RawImageFileSource(std::string filename, ImageData&& image)
     : file_(std::move(filename)), image_(std::move(image)) {}
 
-int RawImageFileSource::Start(uint32_t pixel_format,
+int RawImageFileSource::Start(VerImageFormat pixel_format,
                                      int width,
                                      int height) {
     return 0;
@@ -251,13 +247,13 @@ absl::StatusOr<std::optional<RawImageToken>> RawImageFileSource::UpdateImage(
         return std::nullopt;
     }
     size_t buffer_size;
-    uint32_t pixel_format;
+    VerImageFormat pixel_format;
     int width;
     int height;
     struct RawImageBufferView im = {
             image_.data_ptr,
             static_cast<size_t>(image_.line_size) * image_.height,
-            V4L2_PIX_FMT_RGB32, image_.width, image_.height};
+            VerImageFormat::RGBA8, image_.width, image_.height};
     absl::Status ret = updater(&im);
     if (ret.ok()) {
         return RawImageToken{1};

@@ -22,10 +22,10 @@
 
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "aemu/base/AlignedBuf.h"
-#include "aemu/base/memory/LazyInstance.h"
 #include "aemu/base/synchronization/Lock.h"
-#include "android/utils/compiler.h"
-#include "android/virtualscene/VertexTypes.h"
+#include "ver/virtual_environment_renderer_types.h"
+
+#include "VertexTypes.h"
 
 #include <memory>
 #include <vector>
@@ -36,6 +36,7 @@ namespace android {
 namespace virtualscene {
 
 class Scene;
+class ScenesManager;
 
 struct Material {
     int id = -1;
@@ -112,12 +113,8 @@ private:
 
 class RendererView {
 public:
-    enum class Format {
-        RGBA8,
-    };
-
     // Updates render target related values, and re-creates the render target
-    void updateTarget(Format format, int frameWidth, int frameHeight);
+    void updateTarget(VerImageFormat format, int frameWidth, int frameHeight);
 
     // Updates positional values that do not require render target recreation
     void updateViewProjection(const glm::mat4& viewProj);
@@ -128,7 +125,7 @@ public:
         return mCache.mFramebufferRGBA8;
     }
 
-    Format getFormatLocked() const { return mFormat; }
+    VerImageFormat getFormatLocked() const { return mFormat; }
     int getWidthLocked() const { return mFrameWidth; }
     int getHeightLocked() const { return mFrameHeight; }
 
@@ -139,6 +136,11 @@ public:
                                     int32_t* scratchBuffer,
                                     float sigma);
 
+    bool isCacheValidFor(uint64_t sceneHash, uint64_t frameTime) const {
+        std::lock_guard lock(mLock);
+        return mCache.isValidFor(sceneHash, frameTime);
+    }
+
 protected:
     friend class RendererImpl;
     friend class ScenesManager;
@@ -147,7 +149,7 @@ protected:
     mutable std::mutex mLock;
     int mFrameWidth = 0;
     int mFrameHeight = 0;
-    Format mFormat = Format::RGBA8;
+    VerImageFormat mFormat = VerImageFormat::RGBA8;
 
     glm::mat4 mViewProjection = glm::mat4(1.0f);
     float mBlurFactor = 0.0f;
@@ -186,7 +188,8 @@ protected:
 };
 
 class Renderer {
-    DISALLOW_COPY_AND_ASSIGN(Renderer);
+    Renderer(const Renderer& other) = delete;
+    Renderer& operator=(const Renderer& other) = delete;
 
 protected:
     Renderer();

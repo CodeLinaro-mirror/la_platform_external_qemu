@@ -463,8 +463,11 @@ private:
         }
 
         // mTempRootPrefix ends with a dir separator, ignore it for comparison.
-        std::string_view prefix(mTempRootPrefix.c_str(),
-                                mTempRootPrefix.size() - 1);
+        std::string_view prefix;
+        if (mTempRootPrefix.size()) {
+            prefix = std::string_view(mTempRootPrefix.c_str(),
+                                      mTempRootPrefix.size() - 1);
+        }
         if (prefix.size() <= path.size() &&
             prefix == std::string_view(path.c_str(), prefix.size()) &&
             (prefix.size() == path.size() ||

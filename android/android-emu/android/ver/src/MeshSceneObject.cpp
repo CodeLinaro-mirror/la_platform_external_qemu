@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "android/virtualscene/MeshSceneObject.h"
+#include "MeshSceneObject.h"
 
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
-#include "android/utils/debug.h"
 
 #include <tiny_obj_loader.h>
 
@@ -25,8 +24,7 @@
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
-#define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
-#define D_ACTIVE VERBOSE_CHECK(virtualscene)
+#define D(...) dprint(__VA_ARGS__)
 
 using android::base::PathUtils;
 using android::base::System;

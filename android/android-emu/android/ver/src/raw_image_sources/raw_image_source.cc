@@ -8,26 +8,25 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-#include "android/raw_image_sources/raw_image_source.h"
+#include "raw_image_source.h"
 #include <cstdint>
 #include <optional>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "android/camera/camera-common.h"
 
 SolidColorImageSource::SolidColorImageSource()
     : SolidColorImageSource({0, 0, 0}) {}
 
 SolidColorImageSource::SolidColorImageSource(Color c)
-    : buffer_({image_, sizeof(image_), V4L2_PIX_FMT_RGB32, 1, 1}) {
+    : buffer_({image_, sizeof(image_), VerImageFormat::RGBA8, 1, 1}) {
     image_[0] = c.r;
     image_[1] = c.g;
     image_[2] = c.b;
     image_[3] = 0xff;
 }
 
-int SolidColorImageSource::Start(uint32_t pixel_format, int width, int height) {
+int SolidColorImageSource::Start(VerImageFormat pixel_format, int width, int height) {
     return 0;
 }
 

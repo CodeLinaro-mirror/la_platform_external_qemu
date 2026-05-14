@@ -162,9 +162,6 @@ set(android-emu-common
 set(android_emu_dependent_src
     android/automation/AutomationController.cpp
     android/automation/AutomationEventSink.cpp
-    android/raw_image_sources/raw_image_source.cc
-    android/raw_image_sources/image_file/raw_image_file_source.cc
-    android/raw_image_sources/video_file/raw_video_file_source.cc
     android/camera/camera-common.cpp
     android/camera/camera-format-converters.c
     android/camera/camera-list.cpp
@@ -192,17 +189,58 @@ set(android_emu_dependent_src
     android/sensors-port.c
     android/snapshot/Icebox.cpp
     android/snapshot/SnapshotAPI.cpp
-    android/virtualscene/MeshSceneObject.cpp
-    android/virtualscene/PosterInfo.cpp
-    android/virtualscene/PosterSceneObject.cpp
-    android/virtualscene/Renderer.cpp
-    android/virtualscene/RenderTarget.cpp
-    android/virtualscene/Scene.cpp
     android/virtualscene/SceneCamera.cpp
-    android/virtualscene/SceneObject.cpp
-    android/virtualscene/TextureUtils.cpp
     android/virtualscene/VirtualSceneManager.cpp
     android/virtualscene/WASDInputHandler.cpp)
+
+set(virtual_environment_renderer_src
+    android/ver/src/virtual_environment_renderer.cpp
+    android/ver/src/MeshSceneObject.cpp
+    android/ver/src/PosterSceneObject.cpp
+    android/ver/src/Renderer.cpp
+    android/ver/src/RenderTarget.cpp
+    android/ver/src/Scene.cpp
+    android/ver/src/SceneObject.cpp
+    android/ver/src/TextureUtils.cpp
+    android/ver/src/raw_image_sources/raw_image_source.cc
+    android/ver/src/raw_image_sources/image_file/raw_image_file_source.cc
+    android/ver/src/raw_image_sources/video_file/raw_video_file_source.cc)
+
+android_add_library(
+  TARGET virtual_environment_renderer
+  LICENSE Apache-2.0
+  SRC ${virtual_environment_renderer_src}
+  DEPS android-emu-base-headers
+       qemu-host-common-headers
+       android-emu-base
+       gfxstream_glm_headers
+       png
+       zlib
+       FFMPEG::FFMPEG
+       emulator-libjpeg
+       emulator-tinyobjloader
+       webrtc-yuv
+)
+target_include_directories(
+  virtual_environment_renderer
+  PUBLIC  android/ver/include
+  PRIVATE
+          android/ver/src
+          ${CMAKE_CURRENT_SOURCE_DIR}
+          ${ANDROID_QEMU2_TOP_DIR}
+          ${ANDROID_QEMU2_TOP_DIR}/android/android-emugl/host/include
+          ${ANDROID_QEMU2_TOP_DIR}/../libpng
+          ${ANDROID_QEMU2_TOP_DIR}/../zlib
+          ${ANDROID_QEMU2_TOP_DIR}/../tinyobjloader
+          ${ANDROID_QEMU2_TOP_DIR}/android/third_party/jpeg-6b
+          ${ANDROID_QEMU2_TOP_DIR}/../webrtc/third_party/libyuv/include)
+
+android_target_link_libraries(
+  virtual_environment_renderer darwin
+  PUBLIC "-framework AVFoundation"
+         "-framework CoreMedia"
+         "-framework CoreVideo"
+         "-lbz2")
 
 # The standard archive has all the sources, including those that have external
 # dependencies that we have not properly declared yet.
@@ -288,6 +326,7 @@ target_link_libraries(
          aemu-recording
          gfxstream_features
          gfxstream_glm_headers
+         virtual_environment_renderer
   PRIVATE android-emu-protobuf)
 
 target_link_libraries(android-emu PRIVATE modem_simulator_lib gnss_proxy_lib)
@@ -446,6 +485,7 @@ target_link_libraries(
          android-emu-adb-interface
          android-emu-sockets
          android-emu-hardware
+         virtual_environment_renderer
          # Protobuf dependencies
          android-emu-protos
          protobuf::libprotobuf
@@ -636,8 +676,7 @@ if(NOT LINUX_AARCH64)
       android/snapshot/RamSnapshot_unittest.cpp
       android/snapshot/Snapshot_unittest.cpp
       android/userspace-boot-properties_unittest.cpp
-      android/verified-boot/load_config_unittest.cpp
-      android/virtualscene/TextureUtils_unittest.cpp)
+      android/verified-boot/load_config_unittest.cpp)
 
   # And declare the test
   android_add_test(TARGET android-emu_unittests
@@ -663,6 +702,7 @@ if(NOT LINUX_AARCH64)
   target_link_libraries(
     android-emu_unittests
     PRIVATE android-emu
+            virtual_environment_renderer
             android-emu-base-headers
             android-emu-protobuf
             android-emu-cmdline-testing
@@ -670,32 +710,36 @@ if(NOT LINUX_AARCH64)
             android-emu-test-launcher
             qemu-host-common-headers)
 
-  list(
-    APPEND
-    android-emu-testdata
-    testdata/snapshots/random-ram-100.bin
-    testdata/textureutils/gray_alpha_golden.bmp
-    testdata/textureutils/gray_alpha.png
-    testdata/textureutils/gray_golden.bmp
-    testdata/textureutils/gray.png
-    testdata/textureutils/indexed_alpha_golden.bmp
-    testdata/textureutils/indexed_alpha.png
-    testdata/textureutils/indexed_golden.bmp
-    testdata/textureutils/indexed.png
-    testdata/textureutils/interlaced_golden.bmp
-    testdata/textureutils/interlaced.png
-    testdata/textureutils/jpeg_gray_golden.bmp
-    testdata/textureutils/jpeg_gray.jpg
-    testdata/textureutils/jpeg_gray_progressive_golden.bmp
-    testdata/textureutils/jpeg_gray_progressive.jpg
-    testdata/textureutils/jpeg_rgb24_golden.bmp
-    testdata/textureutils/jpeg_rgb24.jpg
-    testdata/textureutils/jpeg_rgb24_progressive_golden.bmp
-    testdata/textureutils/jpeg_rgb24_progressive.jpg
-    testdata/textureutils/rgb24_31px_golden.bmp
-    testdata/textureutils/rgb24_31px.png
-    testdata/textureutils/rgba32_golden.bmp
-    testdata/textureutils/rgba32.png)
+  list(APPEND android-emu-testdata testdata/snapshots/random-ram-100.bin)
+
+  set(virtual_environment_renderer-testdata
+      testdata/textureutils/gray_alpha_golden.bmp
+      testdata/textureutils/gray_alpha.png
+      testdata/textureutils/gray_golden.bmp
+      testdata/textureutils/gray.png
+      testdata/textureutils/indexed_alpha_golden.bmp
+      testdata/textureutils/indexed_alpha.png
+      testdata/textureutils/indexed_golden.bmp
+      testdata/textureutils/indexed.png
+      testdata/textureutils/interlaced_golden.bmp
+      testdata/textureutils/interlaced.png
+      testdata/textureutils/jpeg_gray_golden.bmp
+      testdata/textureutils/jpeg_gray.jpg
+      testdata/textureutils/jpeg_gray_progressive_golden.bmp
+      testdata/textureutils/jpeg_gray_progressive.jpg
+      testdata/textureutils/jpeg_rgb24_golden.bmp
+      testdata/textureutils/jpeg_rgb24.jpg
+      testdata/textureutils/jpeg_rgb24_progressive_golden.bmp
+      testdata/textureutils/jpeg_rgb24_progressive.jpg
+      testdata/textureutils/rgb24_31px_golden.bmp
+      testdata/textureutils/rgb24_31px.png
+      testdata/textureutils/rgba32_golden.bmp
+      testdata/textureutils/rgba32.png
+      testdata/ver/scene_color_golden.png
+      testdata/ver/scene_imagefile_golden.png
+      testdata/ver/scene_videofile_golden.png
+      testdata/ver/scene_mesh3d_golden.png
+      testdata/ver/scene_image360_golden.png)
 
   prebuilt(VIRTUALSCENE)
   android_copy_test_files(android-emu_unittests "${android-emu-testdata}"
@@ -703,4 +747,42 @@ if(NOT LINUX_AARCH64)
   android_target_dependency(android-emu_unittests all
                             VIRTUAL_SCENE_DEPENDENCIES)
   android_copy_test_dir(android-emu_unittests test-sdk test-sdk)
+
+  # Declare virtual_environment_renderer_unittests
+  android_add_test(TARGET virtual_environment_renderer_unittests
+                   SRC android/ver/test/TextureUtils_unittest.cpp
+                       android/ver/test/SceneRendering_unittests.cpp)
+
+  target_compile_options(
+    virtual_environment_renderer_unittests PRIVATE -O0 -Wno-invalid-constexpr
+                                  -Wno-string-plus-int)
+  target_include_directories(
+    virtual_environment_renderer_unittests
+    PRIVATE
+            android/ver/src
+            ../android-emugl/host/include/
+            android/)
+
+  # Sign unit test if needed.
+  android_sign(TARGET virtual_environment_renderer_unittests)
+
+  # Settings needed for darwin
+  android_target_compile_definitions(
+    virtual_environment_renderer_unittests darwin PRIVATE "-D_DARWIN_C_SOURCE=1")
+
+  android_target_compile_options(virtual_environment_renderer_unittests darwin
+                                 PRIVATE "-Wno-deprecated-declarations")
+
+  target_link_libraries(
+    virtual_environment_renderer_unittests
+    PRIVATE android-emu
+            virtual_environment_renderer
+            android-emu-base-headers
+            android-emu-test-launcher
+            qemu-host-common-headers
+            gfxstream_openglesdispatch)
+
+  android_copy_test_files(virtual_environment_renderer_unittests
+                          "${virtual_environment_renderer-testdata}" testdata)
+
 endif()

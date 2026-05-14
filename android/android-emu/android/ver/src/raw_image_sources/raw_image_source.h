@@ -18,11 +18,12 @@
 #include <optional>
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "ver/virtual_environment_renderer_types.h"
 
 struct RawImageBufferView {
     const uint8_t *buffer;
     size_t buffer_size;
-    uint32_t pixel_format;
+    VerImageFormat pixel_format;
     int width;
     int height;
 };
@@ -34,7 +35,7 @@ struct RawImageToken {
 class RawImageSource {
 public:
     /* The arguments are suggestions, must check Image for resulting values */
-    virtual int Start(uint32_t pixel_format, int width, int height) = 0;
+    virtual int Start(VerImageFormat pixel_format, int width, int height) = 0;
     /* Updates the current image using the given updater function.
      * target_time_us is the point within any animation that we would like an
      * image for token should be the previous token provided by this function.
@@ -73,7 +74,7 @@ class SolidColorImageSource : public RawImageSource {
 public:
     SolidColorImageSource();
     explicit SolidColorImageSource(Color c);
-    int Start(uint32_t pixel_format, int width, int height) override;
+    int Start(VerImageFormat pixel_format, int width, int height) override;
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
             std::optional<RawImageToken> token,
