@@ -481,6 +481,37 @@ static pa_stream *qpa_simple_new (
         goto fail;
     }
 
+    int64_t deadline_us = g_get_monotonic_time() + 250000;
+
+    /*
+     * Streams are initialized asynchronously, wait here until
+     * they are PA_STREAM_READY.
+     */
+    while (true) {
+        switch (pa_stream_get_state(stream)) {
+        case PA_STREAM_READY:
+            goto ready;
+
+        case PA_STREAM_CREATING:
+            pa_threaded_mainloop_unlock(c->mainloop);
+            g_usleep(10000); /* 10 ms */
+            pa_threaded_mainloop_lock(c->mainloop);
+
+            if (g_get_monotonic_time() > deadline_us) {
+                AUD_log(AUDIO_CAP,
+                        "Timeout waiting for stream to become ready");
+                goto fail;
+            }
+            break;
+
+        default:
+            AUD_log(AUDIO_CAP,
+                    "Stream failed while waiting to become ready");
+            goto fail;
+        }
+    }
+
+ready:
     pa_threaded_mainloop_unlock(c->mainloop);
 
     return stream;
