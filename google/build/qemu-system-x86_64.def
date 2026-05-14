@@ -192,6 +192,7 @@ EXPORTS
     qemu_console_is_graphic
     qemu_console_lookup_by_index
     qemu_console_lookup_default
+    qemu_console_surface
     qemu_cpu_is_self
     qemu_cpu_kick
     qemu_cpu_list_lock
