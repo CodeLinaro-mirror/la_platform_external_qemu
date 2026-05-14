@@ -660,6 +660,7 @@ static void qpa_volume_out(HWVoiceOut *hw, Volume *vol)
     pa_operation *op;
     pa_cvolume v;
     PAConnection *c = pa->g->conn;
+    uint32_t stream_index;
     int i;
 
     pa_cvolume_init(&v);
@@ -671,9 +672,15 @@ static void qpa_volume_out(HWVoiceOut *hw, Volume *vol)
 
     pa_threaded_mainloop_lock(c->mainloop);
 
-    op = pa_context_set_sink_input_volume(c->context,
-                                          pa_stream_get_index(pa->stream),
-                                          &v, NULL, NULL);
+    stream_index = pa_stream_get_index(pa->stream);
+    if (stream_index == PA_INVALID_INDEX) {
+        pa_threaded_mainloop_unlock(c->mainloop);
+        AUD_log(AUDIO_CAP, "Can't set volume: the audio stream is not ready");
+        return;
+    }
+
+    op = pa_context_set_sink_input_volume(c->context, stream_index, &v,
+                                          NULL, NULL);
     if (!op) {
         qpa_logerr(pa_context_errno(c->context),
                    "set_sink_input_volume() failed");
@@ -681,9 +688,8 @@ static void qpa_volume_out(HWVoiceOut *hw, Volume *vol)
         pa_operation_unref(op);
     }
 
-    op = pa_context_set_sink_input_mute(c->context,
-                                        pa_stream_get_index(pa->stream),
-                                        vol->mute, NULL, NULL);
+    op = pa_context_set_sink_input_mute(c->context, stream_index, vol->mute,
+                                        NULL, NULL);
     if (!op) {
         qpa_logerr(pa_context_errno(c->context),
                    "set_sink_input_mute() failed");
@@ -700,6 +706,7 @@ static void qpa_volume_in(HWVoiceIn *hw, Volume *vol)
     pa_operation *op;
     pa_cvolume v;
     PAConnection *c = pa->g->conn;
+    uint32_t stream_index;
     int i;
 
     pa_cvolume_init(&v);
@@ -711,9 +718,15 @@ static void qpa_volume_in(HWVoiceIn *hw, Volume *vol)
 
     pa_threaded_mainloop_lock(c->mainloop);
 
-    op = pa_context_set_source_output_volume(c->context,
-        pa_stream_get_index(pa->stream),
-        &v, NULL, NULL);
+    stream_index = pa_stream_get_index(pa->stream);
+    if (stream_index == PA_INVALID_INDEX) {
+        pa_threaded_mainloop_unlock(c->mainloop);
+        AUD_log(AUDIO_CAP, "Can't set volume: the audio stream is not ready");
+        return;
+    }
+
+    op = pa_context_set_source_output_volume(c->context, stream_index, &v,
+                                             NULL, NULL);
     if (!op) {
         qpa_logerr(pa_context_errno(c->context),
                    "set_source_output_volume() failed");
@@ -721,9 +734,8 @@ static void qpa_volume_in(HWVoiceIn *hw, Volume *vol)
         pa_operation_unref(op);
     }
 
-    op = pa_context_set_source_output_mute(c->context,
-        pa_stream_get_index(pa->stream),
-        vol->mute, NULL, NULL);
+    op = pa_context_set_source_output_mute(c->context, stream_index, vol->mute,
+                                           NULL, NULL);
     if (!op) {
         qpa_logerr(pa_context_errno(c->context),
                    "set_source_output_mute() failed");
