@@ -52,6 +52,11 @@ void ScenesManager::setSearchPaths(
     mResourceSearchPaths = resourceSearchPaths;
 }
 
+bool ScenesManager::configArgumentFileExists(const SceneConfig& config) {
+    android::base::AutoLock lock(mScenesLock);
+    return Scene::configArgumentFileExists(config, mResourceSearchPaths);
+}
+
 Scene* ScenesManager::createScene(const SceneConfig& config) {
     if (config.mSceneMode == SceneConfig::Mode::Unknown) {
         derror("%s: invalid config", __func__);
@@ -272,6 +277,10 @@ void ver_initialize(const std::vector<std::filesystem::path>& resourceBasePaths,
            static_cast<int>(resourceBasePaths.size()));
     ScenesManager::setSearchPaths(resourceBasePaths);
     ScenesManager::setDispatch(eglDispatch, gles2Dispatch);
+}
+
+bool ver_scene_config_file_exists(const VerSceneConfig& config) {
+    return ScenesManager::configArgumentFileExists(config);
 }
 
 VerSceneHandle ver_create_scene(const VerSceneConfig& config) {

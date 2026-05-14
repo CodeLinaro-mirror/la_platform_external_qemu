@@ -20,14 +20,14 @@
  * The Scene container for the Virtual Scene.
  */
 
+#include "PosterSceneObject.h"
 #include "raw_image_sources/raw_image_source.h"
 #include "ver/virtual_environment_renderer_types.h"
-#include "PosterSceneObject.h"
 
+#include <filesystem>
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include <filesystem>
 
 namespace android {
 namespace virtualscene {
@@ -61,6 +61,11 @@ public:
     // Creates a scene instance if the scene was successfully created or
     // null if there was an error.
     static std::unique_ptr<Scene> create(
+            const SceneConfig& config,
+            const std::vector<std::filesystem::path>& resourceBasePaths);
+
+    // Check if the argument file for the scene config exists
+    static bool configArgumentFileExists(
             const SceneConfig& config,
             const std::vector<std::filesystem::path>& resourceBasePaths);
 
@@ -130,15 +135,16 @@ public:
 
 private:
     // Private constructor, use Scene::create to create an instance.
-    Scene(const SceneConfig& config);
+    Scene(const SceneConfig& config,
+          const std::vector<std::filesystem::path>& basePaths);
 
     // Load the scene and create SceneObjects.
     //
     // Returns true on success.
-    bool initialize(const std::vector<std::filesystem::path>& basePaths);
+    bool initialize();
 
     // Load renderer related resources, separated from the initialize call
-    // function be able to defer the renderer and related GPU resource
+    // function to be able to defer the renderer and related GPU resource
     // creations.
     bool loadRendererResources();
 
@@ -154,9 +160,9 @@ private:
         Texture defaultTexture;
     };
 
+    const SceneConfig mConfig;
+    const std::vector<std::filesystem::path> mResourceBasePaths;
     std::unique_ptr<Renderer> mRenderer;
-    SceneConfig mConfig;
-    std::vector<std::filesystem::path> mResourceBasePaths;
 
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;

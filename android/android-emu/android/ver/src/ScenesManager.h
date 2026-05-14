@@ -38,6 +38,8 @@ public:
     static void setSearchPaths(
             const std::vector<std::filesystem::path>& resourceSearchPaths);
 
+    static bool configArgumentFileExists(const SceneConfig& config);
+
     static Scene* createScene(const SceneConfig& config);
 
     static bool renderView(Scene* scene,

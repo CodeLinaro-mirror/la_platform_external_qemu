@@ -22,7 +22,6 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
-#include "android/base/logging/StudioMessage.h"
 #include "android/base/system/System.h"
 #include "raw_image_sources/image_file/raw_image_file_source.h"
 #include "raw_image_sources/raw_image_source.h"
@@ -73,7 +72,9 @@ std::unique_ptr<To> static_unique_cast(std::unique_ptr<From>& from) {
 namespace android {
 namespace virtualscene {
 
-Scene::Scene(const SceneConfig& config) : mConfig(config) {
+Scene::Scene(const SceneConfig& config,
+             const std::vector<std::filesystem::path>& basePaths)
+    : mConfig(config), mResourceBasePaths(basePaths) {
     D("%s: creating Scene", __func__);
 }
 
@@ -90,43 +91,57 @@ std::unique_ptr<Scene> Scene::create(
         const SceneConfig& config,
         const std::vector<fs::path>& resourceBasePaths) {
     std::unique_ptr<Scene> scene;
-    scene.reset(new Scene(config));
-    if (!scene || !scene->initialize(resourceBasePaths)) {
+    scene.reset(new Scene(config, resourceBasePaths));
+    if (!scene->initialize()) {
         return nullptr;
     }
 
     return scene;
 }
 
-bool Scene::initialize(const std::vector<fs::path>& basePaths) {
+bool Scene::configArgumentFileExists(
+        const SceneConfig& config,
+        const std::vector<fs::path>& resourceBasePaths) {
+    if (config.mSceneMode == SceneConfig::Mode::Color) {
+        // Argument is not a file
+        return true;
+    }
+    auto sceneFilename =
+            resolveSceneFilename(config.mArgument, resourceBasePaths);
+    if (sceneFilename.empty()) {
+        dprint("%s: Invalid scene argument: %s", __func__,
+               config.mArgument.c_str());
+        return false;
+    }
+    return true;
+}
+
+bool Scene::initialize() {
     auto sceneMode = getSceneMode();
     const char* sceneModeStr = SceneConfig::modeToString(sceneMode);
     dprint("Initializing scene with '%s' mode, argument:%s", sceneModeStr,
            mConfig.mArgument.c_str());
 
-    mResourceBasePaths = basePaths;
-
-    // Find the file, in case it's given as a local path
+    // Find and validate the input file parameter, call configArgumentFileExists
+    // to avoid or handle this case earlier.
     std::string sceneFilename;
     if (sceneMode != SceneConfig::Mode::Color) {
-        sceneFilename = resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
+        sceneFilename =
+                resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
         if (sceneFilename.empty()) {
-            USER_MESSAGE(ERROR)
-                    << "Could not find file '" << mConfig.mArgument.c_str()
-                    << "' using default Environment";
-            sceneMode = SceneConfig::Mode::ImageFile;
-            sceneFilename = resolveSceneFilename(
-                    SceneConfig::defaultArgumentForMode(sceneMode), mResourceBasePaths);
+            derror("%s: Invalid scene argument: %s", __func__,
+                   mConfig.mArgument.c_str());
+            return false;
         }
     }
 
-    bool needsRawImageSource = false;
     switch (sceneMode) {
         case SceneConfig::Mode::Unknown: {
             derror("%s: Unknown scene mode!", __func__);
+            return false;
         } break;
         case SceneConfig::Mode::Mesh3D: {
-            // Just check if the obj file is vali, the object addition is
+            // Just check if the obj file is valid, the object addition is
             // handled in loadRendererResources
             // TODO(virtualscene-perf): initialize renderer early and avoid
             // loading content twice
@@ -141,24 +156,32 @@ bool Scene::initialize(const std::vector<fs::path>& basePaths) {
             mBaseRotation = 90;
         } break;
         case SceneConfig::Mode::VideoFile: {
-            needsRawImageSource = true;
             mRawImageSource = RawVideofileSource::Create(sceneFilename);
+            if (!mRawImageSource) {
+                derror("%s: Could not load video file: '%s'", __func__,
+                       mConfig.mArgument.c_str());
+                return false;
+            }
         } break;
         case SceneConfig::Mode::ImageFile: {
-            needsRawImageSource = true;
             mRawImageSource = RawImageFileSource::Create(sceneFilename);
+            if (!mRawImageSource) {
+                derror("%s: Could not load image file: '%s'", __func__,
+                       mConfig.mArgument.c_str());
+                return false;
+            }
         } break;
         case SceneConfig::Mode::Color: {
-            needsRawImageSource = true;
             unsigned int r, g, b;
             if (sscanf(mConfig.mArgument.c_str(), "#%02x%02x%02x", &r, &g,
-                       &b) == 3) {
-                mRawImageSource = std::make_unique<SolidColorImageSource>(
-                        Color{(uint8_t)r, (uint8_t)g, (uint8_t)b});
-            } else {
+                       &b) != 3) {
                 derror("%s: Could not parse color: %s", __func__,
                        mConfig.mArgument.c_str());
+                return false;
             }
+
+            mRawImageSource = std::make_unique<SolidColorImageSource>(
+                    Color{(uint8_t)r, (uint8_t)g, (uint8_t)b});
         } break;
         case SceneConfig::Mode::Image360: {
             // Check if the texture file is valid to be able to return error
@@ -181,27 +204,7 @@ bool Scene::initialize(const std::vector<fs::path>& basePaths) {
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
     }
 
-    if (needsRawImageSource) {
-        if (!mRawImageSource) {
-            sceneFilename =
-                    resolveSceneFilename(SceneConfig::defaultArgumentForMode(
-                            SceneConfig::Mode::ImageFile), mResourceBasePaths);
-            if (!sceneFilename.empty()) {
-                mRawImageSource = RawImageFileSource::Create(sceneFilename);
-            }
-            if (mRawImageSource) {
-                USER_MESSAGE(ERROR) << "Could not load background source: '"
-                                    << mConfig.mArgument.c_str()
-                                    << "' using default Environment";
-            } else {
-                mRawImageSource =
-                        std::make_unique<SolidColorImageSource>(kErrorColor);
-                USER_MESSAGE(ERROR) << "Could not load background source: '"
-                                    << mConfig.mArgument.c_str()
-                                    << "' and default Environment unavailable";
-            }
-            mConfig.mSceneMode = SceneConfig::Mode::ImageFile;
-        }
+    if (mRawImageSource) {
         mBaseRotation = mRawImageSource->GetBaseRotation();
 
         // Set up an initial black image
