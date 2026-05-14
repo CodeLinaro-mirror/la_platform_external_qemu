@@ -65,8 +65,16 @@ void process_early_setup(int argc, char** argv) {
     // libcurl initialization is thread-unsafe, so let's call it first
     // to make sure no other thread could be doing the same
     std::string launcherDir = System::get()->getLauncherDirectory();
-    std::string caBundleFile =
-            PathUtils::join(launcherDir, "lib", "ca-bundle.pem");
+    std::string programDir = System::get()->getProgramDirectory();
+    std::string caBundleFile = PathUtils::join(launcherDir, "lib", "ca-bundle.pem");
+    bool canReadLauncher = System::get()->pathCanRead(caBundleFile);
+
+    if (!canReadLauncher) {
+        dprint("Unable to find ca-bundle.pem in [%s]", caBundleFile);
+        caBundleFile = PathUtils::join(programDir, "lib", "ca-bundle.pem");
+        dprint("Searching ca-bundle.pem in [%s]", caBundleFile);
+    }
+
     if (!System::get()->pathCanRead(caBundleFile)) {
         dprint("Can not read ca-bundle. Curl init skipped.");
     } else {

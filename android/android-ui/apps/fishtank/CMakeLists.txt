@@ -265,6 +265,7 @@ install(
   COMPONENT fishtank
   EXCLUDE_FROM_ALL)
 fishtank_post_install("fishtank/fishtank")
+fishtank_install_dependency(DEPS "${ANDROID_QEMU2_TOP_DIR}/android/data/ca-bundle.pem>lib/ca-bundle.pem")
 
 if(NOT LINUX_AARCH64)
   fishtank_install_dependency(DEPS
