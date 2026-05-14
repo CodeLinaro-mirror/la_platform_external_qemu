@@ -16,13 +16,14 @@
 using android::virtualscene::VirtualSceneManager;
 
 static const QAndroidVirtualSceneAgent sQAndroidVirtualSceneAgent = {
-    VirtualSceneManager::setInitialPoster,
-    VirtualSceneManager::loadPoster,
-    VirtualSceneManager::enumeratePosters,
-    VirtualSceneManager::setPosterScale,
-    VirtualSceneManager::setAnimationState,
-    VirtualSceneManager::getAnimationState,
-    VirtualSceneManager::reloadEnvironment,
+        VirtualSceneManager::setInitialPoster,
+        VirtualSceneManager::loadPoster,
+        VirtualSceneManager::enumeratePosters,
+        VirtualSceneManager::setPosterScale,
+        VirtualSceneManager::setAnimationState,
+        VirtualSceneManager::getAnimationState,
+        VirtualSceneManager::reloadEnvironment,
+        VirtualSceneManager::getAnimationStateEventListener,
 };
 
 extern "C" const QAndroidVirtualSceneAgent* const gQAndroidVirtualSceneAgent =

@@ -113,6 +113,10 @@ public:
     // Returns true for enabled, false for disabled.
     static bool getAnimationState();
 
+    // Returns a pointer to the event listener that can be used to track changes
+    // to the animation state.
+    static void* getAnimationStateEventListener();
+
     static void setSceneControlsParameters(bool show);
 
     static bool addSceneUser();

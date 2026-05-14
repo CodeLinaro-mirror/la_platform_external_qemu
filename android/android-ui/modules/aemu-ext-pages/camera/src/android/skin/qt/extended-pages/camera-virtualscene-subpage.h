@@ -15,6 +15,7 @@
 #include <QWidget>                           // for QWidget
 #include <memory>                            // for shared_ptr, unique_ptr
 
+#include "aemu/base/EventNotificationSupport.h"
 #include "ui_camera-virtualscene-subpage.h"  // for CameraVirtualSceneSubpage
 
 class QObject;
@@ -39,6 +40,9 @@ public:
 
     void showEvent(QShowEvent* event) override;
 
+signals:
+    void animationStateChanged(bool enabled);
+
 private slots:
     void on_imageWall_pathChanged(QString path);
     void on_imageTable_pathChanged(QString path);
@@ -48,6 +52,8 @@ private slots:
 
     void on_toggleTV_toggled(bool value);
     void on_reloadEnvironment_clicked();
+
+    void onAnimationStateChanged(bool enabled);
 
     // Report metrics for the first interaction to this page.
     void reportInteraction();
@@ -65,6 +71,11 @@ private:
     std::shared_ptr<UiEventTracker> mCameraTracker;
     bool mHasBeenShown = false;
     bool mHadFirstInteraction = false;
+
+    std::unique_ptr<android::base::RaiiEventListener<
+            android::base::EventNotificationSupport<bool>,
+            bool>>
+            mAnimationStateListener;
 
     static const QAndroidVirtualSceneAgent* sVirtualSceneAgent;
 };
