@@ -1008,6 +1008,31 @@ virtio_gpu_rutabaga_debug_cb(uint64_t user_data,
     }
 }
 
+static void
+virtio_gpu_rutabaga_debug_cb_ex(uint64_t user_data,
+                                const struct rutabaga_debug_ex *debug)
+{
+    Location loc;
+    loc_push_none(&loc);
+    loc_set_file(debug->file, debug->line);
+
+    switch (debug->type) {
+    case RUTABAGA_DEBUG_ERROR:
+        error_report("%s", debug->message);
+        break;
+    case RUTABAGA_DEBUG_WARN:
+        warn_report("%s", debug->message);
+        break;
+    case RUTABAGA_DEBUG_INFO:
+        info_report("%s", debug->message);
+        break;
+    default:
+        error_report("unknown debug type: %u", debug->type);
+    }
+
+    loc_pop(&loc);
+}
+
 static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
 {
     int result;
@@ -1045,7 +1070,7 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     }
 
     builder.fence_cb = virtio_gpu_rutabaga_fence_cb;
-    builder.debug_cb = virtio_gpu_rutabaga_debug_cb;
+    builder.debug_cb_ex = virtio_gpu_rutabaga_debug_cb_ex;
     builder.capset_mask = vr->capset_mask;
     builder.user_data = (uint64_t)g;
     builder.display_width = base->conf.xres;
