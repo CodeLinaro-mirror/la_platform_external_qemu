@@ -44,30 +44,30 @@ static inline T alignRowBytes(T value) {
 std::optional<ImageData> loadPNGImage(std::string& filename) {
     ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
-        derror("%s: Failed to open file %s", __FUNCTION__, filename);
+        derror("Failed to open file %s", filename);
         return {};
     }
 
     uint8_t header[8];
     if (fread(header, sizeof(header), 1, fp.get()) != 1) {
-        derror("%s: Failed to read header", __FUNCTION__);
+        derror("Failed to read header");
         return {};
     }
 
     if (png_sig_cmp(header, 0, sizeof(header))) {
-        derror("%s: header is not a PNG header", __FUNCTION__);
+        derror("header is not a PNG header");
         return {};
     }
 
     png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
     if (!png) {
-        derror("%s: Failed to allocate png read struct", __FUNCTION__);
+        derror("Failed to allocate png read struct");
         return {};
     }
 
     png_infop pngInfo = png_create_info_struct(png);
     if (!pngInfo) {
-        derror("%s: Failed to allocate png info struct", __FUNCTION__);
+        derror("Failed to allocate png info struct");
         return {};
     }
 
@@ -78,7 +78,7 @@ std::optional<ImageData> loadPNGImage(std::string& filename) {
     std::vector<uint8_t*> rowPtrs;
 
     if (setjmp(png_jmpbuf(png))) {
-        derror("%s: PNG library error", __FUNCTION__);
+        derror("PNG library error");
         png_destroy_read_struct(&png, &pngInfo, 0);
         return {};
     }
@@ -133,7 +133,7 @@ std::optional<ImageData> loadPNGImage(std::string& filename) {
     }
 
     if (newColorType != PNG_COLOR_TYPE_RGB_ALPHA) {
-        derror("%s: Unsupported color type: %d", __FUNCTION__, newColorType);
+        derror("Unsupported color type: %d", newColorType);
         png_destroy_read_struct(&png, &pngInfo, 0);
         return {};
     }
@@ -181,7 +181,7 @@ std::optional<ImageData> loadJPEGImage(std::string& filename) {
     ImageData img;
     ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
-        derror("%s: Failed to open file %s", __FUNCTION__, filename.c_str());
+        derror("Failed to open file %s", filename.c_str());
         return std::nullopt;
     }
 
@@ -195,8 +195,7 @@ std::optional<ImageData> loadJPEGImage(std::string& filename) {
         char buffer[JMSG_LENGTH_MAX];
         (*cinfo.err->format_message)(
                 reinterpret_cast<jpeg_common_struct*>(&cinfo), buffer);
-        derror("%s: JPEG library error for %s: %s", __FUNCTION__,
-               filename.c_str(), buffer);
+        derror("JPEG library error for %s: %s", filename.c_str(), buffer);
         return std::nullopt;
     }
 
@@ -236,7 +235,7 @@ std::optional<ImageData> loadImageFromFile(std::string& filename) {
                strncasecmp(extension.data(), ".jpeg", extension.size()) == 0) {
         return loadJPEGImage(filename);
     } else {
-        derror("%s: Unsupported file format %s", __FUNCTION__,
+        derror("Unsupported file format %s",
                android::base::c_str(extension).get());
         return std::nullopt;
     }
