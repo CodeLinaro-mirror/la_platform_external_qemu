@@ -460,7 +460,7 @@ static int _avdInfo_getContentPath(AvdInfo* i) {
 }
 
 static bool _avdInfo_isApiExtension(const char* str, long val) {
-    return *str != '\0' && !memcmp(str, "-ext", 4) && val == (int)val;
+    return *str != '\0' && !strncmp(str, "-ext", 4) && val == (int)val;
 }
 
 static int _avdInfo_getApiLevel(AvdInfo* i, bool* isMarshmallowOrHigher) {
