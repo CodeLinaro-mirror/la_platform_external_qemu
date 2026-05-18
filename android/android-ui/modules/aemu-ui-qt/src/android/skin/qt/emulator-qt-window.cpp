@@ -3823,7 +3823,7 @@ void EmulatorQtWindow::checkAdbVersionAndWarn() {
                        "> General tab > 'Use detected ADB location'"));
         } else {
             mAdbWarningBox->setText(
-                    tr("The ADB binary found at %1 is obsolete and has serious"
+                    tr("The ADB binary found at %1 is obsolete and has serious "
                        "performance problems with the Android Emulator. Please "
                        "update to a newer version to get significantly faster "
                        "app/file transfer.")
