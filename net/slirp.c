@@ -673,6 +673,33 @@ static int net_slirp_init(NetClientState *peer, const char *model,
     cfg.vdnssearch = dnssearch;
     cfg.vdomainname = vdomainname;
     s->slirp = slirp_new(&cfg, &slirp_cb, s);
+
+    const char *dns_override = getenv("SLIRP_DNS_SERVERS");
+    if (dns_override) {
+        struct sockaddr_storage host_dns[4] = {0};
+        int host_dns_count = 0;
+        char **tokens = g_strsplit(dns_override, ",", 0);
+        for (int i = 0; tokens[i] && host_dns_count < 4; i++) {
+            struct sockaddr_in *sin =
+                (struct sockaddr_in *)&host_dns[host_dns_count];
+            struct sockaddr_in6 *sin6 =
+                (struct sockaddr_in6 *)&host_dns[host_dns_count];
+            if (inet_pton(AF_INET, tokens[i], &sin->sin_addr) == 1) {
+                host_dns[host_dns_count].ss_family = AF_INET;
+                sin->sin_port = htons(53);
+                host_dns_count++;
+            } else if (inet_pton(AF_INET6, tokens[i], &sin6->sin6_addr) == 1) {
+                host_dns[host_dns_count].ss_family = AF_INET6;
+                sin6->sin6_port = htons(53);
+                host_dns_count++;
+            }
+        }
+        g_strfreev(tokens);
+        if (host_dns_count > 0) {
+            slirp_init_custom_dns_servers(s->slirp, host_dns, host_dns_count);
+        }
+    }
+
     QTAILQ_INSERT_TAIL(&slirp_stacks, s, entry);
 
     /*
