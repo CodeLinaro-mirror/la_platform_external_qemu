@@ -124,6 +124,9 @@ std::optional<TextureUtils::Result> TextureUtils::loadPNG(const char* filename,
 
     png_set_error_fn(png, nullptr, nullptr, pngWarningCallback);
 
+    std::vector<uint8_t> data;
+    std::vector<uint8_t*> rowPtrs;
+
     if (setjmp(png_jmpbuf(png))) {
         E("%s: PNG library error", __FUNCTION__);
         png_destroy_read_struct(&png, &pngInfo, 0);
@@ -182,8 +185,8 @@ std::optional<TextureUtils::Result> TextureUtils::loadPNG(const char* filename,
 
     const size_t rowBytes = png_get_rowbytes(png, pngInfo);
     const size_t stride = alignRowBytes(rowBytes);
-    std::vector<uint8_t> data(stride * height);
-    std::vector<uint8_t*> rowPtrs(height);
+    data.resize(stride * height);
+    rowPtrs.resize(height);
 
     for (size_t i = 0; i < height; i++) {
         if (orientation == Orientation::BottomUp)
@@ -218,10 +221,15 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
     }
 
     jpeg_decompress_struct cinfo;
+    ErrorManager jerr;
+    std::vector<uint8_t> data;
+
+    // RAII wrapper for cinfo.
+    std::unique_ptr<jpeg_decompress_struct, decltype(&jpeg_destroy_decompress)>
+            cinfo_guard(&cinfo, &jpeg_destroy_decompress);
 
     // Set up normal error routines, then override error_exit to avoid exit()
     // on failure.
-    ErrorManager jerr;
     cinfo.err = jpeg_std_error(&jerr.pub);
     jerr.pub.error_exit = [](j_common_ptr cinfoPtr) {
         ErrorManager* err = reinterpret_cast<ErrorManager*>(cinfoPtr->err);
@@ -233,7 +241,6 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
         // Prints the message.
         (cinfo.err->output_message)(
                 reinterpret_cast<jpeg_common_struct*>(&cinfo));
-        jpeg_destroy_decompress(&cinfo);
         return {};
     }
 
@@ -253,13 +260,12 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
     if (cinfo.output_components != 3) {
         E("%s: Unsupported output_components %d, should be 3.", __FUNCTION__,
           cinfo.output_components);
-        jpeg_destroy_decompress(&cinfo);
         return {};
     }
 
     const size_t rowBytes = width * cinfo.output_components;
     const size_t stride = alignRowBytes(rowBytes);
-    std::vector<uint8_t> data(stride * height);
+    data.resize(stride * height);
 
     while (cinfo.output_scanline < height) {
         // libjpeg can read multiple scanlines at a time, but on high-quality
@@ -276,7 +282,6 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
     }
 
     jpeg_finish_decompress(&cinfo);
-    jpeg_destroy_decompress(&cinfo);
 
     Result result;
     result.mBuffer = std::move(data);

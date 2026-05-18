@@ -207,7 +207,7 @@ int RawVideofileSource::Start(VerImageFormat pixel_format, int width, int height
         mConvertedFrameCache.reset(::av_frame_alloc());
         return (mFrameCache || mConvertedFrameCache) ? 0 : -1;
     } else {
-        derror("%s:%d av_seek_frame: err=%d", __func__, __LINE__, err);
+        derror("av_seek_frame: err=%d", err);
         return err;
     }
 };
@@ -351,7 +351,7 @@ int RawVideofileSource::decodeNextFrame() {
     } else if (err == AVERROR_EOF) {
         return err;
     } else if (err != AVERROR(EAGAIN)) {
-        derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__, err);
+        derror("avcodec_receive_frame: err=%d", err);
         return err;
     }
 
@@ -371,8 +371,7 @@ int RawVideofileSource::decodeNextFrame() {
         ::av_packet_unref(&packet);
 
         if (err < 0) {
-            derror("%s:%d avcodec_send_packet: err=%d", __func__, __LINE__,
-                   err);
+            derror("avcodec_send_packet: err=%d", err);
             continue;
         }
 
@@ -381,8 +380,7 @@ int RawVideofileSource::decodeNextFrame() {
         if (err >= 0) {
             return 0;
         } else if (err != AVERROR(EAGAIN)) {
-            derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__,
-                   err);
+            derror("avcodec_receive_frame: err=%d", err);
         }
     }
 
@@ -396,8 +394,7 @@ int RawVideofileSource::decodeNextFrame() {
         if (err >= 0) {
             return 0;
         } else if (err != AVERROR(EAGAIN) && err != AVERROR_EOF) {
-            derror("%s:%d avcodec_receive_frame: err=%d", __func__, __LINE__,
-                   err);
+            derror("avcodec_receive_frame: err=%d", err);
             return err;
         }
     }

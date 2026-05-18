@@ -164,12 +164,12 @@ private:
 #ifdef _WIN32
     std::string getTempPath() {
         std::string result;
-        DWORD len = GetTempPath(0, NULL);
+        DWORD len = GetTempPathA(0, NULL);
         if (!len) {
             LOG(FATAL) << "Can't find temporary path!";
         }
         result.resize(static_cast<size_t>(len));
-        GetTempPath(len, &result[0]);
+        GetTempPathA(len, &result[0]);
         // The length returned by GetTempPath() is sometimes too large.
         result.resize(::strlen(result.c_str()));
         for (size_t n = 0; n < result.size(); ++n) {
