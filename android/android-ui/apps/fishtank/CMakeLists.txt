@@ -29,6 +29,8 @@ android_add_executable(
       opengles.cpp
       main.cpp)
 
+target_compile_options(fishtank PRIVATE -Wmissing-field-initializers -Werror=missing-field-initializers)
+
 if(APPLE)
   # Override the default RPATH to match the standalone distribution layout
   android_target_properties(fishtank all "INSTALL_RPATH=@executable_path/lib64")

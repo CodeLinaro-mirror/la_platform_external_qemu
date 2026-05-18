@@ -151,6 +151,10 @@ const QAndroidVmOperations sFishtankQAndroidVmOperations = {
             NOT_IMPLEMENTED("QAndroidVmOperations.getRealAudioEventListener");
             return nullptr;
         },
+        .physicalMemoryGetAddr = [](uint64_t) -> void* {
+            NOT_IMPLEMENTED("QAndroidVmOperations.physicalMemoryGetAddr");
+            return nullptr;
+        },
         .setSkipSnapshotSave =
                 [](bool used) {
                     NOT_IMPLEMENTED("QAndroidVmOperations.setSkipSnapshotSave");
@@ -160,6 +164,17 @@ const QAndroidVmOperations sFishtankQAndroidVmOperations = {
                     NOT_IMPLEMENTED("QAndroidVmOperations.isSnapshotSaveSkipped");
                     return false;
                 },
+        .hostmemRegister = [](const struct MemEntry*) -> uint64_t {
+            NOT_IMPLEMENTED("QAndroidVmOperations.hostmemRegister");
+            return 0;
+        },
+        .hostmemUnregister = [](uint64_t) {
+            NOT_IMPLEMENTED("QAndroidVmOperations.hostmemUnregister");
+        },
+        .hostmemGetInfo = [](uint64_t) -> struct HostmemEntry {
+            NOT_IMPLEMENTED("QAndroidVmOperations.hostmemGetInfo");
+            return {};
+        },
         .getRunState =
                 []() {
                     NOT_IMPLEMENTED("QAndroidVmOperations.getRunState");
@@ -174,6 +189,15 @@ const QAndroidVmOperations sFishtankQAndroidVmOperations = {
                 [](QemuShutdownCause reason) {
                     NOT_IMPLEMENTED("QAndroidVmOperations.system_shutdown_request");
                 },
+        .vulkanInstanceRegister = [](uint64_t, const char*) {
+            NOT_IMPLEMENTED("QAndroidVmOperations.vulkanInstanceRegister");
+        },
+        .vulkanInstanceUnregister = [](uint64_t) {
+            NOT_IMPLEMENTED("QAndroidVmOperations.vulkanInstanceUnregister");
+        },
+        .vulkanInstanceEnumerate = [](uint32_t*, uint64_t*, char**) {
+            NOT_IMPLEMENTED("QAndroidVmOperations.vulkanInstanceEnumerate");
+        },
         .setSkipSnapshotSaveReason =
                 [](uint32_t reason) {
                     NOT_IMPLEMENTED(
