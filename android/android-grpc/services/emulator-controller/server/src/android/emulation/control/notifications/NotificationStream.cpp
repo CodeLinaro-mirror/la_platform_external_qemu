@@ -21,6 +21,7 @@
 #include "android/emulation/control/BootCompletionHandler.h"
 #include "android/emulation/control/utils/TypeConversion.h"
 #include "android/hw-sensors.h"
+#include "android/hw-xrlights.h"
 #include "android/utils/debug.h"
 #include "android/xr/XrService.h"
 #include "host-common/MultiDisplay.h"
@@ -192,6 +193,33 @@ static void brightness_forwarder(void* opaque,
     notificationListeners->fireEvent(event);
 }
 
+static void led_forwarder(void* opaque,
+                          const AndroidHwXrLedEvent* event) {
+    NotificationEventChangeSupport* notificationListeners =
+            reinterpret_cast<NotificationEventChangeSupport*>(opaque);
+    Notification streamEvent;
+    auto ledIndicator = streamEvent.mutable_ledindicator();
+    ledIndicator->set_id(event->lightid);
+
+    if (0 == event->lightid) {
+        ledIndicator->set_facing(LedIndicator::OUTSIDE);
+    } else if (1 == event->lightid) {
+        ledIndicator->set_facing(LedIndicator::INSIDE);
+    } else {
+        DD("Got invalid Led Indicator ID in Notification Stream");
+    }
+
+    if (0 == event->lightcolor) {
+        ledIndicator->set_state(LedIndicator::OFF);
+    } else {
+        ledIndicator->set_state(LedIndicator::ON);
+    }
+
+    ledIndicator->set_color(event->lightcolor);
+    notificationListeners->fireEvent(streamEvent);
+}
+
+
 void NotificationStream::registerListeners() {
     // Register event listeners.
     mCamera->registerOnce([&](auto state) {
@@ -203,6 +231,12 @@ void NotificationStream::registerListeners() {
     const static AndroidHwControlFuncs sCallbacks = {
             .light_brightness = brightness_forwarder};
     mAgents->hw_control->setCallbacks(&mNotificationListeners, &sCallbacks);
+
+    // Register Led Indicator event listeners.
+    const static AndroidHwXrLedFuncs sLedCallbacks = {
+        .led_forwarder = led_forwarder
+    };
+    mAgents->hw_xr_led->setCallbacks(&mNotificationListeners, &sLedCallbacks);
 
     MultiDisplay::getInstance()->registerOnce(
             [&](const android::DisplayChangeEvent state) {
@@ -249,6 +283,11 @@ void handleXrOptionsEvent(void* user_data,
     android::emulation::control::XrOptions* options = event.mutable_xroptions();
     *options = toHostXrOptions(response.xr_options());
     notificationStream->mNotificationListeners.fireEvent(event);
+}
+
+NotificationStream::~NotificationStream() {
+    // Unset the XR lights callback for this instance to prevent Use-After-Free
+    android_hw_xrlights_unset(&mNotificationListeners);
 }
 
 }  // namespace control

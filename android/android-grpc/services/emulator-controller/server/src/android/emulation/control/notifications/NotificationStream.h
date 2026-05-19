@@ -57,7 +57,7 @@ class NotificationStream {
 public:
     NotificationStream(VirtualSceneCamera* camera,
                        const AndroidConsoleAgents* agents);
-    ~NotificationStream() = default;
+    ~NotificationStream();
 
     // Produce an aysnchronous handler for the following gRPC method:
     //

@@ -13,7 +13,9 @@
 
 #include "aemu/base/utils/stream.h"
 #include "aemu/base/EventNotificationSupport.h"  // for EventNotifi...
+#include "absl/container/flat_hash_map.h"
 #include "android/emulation/android_qemud.h"
+#include "android/emulation/control/hw_xr_led_agent.h"
 #include "lights_conn.pb.h"
 #include "xr_emulator_conn.pb.h"
 
@@ -44,12 +46,17 @@ public:
     HwXrLights();
     QemudClient* initializeQemudClient(int channel, const char* client_param);
     void qemudClientRecv(uint8_t* msg, int msglen);
+
+    void setClient(void* client, AndroidHwXrLedFuncs clientFuncs);
+    void removeClient(void* client);
     uint32_t getLightStatus(uint32_t id);
     void setLightStatus(uint32_t id, uint32_t color);
 
 private:
     QemudService* mService = nullptr;
     HwXrLightStatus mHwXrLightStatus = {};
+    std::unique_ptr<std::mutex> mClientCallbacksLock;
+    absl::flat_hash_map<void*, AndroidHwXrLedFuncs> mClientCallbacks;
 };
 
 class HwXrLightsClient {
@@ -67,3 +74,10 @@ private:
     HwXrLights* mHwXrLights = nullptr;
     QemudClient* mQemudClient = nullptr;
 };
+
+extern uint32_t android_hw_xrlights_get_lightstatus(const uint32_t id);
+
+extern void android_hw_xrlights_set(void* opaque,
+                                    const AndroidHwXrLedFuncs* funcs);
+
+extern void android_hw_xrlights_unset(void* opaque);
