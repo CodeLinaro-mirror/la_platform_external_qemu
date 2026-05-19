@@ -788,6 +788,15 @@ bool Snapshotter::isSavingCanceled(const char* name) const {
 }
 
 bool Snapshotter::stopVulkanAppsIfApplicable() {
+
+    uint32_t count = 0;
+    auto* vm = getConsoleAgents()->vm;
+    vm->vulkanInstanceEnumerate(&count, nullptr, nullptr);
+    if (!count) {
+        // No vulkan apps are running
+        return true;
+    }
+
     bool needToSaveSnapshot =
             !(getConsoleAgents()->settings->avdParams()->flags &
               AVDINFO_NO_SNAPSHOT_SAVE_ON_EXIT);
@@ -807,13 +816,6 @@ bool Snapshotter::stopVulkanAppsIfApplicable() {
     } else {
         // do nothing
         return false;
-    }
-
-    uint32_t count = 0;
-    auto* vm = getConsoleAgents()->vm;
-    vm->vulkanInstanceEnumerate(&count, nullptr, nullptr);
-    if (!count) {
-        return true;
     }
 
     auto adbInterface = android::emulation::AdbInterface::getGlobal();

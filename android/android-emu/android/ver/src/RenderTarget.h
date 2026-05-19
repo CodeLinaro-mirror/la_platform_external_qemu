@@ -22,9 +22,7 @@
  */
 
 #include "OpenGLESDispatch/GLESv2Dispatch.h"
-#include "aemu/base/Compiler.h"
-#include "android/utils/compiler.h"
-#include "android/virtualscene/Renderer.h"
+#include "Renderer.h"
 
 #include <memory>
 
@@ -32,7 +30,8 @@ namespace android {
 namespace virtualscene {
 
 class RenderTarget {
-    DISALLOW_COPY_AND_ASSIGN(RenderTarget);
+    RenderTarget(const RenderTarget& other) = delete;
+    RenderTarget& operator=(const RenderTarget& other) = delete;
 
 public:
     ~RenderTarget();

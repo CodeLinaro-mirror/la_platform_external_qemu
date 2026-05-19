@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#include "android/virtualscene/Renderer.h"
+#include "Renderer.h"
+#include "ScenesManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -22,37 +23,25 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "OpenGLESDispatch/EGLDispatch.h"
-#include "OpenGLESDispatch/GLESv2Dispatch.h"
-#include "aemu/base/ArraySize.h"
+
+#include <libyuv.h>
+
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/synchronization/MessageChannel.h"
 #include "aemu/base/threads/WorkerThread.h"
 #include "android/base/system/System.h"
-#include "android/utils/debug.h"
-#include "android/utils/system.h"
-#include "android/virtualscene/RenderTarget.h"
-#include "android/virtualscene/TextureUtils.h"
-#include "host-common/opengles.h"
 
-#ifdef _WIN32
-/* Include declarations that are missing in non-Linux headers. */
-#include "android/camera/camera-win.h"
-#elif _DARWIN_C_SOURCE
-/* Include declarations that are missing in non-Linux headers. */
-#include "android/camera/camera-win.h"
-#else
-#include <linux/videodev2.h>
-#endif /* _WIN32 */
+#include "OpenGLESDispatch/EGLDispatch.h"
+#include "OpenGLESDispatch/GLESv2Dispatch.h"
 
-#include <libyuv.h>
+#include "RenderTarget.h"
+#include "TextureUtils.h"
 
 using namespace android::base;
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
-#define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
-#define D_ACTIVE VERBOSE_CHECK(virtualscene)
+#define D(...) dprint(__VA_ARGS__)
 
 // The T(...) macro is used to dump extra verbose information.
 #define T_ACTIVE 0
@@ -481,7 +470,7 @@ int ImageScaler::scaleToFill(int inputWidth,
  *                     RendererView routines
  ******************************************************************************/
 
-void RendererView::updateTarget(Format format,
+void RendererView::updateTarget(VerImageFormat format,
                                 int frameWidth,
                                 int frameHeight) {
     std::lock_guard lock(mLock);
@@ -1152,7 +1141,7 @@ Texture RendererImpl::loadTexture(const char* filename) {
         return cachedTexture;
     }
 
-    Optional<TextureUtils::Result> result = TextureUtils::load(path.c_str());
+    std::optional<TextureUtils::Result> result = TextureUtils::load(path.c_str());
     if (!result) {
         E("%s: Failed to load texture from file '%s'", __FUNCTION__,
           path.c_str());
@@ -1495,7 +1484,7 @@ void RendererImpl::onLoaderLoadTexture(Texture texture) {
         filename = textureIt->second.mFilename;
     }
 
-    Optional<TextureUtils::Result> resultOpt =
+    std::optional<TextureUtils::Result> resultOpt =
             TextureUtils::load(filename.c_str());
     if (!resultOpt) {
         E("%s: Failed to load texture %d from file '%s'", __FUNCTION__,
@@ -1723,8 +1712,8 @@ void RendererImpl::processRenderable(
 }
 
 bool RendererImpl::EglState::initialize(int frameWidth, int frameHeight) {
-    mEglDispatch = (const EGLDispatch*)android_getEGLDispatch();
-    mGles2 = (const GLESv2Dispatch*)android_getGLESv2Dispatch();
+    mEglDispatch = (const EGLDispatch*)ScenesManager::getEglDispatch();
+    mGles2 = (const GLESv2Dispatch*)ScenesManager::getGles2Dispatch();
     if (!mEglDispatch || !mGles2) {
         LOG(ERROR) << "EglState::initialize failed, cannot get GL dispatch.";
         return false;

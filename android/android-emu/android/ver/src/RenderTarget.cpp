@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "android/virtualscene/RenderTarget.h"
+#include "RenderTarget.h"
 
 namespace android {
 namespace virtualscene {

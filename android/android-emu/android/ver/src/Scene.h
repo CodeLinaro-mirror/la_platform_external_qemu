@@ -20,62 +20,21 @@
  * The Scene container for the Virtual Scene.
  */
 
-#include "android/raw_image_sources/raw_image_source.h"
-#include "android/utils/compiler.h"
-#include "android/virtualscene/PosterInfo.h"
-#include "android/virtualscene/PosterSceneObject.h"
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/SceneCamera.h"
+#include "raw_image_sources/raw_image_source.h"
+#include "ver/virtual_environment_renderer_types.h"
+#include "PosterSceneObject.h"
 
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <filesystem>
 
 namespace android {
 namespace virtualscene {
 
 // Forward declarations.
 class SceneObject;
-
-struct SceneConfig {
-    enum class Mode {
-        Unknown = 0,
-        Mesh3D,
-        VideoFile,
-        ImageFile,
-        Color,
-        Image360,
-    };
-
-    SceneConfig(Mode mode, std::string_view argument);
-
-    Mode mSceneMode = Mode::Unknown;
-    std::string mArgument;
-
-    static Mode modeFromString(std::string_view sceneModeStr);
-    static const char* modeToString(SceneConfig::Mode mode);
-
-    // Returns fullpath to default file for the given scene mode
-    static const char* defaultArgumentForMode(SceneConfig::Mode mode);
-
-    // Check if a GPU renderer should be initialized for the scene mode
-    static bool modeRequiresRenderer(SceneConfig::Mode mode);
-
-    // Check if the scene mode supports view rotations, otherwise a seperate
-    // rotation operation will be required
-    static bool modeSupportsViewRotations(SceneConfig::Mode mode);
-
-    // Check if the scene mode supports animated content
-    static bool modeSupportsAnimations(SceneConfig::Mode mode);
-
-    // Check if the scene mode supports scene camera controls
-    static bool modeSupportsSceneControls(SceneConfig::Mode mode);
-};
-
-inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {
-    return (lhs.mSceneMode == rhs.mSceneMode) &&
-           (lhs.mArgument == rhs.mArgument);
-}
+class Renderer;
 
 // TODO(virtualscene-perf): temporary object type to support 2d rendering modes,
 // will be removed once the 2d quad objects are used directly instead
@@ -91,7 +50,8 @@ struct SceneOverlayObject {
 };
 
 class Scene {
-    DISALLOW_COPY_AND_ASSIGN(Scene);
+    Scene(const Scene& other) = delete;
+    Scene& operator=(const Scene& other) = delete;
 
 public:
     enum class LoadBehavior { Default, Synchronous };
@@ -100,13 +60,12 @@ public:
 
     // Creates a scene instance if the scene was successfully created or
     // null if there was an error.
-    static std::unique_ptr<Scene> create(const SceneConfig& config);
+    static std::unique_ptr<Scene> create(
+            const SceneConfig& config,
+            const std::vector<std::filesystem::path>& resourceBasePaths);
 
     // Before teardown, release all Renderer resources and SceneObjects.
     bool releaseResources();
-
-    // Get the scene camera.
-    const SceneCamera& getCamera() const;
 
     const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
     const SceneConfig& getSceneConfig() const { return mConfig; }
@@ -176,7 +135,7 @@ private:
     // Load the scene and create SceneObjects.
     //
     // Returns true on success.
-    bool initialize();
+    bool initialize(const std::vector<std::filesystem::path>& basePaths);
 
     // Load renderer related resources, separated from the initialize call
     // function be able to defer the renderer and related GPU resource
@@ -197,6 +156,7 @@ private:
 
     std::unique_ptr<Renderer> mRenderer;
     SceneConfig mConfig;
+    std::vector<std::filesystem::path> mResourceBasePaths;
 
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;

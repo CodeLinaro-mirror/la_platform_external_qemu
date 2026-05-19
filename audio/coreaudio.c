@@ -895,7 +895,12 @@ static OSStatus coreaudio_init_or_redo_sample_rate_conversion(
     if (isInput) {
         status = AudioConverterNew(&core->hwBasicDescription, &core->swBasicDescription, &core->converter);
     } else {
-        status = AudioConverterNew(&core->swBasicDescription, &core->hwBasicDescription, &core->converter);
+        AudioStreamBasicDescription outputDesc = core->hwBasicDescription;
+        outputDesc.mChannelsPerFrame = core->swBasicDescription.mChannelsPerFrame;
+        outputDesc.mBytesPerFrame = outputDesc.mChannelsPerFrame * (outputDesc.mBitsPerChannel / CHAR_BIT);
+        outputDesc.mBytesPerPacket = outputDesc.mBytesPerFrame;
+
+        status = AudioConverterNew(&core->swBasicDescription, &outputDesc, &core->converter);
     }
 
     if (status != kAudioHardwareNoError) {
@@ -1166,15 +1171,14 @@ static OSStatus coreaudio_check_and_fixup_streamformat(coreaudioVoiceBase* core,
     OSStatus status;
     const char *typ = coreaudio_io_type(isInput);
 
-    /* Is the stream format linear pcm packed float and having 1 or 2 channels? */
+    /* Is the stream format linear pcm packed float and having at least 1 channel? */
     if (core->hwBasicDescription.mFormatID == kAudioFormatLinearPCM &&
         core->hwBasicDescription.mFormatFlags & kAudioFormatFlagIsFloat &&
         core->hwBasicDescription.mFormatFlags & kAudioFormatFlagIsPacked &&
-        (core->hwBasicDescription.mChannelsPerFrame == 1 ||
-         core->hwBasicDescription.mChannelsPerFrame == 2)) {
+        core->hwBasicDescription.mChannelsPerFrame > 0) {
 
         /* Stream format conforms to what we want, continue. */
-        DCORE("Got a stream format within expected parameters (linear pcm packed float with 1 or 2 channels");
+        DCORE("Got a stream format within expected parameters (linear pcm packed float)");
 
     } else {
         /* If not, try to fix up the stream format by setting the fields we want explicitly. */
@@ -1199,17 +1203,7 @@ static OSStatus coreaudio_check_and_fixup_streamformat(coreaudioVoiceBase* core,
             fprintf(stderr, "%s: core %p input? %d trying to fix up format flags to kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked\n",
                     __func__, core, isInput);
 
-            core->hwBasicDescription.mFormatID = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
-        }
-
-        if (!(core->hwBasicDescription.mChannelsPerFrame == 1 ||
-              core->hwBasicDescription.mChannelsPerFrame == 2)) {
-
-            fprintf(stderr, "%s: core %p input? %d trying to fix up number of channels to 2\n",
-                    __func__, core, isInput);
-
-            /* Since channels must be nonzero, we have something with many more channels. Reduce to 2. */
-            core->hwBasicDescription.mChannelsPerFrame = 2;
+            core->hwBasicDescription.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
         }
 
         status = coreaudio_set_streamformat(core->deviceID, &core->hwBasicDescription, isInput);
@@ -1790,16 +1784,47 @@ static OSStatus audioOutputDeviceIOProc(
         D("Channels for first buffer: %d",
                 outOutputData->mBuffers[0].mNumberChannels);
 
+        AudioBufferList outputBufferList;
+        outputBufferList.mNumberBuffers = 1;
+        outputBufferList.mBuffers[0].mNumberChannels = core->swBasicDescription.mChannelsPerFrame;
+        outputBufferList.mBuffers[0].mDataByteSize = convertedFrameCount * core->swBasicDescription.mBytesPerFrame;
+        outputBufferList.mBuffers[0].mData = core->converterOutputBuffer;
+
         err = AudioConverterFillComplexBuffer(
             core->converter,
             converterInputDataProc,
             core,
             &convertedFrameCount,
-            outOutputData,
+            &outputBufferList,
             0 /* null output packet descriptions */);
 
         if (err != kAudioHardwareNoError) {
             fprintf(stderr, "%s: error from conversion: 0x%x\n", __func__, err);
+        } else {
+            /* Apply channel mapping from converterOutputBuffer to outOutputData */
+            const float *in_samples = (float *)core->converterOutputBuffer;
+            float *out_samples = (float *)outOutputData->mBuffers[0].mData;
+            const int q_channels = core->swBasicDescription.mChannelsPerFrame;
+            const int h_channels = core->hwBasicDescription.mChannelsPerFrame;
+
+            if (q_channels == h_channels) {
+                memcpy(out_samples, in_samples, convertedFrameCount * h_channels * sizeof(float));
+            } else if (q_channels < h_channels) {
+                for (UInt32 frame = convertedFrameCount; frame > 0; frame--) {
+                    memcpy(out_samples, in_samples, q_channels * sizeof(float));
+                    out_samples += q_channels;
+                    for (int j = h_channels - q_channels; j > 0; j--) {
+                        *out_samples++ = 0.0f;
+                    }
+                    in_samples += q_channels;
+                }
+            } else {
+                for (UInt32 frame = convertedFrameCount; frame > 0; frame--) {
+                    memcpy(out_samples, in_samples, h_channels * sizeof(float));
+                    out_samples += h_channels;
+                    in_samples += q_channels;
+                }
+            }
         }
 
         D("after: convertedFrameCount %u", convertedFrameCount);
@@ -1827,24 +1852,52 @@ static OSStatus audioOutputDeviceIOProc(
     /* If we aren't doing conversion, write directly to our HW's output buffers and increment. */
 
     if (!core->conversionNeeded) {
-        /* fill buffer */
-        for (frame = 0; frame < frameCountHw; frame++) {
-#ifdef FLOAT_MIXENG
         if (numChannels == 2) {
-            *out++ = src[frame].l; /* left channel */
-            *out++ = src[frame].r; /* right channel */
-        } else {
-            *out++ = (src[frame].l + src[frame].r) * 0.5;
-        }
+            for (frame = 0; frame < frameCountHw; frame++) {
+#ifdef FLOAT_MIXENG
+                *out++ = src[frame].l;
+                *out++ = src[frame].r;
 #else
 #ifdef RECIPROCAL
-        *out++ = src[frame].l * scale; /* left channel */
-        *out++ = src[frame].r * scale; /* right channel */
+                *out++ = src[frame].l * scale;
+                *out++ = src[frame].r * scale;
 #else
-         *out++ = src[frame].l / scale; /* left channel */
-         *out++ = src[frame].r / scale; /* right channel */
+                *out++ = src[frame].l / scale;
+                *out++ = src[frame].r / scale;
 #endif
 #endif
+            }
+        } else if (numChannels > 2) {
+            for (frame = 0; frame < frameCountHw; frame++) {
+#ifdef FLOAT_MIXENG
+                *out++ = src[frame].l;
+                *out++ = src[frame].r;
+#else
+#ifdef RECIPROCAL
+                *out++ = src[frame].l * scale;
+                *out++ = src[frame].r * scale;
+#else
+                *out++ = src[frame].l / scale;
+                *out++ = src[frame].r / scale;
+#endif
+#endif
+                for (int j = numChannels - 2; j > 0; j--) {
+                    *out++ = 0.0f;
+                }
+            }
+        } else {
+            assert(numChannels == 1);
+            for (frame = 0; frame < frameCountHw; frame++) {
+#ifdef FLOAT_MIXENG
+                *out++ = src[frame].l;
+#else
+#ifdef RECIPROCAL
+                *out++ = src[frame].l * scale;
+#else
+                *out++ = src[frame].l / scale;
+#endif
+#endif
+            }
         }
     }
 

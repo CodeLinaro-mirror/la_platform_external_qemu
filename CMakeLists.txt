@@ -345,7 +345,7 @@ endif()
 
 # Note that clang in windows act as a drop in replacement for cl
 if(NOT WINDOWS_MSVC_X86_64 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  add_definitions("-D__STDC_CONSTANT_MACROS" "-D_LIBCPP_VERSION=__GLIBCPP__")
+  add_definitions("-D__STDC_CONSTANT_MACROS" "-D_LIBCPP_VERSION=__GLIBCPP__" "-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST")
 
   # If macro expansion goes wrong, we like to see why
   add_c_flag("-fmacro-backtrace-limit=0")

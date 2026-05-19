@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#include "android/virtualscene/TextureUtils.h"
+#include "TextureUtils.h"
 #include <string>
 #include <string_view>
+#include <cstdint>
+#include "aemu/base/Log.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/ScopedStdioFile.h"
-#include "android/utils/debug.h"
 #include "android/utils/file_io.h"
 
 #ifdef _MSC_VER
@@ -33,10 +34,8 @@ extern "C" {
 
 #define E(...) derror(__VA_ARGS__)
 #define W(...) dwarning(__VA_ARGS__)
-#define D(...) VERBOSE_PRINT(virtualscene, __VA_ARGS__)
-#define D_ACTIVE VERBOSE_CHECK(virtualscene)
+#define D(...) dprint(__VA_ARGS__)
 
-using android::base::Optional;
 using android::base::PathUtils;
 using android::base::ScopedStdioFile;
 
@@ -75,7 +74,7 @@ TextureUtils::Result TextureUtils::createPlaceholder() {
     return result;
 }
 
-Optional<TextureUtils::Result> TextureUtils::load(const char* filename,
+std::optional<TextureUtils::Result> TextureUtils::load(const char* filename,
                                                   Orientation orientation) {
     const std::string filename_str{filename};
     const std::string_view extension{PathUtils::extension(filename_str)};
@@ -92,7 +91,7 @@ Optional<TextureUtils::Result> TextureUtils::load(const char* filename,
     }
 }
 
-Optional<TextureUtils::Result> TextureUtils::loadPNG(const char* filename,
+std::optional<TextureUtils::Result> TextureUtils::loadPNG(const char* filename,
                                                      Orientation orientation) {
     ScopedStdioFile fp(android_fopen(filename, "rb"));
     if (!fp) {
@@ -210,7 +209,7 @@ struct ErrorManager {
     jmp_buf setjmp_buffer;
 };
 
-Optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
+std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
                                                       Orientation orientation) {
     ScopedStdioFile fp(android_fopen(filename, "rb"));
     if (!fp) {

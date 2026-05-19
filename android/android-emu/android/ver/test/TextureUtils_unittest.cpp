@@ -9,7 +9,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#include "android/virtualscene/TextureUtils.h"
+#include "TextureUtils.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/ScopedStdioFile.h"
 #include "android/utils/file_io.h"
@@ -102,7 +102,7 @@ static std::string testdataPathToAbsolute(std::string_view filename) {
 static void loadImage(std::string_view filename,
                       TextureUtils::Result* outResult) {
     const std::string path = testdataPathToAbsolute(filename);
-    Optional<TextureUtils::Result> result = TextureUtils::load(path.c_str());
+    std::optional<TextureUtils::Result> result = TextureUtils::load(path.c_str());
     ASSERT_TRUE(result);
     *outResult = std::move(result.value());
 }
