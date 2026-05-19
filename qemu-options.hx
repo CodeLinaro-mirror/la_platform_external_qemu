@@ -4873,6 +4873,15 @@ SRST
     Start right away with a saved state (``loadvm`` in monitor)
 ERST
 
+DEF("savevm", HAS_ARG, QEMU_OPTION_savevm, \
+    "-savevm [tag|id]\n" \
+    "                save the current state to a snapshot when exiting\n",
+    QEMU_ARCH_ALL)
+SRST
+``-savevm file``
+    Save the current state to a snapshot when exiting.
+ERST
+
 #ifndef _WIN32
 DEF("daemonize", 0, QEMU_OPTION_daemonize, \
     "-daemonize      daemonize QEMU after initializing\n", QEMU_ARCH_ALL)
