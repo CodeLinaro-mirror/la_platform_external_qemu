@@ -41,6 +41,9 @@ extern "C" {
 #include <libswscale/swscale.h>
 }  // extern "C"
 
+namespace android {
+namespace ver {
+
 namespace {
 
 int getVideoStreamIndex(const AVFormatContext& fmtctx) {
@@ -474,3 +477,6 @@ SwsContext* RawVideofileSource::getSwsContext(const int srcWidth,
 
     return ctx;
 }
+
+}  // namespace ver
+}  // namespace android

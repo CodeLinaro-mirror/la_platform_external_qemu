@@ -15,6 +15,9 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
+namespace android {
+namespace ver {
+
 SolidColorImageSource::SolidColorImageSource()
     : SolidColorImageSource({0, 0, 0}) {}
 
@@ -48,3 +51,6 @@ absl::StatusOr<std::optional<RawImageToken>> SolidColorImageSource::UpdateImage(
 int SolidColorImageSource::Stop() {
     return 0;
 }
+
+}  // namespace ver
+}  // namespace android

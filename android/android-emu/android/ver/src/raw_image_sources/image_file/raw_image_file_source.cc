@@ -31,6 +31,9 @@ extern "C" {
 using android::base::PathUtils;
 using android::base::ScopedStdioFile;
 
+namespace android {
+namespace ver {
+
 static void pngWarningCallback(png_structp readPtr,
                                png_const_charp warningMessage) {
     dprint("%s: %s\n", __FUNCTION__, warningMessage);
@@ -286,3 +289,6 @@ absl::StatusOr<std::optional<RawImageToken>> RawImageFileSource::UpdateImage(
 int RawImageFileSource::Stop() {
     return 0;
 }
+
+}  // namespace ver
+}  // namespace android
