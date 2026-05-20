@@ -61,6 +61,8 @@ public:
      * or 0 if there is no meaninful finite length
      */
     virtual int64_t GetAnimationLengthUs() { return 0; }
+
+    virtual ~RawImageSource() = default;
 };
 
 struct Color {
