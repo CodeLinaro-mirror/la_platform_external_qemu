@@ -27,7 +27,7 @@
 #include <glm/glm.hpp>
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class SceneObject {
     SceneObject(const SceneObject& other) = delete;
@@ -65,5 +65,5 @@ protected:
     bool mVisible = true;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

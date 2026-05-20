@@ -29,6 +29,9 @@ extern "C" {
 #include <optional>
 #include <string>
 
+namespace android {
+namespace ver {
+
 class RawVideofileSource : public RawImageSource {
 public:
     static std::unique_ptr<RawVideofileSource> Create(std::string filename);
@@ -124,3 +127,6 @@ private:
                               const int dstHeight,
                               const AVPixelFormat dstFmt);
 };
+
+}  // namespace ver
+}  // namespace android

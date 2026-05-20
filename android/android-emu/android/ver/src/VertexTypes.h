@@ -24,7 +24,7 @@
 #include <glm/gtx/hash.hpp>
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 struct VertexPositionUV {
     glm::vec3 pos;
@@ -49,5 +49,5 @@ struct VertexInfo {
     size_t uvOffset = 0;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

@@ -66,7 +66,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
                                          int frameHeight) {
     VLOG(camera) << "Start capturing at " << frameWidth << " x " << frameHeight;
 
-    SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
+    VerSceneConfig::Mode sceneMode = VerSceneConfig::Mode::Unknown;
     std::string sceneModeStr;
     std::string sceneArgument;
     const size_t sepPos =
@@ -92,19 +92,19 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
         VirtualSceneManager::addSceneUser();
     } else {
         // Create and own the scene
-        SceneConfig::Mode mode = SceneConfig::modeFromString(sceneModeStr);
+        VerSceneConfig::Mode mode = VerSceneConfig::modeFromString(sceneModeStr);
         if (sceneArgument.empty()) {
             // Create with default content if a filename is not given
-            sceneArgument = SceneConfig::defaultArgumentForMode(mode);
+            sceneArgument = VerSceneConfig::defaultArgumentForMode(mode);
         }
-        SceneConfig sceneConfig(mode, sceneArgument);
+        VerSceneConfig sceneConfig(mode, sceneArgument);
         mOwnedScene = ver_create_scene(sceneConfig);
         if (mOwnedScene == VER_INVALID_HANDLE) {
             // Use magenta/error color fallback for camera owned scenes
             LOG(ERROR)
                     << "Camera scene could not be initialized, using default configuration!";
             mOwnedScene = ver_create_scene(
-                    SceneConfig(SceneConfig::Mode::Color, "#FF00FF"));
+                    VerSceneConfig(VerSceneConfig::Mode::Color, "#FF00FF"));
         }
 
         if (mOwnedScene != VER_INVALID_HANDLE) {
@@ -113,7 +113,7 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
         }
     }
 
-    if (sceneMode == SceneConfig::Mode::Unknown) {
+    if (sceneMode == VerSceneConfig::Mode::Unknown) {
         LOG(ERROR) << "Camera scene could not be not initialized!";
         stopCapturing();
         return -1;
@@ -162,14 +162,14 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
                                     const char* direction,
                                     int orientation) {
 
-    SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
+    VerSceneConfig::Mode sceneMode = VerSceneConfig::Mode::Unknown;
     if (mUsingEnvironmentScene) {
         sceneMode = VirtualSceneManager::getSceneMode();
     } else if (mOwnedScene != VER_INVALID_HANDLE) {
         sceneMode = ver_scene_get_mode(mOwnedScene);
     }
 
-    if (sceneMode == SceneConfig::Mode::Unknown) {
+    if (sceneMode == VerSceneConfig::Mode::Unknown) {
         LOG(ERROR) << "Virtual scene is not initialized!";
         return -1;
     }
@@ -189,7 +189,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
 
     // TODO(virtualscene-perf): update the view here to avoid resizing?
     // Update camera based on physical model and set view projection accordingly
-    const bool supportsPosition = (sceneMode == SceneConfig::Mode::Mesh3D);
+    const bool supportsPosition = (sceneMode == VerSceneConfig::Mode::Mesh3D);
     mSceneCamera.setExtraRotationEulerDegrees(extraRotationEulerDegrees);
     mSceneCamera.update(supportsPosition);
 
@@ -214,7 +214,7 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
 
         // Do not rotate during the conversion if the view is already handling
         const bool viewHandlesRotation =
-                SceneConfig::modeSupportsViewRotations(sceneMode);
+                VerSceneConfig::modeSupportsViewRotations(sceneMode);
         const char* convertDirection = direction;
         int convertOrientation = orientation;
         if (viewHandlesRotation) {

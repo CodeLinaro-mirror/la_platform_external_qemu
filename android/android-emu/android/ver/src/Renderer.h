@@ -33,7 +33,7 @@
 using namespace gfxstream::host::gl;
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class Scene;
 class ScenesManager;
@@ -346,5 +346,5 @@ public:
     virtual std::unique_ptr<RendererContext> makeCurrent() = 0;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

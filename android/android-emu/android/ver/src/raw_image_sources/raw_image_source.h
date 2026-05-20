@@ -20,6 +20,9 @@
 #include "absl/status/statusor.h"
 #include "ver/virtual_environment_renderer_types.h"
 
+namespace android {
+namespace ver {
+
 struct RawImageBufferView {
     const uint8_t *buffer;
     size_t buffer_size;
@@ -86,3 +89,6 @@ private:
     uint8_t image_[4];
     RawImageBufferView buffer_;
 };
+
+}  // namespace ver
+}  // namespace android

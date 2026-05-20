@@ -27,7 +27,7 @@
 #include <memory>
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class RenderTarget {
     RenderTarget(const RenderTarget& other) = delete;
@@ -100,5 +100,5 @@ private:
     uint32_t mHeight;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

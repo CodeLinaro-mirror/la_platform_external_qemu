@@ -28,6 +28,9 @@ using android::base::ScopedStdioFile;
 using android::base::System;
 using android::base::TestTempDir;
 
+namespace android {
+namespace ver {
+
 // Allowed average squared difference
 static constexpr double kCompareThreshold = 0.125;
 static constexpr size_t kMaxVectorOutput = 128;
@@ -357,3 +360,6 @@ INSTANTIATE_TEST_SUITE_P(
                                "jpeg_rgb24_progressive_golden.bmp"),
                 ImageTestParam("rgb24_31px.png", "rgb24_31px_golden.bmp"),
                 ImageTestParam("rgba32.png", "rgba32_golden.bmp")));
+
+}  // namespace ver
+}  // namespace android
