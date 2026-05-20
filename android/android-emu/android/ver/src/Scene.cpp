@@ -70,7 +70,7 @@ std::unique_ptr<To> static_unique_cast(std::unique_ptr<From>& from) {
 }
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 Scene::Scene(const SceneConfig& config,
              const std::vector<std::filesystem::path>& basePaths)
@@ -512,5 +512,5 @@ void Scene::unloadUserResources() {
     }
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

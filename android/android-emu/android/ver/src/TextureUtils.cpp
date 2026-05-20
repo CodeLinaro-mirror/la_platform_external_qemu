@@ -40,7 +40,7 @@ using android::base::PathUtils;
 using android::base::ScopedStdioFile;
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 static constexpr uint32_t kPlaceholderWidth = 1;
 static constexpr uint32_t kPlaceholderHeight = 1;
@@ -291,5 +291,5 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
     return result;
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

@@ -23,7 +23,7 @@
 #include "SceneObject.h"
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class PosterSceneObject : public SceneObject {
     PosterSceneObject(const PosterSceneObject& other) = delete;
@@ -81,5 +81,5 @@ private:
     float mScale = 1.0f;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

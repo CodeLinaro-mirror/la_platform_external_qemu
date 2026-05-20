@@ -30,7 +30,7 @@
 #include <vector>
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 // Forward declarations.
 class SceneObject;
@@ -175,5 +175,5 @@ private:
     int mBaseRotation = 0;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

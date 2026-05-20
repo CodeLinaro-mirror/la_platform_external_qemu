@@ -24,7 +24,7 @@
 #define D(...) dprint(__VA_ARGS__)
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 SceneObject::SceneObject(Renderer& renderer) : mRenderer(renderer) {}
 
@@ -62,5 +62,5 @@ void SceneObject::setTexture(int renderableIndex, Texture texture) {
     mRenderables[renderableIndex].texture = mRenderer.duplicateTexture(texture);
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

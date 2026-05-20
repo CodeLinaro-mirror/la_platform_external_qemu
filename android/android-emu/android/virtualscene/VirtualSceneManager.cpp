@@ -66,12 +66,12 @@ namespace android {
 namespace virtualscene {
 
 /**
- * @brief Parses a .posters file and returns a list of PosterInfo structures.
+ * @brief Parses a .posters file and returns a list of android::ver::PosterInfo structures.
  *
  * @param filename The name of the posters file to parse.
- * @return A vector of PosterInfo containing the parsed poster data.
+ * @return A vector of android::ver::PosterInfo containing the parsed poster data.
  */
-std::vector<PosterInfo> parsePostersFile(const char* filename) {
+std::vector<android::ver::PosterInfo> parsePostersFile(const char* filename) {
     const std::string filePath = android::base::PathUtils::join(
             android::base::System::get()->getLauncherDirectory(), "resources",
             filename);
@@ -83,8 +83,8 @@ std::vector<PosterInfo> parsePostersFile(const char* filename) {
         return {};
     }
 
-    std::vector<PosterInfo> results;
-    PosterInfo poster;
+    std::vector<android::ver::PosterInfo> results;
+    android::ver::PosterInfo poster;
 
     std::string str;
 
@@ -103,7 +103,7 @@ std::vector<PosterInfo> parsePostersFile(const char* filename) {
                 results.push_back(poster);
             }
 
-            poster = PosterInfo();
+            poster = android::ver::PosterInfo();
             in >> poster.name;
             if (!in) {
                 dwarning("%s: Invalid name.", __FUNCTION__);
@@ -242,7 +242,7 @@ public:
 
     bool getAnimationState() const { return mAnimationState; }
 
-    const std::vector<PosterInfo> getPosterLocations() const {
+    const std::vector<android::ver::PosterInfo> getPosterLocations() const {
         return mPosterLocations;
     }
 
@@ -252,7 +252,7 @@ public:
     }
 
 private:
-    std::vector<PosterInfo> mPosterLocations;
+    std::vector<android::ver::PosterInfo> mPosterLocations;
     std::unordered_map<std::string, PosterSetting> mPosterSettings;
     bool mAnimationState = true;
 };
@@ -263,7 +263,7 @@ static LazyInstance<Settings> sSettings = LAZY_INSTANCE_INIT;
 struct EnvironmentConfig {
     static const float defaultBackgroundBlur = 5.0f;
     static const int defaultFps = 30;
-    SceneConfig::Mode sceneMode = SceneConfig::Mode::Unknown;
+    VerSceneConfig::Mode sceneMode = VerSceneConfig::Mode::Unknown;
     std::string sceneArgument;
     bool backgroundEnabled = true;
     float backgroundBlur = defaultBackgroundBlur;
@@ -307,8 +307,8 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
                     argpos = separator + 1;
                 }
                 ret.sceneMode =
-                        SceneConfig::modeFromString(mode.substr(0, separator));
-                if (ret.sceneMode == SceneConfig::Mode::Unknown) {
+                        VerSceneConfig::modeFromString(mode.substr(0, separator));
+                if (ret.sceneMode == VerSceneConfig::Mode::Unknown) {
                     dwarning("%s: Invalid mode set.", __func__);
                 } else {
                     ret.sceneArgument = mode.substr(argpos);
@@ -319,7 +319,7 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
                 std::string backgroundImageFilename = iniFile_getString(
                         environmentIni, "background.image.filename", "");
                 if (!backgroundImageFilename.empty()) {
-                    ret.sceneMode = SceneConfig::Mode::ImageFile;
+                    ret.sceneMode = VerSceneConfig::Mode::ImageFile;
                     ret.sceneArgument = backgroundImageFilename;
                     modeSet = true;
                 }
@@ -340,17 +340,17 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
         if (showBackground) {
             dinfo("%s: Using default blank background for the environment.",
                   __func__);
-            ret.sceneMode = SceneConfig::Mode::Color;
+            ret.sceneMode = VerSceneConfig::Mode::Color;
         } else {
             dinfo("%s: Using default virtual scene mode for the environment.",
                   __func__);
-            ret.sceneMode = SceneConfig::Mode::Mesh3D;
+            ret.sceneMode = VerSceneConfig::Mode::Mesh3D;
         }
     }
     if (ret.sceneArgument.empty()) {
         dinfo("%s: Using default configuration for mode %s for the environment.",
-              __func__, SceneConfig::modeToString(ret.sceneMode));
-        ret.sceneArgument = SceneConfig::defaultArgumentForMode(ret.sceneMode);
+              __func__, VerSceneConfig::modeToString(ret.sceneMode));
+        ret.sceneArgument = VerSceneConfig::defaultArgumentForMode(ret.sceneMode);
     }
 
     return ret;
@@ -433,15 +433,15 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
     mShowBackground = transparentDisplay;
     EnvironmentConfig envConfig =
             getEnvironmentConfig(avdInfo, warnIfMissing, mShowBackground);
-    const SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
+    const VerSceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
 
     D("Initializing VirtualSceneManager with mode:%s, argument:%s",
-      SceneConfig::modeToString(sceneConfig.mSceneMode),
+      VerSceneConfig::modeToString(sceneConfig.mSceneMode),
       sceneConfig.mArgument.c_str());
 
     // Use scene mode name for metrics
     const char* sceneModeStr =
-            SceneConfig::modeToString(sceneConfig.mSceneMode);
+            VerSceneConfig::modeToString(sceneConfig.mSceneMode);
     camera::CameraMetrics::instance().setVirtualSceneName(sceneModeStr);
 
     // Check if the config is valid, and provide a different error if the file
@@ -453,10 +453,10 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
 
     if (mEnvironmentScene == VER_INVALID_HANDLE) {
         // If the config cannot be loaded, try with the fallback config
-        const SceneConfig::Mode fallbackMode = SceneConfig::Mode::ImageFile;
-        const SceneConfig fallbackConfig(
+        const VerSceneConfig::Mode fallbackMode = VerSceneConfig::Mode::ImageFile;
+        const VerSceneConfig fallbackConfig(
                 fallbackMode,
-                SceneConfig::defaultArgumentForMode(fallbackMode));
+                VerSceneConfig::defaultArgumentForMode(fallbackMode));
         mEnvironmentScene = ver_create_scene(fallbackConfig);
 
         if (mEnvironmentScene == VER_INVALID_HANDLE) {
@@ -531,7 +531,7 @@ void VirtualSceneManager::update() {
     // virtualscene and animation is controlled by renderTime in shaders. Always
     // update the scene and timer in other modes.
     bool updateTime = true;
-    if (SceneConfig::modeSupportsAnimations(
+    if (VerSceneConfig::modeSupportsAnimations(
                 ver_scene_get_mode(mEnvironmentScene))) {
         // Use virtualscene settings for animation control
         updateTime = sSettings->getAnimationState();
@@ -641,7 +641,7 @@ void VirtualSceneManager::enumeratePosters(void* context,
         }
 
         const float maxWidth = location.size.x;
-        callback(context, location.name.c_str(), kPosterMinimumSizeMeters,
+        callback(context, location.name.c_str(), ver::kPosterMinimumSizeMeters,
                  maxWidth, filename, scale);
     }
 }
@@ -683,7 +683,7 @@ void VirtualSceneManager::setSceneControlsParameters(bool show) {
     }
 
     // Only allow showing scene controls if it's a 3d scene
-    if (!show || SceneConfig::modeSupportsSceneControls(
+    if (!show || VerSceneConfig::modeSupportsSceneControls(
                          ver_scene_get_mode(mEnvironmentScene))) {
         D("%s: show=%s", __func__, (show ? "true" : "false"));
         skin_winsys_show_virtual_scene_controls(show);
@@ -750,22 +750,22 @@ void VirtualSceneManager::setUpdateCallback(std::function<void()> callback) {
     mUpdateCallback = callback;
 }
 
-SceneConfig::Mode VirtualSceneManager::getSceneMode() {
+VerSceneConfig::Mode VirtualSceneManager::getSceneMode() {
     AutoLock lock(mLock);
     if (mEnvironmentScene == VER_INVALID_HANDLE) {
         E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
-        return SceneConfig::Mode::Unknown;
+        return VerSceneConfig::Mode::Unknown;
     }
     return ver_scene_get_mode(mEnvironmentScene);
 }
 
-bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
+bool VirtualSceneManager::reloadScene(const VerSceneConfig& config) {
     bool shouldNotifyAnimation = false;
     {
         AutoLock lock(mLock);
 
         // Only reload if the config has changed
-        const SceneConfig* existingConfig =
+        const VerSceneConfig* existingConfig =
                 ver_scene_get_config(mEnvironmentScene);
         if (mEnvironmentScene && existingConfig && *existingConfig == config) {
             D("%s: no changes to the scene config.", __func__);
@@ -773,7 +773,7 @@ bool VirtualSceneManager::reloadScene(const SceneConfig& config) {
         }
 
         D("%s: Reloading with mode:%s, argument:%s", __func__,
-          SceneConfig::modeToString(config.mSceneMode),
+          VerSceneConfig::modeToString(config.mSceneMode),
           config.mArgument.c_str());
 
         // Create a new scene and check if there were any errors
@@ -836,7 +836,7 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
 
     EnvironmentConfig envConfig =
             getEnvironmentConfig(avdInfo, true, mShowBackground);
-    SceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
+    VerSceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
 
     // Check if the config is valid, and provide a different error if the file
     // is not present
@@ -974,7 +974,7 @@ bool BackgroundUpdateService::start(int displayWidth,
         if (mBackgroundEnabled) {
             const bool supportsPosition =
                     (VirtualSceneManager::getSceneMode() ==
-                     SceneConfig::Mode::Mesh3D);
+                     VerSceneConfig::Mode::Mesh3D);
             mSceneCamera->update(supportsPosition);
 
             // TODO(virtualscene) Handle rotation properly for all scenes.

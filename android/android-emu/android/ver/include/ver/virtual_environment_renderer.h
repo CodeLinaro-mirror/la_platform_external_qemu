@@ -210,7 +210,7 @@ VER_EXPORT uint64_t ver_scene_load_poster(VerSceneHandle scene,
  */
 VER_EXPORT bool ver_scene_create_poster_location(
         VerSceneHandle scene,
-        const android::virtualscene::PosterInfo& info);
+        const android::ver::PosterInfo& info);
 
 // --- Render View Management ---
 

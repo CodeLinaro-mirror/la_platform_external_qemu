@@ -22,7 +22,7 @@
 #include "SceneObject.h"
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class MeshSceneObject : public SceneObject {
     MeshSceneObject(const MeshSceneObject& other) = delete;
@@ -57,5 +57,5 @@ public:
     static std::unique_ptr<MeshSceneObject> createSphere(Renderer& renderer);
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

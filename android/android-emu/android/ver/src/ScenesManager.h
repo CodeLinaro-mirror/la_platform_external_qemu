@@ -25,7 +25,7 @@
 #include "ver/virtual_environment_renderer_types.h"
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class Scene;
 class RendererView;
@@ -74,5 +74,5 @@ private:
     static const void* mGles2Dispatch;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

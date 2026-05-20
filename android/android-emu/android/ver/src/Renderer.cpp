@@ -233,7 +233,7 @@ void main() {
 }
 )";
 
-static constexpr android::virtualscene::VertexPositionUV kScreenQuadVerts[] = {
+static constexpr android::ver::VertexPositionUV kScreenQuadVerts[] = {
         {glm::vec3(-1.f, -1.f, 0.f), glm::vec2(0.f, 0.f)},
         {glm::vec3(3.f, -1.f, 0.f), glm::vec2(2.f, 0.f)},
         {glm::vec3(-1.f, 3.f, 0.f), glm::vec2(0.f, 2.f)},
@@ -246,7 +246,7 @@ static constexpr GLuint kScreenQuadIndices[] = {
 };
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 struct MaterialData {
     GLuint program = 0;
@@ -1819,5 +1819,5 @@ void RendererImpl::EglState::destroy() {
     }
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

@@ -124,7 +124,7 @@ public:
 
     static void setUpdateCallback(std::function<void()> callback);
 
-    static SceneConfig::Mode getSceneMode();
+    static VerSceneConfig::Mode getSceneMode();
 
     // Returns false on error.
     static bool reloadEnvironment(const char* environmentData);
@@ -148,7 +148,7 @@ private:
     static void updateSceneWorker();
     static void startSceneUpdateThread();
     static void stopSceneUpdateThread();
-    static bool reloadScene(const SceneConfig& config);
+    static bool reloadScene(const VerSceneConfig& config);
 };
 
 // TODO(virtualscene): move into a regular service
