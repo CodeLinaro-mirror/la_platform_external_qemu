@@ -1282,6 +1282,8 @@ static bool emulator_handleCommonEmulatorOptions(AndroidOptions* opts,
     // 3. Some times we have fixed requirements
     if (avdInfo_getAvdFlavor(avd) == AVD_TV) {
         minRam = 1024;
+    } else if (avdInfo_getAvdFlavor(avd) == AVD_WEAR) {
+        minRam = 2048;
     } else if (avdInfo_getAvdFlavor(avd) == AVD_XR) {
         minRam = 4096;
     }
