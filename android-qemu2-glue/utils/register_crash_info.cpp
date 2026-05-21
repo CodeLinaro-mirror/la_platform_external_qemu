@@ -76,10 +76,15 @@ crashinfo collectCrashInfo(AvdInfo* avd, const std::string& sessionId) {
     }
 
     IniFile buildprop(reinterpret_cast<char*>(data->data), data->size);
-    std::string fingerPrint = buildprop.getString("ro.system.build.fingerprint", "??");
+    std::string fingerPrint = buildprop.getString("ro.build.fingerprint", "??");
     if (fingerPrint == "??") {
-        // Try old method
-        fingerPrint = buildprop.getString("ro.build.fingerprint", "??");
+        fingerPrint = buildprop.getString("ro.product.build.fingerprint", "??");
+    }
+    if (fingerPrint == "??") {
+        fingerPrint = buildprop.getString("ro.vendor.build.fingerprint", "??");
+    }
+    if (fingerPrint == "??") {
+        fingerPrint = buildprop.getString("ro.system.build.fingerprint", "??");
     }
     info["ro.build.fingerprint"] = std::move(fingerPrint);
 

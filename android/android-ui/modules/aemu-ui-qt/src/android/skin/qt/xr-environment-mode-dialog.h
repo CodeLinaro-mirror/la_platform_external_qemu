@@ -12,8 +12,11 @@
 #define XRENVIRONMENTMODEDIALOG_H
 
 #include <QDialog>
+#include <thread>
 
 #include <vector>
+#include "aemu/base/EventNotificationSupport.h"
+#include "xr_emulator_conn.pb.h"
 
 namespace Ui {
 class XrEnvironmentModeDialog;
@@ -30,19 +33,30 @@ public:
 
 signals:
     void onXrEnvironmentModeRequested(int control);
-    void onXrDimmingValueRequested(float value);
+    void onXrDimmingValueRequested(float value, bool fromGuest = false);
+    void _externalXROptionsChanged(xr_emulator_proto::XrOptions options);
 
 private slots:
     void on_btn_xr_environment_passthrough_on_clicked();
     void on_btn_xr_environment_passthrough_off_clicked();
     void on_slider_xr_dimming_value_valueChanged(int value);
+    // Signal handler for external changes
+    void onExternalXROptionsChanged(xr_emulator_proto::XrOptions options);
 
 private:
     Ui::XrEnvironmentModeDialog* ui;
+    std::unique_ptr<android::base::RaiiEventListener<
+            android::base::EventNotificationSupport<
+                    xr_emulator_proto::XrOptions>,
+            xr_emulator_proto::XrOptions>>
+            mXROptionsListener;
     bool mShown = false;
     std::vector<float> mDimmingLevels;
     float mCurrentDiscreteValue = 0.0f;
     int mLastSliderValue = -1;
+    void register_listener();
+    std::thread mListenerRegisterThread;
+    std::atomic<bool> mKeepRunning;
 };
 
 #endif  // XRENVIRONMENTMODEDIALOG_H

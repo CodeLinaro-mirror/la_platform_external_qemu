@@ -11,15 +11,17 @@
 
 #include "android/skin/qt/extended-pages/camera-virtualscene-subpage.h"
 
-#include <QByteArray>                                       // for QByteArray
-#include <QCheckBox>                                        // for QCheckBox
+#include <QByteArray>    // for QByteArray
+#include <QCheckBox>     // for QCheckBox
+#include <QFileInfo>     // for QFileInfo
+#include <QMap>          // for QMap
+#include <QMapIterator>  // for QMapIterator
+#include <QPointer>
 #include <QPushButton>
-#include <QFileInfo>                                        // for QFileInfo
-#include <QMap>                                             // for QMap
-#include <QMapIterator>                                     // for QMapIterator
-#include <QSettings>                                        // for QSettings
-#include <QVariant>                                         // for QVariant
-#include <functional>                                       // for __base
+#include <QSettings>  // for QSettings
+#include <QSignalBlocker>
+#include <QVariant>    // for QVariant
+#include <functional>  // for __base
 
 #include "android/avd/util.h"                               // for path_getA...
 #include "android/avd/info.h"
@@ -49,6 +51,29 @@ CameraVirtualSceneSubpage::CameraVirtualSceneSubpage(QWidget* parent)
             SLOT(reportInteraction()));
     connect(mUi->imageTable, SIGNAL(interaction()), this,
             SLOT(reportInteraction()));
+
+    connect(this, SIGNAL(animationStateChanged(bool)), this,
+            SLOT(onAnimationStateChanged(bool)));
+
+    if (sVirtualSceneAgent) {
+        auto notifier =
+                static_cast<android::base::EventNotificationSupport<bool>*>(
+                        sVirtualSceneAgent->getAnimationStateEventListener());
+        if (notifier) {
+            QPointer<CameraVirtualSceneSubpage> weakThis(this);
+            mAnimationStateListener =
+                    std::make_unique<android::base::RaiiEventListener<
+                            android::base::EventNotificationSupport<bool>,
+                            bool>>(notifier, [weakThis](bool /*enabled*/) {
+                        if (weakThis && sVirtualSceneAgent) {
+                            // In case the sequence we recieve events in is out
+                            // of order, fetch current state from the source
+                            emit weakThis->animationStateChanged(
+                                    sVirtualSceneAgent->getAnimationState());
+                        }
+                    });
+        }
+    }
 }
 
 // static
@@ -105,6 +130,11 @@ void CameraVirtualSceneSubpage::on_reloadEnvironment_clicked() {
     if (sVirtualSceneAgent) {
         sVirtualSceneAgent->reloadEnvironment(nullptr);
     }
+}
+
+void CameraVirtualSceneSubpage::onAnimationStateChanged(bool enabled) {
+    QSignalBlocker blocker(mUi->toggleTV);
+    mUi->toggleTV->setChecked(enabled);
 }
 
 void CameraVirtualSceneSubpage::reportInteraction() {

@@ -68,7 +68,7 @@
 #include "android/utils/eintr_wrapper.h"
 #include "android/utils/filelock.h"
 #include "android/utils/x86_cpuid.h"
-#include "android/virtualscene/TextureUtils.h"
+#include "ver/virtual_environment_renderer.h" // for ver_texture_utils_load_png
 #include "android_modem_v2.h"
 #include "emulator_controller.pb.h"
 #include "host-common/FeatureControl.h"
@@ -153,7 +153,6 @@ using android::emulation::ApkInstaller;
 using android::emulation::AvdCompatibility;
 using android::emulation::AvdCompatibilityManager;
 using android::emulation::FilePusher;
-using android::virtualscene::TextureUtils;
 
 namespace {
 
@@ -322,17 +321,16 @@ SkinSurfaceBitmap::SkinSurfaceBitmap(const char* path) : reader(path) {
     // source and it doesn't introduce unexpected dependencies.
     // This code path will be executed iff the file format is png.
     if (PathUtils::extension(path) == ".png") {
-        auto result =
-                TextureUtils::loadPNG(reader.fileName().toStdString().c_str(),
-                                      TextureUtils::Orientation::Qt);
-        if (result) {
-            QImage::Format format =
-                    (result->mFormat == TextureUtils::Format::RGB24)
-                            ? QImage::Format_RGB888
-                            : QImage::Format_RGBA8888;
-            image = QImage(reinterpret_cast<const unsigned char*>(
-                                   result->mBuffer.data()),
-                           result->mWidth, result->mHeight, format);
+        int width = 0, height = 0, formatBpp = 0;
+        std::vector<uint8_t> imageBuffer;
+        if (ver_texture_utils_load_png(reader.fileName().toStdString().c_str(),
+                                       &width, &height, &formatBpp,
+                                       &imageBuffer)) {
+            QImage::Format format = (formatBpp == 3) ? QImage::Format_RGB888
+                                                     : QImage::Format_RGBA8888;
+            image = QImage(
+                    reinterpret_cast<const unsigned char*>(imageBuffer.data()),
+                    width, height, format);
 
             image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
             resetReader();
@@ -3825,7 +3823,7 @@ void EmulatorQtWindow::checkAdbVersionAndWarn() {
                        "> General tab > 'Use detected ADB location'"));
         } else {
             mAdbWarningBox->setText(
-                    tr("The ADB binary found at %1 is obsolete and has serious"
+                    tr("The ADB binary found at %1 is obsolete and has serious "
                        "performance problems with the Android Emulator. Please "
                        "update to a newer version to get significantly faster "
                        "app/file transfer.")

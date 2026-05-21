@@ -1148,8 +1148,7 @@ public:
     }
 
 #ifdef _WIN32
-    static int getCpuBrandNameAndCoreCountWMI(char *name, uint32_t *core_count,
-                                       uint32_t *lp_count) {
+    static int getCpuBrandNameWMI(char *name) {
         HRESULT hres;
         IWbemLocator* pLoc = NULL;
         IWbemServices* pSvc = NULL;
@@ -1180,7 +1179,7 @@ public:
                              " Error code = 0x%x", __func__, hres);
             LOG(DEBUG) << errorStr;
             CoUninitialize();
-            return 1;
+            return 2;
         }
 
         hres = pLoc->ConnectServer(_bstr_t(L"ROOT\\CIMV2"), NULL, NULL, 0,
@@ -1193,7 +1192,7 @@ public:
             LOG(DEBUG) << errorStr;
             pLoc->Release();
             CoUninitialize();
-            return 1;
+            return 3;
         }
 
         hres = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE,
@@ -1209,7 +1208,7 @@ public:
             pSvc->Release();
             pLoc->Release();
             CoUninitialize();
-            return 1;
+            return 4;
         }
 
         hres = pSvc->ExecQuery(bstr_t("WQL"),
@@ -1225,7 +1224,7 @@ public:
             pSvc->Release();
             pLoc->Release();
             CoUninitialize();
-            return 1;
+            return 5;
         }
 
         while (pEnumerator)
@@ -1255,10 +1254,12 @@ public:
 
         pSvc->Release();
         pLoc->Release();
-        pEnumerator->Release();
+        if (pEnumerator) {
+            pEnumerator->Release();
+        }
         CoUninitialize();
 
-        return 0;
+        return (numCores > 0) ? 0 : 6;
     }
 #endif
 
@@ -1468,8 +1469,7 @@ public:
 #elif defined(__aarch64__) || defined(_M_ARM64)
 
 #ifdef _WIN32
-	uint32_t core_count, lp_count;
-	return getCpuBrandNameAndCoreCountWMI(name, &core_count, &lp_count);
+	return getCpuBrandNameWMI(name);
 #elif defined(__APPLE__) && defined(__MACH__)
 	return getCpuBrandNameSysctl(name);
 #elif defined(__linux__)
@@ -3994,4 +3994,4 @@ bool System::queryFileVersionInfo(std::string_view, int*, int*, int*, int*) {
 #endif // _WIN32
 
 }  // namespace base
-}  // namespaconExWs android
+}  // namespace android

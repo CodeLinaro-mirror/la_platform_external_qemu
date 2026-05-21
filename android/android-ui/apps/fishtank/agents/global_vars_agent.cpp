@@ -16,6 +16,7 @@
 #include "android/avd/info.h"
 #include "android/cmdline-definitions.h"
 #include "android/emulation/control/globals_agent.h"
+#include "aemu/base/logging/Log.h"
 
 #include <string>
 
@@ -23,10 +24,10 @@
 AndroidOptions emptyOptions{};
 AndroidOptions* sAndroid_cmdLineOptions = &emptyOptions;
 AvdInfo* sAndroid_avdInfo = nullptr;
-AndroidHwConfig s_hwConfig = {0};
-AvdInfoParams sAndroid_avdInfoParams = {0};
+AndroidHwConfig s_hwConfig = {};
+AvdInfoParams sAndroid_avdInfoParams = {};
 std::string sCmdlLine;
-LanguageSettings s_languageSettings = {0};
+LanguageSettings s_languageSettings = {};
 AUserConfig* s_userConfig = nullptr;
 bool sKeyCodeForwarding = false;
 bool sEnforceKeyCodeForwarding = false;
@@ -103,4 +104,11 @@ const QAndroidGlobalVarsAgent sFishtankQAndroidGlobalVarsAgent = {
         .set_is_fuchsia =
                 [](bool fuchsia) { s_min_config_qemu_mode = fuchsia; },
         .set_android_snapshot_update_timer =
-                [](int timer) { s_android_snapshot_update_timer = timer; }};
+                [](int timer) { s_android_snapshot_update_timer = timer; },
+        .android_base_port = []() -> int { LOG(FATAL) << "QAndroidGlobalVarsAgent.android_base_port not implemented"; },
+        .set_android_base_port = [](int port) { LOG(FATAL) << "QAndroidGlobalVarsAgent.set_android_base_port not implemented"; },
+        .android_adb_port = []() -> int { LOG(FATAL) << "QAndroidGlobalVarsAgent.android_adb_port not implemented"; },
+        .set_android_adb_port = [](int port) { LOG(FATAL) << "QAndroidGlobalVarsAgent.set_android_adb_port not implemented"; },
+        .android_serial_number_port = []() -> int { LOG(FATAL) << "QAndroidGlobalVarsAgent.android_serial_number_port not implemented"; },
+        .set_android_serial_number_port = [](int port) { LOG(FATAL) << "QAndroidGlobalVarsAgent.set_android_serial_number_port not implemented"; },
+        .has_network_option = []() -> bool { LOG(FATAL) << "QAndroidGlobalVarsAgent.has_network_option not implemented"; }};

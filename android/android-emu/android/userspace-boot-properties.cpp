@@ -470,10 +470,16 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
     }
 
     if (qemuCpuVulkanVersionProp) {
-        // Put our swiftshader version string there, which is currently
-        // Vulkan 1.1 (0x402000)
+        // Put software vulkan driver version, based on software driver version
+        // and the CTS requirements
+        int vulkanVersion = 0x00402000;  // 1.2
+        if (apiLevel >= 37) {
+            vulkanVersion = 0x00404000;  // 1.4
+        } else if (apiLevel >= 34) {
+            vulkanVersion = 0x00403000;  // 1.3
+        }
         params.push_back(
-                {qemuCpuVulkanVersionProp, StringFormat("%d", 0x402000)});
+                {qemuCpuVulkanVersionProp, StringFormat("%d", vulkanVersion)});
     }
 
     const char* pTimeout = avdInfo_screen_off_timeout(apiLevel);

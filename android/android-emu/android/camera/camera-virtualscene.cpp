@@ -19,7 +19,7 @@
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/camera/camera-format-converters.h"
 #include "android/camera/camera-virtualscene-utils.h"
-#include "android/virtualscene/VirtualSceneManager.h"
+#include "ver/virtual_environment_renderer.h"
 
 #include <vector>
 
@@ -30,14 +30,11 @@
 
 #define VIRTUALSCENE_PIXEL_FORMAT V4L2_PIX_FMT_RGB32
 
-using namespace gfxstream::host::gl;
-
 /*******************************************************************************
  *                     CameraDevice API
  ******************************************************************************/
 
 using android::virtualscene::RenderedCameraDevice;
-using android::virtualscene::VirtualSceneManager;
 
 static RenderedCameraDevice* toRenderedCameraDevice(CameraDevice* ccd) {
     if (!ccd || !ccd->opaque) {

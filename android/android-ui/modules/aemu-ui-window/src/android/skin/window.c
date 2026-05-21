@@ -1745,15 +1745,30 @@ SkinWindow* skin_window_create(SkinLayout* slayout,
         monitor.size.h = window->monitor.size.h;
     }
 
-    int hw_lcd_density = getConsoleAgents()->settings->hw()->hw_lcd_density;
 
     // Adjust the default scale for a 1-to-1 logical pixel ratio.
-    if (enable_scale && hw_lcd_density != LCD_DENSITY_MDPI && user_window_scale_is_invalid) {
-        double hw_scale = (double) LCD_DENSITY_MDPI / hw_lcd_density;
-        VERBOSE_PRINT(init, "Adjusting window size by %.2gx for hw_lcd_density", hw_scale);
-        scale_w *= hw_scale;
-        scale_h *= hw_scale;
+    if (enable_scale && user_window_scale_is_invalid) {
+        int hw_lcd_density = getConsoleAgents()->settings->hw()->hw_lcd_density;
+        if (hw_lcd_density != LCD_DENSITY_MDPI) {
+            double hw_scale = (double) LCD_DENSITY_MDPI / hw_lcd_density;
+            VERBOSE_PRINT(init, "Adjusting window size by %.2gx for hw_lcd_density", hw_scale);
+            scale_w *= hw_scale;
+            scale_h *= hw_scale;
+        }
+
+        const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
+        const AvdFlavor avdFlavor = avdInfo ? avdInfo_getAvdFlavor(avdInfo) : AVD_OTHER;
+        if (hw_lcd_density == LCD_DENSITY_MDPI && avdFlavor == AVD_GLASSES) {
+            // When Glasses AVDs are using LCD_DENSITY_MDPI with a low
+            // resolution, scale it down to avoid having a very large and
+            // pixelated standalone window
+            const float avd_scale = 0.5f;
+            VERBOSE_PRINT(init, "Adjusting window size by %.2f for AVD Flavor", avd_scale);
+            scale_w *= avd_scale;
+            scale_h *= avd_scale;
+        }
     }
+
 
     // If the window is still too big, adjust to about 30% to 80% of the screen size.
     if (enable_scale) {

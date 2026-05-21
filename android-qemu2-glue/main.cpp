@@ -1356,7 +1356,10 @@ static int startEmulatorWithMinConfig(int argc,
     skin_winsys_enter_main_loop(opts->no_window);
     android::crashreport::CrashReporter::get()->hangDetector().pause(true);
 
-    android::virtualscene::ScenesManager::removeAll();
+    // Make sure VirtualSceneManager and scene service library resources are
+    // cleaned up properly
+    android::virtualscene::VirtualSceneManager::uninitialize();
+    ver_cleanup();
 
     stopRenderer();
     emulator_finiUserInterface();
@@ -2078,8 +2081,22 @@ extern "C" int main(int argc, char** argv) {
                 feature_set_if_not_overridden(kFeature_QuickbootFileBacked,
                                               false /* disabled */);
             } else {
-                dprint("File System is ext4, do not disable "
-                       "QuickbootFileBacked feature");
+                const auto forceFileBacked = System::get()->envGet(
+                        "ANDROID_EMU_FORCE_QUICKBOOT_FILE_BACKED");
+                if (forceFileBacked == "1") {
+                    dprint("File System is ext4, do not disable "
+                           "QuickbootFileBacked feature");
+                } else {
+                    dwarning(
+                            "Feature QuickbootFileBacked is disabled due to "
+                            "stability issues, if you really want that, "
+                            "the environment variable "
+                            "ANDROID_EMU_FORCE_QUICKBOOT_FILE_BACKED need to "
+                            "set "
+                            "to 1");
+                    feature_set_if_not_overridden(kFeature_QuickbootFileBacked,
+                                                  false);
+                }
             }
 #endif
 #ifdef __APPLE__
@@ -3593,7 +3610,10 @@ extern "C" int main(int argc, char** argv) {
     skin_winsys_enter_main_loop(opts->no_window);
     android::crashreport::CrashReporter::get()->hangDetector().pause(true);
 
-    android::virtualscene::ScenesManager::removeAll();
+    // Make sure VirtualSceneManager and scene service library resources are
+    // cleaned up properly
+    android::virtualscene::VirtualSceneManager::uninitialize();
+    ver_cleanup();
 
     stopRenderer();
     emulator_finiUserInterface();

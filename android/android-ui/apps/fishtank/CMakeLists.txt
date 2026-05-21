@@ -29,6 +29,8 @@ android_add_executable(
       opengles.cpp
       main.cpp)
 
+target_compile_options(fishtank PRIVATE -Wmissing-field-initializers -Werror=missing-field-initializers)
+
 if(APPLE)
   # Override the default RPATH to match the standalone distribution layout
   android_target_properties(fishtank all "INSTALL_RPATH=@executable_path/lib64")
@@ -265,6 +267,7 @@ install(
   COMPONENT fishtank
   EXCLUDE_FROM_ALL)
 fishtank_post_install("fishtank/fishtank")
+fishtank_install_dependency(DEPS "${ANDROID_QEMU2_TOP_DIR}/android/data/ca-bundle.pem>lib/ca-bundle.pem")
 
 if(NOT LINUX_AARCH64)
   fishtank_install_dependency(DEPS

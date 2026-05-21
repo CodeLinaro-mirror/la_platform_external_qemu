@@ -21,6 +21,7 @@
 #include "android/avd/info.h"
 #include "android/avd/keys.h"
 #include "android/avd/util.h"
+#include "android/base/system/System.h"
 #include "android/console.h"
 #include "android/hw-sensors.h"
 #include "android/network/globals.h"
@@ -33,25 +34,40 @@
 #include "host-common/vm_operations.h"
 #include "host-common/window_agent.h"
 
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/Scene.h"
-#include "android/virtualscene/SceneCamera.h"
 #include "android/virtualscene/VirtualSceneManager.h"
 
-using android::virtualscene::RendererView;
-using android::virtualscene::SceneCamera;
-using android::virtualscene::SceneConfig;
 using android::virtualscene::VirtualSceneManager;
 
 static bool emulatorSetupEnvironment() {
-    AndroidHwConfig* hwCfg = getConsoleAgents() && getConsoleAgents()->settings
-                                     ? getConsoleAgents()->settings->hw()
-                                     : nullptr;
+    if (!getConsoleAgents() || !getConsoleAgents()->settings) {
+        derror("%s: Console agents are not available!", __func__);
+        return false;
+    }
+    AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
+    const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
 
-    if (!hwCfg) {
+    if (!hwCfg || !avdInfo) {
         derror("%s: Invalid AVD config", __func__);
         return false;
     }
+
+    std::vector<std::filesystem::path> resourceBasePaths;
+    {
+        // If it's not a usable full path, try AVD local
+        const char* avdBasePath = avdInfo_getContentPath(avdInfo);
+        if (avdBasePath) {
+            resourceBasePaths.push_back(std::filesystem::path(avdBasePath));
+        }
+
+        // If not in AVD folder, check 'resources' folder
+        std::filesystem::path resourcesBasePath =
+                std::filesystem::path(
+                        android::base::System::get()->getLauncherDirectory()) /
+                "resources";
+        resourceBasePaths.push_back(resourcesBasePath);
+    }
+    ver_initialize(resourceBasePaths, android_getEGLDispatch(),
+                   android_getGLESv2Dispatch());
 
     int envWidth, envHeight;
     androidHwConfig_getScreenDimensions(hwCfg, &envWidth, &envHeight);
@@ -87,16 +103,6 @@ static bool emulatorSetupEnvironment() {
         dinfo("%s: Environment scene is not required", __func__);
         return true;
     }
-
-    struct ScopeTimer {
-        ScopeTimer() { mStartTime = get_uptime_ms(); }
-        ~ScopeTimer() {
-            const uint64_t scopeTime = get_uptime_ms() - mStartTime;
-            dprint("emulatorSetupEnvironment: took %llu ms", __func__,
-                   scopeTime);
-        }
-        int64_t mStartTime;
-    } timer;
 
     // Initialize virtual scene and background view
     if (!VirtualSceneManager::initialize(backgroundUsesEnvironment,

@@ -32,37 +32,13 @@
 #include "aemu/base/synchronization/Lock.h"
 #include "android/emulation/control/virtual_scene_agent.h"
 #include "android/utils/compiler.h"
-#include "android/virtualscene/Renderer.h"
-#include "android/virtualscene/Scene.h"
+#include "ver/virtual_environment_renderer.h"
 
 namespace android {
 namespace virtualscene {
 
 // Forward declarations.
 class SceneCamera;
-
-// ScenesManager is responsible for creating, rendering and destroying
-// scenes. Clients can create and render scenes through this interface
-// without any interaction with the 'environment' scene, like posters..etc.
-class ScenesManager {
-public:
-    // Parse command line options for the virtual scene.
-    static std::shared_ptr<Scene> createScene(const SceneConfig& config);
-
-    // Render the virtual scene to the given view.
-    static bool renderView(Scene* scene,
-                           RendererView* view,
-                           std::function<void()> finishCallback,
-                           uint64_t* outFrameTime);
-
-    static bool removeScene(Scene* scene);
-
-    static bool removeAll();
-
-private:
-    static android::base::StaticLock mLock;
-    static std::vector<std::shared_ptr<Scene>> mScenes;
-};
 
 // VirtualSceneManager is responsible for 'virtualscene', which is a special
 // type of shared scene and can support changing posters.
@@ -85,11 +61,11 @@ public:
     static void update();
 
     // Check if the view's cache requires update due to view/scene changes
-    static bool viewCacheRequiresUpdate(const RendererView* view);
+    static bool viewCacheRequiresUpdate(const VerRenderViewHandle view);
 
     // Render the virtual scene to the given view.
-    static bool renderView(RendererView* view,
-                           std::function<void()> finishCallback,
+    static bool renderView(VerRenderViewHandle view,
+                           VerRenderFinishCallback finishCallback,
                            uint64_t* outFrameTime);
 
     // Set the initial poster of the scene, loaded from persisted settings.
@@ -137,6 +113,10 @@ public:
     // Returns true for enabled, false for disabled.
     static bool getAnimationState();
 
+    // Returns a pointer to the event listener that can be used to track changes
+    // to the animation state.
+    static void* getAnimationStateEventListener();
+
     static void setSceneControlsParameters(bool show);
 
     static bool addSceneUser();
@@ -144,7 +124,7 @@ public:
 
     static void setUpdateCallback(std::function<void()> callback);
 
-    static SceneConfig::Mode getSceneMode();
+    static VerSceneConfig::Mode getSceneMode();
 
     // Returns false on error.
     static bool reloadEnvironment(const char* environmentData);
@@ -157,20 +137,18 @@ public:
 
 private:
     static android::base::StaticLock mLock;
-    static std::shared_ptr<Scene> mEnvironmentScene;
+    static VerSceneHandle mEnvironmentScene;
     static std::deque<std::string> mPosterFilenameUpdates;
     static std::optional<std::thread> mBackgroundUpdateThread;
     static std::function<void()> mUpdateCallback;
-    static int mNumUsers;
+    static std::atomic<int> mNumUsers;
     static bool mShowBackground;
     static std::atomic<bool> mKeepUpdating;
 
     static void updateSceneWorker();
     static void startSceneUpdateThread();
     static void stopSceneUpdateThread();
-    static bool reloadScene(const SceneConfig& config);
-    static std::shared_ptr<Scene> createEnvironmentScene(
-            const SceneConfig& config);
+    static bool reloadScene(const VerSceneConfig& config);
 };
 
 // TODO(virtualscene): move into a regular service
@@ -187,7 +165,7 @@ public:
 
 private:
     static std::unique_ptr<SceneCamera> mSceneCamera;
-    static std::unique_ptr<RendererView> mBackgroundView;
+    static VerRenderViewHandle mBackgroundView;
     static std::vector<uint8_t> mReadbackDataCopy;
     static bool mStarted;
     static bool mBackgroundEnabled;
