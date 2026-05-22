@@ -1329,10 +1329,12 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         if (w > 0) {
             uint32_t h = qemu_get_be32(f);
             uint32_t stride = qemu_get_be32(f);
+            uint8_t flags = qemu_get_byte(f);
             if (vb->scanout[i].con) {
                 DisplaySurface *surface = qemu_console_surface(vb->scanout[i].con);
                 if (surface && surface_data(surface) && surface_width(surface) == w && surface_height(surface) == h && surface_stride(surface) == stride) {
                     qemu_get_buffer(f, surface_data(surface), h * stride);
+                    surface->flags = flags;
                 } else {
                     error_report("corrupted rutagaba surface data");
                     return -EINVAL;
@@ -1422,6 +1424,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
                 qemu_put_be32(f, w);
                 qemu_put_be32(f, h);
                 qemu_put_be32(f, stride);
+                qemu_put_byte(f, surface->flags);
                 qemu_put_buffer(f, surface_data(surface), h * stride);
             } else {
                 qemu_put_be32(f, 0);
