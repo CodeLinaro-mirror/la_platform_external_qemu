@@ -19,10 +19,11 @@
 #include "aemu/base/EventNotificationSupport.h"
 #include "android/avd/info.h"
 #include "android/emulation/control/BootCompletionHandler.h"
+#include "android/emulation/control/utils/TypeConversion.h"
 #include "android/hw-sensors.h"
 #include "android/utils/debug.h"
+#include "android/xr/XrService.h"
 #include "host-common/MultiDisplay.h"
-#include "xr_emulator_conn.pb.h"
 
 #define DEBUG 0
 /* set  for very verbose debugging */
@@ -32,9 +33,14 @@
 #define DD(...) dinfo(__VA_ARGS__)
 #endif
 
+namespace xr_service = android::xr::xr_service;
+
 namespace android {
 namespace emulation {
 namespace control {
+
+void handleXrOptionsEvent(void* user_data,
+                          const xr_emulator_proto::EmulatorResponse& response);
 
 NotificationStream::NotificationStream(VirtualSceneCamera* camera,
                                        const AndroidConsoleAgents* agents)
@@ -133,29 +139,11 @@ std::optional<Notification> NotificationStream::getPostureNotificationEvent() {
 
 std::optional<Notification> NotificationStream::getXrOptionsNotificationEvent() {
     Notification event;
-
-    int environment;
-    float passthroughCoefficient;
-    float dimmingValue;
-    bool success = android_xr_get_options(&environment, &passthroughCoefficient, &dimmingValue);
-
-    if (success) {
-        auto eventDetails = event.mutable_xroptions();
-        eventDetails->set_environment(static_cast<XrOptions::Environment>(environment));
-        eventDetails->set_passthrough_coefficient(passthroughCoefficient);
-        eventDetails->set_dimming_value(dimmingValue);
-
-        DD("XR options notification event: Environment=%d, PassthroughCoefficient=%.2f, DimmingValue=%.2f, "
-           "Full proto: %s",
-           environment,
-           passthroughCoefficient,
-           dimmingValue,
-           event.ShortDebugString().c_str());
-        return event;
-    } else {
-        DD("Failed to get XR options for notification event");
-        return std::nullopt;
-    }
+    android::emulation::control::XrOptions* options = event.mutable_xroptions();
+    xr_emulator_proto::XrOptions guestOptions =
+            xr_service::retrieveXrOptionsCache();
+    *options = toHostXrOptions(guestOptions);
+    return event;
 }
 
 std::optional<Notification>
@@ -234,21 +222,7 @@ void NotificationStream::registerListeners() {
         mNotificationListeners.fireEvent(getBootedNotificationEvent());
     });
 
-    auto xrOptionsPublisher =
-            static_cast<base::EventNotificationSupport<xr_emulator_proto::XrOptions>*>(
-                    android_get_xr_options_publisher());
-    xrOptionsPublisher->registerOnce([&](auto options) {
-        DD("Sending XR options notification event - environment: %d, passthrough_coefficient: %f, dimming_value: %f",
-          options.environment(),
-          options.passthrough_coefficient(),
-          options.dimming_value());
-        Notification event;
-        auto eventDetails = event.mutable_xroptions();
-        eventDetails->set_environment(static_cast<XrOptions::Environment>(options.environment()));
-        eventDetails->set_passthrough_coefficient(options.passthrough_coefficient());
-        eventDetails->set_dimming_value(options.dimming_value());
-        mNotificationListeners.fireEvent(event);
-    });
+    xr_service::registerCallback(handleXrOptionsEvent, this);
 
     auto microphoneStatePublisher =
             static_cast<base::EventNotificationSupport<bool>*>(
@@ -260,6 +234,23 @@ void NotificationStream::registerListeners() {
         });
     }
 }
+
+void handleXrOptionsEvent(void* user_data,
+                          const xr_emulator_proto::EmulatorResponse& response) {
+    NotificationStream* notificationStream =
+            static_cast<NotificationStream*>(user_data);
+
+    if (response.response_case() !=
+        xr_emulator_proto::EmulatorResponse::kXrOptions) {
+        return;
+    }
+
+    Notification event;
+    android::emulation::control::XrOptions* options = event.mutable_xroptions();
+    *options = toHostXrOptions(response.xr_options());
+    notificationStream->mNotificationListeners.fireEvent(event);
+}
+
 }  // namespace control
 }  // namespace emulation
 }  // namespace android

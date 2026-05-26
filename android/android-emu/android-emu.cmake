@@ -184,14 +184,14 @@ set(android_emu_dependent_src
     android/physics/FoldableModel.cpp
     android/physics/InertialModel.cpp
     android/physics/PhysicalModel.cpp
-    android/physics/XrDeviceModel.cpp
     android/qemu-setup.cpp
     android/sensors-port.c
     android/snapshot/Icebox.cpp
     android/snapshot/SnapshotAPI.cpp
     android/virtualscene/SceneCamera.cpp
     android/virtualscene/VirtualSceneManager.cpp
-    android/virtualscene/WASDInputHandler.cpp)
+    android/virtualscene/WASDInputHandler.cpp
+    android/xr/XrService.cpp)
 
 set(virtual_environment_renderer_src
     android/ver/src/virtual_environment_renderer.cpp

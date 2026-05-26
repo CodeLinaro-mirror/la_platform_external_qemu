@@ -16,6 +16,7 @@
 
 #include <vector>
 #include "aemu/base/EventNotificationSupport.h"
+#include "android/xr/XrService.h"
 #include "xr_emulator_conn.pb.h"
 
 namespace Ui {
@@ -33,6 +34,7 @@ public:
 
 signals:
     void onXrEnvironmentModeRequested(int control);
+    void onXrPassthroughCoefficientRequested(float value);
     void onXrDimmingValueRequested(float value, bool fromGuest = false);
     void _externalXROptionsChanged(xr_emulator_proto::XrOptions options);
 
@@ -45,18 +47,17 @@ private slots:
 
 private:
     Ui::XrEnvironmentModeDialog* ui;
-    std::unique_ptr<android::base::RaiiEventListener<
-            android::base::EventNotificationSupport<
-                    xr_emulator_proto::XrOptions>,
-            xr_emulator_proto::XrOptions>>
-            mXROptionsListener;
     bool mShown = false;
     std::vector<float> mDimmingLevels;
     float mCurrentDiscreteValue = 0.0f;
     int mLastSliderValue = -1;
     void register_listener();
-    std::thread mListenerRegisterThread;
-    std::atomic<bool> mKeepRunning;
+    android::xr::xr_service::Handle* xrServiceCallbackHandle =
+            android::xr::xr_service::kInvalidHandleValue;
+
+    friend void XrEnvironmentModeDialogHandleXrOptionsEvent(
+            void* user_data,
+            const xr_emulator_proto::EmulatorResponse& response);
 };
 
 #endif  // XRENVIRONMENTMODEDIALOG_H

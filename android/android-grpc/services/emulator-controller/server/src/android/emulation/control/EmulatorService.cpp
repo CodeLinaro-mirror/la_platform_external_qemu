@@ -83,13 +83,14 @@
 #include "android/emulation/control/utils/EventWaiter.h"
 #include "android/emulation/control/utils/ScreenshotUtils.h"
 #include "android/emulation/control/utils/SharedMemoryLibrary.h"
-#include "android/emulation/control/xr/XrInputEventSender.h"
+#include "android/emulation/control/utils/TypeConversion.h"
 #include "android/emulation/resizable_display_config.h"
 #include "android/gpu_frame.h"
 #include "android/grpc/utils/SimpleAsyncGrpc.h"
 #include "android/hw-sensors.h"
 #include "android/metrics/MetricsReporter.h"
 #include "android/metrics/Percentiles.h"
+#include "android/metrics/studio_stats_wrapper.pb.h"
 #include "android/physics/Physics.h"
 #include "android/skin/rect.h"
 #include "android/skin/winsys.h"
@@ -98,6 +99,7 @@
 #include "android/telephony/sms.h"
 #include "android/utils/debug.h"
 #include "android/version.h"
+#include "android/xr/XrService.h"
 #include "android_modem_v2.h"
 #include "emulator_controller.grpc.pb.h"
 #include "emulator_controller.pb.h"
@@ -109,13 +111,13 @@
 #include "host-common/opengles.h"
 #include "host-common/vm_operations.h"
 #include "render-utils/Renderer.h"
-#include "android/metrics/studio_stats_wrapper.pb.h"
 
 using ::google::protobuf::Empty;
 using ::grpc::ServerContext;
 using ::grpc::ServerWriter;
 using ::grpc::Status;
 using namespace android::base;
+namespace xr_service = android::xr::xr_service;
 // using namespace android::control::interceptor;
 using namespace std::chrono_literals;
 
@@ -143,7 +145,6 @@ public:
           mTouchEventSender(agents),
           mTouchpadEventSender(agents),
           mWheelEventSender(agents),
-          mXrInputEventSender(agents),
           mCamera(agents->sensors),
           mClipboard(Clipboard::getClipboard(agents->clipboard)),
           mLooper(android::base::ThreadLooper::get()),
@@ -539,25 +540,56 @@ public:
                             } else if (request->has_wheel_event()) {
                                 mWheelEventSender.send(request->wheel_event());
                             } else if (request->has_xr_command()) {
-                                mXrInputEventSender.sendXrCommand(
-                                        request->xr_command());
+                                const XrCommand command = request->xr_command();
+                                switch (command.action()) {
+                                    case XrCommand::RECENTER:
+                                        xr_service::sendScreenRecenter();
+                                        break;
+                                    default:
+                                        LOG(WARNING)
+                                                << "Unknown XrCommand action: "
+                                                << command.action();
+                                        break;
+                                }
                             } else if (request->has_xr_head_rotation_event()) {
-                                mXrInputEventSender.sendXrHeadRotation(
-                                        request->xr_head_rotation_event());
+                                const RotationRadian rotation =
+                                        request->xr_head_rotation_event();
+                                xr_service::sendHeadRotation(rotation.x(),
+                                                             rotation.y(),
+                                                             rotation.z());
                             } else if (request->has_xr_head_movement_event()) {
-                                mXrInputEventSender.sendXrHeadMovement(
-                                        request->xr_head_movement_event());
+                                const Translation translation =
+                                        request->xr_head_movement_event();
+                                xr_service::sendHeadMovement(
+                                        translation.delta_x(),
+                                        translation.delta_y(),
+                                        translation.delta_z());
                             } else if (request->has_xr_head_angular_velocity_event()) {
-                                mXrInputEventSender.sendXrHeadAngularVelocity(
-                                        request->xr_head_angular_velocity_event());
+                                const AngularVelocity angular_velocity =
+                                        request->xr_head_angular_velocity_event();
+                                xr_service::sendHeadAngularVelocity(
+                                        angular_velocity.omega_x(),
+                                        angular_velocity.omega_y(),
+                                        angular_velocity.omega_z());
                             } else if (request->has_xr_head_velocity_event()) {
-                                mXrInputEventSender.sendXrHeadVelocity(request->xr_head_velocity_event());
+                                const Velocity velocity =
+                                        request->xr_head_velocity_event();
+                                xr_service::sendHeadVelocity(velocity.x(),
+                                                             velocity.y(),
+                                                             velocity.z());
                             } else if (request->has_xr_hand_event()) {
-                                const MouseEvent& handEvent = request->xr_hand_event();
-                                mXrInputEventSender.sendXrHandEvent(handEvent.x(), handEvent.y(), handEvent.buttons(), handEvent.display());
+                                const MouseEvent handEvent =
+                                        request->xr_hand_event();
+                                xr_service::sendHandEvent(handEvent.x(),
+                                                          handEvent.y(),
+                                                          handEvent.buttons(),
+                                                          handEvent.display());
                             } else if (request->has_xr_eye_event()) {
-                                const MouseEvent& eyeEvent = request->xr_eye_event();
-                                mXrInputEventSender.sendXrEyeEvent(eyeEvent.x(), eyeEvent.y(), eyeEvent.buttons(), eyeEvent.display());
+                                const MouseEvent eyeEvent =
+                                        request->xr_eye_event();
+                                xr_service::sendEyeEvent(
+                                        eyeEvent.x(), eyeEvent.y(),
+                                        eyeEvent.buttons(), eyeEvent.display());
                             } else {
                                 return Status(
                                         ::grpc::StatusCode::INVALID_ARGUMENT,
@@ -1557,36 +1589,16 @@ public:
     Status setXrOptions(ServerContext* context,
                         const XrOptions* xrOptions,
                         ::google::protobuf::Empty* reply) {
-        auto agent = mAgents->emu;
-        if (!agent->setXrOptions(static_cast<int>(xrOptions->environment()),
-                                xrOptions->passthrough_coefficient(),
-                                xrOptions->dimming_value())) {
-            return Status(::grpc::StatusCode::FAILED_PRECONDITION,
-                          "Unable to set XrOptions.", "");
-        }
+        xr_emulator_proto::XrOptions guestOptions =
+                toGuestXrOptions(*xrOptions);
+        xr_service::sendXrOptions(guestOptions);
         return Status::OK;
     }
 
     Status getXrOptions(ServerContext* context,
                         const ::google::protobuf::Empty* empty,
                         XrOptions* reply) override {
-        if (!isXrGuestOs()) {
-            return Status(::grpc::StatusCode::FAILED_PRECONDITION,
-                          "XR mode is not supported in the current AVD.", "");
-        }
-        auto agent = mAgents->emu;
-        int environment = 0;
-        float passthroughCoefficient = 0;
-        float dimmingValue = 0;
-        if (!agent->getXrOptions(
-                &environment, &passthroughCoefficient, &dimmingValue)) {
-            return Status(::grpc::StatusCode::FAILED_PRECONDITION,
-                          "Unable to get XrOptions.", "");
-        } else {
-            reply->set_environment(static_cast<::android::emulation::control::XrOptions_Environment>(environment));
-            reply->set_passthrough_coefficient(passthroughCoefficient);
-            reply->set_dimming_value(dimmingValue);
-        }
+        *reply = toHostXrOptions(xr_service::retrieveXrOptionsCache());
         return Status::OK;
     }
 
@@ -1619,7 +1631,6 @@ private:
     TouchpadEventSender mTouchpadEventSender;
     AndroidEventSender mAndroidEventSender;
     WheelEventSender mWheelEventSender;
-    XrInputEventSender mXrInputEventSender;
     SharedMemoryLibrary mSharedMemoryLibrary;
     EventWaiter mNotificationWaiter;
     NotificationStream mNotificationStream;

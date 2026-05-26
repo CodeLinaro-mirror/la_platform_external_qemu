@@ -69,6 +69,7 @@
 #include "android/emulation/control/adb/AdbInterface.h"
 #include "android/emulation/control/clipboard_agent.h"
 #include "android/emulation/control/sensors_agent.h"
+#include "android/emulation/control/utils/TypeConversion.h"
 #include "android/emulator-window.h"
 #include "android/hw-events.h"
 #include "android/hw-sensors.h"
@@ -94,6 +95,7 @@
 #include "android/ui-emu-agent.h"
 #include "android/utils/debug.h"
 #include "android/utils/system.h"
+#include "android/xr/XrService.h"
 #include "host-common/FeatureControl.h"
 #include "host-common/Features.h"
 #include "host-common/hw-config-helper.h"
@@ -195,6 +197,7 @@ using Ui::Settings::SaveSnapshotOnExit;
 
 namespace proto = android_studio;
 namespace fc = android::featurecontrol;
+namespace xr_service = android::xr::xr_service;
 
 template <typename T>
 ToolWindow::WindowHolder<T>::WindowHolder(ToolWindow* tw,
@@ -603,6 +606,9 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     if (android_is_xr_vst_headset_mode()) {
         connect(mXrEnvironmentModeDialog, SIGNAL(onXrEnvironmentModeRequested(int)),
                 this, SLOT(onXrEnvironmentModeChanged(int)));
+        connect(mXrEnvironmentModeDialog,
+                SIGNAL(onXrPassthroughCoefficientRequested(float)), this,
+                SLOT(onXrPassthroughCoefficientChanged(float)));
         connect(mXrEnvironmentModeDialog,
                 SIGNAL(onXrDimmingValueRequested(float, bool)), this,
                 SLOT(onXrDimmingValueChanged(float, bool)));
@@ -1267,92 +1273,49 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
         case QtUICommand::CHANGE_XR_INPUT_MODE:
             if (android_is_xr_vst_headset_mode()) {
                 if (down) {
-                    float mode = static_cast<float>(mLastInputModeRequested);
-                    LOG(DEBUG) << "Sending XR Input Mode: " << mode;
-                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
-                            PHYSICAL_PARAMETER_XR_INPUT_MODE, &mode, 1,
-                            PHYSICAL_INTERPOLATION_SMOOTH);
+                    LOG(DEBUG) << "Sending XR Input Mode: "
+                               << mLastInputModeRequested;
+                    xr_service::sendInputMode(
+                            static_cast<XrInputMode>(mLastInputModeRequested));
                     updateXrNavigationButtonsChecked(cmd);
                 }
                 setRelativeMouseMode(false);
             }
             break;
+        case QtUICommand::CHANGE_XR_PASSTHROUGH_COEFFICIENT:
+            if (android_is_xr_vst_headset_mode()) {
+                xr_service::sendPassthroughCoefficient(
+                        mLastPassthroughCoefficientRequested);
+            }
+            break;
         case QtUICommand::CHANGE_XR_ENVIRONMENT_MODE:
             if (android_is_xr_vst_headset_mode()) {
-                if (down) {
-                    float mode = static_cast<float>(mLastEnvironmentModeRequested);
-                    LOG(DEBUG) << "Sending XR Environment Mode " << mode;
-                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
-                            PHYSICAL_PARAMETER_XR_ENVIRONMENT_MODE, &mode, 1,
-                            PHYSICAL_INTERPOLATION_SMOOTH);
-                }
+                xr_service::sendEnvironment(
+                        static_cast<xr_emulator_proto::XrOptions_Environment>(
+                                mLastEnvironmentRequested));
             }
             break;
         case QtUICommand::CHANGE_XR_DIMMING_VALUE:
             if (android_is_xr_vst_headset_mode()) {
-                if (down) {
-                    vec3 options;
-                    options.x =
-                            static_cast<float>(mLastEnvironmentModeRequested);
-                    options.y = mLastPassthroughCoefficientRequested;
-                    options.z = mLastDimmingValueRequested;
-                    LOG(DEBUG) << "Sending XR Options: " << options.x << ", "
-                               << options.y << ", " << options.z;
-                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
-                            PHYSICAL_PARAMETER_XR_OPTIONS, &options.x, 3,
-                            PHYSICAL_INTERPOLATION_SMOOTH);
-                }
+                xr_service::sendDimmingValue(mLastDimmingValueRequested);
             }
             break;
         case QtUICommand::XR_SCREEN_RECENTER:
             if (android_is_xr_vst_headset_mode()) {
                 if (down) {
-                    float mode = 1;
                     LOG(DEBUG) << "Sending XR Screen Recenter";
-                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
-                            PHYSICAL_PARAMETER_XR_SCREEN_RECENTER, &mode, 1,
-                            PHYSICAL_INTERPOLATION_SMOOTH);
+                    xr_service::sendScreenRecenter();
                 }
             }
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_PAN:
-            if (android_is_xr_vst_headset_mode()) {
-                if (down) {
-                    float control = VIEWPORT_CONTROL_MODE_PAN;
-                    LOG(DEBUG) << "Sending XR Viewport Mode: " << control;
-                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
-                            PHYSICAL_PARAMETER_XR_VIEWPORT_CONTROL_MODE, &control,
-                            1, PHYSICAL_INTERPOLATION_SMOOTH);
-                    updateXrNavigationButtonsChecked(cmd);
-                }
-                setRelativeMouseMode(true);
-            }
+            setViewportControlMode(VIEWPORT_CONTROL_MODE_PAN, down, cmd);
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_DOLLY:
-            if (android_is_xr_vst_headset_mode()) {
-                if (down) {
-                    float control = VIEWPORT_CONTROL_MODE_ZOOM;
-                    LOG(DEBUG) << "Sending XR Viewport Mode: " << control;
-                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
-                            PHYSICAL_PARAMETER_XR_VIEWPORT_CONTROL_MODE, &control,
-                            1, PHYSICAL_INTERPOLATION_SMOOTH);
-                    updateXrNavigationButtonsChecked(cmd);
-                }
-                setRelativeMouseMode(true);
-            }
+            setViewportControlMode(VIEWPORT_CONTROL_MODE_ZOOM, down, cmd);
             break;
         case QtUICommand::XR_VIEWPORT_CONTROL_MODE_ROTATE:
-            if (android_is_xr_vst_headset_mode()) {
-                if (down) {
-                    float control = VIEWPORT_CONTROL_MODE_ROTATE;
-                    LOG(DEBUG) << "Sending XR Viewport Mode: " << control;
-                    sUiEmuAgent->sensors->setPhysicalParameterTarget(
-                            PHYSICAL_PARAMETER_XR_VIEWPORT_CONTROL_MODE, &control,
-                            1, PHYSICAL_INTERPOLATION_SMOOTH);
-                    updateXrNavigationButtonsChecked(cmd);
-                }
-                setRelativeMouseMode(true);
-            }
+            setViewportControlMode(VIEWPORT_CONTROL_MODE_ROTATE, down, cmd);
             break;
         case QtUICommand::SHOW_MULTITOUCH:
         // Multitouch is handled in EmulatorQtWindow, and doesn't
@@ -1360,6 +1323,19 @@ void ToolWindow::handleUICommand(QtUICommand cmd,
         // enum element exists solely for the purpose of displaying
         // it in the list of keyboard shortcuts in the Help page.
         default:;
+    }
+}
+
+void ToolWindow::setViewportControlMode(XrViewportControlMode control,
+                                        bool down,
+                                        QtUICommand cmd) {
+    if (android_is_xr_vst_headset_mode()) {
+        if (down) {
+            LOG(DEBUG) << "Sending XR Viewport Mode: " << control;
+            xr_service::sendViewportControlMode(control);
+            updateXrNavigationButtonsChecked(cmd);
+        }
+        setRelativeMouseMode(true);
     }
 }
 
@@ -2367,14 +2343,19 @@ void ToolWindow::onNewPostureRequested(int newPosture) {
 }
 
 void ToolWindow::onXrEnvironmentModeChanged(int mode) {
-    if (mode == /*XR_ENVIRONMENT_MODE_UNKNOWN*/ 0) {
-        LOG(WARNING) << "Unknown XR environment mode requested: " << mode;
-        return;
-    }
+    mLastEnvironmentRequested = static_cast<int>(
+            android::emulation::control::XrEnvironmentModeToGuestEnvironment(
+                    static_cast<XrEnvironmentMode>(mode)));
 
     mEmulatorWindow->activateWindow();
-    mLastEnvironmentModeRequested = mode;
     handleUICommand(QtUICommand::CHANGE_XR_ENVIRONMENT_MODE, true);
+}
+
+void ToolWindow::onXrPassthroughCoefficientChanged(float value) {
+    mLastPassthroughCoefficientRequested = value;
+
+    mEmulatorWindow->activateWindow();
+    handleUICommand(QtUICommand::CHANGE_XR_PASSTHROUGH_COEFFICIENT, true);
 }
 
 void ToolWindow::onXrInputModeChanged(int mode) {
@@ -2574,8 +2555,7 @@ void ToolWindow::notifyGuestOnLeftHandGesture(const QString& gesture) {
     if (data == LEFT_HAND_GESTURE_DATA.end()) {
         return;
     }
-    sUiEmuAgent->window->setXrHandGesture(data->second.protoId);
-
+    xr_service::sendHandGesture(data->second.protoId);
     mCurrentLeftHandGesture = gesture;
 }
 
@@ -2584,8 +2564,7 @@ void ToolWindow::notifyGuestOnRightHandGesture(const QString& gesture) {
     if (data == RIGHT_HAND_GESTURE_DATA.end()) {
         return;
     }
-    sUiEmuAgent->window->setXrHandGesture(data->second.protoId);
-
+    xr_service::sendHandGesture(data->second.protoId);
     mCurrentRightHandGesture = gesture;
 }
 
