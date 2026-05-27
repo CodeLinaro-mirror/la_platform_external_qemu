@@ -66,10 +66,16 @@ def fetch_artifact(
         location.parent.mkdir(parents=True)
 
     if location.exists() and not overwrite:
-        logging.warning("%s already exists, not downloading again.", location)
-    else:
-        logging.info("Fetching: %s/%s/%s -> %s", bid, build_target, artifact, location)
-        go_ab_service.fetch_bits(location, bid, build_target, artifact=artifact)
+        if location.suffix == ".zip" and not zipfile.is_zipfile(location):
+            logging.warning(
+                "%s exists but is not a valid zipfile, re-downloading.", location
+            )
+        else:
+            logging.warning("%s already exists, not downloading again.", location)
+            return location
+
+    logging.info("Fetching: %s/%s/%s -> %s", bid, build_target, artifact, location)
+    go_ab_service.fetch_bits(location, bid, build_target, artifact=artifact)
 
     return location
 
@@ -108,7 +114,7 @@ def invoke_shell_with_artifact(
 
     # Unzip the artifact to a temporary location, if it is a zip file.
     if zipfile.is_zipfile(location) and unzip:
-        tmp_dir = dest   / str(bid)
+        tmp_dir = dest / str(bid)
         logging.info("Unzipping %s -> %s", location, tmp_dir)
         with ZipFileWithAttr(location) as zip_ref:
             # Get a list of all the files in the zip file
