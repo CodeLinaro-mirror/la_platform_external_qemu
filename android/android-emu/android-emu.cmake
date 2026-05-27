@@ -751,8 +751,8 @@ if(NOT LINUX_AARCH64)
   # Declare virtual_environment_renderer_unittests
   android_add_test(TARGET virtual_environment_renderer_unittests
                    SRC android/ver/test/TextureUtils_unittest.cpp
+                       android/ver/test/RawImageFileSource_unittest.cpp
                        android/ver/test/SceneRendering_unittests.cpp)
-
   target_compile_options(
     virtual_environment_renderer_unittests PRIVATE -O0 -Wno-invalid-constexpr
                                   -Wno-string-plus-int)

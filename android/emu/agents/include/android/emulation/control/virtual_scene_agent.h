@@ -79,6 +79,10 @@ typedef struct QAndroidVirtualSceneAgent {
     // AVD's file will be used.
     // Returns true on success, false for failure.
     bool (*reloadEnvironment)(const char* environmentData);
+
+    // Returns a pointer to the event listener that can be used to track changes
+    // to the animation state.
+    void* (*getAnimationStateEventListener)();
 } QAndroidVirtualSceneAgent;
 
 ANDROID_END_HEADER

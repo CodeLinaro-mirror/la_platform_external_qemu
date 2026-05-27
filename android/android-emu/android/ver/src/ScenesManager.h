@@ -25,7 +25,7 @@
 #include "ver/virtual_environment_renderer_types.h"
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class Scene;
 class RendererView;
@@ -37,6 +37,8 @@ class ScenesManager {
 public:
     static void setSearchPaths(
             const std::vector<std::filesystem::path>& resourceSearchPaths);
+
+    static bool configArgumentFileExists(const SceneConfig& config);
 
     static Scene* createScene(const SceneConfig& config);
 
@@ -72,5 +74,5 @@ private:
     static const void* mGles2Dispatch;
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

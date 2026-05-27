@@ -20,6 +20,9 @@
 #include "absl/status/statusor.h"
 #include "ver/virtual_environment_renderer_types.h"
 
+namespace android {
+namespace ver {
+
 struct RawImageBufferView {
     const uint8_t *buffer;
     size_t buffer_size;
@@ -58,6 +61,8 @@ public:
      * or 0 if there is no meaninful finite length
      */
     virtual int64_t GetAnimationLengthUs() { return 0; }
+
+    virtual ~RawImageSource() = default;
 };
 
 struct Color {
@@ -86,3 +91,6 @@ private:
     uint8_t image_[4];
     RawImageBufferView buffer_;
 };
+
+}  // namespace ver
+}  // namespace android

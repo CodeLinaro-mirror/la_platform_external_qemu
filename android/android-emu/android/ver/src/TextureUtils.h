@@ -26,7 +26,7 @@
 #include <cstdint>
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 class TextureUtils {
 public:
@@ -104,5 +104,5 @@ public:
             Orientation orientation = Orientation::OpenGL);
 };
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

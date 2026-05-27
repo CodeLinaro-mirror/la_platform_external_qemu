@@ -22,7 +22,7 @@
 #define W(...) dwarning(__VA_ARGS__)
 #define D(...) dprint(__VA_ARGS__)
 
-static constexpr android::virtualscene::VertexPositionUV kQuadVerts[] = {
+static constexpr android::ver::VertexPositionUV kQuadVerts[] = {
         {glm::vec3(-0.5f, -0.5f, 0.f), glm::vec2(0.f, 0.f)},
         {glm::vec3(0.5f, -0.5f, 0.f), glm::vec2(1.f, 0.f)},
         {glm::vec3(-0.5f, 0.5f, 0.f), glm::vec2(0.f, 1.f)},
@@ -32,7 +32,7 @@ static constexpr android::virtualscene::VertexPositionUV kQuadVerts[] = {
 static constexpr GLuint kQuadIndices[] = {0, 1, 2, 2, 1, 3};
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 PosterSceneObject::PosterSceneObject(Renderer& renderer)
     : SceneObject(renderer) {}
@@ -110,5 +110,5 @@ void PosterSceneObject::updateTransform() {
                  glm::scale(glm::mat4(), glm::vec3(scale)));
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

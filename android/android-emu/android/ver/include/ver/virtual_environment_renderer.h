@@ -61,6 +61,15 @@ VER_EXPORT bool ver_cleanup(void);
 // --- Scene Management ---
 
 /**
+ * @brief Validates the scene configuration
+ *
+ * @param config The configuration for the new scene.
+ * @return true if the file argument referenced in the config is present based
+ * on current base resource paths.
+ */
+VER_EXPORT bool ver_scene_config_file_exists(const VerSceneConfig& config);
+
+/**
  * @brief Creates a new virtual scene based on the provided configuration.
  *
  * @param config The configuration for the new scene.
@@ -201,7 +210,7 @@ VER_EXPORT uint64_t ver_scene_load_poster(VerSceneHandle scene,
  */
 VER_EXPORT bool ver_scene_create_poster_location(
         VerSceneHandle scene,
-        const android::virtualscene::PosterInfo& info);
+        const android::ver::PosterInfo& info);
 
 // --- Render View Management ---
 

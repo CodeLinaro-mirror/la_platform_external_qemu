@@ -35,7 +35,7 @@
 // TODO(virtualscene-library): remove the namespace and other C++ usages
 // TODO(virtualscene-library): make sure get/set pairing is complete
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 /**
  * @brief Minimum allowed size for a poster in meters.
@@ -191,7 +191,7 @@ inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {
            (lhs.mArgument == rhs.mArgument);
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android
 
 /**
@@ -204,7 +204,7 @@ enum class VerImageFormat {
 /**
  * @brief Alias for scene configuration.
  */
-typedef android::virtualscene::SceneConfig VerSceneConfig;
+typedef android::ver::SceneConfig VerSceneConfig;
 
 // Opaque handle for a Scene
 typedef struct VerScene VerScene;

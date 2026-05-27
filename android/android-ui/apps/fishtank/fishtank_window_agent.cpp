@@ -265,7 +265,7 @@ static const QAndroidEmulatorWindowAgent sFishtankQAndroidEmulatorWindowAgent = 
                     return false;
                 },
         .getMonitorRect = [](uint32_t* w, uint32_t* h) -> bool {
-            SkinRect rect{0};
+            SkinRect rect = {{0, 0}, {0, 0}};
             skin_winsys_get_monitor_rect(&rect);
             if (w) {
                 *w = rect.size.w;
@@ -377,6 +377,9 @@ static const QAndroidEmulatorWindowAgent sFishtankQAndroidEmulatorWindowAgent = 
                     }
                     return (void*)layout;
                 },
+        .resizableEnabled = resizableEnabled,
+        .show_virtual_scene_controls = skin_winsys_show_virtual_scene_controls,
+        .quit_request = skin_winsys_quit_request,
         .getWindowPosition = [](int* x,
                                 int* y) { skin_winsys_get_window_pos(x, y); },
         .hasWindow = [] { return true; },
@@ -410,11 +413,17 @@ static const QAndroidEmulatorWindowAgent sFishtankQAndroidEmulatorWindowAgent = 
         .sendXrHeadVelocityEvent = [](float x, float y, float z) -> bool {
             LOG(FATAL) << "Not yet implemented";
         },
+        .sendXrHandEvent = [](int32_t, int32_t, int32_t, int32_t) -> bool {
+            LOG(FATAL) << "Not yet implemented";
+        },
+        .sendXrEyeEvent = [](int32_t, int32_t, int32_t, int32_t) -> bool {
+            LOG(FATAL) << "Not yet implemented";
+        },
         .setXrOptions = [](int environment, float passthroughCoefficient, float dimmingValue)
                 -> bool { LOG(FATAL) << "Not yet implemented"; },
         .getXrOptions = [](int* environment, float* passthroughCoefficient, float* dimmingValue)
                 -> bool { LOG(FATAL) << "Not yet implemented"; },
-//        .setXrHandGesture = [](int gesture) -> bool { LOG(FATAL) << "Not yet implemented"; },
+        .setXrHandGesture = [](int gesture) -> bool { LOG(FATAL) << "Not yet implemented"; },
 };
 
 const QAndroidEmulatorWindowAgent* const gFishtankQAndroidEmulatorWindowAgent =

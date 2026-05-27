@@ -20,6 +20,9 @@
 #include "absl/status/statusor.h"
 #include "../raw_image_source.h"
 
+namespace android {
+namespace ver {
+
 struct ImageData {
     unsigned int width;
     unsigned int height;
@@ -73,3 +76,6 @@ private:
     std::string file_;
     ImageData image_;
 };
+
+}  // namespace ver
+}  // namespace android

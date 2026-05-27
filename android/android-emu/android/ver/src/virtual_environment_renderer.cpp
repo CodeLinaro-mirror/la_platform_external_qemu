@@ -33,7 +33,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 // Static initialization
 android::base::StaticLock ScenesManager::mScenesLock;
@@ -50,6 +50,11 @@ void ScenesManager::setSearchPaths(
         const std::vector<std::filesystem::path>& resourceSearchPaths) {
     android::base::AutoLock lock(mScenesLock);
     mResourceSearchPaths = resourceSearchPaths;
+}
+
+bool ScenesManager::configArgumentFileExists(const SceneConfig& config) {
+    android::base::AutoLock lock(mScenesLock);
+    return Scene::configArgumentFileExists(config, mResourceSearchPaths);
 }
 
 Scene* ScenesManager::createScene(const SceneConfig& config) {
@@ -253,17 +258,17 @@ bool ScenesManager::removeAll() {
     return true;
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android
 
 ////////////////////////////////////////////////////////////////////////////////
 // C-API Implementation (Forwarding to ScenesManager)
 ////////////////////////////////////////////////////////////////////////////////
 
-using android::virtualscene::Renderer;
-using android::virtualscene::RendererView;
-using android::virtualscene::Scene;
-using android::virtualscene::ScenesManager;
+using android::ver::Renderer;
+using android::ver::RendererView;
+using android::ver::Scene;
+using android::ver::ScenesManager;
 
 void ver_initialize(const std::vector<std::filesystem::path>& resourceBasePaths,
                     const void* eglDispatch,
@@ -272,6 +277,10 @@ void ver_initialize(const std::vector<std::filesystem::path>& resourceBasePaths,
            static_cast<int>(resourceBasePaths.size()));
     ScenesManager::setSearchPaths(resourceBasePaths);
     ScenesManager::setDispatch(eglDispatch, gles2Dispatch);
+}
+
+bool ver_scene_config_file_exists(const VerSceneConfig& config) {
+    return ScenesManager::configArgumentFileExists(config);
 }
 
 VerSceneHandle ver_create_scene(const VerSceneConfig& config) {
@@ -380,7 +389,7 @@ uint64_t ver_scene_load_poster(VerSceneHandle scene,
 
 bool ver_scene_create_poster_location(
         VerSceneHandle scene,
-        const android::virtualscene::PosterInfo& info) {
+        const android::ver::PosterInfo& info) {
     auto* scenePtr = reinterpret_cast<Scene*>(scene);
     return scenePtr ? scenePtr->createPosterLocation(info) : false;
 }
@@ -458,8 +467,8 @@ bool ver_texture_utils_load_png(const char* filename,
         return false;
     }
 
-    auto result = android::virtualscene::TextureUtils::loadPNG(
-            filename, android::virtualscene::TextureUtils::Orientation::Qt);
+    auto result = android::ver::TextureUtils::loadPNG(
+            filename, android::ver::TextureUtils::Orientation::Qt);
     if (!result) {
         return false;
     }
@@ -468,7 +477,7 @@ bool ver_texture_utils_load_png(const char* filename,
     *outWidth = result->mWidth;
     *outHeight = result->mHeight;
     *outFormatBpp = (result->mFormat ==
-                     android::virtualscene::TextureUtils::Format::RGB24)
+                     android::ver::TextureUtils::Format::RGB24)
                             ? 3
                             : 4;
     return true;

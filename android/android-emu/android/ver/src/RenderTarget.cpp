@@ -17,7 +17,7 @@
 #include "RenderTarget.h"
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 RenderTarget::RenderTarget(Renderer& renderer,
                            const GLESv2Dispatch* gles2,
@@ -97,5 +97,5 @@ const Texture& RenderTarget::getTexture() const {
     return mTexture;
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

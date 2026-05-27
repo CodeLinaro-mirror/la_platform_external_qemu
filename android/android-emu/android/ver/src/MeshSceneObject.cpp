@@ -31,7 +31,7 @@ using android::base::System;
 namespace fs = std::filesystem;
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 
 MeshSceneObject::MeshSceneObject(Renderer& renderer) : SceneObject(renderer) {}
 
@@ -268,5 +268,5 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::createSphere(
     return result;
 }
 
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android

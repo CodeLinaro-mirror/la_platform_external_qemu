@@ -20,7 +20,7 @@
 #include <string_view>
 #include <vector>
 
-using namespace android::virtualscene;
+using namespace android::ver;
 using namespace android::base;
 
 // For a 32x32 image, allow a max of half of the pixels to be off by one.
@@ -41,7 +41,7 @@ static void PrintTo(const ImageTestParam& param, std::ostream* os) {
 }
 
 namespace android {
-namespace virtualscene {
+namespace ver {
 static void PrintTo(const TextureUtils::Result& param, std::ostream* os) {
     *os << "TextureUtils::Result(" << param.mWidth << "x" << param.mHeight
         << ", format=";
@@ -55,7 +55,7 @@ static void PrintTo(const TextureUtils::Result& param, std::ostream* os) {
     }
     *os << ", size=" << param.mBuffer.size() << " bytes)";
 }
-}  // namespace virtualscene
+}  // namespace ver
 }  // namespace android
 
 namespace std {

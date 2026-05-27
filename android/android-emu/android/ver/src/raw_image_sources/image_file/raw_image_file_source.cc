@@ -11,6 +11,7 @@
 #include "raw_image_file_source.h"
 
 #include <png.h>
+#include <csetjmp>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -30,6 +31,9 @@ extern "C" {
 using android::base::PathUtils;
 using android::base::ScopedStdioFile;
 
+namespace android {
+namespace ver {
+
 static void pngWarningCallback(png_structp readPtr,
                                png_const_charp warningMessage) {
     dprint("%s: %s\n", __FUNCTION__, warningMessage);
@@ -43,37 +47,41 @@ static inline T alignRowBytes(T value) {
 std::optional<ImageData> loadPNGImage(std::string& filename) {
     ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
-        derror("%s: Failed to open file %s", __FUNCTION__, filename);
+        derror("Failed to open file %s", filename);
         return {};
     }
 
     uint8_t header[8];
     if (fread(header, sizeof(header), 1, fp.get()) != 1) {
-        derror("%s: Failed to read header", __FUNCTION__);
+        derror("Failed to read header");
         return {};
     }
 
     if (png_sig_cmp(header, 0, sizeof(header))) {
-        derror("%s: header is not a PNG header", __FUNCTION__);
+        derror("header is not a PNG header");
         return {};
     }
 
     png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
     if (!png) {
-        derror("%s: Failed to allocate png read struct", __FUNCTION__);
+        derror("Failed to allocate png read struct");
         return {};
     }
 
     png_infop pngInfo = png_create_info_struct(png);
     if (!pngInfo) {
-        derror("%s: Failed to allocate png info struct", __FUNCTION__);
+        derror("Failed to allocate png info struct");
         return {};
     }
 
     png_set_error_fn(png, nullptr, nullptr, pngWarningCallback);
 
+    // These are before setjmp to ensure the deconstructors work properly
+    std::vector<uint8_t> data;
+    std::vector<uint8_t*> rowPtrs;
+
     if (setjmp(png_jmpbuf(png))) {
-        derror("%s: PNG library error", __FUNCTION__);
+        derror("PNG library error");
         png_destroy_read_struct(&png, &pngInfo, 0);
         return {};
     }
@@ -128,15 +136,15 @@ std::optional<ImageData> loadPNGImage(std::string& filename) {
     }
 
     if (newColorType != PNG_COLOR_TYPE_RGB_ALPHA) {
-        derror("%s: Unsupported color type: %d", __FUNCTION__, newColorType);
+        derror("Unsupported color type: %d", newColorType);
         png_destroy_read_struct(&png, &pngInfo, 0);
         return {};
     }
 
     const size_t rowBytes = png_get_rowbytes(png, pngInfo);
     const size_t stride = alignRowBytes(rowBytes);
-    std::vector<uint8_t> data(stride * height);
-    std::vector<uint8_t*> rowPtrs(height);
+    data.resize(stride * height);
+    rowPtrs.resize(height);
 
     for (size_t i = 0; i < height; i++) {
         rowPtrs[i] = data.data() + stride * i;
@@ -156,35 +164,51 @@ std::optional<ImageData> loadPNGImage(std::string& filename) {
     return img;
 }
 
+struct JpegErrorManager {
+    struct jpeg_error_mgr pub;  // "public" fields
+    jmp_buf setjmp_buffer;      // for return to caller
+};
+
+static void jpeg_error_exit(j_common_ptr cinfoPtr) {
+    JpegErrorManager* myerr =
+            reinterpret_cast<JpegErrorManager*>(cinfoPtr->err);
+    longjmp(myerr->setjmp_buffer, 1);
+}
+
 std::optional<ImageData> loadJPEGImage(std::string& filename) {
     struct jpeg_decompress_struct cinfo;
-    struct jpeg_error_mgr jerr;
+    JpegErrorManager jerr;
 
+    // All cpp classes must be declared before the setjmp to ensure thier
+    // deconstructors are called.
+    ImageData img;
     ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
-        derror("%s: Failed to open file %s", __FUNCTION__, filename);
+        derror("Failed to open file %s", filename.c_str());
         return std::nullopt;
     }
 
-    cinfo.err = jpeg_std_error(&jerr);
-    jpeg_create_decompress(&cinfo);
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = jpeg_error_exit;
 
-    auto destroy_decompress = [](j_decompress_ptr cinfo_ptr) {
-        if (cinfo_ptr)
-            jpeg_destroy_decompress(cinfo_ptr);
-    };
-    std::unique_ptr<jpeg_decompress_struct, decltype(destroy_decompress)>
-            cinfo_ptr(&cinfo, destroy_decompress);
+    std::unique_ptr<jpeg_decompress_struct, decltype(&jpeg_destroy_decompress)>
+            cinfo_guard(&cinfo, &jpeg_destroy_decompress);
+
+    if (setjmp(jerr.setjmp_buffer)) {
+        char buffer[JMSG_LENGTH_MAX];
+        (*cinfo.err->format_message)(
+                reinterpret_cast<jpeg_common_struct*>(&cinfo), buffer);
+        derror("JPEG library error for %s: %s", filename.c_str(), buffer);
+        return std::nullopt;
+    }
+
+    jpeg_create_decompress(&cinfo);
 
     jpeg_stdio_src(&cinfo, fp.get());
     (void)jpeg_read_header(&cinfo, TRUE);
     cinfo.out_color_space = JCS_RGBA_8888;  // Force RGBA format.
     (void)jpeg_start_decompress(&cinfo);
 
-    const uint32_t width = cinfo.output_width;
-    const uint32_t height = cinfo.output_height;
-
-    ImageData img;
     img.width = cinfo.output_width;
     img.height = cinfo.output_height;
     img.num_components = cinfo.output_components;
@@ -214,7 +238,7 @@ std::optional<ImageData> loadImageFromFile(std::string& filename) {
                strncasecmp(extension.data(), ".jpeg", extension.size()) == 0) {
         return loadJPEGImage(filename);
     } else {
-        derror("%s: Unsupported file format %s", __FUNCTION__,
+        derror("Unsupported file format %s",
                android::base::c_str(extension).get());
         return std::nullopt;
     }
@@ -265,3 +289,6 @@ absl::StatusOr<std::optional<RawImageToken>> RawImageFileSource::UpdateImage(
 int RawImageFileSource::Stop() {
     return 0;
 }
+
+}  // namespace ver
+}  // namespace android
