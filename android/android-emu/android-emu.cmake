@@ -22,6 +22,7 @@ android_add_library(
        android-emu-base-headers
        android-emu-cmdline
        android-emu-files
+       android-emu-hardware
        android-emu-min-avd
        android-emu-utils
        android-hw-config
