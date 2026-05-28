@@ -109,7 +109,8 @@ BugreportInfo GrpcBugreportController::getSystemInfo() {
         if (entry.key() == "avd.api_level") {
             info.apiLevel = std::stoi(entry.value());
         }
-        if (entry.key() == "AvdId") {
+        if (info.deviceName.empty() &&
+            (entry.key() == "AvdId" || entry.key() == "avd.id" || entry.key() == "avd.name")) {
             info.deviceName = entry.value();
         }
     }
@@ -121,6 +122,10 @@ BugreportInfo GrpcBugreportController::getSystemInfo() {
     it = emulatorStatus.guestconfig().find("hypervisorVersion");
     if (it != emulatorStatus.guestconfig().end()) {
         info.hypervisorVersion = it->second;
+    }
+    it = emulatorStatus.guestconfig().find("avdDetails");
+    if (it != emulatorStatus.guestconfig().end()) {
+        info.avdDetails = it->second;
     }
 
 

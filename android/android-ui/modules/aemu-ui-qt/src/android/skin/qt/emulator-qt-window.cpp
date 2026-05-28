@@ -2462,10 +2462,8 @@ void EmulatorQtWindow::slot_setWindowTitle(QString title,
     mBaseWindowTitle = title;
     updateWindowTitle();
 
-    // This is the first time that we know the android_serial_number_port
-    // has been set. This port ensures AdbInterface can identify the correct
-    // device if there is more than one.
-    (*mAdbInterface)->setSerialNumberPort(android_serial_number_port);
+    (*mAdbInterface)->setSerialNumberPort(
+            getConsoleAgents()->settings->android_serial_number_port());
 }
 
 void EmulatorQtWindow::slot_showWindow(SkinSurface* surface,

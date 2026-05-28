@@ -29,6 +29,8 @@
 #include "android/emulation/control/EmulatorAdvertisement.h"
 #include "android/emulation/control/ScreenCapturer.h"
 #include "android/emulation/control/interceptor/LoggingInterceptor.h"
+#include "android/emulation/control/adb/AdbInterface.h"
+#include "android/emulation/ConfigDirs.h"
 #include "android/emulation/control/utils/EmulatorControlClient.h"
 #include "android/emulation/control/utils/EmulatorGrcpClient.h"
 #include "android/emulator-window.h"
@@ -175,6 +177,29 @@ static std::string discoverEmulatorFile(int argc, char* argv[]) {
     return "";
 }
 
+static std::string resolveAdbPathFromSdkRoot() {
+    auto* system = System::get();
+    std::string sdkRoot = android::ConfigDirs::getSdkRootDirectoryByEnv();
+    const std::string kErrSuffix = "Features utilizing adb (e.g. Bugreport UI) will not work.";
+    if (sdkRoot.empty()) {
+        LOG(WARNING) << "Neither ANDROID_SDK_ROOT nor ANDROID_HOME "
+                     << "environment variables are defined on the host. "
+                     << kErrSuffix;
+        return "";
+    }
+
+    auto path = android::base::PathUtils::join(
+            sdkRoot, "platform-tools",
+            android::base::PathUtils::toExecutableName("adb"));
+    if (system->pathCanExec(path)) {
+        return path;
+    }
+
+    LOG(WARNING) << "adb not found or is not executable in ANDROID_SDK_ROOT or ANDROID_HOME. "
+                 << kErrSuffix;
+    return "";
+}
+
 /**
  * @brief Sets up environment variables from the discovery file.
  *
@@ -204,6 +229,28 @@ static void setupEnvFromDiscovery(const std::string& discovery_file) {
             if (android::base::PathUtils::split(avdDir.c_str(), &avdHome,
                                                 nullptr)) {
                 system->envSet("ANDROID_AVD_HOME", avdHome);
+            }
+        }
+
+        int serialPort = discoveryFile.getInt("port.serial", -1);
+        if (serialPort > 0) {
+            getConsoleAgents()->settings->set_android_serial_number_port(serialPort);
+
+            // TODO(joshuaduong): If the discovery file ever starts exposing the dynamic
+            // Telnet console port (e.g., under 'port.console'), read it here and inject
+            // it into the mock settings agent using:
+            // getConsoleAgents()->settings->set_android_base_port(consolePort);
+
+            // Attempt to initialize the AdbInterface singleton to use the adb binary from
+            // $ANDROID_SDK_ROOT/platform-tools.
+            auto* adb = android::emulation::AdbInterface::createGlobalOwnThread();
+            adb->setSerialNumberPort(serialPort);
+
+            std::string adbPath = resolveAdbPathFromSdkRoot();
+            if (!adbPath.empty()) {
+                adb->setCustomAdbPath(adbPath);
+                LOG(INFO) << "Fishtank local ADB configured to: " << adbPath
+                          << " targeting: emulator-" << serialPort;
             }
         }
     }

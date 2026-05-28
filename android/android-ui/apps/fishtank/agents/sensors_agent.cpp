@@ -29,7 +29,7 @@
 using android::emulation::control::PhysicalModelValue;
 using android::emulation::control::ParameterValue;
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG >= 1
 #define DPRINT(fmt, ...) \
     dinfo("FishtankAgents (Sensors): " fmt, ##__VA_ARGS__);
