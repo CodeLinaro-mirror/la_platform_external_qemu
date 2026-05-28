@@ -832,6 +832,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::VULKAN_PROTECTED_MEMORY_EMULATION;
         case android::featurecontrol::XrDimming:
             return android_studio::EmulatorFeatureFlagState::XR_DIMMING;
+        case android::featurecontrol::XrHandAndEyePointers:
+            return android_studio::EmulatorFeatureFlagState::XR_HAND_AND_EYE_POINTERS;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;
