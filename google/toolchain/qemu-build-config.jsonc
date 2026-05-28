@@ -901,7 +901,7 @@
         }
       },
       "meson_options": {
-        "--vsenv": null,
+        "-Dvsenv": "false",
         "-Daudio_drv_list": "dsound",
         "-Davx2": "auto",
         "-Davx512bw": "auto",

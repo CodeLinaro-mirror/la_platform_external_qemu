@@ -23,6 +23,29 @@ exports_files([
     "google/build/darwin-entitlements.plist",
 ])
 
+filegroup(
+    name = "qemu_sources",
+    srcs = glob(
+        ["**/*"],
+        exclude = [
+            "google/toolchain/**/*",
+            "bazel-*/**/*",
+            "out/**/*",
+        ],
+    ),
+    visibility = [":__subpackages__"],
+)
+
+filegroup(
+    name = "platform_files",
+    srcs = select({
+        "@platforms//os:windows": ["platform/BUILD.windows-x86_64"] + glob(["platform/windows-amd64/**/*"]),
+        "@platforms//os:macos": ["platform/BUILD.darwin-arm64"] + glob(["platform/darwin-arm64/**/*"]),
+        "@platforms//os:linux": ["platform/BUILD.linux-x86_64"] + glob(["platform/linux-x86_64/**/*"]),
+    }),
+    visibility = [":__subpackages__"],
+)
+
 cc_library(
     name = "aemu_func_defs",
     hdrs = ["google/system/aemu_func_defs.h"],
@@ -213,8 +236,8 @@ cc_library(
     # Note that . is needed for config-poison.h.
     includes = [
         ".",
-        "include",
         "google/drivers",
+        "include",
     ] + select({
         "@platforms//os:windows": ["platform/windows-amd64"],
         "@platforms//os:macos": ["platform/darwin-arm64"],
