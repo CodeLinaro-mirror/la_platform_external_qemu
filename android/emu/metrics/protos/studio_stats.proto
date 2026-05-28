@@ -905,6 +905,12 @@ message AndroidStudioEvent {
   // set when kind = SHERLOCK_EVENT
   optional SherlockEvent sherlock_event = 253 [lazy = true];
 
+  // set when kind = MCP_ENABLEMENT_EVENT
+  optional McpEnablementEvent mcp_enablement_event = 254 [lazy = true];
+
+  // set when kind = GEMINI_TELEMETRY_EVENT
+  optional GeminiTelemetryEvent gemini_telemetry_event = 255 [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1938,6 +1944,12 @@ message AndroidStudioEvent {
 
     // Sherlock event.
     SHERLOCK_EVENT = 377;
+
+    // Mcp enablement event.
+    MCP_ENABLEMENT_EVENT = 378;
+
+    // Gemini telemetry event.
+    GEMINI_TELEMETRY_EVENT = 379;
   }
 
   // Represents different Performance Monitoring types.
@@ -7652,7 +7664,7 @@ message AppLinksAssistantEvent {
       [lazy = true];
 
   // UI event source.
-  // Next ID: 67
+  // Next ID: 71
   // Note: Not a properly sequentially incrementing ID (200 & 201 are used)
   enum EventSource {
     // Will be deprecated and replaced by NEW_LINK_CREATION_SIDE_PANEL.
@@ -7672,6 +7684,9 @@ message AppLinksAssistantEvent {
     CODE_INSERT_DIALOG = 9;
     CODE_INSERT_DIALOG_INSERT_BUTTON = 10;
     CODE_INSERT_DIALOG_LIST_SELECTION = 11;
+    CODE_INSERT_DIALOG_V2 = 67;
+    CODE_INSERT_DIALOG_INSERT_BUTTON_V2 = 68;
+    CODE_INSERT_DIALOG_LIST_SELECTION_V2 = 69;
 
     // UI elements of DAL generation panel.
     DAL_PANEL = 12;
@@ -7689,6 +7704,7 @@ message AppLinksAssistantEvent {
 
     // The new link creation panel.
     NEW_LINK_CREATION_SIDE_PANEL = 20;
+    NEW_LINK_CREATION_SIDE_PANEL_V2 = 70;
 
     // The main page of the new App Links Assistant.
     OVERVIEW_TABLE = 22;
@@ -9204,6 +9220,24 @@ message SherlockEvent {
   optional PerfettoSqlQueryMetadata perfetto_sql_query_metadata = 6
       [lazy = true];
 
+  // Set if |type| is |PERFETTO_TRACE_LOADED|
+  optional PerfettoTraceLoadedMetadata perfetto_trace_loaded_metadata = 7
+      [lazy = true];
+
+  // Set if |type| is |TRACK_ITEM_SELECTED|
+  optional TrackItemSelectedMetadata track_item_selected_metadata = 8
+      [lazy = true];
+
+  // Set if |type| is |TRACK_PIN_TOGGLED|
+  optional TrackPinToggledMetadata track_pin_toggled_metadata = 9 [lazy = true];
+
+  // Set if |type| is |TRACK_GROUP_TOGGLED|
+  optional TrackGroupToggledMetadata track_group_toggled_metadata = 10
+      [lazy = true];
+
+  // Set if |type| is |CAPTURE_EVENT|
+  optional CaptureEventMetadata capture_event_metadata = 11 [lazy = true];
+
   enum Type {
     UNKNOWN_TYPE = 0;
 
@@ -9222,6 +9256,10 @@ message SherlockEvent {
     // Fired when perfetto trace recording is completed.
     PERFETTO_TRACE_RECORDED = 204;
 
+    // Fired when something happens during a capture (trace recording, replay,
+    // benchmarking).
+    CAPTURE_EVENT = 205;
+
     // Fired when the user clicks to enable/disable custom perfetto config.
     NEW_CAPTURE_DIALOG_CUSTOM_PERFETTO_CONFIG_ENABLED = 211;
     NEW_CAPTURE_DIALOG_CUSTOM_PERFETTO_CONFIG_DISABLED = 212;
@@ -9239,6 +9277,19 @@ message SherlockEvent {
 
     // Fired when the user executes a SQL query in the viewer.
     PERFETTO_SQL_QUERY_EXECUTED = 302;
+
+    // Fired when trace loading into the viewer is finished (success or error).
+    PERFETTO_TRACE_LOADED = 303;
+
+    // Fired when a track item (e.g., a slice, a counter value) is selected in
+    // the viewer.
+    TRACK_ITEM_SELECTED = 304;
+
+    // Fired when a user pins or unpins a track in the viewer.
+    TRACK_PIN_TOGGLED = 305;
+
+    // Fired when a user expands or collapses a track group in the viewer.
+    TRACK_GROUP_TOGGLED = 306;
   }
 
   // Details around user opening or closing projects.
@@ -9417,6 +9468,172 @@ message SherlockEvent {
       PERFETTO_SQL_QUERY_STATUS_UNKNOWN = 0;
       PERFETTO_SQL_QUERY_STATUS_SUCCESS = 1;
       PERFETTO_SQL_QUERY_STATUS_FAILURE = 2;
+    }
+  }
+
+  // Metadata for the |PERFETTO_TRACE_LOADED| event.
+  message PerfettoTraceLoadedMetadata {
+    // The final status of the trace loading operation.
+    optional TraceLoadStatus trace_load_status = 1;
+
+    // Time taken to start the trace processor process and establish the RPC
+    // connection.
+    optional int64 rpc_client_init_duration_ms = 2;
+    // Time taken by the trace processor to parse the trace file.
+    optional int64 capture_parsing_duration_ms = 3;
+    // Time taken to query the trace processor and populate the model with
+    // summary data (e.g., threads, processes, counters).
+    optional int64 overview_data_loading_duration_ms = 4;
+
+    // Duration of the trace in nanoseconds.
+    optional int64 trace_duration_ns = 5;
+    // Duration of the initial calculated visible time range in nanoseconds.
+    optional int64 calculated_view_duration_ns = 6;
+
+    // Size of the trace file in bytes.
+    optional int64 trace_file_size_bytes = 7;
+
+    // Number of threads in the trace.
+    optional int32 trace_threads_count = 8;
+    // Number of processes in the trace.
+    optional int32 trace_processes_count = 9;
+    // Number of counters in the trace.
+    optional int32 trace_counters_count = 10;
+
+    enum TraceLoadStatus {
+      TRACE_LOAD_STATUS_UNKNOWN = 0;
+      TRACE_LOAD_STATUS_SUCCESS = 1;
+      TRACE_LOAD_STATUS_TIMEOUT = 2;
+      TRACE_LOAD_STATUS_IO_ERROR = 3;
+      TRACE_LOAD_STATUS_SERVER_UNAVAILABLE = 4;
+    }
+  }
+
+  // Metadata for the |TRACK_ITEM_SELECTED| event.
+  message TrackItemSelectedMetadata {
+    message Selection {
+      optional int32 num_items = 1;
+      optional SelectionKind selection_kind = 2;
+    }
+
+    enum SelectionKind {
+      SELECTION_KIND_UNKNOWN = 0;
+      SELECTION_KIND_THREAD = 1;
+      SELECTION_KIND_THREAD_STATE = 2;
+      SELECTION_KIND_CPU = 3;
+      SELECTION_KIND_ASYNC = 4;
+      SELECTION_KIND_GPU = 5;
+      SELECTION_KIND_VULKAN_EVENT = 6;
+      SELECTION_KIND_COUNTER = 7;
+      SELECTION_KIND_FRAME_EVENTS = 8;
+      SELECTION_KIND_MEMORY = 9;
+      SELECTION_KIND_BATTERY = 10;
+      SELECTION_KIND_PROCESS_MEMORY = 11;
+      SELECTION_KIND_JANK_CUJ = 12;
+      SELECTION_KIND_APP_STARTUP = 13;
+    }
+
+    repeated Selection selections = 1;
+  }
+
+  // Metadata for the |TRACK_PIN_TOGGLED| event.
+  message TrackPinToggledMetadata {
+    // True if the track was pinned, false if it was unpinned.
+    optional bool is_pinned = 1;
+    // The type of the track or track group that was pinned or unpinned.
+    optional TrackKind track_kind = 2;
+    // True if the pinned item was a group, false if it was a track.
+    optional bool is_group = 3;
+  }
+
+  // Metadata for the |TRACK_GROUP_TOGGLED| event.
+  message TrackGroupToggledMetadata {
+    // True if the group was expanded, false if it was collapsed.
+    optional bool is_expanded = 1;
+    // The type of the track group that was expanded or collapsed.
+    optional TrackKind group_kind = 2;
+  }
+
+  // The type of track or track group.
+  enum TrackKind {
+    TRACK_KIND_UNKNOWN = 0;
+
+    // CPU Kinds
+    TRACK_KIND_CPU_SCHED = 1;
+    TRACK_KIND_CPU_FREQ = 2;
+    TRACK_KIND_CPU_UTIL = 3;
+    TRACK_KIND_CPU_UTIL_SUMMARY = 4;
+
+    // GPU Kinds
+    TRACK_KIND_GPU_MEMORY = 5;
+    TRACK_KIND_GPU_QUEUE = 6;
+    TRACK_KIND_GPU_COUNTER = 7;
+    TRACK_KIND_VULKAN_EVENT = 8;
+
+    // Process & Thread Kinds
+    TRACK_KIND_PROCESS_SUMMARY = 9;
+    TRACK_KIND_PROCESS_MEMORY = 10;
+    TRACK_KIND_PROCESS_COUNTER = 11;
+    TRACK_KIND_ASYNC_EVENT = 12;
+    TRACK_KIND_THREAD = 13;
+    TRACK_KIND_TIMELINE = 14;
+
+    // Generic/Other Kinds
+    TRACK_KIND_BATTERY = 15;
+    TRACK_KIND_POWER = 16;
+  }
+
+  // Metadata for the |CAPTURE_EVENT| event.
+  message CaptureEventMetadata {
+    // The type of capture event.
+    optional CaptureType capture_type = 1;
+
+    oneof result {
+      // The capture was attempted.
+      Attempt attempt = 2;
+      // The capture was successful.
+      Success success = 3;
+      // The capture failed.
+      Failure failure = 4;
+    }
+
+    enum CaptureType {
+      CAPTURE_TYPE_UNKNOWN = 0;
+      CAPTURE_TYPE_PERFETTO = 1;
+      CAPTURE_TYPE_GFXR = 2;
+    }
+
+    enum CaptureStage {
+      CAPTURE_STAGE_UNKNOWN = 0;
+      CAPTURE_STAGE_PREPARE = 1;
+      CAPTURE_STAGE_CAPTURE_IN_PROGRESS = 2;
+      CAPTURE_STAGE_PULL = 3;
+      CAPTURE_STAGE_CLEANUP = 4;
+    }
+
+    message Attempt {}
+
+    message Success {
+      // The duration (in milliseconds) that it took to actually stop the trace
+      // after the user clicked the stop button. This is only populated for
+      // manual stops. See b/507460819 for context.
+      optional int32 time_to_stop_ms = 1;
+    }
+
+    message Failure {
+      // The stage of the capture that the event failed at.
+      optional CaptureStage capture_stage = 1;
+
+      // The reason for the capture stage failure.
+      optional FailureReason failure_reason = 2;
+
+      // TODO: Add more failure reasons.
+      enum FailureReason {
+        CAPTURE_FAILURE_REASON_UNKNOWN = 0;
+        CAPTURE_FAILURE_REASON_CANCELLATION = 1;
+        CAPTURE_FAILURE_REASON_DEVICE_DISCONNECTED = 2;
+        CAPTURE_FAILURE_REASON_NO_RESULT_FOUND = 3;
+      }
     }
   }
 }
@@ -13083,6 +13300,14 @@ message VsPluginEvent {
       EXECUTE_COMMAND = 14;
     }
   }
+}
+
+// Metrics on which (MCPs) are enabled or disabled by users in the IDE.
+message McpEnablementEvent {
+  // The name of the MCP being enabled or disabled.
+  optional string mcp_name = 1;
+  // Whether the MCP is being enabled or disabled.
+  optional bool enabled = 2;
 }
 
 message RenderToolEvent {
@@ -17257,6 +17482,27 @@ message SmlChatBotEvent {
     }
   }
 
+  // Event related to banners displayed in the chat timeline.
+  message TimelineBannerEvent {
+    enum BannerType {
+      BANNER_TYPE_UNKNOWN = 0;
+      RESOURCE_EXHAUSTED_ERROR_BANNER = 1;
+    }
+
+    enum EventType {
+      UNKNOWN_EVENT = 0;
+      // The banner was shown.
+      SHOWN = 1;
+      // User dismissed the banner.
+      DISMISSED = 2;
+    }
+
+    // Metadata about a Bot conversation.
+    optional SmlResponseMetadata metadata = 1 [lazy = true];
+    optional BannerType banner_type = 2;
+    optional EventType event_type = 3;
+  }
+
   oneof content {
     BotResponse response = 1 [lazy = true];
     UserFeedback user_feedback = 2 [lazy = true];
@@ -17279,6 +17525,185 @@ message SmlChatBotEvent {
     ChangesDrawerEvent changes_drawer_event = 19 [lazy = true];
     ConversationActionInvoked conversation_action_invoked = 20 [lazy = true];
     PlanningModeEvent planning_mode_event = 21 [lazy = true];
+    TimelineBannerEvent timeline_banner_event = 22 [lazy = true];
+  }
+}
+
+message GeminiTelemetryEvent {
+  // The envelope holds metadata about the event, such as the model ID,
+  // provider Id, etc.,
+  optional EventEnvelope envelope = 1;
+
+  oneof domain {
+    // Server call events, such as requests, responses, etc.
+    ServerEvent server_event = 2;
+    // UI events holding user interactions, notifications, etc.
+    UiEvent ui_event = 3;
+    // Events related to the agent, such as tool calls etc.
+    AgentEvent agent_event = 4;
+  }
+
+  message EventEnvelope {
+    // Trajectory id of the event.
+    optional string trajectory_id = 1;
+    // Subagents fill this, empty for top-level trajectories
+    optional string parent_trajectory_id = 2;
+    // root trajectory_id for this trajectory. Same as conversation_id.
+    optional string root_trajectory_id = 3;
+    // true if visible in chat history
+    optional bool is_chat_thread = 4;
+
+    // Server request/response cycle identifier.
+    optional string request_id = 5;
+    // Backend trace identifier
+    optional string server_trace_id = 6;
+
+    // Provider ID of the model used for this event.
+    optional string model_provider_id = 7;
+    // Model ID of the model used for this event.
+    optional string model_id = 8;
+    // Whether the model is the default model.
+    optional bool is_default_model = 9;
+  }
+
+  message ServerEvent {}
+
+  message UiEvent {}
+
+  message AgentEvent {
+    // A single, comprehensive log for the entire tool lifecycle
+    optional ToolExecutionSpan tool_execution_span = 1;
+
+    message ToolExecutionSpan {
+      // Tool Identity
+      optional string tool_name = 1;
+      optional string tool_call_id = 2;
+
+      // Timing Metrics
+      // Timestamp when the tool execution started.
+      optional int64 start_timestamp_ms = 3;
+      // computation time
+      optional int64 active_ms = 4;
+      // Calculates the time from when the model requested the tool until it
+      // finished. Includes waiting for user input if any.
+      optional int64 total_ms = 5;
+
+      // Execution status of the tool call infrastructure.
+      // Tracks the lifecycle of the execution (e.g. if it crashed or was
+      // cancelled) rather than the semantic result of the tool itself.
+      optional ExecutionStatus execution_status = 6;
+
+      // Semantic outcome of the tool call.
+      // While ExecutionStatus tracks if the tool ran, ResponseStatus tracks
+      // the logical result (e.g. "file not found" or "build success").
+      optional ResponseStatus response_status = 7;
+
+      // Tool-Specific Metadata
+      oneof tool_specific_metadata {
+        // Data for a find declaration tool call.
+        FindDeclarationToolCallData find_declaration_tool_call_data = 8;
+      }
+
+      message FindDeclarationToolCallData {
+        // The exception the find_declaration tool encountered.
+        optional string exception = 1;
+        // The number of files in the find_declaration.
+        optional int32 result_count = 2;
+      }
+
+      // Execution status of the tool call infrastructure.
+      // Tracks the lifecycle of the execution (e.g. if it crashed or was
+      // cancelled) rather than the semantic result of the tool itself.
+      enum ExecutionStatus {
+        // Status is unknown or not set.
+        UNKNOWN_STATUS = 0;
+        // The tool infrastructure completed the execution successfully.
+        SUCCESS = 1;
+        // The execution was interrupted (e.g. by user cancellation or timeout).
+        INTERRUPTED = 2;
+        // The tool infrastructure encountered an internal error or crash.
+        INTERNAL_ERROR = 3;
+      }
+
+      // Semantic outcome of the tool call.
+      // While ExecutionStatus tracks if the tool ran, ResponseStatus tracks
+      // the logical result (e.g. "file not found" or "build success").
+      enum ResponseStatus {
+        // Status is unknown or not set.
+        UNKNOWN_RESPONSE_STATUS = 0;
+        // The tool call was successfully executed. Prefer more specific status
+        // where possible.
+        OK = 1;
+        // A generic error occurred during tool execution. Prefer more specific
+        // errors where possible.
+        ERROR_OCCURRED = 2;
+        // The target file was not found.
+        ERR_FILE_NOT_FOUND = 3;
+        // The target file was not accessible due to permissions or locks.
+        ERR_FILE_INACCESSIBLE = 4;
+        // The target file is not part of the current project.
+        ERR_FILE_NOT_IN_PROJECT = 5;
+        // The operation was blocked by AI exclusion rules (e.g. .aiexclude).
+        ERR_FILE_BLOCKED_BY_AI_EXCLUDE = 6;
+        // Encountered an unexpected IOException when executing the tool call.
+        ERR_IO_EXCEPTION = 7;
+        // The replacement tool could not find any matches for the provided
+        // pattern.
+        ERR_REPLACE_TEXT_NO_OCCURRENCES_FOUND_TO_REPLACE = 8;
+        // The user rejected the tool's proposed action or change.
+        ERR_USER_REJECTED_PROPOSAL = 9;
+        // The build process finished successfully.
+        BUILD_FINISHED_SUCCESSFULLY = 10;
+        // The build process finished but the output contained errors.
+        BUILD_FINISHED_WITH_ERRORS = 11;
+        // The build process failed to finish (e.g. "Build failed" in output).
+        BUILD_FAILED = 12;
+        // The build was interrupted before completion.
+        BUILD_INTERRUPTED = 13;
+        // The Gradle tool could not find any modules in the project.
+        GRADLE_ERR_NO_MODULES = 14;
+        // The Gradle tool could not run because the project is not an Android
+        // project.
+        GRADLE_ERR_NOT_ANDROID = 15;
+        // The specified Gradle module was not found.
+        GRADLE_ERR_MODULE_NOT_FOUND = 16;
+        // The specified build artifact was not found.
+        GRADLE_ERR_ARTIFACT_NOT_FOUND = 17;
+        // The specified build variant was not found.
+        GRADLE_ERR_VARIANT_NOT_FOUND = 18;
+        // The artifact provided was of a different type than expected by the
+        // tool.
+        GRADLE_ERR_WRONG_ARTIFACT = 19;
+        // Required data for the Gradle operation was missing from the project
+        // state.
+        GRADLE_ERR_MISSING_DATA = 20;
+        // The requested build task was not found.
+        BUILD_TASK_NOT_FOUND = 21;
+        // A successful response from a sub-agent call. The result is
+        // embedded in the response.
+        SUB_AGENT_RESULT = 22;
+        // The sub-agent terminated without providing a valid response.
+        SUB_AGENT_ENDED_WITHOUT_RESPONSE = 23;
+        // The arguments provided to the tool call were invalid or malformed.
+        ERR_INVALID_ARGUMENTS = 24;
+        // The URL provided to the tool call was invalid.
+        ERR_INVALID_URL = 25;
+        // The file was blocked by AI exclude via a gitignore file.
+        ERR_FILE_BLOCKED_BY_GIT_IGNORE = 26;
+        // The file critic timed out during analysis returning null as output.
+        ERR_FILE_CRITIC_TIMED_OUT = 27;
+        // The file is a directory.
+        ERR_FILE_IS_DIRECTORY = 28;
+        // Invalid line range to read file from.
+        ERR_INVALID_LINE_RANGE = 29;
+        // The file was modified by someone else since it was last read.
+        ERR_FILE_MODIFIED_BY_SOMEONE_ELSE = 30;
+        // The tool call was malformatted or invalid.
+        MALFORMATTED_TOOL_CALL = 31;
+        // The tool execution was interrupted. Used by the shell command tool.
+        TOOL_EXECUTION_INTERRUPTED = 32;
+      }
+    }
   }
 }
 
@@ -18142,14 +18567,28 @@ message AdbServerStatus {
 }
 
 message AndroidCliInvocation {
-  // Note that we only log the command and sub-command name, and not the entire
-  // command line to avoid logging user data.
-  optional string command_name = 1;
-  optional string sub_command_name = 2;
-  repeated string global_flags = 3;
-  repeated string flags = 4;
+  // Deprecated. Subsumed by "args" field.
+  optional string command_name = 1 [deprecated = true];
+  // Deprecated. Subsumed by "args" field.
+  optional string sub_command_name = 2 [deprecated = true];
+  // Deprecated. Subsumed by "args" field.
+  repeated string global_flags = 3 [deprecated = true];
+  // Deprecated. Subsumed by "args" field.
+  repeated string flags = 4 [deprecated = true];
+
   // The name of the agent invoking android-cli
   optional Agent agent_name = 5;
+
+  message Arg {
+    optional string flag = 1;
+    // Non-user-generated values only.
+    optional string value = 2;
+  }
+
+  // The commands and arguments passed to android-cli. Flags names
+  // (with "--"" prefix) are Arg.flag. Positional arguments, commands, and flag
+  // values are Arg.value. User-generated values are redacted.
+  repeated Arg args = 6;
 
   enum Agent {
     UNKNOWN = 0;
