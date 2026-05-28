@@ -32,6 +32,7 @@ extern int min_config_qemu_mode;
 #include "android/emulation/control/grpc_agent.h"
 #include "android/emulation/control/http_proxy_agent.h"
 #include "android/emulation/control/hw_control_agent.h"
+#include "android/emulation/control/hw_xr_led_agent.h"
 #include "android/emulation/control/libui_agent.h"
 #include "android/emulation/control/location_agent.h"
 #include "host-common/multi_display_agent.h"
@@ -79,6 +80,7 @@ typedef struct QAndroidAutomationAgent QAndroidAutomationAgent;
     X(QCarDataAgent, car)                       \
     X(QGrpcAgent, grpc)                         \
     X(QAndroidHwControlAgent, hw_control)       \
+    X(QAndroidHwXrLedAgent, hw_xr_led) \
     X(QAndroidGlobalVarsAgent, settings)        \
     X(QAndroidSurfaceAgent, surface)
 

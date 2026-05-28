@@ -19,6 +19,7 @@
 #include "android/emulation/control/camera/VirtualSceneCamera.h"
 #include "android/emulation/control/utils/EventSupport.h"
 #include "emulator_controller.pb.h"
+#include "xr_emulator_conn.pb.h"
 
 namespace android {
 namespace emulation {
@@ -56,7 +57,7 @@ class NotificationStream {
 public:
     NotificationStream(VirtualSceneCamera* camera,
                        const AndroidConsoleAgents* agents);
-    ~NotificationStream() = default;
+    ~NotificationStream();
 
     // Produce an aysnchronous handler for the following gRPC method:
     //
@@ -88,6 +89,10 @@ private:
     VirtualSceneCamera* mCamera;
     const AndroidConsoleAgents* mAgents;
     std::atomic_flag mRegisteredListeners = ATOMIC_FLAG_INIT;
+
+    friend void handleXrOptionsEvent(
+            void* user_data,
+            const xr_emulator_proto::EmulatorResponse& response);
 };
 }  // namespace control
 }  // namespace emulation

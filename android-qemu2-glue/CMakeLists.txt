@@ -56,6 +56,7 @@ set(android-qemu2-glue_src
     qemu-grpc-agent-impl.cpp
     qemu-http-proxy-agent-impl.c
     qemu-hw-control-agent-impl.cpp
+    qemu-hw-xr-led-agent-impl.cpp
     qemu-location-agent-impl.c
     qemu-multi-display-agent-impl.cpp
     qemu-net-agent-impl.c
