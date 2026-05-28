@@ -1353,18 +1353,50 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         if (w > 0) {
             uint32_t h = qemu_get_be32(f);
             uint32_t stride = qemu_get_be32(f);
+            uint32_t format = qemu_get_be32(f);
             uint8_t flags = qemu_get_byte(f);
+
+            if (w > 16384 || h > 16384) {
+                error_report("%s: invalid surface dimensions %ux%u", __func__, w, h);
+                return -EINVAL;
+            }
+
+            uint32_t bpp = PIXMAN_FORMAT_BPP(format);
+            if (!bpp) {
+                error_report("%s: invalid format %u", __func__, format);
+                return -EINVAL;
+            }
+
+            uint32_t bytes_pp = DIV_ROUND_UP(bpp, 8);
+            if (stride < w * bytes_pp) {
+                error_report("%s: invalid stride %u for width %u and bytes_pp %u",
+                             __func__, stride, w, bytes_pp);
+                return -EINVAL;
+            }
+
+            uint64_t surface_size = (uint64_t)h * stride;
+            if (surface_size > 256 * 1024 * 1024) {
+                error_report("%s: surface size %llu exceeds maximum",
+                             __func__, (unsigned long long)surface_size);
+                return -EINVAL;
+            }
+
             if (vb->scanout[i].con) {
-                DisplaySurface *surface = qemu_console_surface(vb->scanout[i].con);
-                if (surface && surface_data(surface) && surface_width(surface) == w && surface_height(surface) == h && surface_stride(surface) == stride) {
-                    qemu_get_buffer(f, surface_data(surface), h * stride);
-                    surface->flags = flags;
-                } else {
-                    error_report("corrupted rutagaba surface data");
+                DisplaySurface *surface = qemu_create_displaysurface_from(w, h, format, stride, NULL);
+                if (!surface_data(surface)) {
+                    error_report("%s: failed to allocate surface data", __func__);
                     return -EINVAL;
                 }
+                qemu_get_buffer(f, surface_data(surface), h * stride);
+                dpy_gfx_replace_surface(vb->scanout[i].con, surface);
+                QemuUIInfo info = {
+                    .width = w,
+                    .height = h,
+                };
+                dpy_set_ui_info(vb->scanout[i].con, &info, false);
+                surface->flags = flags;
             } else {
-                error_report("corrupted rutagaba surface data");
+                error_report("%s %s %d: corrupted rutagaba surface data", __FILE__, __func__, __LINE__);
                 return -EINVAL;
             }
         }
@@ -1448,9 +1480,11 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
                 int w = surface_width(surface);
                 int h = surface_height(surface);
                 int stride = surface_stride(surface);
+                int format = surface_format(surface);
                 qemu_put_be32(f, w);
                 qemu_put_be32(f, h);
                 qemu_put_be32(f, stride);
+                qemu_put_be32(f, format);
                 qemu_put_byte(f, surface->flags);
                 qemu_put_buffer(f, surface_data(surface), h * stride);
             } else {
@@ -1633,12 +1667,6 @@ static int virtio_gpu_post_load(void* opaque, int version_id) {
           rutabaga_context_attach_resource(vr->rutabaga,
                   ctx->context_id,
                   res_ctx->resource_id);
-      }
-  }
-
-  for (int i = 0; i < vb->conf.max_outputs; i++) {
-      if (vb->scanout[i].con) {
-          dpy_gfx_update_full(vb->scanout[i].con);
       }
   }
 
