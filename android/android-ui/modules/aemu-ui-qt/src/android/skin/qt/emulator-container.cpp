@@ -34,11 +34,15 @@
 #include "android/skin/qt/ModalOverlay.h"          // for ModalOverlay
 #include "android/skin/qt/OverlayMessageCenter.h"  // for OverlayMessageCe...
 #include "android/console.h"
+#include "android/avd/info.h"
+#include "android/skin/qt/GlassesStatusOverlay.h"
 #include "android/skin/qt/VirtualSceneInfoDialog.h"  // for VirtualSceneInfo...
 #include "android/skin/qt/emulator-qt-window.h"      // for EmulatorQtWindow
 #include "android/skin/qt/size-tweaker.h"            // for SizeTweaker
 #include "android/skin/qt/tool-window.h"             // for ToolWindow
 #include "android/utils/debug.h"                     // for VERBOSE_PRINT
+#include "android/utils/file_data.h"
+#include "android/utils/property_file.h"
 
 class QCloseEvent;
 class QFocusEvent;
@@ -118,6 +122,17 @@ EmulatorContainer::EmulatorContainer(EmulatorQtWindow* window)
             SLOT(slot_showVirtualSceneInfoDialog()));
     connect(this, SIGNAL(hideVirtualSceneInfoDialog()), this,
             SLOT(slot_hideVirtualSceneInfoDialog()));
+
+    // Detect AI Glasses and add GlassesStatusOverlay
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_GLASSES) {
+        mGlassesStatusOverlay = new GlassesStatusOverlay(this);
+
+        // For displayless AI Glasses, show the "no display" status overlay
+        QString displayDevice = getBootProp("ro.boot.display_device");
+        if (displayDevice == "none") {
+            mGlassesStatusOverlay->setStatusNoDisplay();
+        }
+    }
 }
 
 EmulatorContainer::~EmulatorContainer() {
@@ -219,6 +234,9 @@ void EmulatorContainer::changeEvent(QEvent* event) {
                 if (mVirtualSceneInfo) {
                     mVirtualSceneInfo->showNormal();
                 }
+                if (mGlassesStatusOverlay) {
+                    mGlassesStatusOverlay->showOverlay();
+                }
                 mMessages->showNormal();
 #endif
             } else if (windowState() & Qt::WindowMinimized) {
@@ -243,6 +261,17 @@ void EmulatorContainer::changeEvent(QEvent* event) {
                 //     mVirtualSceneInfo->hide();
                 // }
                 // mMessages->hide();
+
+                // Note that we are hiding the glasses overlay in a different
+                // way to bypass this issue.
+                if (mGlassesStatusOverlay) {
+                    mGlassesStatusOverlay->hideOverlay();
+                }
+            } else if (windowState() == Qt::WindowNoState) {
+                // The window has no state set (in normal state).
+                if (mGlassesStatusOverlay) {
+                    mGlassesStatusOverlay->showOverlay();
+                }
             }
 
             break;
@@ -323,6 +352,7 @@ void EmulatorContainer::moveEvent(QMoveEvent* event) {
     adjustModalOverlayGeometry();
     adjustVirtualSceneDialogGeometry();
     adjustMessagesOverlayGeometry();
+    adjustGlassesStatusOverlayGeometry();
 }
 
 void EmulatorContainer::resizeEvent(QResizeEvent* event) {
@@ -331,6 +361,7 @@ void EmulatorContainer::resizeEvent(QResizeEvent* event) {
     adjustModalOverlayGeometry();
     adjustVirtualSceneDialogGeometry();
     adjustMessagesOverlayGeometry();
+    adjustGlassesStatusOverlayGeometry();
 
     if (mRotating) {
         // Rotation event also generate a resize, but it shouldn't recalculate
@@ -407,6 +438,9 @@ void EmulatorContainer::showEvent(QShowEvent* event) {
         }
         if (mVirtualSceneInfo) {
             mVirtualSceneInfo->showNormal();
+        }
+        if (mGlassesStatusOverlay) {
+            mGlassesStatusOverlay->showOverlay();
         }
         mMessages.ifExists([&] { mMessages->showNormal(); });
     }
@@ -611,4 +645,36 @@ void EmulatorContainer::adjustMessagesOverlayGeometry() {
     mMessages->adjustSize();
     mMessages->move(mapToGlobal(QPoint()) +=
                     {(width() - mMessages->width()) / 2, 0});
+}
+
+void EmulatorContainer::adjustGlassesStatusOverlayGeometry() {
+    if (!mGlassesStatusOverlay) {
+        return;
+    }
+
+    auto scaleFactor = SizeTweaker::scaleFactor(this).x();
+    mGlassesStatusOverlay->move(mapToGlobal(QPoint(10 * scaleFactor, 10 * scaleFactor)));
+}
+
+QString EmulatorContainer::getBootProp(const char* prop) {
+    if (!getConsoleAgents() || !getConsoleAgents()->settings) {
+        return "";
+    }
+    const AvdInfo* avd = getConsoleAgents()->settings->avdInfo();
+    if (!avd) {
+        return "";
+    }
+    const FileData* bootProps = avdInfo_getBootProperties(avd);
+    if (!bootProps || fileData_isEmpty(bootProps)) {
+        return "";
+    }
+
+    char* val = propertyFile_getValue((const char*)bootProps->data,
+                                      bootProps->size, prop);
+    if (!val) {
+        return "";
+    }
+    QString result = QString::fromUtf8(val);
+    free(val);
+    return result;
 }
