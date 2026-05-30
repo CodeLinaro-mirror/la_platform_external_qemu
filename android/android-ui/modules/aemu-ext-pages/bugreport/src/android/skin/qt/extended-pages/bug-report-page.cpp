@@ -387,7 +387,16 @@ bool BugreportPage::launchIssueTracker() {
     // launch the issue tracker in a separate thread
     StringAppendFormat(&bugTemplate, BUG_REPORT_TEMPLATE, mReproSteps);
     bugTemplate += "\n\n-----\n\n";
-    bugTemplate += mReportingFields.dump();
+    std::string uiName = getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui ?
+                         "Fishtank (gRPC)" : "Qt UI";
+
+    bool qtHideWindow = getConsoleAgents()->settings->android_cmdLineOptions() &&
+                        getConsoleAgents()->settings->android_cmdLineOptions()->qt_hide_window;
+    if (qtHideWindow) {
+        uiName += " (--qt-hide-window)";
+    }
+
+    bugTemplate += "Emulator UI: " + uiName + "\n" + mReportingFields.dump();
     std::string encodedArgs =
             Uri::FormatEncodeArguments(FILE_BUG_URL, bugTemplate);
     QUrl url(QString::fromStdString(encodedArgs));

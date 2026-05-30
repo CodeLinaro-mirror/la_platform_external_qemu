@@ -38,6 +38,8 @@ bool s_host_emulator_is_headless = 0;
 bool s_android_qemu_mode = true;
 bool s_min_config_qemu_mode = false;
 int s_android_snapshot_update_timer = 0;
+static int s_android_serial_number_port = -1;
+
 
 // A mock implementation of the global vars agent.
 // This is basically copied from MockAndroidAgentFactory.cpp
@@ -105,10 +107,34 @@ const QAndroidGlobalVarsAgent sFishtankQAndroidGlobalVarsAgent = {
                 [](bool fuchsia) { s_min_config_qemu_mode = fuchsia; },
         .set_android_snapshot_update_timer =
                 [](int timer) { s_android_snapshot_update_timer = timer; },
-        .android_base_port = []() -> int { LOG(FATAL) << "QAndroidGlobalVarsAgent.android_base_port not implemented"; },
-        .set_android_base_port = [](int port) { LOG(FATAL) << "QAndroidGlobalVarsAgent.set_android_base_port not implemented"; },
-        .android_adb_port = []() -> int { LOG(FATAL) << "QAndroidGlobalVarsAgent.android_adb_port not implemented"; },
-        .set_android_adb_port = [](int port) { LOG(FATAL) << "QAndroidGlobalVarsAgent.set_android_adb_port not implemented"; },
-        .android_serial_number_port = []() -> int { LOG(FATAL) << "QAndroidGlobalVarsAgent.android_serial_number_port not implemented"; },
-        .set_android_serial_number_port = [](int port) { LOG(FATAL) << "QAndroidGlobalVarsAgent.set_android_serial_number_port not implemented"; },
+        // TODO(joshuaduong): Add support to read and return the dynamic telnet port
+        // if it is ever exposed inside the client's discovery file.
+        .android_base_port =
+                []() -> int {
+                    LOG(WARNING)
+                            << "android_base_port getter is not available "
+                            << "in decoupled client mode (Fishtank).";
+                    return -1;
+                },
+        .set_android_base_port =
+                [](int port) {
+                    LOG(WARNING)
+                            << "set_android_base_port setter is not supported "
+                            << "in decoupled client mode (Fishtank).";
+                },
+        .android_adb_port =
+                []() -> int {
+                    LOG(WARNING)
+                            << "android_adb_port getter is not available "
+                            << "in decoupled client mode (Fishtank).";
+                    return -1;
+                },
+        .set_android_adb_port =
+                [](int port) {
+                    LOG(WARNING)
+                            << "set_android_adb_port setter is not supported "
+                            << "in decoupled client mode (Fishtank).";
+                },
+        .android_serial_number_port = []() -> int { return s_android_serial_number_port; },
+        .set_android_serial_number_port = [](int port) { s_android_serial_number_port = port; },
         .has_network_option = []() -> bool { LOG(FATAL) << "QAndroidGlobalVarsAgent.has_network_option not implemented"; }};
