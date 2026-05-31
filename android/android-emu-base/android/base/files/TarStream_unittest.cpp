@@ -275,8 +275,15 @@ TEST_F(TarStreamTest, stream_can_extract_tar) {
     // tar the things..
     auto currdir = mTestSystem.host()->getCurrentDirectory();
     mTestSystem.host()->setCurrentDirectory(indir);
+#ifdef __APPLE__
+    std::string prev_copyfile_disable = System::getEnvironmentVariable("COPYFILE_DISABLE");
+    System::setEnvironmentVariable("COPYFILE_DISABLE", "1");
+#endif
     auto result = mTestSystem.host()->runCommandWithResult(
             {"tar", "cf", tar, "hello.txt"});
+#ifdef __APPLE__
+    System::setEnvironmentVariable("COPYFILE_DISABLE", prev_copyfile_disable);
+#endif
     mTestSystem.host()->setCurrentDirectory(currdir);
 
     if (result) {
