@@ -1623,6 +1623,20 @@ public:
                             "Unable to load environment");
     }
 
+    Status getHostCameras(ServerContext* /*context*/,
+                          const ::google::protobuf::Empty* request,
+                          CameraList* reply) override {
+        mAgents->virtual_scene->enumerateWebcams(
+                reply, [](void* context, const char* userFacingName,
+                          const char* label, const char* id) {
+                    auto* replyList = reinterpret_cast<CameraList*>(context);
+                    auto* camera = replyList->add_cameras();
+                    camera->set_display_name(userFacingName);
+                    camera->set_id(id);
+                });
+        return Status::OK;
+    }
+
 private:
     const AndroidConsoleAgents* mAgents;
     keyboard::KeyEventSender mKeyEventSender;
