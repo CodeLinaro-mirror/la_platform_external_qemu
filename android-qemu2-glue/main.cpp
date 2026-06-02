@@ -1341,6 +1341,16 @@ static int startEmulatorWithMinConfig(int argc,
         fc::setEnabledOverride(fc::GLAsyncSwap, false);
     }
 
+    if (fc::isEnabled(fc::Minigbm) && fc::isEnabled(fc::HardwareDecoder)) {
+        // TODO(b/519019860): Known issues with hardware decoder when
+        // minigbm is used. Auto-disable it to avoid issues on video
+        // rendering and tests.
+        fc::setEnabledOverride(fc::HardwareDecoder, false);
+        dwarning(
+                "Disabled feature 'HardwareDecoder', is not supported with "
+                "feature 'Minigbm'");
+    }
+
     android_report_session_phase(ANDROID_SESSION_PHASE_INITGENERAL);
 
     // Generate a hardware-qemu.ini for this AVD.
@@ -3449,6 +3459,16 @@ extern "C" int main(int argc, char** argv) {
 
         if (shouldDisableAsyncSwap) {
             fc::setEnabledOverride(fc::GLAsyncSwap, false);
+        }
+
+        if (fc::isEnabled(fc::Minigbm) && fc::isEnabled(fc::HardwareDecoder)) {
+            // TODO(b/519019860): Known issues with hardware decoder when
+            // minigbm is used. Auto-disable it to avoid issues on video
+            // rendering and tests.
+            fc::setEnabledOverride(fc::HardwareDecoder, false);
+            dwarning(
+                    "Disabled feature 'HardwareDecoder', is not supported with "
+                    "feature 'Minigbm'");
         }
 
         // Get verified boot kernel parameters, if they exist.
