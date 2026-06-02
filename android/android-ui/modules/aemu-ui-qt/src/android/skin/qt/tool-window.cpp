@@ -578,15 +578,47 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
 
         QMenu* envMenu = new QMenu(this);
         envMenu->addAction(tr("Default Environment"), this,
-                           SLOT(on_default_environment_selected()));
-        envMenu->addAction(tr("None"), this, SLOT(on_none_selected()));
+                           SLOT(defaultEnvironmentSelected()));
+        envMenu->addAction(tr("None"), this, SLOT(noneSelected()));
         envMenu->addSeparator();
         envMenu->addAction(tr("Custom Image..."), this,
-                           SLOT(on_custom_image_selected()));
+                           SLOT(customImageSelected()));
         envMenu->addAction(tr("Custom Video..."), this,
-                           SLOT(on_custom_video_selected()));
+                           SLOT(customVideoSelected()));
         envMenu->addAction(tr("Custom 360 Image..."), this,
-                           SLOT(on_custom_360_image_selected()));
+                           SLOT(custom360ImageSelected()));
+
+        QMenu* webcamMenu = new QMenu(tr("Webcams"), this);
+        const QAndroidVirtualSceneAgent* agent =
+                getConsoleAgents()->virtual_scene;
+        if (agent && agent->enumerateWebcams) {
+            struct Context {
+                QMenu* menu;
+                ToolWindow* window;
+            } context = {webcamMenu, this};
+
+            agent->enumerateWebcams(&context, [](void* opaque,
+                                                 const char* userFacingName,
+                                                 const char* label,
+                                                 const char* id) {
+                auto* ctx = static_cast<Context*>(opaque);
+                ToolWindow* window = ctx->window;
+                QAction* action = ctx->menu->addAction(QString::fromUtf8(
+                        userFacingName ? userFacingName : label));
+                // This should never be null, but if it is, we'll fail when
+                // attempting to set up the camera with more details
+                std::string id_str = id ? id : "";
+                window->connect(
+                        action, &QAction::triggered,
+                        [window, id_str]() { window->webcamSelected(id_str); });
+            });
+        }
+        if (!webcamMenu->isEmpty()) {
+            envMenu->addMenu(webcamMenu);
+        } else {
+            delete webcamMenu;
+        }
+
         mToolsUi->environment_button->setMenu(envMenu);
         mToolsUi->environment_button->setEnabled(true);
     } else {
@@ -1987,17 +2019,17 @@ void ToolWindow::on_xr_viewport_rotate_button_clicked() {
     }
 }
 
-void ToolWindow::on_default_environment_selected() {
+void ToolWindow::defaultEnvironmentSelected() {
     getConsoleAgents()->virtual_scene->reloadEnvironment(
             "scene.mode = imagefile");
 }
 
-void ToolWindow::on_none_selected() {
+void ToolWindow::noneSelected() {
     getConsoleAgents()->virtual_scene->reloadEnvironment(
             "scene.mode = color:#000000");
 }
 
-void ToolWindow::on_custom_image_selected() {
+void ToolWindow::customImageSelected() {
     QString fileName = QFileDialog::getOpenFileName(
             this, tr("Select Image"), "", tr("Images (*.png *.jpg)"));
     if (!fileName.isEmpty()) {
@@ -2007,7 +2039,7 @@ void ToolWindow::on_custom_image_selected() {
     }
 }
 
-void ToolWindow::on_custom_video_selected() {
+void ToolWindow::customVideoSelected() {
     QString fileName = QFileDialog::getOpenFileName(this, tr("Select Video"),
                                                     "", tr("Videos (*.mp4)"));
     if (!fileName.isEmpty()) {
@@ -2017,13 +2049,18 @@ void ToolWindow::on_custom_video_selected() {
     }
 }
 
-void ToolWindow::on_custom_360_image_selected() {
+void ToolWindow::custom360ImageSelected() {
     QString fileName = QFileDialog::getOpenFileName(
             this, tr("Select 360 Image"), "", tr("Images (*.png *.jpg)"));
     if (!fileName.isEmpty()) {
         std::string command = "scene.mode = image360:" + fileName.toStdString();
         getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
     }
+}
+
+void ToolWindow::webcamSelected(const std::string& id) {
+    std::string command = "scene.mode = webcam:" + id;
+    getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
 }
 
 // Set the current selected input mode button or viewport control mode button
