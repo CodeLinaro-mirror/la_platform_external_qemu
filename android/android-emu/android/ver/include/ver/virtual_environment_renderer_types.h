@@ -54,6 +54,11 @@ struct PosterInfo {
 };
 
 /**
+ * @brief Opaque handle to a webcam info.
+ */
+typedef struct VerWebcamInfoOpaque* VerWebcamHandle;
+
+/**
  * @brief Configuration for a virtual scene.
  */
 struct SceneConfig {

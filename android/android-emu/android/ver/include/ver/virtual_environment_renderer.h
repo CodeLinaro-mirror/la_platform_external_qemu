@@ -24,8 +24,11 @@
 #include <string_view>
 #include <vector>
 
+#include "android/utils/compiler.h"
 #include "ver/export.h"
 #include "ver/virtual_environment_renderer_types.h"
+
+using android::ver::VerWebcamHandle;
 
 /**
  * @file virtual_environment_renderer.h
@@ -314,3 +317,96 @@ VER_EXPORT bool ver_texture_utils_load_png(const char* filename,
                                            int* outHeight,
                                            int* outFormatBpp,
                                            std::vector<uint8_t>* outBuffer);
+
+ANDROID_BEGIN_HEADER
+
+/**
+ * @brief Retrieves the number of webcams available.
+ * @return The number of webcams.
+ */
+VER_EXPORT uint32_t ver_get_webcam_count();
+
+/**
+ * @brief Retrieves the webcam info for the webcam at index.
+ * The returned handle must be freed with ver_free_webcam_info.
+ * @param index The index of the webcam.
+ * @return A handle to the webcam info, or nullptr if index is out of bounds.
+ */
+VER_EXPORT VerWebcamHandle ver_get_webcam_info(uint32_t index);
+
+/**
+ * @brief Frees a webcam info handle.
+ * @param handle The handle to free.
+ */
+VER_EXPORT void ver_free_webcam_info(VerWebcamHandle handle);
+
+/**
+ * @brief Retrieves the user-facing name of the webcam.
+ * The returned string is owned by the handle and valid until the handle is
+ * freed.
+ * @param handle The webcam info handle.
+ * @return The user-facing name of the webcam.
+ */
+VER_EXPORT const char* ver_webcam_info_get_user_facing_name(
+        VerWebcamHandle handle);
+
+/**
+ * @brief Retrieves the OS-specific identifier of the webcam.
+ * The returned string is owned by the handle and valid until the handle is
+ * freed.
+ * @param handle The webcam info handle.
+ * @return The OS-specific identifier of the webcam.
+ */
+VER_EXPORT const char* ver_webcam_info_get_id(VerWebcamHandle handle);
+
+/**
+ * @brief Retrieves the index of the preferred format for the webcam.
+ * @param handle The webcam info handle.
+ * @return The index of the preferred format, or -1 if no format is supported.
+ */
+VER_EXPORT int ver_webcam_info_get_preferred_format_index(
+        VerWebcamHandle handle);
+
+/**
+ * @brief Retrieves the number of formats supported by the webcam.
+ * @param handle The webcam info handle.
+ * @return The number of supported formats.
+ */
+VER_EXPORT uint32_t ver_webcam_info_get_format_count(VerWebcamHandle handle);
+
+/**
+ * @brief Retrieves the pixel format (fourcc) for the format at index.
+ * @param handle The webcam info handle.
+ * @param format_index The index of the format.
+ * @return The pixel format fourcc.
+ */
+VER_EXPORT uint32_t
+ver_webcam_info_get_pixel_format_fourcc(VerWebcamHandle handle,
+                                        uint32_t format_index);
+
+/**
+ * @brief Retrieves the number of resolutions supported by this format.
+ * @param handle The webcam info handle.
+ * @param format_index The index of the format.
+ * @return The number of supported resolutions.
+ */
+VER_EXPORT uint32_t
+ver_webcam_info_get_format_resolution_count(VerWebcamHandle handle,
+                                            uint32_t format_index);
+
+/**
+ * @brief Retrieves the width and height of the resolution at index for the
+ * format at index.
+ * @param handle The webcam info handle.
+ * @param format_index The index of the format.
+ * @param res_index The index of the resolution.
+ * @param out_width Pointer to receive the width.
+ * @param out_height Pointer to receive the height.
+ */
+VER_EXPORT bool ver_webcam_info_get_format_resolution(VerWebcamHandle handle,
+                                                      uint32_t format_index,
+                                                      uint32_t res_index,
+                                                      int* out_width,
+                                                      int* out_height);
+
+ANDROID_END_HEADER
