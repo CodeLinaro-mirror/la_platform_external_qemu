@@ -238,13 +238,15 @@ void LocationPage::on_loc_routeList_itemSelectionChanged() {
                        UiState::Default;
     updateRouteWidgetItemsColor();
 
-    if (mRouteState == UiState::Deletion &&
-        mUi->loc_routeList->selectedItems().size() != 1) {
-        // Either no routes selected, or in deletion mode, either of which
-        // means the map shouldn't be set to anything.
+    if (mUi->loc_routeList->selectedItems().size() != 1) {
+        if (mRouteJson.isEmpty()) {
 #ifdef USE_WEBENGINE
-        emit mMapBridge->showRouteOnMap("");
+            if (mMapBridge) {
+                emit mMapBridge->showRouteOnMap("");
+            }
 #endif  // USE_WEBENGINE
+            mUi->loc_playRouteButton->setEnabled(false);
+        }
     }
     if (mUi->loc_routeList->selectedItems().size() == 1) {
         // show the location on the map, but do not send it to the device
@@ -277,6 +279,9 @@ void LocationPage::on_loc_routeList_itemSelectionChanged() {
             newState == UiState::Default ?
                       tr("PLAY ROUTE") :
                       tr("DELETE ITEMS"));
+    if (newState == UiState::Deletion) {
+        mUi->loc_playRouteButton->setEnabled(true);
+    }
     mRouteState = newState;
 }
 
