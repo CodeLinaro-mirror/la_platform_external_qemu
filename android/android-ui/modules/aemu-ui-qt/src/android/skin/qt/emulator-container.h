@@ -35,6 +35,7 @@ class QSize;
 class QString;
 class QWidget;
 class VirtualSceneInfoDialog;
+class GlassesStatusOverlay;
 
 class EmulatorContainer : public QScrollArea {
     Q_OBJECT
@@ -87,10 +88,14 @@ private:
     void adjustModalOverlayGeometry();
     void adjustVirtualSceneDialogGeometry();
     void adjustMessagesOverlayGeometry();
+    void adjustGlassesStatusOverlayGeometry();
+
+    QString getBootProp(const char* prop);
 
     EmulatorQtWindow* mEmulatorWindow;
     Ui::ModalOverlay* mModalOverlay = nullptr;
     VirtualSceneInfoDialog* mVirtualSceneInfo = nullptr;
+    GlassesStatusOverlay* mGlassesStatusOverlay = nullptr;
     bool mShouldCreateVirtualSceneInfo = false;
     bool mVirtualSceneWindowShown = false;
     android::base::MemberOnDemandT<Ui::OverlayMessageCenter, QWidget*>

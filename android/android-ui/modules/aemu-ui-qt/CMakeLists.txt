@@ -27,6 +27,7 @@ android_qt_lib(
       android/skin/qt/extended-window.cpp
       android/skin/qt/extended.ui
       android/skin/qt/FramelessDetector.cpp
+      android/skin/qt/GlassesStatusOverlay.cpp
       android/skin/qt/init-qt.cpp
       android/skin/qt/left-hand-dialog.cpp
       android/skin/qt/left-hand-dialog.ui
