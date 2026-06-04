@@ -533,9 +533,7 @@ class WindowsImpl : public WebcamSource::Impl {
 public:
     explicit WindowsImpl(std::shared_ptr<const WebcamSource::WebcamInfo> info)
         : webcam_info_(std::move(info)) {}
-    ~WindowsImpl() override {
-        Stop();
-    }
+    ~WindowsImpl() override { StopLocked(); }
 
     HRESULT configureMediaSource(const ComPtr<IMFMediaSource>& source,
                                  uint32_t pixel_format,
@@ -621,9 +619,9 @@ public:
         return hr;
     }
 
-    int Start(uint32_t pixel_format,
-              int frame_width,
-              int frame_height) override {
+    int StartLocked(uint32_t pixel_format,
+                    int frame_width,
+                    int frame_height) override {
         LOG(INFO) << "Starting webcam at " << frame_width << "x"
                   << frame_height;
         if (!mMF) {
@@ -678,7 +676,7 @@ public:
                                     mCallback.Get());
         if (FAILED(hr)) {
             LOG(ERROR) << "Failed setting attributes, hr=" << hrToString(hr);
-            Stop();
+            StopLocked();
             return -1;
         }
 
@@ -692,7 +690,7 @@ public:
         }
         if (FAILED(hr)) {
             LOG(ERROR) << "Failed setting attributes, hr=" << hrToString(hr);
-            Stop();
+            StopLocked();
             return -1;
         }
 
@@ -701,7 +699,7 @@ public:
         if (FAILED(hr)) {
             LOG(ERROR) << "Configure source reader failed, hr="
                        << hrToString(hr);
-            Stop();
+            StopLocked();
             return -1;
         }
 
@@ -709,7 +707,7 @@ public:
         hr = mMF.getMFApi().mfCreateMediaType(&type);
         if (FAILED(hr)) {
             LOG(ERROR) << "Failed to create media type, hr=" << hrToString(hr);
-            Stop();
+            StopLocked();
             return -1;
         }
         hr = type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
@@ -727,7 +725,7 @@ public:
         if (FAILED(hr)) {
             LOG(ERROR) << "Failed to configure media type attributes, hr="
                        << hrToString(hr);
-            Stop();
+            StopLocked();
             return -1;
         }
 
@@ -737,7 +735,7 @@ public:
         if (FAILED(hr)) {
             LOG(ERROR) << "Configure webcam source failed, hr="
                        << hrToString(hr);
-            Stop();
+            StopLocked();
             return -1;
         }
 
@@ -748,7 +746,7 @@ public:
             } else {
                 LOG(ERROR)
                         << "Unknown pixel format, could not configure webcam";
-                Stop();
+                StopLocked();
                 return -1;
             }
         }
@@ -760,23 +758,21 @@ public:
                 nullptr, nullptr);
         if (FAILED(hr)) {
             LOG(ERROR) << "ReadSample failed, hr=" << hrToString(hr);
-            Stop();
+            StopLocked();
             return -1;
         }
 
         return 0;
     }
 
-    int Stop() override {
+    int StopLocked() override {
         mSourceReader.Reset();
         mCallback.Reset();
         return 0;
     }
 
-    absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
-            int64_t target_time_us,
-            std::optional<RawImageToken> token,
-            std::function<absl::Status(const RawImageBufferView*)> updater)
+    absl::StatusOr<bool> FetchNextFrame(
+            std::function<absl::Status(const RawImageBufferView*)> new_frame_cb)
             override {
         if (!mSourceReader || !mCallback)
             return absl::InternalError("Not started");
@@ -800,14 +796,14 @@ public:
                     (DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, nullptr,
                     nullptr, nullptr, nullptr);
             if (FAILED(hr)) {
-                LOG(ERROR) << "ReadSample failed in UpdateImage, hr="
+                LOG(ERROR) << "ReadSample failed in FetchNextFrame, hr="
                            << hrToString(hr);
                 return absl::InternalError("ReadSample failed");
             }
         }
 
         if (!sample)
-            return std::nullopt;
+            return false;
 
         ComPtr<IMFMediaBuffer> buffer;
         HRESULT hr_conv = sample->ConvertToContiguousBuffer(&buffer);
@@ -836,13 +832,13 @@ public:
             }
         }
         auto ver_view = RawImageBufferViewFourCCBridge(&view);
-        absl::Status status = updater(&ver_view);
+        absl::Status status = new_frame_cb(&ver_view);
         buffer->Unlock();
 
         if (!status.ok())
             return status;
 
-        return RawImageToken{++mTokenCounter};
+        return true;
     }
 
 private:
@@ -853,7 +849,6 @@ private:
     uint32_t mPixelFormat = 0;
     int mWidth = 0;
     int mHeight = 0;
-    int64_t mTokenCounter = 0;
     std::vector<uint8_t> conversion_storage_;
     std::vector<uint8_t> staging_buffer_;
 };

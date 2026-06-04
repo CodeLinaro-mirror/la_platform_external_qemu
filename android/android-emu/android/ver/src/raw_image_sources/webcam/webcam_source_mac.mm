@@ -526,29 +526,27 @@ public:
     }
     ~MacImpl() override { [camera_ release]; }
 
-    int Start(uint32_t pixel_format,
-              int frame_width,
-              int frame_height) override {
+    int StartLocked(uint32_t pixel_format,
+                    int frame_width,
+                    int frame_height) override {
         return [camera_ startCapturing:webcam_info_->os_name.c_str()
                                  width:frame_width
                                 height:frame_height];
     }
 
-    int Stop() override {
+    int StopLocked() override {
         [camera_ stopCapture];
         return 0;
     }
 
-    absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
-            int64_t target_time_us,
-            std::optional<RawImageToken> token,
-            std::function<absl::Status(const RawImageBufferView*)> updater)
+    absl::StatusOr<bool> FetchNextFrame(
+            std::function<absl::Status(const RawImageBufferView*)> new_frame_cb)
             override {
-        int res = [camera_ readFrameWithUpdater:updater];
+        int res = [camera_ readFrameWithUpdater:new_frame_cb];
         if (res == 0) {
-            return RawImageToken{++token_counter_};
+            return true;
         } else if (res == 1) {
-            return std::nullopt;
+            return false;
         } else {
             return absl::InternalError("Failed to read frame");
         }
@@ -557,7 +555,6 @@ public:
 private:
     std::shared_ptr<const WebcamSource::WebcamInfo> webcam_info_;
     VerMacCamera* camera_;
-    int64_t token_counter_ = 0;
 };
 
 std::unique_ptr<WebcamSource::Impl> CreatePlatformWebcamImpl(
