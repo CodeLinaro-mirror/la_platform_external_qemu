@@ -568,6 +568,7 @@ int main(int argc, char* argv[]) {
             android::emulation::control::SimpleScreenRecordingClient>(
             android::emulation::control::EmulatorGrpcClient::me());
     initializeGrpcUserEventAgent(gControlClient.get());
+    initializeGrpcNotifications(gControlClient.get());
 
     auto program_dir = system->getProgramDirectory();
     setupRenderer(hw, program_dir);

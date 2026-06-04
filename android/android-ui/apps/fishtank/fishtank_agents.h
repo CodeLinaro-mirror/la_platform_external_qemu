@@ -83,5 +83,7 @@ std::shared_ptr<android::emulation::control::SimpleScreenRecordingClient> getGlo
 
 void initializeGrpcUserEventAgent(
         android::emulation::control::EmulatorControlClient* client);
+void initializeGrpcNotifications(
+        android::emulation::control::EmulatorControlClient* client);
 void injectFishtankConsoleAgents();
 const QAndroidEmulatorWindowAgent* const getFishtankEmulatorWindowAgent();

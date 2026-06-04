@@ -377,6 +377,8 @@ android_add_test(
       grpc/FishtankGrpcServer.cpp
       agents/sensors_agent_unittest.cpp
       agents/sensors_agent.cpp
+      agents/multi_display_agent_unittest.cpp
+      agents/multi_display_agent.cpp
       agents/record_screen_agent_unittest.cpp
       agents/record_screen_agent.cpp
       agents/user_event_agent_unittest.cpp

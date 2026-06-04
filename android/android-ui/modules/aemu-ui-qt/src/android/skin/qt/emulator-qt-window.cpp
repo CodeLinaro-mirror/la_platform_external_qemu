@@ -1782,6 +1782,7 @@ void EmulatorQtWindow::setSharedMemoryRenderer(SharedMemoryRenderer* renderer) {
 
 void EmulatorQtWindow::initializeStreamer(std::string_view shm_handle,
                                           StreamTransport transport_type) {
+    mTransportType = transport_type;
     using android::emulation::control::Image;
     using android::emulation::control::ImageFormat;
 
@@ -4244,6 +4245,9 @@ bool EmulatorQtWindow::addMultiDisplayWindow(uint32_t id,
         if (mMultiDisplayWindow[id] == nullptr) {
             // create qt window for the 1st time.
             mMultiDisplayWindow[id].reset(new MultiDisplayWidget(w, h, id));
+            if (mStreamer) {
+                mMultiDisplayWindow[id]->initializeStreamer(mTransportType);
+            }
             char title[16];
             uint32_t tId;
             if (id >= android::MultiDisplay::s_displayIdInternalBegin &&

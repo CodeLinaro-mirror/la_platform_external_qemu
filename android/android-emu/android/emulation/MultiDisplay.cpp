@@ -915,6 +915,7 @@ int MultiDisplay::setDisplayColorBuffer(uint32_t displayId,
             LOG(DEBUG) << "change window size to " << width << "x" << height;
             mWindowAgent->setUIDisplayRegion(0, 0, width, height, true);
         }
+        fireEvent(DisplayChangeEvent{DisplayChange::DisplayChanged, displayId});
     }
     LOG(VERBOSE) << "setDisplayColorBuffer " << displayId << " cb "
                  << colorBuffer;
@@ -1063,11 +1064,13 @@ void MultiDisplay::recomputeStackedLayoutLocked() {
     }
 }
 
+/* static */
 bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
                                              uint32_t w,
                                              uint32_t h,
                                              uint32_t dpi,
-                                             uint32_t flag) {
+                                             uint32_t flag,
+                                             std::string* outErrorMsg) {
     // According the Android 9 CDD,
     // * 120 <= dpi <= 640
     // * 320 * (dpi / 160) <= width
@@ -1077,20 +1080,23 @@ bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
     // * 4K might be a good upper limit
 
     if (dpi < 120 || dpi > 640) {
-        mWindowAgent->showMessage("dpi should be between 120 and 640",
-                                  WINDOW_MESSAGE_ERROR, 1000);
+        if (outErrorMsg) {
+            *outErrorMsg = "dpi should be between 120 and 640";
+        }
         derror("Display dpi should be between 120 and 640, not %d", dpi);
         return false;
     }
     if (w < 320 * dpi / 160 || h < 320 * dpi / 160) {
-        mWindowAgent->showMessage("width and height should be >= 320dp",
-                                  WINDOW_MESSAGE_ERROR, 1000);
+        if (outErrorMsg) {
+            *outErrorMsg = "width and height should be >= 320dp";
+        }
         derror("Display width and height should be >= 320dp, not %d", dpi);
         return false;
     }
     if (!((w <= 7680 && h <= 4320) || (w <= 4320 && h <= 7680))) {
-        mWindowAgent->showMessage("resolution should not exceed 8k (7680*4320)",
-                                  WINDOW_MESSAGE_ERROR, 1000);
+        if (outErrorMsg) {
+            *outErrorMsg = "resolution should not exceed 8k (7680*4320)";
+        }
         derror("Display resolution should not exceed 8k (7680x4320) vs (%dx%d)",
                w, h);
         return false;
@@ -1098,11 +1104,26 @@ bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
     if (id > s_maxNumMultiDisplay) {
         std::string msg = "Display index cannot be more than " +
                           std::to_string(s_maxNumMultiDisplay);
-        mWindowAgent->showMessage(msg.c_str(), WINDOW_MESSAGE_ERROR, 1000);
-        derror("%s", msg);
+        if (outErrorMsg) {
+            *outErrorMsg = msg;
+        }
+        derror("%s", msg.c_str());
         return false;
     }
     return true;
+}
+
+bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
+                                             uint32_t w,
+                                             uint32_t h,
+                                             uint32_t dpi,
+                                             uint32_t flag) {
+    std::string errorMsg;
+    bool ok = multiDisplayParamValidate(id, w, h, dpi, flag, &errorMsg);
+    if (!ok && mWindowAgent) {
+        mWindowAgent->showMessage(errorMsg.c_str(), WINDOW_MESSAGE_ERROR, 1000);
+    }
+    return ok;
 }
 
 std::map<uint32_t, MultiDisplayInfo> MultiDisplay::parseConfig() {

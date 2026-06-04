@@ -83,6 +83,7 @@ public:
      * @param transport The transport mechanism to use. Defaults to MMAP.
      * @param client A shared pointer to the EmulatorGrpcClient instance.
      *               Defaults to the singleton instance.
+     * @param displayId The ID of the display to stream. Defaults to 0 (primary display).
      */
     explicit SharedStreamEmulator(
             std::string_view handle,
@@ -91,7 +92,8 @@ public:
             int h,
             StreamTransport transport = StreamTransport::MMAP,
             std::shared_ptr<android::emulation::control::EmulatorGrpcClient>
-                    client = nullptr);
+                    client = nullptr,
+            uint32_t displayId = 0);
     ~SharedStreamEmulator();
 
     // This class manages a thread and raw pointers, it is not safe to copy or
@@ -120,6 +122,7 @@ private:
 
     int mWidth;
     int mHeight;
+    uint32_t mDisplayId;
     std::shared_ptr<android::emulation::control::EmulatorGrpcClient> mClient;
     std::string mHandle;
     StreamTransport mTransport;
