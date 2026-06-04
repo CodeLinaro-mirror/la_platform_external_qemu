@@ -591,7 +591,9 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         QMenu* webcamMenu = new QMenu(tr("Webcams"), this);
         const QAndroidVirtualSceneAgent* agent =
                 getConsoleAgents()->virtual_scene;
-        if (agent && agent->enumerateWebcams) {
+        if (agent && agent->enumerateWebcams &&
+            android::base::System::get()->getEnvironmentVariable(
+                    "ANDROID_EMU_ENABLE_WEBCAM_MENU") != "") {
             struct Context {
                 QMenu* menu;
                 ToolWindow* window;
