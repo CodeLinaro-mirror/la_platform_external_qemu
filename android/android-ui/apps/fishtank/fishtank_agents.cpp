@@ -39,6 +39,8 @@
 #include "host-common/vm_operations.h"
 #include "host-common/window_agent.h"
 
+#include <set>
+
 #define ANDROID_AGENTS_LIST(X)   \
     X(QAndroidAutomationAgent)   \
     X(QAndroidBatteryAgent)      \
@@ -87,4 +89,65 @@ public:
 
 void injectFishtankConsoleAgents() {
     android::emulation::injectConsoleAgents(FishtankAgentConsoleFactory());
+}
+
+static std::set<uint32_t> sOpenedDisplays;
+
+void initializeGrpcNotifications(
+        android::emulation::control::EmulatorControlClient* client) {
+    client->registerNotificationListener(
+            [](const android::emulation::control::Notification* event) {
+                if (event && event->has_displayconfigurationschangednotification()) {
+                    const auto& displayConfigs =
+                            event->displayconfigurationschangednotification()
+                                    .displayconfigurations();
+
+                    std::set<uint32_t> activeIds;
+                    for (const auto& display : displayConfigs.displays()) {
+                        if (display.display() > 0) {
+                            activeIds.insert(display.display());
+                        }
+                    }
+
+                    const auto windowAgent = getFishtankEmulatorWindowAgent();
+                    if (!windowAgent) {
+                        derror("FishtankAgents: No window agent to apply display changes");
+                        return;
+                    }
+
+                    // Open new displays
+                    for (uint32_t id : activeIds) {
+                        if (sOpenedDisplays.count(id) == 0) {
+                            // Find config to get width/height
+                            for (const auto& display : displayConfigs.displays()) {
+                                if (display.display() == id) {
+                                    windowAgent->addMultiDisplayWindow(
+                                            id, true, display.width(),
+                                            display.height());
+                                    windowAgent->updateUIMultiDisplayPage(id);
+                                    sOpenedDisplays.insert(id);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Close removed displays
+                    for (auto it = sOpenedDisplays.begin();
+                         it != sOpenedDisplays.end();) {
+                        uint32_t id = *it;
+                        if (activeIds.count(id) == 0) {
+                            windowAgent->addMultiDisplayWindow(id, false, 0, 0);
+                            windowAgent->updateUIMultiDisplayPage(id);
+                            it = sOpenedDisplays.erase(it);
+                        } else {
+                            ++it;
+                        }
+                    }
+                }
+            },
+            [](absl::Status status) {
+                dwarning("FishtankAgents: Notification stream finished with status: %s",
+                         status.ToString().c_str());
+            });
 }

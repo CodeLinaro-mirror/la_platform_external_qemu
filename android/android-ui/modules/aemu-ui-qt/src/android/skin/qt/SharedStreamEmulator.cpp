@@ -29,9 +29,11 @@ SharedStreamEmulator::SharedStreamEmulator(
         int width,
         int height,
         StreamTransport transport,
-        std::shared_ptr<android::emulation::control::EmulatorGrpcClient> client)
+        std::shared_ptr<android::emulation::control::EmulatorGrpcClient> client,
+        uint32_t displayId)
     : mWidth(width),
       mHeight(height),
+      mDisplayId(displayId),
       mClient(client),
       mHandle(handle),
       mTransport(transport),
@@ -83,6 +85,7 @@ void SharedStreamEmulator::streamLoop() {
 
     request.set_width(mWidth);
     request.set_height(mHeight);
+    request.set_display(mDisplayId);
 
     auto* transport = request.mutable_transport();
     if (mTransport == StreamTransport::MMAP) {

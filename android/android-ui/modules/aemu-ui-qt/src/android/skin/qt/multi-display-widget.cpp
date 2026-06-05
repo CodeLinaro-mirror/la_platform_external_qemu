@@ -17,6 +17,11 @@
 #include "host-common/opengles.h"
 #include "android/skin/qt/emulator-qt-window.h"
 #include "android/skin/qt/gl-common.h"
+#include "emulator_controller.pb.h"
+
+#include <QPainter>
+#include <QPaintEvent>
+#include <QImage>
 
 MultiDisplayWidget::MultiDisplayWidget(uint32_t frameWidth,
                                        uint32_t frameHeight,
@@ -279,7 +284,7 @@ void MultiDisplayWidget::repaintGL() {
 
 void MultiDisplayWidget::paintWindow(uint32_t colorBufferId) {
     mColorBufferId = colorBufferId;
-    renderFrame();
+    update();
 }
 
 void MultiDisplayWidget::mousePressEvent(QMouseEvent* event) {
@@ -335,4 +340,70 @@ void MultiDisplayWidget::keyPressEvent(QKeyEvent* event) {
 void MultiDisplayWidget::keyReleaseEvent(QKeyEvent* event) {
     auto win = EmulatorQtWindow::getInstance();
     win->handleKeyEvent(kEventKeyUp, *event);
+}
+
+void MultiDisplayWidget::initializeStreamer(StreamTransport transport_type) {
+    using android::emulation::control::Image;
+    using android::emulation::control::ImageFormat;
+
+    connect(this, &MultiDisplayWidget::frameReady, this,
+            &MultiDisplayWidget::slot_updateGuestScreen);
+
+    mStreamer = std::make_unique<SharedStreamEmulator>(
+            "",
+            [this](const Image* image) {
+                const std::string& data = image->image();
+                if (data.empty()) {
+                    return;
+                }
+
+                QImage qimage;
+                switch (image->format().format()) {
+                    case ImageFormat::PNG:
+                        qimage.loadFromData(
+                                reinterpret_cast<const uchar*>(data.data()),
+                                static_cast<int>(data.size()), "PNG");
+                        break;
+                    case ImageFormat::RGBA8888:
+                        qimage = QImage(
+                                reinterpret_cast<const uchar*>(data.data()),
+                                image->format().width(),
+                                image->format().height(),
+                                QImage::Format_RGBA8888);
+                        qimage = qimage.copy();
+                        break;
+                    case ImageFormat::RGB888:
+                        qimage = QImage(
+                                reinterpret_cast<const uchar*>(data.data()),
+                                image->format().width(),
+                                image->format().height(),
+                                QImage::Format_RGB888);
+                        qimage = qimage.copy();
+                        break;
+                    default:
+                        return;
+                }
+                if (!qimage.isNull()) {
+                    emit frameReady(qimage);
+                }
+            },
+            mFrameWidth, mFrameHeight,
+            transport_type,
+            nullptr,
+            mDisplayId);
+    mStreamer->startStream();
+}
+
+void MultiDisplayWidget::slot_updateGuestScreen(const QImage& frame) {
+    mGuestScreenPixmap = QPixmap::fromImage(frame);
+    update();
+}
+
+void MultiDisplayWidget::paintEvent(QPaintEvent* event) {
+    if (!mGuestScreenPixmap.isNull()) {
+        QPainter painter(this);
+        painter.drawPixmap(rect(), mGuestScreenPixmap);
+    } else {
+        GLWidget::paintEvent(event);
+    }
 }
