@@ -1398,8 +1398,10 @@ void ToolWindow::presetSizeAdvance(PresetEmulatorSizeType newSize) {
         mEmulatorWindow->resizeAndChangeAspectRatio(0, 0, info.width,
                                                     info.height);
     }
-    sUiEmuAgent->window->showMessage(updateMsg.c_str(), WINDOW_MESSAGE_GENERIC,
-                                     3000);
+    if (sUiEmuAgent && sUiEmuAgent->window) {
+        sUiEmuAgent->window->showMessage(updateMsg.c_str(), WINDOW_MESSAGE_GENERIC,
+                                         3000);
+    }
     if (resizableEnabled34()) {
         mToolsUi->change_posture_button->setEnabled(newSize ==
                                                     PRESET_SIZE_UNFOLDED);

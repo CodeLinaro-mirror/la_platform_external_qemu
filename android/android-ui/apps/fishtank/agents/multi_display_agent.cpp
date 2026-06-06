@@ -275,7 +275,9 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                 },
         .translateCoordination =
                 [](uint32_t* x, uint32_t* y, uint32_t* displayId) {
-                    NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.translateCoordination");
+                    if (auto md = android::MultiDisplay::getInstance()) {
+                        return md->translateCoordination(x, y, displayId);
+                    }
                     return false;
                 },
         .setGpuMode = [](bool isGuestMode,
@@ -346,15 +348,17 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                 },
         .isMultiDisplayWindow =
                 []() {
-                    // Fishtank usually runs in a multi-display window mode if it's managing multiple windows.
-                    // We can return true if we have multiple displays, or just default to false if we don't know.
-                    return sFishtankQAndroidMultiDisplayAgent.isMultiDisplayEnabled();
+                    if (auto md = android::MultiDisplay::getInstance()) {
+                        return md->isMultiDisplayWindow();
+                    }
+                    return false;
                 },
         .performRotation = [](int rot) { NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.performRotation"); },
         .isPixelFold =
                 []() {
-                    // We don't easily know if it's a Pixel Fold without querying status or features.
-                    // But we can assume false for now, or try to query if needed.
+                    if (auto md = android::MultiDisplay::getInstance()) {
+                        return md->isPixelFold();
+                    }
                     return false;
                 },
 };

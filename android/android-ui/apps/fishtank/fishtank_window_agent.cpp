@@ -156,23 +156,20 @@ static const QAndroidEmulatorWindowAgent sFishtankQAndroidEmulatorWindowAgent = 
                 RECORDER_RECORDING) {
                 return false;
             }
-            LOG(FATAL) << "Foldable not yet implemented";
-            if (is_fold) {
-                // return android_foldable_fold();
-            } else {
-                // return android_foldable_unfold();
+            const QAndroidSensorsAgent* sensorsAgent = getConsoleAgents()->sensors;
+            if (!sensorsAgent) {
+                return false;
             }
-            return false;
+            float posture = static_cast<float>(is_fold ? POSTURE_CLOSED : POSTURE_OPENED);
+            return sensorsAgent->setPhysicalParameterTarget(
+                    PHYSICAL_PARAMETER_POSTURE, &posture, 1,
+                    PHYSICAL_INTERPOLATION_SMOOTH) == 0;
         },
         .isFolded = []() -> bool {
-            LOG(FATAL) << "Foldable not yet ready";
-            return false;
-            // return android_foldable_is_folded();
+            return android_foldable_is_folded();
         },
         .getFoldedArea = [](int* x, int* y, int* w, int* h) -> bool {
-            LOG(FATAL) << "Foldable not yet ready";
-            return false;
-            // return android_foldable_get_folded_area(x, y, w, h);
+            return android_foldable_get_folded_area(x, y, w, h);
         },
         .updateFoldablePostureIndicator =
                 [](bool confirmFoldedArea) {
