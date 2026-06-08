@@ -54,6 +54,9 @@ using namespace std::literals;
 
 constexpr uint32_t kPixelFormat_RGBA_8888 = 0x1;
 constexpr uint32_t kPixelFormat_YCBCR_420_888 = 0x23;
+constexpr size_t kMaxStreamDim = 16384;
+constexpr size_t kMaxStreamBytes =
+        kMaxStreamDim * kMaxStreamDim * sizeof(uint32_t);
 
 // TODO(b/173651912): remove this thing and call the callback from
 // camera_XYZ_(start|stop)_capturing instead.
@@ -428,8 +431,9 @@ std::string cameraInfoToString(const CameraInfo& ci) {
 
 template <class T>
 std::pair<uint32_t, uint32_t> getMaxResolution(const T* begin, const T* end) {
-    const auto cmp = [](const T& lhs, const T& rhs){
-        return (lhs.width * lhs.height) < (rhs.width * rhs.height);
+    const auto cmp = [](const T& lhs, const T& rhs) {
+        return (size_t(lhs.width) * size_t(lhs.height)) <
+               (size_t(rhs.width) * size_t(rhs.height));
     };
 
     const T* result = std::max_element(begin, end, cmp);
@@ -1358,6 +1362,12 @@ struct GasCameraClient : public OldCamerasClient {
             return;
         }
 
+        if ((width == 0) || (width > kMaxStreamDim) ||
+            (height == 0) || (height > kMaxStreamDim)) {
+            qemuClientReply(qc, false, "'dim' is out of bounds"sv);
+            return;
+        }
+
         uint32_t pixFormat;
         if (!getParamValue(pixFormat, params, kParamPix, parsePix)) {
             qemuClientReply(qc, false, "Invalid or missing 'pix' parameter"sv);
@@ -1539,20 +1549,43 @@ private:
                                          return false;
                                      }
 
-                                     switch (androidFormat) {
-                                     case kPixelFormat_RGBA_8888:
-                                         ss.format = V4L2_PIX_FMT_RGB32;
-                                         ss.frameBuffer.resize(ss.width * ss.height * sizeof(uint32_t));
-                                         break;
-
-                                     case kPixelFormat_YCBCR_420_888:
-                                         ss.format = V4L2_PIX_FMT_NV12;
-                                         ss.frameBuffer.resize(align16(ss.width * ss.height) +
-                                                               align16(ss.width * ss.height / 2));
-                                         break;
-
-                                     default:
+                                     if ((ss.width == 0) ||
+                                         (ss.width > kMaxStreamDim) ||
+                                         (ss.height == 0) ||
+                                         (ss.height > kMaxStreamDim)) {
                                          return false;
+                                     }
+
+                                     const size_t numPixels = size_t(ss.width) *
+                                                              size_t(ss.height);
+
+                                     switch (androidFormat) {
+                                         case kPixelFormat_RGBA_8888: {
+                                             const size_t bufferSize =
+                                                     numPixels *
+                                                     sizeof(uint32_t);
+                                             if (bufferSize > kMaxStreamBytes) {
+                                                 return false;
+                                             }
+
+                                             ss.format = V4L2_PIX_FMT_RGB32;
+                                             ss.frameBuffer.resize(bufferSize);
+                                         } break;
+
+                                         case kPixelFormat_YCBCR_420_888: {
+                                             const size_t bufferSize =
+                                                     align16(numPixels) +
+                                                     align16(numPixels / 2);
+                                             if (bufferSize > kMaxStreamBytes) {
+                                                 return false;
+                                             }
+
+                                             ss.format = V4L2_PIX_FMT_NV12;
+                                             ss.frameBuffer.resize(bufferSize);
+                                         } break;
+
+                                         default:
+                                             return false;
                                      }
 
                                      streams.push_back(std::move(ss));
