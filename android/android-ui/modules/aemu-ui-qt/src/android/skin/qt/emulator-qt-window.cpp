@@ -4270,12 +4270,13 @@ bool EmulatorQtWindow::addMultiDisplayWindow(uint32_t id,
                 QSize((int)(w * scale), (int)(h * scale)));
         mMultiDisplayWindow[id]->show();
     } else {
+        auto iter = mMultiDisplayWindow.find(id);
+        if (iter == mMultiDisplayWindow.end()) {
+            return false;
+        }
+        mMultiDisplayWindow.erase(iter);
         skin_event = createSkinEvent(kEventRemoveDisplay);
         skin_event.u.remove_display.id = id;
-        auto iter = mMultiDisplayWindow.find(id);
-        if (iter != mMultiDisplayWindow.end()) {
-            mMultiDisplayWindow.erase(iter);
-        }
     }
     queueSkinEvent(std::move(skin_event));
     return true;
