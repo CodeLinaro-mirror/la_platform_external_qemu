@@ -22,6 +22,7 @@
 #include "android-qemu2-glue/netsim/PacketProtocol.h"
 #include "android-qemu2-glue/netsim/BluetoothPacketProtocol.h"
 #include "android-qemu2-glue/netsim/UwbPacketProtocol.h"
+#include "android-qemu2-glue/netsim/NfcPacketProtocol.h"
 #include "netsim/startup.pb.h"
 
 namespace android {
@@ -172,6 +173,8 @@ std::unique_ptr<PacketProtocol> getPacketProtocol(
         return android::qemu2::getBluetoothPacketProtocol(deviceType, deviceInfo);
     } else if (deviceType == "uwb") {
         return android::qemu2::getUwbPacketProtocol(deviceType, deviceInfo);
+    } else if (deviceType == "nfc") {
+        return android::qemu2::getNfcPacketProtocol(deviceType, deviceInfo);
     }
     dfatal("Unexpected device: %s. Not supported.", deviceType.c_str());
     return nullptr;

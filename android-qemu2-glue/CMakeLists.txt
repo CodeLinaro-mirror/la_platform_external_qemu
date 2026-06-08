@@ -67,6 +67,7 @@ set(android-qemu2-glue_src
     netsim/h4_parser.cc
     netsim/BluetoothPacketProtocol.cpp
     netsim/UwbPacketProtocol.cpp
+    netsim/NfcPacketProtocol.cpp
     netsim/PacketStreamTransport.cpp
     netsim/qemu-packet-stream-agent-impl.cpp
     qemu-telephony-agent-impl.c
@@ -144,7 +145,8 @@ android_add_test(
   TARGET libqemu2-glue_unittests
   SRC base/files/KernelCmdLineLoader_unittest.cpp
       tests/VirtioGpuTimelines_unittest.cpp
-      utils/register_crash_info_unittest.cpp)
+      utils/register_crash_info_unittest.cpp
+      netsim/NfcPacketProtocol_unittest.cpp)
 
 target_link_libraries(
   libqemu2-glue_unittests
@@ -155,7 +157,10 @@ target_link_libraries(
           android-emu
           gmock
           gtest
-          gmock_main)
+          gmock_main
+          packet-streamer-client-lib
+          packet-streamer-proto-lib
+          protobuf::libprotobuf)
 
 target_include_directories(
   libqemu2-glue_unittests
