@@ -632,7 +632,13 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
     qRegisterMetaType<Ui::OverlayMessageType>();
     qRegisterMetaType<Ui::OverlayChildWidget::DismissFunc>();
 
-    if (EmulatorSkin::getInstance()->isPortrait()) {
+    if (getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui &&
+        getConsoleAgents()->emu) {
+        // For standalone gRPC UI clients (such as Fishtank), determine the initial window
+        // orientation dynamically by querying the live physical model state over gRPC rather
+        // than relying on static hardware config defaults.
+        mOrientation = static_cast<SkinRotation>(getConsoleAgents()->emu->getRotation());
+    } else if (EmulatorSkin::getInstance()->isPortrait()) {
         mOrientation = !strcasecmp(getConsoleAgents()
                                            ->settings->hw()
                                            ->hw_initialOrientation,

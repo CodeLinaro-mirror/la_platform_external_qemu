@@ -61,6 +61,7 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_join.h"
 #include "host-common/FeatureControl.h"
+#include "host-common/MultiDisplay.h"
 
 using android::base::pj;
 using android::base::System;
@@ -568,6 +569,10 @@ int main(int argc, char* argv[]) {
     getConsoleAgents()->settings->inject_AvdInfo(avd);
 
     const UiEmuAgent uiEmuAgent = createUiEmuAgent();
+    // Initialize the MultiDisplay singleton. This is required so that touch events
+    // dispatched through window.c can successfully translate coordinates across
+    // multiple display layouts and foldable posturing without resolving to null.
+    android_init_multi_display(uiEmuAgent.window, uiEmuAgent.record, getConsoleAgents()->vm, false);
 
     if (!emulator_parseUiCommandLineOptions(opts, avd, hw)) {
         LOG(FATAL) << "Bad news bears, unable to init ui";

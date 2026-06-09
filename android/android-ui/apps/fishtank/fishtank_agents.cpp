@@ -153,9 +153,16 @@ void initializeGrpcNotifications(
                     }
 
                     std::set<uint32_t> activeIds;
-                    for (const auto& display : displayConfigs.displays()) {
-                        if (display.display() > 0) {
-                            activeIds.insert(display.display());
+                    // Restrict secondary display pop-up windows to AVDs explicitly
+                    // configured with multi-display window hardware support. This prevents
+                    // opening unwanted secondary windows on foldable devices where the
+                    // emu-main-next backend transmits the folded outer buffer over gRPC.
+                    if (const auto md = getConsoleAgents()->multi_display;
+                        md && md->isMultiDisplayWindow()) {
+                        for (const auto& display : displayConfigs.displays()) {
+                            if (display.display() > 0) {
+                                activeIds.insert(display.display());
+                            }
                         }
                     }
 
