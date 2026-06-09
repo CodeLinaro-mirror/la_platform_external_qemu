@@ -116,6 +116,7 @@ public:
     };
 
 private:
+    friend class WebcamSourceTestHelper;
     explicit WebcamSource(std::shared_ptr<WebcamInfo> info);
     // The list of webcams available on the system. This is a shared ptr so we
     // can refresh it safely without distrupting webcams which are using data
