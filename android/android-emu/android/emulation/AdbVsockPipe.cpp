@@ -13,6 +13,7 @@
 #include "android/emulation/AdbHub.h"
 #include "android/emulation/AdbMessageSniffer.h"
 #include "android/emulation/AdbVsockPipe.h"
+#include "host-common/VmLock.h"
 #include "host-common/crash-handler.h"
 #include "host-common/hw-config.h"
 #include "android/console.h"
@@ -524,9 +525,11 @@ AdbVsockPipe::AdbVsockPipe(AdbVsockPipe::Service *service,
 }
 
 AdbVsockPipe::~AdbVsockPipe() {
+    android::RecursiveScopedVmLock lock;
     if (mSocketWatcher) {
         mSocketWatcher->dontWantWrite();
         mSocketWatcher->dontWantRead();
+        mSocketWatcher.reset();  // run ~FdWatch under BQL
     }
 }
 
