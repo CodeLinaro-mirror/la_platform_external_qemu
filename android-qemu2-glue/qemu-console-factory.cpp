@@ -25,6 +25,7 @@
 #include "android/emulation/control/grpc_agent.h"           // for QGrpcAgent
 #include "android/emulation/control/http_proxy_agent.h"     // for QAndroidH...
 #include "android/emulation/control/hw_control_agent.h"
+#include "android/emulation/control/hw_xr_led_agent.h"
 #include "android/emulation/control/libui_agent.h"          // for QAndroidL...
 #include "android/emulation/control/location_agent.h"       // for QAndroidL...
 #include "android/emulation/control/net_agent.h"            // for QAndroidN...
@@ -97,6 +98,9 @@ extern "C" const QAndroidMultiDisplayAgent* const gQAndroidMultiDisplayAgent;
 // Defined in android-qemu2-glue/qemu-hw-control-agent-impl.cpp
 extern "C" const QAndroidHwControlAgent* const gQAndroidHwControlAgent;
 
+// Defined in android-qemu2-glue/qemu-hw-xr-led-agent-impl.cpp
+extern "C" const QAndroidHwXrLedAgent* const gQAndroidHwXrLedAgent;
+
 // Defined in android-qemu2-glue/qemu-globals-agent-impl.cpp
 extern "C" const QAndroidGlobalVarsAgent* const gQAndroidGlobalVarsAgent;
 
@@ -131,6 +135,7 @@ const QAndroidLibuiAgent* const getQAndroidLibuiAgent();
     X(QCarDataAgent)             \
     X(QGrpcAgent)                \
     X(QAndroidHwControlAgent)    \
+    X(QAndroidHwXrLedAgent) \
     X(QAndroidGlobalVarsAgent)   \
     X(QAndroidSurfaceAgent)
 

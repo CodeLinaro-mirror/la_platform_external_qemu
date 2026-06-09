@@ -29,10 +29,10 @@ aarch=x86_64
 cts_verifier_apk=$HOME/Downloads/cts-bluetooth/CtsVerifier.apk
 
 # Location of the emulator build you wish to use for launch
-emulator_exe=$HOME/src/emu-master-dev/external/qemu/objs/emulator
+emulator_exe=$HOME/src/emu-main-dev/external/qemu/objs/emulator
 
 # Location of the netsimd binary
-netsimd_exe=$HOME/src/emu-master-dev/external/qemu/objs/netsimd
+netsimd_exe=$HOME/src/emu-main-dev/external/qemu/objs/netsimd
 avd1="34"
 avd2="34-2"
 

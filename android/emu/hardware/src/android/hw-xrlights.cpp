@@ -12,16 +12,16 @@
 
 #include "android/hw-xrlights.h"
 
-#include "android/emulation/android_qemud.h"
+#include "aemu/base/EventNotificationSupport.h"
+#include "aemu/base/utils/stream.h"
 #include "android/console.h"
+#include "android/emulation/android_qemud.h"
 #include "android/utils/debug.h"
 #include "android/utils/misc.h"
-#include "aemu/base/utils/stream.h"
 #include "android/utils/system.h"
-#include "lights_conn.pb.h"
-#include "xr_emulator_conn.pb.h"
 
-#include "aemu/base/EventNotificationSupport.h"  // for EventNotifi...
+
+#include "lights_conn.pb.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,11 +36,12 @@
 using lights_conn_proto::LightStatus;
 
 std::optional<HwXrLights> sHwXrLights;
+std::once_flag sHwXrLightsOnceFlag;
 
 HwXrLights& getHwXrLights() {
-    if (!sHwXrLights) {
+    std::call_once(sHwXrLightsOnceFlag, []() {
         android_hw_xrlights_init();
-    }
+    });
     return *sHwXrLights;
 }
 
@@ -76,7 +77,8 @@ void HwXrLightsClient::close(void* opaque) {
     delete client;
 }
 
-HwXrLights::HwXrLights() {
+HwXrLights::HwXrLights()
+    : mClientCallbacksLock(std::make_unique<std::mutex>()){
     if (mService == nullptr) {
         mService = qemud_service_register("xrlightsservice", 0, this,
                                              _hwXrLights_connect,
@@ -104,19 +106,44 @@ void HwXrLights::qemudClientRecv(uint8_t* msg, int msglen) {
     // TODO(b/504670848): refine the message format.
     // The color is in ARGB with the alpha channel expected to be 255, but ignored.
     LightStatus lightStatus;
+    int id = -1;
+    int color = -1;
+
+    // SerializeAsString on the sender side still writes standard Protobuf wire-format
+    // binary data, the receiving side can continue using ParseFromArray. This method
+    // naturally accepts a raw pointer and a size without needing a string conversion wrapper.
     if (lightStatus.ParseFromArray(msg, msglen)) {
         // Success! You can now read the fields
-        int id = lightStatus.light_id();
-        int color = lightStatus.light_color();
+        id = lightStatus.light_id();
+        color = lightStatus.light_color();
         D("Received LightStatus: id=%d, color=0x%x", id, color);
         setLightStatus(id, color);
     } else {
         // Failure
         D("Failed to parse LightStatus from received array.");
     }
+
+    std::lock_guard<std::mutex> guard(*mClientCallbacksLock);
+    AndroidHwXrLedEvent event = {
+        .lightid = id,
+        .lightcolor = color
+    };
+    for (const auto& [client, funcs] : mClientCallbacks) {
+        if (funcs.led_forwarder != nullptr) {
+            funcs.led_forwarder(client, &event);
+        }
+    }
 }
 
+void HwXrLights::setClient(void* client, AndroidHwXrLedFuncs clientFuncs) {
+    std::lock_guard<std::mutex> guard(*mClientCallbacksLock);
+    mClientCallbacks[client] = clientFuncs;
+}
 
+void HwXrLights::removeClient(void* client) {
+    std::lock_guard<std::mutex> guard(*mClientCallbacksLock);
+    mClientCallbacks.erase(client);
+}
 
 uint32_t HwXrLights::getLightStatus(uint32_t id) {
     if(id == WORLD) {
@@ -130,14 +157,16 @@ uint32_t HwXrLights::getLightStatus(uint32_t id) {
 }
 
 void android_hw_xrlights_init() {
-    if(sHwXrLights) {
-        D("%s: HwXrLights qemud handler already initialized, skipping", __func__);
-        return;
-    }
     sHwXrLights = std::make_optional<HwXrLights>();
     D("%s: HwXrLights qemud handler initialized", __func__);
 }
 
-uint32_t android_hw_xrlights_get_lightstatus(const uint32_t id) {
-    return getHwXrLights().getLightStatus(id);
+void android_hw_xrlights_set(void* opaque, const AndroidHwXrLedFuncs* funcs) {
+    getHwXrLights().setClient(opaque, *funcs);
+}
+
+void android_hw_xrlights_unset(void* opaque) {
+    if (sHwXrLights) {
+        getHwXrLights().removeClient(opaque);
+    }
 }

@@ -35,7 +35,6 @@
 #include "android/physics/FoldableModel.h"
 #include "android/physics/GlmHelpers.h"
 #include "android/physics/InertialModel.h"
-#include "android/physics/XrDeviceModel.h"
 #include "android/utils/debug.h"
 #include "android/utils/file_io.h"
 
@@ -228,10 +227,6 @@ public:
         return mFoldableModel.getPostureListener();
     }
 
-    android::base::EventNotificationSupport<xr_emulator_proto::XrOptions>* getXrOptionsPublisher() {
-        return mXrDeviceModel.getXrOptionsPublisher();
-    }
-
 private:
     /*
      * Sets the target value for the given physical parameter that the physical
@@ -309,7 +304,6 @@ private:
     AmbientEnvironment mAmbientEnvironment;
     FoldableModel mFoldableModel;
     BodyModel mBodyModel;
-    XrDeviceModel mXrDeviceModel;
 
     AutomationController* mAutomationController = nullptr;
     const QAndroidPhysicalStateAgent* mAgent = nullptr;
@@ -794,151 +788,6 @@ void PhysicalModelImpl::setTargetInternalAccelerometerUncalibrated(vec3, Physica
     targetStateChanged();
 }
 
-void PhysicalModelImpl::setTargetInternalXrInputMode(float value,
-                                                    PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrInputMode(value, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrEnvironmentMode(
-        float value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrEnvironmentMode(value, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrViewportControlMode(
-        float value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrViewportControlMode(value, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrScreenRecenter(
-        float value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrScreenRecenter(value, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrHeadRotation(
-        vec3 value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrHeadRotation(value.x, value.y, value.z, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrHeadMovement(
-        vec3 value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrHeadMovement(value.x, value.y, value.z, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrHeadAngularVelocity(
-        vec3 value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrHeadAngularVelocity(
-            value.x, value.y, value.z, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrHeadVelocity(
-        vec3 value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrHeadVelocity(value.x, value.y, value.z, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrHandEvent(
-        vec4 value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrHandEvent(value.x, value.y, value.z, value.w, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrEyeEvent(
-        vec4 value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrEyeEvent(value.x, value.y, value.z, value.w, mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrOptions(
-        vec3 value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrOptions(static_cast<int>(value.x), value.y, value.z,
-                                    mode);
-    }
-    targetStateChanged();
-}
-
-void PhysicalModelImpl::setTargetInternalXrHandGesture(
-        float value,
-        PhysicalInterpolation mode) {
-    if (!android_is_xr_mode()) return;
-    physicalStateChanging();
-    {
-        std::lock_guard<std::recursive_mutex> lock(mMutex);
-        mXrDeviceModel.setXrHandGesture(static_cast<int>(value), mode);
-    }
-    targetStateChanged();
-}
-
 vec3 PhysicalModelImpl::getParameterAccelerometerUncalibrated(ParameterValueType) const {
     return fromGlm(mInertialModel.getAcceleration());
 }
@@ -1063,71 +912,6 @@ float PhysicalModelImpl::getParameterWristTilt(
         ParameterValueType parameterValueType) const {
     std::lock_guard<std::recursive_mutex> lock(mMutex);
     return mInertialModel.getWristTilt(parameterValueType);
-}
-
-float PhysicalModelImpl::getParameterXrInputMode(
-        ParameterValueType parameterValueType) const {
-    std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return mXrDeviceModel.getXrInputMode(parameterValueType);
-}
-
-float PhysicalModelImpl::getParameterXrEnvironmentMode(
-        ParameterValueType parameterValueType) const {
-    std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return mXrDeviceModel.getXrEnvironmentMode(parameterValueType);
-}
-
-float PhysicalModelImpl::getParameterXrScreenRecenter(
-        ParameterValueType parameterValueType) const {
-    std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return mXrDeviceModel.getXrScreenRecenter(parameterValueType);
-}
-
-float PhysicalModelImpl::getParameterXrViewportControlMode(
-        ParameterValueType parameterValueType) const {
-    std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return mXrDeviceModel.getXrViewportControlMode(parameterValueType);
-}
-
-vec3 PhysicalModelImpl::getParameterXrHeadRotation(
-        ParameterValueType parameterValueType) const {
-    return {0, 0, 0};
-}
-
-vec3 PhysicalModelImpl::getParameterXrHeadMovement(
-        ParameterValueType parameterValueType) const {
-    return {0, 0, 0};
-}
-
-vec3 PhysicalModelImpl::getParameterXrHeadAngularVelocity(
-        ParameterValueType parameterValueType) const {
-    return {0, 0, 0};
-}
-
-vec3 PhysicalModelImpl::getParameterXrHeadVelocity(
-        ParameterValueType parameterValueType) const {
-    return {0, 0, 0};
-}
-
-vec4 PhysicalModelImpl::getParameterXrHandEvent(
-        ParameterValueType parameterValueType) const {
-    return {0, 0, 0, 0};
-}
-
-vec4 PhysicalModelImpl::getParameterXrEyeEvent(
-        ParameterValueType parameterValueType) const {
-    return {0, 0, 0, 0};
-}
-
-vec3 PhysicalModelImpl::getParameterXrOptions(
-        ParameterValueType parameterValueType) const {
-    return mXrDeviceModel.getXrOptions(parameterValueType);
-}
-
-float PhysicalModelImpl::getParameterXrHandGesture(
-        ParameterValueType parameterValueType) const {
-    std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return mXrDeviceModel.getXrHandGesture(parameterValueType);
 }
 
 #define GET_FUNCTION_NAME(x) get##x
@@ -2008,15 +1792,6 @@ physicalModel_getPostureListener(PhysicalModel* model) {
     PhysicalModelImpl* impl = PhysicalModelImpl::getImpl(model);
     if (impl != nullptr) {
         return impl->getPostureListener();
-    }
-    return nullptr;
-}
-
-android::base::EventNotificationSupport<xr_emulator_proto::XrOptions>*
-physicalModel_getXrOptionsPublisher(PhysicalModel* model) {
-    PhysicalModelImpl* impl = PhysicalModelImpl::getImpl(model);
-    if (impl != nullptr) {
-        return impl->getXrOptionsPublisher();
     }
     return nullptr;
 }

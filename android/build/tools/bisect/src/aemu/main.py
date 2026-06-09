@@ -139,7 +139,7 @@ windows, manually create a token on your glinux machine:
 ~/go/bin/oauth2l fetch --sso $USER@google.com androidbuild.internal""",
         epilog="""
 For more detailed examples and usage scenarios, please refer to
-https://android.googlesource.com/platform/external/qemu/+/emu-master-dev/android/build/tools/bisect/README.md""",
+https://android.googlesource.com/platform/external/qemu/+/emu-main-dev/android/build/tools/bisect/README.md""",
     )
 
     parser.add_argument(
@@ -157,10 +157,10 @@ https://android.googlesource.com/platform/external/qemu/+/emu-master-dev/android
     )
     parser.add_argument(
         "--branch",
-        default="aosp-emu-master-dev",
+        default="git_emu-main-dev",
         type=str,
         help="""go/ab branch to use for fetching builds.
-            Defaults to aosp-emu-master-dev.""",
+            Defaults to git_emu-main-dev.""",
     )
     parser.add_argument(
         "--start",

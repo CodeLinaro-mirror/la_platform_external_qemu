@@ -184,41 +184,6 @@ static const QAndroidEmulatorWindowAgent sQAndroidEmulatorWindowAgent = {
                 []() { return gUserSettingIsDontSaveSnapshot; },
         .setUserSettingIsDontSaveSnapshot =
                 [](bool val) { gUserSettingIsDontSaveSnapshot = val; },
-        .setXrInputMode = [](int mode) -> bool {
-            return android_xr_set_input_mode(mode);
-        },
-        .setXrEnvironmentMode = [](int mode) -> bool {
-            return android_xr_set_environment_mode(mode);
-        },
-        .setXrScreenRecenter = []() -> bool {
-            return android_xr_set_screen_recenter();
-        },
-        .setXrViewportControlMode = [](int mode) -> bool {
-            return android_xr_set_viewport_control_mode(mode);
-        },
-        .sendXrHeadRotationEvent = [](float x, float y, float z) -> bool {
-            return android_xr_set_head_rotation(x, y, z);
-        },
-        .sendXrHeadMovementEvent =
-                [](float delta_x, float delta_y, float delta_z) -> bool {
-            return android_xr_set_head_movement(delta_x, delta_y, delta_z);
-        },
-        .sendXrHeadAngularVelocityEvent =
-                [](float omega_x, float omega_y, float omega_z) -> bool {
-            return android_xr_set_head_angular_velocity(
-                    omega_x, omega_y, omega_z);
-        },
-        .sendXrHeadVelocityEvent = [](float x, float y, float z) -> bool {
-            return android_xr_set_head_velocity(x, y, z);
-        },
-        .setXrOptions =
-                [](int environment, float passthroughCoefficient, float dimmingValue) -> bool {
-            return android_xr_set_options(environment, passthroughCoefficient, dimmingValue);
-        },
-        .getXrOptions =
-                [](int* environment, float* passthroughCoefficient, float* dimmingValue) -> bool {
-            return android_xr_get_options(environment, passthroughCoefficient, dimmingValue);
-        },
 };
 
 extern "C" const QAndroidEmulatorWindowAgent* const

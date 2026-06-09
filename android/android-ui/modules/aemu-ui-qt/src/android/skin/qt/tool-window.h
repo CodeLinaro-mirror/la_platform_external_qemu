@@ -47,6 +47,7 @@
 #include "android/skin/qt/user-actions-counter.h"
 #include "android/skin/qt/virtualscene-control-window.h"
 #include "android/ui-emu-agent.h"
+#include "android/xr-defines.h"
 #include "host-common/qt_ui_defs.h"
 
 class PostureSelectionDialog;
@@ -238,7 +239,7 @@ private:
     bool mClipboardSupported = false;
 
     int mLastRequestedFoldablePosture = -1;
-    int mLastEnvironmentModeRequested = 0;
+    int mLastEnvironmentRequested = 0;
     float mLastDimmingValueRequested = 0.0f;
     float mLastPassthroughCoefficientRequested = 1.0f;
     int mLastInputModeRequested = /*XR_INPUT_MODE_MOUSE_KEYBOARD*/ 1;
@@ -353,6 +354,7 @@ private slots:
     void onHostClipboardChanged();
     void on_xr_environment_mode_button_clicked();
     void onXrEnvironmentModeChanged(int mode);
+    void onXrPassthroughCoefficientChanged(float value);
     void onXrDimmingValueChanged(float value, bool fromGuest);
     void onDismissXrEnvironmentModeDialog();
     void on_xr_input_mode_button_clicked();
@@ -373,6 +375,9 @@ private slots:
     void on_custom_360_image_selected();
     void on_glasses_button_pressed();
     void on_glasses_button_released();
+    void setViewportControlMode(XrViewportControlMode control,
+                                bool down,
+                                QtUICommand cmd);
 
     void onSleepTimerDone();
     void onUnfoldTimerDone();

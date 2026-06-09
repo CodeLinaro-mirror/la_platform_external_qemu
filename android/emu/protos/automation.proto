@@ -54,18 +54,6 @@ message PhysicalModelEvent {
         RGBC_LIGHT = 18;
         WRIST_TILT = 19;
         ROTATION_UNCALIBRATED = 20;
-        XR_INPUT_MODE = 21;
-        XR_ENVIRONMENT_MODE = 22;
-        XR_SCREEN_RECENTER = 23;
-        XR_VIEWPORT_CONTROL_MODE = 24;
-        XR_HEAD_ROTATION = 25;
-        XR_HEAD_MOVEMENT = 26;
-        XR_HEAD_ANGULAR_VELOCITY = 27;
-        XR_HEAD_VELOCITY = 28;
-        XR_OPTIONS = 29;
-        XR_HAND_GESTURE = 30;
-        XR_HAND_EVENT = 31;
-        XR_EYE_EVENT = 32;
     }
 
     optional ParameterType type = 1;

@@ -387,43 +387,6 @@ static const QAndroidEmulatorWindowAgent sFishtankQAndroidEmulatorWindowAgent = 
                 []() { return gUserSettingIsDontSaveSnapshot; },
         .setUserSettingIsDontSaveSnapshot =
                 [](bool val) { gUserSettingIsDontSaveSnapshot = val; },
-        .setXrInputMode = [](int mode) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .setXrEnvironmentMode = [](int mode) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .setXrScreenRecenter = []() -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .setXrViewportControlMode = [](int mode) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .sendXrHeadRotationEvent = [](float x, float y, float z) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .sendXrHeadMovementEvent =
-                [](float delta_x, float delta_y, float delta_z) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .sendXrHeadAngularVelocityEvent =
-                [](float omega_x, float omega_y, float omega_z) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .sendXrHeadVelocityEvent = [](float x, float y, float z) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .sendXrHandEvent = [](int32_t, int32_t, int32_t, int32_t) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .sendXrEyeEvent = [](int32_t, int32_t, int32_t, int32_t) -> bool {
-            LOG(FATAL) << "Not yet implemented";
-        },
-        .setXrOptions = [](int environment, float passthroughCoefficient, float dimmingValue)
-                -> bool { LOG(FATAL) << "Not yet implemented"; },
-        .getXrOptions = [](int* environment, float* passthroughCoefficient, float* dimmingValue)
-                -> bool { LOG(FATAL) << "Not yet implemented"; },
-        .setXrHandGesture = [](int gesture) -> bool { LOG(FATAL) << "Not yet implemented"; },
 };
 
 const QAndroidEmulatorWindowAgent* const gFishtankQAndroidEmulatorWindowAgent =

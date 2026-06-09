@@ -14,7 +14,6 @@ android_add_library(
       android/emulation/control/keyboard/TouchEventSender.cpp
       android/emulation/control/keyboard/TouchpadEventSender.cpp
       android/emulation/control/keyboard/WheelEventSender.cpp
-      android/emulation/control/xr/XrInputEventSender.cpp
       android/emulation/control/logcat/LogcatParser.cpp
       android/emulation/control/logcat/LogcatStream.cpp
       android/emulation/control/notifications/NotificationStream.cpp
