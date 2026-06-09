@@ -27,6 +27,7 @@ extern "C" {
 #include "qemu-common.h"
 #include "qemu/timer.h"
 #include "qemu/coroutine.h"
+#include "qemu/main-loop.h"
 #include "chardev/char.h"
 }  // extern "C"
 
@@ -109,16 +110,19 @@ public:
                 void* opaque) : BaseFdWatch(looper, fd, callback, opaque) {}
 
         virtual ~FdWatch() {
+            DCHECK(qemu_mutex_iothread_locked());
             clearPending();
             updateEvents(0);
         }
 
         virtual void addEvents(unsigned events) {
+            DCHECK(qemu_mutex_iothread_locked());
             events &= kEventMask;
             updateEvents(mWantedEvents | events);
         }
 
         virtual void removeEvents(unsigned events) {
+            DCHECK(qemu_mutex_iothread_locked());
             events &= kEventMask;
             updateEvents(mWantedEvents & ~events);
         }
