@@ -24,6 +24,7 @@ static const QAndroidVirtualSceneAgent sQAndroidVirtualSceneAgent = {
         VirtualSceneManager::getAnimationState,
         VirtualSceneManager::reloadEnvironment,
         VirtualSceneManager::getAnimationStateEventListener,
+        VirtualSceneManager::enumerateWebcams,
 };
 
 extern "C" const QAndroidVirtualSceneAgent* const gQAndroidVirtualSceneAgent =

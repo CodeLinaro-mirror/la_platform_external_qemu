@@ -29,21 +29,38 @@ const QAndroidVirtualSceneAgent sFishtankQAndroidVirtualSceneAgent = {
                 [](void* opaque, EnumeratePostersCallback cb) {
                     NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.enumeratePosters(opaque: %p, cb: %p)", opaque, cb);
                 },
-        .setPosterScale = [](const char* name,
-                             float scale) { NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.setPosterScale(name: %s, scale: %f)", name, scale); },
-        .setAnimationState = [](bool play) { NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.setAnimationState(play: %d)", play); },
+        .setPosterScale =
+                [](const char* name, float scale) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidVirtualSceneAgent.setPosterScale(name: %s, scale: %f)",
+                            name, scale);
+                },
+        .setAnimationState =
+                [](bool play) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidVirtualSceneAgent.setAnimationState(play: %d)",
+                            play);
+                },
         .getAnimationState =
                 []() {
                     NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.getAnimationState");
                     return false;
                 },
-        .reloadEnvironment = [](const char* environmentData) {
+        .reloadEnvironment =
+                [](const char* environmentData) {
                     NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.reloadScene(environmentData: %s)", environmentData);
                     return false;
                 },
         .getAnimationStateEventListener = []() -> void* {
-                    NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.getAnimationStateEventListener");
-                    return nullptr;
+            NOT_IMPLEMENTED(
+                    "QAndroidVirtualSceneAgent.getAnimationStateEventListener");
+            return nullptr;
+        },
+        .enumerateWebcams =
+                [](void* opaque, EnumerateWebcamsCallback cb) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidVirtualSceneAgent.enumerateWebcams(opaque: %p, cb: %p)",
+                            opaque, cb);
                 },
 
 };

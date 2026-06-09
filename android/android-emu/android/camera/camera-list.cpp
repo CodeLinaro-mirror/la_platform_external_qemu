@@ -15,31 +15,72 @@
  */
 
 #include "android/camera/camera-list.h"
-
-#include "android/camera/camera-capture.h"
+#include "ver/virtual_environment_renderer.h"
 
 #include <stdio.h>
+#include <string>
 
-/* Maximum number of supported emulated cameras. */
-#define MAX_CAMERA 8
-
-void android_camera_list_webcams(void) {
-    CameraInfo ci[MAX_CAMERA] = {};
-
-    /* Enumerate camera devices connected to the host. */
-    int connected_cnt = camera_enumerate_devices(ci, MAX_CAMERA);
-    if (connected_cnt <= 0) {
+void android_camera_list_webcams(bool verbose) {
+    uint32_t count = ver_get_webcam_count();
+    if (count == 0) {
         return;
     }
 
     printf("List of web cameras connected to the computer:\n");
-    for (int i = 0; i < connected_cnt; i++) {
-        printf(" Camera '%s' is connected to device '%s' on channel %d "
-               "using pixel format '%.4s'\n",
-               ci[i].display_name, ci[i].camera_name, ci[i].inp_channel,
-               (const char*)&ci[i].pixel_format);
+    for (uint32_t i = 0; i < count; ++i) {
+        VerWebcamHandle cam = ver_get_webcam_info(i);
+        if (!cam) {
+            continue;
+        }
 
-        camera_info_done(&ci[i]);
+        int preferred_format_index =
+                ver_webcam_info_get_preferred_format_index(cam);
+        std::string label = "webcam" + std::to_string(i);
+
+        if (preferred_format_index != -1) {
+            uint32_t pixel_format = ver_webcam_info_get_pixel_format_fourcc(
+                    cam, static_cast<uint32_t>(preferred_format_index));
+            char format_str[5];
+            format_str[0] = pixel_format & 0xff;
+            format_str[1] = (pixel_format >> 8) & 0xff;
+            format_str[2] = (pixel_format >> 16) & 0xff;
+            format_str[3] = (pixel_format >> 24) & 0xff;
+            format_str[4] = '\0';
+
+            printf(" Camera '%s' can be specified by label as '%s' or by id as '%s' and will use pixel format '%s'\n",
+                   ver_webcam_info_get_user_facing_name(cam), label.c_str(),
+                   ver_webcam_info_get_id(cam), format_str);
+        } else {
+            printf(" Camera '%s' is unsupported \n",
+                   ver_webcam_info_get_user_facing_name(cam));
+        }
+
+        if (verbose) {
+            printf(" This camera reports support for the following formats and resolutions:\n");
+            uint32_t format_count = ver_webcam_info_get_format_count(cam);
+            for (uint32_t f = 0; f < format_count; ++f) {
+                uint32_t pixel_format =
+                        ver_webcam_info_get_pixel_format_fourcc(cam, f);
+                char format_str[5];
+                format_str[0] = pixel_format & 0xff;
+                format_str[1] = (pixel_format >> 8) & 0xff;
+                format_str[2] = (pixel_format >> 16) & 0xff;
+                format_str[3] = (pixel_format >> 24) & 0xff;
+                format_str[4] = '\0';
+
+                printf("   %s: ", format_str);
+                uint32_t res_count =
+                        ver_webcam_info_get_format_resolution_count(cam, f);
+                for (uint32_t r = 0; r < res_count; ++r) {
+                    int w, h;
+                    if (ver_webcam_info_get_format_resolution(cam, f, r, &w,
+                                                              &h)) {
+                        printf(" %dx%d", w, h);
+                    }
+                }
+                printf("\n");
+            }
+        }
+        ver_free_webcam_info(cam);
     }
-    printf("\n");
 }

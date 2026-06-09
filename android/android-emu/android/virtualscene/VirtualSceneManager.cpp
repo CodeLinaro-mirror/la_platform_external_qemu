@@ -646,6 +646,20 @@ void VirtualSceneManager::enumeratePosters(void* context,
     }
 }
 
+void VirtualSceneManager::enumerateWebcams(void* context,
+                                           EnumerateWebcamsCallback callback) {
+    uint32_t count = ver_get_webcam_count();
+    for (uint32_t i = 0; i < count; ++i) {
+        VerWebcamHandle cam = ver_get_webcam_info(i);
+        if (cam) {
+            std::string label = "webcam" + std::to_string(i);
+            callback(context, ver_webcam_info_get_user_facing_name(cam),
+                     label.c_str(), ver_webcam_info_get_id(cam));
+            ver_free_webcam_info(cam);
+        }
+    }
+}
+
 void VirtualSceneManager::setPosterScale(const char* posterName, float scale) {
     AutoLock lock(mLock);
     sSettings->setPosterScale(posterName, scale);

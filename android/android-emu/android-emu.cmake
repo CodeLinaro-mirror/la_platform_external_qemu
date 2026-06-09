@@ -19,6 +19,7 @@ android_add_library(
   DARWIN android/camera/camera-capture-mac.m
   DEPS android-emu-agents-headers
        android-emu-base
+       virtual_environment_renderer
        android-emu-base-headers
        android-emu-cmdline
        android-emu-files
@@ -216,10 +217,8 @@ android_add_library(
   WINDOWS android/ver/src/raw_image_sources/webcam/webcam_source_windows.cc
   LINUX android/ver/src/raw_image_sources/webcam/webcam_source_linux.cc
   DARWIN android/ver/src/raw_image_sources/webcam/webcam_source_mac.mm
-  DEPS android-emu-base-headers
-       qemu-host-common-headers
+  DEPS qemu-host-common-headers
        android-emu-base
-       gfxstream_glm_headers
        png
        zlib
        FFMPEG::FFMPEG
@@ -227,6 +226,10 @@ android_add_library(
        emulator-tinyobjloader
        webrtc-yuv
 )
+target_link_libraries(
+  virtual_environment_renderer
+  PUBLIC android-emu-base-headers
+         gfxstream_glm_headers)
 target_include_directories(
   virtual_environment_renderer
   PUBLIC  android/ver/include

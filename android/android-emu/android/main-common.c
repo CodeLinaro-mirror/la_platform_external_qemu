@@ -1717,7 +1717,7 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
     }
 
     if (opts->webcam_list) {
-        android_camera_list_webcams();
+        android_camera_list_webcams(VERBOSE_CHECK(init));
         *exit_status = 0;
         return false;
     }

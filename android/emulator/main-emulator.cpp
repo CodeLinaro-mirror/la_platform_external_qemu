@@ -855,7 +855,7 @@ int main(int argc, char** argv) {
     }
 
     if (doListWebcams) {
-        android_camera_list_webcams();
+        android_camera_list_webcams(LOG_IS_ON_IMPL(EMULATOR_LOG_DEBUG));
         return 0;
     }
 
