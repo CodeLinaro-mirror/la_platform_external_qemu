@@ -378,6 +378,9 @@ static void virtio_snd_get_qemu_audsettings(audsettings *as,
 static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s)
 {
     VirtIOSoundPCMStream *stream = g_new0(VirtIOSoundPCMStream, 1);
+    if (!stream) {
+        return NULL;
+    }
 
     stream->s = s;
     stream->active = false;
