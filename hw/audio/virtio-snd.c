@@ -38,28 +38,28 @@ static void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream);
 static void virtio_snd_pcm_in_cb(void *data, int available);
 static void virtio_snd_unrealize(DeviceState *dev);
 
-static uint32_t supported_formats = BIT(VIRTIO_SND_PCM_FMT_S8)
-                                  | BIT(VIRTIO_SND_PCM_FMT_U8)
-                                  | BIT(VIRTIO_SND_PCM_FMT_S16)
-                                  | BIT(VIRTIO_SND_PCM_FMT_U16)
-                                  | BIT(VIRTIO_SND_PCM_FMT_S32)
-                                  | BIT(VIRTIO_SND_PCM_FMT_U32)
-                                  | BIT(VIRTIO_SND_PCM_FMT_FLOAT);
+static const uint32_t supported_formats = BIT(VIRTIO_SND_PCM_FMT_S8)
+                                        | BIT(VIRTIO_SND_PCM_FMT_U8)
+                                        | BIT(VIRTIO_SND_PCM_FMT_S16)
+                                        | BIT(VIRTIO_SND_PCM_FMT_U16)
+                                        | BIT(VIRTIO_SND_PCM_FMT_S32)
+                                        | BIT(VIRTIO_SND_PCM_FMT_U32)
+                                        | BIT(VIRTIO_SND_PCM_FMT_FLOAT);
 
-static uint32_t supported_rates = BIT(VIRTIO_SND_PCM_RATE_5512)
-                                | BIT(VIRTIO_SND_PCM_RATE_8000)
-                                | BIT(VIRTIO_SND_PCM_RATE_11025)
-                                | BIT(VIRTIO_SND_PCM_RATE_16000)
-                                | BIT(VIRTIO_SND_PCM_RATE_22050)
-                                | BIT(VIRTIO_SND_PCM_RATE_32000)
-                                | BIT(VIRTIO_SND_PCM_RATE_44100)
-                                | BIT(VIRTIO_SND_PCM_RATE_48000)
-                                | BIT(VIRTIO_SND_PCM_RATE_64000)
-                                | BIT(VIRTIO_SND_PCM_RATE_88200)
-                                | BIT(VIRTIO_SND_PCM_RATE_96000)
-                                | BIT(VIRTIO_SND_PCM_RATE_176400)
-                                | BIT(VIRTIO_SND_PCM_RATE_192000)
-                                | BIT(VIRTIO_SND_PCM_RATE_384000);
+static const uint32_t supported_rates = BIT(VIRTIO_SND_PCM_RATE_5512)
+                                      | BIT(VIRTIO_SND_PCM_RATE_8000)
+                                      | BIT(VIRTIO_SND_PCM_RATE_11025)
+                                      | BIT(VIRTIO_SND_PCM_RATE_16000)
+                                      | BIT(VIRTIO_SND_PCM_RATE_22050)
+                                      | BIT(VIRTIO_SND_PCM_RATE_32000)
+                                      | BIT(VIRTIO_SND_PCM_RATE_44100)
+                                      | BIT(VIRTIO_SND_PCM_RATE_48000)
+                                      | BIT(VIRTIO_SND_PCM_RATE_64000)
+                                      | BIT(VIRTIO_SND_PCM_RATE_88200)
+                                      | BIT(VIRTIO_SND_PCM_RATE_96000)
+                                      | BIT(VIRTIO_SND_PCM_RATE_176400)
+                                      | BIT(VIRTIO_SND_PCM_RATE_192000)
+                                      | BIT(VIRTIO_SND_PCM_RATE_384000);
 
 static const Property virtio_snd_properties[] = {
     DEFINE_AUDIO_PROPERTIES(VirtIOSound, card),
