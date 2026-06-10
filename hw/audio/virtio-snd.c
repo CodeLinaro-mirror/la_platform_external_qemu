@@ -1594,11 +1594,17 @@ static int virtio_snd_device_post_load(void *opaque, int version_id)
 
     for (i = 0; i < s->snd_conf.streams; ++i) {
         VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
-        if (stream && stream->active) {
-            if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
-                audio_be_set_active_out(stream->s->audio_be, stream->voice.out, 1);
-            } else {
-                audio_be_set_active_in(stream->s->audio_be, stream->voice.in, 1);
+        if (stream) {
+            WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+                if (stream->active) {
+                    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+                        audio_be_set_active_out(stream->s->audio_be,
+                                                stream->voice.out, 1);
+                    } else {
+                        audio_be_set_active_in(stream->s->audio_be,
+                                               stream->voice.in, 1);
+                    }
+                }
             }
         }
     }
