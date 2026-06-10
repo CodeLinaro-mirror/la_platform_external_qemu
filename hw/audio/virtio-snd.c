@@ -61,6 +61,18 @@ static const uint32_t supported_rates = BIT(VIRTIO_SND_PCM_RATE_5512)
                                       | BIT(VIRTIO_SND_PCM_RATE_192000)
                                       | BIT(VIRTIO_SND_PCM_RATE_384000);
 
+static const struct virtio_snd_pcm_info stream_default_info = {
+    .hdr = {
+        .hda_fn_nid = VIRTIO_SOUND_HDA_FN_NID,
+    },
+    .features = 0,
+    .formats = supported_formats,
+    .rates = supported_rates,
+    .direction = -1,  /* overwritten in virtio_snd_create_new_stream */
+    .channels_min = 1,
+    .channels_max = 2,
+};
+
 static const Property virtio_snd_properties[] = {
     DEFINE_AUDIO_PROPERTIES(VirtIOSound, card),
     DEFINE_PROP_UINT32("jacks", VirtIOSound, snd_conf.jacks,
@@ -365,7 +377,9 @@ static void virtio_snd_get_qemu_audsettings(audsettings *as,
  *
  * @s: VirtIOSound *s
  */
-static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s)
+static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
+                                                          uint32_t id,
+                                                          uint8_t direction)
 {
     VirtIOSoundPCMStream *stream = g_new0(VirtIOSoundPCMStream, 1);
     if (!stream) {
@@ -373,6 +387,10 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s)
     }
 
     stream->s = s;
+    stream->id = id;
+    stream->info = stream_default_info;
+    stream->info.direction = direction;
+
     stream->active = false;
     qemu_mutex_init(&stream->queue_mutex);
     QSIMPLEQ_INIT(&stream->queue);
@@ -463,25 +481,10 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
 
     stream = virtio_snd_pcm_get_stream(s, stream_id);
     if (stream == NULL) {
-        stream = virtio_snd_create_new_stream(s);
-        stream->id = stream_id;
-
-        /*
-         * stream_id >= s->snd_conf.streams was checked before so this is
-         * in-bounds
-         */
-        s->pcm_items[stream_id].stream = stream;
+        return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
     }
 
     virtio_snd_get_qemu_audsettings(&as, params);
-    stream->info.direction = stream_id < s->snd_conf.streams / 2 +
-        (s->snd_conf.streams & 1) ? VIRTIO_SND_D_OUTPUT : VIRTIO_SND_D_INPUT;
-    stream->info.hdr.hda_fn_nid = VIRTIO_SOUND_HDA_FN_NID;
-    stream->info.features = 0;
-    stream->info.channels_min = 1;
-    stream->info.channels_max = as.nchannels;
-    stream->info.formats = supported_formats;
-    stream->info.rates = supported_rates;
     stream->as = as;
     stream->period_bytes = params->period_bytes;
     stream->hw_format = params->format;
@@ -1012,6 +1015,7 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
     virtio_snd_pcm_set_params default_params = { 0 };
     uint32_t status;
+    uint32_t num_output_streams;
 
     trace_virtio_snd_realize(vsnd);
 
@@ -1049,13 +1053,6 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
     virtio_init(vdev, VIRTIO_ID_SOUND, sizeof(virtio_snd_config));
     virtio_add_feature(&vsnd->features, VIRTIO_F_VERSION_1);
 
-    /* set default params for all streams */
-    default_params.features = 0;
-    default_params.buffer_bytes = cpu_to_le32(8192);
-    default_params.period_bytes = cpu_to_le32(2048);
-    default_params.channels = 2;
-    default_params.format = VIRTIO_SND_PCM_FMT_S16;
-    default_params.rate = VIRTIO_SND_PCM_RATE_48000;
     vsnd->queues[VIRTIO_SND_VQ_CONTROL] =
         virtio_add_queue(vdev, 64, virtio_snd_handle_ctrl);
     vsnd->queues[VIRTIO_SND_VQ_EVENT] =
@@ -1065,7 +1062,19 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
     vsnd->queues[VIRTIO_SND_VQ_RX] =
         virtio_add_queue(vdev, 64, virtio_snd_handle_rx_xfer);
 
+    /* set default params for all streams */
+    default_params.features = stream_default_info.features;
+    default_params.buffer_bytes = cpu_to_le32(8192);
+    default_params.period_bytes = cpu_to_le32(2048);
+    default_params.channels = stream_default_info.channels_min;
+    default_params.format = VIRTIO_SND_PCM_FMT_S16;
+    default_params.rate = VIRTIO_SND_PCM_RATE_48000;
+
+    num_output_streams = (vsnd->snd_conf.streams + 1U) / 2;
+
     for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
+        VirtIOSoundPCMStream* stream;
+
         status = virtio_snd_set_pcm_params(vsnd, i, &default_params);
         if (status != cpu_to_le32(VIRTIO_SND_S_OK)) {
             error_setg(errp,
@@ -1073,13 +1082,10 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
                        print_code(status));
             goto error_cleanup;
         }
-        status = virtio_snd_pcm_prepare(vsnd, i);
-        if (status != cpu_to_le32(VIRTIO_SND_S_OK)) {
-            error_setg(errp,
-                       "Can't prepare streams, device responded with %s.",
-                       print_code(status));
-            goto error_cleanup;
-        }
+
+        vsnd->pcm_items[i].stream = virtio_snd_create_new_stream(
+            vsnd, i, ((i < num_output_streams) ?
+                VIRTIO_SND_D_OUTPUT : VIRTIO_SND_D_INPUT));
     }
 
     return;
@@ -1437,7 +1443,7 @@ static VirtIOSoundPCMStream
 *virtio_snd_pcm_VirtIOSoundPCMStream_get(QEMUFile *f,
                                          VirtIOSound *s)
 {
-    VirtIOSoundPCMStream* stream = virtio_snd_create_new_stream(s);
+    VirtIOSoundPCMStream* stream = virtio_snd_create_new_stream(s, 0, 0);
 
     if (vmstate_load_state(f, &vmstate_VirtIOSoundPCMStream, stream, 1)) {
         virtio_snd_destroy_stream(stream);
