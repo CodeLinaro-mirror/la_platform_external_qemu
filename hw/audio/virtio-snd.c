@@ -193,11 +193,9 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
             cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
             return;
         }
-        val = stream->info;
-        val.hdr.hda_fn_nid = cpu_to_le32(val.hdr.hda_fn_nid);
-        val.features = cpu_to_le32(val.features);
-        val.formats = cpu_to_le64(val.formats);
-        val.rates = cpu_to_le64(val.rates);
+        val = stream_default_info;
+        val.direction = stream->is_output ?
+                VIRTIO_SND_D_OUTPUT : VIRTIO_SND_D_INPUT;
         /*
          * 5.14.6.6.2.1 Device Requirements: Stream Information The device MUST
          * NOT set undefined feature, format, rate and direction values. The
@@ -379,7 +377,7 @@ static void virtio_snd_get_qemu_audsettings(audsettings *as,
  */
 static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
                                                           uint32_t id,
-                                                          uint8_t direction)
+                                                          bool is_output)
 {
     VirtIOSoundPCMStream *stream = g_new0(VirtIOSoundPCMStream, 1);
     if (!stream) {
@@ -388,8 +386,7 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
 
     stream->s = s;
     stream->id = id;
-    stream->info = stream_default_info;
-    stream->info.direction = direction;
+    stream->is_output = is_output;
 
     stream->active = false;
     qemu_mutex_init(&stream->queue_mutex);
@@ -410,7 +407,7 @@ static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream) {
     g_assert(stream->as.freq > 0);
     g_assert(stream->as.nchannels > 0);
 
-    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+    if (stream->is_output) {
         stream->voice.out = AUD_open_out(&stream->s->card,
                                          stream->voice.out,
                                          "virtio-sound.out",
@@ -442,11 +439,11 @@ static void virtio_snd_destroy_stream(VirtIOSoundPCMStream *stream)
     virtio_snd_pcm_flush(stream);
     g_assert(QSIMPLEQ_EMPTY(&stream->queue));
 
-    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+    if (stream->is_output) {
         if (stream->voice.out) {
             AUD_close_out(&stream->s->card, stream->voice.out);
         }
-    } else if (stream->info.direction == VIRTIO_SND_D_INPUT) {
+    } else {
         if (stream->voice.in) {
             AUD_close_in(&stream->s->card, stream->voice.in);
         }
@@ -582,7 +579,7 @@ static void virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
     WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
         stream->active = start;
     }
-    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+    if (stream->is_output) {
         AUD_set_active_out(stream->voice.out, start);
     } else {
         AUD_set_active_in(stream->voice.in, start);
@@ -872,7 +869,7 @@ static void virtio_snd_handle_tx_xfer(VirtIODevice *vdev, VirtQueue *vq)
         }
 
         stream = vsnd->pcm_items[stream_id].stream;
-        if (stream->info.direction != VIRTIO_SND_D_OUTPUT) {
+        if (!stream || !stream->is_output) {
             goto tx_err;
         }
 
@@ -952,7 +949,7 @@ static void virtio_snd_handle_rx_xfer(VirtIODevice *vdev, VirtQueue *vq)
         }
 
         stream = vsnd->pcm_items[stream_id].stream;
-        if (stream == NULL || stream->info.direction != VIRTIO_SND_D_INPUT) {
+        if (!stream || stream->is_output) {
             goto rx_err;
         }
 
@@ -1084,8 +1081,7 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
         }
 
         vsnd->pcm_items[i].stream = virtio_snd_create_new_stream(
-            vsnd, i, ((i < num_output_streams) ?
-                VIRTIO_SND_D_OUTPUT : VIRTIO_SND_D_INPUT));
+            vsnd, i, (i < num_output_streams));
     }
 
     return;
@@ -1275,8 +1271,7 @@ static inline void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream)
 {
     VirtIOSoundPCMBuffer *buffer;
     void (*cb)(VirtIOSoundPCMStream *, VirtIOSoundPCMBuffer *) =
-        (stream->info.direction == VIRTIO_SND_D_OUTPUT) ? return_tx_buffer :
-        return_rx_buffer;
+        stream->is_output ? return_tx_buffer : return_rx_buffer;
 
     WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
         while (!QSIMPLEQ_EMPTY(&stream->queue)) {
@@ -1397,29 +1392,11 @@ virtio_snd_VirtIOSoundPCMBufferQueue_put(QEMUFile *f,
     }
 }
 
-static const VMStateDescription vmstate_virtio_snd_pcm_info = {
-    .name = "virtio_snd_pcm_info",
-    .version_id = 1,
-    .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
-        VMSTATE_UINT32(hdr.hda_fn_nid, virtio_snd_pcm_info),
-        VMSTATE_UINT32(features, virtio_snd_pcm_info),
-        VMSTATE_UINT64(formats, virtio_snd_pcm_info),
-        VMSTATE_UINT64(rates, virtio_snd_pcm_info),
-        VMSTATE_UINT8(direction, virtio_snd_pcm_info),
-        VMSTATE_UINT8(channels_min, virtio_snd_pcm_info),
-        VMSTATE_UINT8(channels_max, virtio_snd_pcm_info),
-        VMSTATE_END_OF_LIST()
-    }
-};
-
 static const VMStateDescription vmstate_VirtIOSoundPCMStream = {
     .name = "VirtIOSoundPCMStream",
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (const VMStateField[]) {
-        VMSTATE_STRUCT(info, VirtIOSoundPCMStream, 1,
-                       vmstate_virtio_snd_pcm_info, virtio_snd_pcm_info),
         VMSTATE_INT32(as.freq, VirtIOSoundPCMStream),
         VMSTATE_INT32(as.nchannels, VirtIOSoundPCMStream),
         /*
@@ -1429,6 +1406,7 @@ static const VMStateDescription vmstate_VirtIOSoundPCMStream = {
         VMSTATE_UINT32(id, VirtIOSoundPCMStream),
         VMSTATE_UINT32(period_bytes, VirtIOSoundPCMStream),
         VMSTATE_UINT8(hw_format, VirtIOSoundPCMStream),  /* shadows as.fmt */
+        VMSTATE_BOOL(is_output, VirtIOSoundPCMStream),
         VMSTATE_BOOL(flushing, VirtIOSoundPCMStream),
         VMSTATE_BOOL(active, VirtIOSoundPCMStream),
         /*
@@ -1443,7 +1421,7 @@ static VirtIOSoundPCMStream
 *virtio_snd_pcm_VirtIOSoundPCMStream_get(QEMUFile *f,
                                          VirtIOSound *s)
 {
-    VirtIOSoundPCMStream* stream = virtio_snd_create_new_stream(s, 0, 0);
+    VirtIOSoundPCMStream* stream = virtio_snd_create_new_stream(s, 0, true);
 
     if (vmstate_load_state(f, &vmstate_VirtIOSoundPCMStream, stream, 1)) {
         virtio_snd_destroy_stream(stream);
@@ -1560,7 +1538,7 @@ static int virtio_snd_device_post_load(void *opaque, int version_id)
         if (stream) {
             WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
                 if (stream->active) {
-                    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+                    if (stream->is_output) {
                         AUD_set_active_out(stream->voice.out, 1);
                     } else {
                         AUD_set_active_in(stream->voice.in, 1);

@@ -144,11 +144,11 @@ struct VirtIOSoundPCMStream {
 
     /* All the fields below are migratable. */
     VirtIOSoundPCMBufferQueue queue;
-    virtio_snd_pcm_info info;
     audsettings as;
     uint32_t id;
     uint32_t period_bytes;  /* from virtio_snd_pcm_set_params */
     uint8_t hw_format;      /* from virtio_snd_pcm_set_params */
+    bool is_output;
     bool active;
     bool flushing;
 };
