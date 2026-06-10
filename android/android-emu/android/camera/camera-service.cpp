@@ -1182,7 +1182,7 @@ struct SerialCameraClient : public OldCamerasClient {
             return;
         }
 
-        ClientFrameBuffer fbs[2];
+        ClientFrameBuffer fbs[2] = {};
         uint32_t fbsNum = 0;
         if (videoSize) {
             fbs[fbsNum].pixel_format = mPixelFormat;
@@ -1701,6 +1701,7 @@ private:
             fb.width = ss.width;
             fb.height = ss.height;
             fb.framebuffer = ss.frameBuffer.data();
+            fb.framebuffer_size = ss.frameBuffer.size();
         }
 
         ClientFrame frame = {

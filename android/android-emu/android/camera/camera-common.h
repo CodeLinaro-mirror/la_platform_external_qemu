@@ -115,6 +115,7 @@ typedef struct ClientFrameBuffer {
     int height;
     /* Address of the client framebuffer. */
     void*       framebuffer;
+    size_t framebuffer_size;
 } ClientFrameBuffer;
 
 /* Defines framebuffers and metadata associated with a specific camera frame. */
