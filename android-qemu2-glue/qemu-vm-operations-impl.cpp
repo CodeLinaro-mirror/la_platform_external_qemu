@@ -29,6 +29,8 @@ extern "C" {
 
 #include "aemu/base/EventNotificationSupport.h"
 #include "aemu/base/files/PathUtils.h"            // for pj, PathUtils
+#include "android/avd/info.h"                     // for avdInfo_getContentPath
+#include "android/base/logging/StudioMessage.h"   // for USER_MESSAGE
 #include "android/base/system/System.h"           // for System
 #include "android/emulation/CpuAccelerator.h"     // for GetCurrentCpuAc...
 #include "android/emulation/control/callbacks.h"  // for LineConsumerCal...
@@ -318,8 +320,23 @@ static bool qemu_snapshot_save(const char* name,
                 std::string("Snapshot cannot be saved. Reason: ") +
                 toString_SnapshotSkipReason(get_skip_snapshot_save_reason());
         DD("extract error %s\n", err.c_str());
-        errConsumer(opaque, err.c_str(), err.size());
-        return -1;
+        std::string errWithNewline = err + "\n";
+        errConsumer(opaque, errWithNewline.c_str(), errWithNewline.size());
+        return false;
+    }
+
+    // Unified Proactive Disk Space Check
+    const char* contentPath = getConsoleAgents()->settings->avdInfo() ?
+            avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo()) : "";
+    if (getConsoleAgents()->settings->avdInfo() &&
+        System::isUnderDiskPressure(contentPath ? contentPath : "")) {
+        std::string err = "Unable to save snapshot: Not enough disk space. Please free up some space and try again.";
+        USER_MESSAGE(WARNING) << err;
+        if (errConsumer) {
+            std::string errWithNewline = err + "\n";
+            errConsumer(opaque, errWithNewline.c_str(), errWithNewline.size());
+        }
+        return false;
     }
 
     bool wasVmRunning = runstate_is_running() != 0;
