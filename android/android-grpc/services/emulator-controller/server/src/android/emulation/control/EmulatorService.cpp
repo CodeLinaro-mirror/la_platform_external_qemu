@@ -627,13 +627,14 @@ public:
         };
 
         avd::BugreportInfo bugreport;
-        auto guestConfig = (*reply->mutable_guestconfig());
+        auto& guestConfig = (*reply->mutable_guestconfig());
         guestConfig["multidisplay"] =
                 MultiDisplay::getInstance()->isDisplayPipeReady()
                         ? "available"
                         : "unavailable";
         guestConfig["androidVersion"] = bugreport.androidVer;
         guestConfig["hypervisorVersion"] = bugreport.hypervisorVer;
+        guestConfig["avdDetails"] = bugreport.avdDetails;
         return Status::OK;
     }
 
