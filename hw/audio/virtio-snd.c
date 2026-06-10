@@ -570,21 +570,20 @@ static void virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
             "VIRTIO_SND_R_PCM_STOP", stream_id);
 
     stream = virtio_snd_pcm_get_stream(s, stream_id);
-    if (stream) {
-        WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
-            stream->active = start;
-        }
-        if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
-            AUD_set_active_out(stream->voice.out, start);
-        } else {
-            AUD_set_active_in(stream->voice.in, start);
-        }
-    } else {
+    if (!stream) {
         error_report("Invalid stream id: %"PRIu32, stream_id);
         cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
         return;
     }
-    stream->active = start;
+
+    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+        stream->active = start;
+    }
+    if (stream->info.direction == VIRTIO_SND_D_OUTPUT) {
+        AUD_set_active_out(stream->voice.out, start);
+    } else {
+        AUD_set_active_in(stream->voice.in, start);
+    }
 }
 
 /*
