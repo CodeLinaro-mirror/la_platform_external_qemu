@@ -632,7 +632,13 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
     qRegisterMetaType<Ui::OverlayMessageType>();
     qRegisterMetaType<Ui::OverlayChildWidget::DismissFunc>();
 
-    if (EmulatorSkin::getInstance()->isPortrait()) {
+    if (getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui &&
+        getConsoleAgents()->emu) {
+        // For standalone gRPC UI clients (such as Fishtank), determine the initial window
+        // orientation dynamically by querying the live physical model state over gRPC rather
+        // than relying on static hardware config defaults.
+        mOrientation = static_cast<SkinRotation>(getConsoleAgents()->emu->getRotation());
+    } else if (EmulatorSkin::getInstance()->isPortrait()) {
         mOrientation = !strcasecmp(getConsoleAgents()
                                            ->settings->hw()
                                            ->hw_initialOrientation,
@@ -1846,13 +1852,17 @@ void EmulatorQtWindow::initializeStreamer(std::string_view shm_handle,
                     }
                 }
             },
-            width, height, transport_type);
+            // Shared memory (MMAP) transport requires pre-allocated fixed buffer dimensions.
+            // Standard gRPC streaming adapts dynamically to incoming image frame packet sizes,
+            // so we initialize dimensions to 0 to allow dynamic adaptation.
+            (transport_type == StreamTransport::MMAP) ? width : 0,
+            (transport_type == StreamTransport::MMAP) ? height : 0,
+            transport_type);
     mStreamer->startStream();
 }
 
 void EmulatorQtWindow::slot_updateGuestScreen(const QImage& frame) {
     // This code runs safely on the UI thread.
-    // LOG(INFO) << "Updating guest!";
     mGuestScreenPixmap = QPixmap::fromImage(frame);
     // Trigger a repaint of the window to display the new pixmap.
     update();
@@ -2326,6 +2336,14 @@ void EmulatorQtWindow::queueSkinEvent(SkinEvent event) {
         // if this event is the first one.
         uiAgent->userEvents->onNewUserEvent();
     }
+
+    if (getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+        // Restrict outbound resizable config signal emissions to fishtank.
+        if (eventType == kEventSetDisplayActiveConfig) {
+            emit resizableConfigChanged(event.u.display_active_config);
+        }
+    }
+
     if (rotationEventLayout) {
         emit(layoutChanged(*rotationEventLayout));
     }

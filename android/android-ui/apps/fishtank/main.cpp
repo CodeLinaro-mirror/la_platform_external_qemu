@@ -37,6 +37,7 @@
 #include "android/files/TemporaryFile.h"
 #include "android/main-common-ui.h"
 #include "android/main-common.h"
+#include "android/hw-sensors.h"
 #include "android/opengl/gpuinfo.h"
 #include "OpenGLESDispatch/OpenGLDispatchLoader.h"
 #include "android/process_setup.h"
@@ -44,6 +45,9 @@
 #include "android/skin/qt/QtLogger.h"
 #include "android/skin/qt/SharedMemoryRenderer.h"
 #include "android/skin/qt/emulator-qt-window.h"
+#include "android/skin/qt/tool-window.h"
+#include "emulator_controller.pb.h"
+#include "android/emulation/resizable_display_config.h"
 #include "android/skin/qt/init-qt.h"
 #include "android/utils/debug.h"
 #include "android/utils/string.h"  // for str_reset
@@ -57,6 +61,7 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_join.h"
 #include "host-common/FeatureControl.h"
+#include "host-common/MultiDisplay.h"
 
 using android::base::pj;
 using android::base::System;
@@ -462,6 +467,34 @@ static void startFishtankGrpc(AndroidOptions* opts) {
     }
 }
 
+// At initial startup, Fishtank syncs its local UI window size and aspect ratio with the
+// remote emulator backend's current display mode (Phone, Foldable, Tablet, Desktop) via
+// getDisplayMode. This ensures the client immediately reflects the active remote posture.
+static void syncDisplayModeWithBackend(EmulatorQtWindow* window) {
+    auto client = getGlobalControlClient();
+    if (!client) {
+        LOG(WARNING) << "syncDisplayModeWithBackend: No control client";
+        return;
+    }
+    auto context = client->client()->newContext();
+    google::protobuf::Empty request;
+    android::emulation::control::DisplayMode reply;
+    auto status = client->service()->getDisplayMode(context.get(), request, &reply);
+    if (!status.ok()) {
+        LOG(ERROR) << "syncDisplayModeWithBackend: getDisplayMode failed: "
+                   << status.error_message();
+        return;
+    }
+    int backendMode = reply.value();
+
+    if (backendMode >= 0 && backendMode < PRESET_SIZE_MAX) {
+        window->runOnUiThread([window, backendMode]() {
+            auto newSize = static_cast<PresetEmulatorSizeType>(backendMode);
+            window->toolWindow()->presetSizeAdvance(newSize);
+        });
+    }
+}
+
 int main(int argc, char* argv[]) {
     base_configure_logs(kLogDefaultOptions);
     injectFishtankConsoleAgents();
@@ -536,6 +569,10 @@ int main(int argc, char* argv[]) {
     getConsoleAgents()->settings->inject_AvdInfo(avd);
 
     const UiEmuAgent uiEmuAgent = createUiEmuAgent();
+    // Initialize the MultiDisplay singleton. This is required so that touch events
+    // dispatched through window.c can successfully translate coordinates across
+    // multiple display layouts and foldable posturing without resolving to null.
+    android_init_multi_display(uiEmuAgent.window, uiEmuAgent.record, getConsoleAgents()->vm, false);
 
     if (!emulator_parseUiCommandLineOptions(opts, avd, hw)) {
         LOG(FATAL) << "Bad news bears, unable to init ui";
@@ -584,6 +621,28 @@ int main(int argc, char* argv[]) {
 
     android::files::TemporaryFile pixels;
     EmulatorQtWindow* window = EmulatorQtWindow::getInstance();
+    if (window) {
+        syncDisplayModeWithBackend(window);
+        // Connect outbound UI resizable display switches to setDisplayMode. When the user
+        // selects a new preset size in the local UI tool window, this signal automatically
+        // updates the remote emulator backend to reflect the newly chosen form factor.
+        QObject::connect(window, &EmulatorQtWindow::resizableConfigChanged, [](int configId) {
+            auto client = getGlobalControlClient();
+            if (client) {
+                auto context = client->client()->newContext();
+                android::emulation::control::DisplayMode request;
+                auto val = static_cast<android::emulation::control::DisplayModeValue>(configId);
+                request.set_value(val);
+                google::protobuf::Empty response;
+                auto status = client->service()->setDisplayMode(
+                        context.get(), request, &response);
+                if (!status.ok()) {
+                    LOG(ERROR) << "Fishtank (main): setDisplayMode failed: "
+                               << status.error_message();
+                }
+            }
+        });
+    }
     if (!opts->qt_hide_window) {
         if (opts->grpc_ui) {
             LOG(INFO) << "Visible ui, initializing pixel streamer via gRPC";

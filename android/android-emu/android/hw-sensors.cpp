@@ -32,6 +32,7 @@
 #include "aemu/base/utils/stream.h"
 #include "android/automation/AutomationController.h"
 #include "android/avd/info.h"
+#include "android/cmdline-definitions.h"
 #include "android/console.h"
 #include "android/emulation/android_qemud.h"
 #include "android/emulation/control/adb/AdbInterface.h"
@@ -966,8 +967,14 @@ static void _hwSensors_init(HwSensors* h) {
 
     h->sensors_port = NULL;
 
-    h->service = qemud_service_register("sensors", 0, h, _hwSensors_connect,
-                                        _hwSensors_save, _hwSensors_load);
+    if (getConsoleAgents()->settings &&
+        getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+        // Fishtank does not create a qemud service.
+        h->service = NULL;
+    } else {
+        h->service = qemud_service_register("sensors", 0, h, _hwSensors_connect,
+                                            _hwSensors_save, _hwSensors_load);
+    }
 
     if (h->physical_model != NULL) {
         physicalModel_free(h->physical_model);
@@ -1074,7 +1081,16 @@ void android_hw_sensors_init(const QAndroidEmulatorWindowAgent* windowAgent) {
         _windowAgent = windowAgent;
     }
 
-    if (hw->service == NULL) {
+    bool needsInit = false;
+    if (getConsoleAgents()->settings &&
+        getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+        // Fishtank bypasses qemud service registration
+        needsInit = (hw->physical_model == NULL);
+    } else {
+        needsInit = (hw->service == NULL);
+    }
+
+    if (needsInit) {
         _hwSensors_init(hw);
         D("%s: sensors qemud service initialized", __FUNCTION__);
     }

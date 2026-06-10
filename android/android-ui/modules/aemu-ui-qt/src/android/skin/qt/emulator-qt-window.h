@@ -198,6 +198,7 @@ signals:
                        int size,
                        QSemaphore* semaphore = NULL);
     void setWindowPos(int x, int y, QSemaphore* semaphore = NULL);
+    void resizableConfigChanged(int configId);
     void setWindowSize(int w, int h, QSemaphore* semaphore = NULL);
     void paintWindowOverlayForResize(int mouseX,
                                      int mouseY,

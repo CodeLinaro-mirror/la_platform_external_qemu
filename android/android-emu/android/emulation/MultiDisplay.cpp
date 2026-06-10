@@ -34,6 +34,7 @@
 #include "android/avd/info.h"
 #include "android/avd/util.h"
 #include "android/cmdline-option.h"
+#include "android/cmdline-definitions.h"
 #include "android/console.h"
 #include "android/emulation/AutoDisplays.h"
 #include "android/emulation/control/adb/AdbInterface.h"
@@ -359,7 +360,13 @@ bool MultiDisplay::translateCoordination(uint32_t* x,
     }
 
     if (android_foldable_is_pixel_fold()) {
-        if (android_foldable_is_folded()) {
+        // Standalone gRPC UI clients (such as Fishtank) transmit input events over gRPC
+        // to remote emulator backends (like emu-main-next) which manage their own internal
+        // virtual hardware display buffer IDs (e.g. display 1 vs display 6). Sending display 0
+        // delegates the correct folded display mapping to the remote server backend.
+        if (android_foldable_is_folded() &&
+            (!getConsoleAgents()->settings ||
+             !getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui)) {
             *displayId = android_foldable_pixel_fold_second_display_id();
         } else {
             constexpr int primary_display_id = 0;

@@ -374,8 +374,29 @@ void emulator_window_setup(EmulatorWindow* emulator) {
         }
     }
 
+    // For standalone gRPC UI clients (such as Fishtank), map the initial UI layout
+    // orientation dynamically by querying the live physical model state over gRPC rather
+    // than relying on static hardware config defaults (which default to landscape for foldables).
+    const char* initial_orientation = getConsoleAgents()->settings->hw()->hw_initialOrientation;
+    if (emulator->opts->grpc_ui && emulator->uiEmuAgent && emulator->uiEmuAgent->window) {
+        SkinRotation rot = emulator->uiEmuAgent->window->getRotation();
+        switch (rot) {
+            case SKIN_ROTATION_0:
+                initial_orientation = "portrait";
+                break;
+            case SKIN_ROTATION_90:
+                initial_orientation = "reverse_landscape";
+                break;
+            case SKIN_ROTATION_180:
+                initial_orientation = "reverse_portrait";
+                break;
+            case SKIN_ROTATION_270:
+                initial_orientation = "landscape";
+                break;
+        }
+    }
     emulator->ui = skin_ui_create(
-            emulator->layout_file, getConsoleAgents()->settings->hw()->hw_initialOrientation,
+            emulator->layout_file, initial_orientation,
             &my_ui_funcs, &my_ui_params, s_use_emugl_subwindow);
     if (!emulator->ui) {
         return;
@@ -579,9 +600,19 @@ int emulator_window_init(EmulatorWindow* emulator,
     // if not building for a gui-less window, create a skin layout file,
     // else skip as no skin will be displayed
     if (!opts->no_window) {
-        emulator->layout_file = skin_file_create_from_aconfig(aconfig, basepath,
-                                                              &skin_fb_funcs,
-                                                              getConsoleAgents()->settings->hw()->hw_lcd_depth);
+        if (opts->grpc_ui) {
+            // For standalone gRPC UI clients (such as Fishtank), bypass skin configuration files
+            // (which contain bezel offsets) and generate a pure frameless layout perfectly matching
+            // the hardware framebuffer dimensions.
+            int width = getConsoleAgents()->settings->hw()->hw_lcd_width;
+            int height = getConsoleAgents()->settings->hw()->hw_lcd_height;
+            int bpp = getConsoleAgents()->settings->hw()->hw_lcd_depth;
+            emulator->layout_file = skin_file_create_with_width_height_bpp(width, height, bpp, &skin_fb_funcs);
+        } else {
+            emulator->layout_file = skin_file_create_from_aconfig(aconfig, basepath,
+                                                                  &skin_fb_funcs,
+                                                                  getConsoleAgents()->settings->hw()->hw_lcd_depth);
+        }
     }
 
     const bool is_pixel_fold = android_foldable_is_pixel_fold();
@@ -591,7 +622,9 @@ int emulator_window_init(EmulatorWindow* emulator,
         avdInfo_getSkinInfo(getConsoleAgents()->settings->avdInfo(), &skinName,
                             &skinDir);
         int bpp = getConsoleAgents()->settings->hw()->hw_lcd_depth;
-        if (opts->skindir) {
+        // Skip directory-based skin layout overrides when grpc_ui is active, as gRPC UI clients
+        // render frameless windows without physical skin bezels.
+        if (opts->skindir && !opts->grpc_ui) {
             skinName = NULL;
             skinDir = NULL;
             avdInfo_getSkinInfo(getConsoleAgents()->settings->avdInfo(),
