@@ -198,7 +198,8 @@ inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {
  * @brief Supported image formats for render views.
  */
 enum class VerImageFormat {
-    RGBA8, ///< 32-bit RGBA (8 bits per channel)
+    UNKNOWN,  ///< An unsupported format
+    RGBA8,    ///< 32-bit RGBA (8 bits per channel)
 };
 
 /**

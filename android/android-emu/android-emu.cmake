@@ -203,6 +203,7 @@ set(virtual_environment_renderer_src
     android/ver/src/Scene.cpp
     android/ver/src/SceneObject.cpp
     android/ver/src/TextureUtils.cpp
+    android/ver/src/raw_image_sources/fourcc_utils.cc
     android/ver/src/raw_image_sources/raw_image_source.cc
     android/ver/src/raw_image_sources/image_file/raw_image_file_source.cc
     android/ver/src/raw_image_sources/video_file/raw_video_file_source.cc)
