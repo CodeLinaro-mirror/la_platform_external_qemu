@@ -635,6 +635,11 @@ static void virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
     }
 
     WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        if (!stream->voice.raw) {
+            cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
+            return;
+        }
+
         if (stream->is_output) {
             audio_be_set_active_out(s->audio_be, stream->voice.out, start);
         } else {
