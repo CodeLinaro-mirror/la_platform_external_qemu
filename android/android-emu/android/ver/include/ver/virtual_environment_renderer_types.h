@@ -54,6 +54,11 @@ struct PosterInfo {
 };
 
 /**
+ * @brief Opaque handle to a webcam info.
+ */
+typedef struct VerWebcamInfoOpaque* VerWebcamHandle;
+
+/**
  * @brief Configuration for a virtual scene.
  */
 struct SceneConfig {
@@ -62,11 +67,12 @@ struct SceneConfig {
      */
     enum class Mode {
         Unknown = 0,
-        Mesh3D,    ///< Full 3D environment with posters
-        VideoFile, ///< Single video file rendered as a plane
-        ImageFile, ///< Single image file rendered as a plane
-        Color,     ///< Uniform background color
-        Image360,  ///< 360-degree panoramic image
+        Mesh3D,     ///< Full 3D environment with posters
+        VideoFile,  ///< Single video file rendered as a plane
+        ImageFile,  ///< Single image file rendered as a plane
+        Color,      ///< Uniform background color
+        Image360,   ///< 360-degree panoramic image
+        Webcam,     ///< Single webcam feed rendered as a plane
     };
 
     SceneConfig(Mode mode, std::string_view argument) {
@@ -84,6 +90,7 @@ struct SceneConfig {
     static constexpr const char* kDefaultImageFile = "default.jpg";
     static constexpr const char* kDefaultVideoFile = "default.mp4";
     static constexpr const char* kDefaultImage360File = "default360.jpg";
+    static constexpr const char* kDefaultWebcam = "";
 
     // A blank background
     static constexpr const char* kDefaultColor = "#000000";
@@ -104,6 +111,8 @@ struct SceneConfig {
             return SceneConfig::Mode::Color;
         } else if (sceneModeStr == "image360") {
             return SceneConfig::Mode::Image360;
+        } else if (sceneModeStr == "webcam") {
+            return SceneConfig::Mode::Webcam;
         } else {
             dwarning("Unknown scene mode requested: %s", sceneModeStr);
             return SceneConfig::Mode::Unknown;
@@ -124,6 +133,8 @@ struct SceneConfig {
             return "color";
         } else if (mode == SceneConfig::Mode::Image360) {
             return "image360";
+        } else if (mode == SceneConfig::Mode::Webcam) {
+            return "webcam";
         } else {
             return "unknown";
         }
@@ -143,6 +154,8 @@ struct SceneConfig {
             return kDefaultColor;
         } else if (mode == SceneConfig::Mode::Image360) {
             return kDefaultImage360File;
+        } else if (mode == SceneConfig::Mode::Webcam) {
+            return kDefaultWebcam;
         } else {
             derror("%s: Invalid mode %d", __func__, (int)mode);
             return "invalid_filename";
@@ -198,7 +211,8 @@ inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {
  * @brief Supported image formats for render views.
  */
 enum class VerImageFormat {
-    RGBA8, ///< 32-bit RGBA (8 bits per channel)
+    UNKNOWN,  ///< An unsupported format
+    RGBA8,    ///< 32-bit RGBA (8 bits per channel)
 };
 
 /**

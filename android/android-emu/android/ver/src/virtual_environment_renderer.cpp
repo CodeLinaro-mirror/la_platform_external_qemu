@@ -28,6 +28,7 @@
 #include "ScenesManager.h"
 #include "TextureUtils.h"
 
+#include "raw_image_sources/webcam/webcam_source.h"
 #include "ver/virtual_environment_renderer.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -145,7 +146,8 @@ bool ScenesManager::renderView(Scene* scene,
         } break;
         case SceneConfig::Mode::ImageFile:
         case SceneConfig::Mode::VideoFile:
-        case SceneConfig::Mode::Color: {
+        case SceneConfig::Mode::Color:
+        case SceneConfig::Mode::Webcam: {
             const SceneOverlayObject* overlay = scene->getOverlayObject();
             if (!overlay || !overlay->isValid()) {
                 derror("Scene rendering failed");
@@ -481,4 +483,105 @@ bool ver_texture_utils_load_png(const char* filename,
                             ? 3
                             : 4;
     return true;
+}
+
+struct VerWebcamInfoOpaque {
+    std::shared_ptr<android::ver::WebcamSource::WebcamInfo> info;
+};
+
+extern "C" {
+
+uint32_t ver_get_webcam_count() {
+    return static_cast<uint32_t>(android::ver::WebcamSource::GetWebcamCount());
+}
+
+VerWebcamHandle ver_get_webcam_info(uint32_t index) {
+    auto info = android::ver::WebcamSource::GetWebcamInfo(index);
+    if (!info) {
+        return nullptr;
+    }
+    auto handle = new VerWebcamInfoOpaque{info};
+    return reinterpret_cast<VerWebcamHandle>(handle);
+}
+
+void ver_free_webcam_info(VerWebcamHandle handle) {
+    if (handle) {
+        auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+        delete opaque;
+    }
+}
+
+const char* ver_webcam_info_get_user_facing_name(VerWebcamHandle handle) {
+    if (!handle)
+        return nullptr;
+    auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+    return opaque->info->friendly_name.c_str();
+}
+
+const char* ver_webcam_info_get_id(VerWebcamHandle handle) {
+    if (!handle)
+        return nullptr;
+    auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+    return opaque->info->os_alias.c_str();
+}
+
+int ver_webcam_info_get_preferred_format_index(VerWebcamHandle handle) {
+    if (!handle)
+        return -1;
+    auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+    return opaque->info->preferred_format_index;
+}
+
+uint32_t ver_webcam_info_get_format_count(VerWebcamHandle handle) {
+    if (!handle)
+        return 0;
+    auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+    return static_cast<uint32_t>(opaque->info->supported_formats.size());
+}
+
+uint32_t ver_webcam_info_get_pixel_format_fourcc(VerWebcamHandle handle,
+                                                 uint32_t format_index) {
+    if (!handle)
+        return 0;
+    auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+    if (static_cast<size_t>(format_index) >=
+        opaque->info->supported_formats.size()) {
+        return 0;
+    }
+    return opaque->info->supported_formats[format_index].pixel_format;
+}
+
+uint32_t ver_webcam_info_get_format_resolution_count(VerWebcamHandle handle,
+                                                     uint32_t format_index) {
+    if (!handle)
+        return 0;
+    auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+    if (static_cast<size_t>(format_index) >=
+        opaque->info->supported_formats.size()) {
+        return 0;
+    }
+    return static_cast<uint32_t>(
+            opaque->info->supported_formats[format_index].resolutions.size());
+}
+
+bool ver_webcam_info_get_format_resolution(VerWebcamHandle handle,
+                                           uint32_t format_index,
+                                           uint32_t res_index,
+                                           int* out_width,
+                                           int* out_height) {
+    if (!handle || !out_width || !out_height)
+        return false;
+    auto opaque = reinterpret_cast<VerWebcamInfoOpaque*>(handle);
+    if (static_cast<size_t>(format_index) >=
+        opaque->info->supported_formats.size()) {
+        return false;
+    }
+    const auto& format = opaque->info->supported_formats[format_index];
+    if (static_cast<size_t>(res_index) >= format.resolutions.size()) {
+        return false;
+    }
+    *out_width = format.resolutions[res_index].resolution.width;
+    *out_height = format.resolutions[res_index].resolution.height;
+    return true;
+}
 }

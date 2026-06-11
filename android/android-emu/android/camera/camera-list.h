@@ -22,6 +22,6 @@ ANDROID_BEGIN_HEADER
 
 // List available we cameras to stdout. Used to implement -webcam-list
 // option.
-extern void android_camera_list_webcams(void);
+extern void android_camera_list_webcams(bool verbose);
 
 ANDROID_END_HEADER
