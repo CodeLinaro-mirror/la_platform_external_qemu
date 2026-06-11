@@ -139,6 +139,7 @@ struct VirtIOSoundPCMStream {
     union {
         SWVoiceIn *in;
         SWVoiceOut *out;
+        void *raw;
     } voice;
     QemuMutex queue_mutex;
 
