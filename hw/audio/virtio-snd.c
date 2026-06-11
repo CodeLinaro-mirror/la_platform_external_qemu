@@ -1451,7 +1451,6 @@ static const VMStateDescription vmstate_VirtIOSoundPCMStream = {
         VMSTATE_UINT32(period_bytes, VirtIOSoundPCMStream),
         VMSTATE_UINT8(hw_format, VirtIOSoundPCMStream),  /* shadows as.fmt */
         VMSTATE_BOOL(is_output, VirtIOSoundPCMStream),
-        VMSTATE_BOOL(flushing, VirtIOSoundPCMStream),
         VMSTATE_BOOL(active, VirtIOSoundPCMStream),
         /*
          * NOTE: stream->queue is handled manually in
