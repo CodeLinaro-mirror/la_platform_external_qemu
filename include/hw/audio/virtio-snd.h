@@ -140,6 +140,7 @@ struct VirtIOSoundPCMStream {
     union {
         SWVoiceIn *in;
         SWVoiceOut *out;
+        void *raw;  /* to check if the voice (`in` or `out`) is set */
     } voice;
     QemuMutex queue_mutex;
     VirtIOSoundPCMBufferQueue queue;
