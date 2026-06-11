@@ -198,6 +198,7 @@ signals:
                        int size,
                        QSemaphore* semaphore = NULL);
     void setWindowPos(int x, int y, QSemaphore* semaphore = NULL);
+    void resizableConfigChanged(int configId);
     void setWindowSize(int w, int h, QSemaphore* semaphore = NULL);
     void paintWindowOverlayForResize(int mouseX,
                                      int mouseY,
@@ -458,6 +459,7 @@ signals:
 private:
     std::unique_ptr<SharedMemoryRenderer> mSharedMemoryRenderer;
     std::unique_ptr<SharedStreamEmulator> mStreamer;
+    StreamTransport mTransportType = StreamTransport::MMAP;
 
     static const std::string_view kRemoteDownloadsDir;
     static const std::string_view kRemoteDownloadsDirApi10;

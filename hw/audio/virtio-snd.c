@@ -1617,7 +1617,7 @@ static void stream_out_cb(void *opaque, int avail) {
     qemu_mutex_unlock(&stream->mtx);
 }
 
-static bool virtio_snd_process_tx(VirtQueue *vq, VirtQueueElement *e, VirtIOSound *snd) {
+static bool virtio_snd_process_elem(VirtQueue *vq, VirtQueueElement *e, VirtIOSound *snd) {
     const size_t req_size = iov_size(e->out_sg, e->out_num);
     struct virtio_snd_pcm_xfer xfer;
     uint32_t status = VIRTIO_SND_S_OK;
@@ -1782,45 +1782,6 @@ static void stream_in_cb(void *opaque, int avail) {
     qemu_mutex_lock(&stream->mtx);
     stream_in_cb_locked(stream, avail);
     qemu_mutex_unlock(&stream->mtx);
-}
-
-static bool virtio_snd_process_rx(VirtQueue *vq, VirtQueueElement *e, VirtIOSound *snd) {
-    const size_t req_size = iov_size(e->out_sg, e->out_num);
-    struct virtio_snd_pcm_xfer xfer;
-    uint32_t status = VIRTIO_SND_S_OK;
-
-    if (req_size < sizeof(xfer)) {
-        vq_consume_element(vq, e, 0);
-        return FAILURE(true);
-    }
-
-    iov_to_buf(e->out_sg, e->out_num, 0, &xfer, sizeof(xfer));
-    if (xfer.stream_id >= VIRTIO_SND_NUM_PCM_STREAMS) {
-        DPRINTF("stream_id=%u", xfer.stream_id);
-        status = VIRTIO_SND_S_BAD_MSG;
-        goto done;
-    }
-
-    VirtIOSoundPCMStream *stream = &snd->streams[xfer.stream_id];
-    VirtIOSoundVqRingBufferItem item;
-    item.el = e;
-
-    qemu_mutex_lock(&stream->mtx);
-    if (stream->state < VIRTIO_PCM_STREAM_STATE_PREPARED) {
-        DPRINTF("stream_id=%u, state=%u", xfer.stream_id, stream->state);
-        status = VIRTIO_SND_S_IO_ERR;
-        goto done;
-    } else if (!vq_ring_buffer_push(&stream->gpcm_buf, &item)) {
-        ABORT("ring_buffer_push");
-    }
-    qemu_mutex_unlock(&stream->mtx);
-
-done:
-    if (status != VIRTIO_SND_S_OK) {
-        vq_consume_element(vq, e, el_send_pcm_status(e, 0, status, 0));
-        return FAILURE(true);
-    }
-    return false;
 }
 
 static uint32_t
@@ -2047,7 +2008,7 @@ static void virtio_snd_handle_tx(VirtIODevice *vdev, VirtQueue *vq) {
     while (true) {
         VirtQueueElement *e = (VirtQueueElement *)virtqueue_pop(vq, sizeof(VirtQueueElement));
         if (e) {
-            need_notify = virtio_snd_process_tx(vq, e, snd) || need_notify;
+            need_notify = virtio_snd_process_elem(vq, e, snd) || need_notify;
         } else {
             break;
         }
@@ -2066,7 +2027,7 @@ static void virtio_snd_handle_rx(VirtIODevice *vdev, VirtQueue *vq) {
     while (true) {
         VirtQueueElement *e = (VirtQueueElement *)virtqueue_pop(vq, sizeof(VirtQueueElement));
         if (e) {
-            need_notify = virtio_snd_process_rx(vq, e, snd) || need_notify;
+            need_notify = virtio_snd_process_elem(vq, e, snd) || need_notify;
         } else {
             break;
         }

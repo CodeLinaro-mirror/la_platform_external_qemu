@@ -31,3 +31,12 @@ std::shared_ptr<SensorClient> getGlobalSensorClient() {
 std::shared_ptr<SimpleScreenRecordingClient> getGlobalRecordingClient() {
     return gTestRecordingClient;
 }
+
+static QAndroidEmulatorWindowAgent sTestWindowAgent = {
+    .updateUIMultiDisplayPage = [](uint32_t id) {},
+    .addMultiDisplayWindow = [](uint32_t id, bool add, uint32_t w, uint32_t h) { return true; },
+};
+
+const QAndroidEmulatorWindowAgent* const getFishtankEmulatorWindowAgent() {
+    return &sTestWindowAgent;
+}

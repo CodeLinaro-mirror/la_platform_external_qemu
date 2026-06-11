@@ -34,6 +34,7 @@
 #include "android/avd/info.h"
 #include "android/avd/util.h"
 #include "android/cmdline-option.h"
+#include "android/cmdline-definitions.h"
 #include "android/console.h"
 #include "android/emulation/AutoDisplays.h"
 #include "android/emulation/control/adb/AdbInterface.h"
@@ -359,7 +360,13 @@ bool MultiDisplay::translateCoordination(uint32_t* x,
     }
 
     if (android_foldable_is_pixel_fold()) {
-        if (android_foldable_is_folded()) {
+        // Standalone gRPC UI clients (such as Fishtank) transmit input events over gRPC
+        // to remote emulator backends (like emu-main-next) which manage their own internal
+        // virtual hardware display buffer IDs (e.g. display 1 vs display 6). Sending display 0
+        // delegates the correct folded display mapping to the remote server backend.
+        if (android_foldable_is_folded() &&
+            (!getConsoleAgents()->settings ||
+             !getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui)) {
             *displayId = android_foldable_pixel_fold_second_display_id();
         } else {
             constexpr int primary_display_id = 0;
@@ -915,6 +922,7 @@ int MultiDisplay::setDisplayColorBuffer(uint32_t displayId,
             LOG(DEBUG) << "change window size to " << width << "x" << height;
             mWindowAgent->setUIDisplayRegion(0, 0, width, height, true);
         }
+        fireEvent(DisplayChangeEvent{DisplayChange::DisplayChanged, displayId});
     }
     LOG(VERBOSE) << "setDisplayColorBuffer " << displayId << " cb "
                  << colorBuffer;
@@ -1063,11 +1071,13 @@ void MultiDisplay::recomputeStackedLayoutLocked() {
     }
 }
 
+/* static */
 bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
                                              uint32_t w,
                                              uint32_t h,
                                              uint32_t dpi,
-                                             uint32_t flag) {
+                                             uint32_t flag,
+                                             std::string* outErrorMsg) {
     // According the Android 9 CDD,
     // * 120 <= dpi <= 640
     // * 320 * (dpi / 160) <= width
@@ -1077,20 +1087,23 @@ bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
     // * 4K might be a good upper limit
 
     if (dpi < 120 || dpi > 640) {
-        mWindowAgent->showMessage("dpi should be between 120 and 640",
-                                  WINDOW_MESSAGE_ERROR, 1000);
+        if (outErrorMsg) {
+            *outErrorMsg = "dpi should be between 120 and 640";
+        }
         derror("Display dpi should be between 120 and 640, not %d", dpi);
         return false;
     }
     if (w < 320 * dpi / 160 || h < 320 * dpi / 160) {
-        mWindowAgent->showMessage("width and height should be >= 320dp",
-                                  WINDOW_MESSAGE_ERROR, 1000);
+        if (outErrorMsg) {
+            *outErrorMsg = "width and height should be >= 320dp";
+        }
         derror("Display width and height should be >= 320dp, not %d", dpi);
         return false;
     }
     if (!((w <= 7680 && h <= 4320) || (w <= 4320 && h <= 7680))) {
-        mWindowAgent->showMessage("resolution should not exceed 8k (7680*4320)",
-                                  WINDOW_MESSAGE_ERROR, 1000);
+        if (outErrorMsg) {
+            *outErrorMsg = "resolution should not exceed 8k (7680*4320)";
+        }
         derror("Display resolution should not exceed 8k (7680x4320) vs (%dx%d)",
                w, h);
         return false;
@@ -1098,11 +1111,26 @@ bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
     if (id > s_maxNumMultiDisplay) {
         std::string msg = "Display index cannot be more than " +
                           std::to_string(s_maxNumMultiDisplay);
-        mWindowAgent->showMessage(msg.c_str(), WINDOW_MESSAGE_ERROR, 1000);
-        derror("%s", msg);
+        if (outErrorMsg) {
+            *outErrorMsg = msg;
+        }
+        derror("%s", msg.c_str());
         return false;
     }
     return true;
+}
+
+bool MultiDisplay::multiDisplayParamValidate(uint32_t id,
+                                             uint32_t w,
+                                             uint32_t h,
+                                             uint32_t dpi,
+                                             uint32_t flag) {
+    std::string errorMsg;
+    bool ok = multiDisplayParamValidate(id, w, h, dpi, flag, &errorMsg);
+    if (!ok && mWindowAgent) {
+        mWindowAgent->showMessage(errorMsg.c_str(), WINDOW_MESSAGE_ERROR, 1000);
+    }
+    return ok;
 }
 
 std::map<uint32_t, MultiDisplayInfo> MultiDisplay::parseConfig() {

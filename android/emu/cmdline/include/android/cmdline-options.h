@@ -364,8 +364,6 @@ OPT_PARAM(android_serialno,
           "be encodable as 7-bit ASCII and match the regular expression "
           "“^[a-zA-Z0-9._-,]+$”.")
 
-OPT_FLAG(support_multiple_input_modalities, "Support different input modalities.")
-
 OPT_FLAG(hands_in_space, "Enable hands input for XR spatial application.")
 
 OPT_PARAM(systemui_renderer,

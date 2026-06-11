@@ -356,8 +356,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         } else if (avdFlavor == AVD_XR) {
             default_shortcuts +=
                 "Ctrl+Shift+.   XR_SCREEN_RECENTER\n";
-        } else if (android::featurecontrol::isEnabled(
-                           android::featurecontrol::MultiDisplay) &&
+        } else if (fc::isEnabled(fc::MultiDisplay) &&
                    !android_foldable_any_folded_area_configured() &&
                    !android_foldable_hinge_configured() &&
                    !android_foldable_rollable_configured() &&
@@ -1398,8 +1397,10 @@ void ToolWindow::presetSizeAdvance(PresetEmulatorSizeType newSize) {
         mEmulatorWindow->resizeAndChangeAspectRatio(0, 0, info.width,
                                                     info.height);
     }
-    sUiEmuAgent->window->showMessage(updateMsg.c_str(), WINDOW_MESSAGE_GENERIC,
-                                     3000);
+    if (sUiEmuAgent && sUiEmuAgent->window) {
+        sUiEmuAgent->window->showMessage(updateMsg.c_str(), WINDOW_MESSAGE_GENERIC,
+                                         3000);
+    }
     if (resizableEnabled34()) {
         mToolsUi->change_posture_button->setEnabled(newSize ==
                                                     PRESET_SIZE_UNFOLDED);
@@ -1924,9 +1925,7 @@ void ToolWindow::on_xr_environment_mode_button_clicked() {
 }
 
 void ToolWindow::on_xr_input_mode_button_clicked() {
-    const auto* opts = getConsoleAgents()->settings->android_cmdLineOptions();
-
-    if (opts->support_multiple_input_modalities) {
+    if (fc::isEnabled(fc::XrHandAndEyePointers)) {
         mXrInputModeDialog->show();
         // Align pop-up input selection dialog to the right of input button.
         QRect geoTool = this->geometry();
