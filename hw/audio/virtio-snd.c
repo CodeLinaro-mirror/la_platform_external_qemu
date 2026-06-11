@@ -389,7 +389,7 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
     stream->is_output = is_output;
 
     stream->active = false;
-    qemu_mutex_init(&stream->queue_mutex);
+    qemu_mutex_init(&stream->mtx);
     QSIMPLEQ_INIT(&stream->queue);
 
     return stream;
@@ -402,8 +402,9 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
  * @stream: VirtIOSoundPCMStream *stream
  * @as: audsettings *as
  */
-static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream,
-                                         audsettings *as) {
+static void virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
+                                                audsettings *as)
+{
     g_assert(stream->s);
     g_assert(as->freq > 0);
     g_assert(as->nchannels > 0);
@@ -468,7 +469,8 @@ static void virtio_snd_destroy_stream(VirtIOSoundPCMStream *stream)
     g_assert(QSIMPLEQ_EMPTY(&stream->queue));
 
     virtio_snd_close_stream_voice(stream);
-    qemu_mutex_destroy(&stream->queue_mutex);
+
+    qemu_mutex_destroy(&stream->mtx);
     g_free(stream);
 }
 
@@ -500,11 +502,14 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
         return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
     }
 
-    virtio_snd_get_qemu_audsettings(&as, params);
-    stream->period_bytes = params->period_bytes;
-    stream->hw_format = params->format;
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        virtio_snd_get_qemu_audsettings(&as, params);
 
-    virtio_snd_init_stream_voice(stream, &as);
+        stream->period_bytes = params->period_bytes;
+        stream->hw_format = params->format;
+
+        virtio_snd_init_stream_voice_locked(stream, &as);
+    }
 
     return cpu_to_le32(VIRTIO_SND_S_OK);
 }
@@ -594,13 +599,14 @@ static void virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
         return;
     }
 
-    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        if (stream->is_output) {
+            AUD_set_active_out(stream->voice.out, start);
+        } else {
+            AUD_set_active_in(stream->voice.in, start);
+        }
+
         stream->active = start;
-    }
-    if (stream->is_output) {
-        AUD_set_active_out(stream->voice.out, start);
-    } else {
-        AUD_set_active_in(stream->voice.in, start);
     }
 }
 
@@ -614,7 +620,7 @@ static size_t virtio_snd_pcm_get_io_msgs_count(VirtIOSoundPCMStream *stream)
     VirtIOSoundPCMBuffer *buffer, *next;
     size_t count = 0;
 
-    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
         QSIMPLEQ_FOREACH_SAFE(buffer, &stream->queue, entry, next) {
             count += 1;
         }
@@ -899,7 +905,7 @@ static void virtio_snd_handle_tx_xfer(VirtIODevice *vdev, VirtQueue *vq)
         buffer->size = size;
         buffer->offset = 0;
 
-        WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+        WITH_QEMU_LOCK_GUARD(&stream->mtx) {
             QSIMPLEQ_INSERT_TAIL(&stream->queue, buffer, entry);
         }
         continue;
@@ -979,7 +985,7 @@ static void virtio_snd_handle_rx_xfer(VirtIODevice *vdev, VirtQueue *vq)
         buffer->size = 0;
         buffer->offset = 0;
 
-        WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+        WITH_QEMU_LOCK_GUARD(&stream->mtx) {
             QSIMPLEQ_INSERT_TAIL(&stream->queue, buffer, entry);
         }
         continue;
@@ -1142,7 +1148,7 @@ static void virtio_snd_pcm_out_cb(void *data, int available)
     VirtIOSoundPCMBuffer *buffer;
     size_t size;
 
-    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
         while (!QSIMPLEQ_EMPTY(&stream->queue)) {
             buffer = QSIMPLEQ_FIRST(&stream->queue);
             if (!virtio_queue_ready(buffer->vq)) {
@@ -1236,7 +1242,7 @@ static void virtio_snd_pcm_in_cb(void *data, int available)
     VirtIOSoundPCMBuffer *buffer;
     size_t size, max_size;
 
-    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
         while (!QSIMPLEQ_EMPTY(&stream->queue)) {
             buffer = QSIMPLEQ_FIRST(&stream->queue);
             if (!virtio_queue_ready(buffer->vq)) {
@@ -1291,7 +1297,7 @@ static inline void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream)
     void (*cb)(VirtIOSoundPCMStream *, VirtIOSoundPCMBuffer *) =
         stream->is_output ? return_tx_buffer : return_rx_buffer;
 
-    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
         while (!QSIMPLEQ_EMPTY(&stream->queue)) {
             buffer = QSIMPLEQ_FIRST(&stream->queue);
             cb(stream, buffer);
@@ -1447,7 +1453,7 @@ static VirtIOSoundPCMStream
     }
 
     /*
-     * Locking `queue_mutex` is not required because the stream
+     * Locking `mtx` is not required because the stream
      * was just created here.
      */
     if (virtio_snd_VirtIOSoundPCMBufferQueue_get(f, &stream->queue, s)) {
@@ -1458,7 +1464,7 @@ static VirtIOSoundPCMStream
     if (stream->as.nchannels) {
         stream->as.fmt = virtio_snd_get_qemu_format(stream->hw_format);
         stream->as.endianness = STREAM_AS_ENDIANNESS;
-        virtio_snd_init_stream_voice(stream, &stream->as);
+        virtio_snd_init_stream_voice_locked(stream, &stream->as);
     }
 
     return stream;
@@ -1471,7 +1477,7 @@ virtio_snd_pcm_VirtIOSoundPCMStream_put(QEMUFile *f,
 {
     vmstate_save_state(f, &vmstate_VirtIOSoundPCMStream, stream, vmdes);
 
-    WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
         virtio_snd_VirtIOSoundPCMBufferQueue_put(f, &stream->queue, stream->s);
     }
 }
@@ -1555,7 +1561,7 @@ static int virtio_snd_device_post_load(void *opaque, int version_id)
     for (i = 0; i < s->snd_conf.streams; ++i) {
         VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
         if (stream) {
-            WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
+            WITH_QEMU_LOCK_GUARD(&stream->mtx) {
                 if (stream->active) {
                     if (stream->is_output) {
                         AUD_set_active_out(stream->voice.out, 1);

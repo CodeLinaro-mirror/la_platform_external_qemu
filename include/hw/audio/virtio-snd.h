@@ -141,7 +141,7 @@ struct VirtIOSoundPCMStream {
         SWVoiceOut *out;
         void *raw;
     } voice;
-    QemuMutex queue_mutex;
+    QemuMutex mtx;
 
     /* All the fields below are migratable. */
     VirtIOSoundPCMBufferQueue queue;
