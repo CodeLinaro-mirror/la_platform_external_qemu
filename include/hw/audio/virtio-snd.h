@@ -151,7 +151,6 @@ struct VirtIOSoundPCMStream {
     uint8_t hw_format;      /* from virtio_snd_pcm_set_params */
     bool is_output;
     bool active;
-    bool flushing;
 };
 
 struct VirtIOSoundPCMItem {
