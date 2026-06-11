@@ -1674,7 +1674,7 @@ static const VMStateDescription vmstate_virtio_snd_device = {
     .pre_load = virtio_snd_device_pre_load,
     .post_load = virtio_snd_device_post_load,
     .fields = (const VMStateField[]) {
-        VMSTATE_UINT64(features, VirtIOSound),
+        VMSTATE_UINT64_EQUAL(features, VirtIOSound, NULL),
         VMSTATE_STRUCT(snd_conf, VirtIOSound, 1,
                        vmstate_virtio_snd_config, virtio_snd_config),
         VMSTATE_STRUCT_VARRAY_POINTER_UINT32(
