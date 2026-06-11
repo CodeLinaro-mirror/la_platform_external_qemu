@@ -30,7 +30,8 @@
 
 #define  E(...)    derror(__VA_ARGS__)
 #define  W(...)    dwarning(__VA_ARGS__)
-#define  D(...)  VERBOSE_PRINT(init,__VA_ARGS__)
+const bool DEBUG = false;
+#define  D(...)  if (DEBUG) { dwarning(__VA_ARGS__); }
 #define  V(...)  VERBOSE_PRINT(init,__VA_ARGS__)
 
 using lights_conn_proto::LightStatus;
@@ -96,12 +97,11 @@ void HwXrLights::setLightStatus(uint32_t id, uint32_t color) {
         } else if (id == USER) {
             mHwXrLightStatus.user_color = color;
         } else {
-            D("Invalid led light id %d received", id);
+            D("Unknown led light id %d received", id);
         }
 }
 
 void HwXrLights::qemudClientRecv(uint8_t* msg, int msglen) {
-    D("%s: received light status message", __func__);
     // The current message format is pure string, only for log and test purpose.
     // TODO(b/504670848): refine the message format.
     // The color is in ARGB with the alpha channel expected to be 255, but ignored.

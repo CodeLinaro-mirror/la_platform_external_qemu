@@ -28,16 +28,16 @@
 extern void android_hw_xrlights_init();
 
 typedef enum {
-    WORLD = 0,
     USER = 1,
+    WORLD = 2,
 } LightFacing;
 
 struct HwXrLightStatus {
-    // world facing led light color, packed in ARGB order.
-    uint32_t world_color = 0;
-
     // user facing led light color, packed in ARGB order.
     uint32_t user_color = 0;
+
+    // world facing led light color, packed in ARGB order.
+    uint32_t world_color = 0;
 };
 
 class HwXrLights {
