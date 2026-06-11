@@ -411,19 +411,24 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
 
 /*
  * Initializes the voice field in VirtIOSoundPCMStream and sets
- * the audsettings in the channel.
+ * the VirtIOPcmParams in the channel.
  *
  * @stream: VirtIOSoundPCMStream *stream
- * @as: audsettings *as
+ * @const VirtIOPcmParams *params
  */
 static int virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
-                                               audsettings *as)
+                                               const VirtIOPcmParams *params)
 {
+    audsettings as;
+
     g_assert(stream);
-    g_assert(as);
+    g_assert(params);
     g_assert(stream->s);
-    g_assert(as->freq > 0);
-    g_assert(as->nchannels > 0);
+
+    if (virtio_snd_get_qemu_audsettings(
+            &as, params->channels, params->format, params->rate)) {
+        return -1;
+    }
 
     if (stream->is_output) {
         stream->voice.out = AUD_open_out(&stream->s->card,
@@ -431,7 +436,7 @@ static int virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
                                          "virtio-sound.out",
                                          stream,
                                          virtio_snd_pcm_out_cb,
-                                         as);
+                                         &as);
         if (!stream->voice.out) {
             return -1;
         }
@@ -443,7 +448,7 @@ static int virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
                                        "virtio-sound.in",
                                        stream,
                                        virtio_snd_pcm_in_cb,
-                                       as);
+                                       &as);
         if (!stream->voice.in) {
             return -1;
         }
@@ -451,7 +456,7 @@ static int virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
         AUD_set_volume_in(stream->voice.in, 0, 255, 255);
     }
 
-    stream->as = *as;
+    stream->effective_params = *params;
     return 0;
 }
 
@@ -466,7 +471,7 @@ static void virtio_snd_close_stream_voice(VirtIOSoundPCMStream *stream) {
     g_assert(stream);
 
     if (stream->voice.raw) {
-        g_assert(stream->as.nchannels);
+        g_assert(stream->effective_params.channels);
 
         if (stream->is_output) {
             AUD_close_out(&stream->s->card, stream->voice.out);
@@ -477,7 +482,7 @@ static void virtio_snd_close_stream_voice(VirtIOSoundPCMStream *stream) {
         stream->voice.raw = NULL;
     }
 
-    stream->as.nchannels = 0;
+    stream->effective_params.channels = 0;
 }
 
 /*
@@ -527,19 +532,9 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
     }
 
     WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        audsettings as;
-
-        if (virtio_snd_get_qemu_audsettings(
-                &as, params->channels, params->format, params->rate)) {
-            return cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
-        }
-
-        if (virtio_snd_init_stream_voice_locked(stream, &as)) {
+        if (virtio_snd_init_stream_voice_locked(stream, params)) {
             return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
         }
-
-        stream->period_bytes = params->period_bytes;
-        stream->hw_format = params->format;
     }
 
     return cpu_to_le32(VIRTIO_SND_S_OK);
@@ -1274,6 +1269,8 @@ static void virtio_snd_pcm_in_cb(void *data, int available)
     size_t size, max_size;
 
     WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        const size_t period_bytes = stream->effective_params.period_bytes;
+
         while (!QSIMPLEQ_EMPTY(&stream->queue)) {
             buffer = QSIMPLEQ_FIRST(&stream->queue);
             if (!virtio_queue_ready(buffer->vq)) {
@@ -1293,15 +1290,14 @@ static void virtio_snd_pcm_in_cb(void *data, int available)
                 }
                 size = AUD_read(stream->voice.in,
                         buffer->data + buffer->size,
-                        MIN(available, (stream->period_bytes -
-                                        buffer->size)));
+                        MIN(available, (period_bytes - buffer->size)));
                 if (!size) {
                     available = 0;
                     break;
                 }
                 buffer->size += size;
                 available -= size;
-                if (buffer->size >= stream->period_bytes) {
+                if (buffer->size >= period_bytes) {
                     return_rx_buffer(stream, buffer);
                     break;
                 }
@@ -1447,20 +1443,29 @@ virtio_snd_VirtIOSoundPCMBufferQueue_put(QEMUFile *f,
     }
 }
 
+static const VMStateDescription vmstate_VirtIOPcmParams = {
+    .name = "VirtIOPcmParams",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINT32(buffer_bytes, VirtIOPcmParams),
+        VMSTATE_UINT32(period_bytes, VirtIOPcmParams),
+        VMSTATE_UINT32(features, VirtIOPcmParams),
+        VMSTATE_UINT8(channels, VirtIOPcmParams),
+        VMSTATE_UINT8(format, VirtIOPcmParams),
+        VMSTATE_UINT8(rate, VirtIOPcmParams),
+        VMSTATE_END_OF_LIST()
+    },
+};
+
 static const VMStateDescription vmstate_VirtIOSoundPCMStream = {
     .name = "VirtIOSoundPCMStream",
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (const VMStateField[]) {
-        VMSTATE_INT32(as.freq, VirtIOSoundPCMStream),
-        VMSTATE_INT32(as.nchannels, VirtIOSoundPCMStream),
-        /*
-         * NOTE: as.fmt is handled manually in
-         * the virtio_snd_pcm_VirtIOSoundPCMStream_get functions.
-         */
+        VMSTATE_STRUCT(effective_params, VirtIOSoundPCMStream, 1,
+                       vmstate_VirtIOPcmParams, VirtIOPcmParams),
         VMSTATE_UINT32(id, VirtIOSoundPCMStream),
-        VMSTATE_UINT32(period_bytes, VirtIOSoundPCMStream),
-        VMSTATE_UINT8(hw_format, VirtIOSoundPCMStream),  /* shadows as.fmt */
         VMSTATE_BOOL(is_output, VirtIOSoundPCMStream),
         VMSTATE_BOOL(active, VirtIOSoundPCMStream),
         /*
@@ -1491,10 +1496,8 @@ static VirtIOSoundPCMStream
         return NULL;
     }
 
-    if (stream->as.nchannels) {
-        virtio_snd_get_qemu_format(&stream->as.fmt, stream->hw_format);
-        stream->as.endianness = STREAM_AS_ENDIANNESS;
-        virtio_snd_init_stream_voice_locked(stream, &stream->as);
+    if (stream->effective_params.channels) {
+        virtio_snd_init_stream_voice_locked(stream, &stream->effective_params);
     }
 
     return stream;
@@ -1605,21 +1608,6 @@ static int virtio_snd_device_post_load(void *opaque, int version_id)
 
     return 0;
 }
-
-static const VMStateDescription vmstate_VirtIOPcmParams = {
-    .name = "VirtIOPcmParams",
-    .version_id = 1,
-    .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
-        VMSTATE_UINT32(buffer_bytes, VirtIOPcmParams),
-        VMSTATE_UINT32(period_bytes, VirtIOPcmParams),
-        VMSTATE_UINT32(features, VirtIOPcmParams),
-        VMSTATE_UINT8(channels, VirtIOPcmParams),
-        VMSTATE_UINT8(format, VirtIOPcmParams),
-        VMSTATE_UINT8(rate, VirtIOPcmParams),
-        VMSTATE_END_OF_LIST()
-    },
-};
 
 static const VMStateDescription vmstate_VirtIOSoundPCMItem = {
     .name = "VirtIOSoundPCMItem",
