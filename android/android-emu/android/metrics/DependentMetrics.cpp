@@ -390,6 +390,9 @@ static android_studio::EmulatorAvdInfo::EmulatorDeviceName getDeviceName() {
     if (0 == strcmp(id, "pixel_10_pro_fold")) {
         return android_studio::EmulatorAvdInfo::PIXEL_10_PRO_FOLD;
     }
+    if (0 == strcmp(id, "pixel_10a")) {
+        return android_studio::EmulatorAvdInfo::PIXEL_10A;
+    }
     if (0 == strcmp(id, "pixel_fold")) {
         return android_studio::EmulatorAvdInfo::PIXEL_FOLD;
     }
