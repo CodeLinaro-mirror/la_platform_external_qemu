@@ -592,8 +592,11 @@ StartResult AutomationControllerImpl::startRecording(
         return Err(StartError::InvalidFilename);
     }
 
+    /* The console layer (console_resolve_output_path) now always hands us an
+     * absolute path under <avd-content>/console_out/.  Reject anything else
+     * so other callers cannot reintroduce the old behaviour. */
     if (!PathUtils::isAbsolute(path.data())) {
-        path = PathUtils::join(System::get()->getHomeDirectory(), path.data());
+        return Err(StartError::InvalidFilename);
     }
 
     if (mRecordingStream) {
