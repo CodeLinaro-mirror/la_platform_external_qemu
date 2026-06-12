@@ -75,8 +75,6 @@ typedef struct VirtIOPcmParams VirtIOPcmParams;
 
 typedef struct VirtIOSoundPCMStream VirtIOSoundPCMStream;
 
-typedef struct virtio_snd_ctrl_command virtio_snd_ctrl_command;
-
 typedef struct VirtIOSoundPCMBuffer VirtIOSoundPCMBuffer;
 
 typedef QSIMPLEQ_HEAD(VirtIOSoundPCMBufferQueue, VirtIOSoundPCMBuffer) VirtIOSoundPCMBufferQueue;
