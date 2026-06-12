@@ -2392,7 +2392,9 @@ void ToolWindow::onXrEnvironmentModeChanged(int mode) {
 void ToolWindow::onXrPassthroughCoefficientChanged(float value) {
     mLastPassthroughCoefficientRequested = value;
 
-    mEmulatorWindow->activateWindow();
+    if (!mXrEnvironmentModeDialog->hasDimmingLevels()) {
+        mEmulatorWindow->activateWindow();
+    }
     handleUICommand(QtUICommand::CHANGE_XR_PASSTHROUGH_COEFFICIENT, true);
 }
 

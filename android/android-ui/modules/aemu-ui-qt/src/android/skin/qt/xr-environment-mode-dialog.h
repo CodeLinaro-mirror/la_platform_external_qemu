@@ -31,6 +31,7 @@ public:
     ~XrEnvironmentModeDialog();
 
     void setDimmingValue(float value);
+    bool hasDimmingLevels() const { return !mDimmingLevels.empty(); }
 
 signals:
     void onXrEnvironmentModeRequested(int control);
