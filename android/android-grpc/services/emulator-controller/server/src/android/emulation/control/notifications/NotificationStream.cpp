@@ -40,6 +40,10 @@ namespace android {
 namespace emulation {
 namespace control {
 
+const int kXrUserLedId = 1;
+const int kXrWorldLedId = 2;
+
+
 void handleXrOptionsEvent(void* user_data,
                           const xr_emulator_proto::EmulatorResponse& response);
 
@@ -207,12 +211,12 @@ static void led_forwarder(void* opaque,
     auto ledIndicator = streamEvent.mutable_ledindicator();
     ledIndicator->set_id(event->lightid);
 
-    if (0 == event->lightid) {
-        ledIndicator->set_facing(LedIndicator::OUTSIDE);
-    } else if (1 == event->lightid) {
+    if (kXrUserLedId == event->lightid) {
         ledIndicator->set_facing(LedIndicator::INSIDE);
+    } else if (kXrWorldLedId == event->lightid) {
+        ledIndicator->set_facing(LedIndicator::OUTSIDE);
     } else {
-        DD("Got invalid Led Indicator ID in Notification Stream");
+        DD("Got unknown Led Indicator ID %d in Notification Stream", event->lightid);
     }
 
     if (0 == event->lightcolor) {
