@@ -27,8 +27,10 @@
 #include <QByteArray>
 #include <QClipboard>
 #include <QCloseEvent>
+#include <QDir>
 #include <QEvent>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFlags>
 #include <QFrame>
 #include <QGuiApplication>
@@ -66,6 +68,7 @@
 #include "android/avd/util.h"
 #include "android/base/system/System.h"
 #include "android/console.h"
+#include "android/emulation/ConfigDirs.h"
 #include "android/emulation/control/adb/AdbInterface.h"
 #include "android/emulation/control/clipboard_agent.h"
 #include "android/emulation/control/sensors_agent.h"
@@ -575,51 +578,7 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
             mTouchpadWindow->get();
         }
 
-        QMenu* envMenu = new QMenu(this);
-        envMenu->addAction(tr("Default Environment"), this,
-                           SLOT(defaultEnvironmentSelected()));
-        envMenu->addAction(tr("None"), this, SLOT(noneSelected()));
-        envMenu->addSeparator();
-        envMenu->addAction(tr("Custom Image..."), this,
-                           SLOT(customImageSelected()));
-        envMenu->addAction(tr("Custom Video..."), this,
-                           SLOT(customVideoSelected()));
-        envMenu->addAction(tr("Custom 360 Image..."), this,
-                           SLOT(custom360ImageSelected()));
-
-        QMenu* webcamMenu = new QMenu(tr("Webcams"), this);
-        const QAndroidVirtualSceneAgent* agent =
-                getConsoleAgents()->virtual_scene;
-        if (agent && agent->enumerateWebcams &&
-            android::base::System::get()->getEnvironmentVariable(
-                    "ANDROID_EMU_ENABLE_WEBCAM_MENU") != "") {
-            struct Context {
-                QMenu* menu;
-                ToolWindow* window;
-            } context = {webcamMenu, this};
-
-            agent->enumerateWebcams(&context, [](void* opaque,
-                                                 const char* userFacingName,
-                                                 const char* label,
-                                                 const char* id) {
-                auto* ctx = static_cast<Context*>(opaque);
-                ToolWindow* window = ctx->window;
-                QAction* action = ctx->menu->addAction(QString::fromUtf8(
-                        userFacingName ? userFacingName : label));
-                // This should never be null, but if it is, we'll fail when
-                // attempting to set up the camera with more details
-                std::string id_str = id ? id : "";
-                window->connect(
-                        action, &QAction::triggered,
-                        [window, id_str]() { window->webcamSelected(id_str); });
-            });
-        }
-        if (!webcamMenu->isEmpty()) {
-            envMenu->addMenu(webcamMenu);
-        } else {
-            delete webcamMenu;
-        }
-
+        QMenu* envMenu = createEnvironmentMenu();
         mToolsUi->environment_button->setMenu(envMenu);
         mToolsUi->environment_button->setEnabled(true);
     } else {
@@ -2018,6 +1977,96 @@ void ToolWindow::on_xr_viewport_rotate_button_clicked() {
     } else {
         handleUICommand(QtUICommand::XR_VIEWPORT_CONTROL_MODE_ROTATE, true);
     }
+}
+
+static QString formatEnvironmentName(const QString& fileName) {
+    QString name = fileName;
+    name.replace('-', ' ');
+    name.replace('_', ' ');
+
+    QStringList words = name.split(' ', Qt::SkipEmptyParts);
+    for (int i = 0; i < words.size(); ++i) {
+        if (!words[i].isEmpty()) {
+            words[i][0] = words[i][0].toUpper();
+            for (int j = 1; j < words[i].length(); ++j) {
+                words[i][j] = words[i][j].toLower();
+            }
+        }
+    }
+    return words.join(' ');
+}
+
+QMenu* ToolWindow::createEnvironmentMenu() {
+    QMenu* envMenu = new QMenu(this);
+    std::string sdkRoot = android::ConfigDirs::getSdkRootDirectory();
+    QDir envDir(QString::fromStdString(sdkRoot) + "/environments");
+
+    envDir.setNameFilters(QStringList() << "*.jpg");
+    envDir.setFilter(QDir::Files | QDir::NoSymLinks);
+
+    QFileInfoList list = envDir.entryInfoList();
+
+    if (!list.isEmpty()) {
+        for (const QFileInfo& fileInfo : list) {
+            // Reserve files ending in 360 for 360 image mode
+            if (fileInfo.fileName().endsWith("360.jpg")) {
+                continue;
+            }
+            QString displayName =
+                    formatEnvironmentName(fileInfo.completeBaseName());
+            QString filePath = fileInfo.absoluteFilePath();
+            QAction* action = envMenu->addAction(displayName);
+            connect(action, &QAction::triggered, this, [this, filePath]() {
+                std::string command =
+                        "scene.mode = imagefile:" + filePath.toStdString();
+                getConsoleAgents()->virtual_scene->reloadEnvironment(
+                        command.c_str());
+            });
+        }
+    } else {
+        envMenu->addAction(tr("Default Environment"), this,
+                           SLOT(defaultEnvironmentSelected()));
+    }
+    envMenu->addAction(tr("None"), this, SLOT(noneSelected()));
+    envMenu->addSeparator();
+    envMenu->addAction(tr("Custom Image..."), this,
+                       SLOT(customImageSelected()));
+    envMenu->addAction(tr("Custom Video..."), this,
+                       SLOT(customVideoSelected()));
+    envMenu->addAction(tr("Custom 360 Image..."), this,
+                       SLOT(custom360ImageSelected()));
+
+    QMenu* webcamMenu = new QMenu(tr("Webcams"), this);
+    const QAndroidVirtualSceneAgent* agent = getConsoleAgents()->virtual_scene;
+    if (agent && agent->enumerateWebcams &&
+        android::base::System::get()->getEnvironmentVariable(
+                "ANDROID_EMU_ENABLE_WEBCAM_MENU") != "") {
+        struct Context {
+            QMenu* menu;
+            ToolWindow* window;
+        } context = {webcamMenu, this};
+
+        agent->enumerateWebcams(&context, [](void* opaque,
+                                             const char* userFacingName,
+                                             const char* label,
+                                             const char* id) {
+            auto* ctx = static_cast<Context*>(opaque);
+            ToolWindow* window = ctx->window;
+            QAction* action = ctx->menu->addAction(
+                    QString::fromUtf8(userFacingName ? userFacingName : label));
+            std::string id_str = id ? id : "";
+            window->connect(action, &QAction::triggered, [window, id_str]() {
+                window->webcamSelected(id_str);
+            });
+        });
+    }
+    if (!webcamMenu->isEmpty()) {
+        envMenu->addMenu(webcamMenu);
+    } else {
+        delete webcamMenu;
+    }
+
+    return envMenu;
 }
 
 void ToolWindow::defaultEnvironmentSelected() {

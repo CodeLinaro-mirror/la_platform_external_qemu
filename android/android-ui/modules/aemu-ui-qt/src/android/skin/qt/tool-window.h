@@ -193,6 +193,7 @@ private:
     // Check the input or viewport control button which matches the
     // `currentMode` command, otherwise uncheck the button.
     void updateXrNavigationButtonsChecked(QtUICommand currentMode);
+    QMenu* createEnvironmentMenu();
 
     // Notify guest (Android) about the hand gesture selection for left hand.
     void notifyGuestOnLeftHandGesture(const QString& gesture);
