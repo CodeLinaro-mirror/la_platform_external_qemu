@@ -725,7 +725,7 @@ static void virtio_snd_handle_pcm_release(VirtIOSound *s,
  * @s: VirtIOSound device
  * @cmd: control command request
  */
-static inline void
+static void
 process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
 {
     uint32_t code;
@@ -844,8 +844,8 @@ static void virtio_snd_handle_event(VirtIODevice *vdev, VirtQueue *vq)
 /*
  * Must only be called if `invalid` is not empty.
  */
-static inline void empty_invalid_queue(VirtIODevice *vdev, VirtQueue *vq,
-                                       VirtIOSoundPCMBufferQueue *invalid)
+static void empty_invalid_queue(VirtIODevice *vdev, VirtQueue *vq,
+                                VirtIOSoundPCMBufferQueue *invalid)
 {
     VirtIOSoundPCMBuffer *buffer = NULL;
     virtio_snd_pcm_status resp = { 0 };
@@ -1145,8 +1145,8 @@ error_cleanup:
     virtio_snd_unrealize(dev);
 }
 
-static inline void return_tx_buffer(VirtIOSoundPCMStream *stream,
-                                    VirtIOSoundPCMBuffer *buffer)
+static void return_tx_buffer(VirtIOSoundPCMStream *stream,
+                             VirtIOSoundPCMBuffer *buffer)
 {
     virtio_snd_pcm_status resp = { 0 };
     resp.status = cpu_to_le32(VIRTIO_SND_S_OK);
@@ -1232,8 +1232,8 @@ static void virtio_snd_pcm_out_cb(void *data, int available)
  *
  * @stream: VirtIOSoundPCMStream *stream
  */
-static inline void return_rx_buffer(VirtIOSoundPCMStream *stream,
-                                    VirtIOSoundPCMBuffer *buffer)
+static void return_rx_buffer(VirtIOSoundPCMStream *stream,
+                             VirtIOSoundPCMBuffer *buffer)
 {
     virtio_snd_pcm_status resp = { 0 };
     resp.status = cpu_to_le32(VIRTIO_SND_S_OK);
@@ -1323,7 +1323,7 @@ static void virtio_snd_pcm_in_cb(void *data, int available)
  *
  * @stream: VirtIOSoundPCMStream *stream
  */
-static inline void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream)
+static void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream)
 {
     VirtIOSoundPCMBuffer *buffer;
     void (*cb)(VirtIOSoundPCMStream *, VirtIOSoundPCMBuffer *) =
