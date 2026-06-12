@@ -288,49 +288,16 @@ extern void skin_winsys_quit_request() {
         // We did not exchange the value, i.e. sMainLoopShouldExit != false.
         return;
     }
-    bool needRequestClose = false;
 
-    if (getConsoleAgents()->settings->avdInfo()) {
-        auto arch = (avdInfo_getTargetCpuArch(getConsoleAgents()->settings->avdInfo()));
-        if (!strcmp(arch, "x86") || !strcmp(arch, "x86_64")) {
-        } else if (!getConsoleAgents()
-                            ->settings->android_cmdLineOptions()
-                            ->no_snapshot_save) {
-            needRequestClose = true;
-        }
+#ifdef _WIN32
+    if (!SetEvent(sWakeEvent)) {
+        derror("%s %s: SetEvent() failed!\n", __FILE__, __FUNCTION__);
     }
-
-#ifdef _WIN32
-    // TODO: check on windows
-    needRequestClose = false;
-#endif
-    if (needRequestClose) {
-        printf("saving arm snapshot.... !!!\n\n");
-        getConsoleAgents()->settings->set_arm_snapshot_save_completed(false);
-        EmulatorNoQtNoWindow* guiless_window =
-                EmulatorNoQtNoWindow::getInstance();
-        guiless_window->requestClose();
-        for (int i = 0; i < 60; ++i) {
-            System::get()->sleepMs(1 * 1000);
-            if (getConsoleAgents()->settings->arm_snapshot_save_completed())
-                break;
-        }
-        printf("saving done.... !!!\n\n");
-        // We did not exit all threads at this point, thus we should do an
-        // std::quick_exit(). But std::quick_exit() is not available on Mac M1.
-        // Thus we call abort() instead.
-        std::abort();
-    } else {
-#ifdef _WIN32
-        if (!SetEvent(sWakeEvent)) {
-            derror("%s %s: SetEvent() failed!\n", __FILE__, __FUNCTION__);
-        }
 #else
-        if (kill(getpid(), SIGUSR1)) {
-            derror("%s %s: kill() failed!\n", __FILE__, __FUNCTION__);
-        }
-#endif
+    if (kill(getpid(), SIGUSR1)) {
+        derror("%s %s: kill() failed!\n", __FILE__, __FUNCTION__);
     }
+#endif
 }
 
 void skin_winsys_destroy() {
