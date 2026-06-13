@@ -51,8 +51,15 @@ std::string getSnapshotBaseDir() {
 
 std::string getSnapshotDir(const char* snapshotName) {
     auto baseDir = getSnapshotBaseDir();
-    auto path = base::PathUtils::join(baseDir, snapshotName);
-    return path;
+    // SECURITY: snapshotName arrives verbatim from gRPC SnapshotService
+    // (Push/Save/DeleteSnapshot). PathUtils::join() returns an absolute
+    // second arg verbatim and does not strip "..". Callers immediately
+    // path_delete_dir() / move() / mkdir the result, so a hostile name like
+    // "/home/<u>" or "../../.." escapes the AVD. Force a single component.
+    std::string safe(snapshotName ? snapshotName : "");
+    std::replace(safe.begin(), safe.end(), '/',  '_');
+    std::replace(safe.begin(), safe.end(), '\\', '_');
+    return base::PathUtils::join(baseDir, safe);
 }
 
 std::string getSnapshotDepsFileName() {
