@@ -136,6 +136,18 @@ static VirtIOPcmParams *virtio_snd_pcm_get_params(VirtIOSound *s,
 }
 
 /*
+ * Returns if a stream is output or input by its id.
+ *
+ * @s: VirtIOSound device
+ * @stream_id: a stream id
+ */
+static bool virtio_snd_is_output_stream(const VirtIOSound *s,
+                                        uint32_t stream_id)
+{
+    return stream_id < ((s->snd_conf.streams + 1U) / 2U);
+}
+
+/*
  * Handle the VIRTIO_SND_R_PCM_INFO request.
  * The function writes the info structs to the request element.
  *
@@ -145,10 +157,8 @@ static VirtIOPcmParams *virtio_snd_pcm_get_params(VirtIOSound *s,
 static void virtio_snd_handle_pcm_info(VirtIOSound *s,
                                        virtio_snd_ctrl_command *cmd)
 {
-    uint32_t stream_id, start_id, count, size;
-    virtio_snd_pcm_info val;
+    uint32_t start_id, count, size;
     virtio_snd_query_info req;
-    VirtIOSoundPCMStream *stream = NULL;
     g_autofree virtio_snd_pcm_info *pcm_info = NULL;
     size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
                                cmd->elem->out_num,
@@ -169,6 +179,15 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
 
     start_id = le32_to_cpu(req.start_id);
     count = le32_to_cpu(req.count);
+    if ((start_id + count) > s->snd_conf.streams) {
+        error_report("pcm info: requested a stream outside of bounds,"
+                " start_id=%" PRIu32 " count=%" PRIu32
+                " snd_conf.streams=%" PRIu32,
+                start_id, count, s->snd_conf.streams);
+        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
+        return;
+    }
+
     size = le32_to_cpu(req.size);
 
     if (iov_size(cmd->elem->in_sg, cmd->elem->in_num) <
@@ -185,24 +204,19 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
 
     pcm_info = g_new0(virtio_snd_pcm_info, count);
     for (uint32_t i = 0; i < count; i++) {
-        stream_id = i + start_id;
+        uint32_t stream_id = i + start_id;
+        virtio_snd_pcm_info* val = &pcm_info[i];
         trace_virtio_snd_handle_pcm_info(stream_id);
-        stream = virtio_snd_pcm_get_stream(s, stream_id);
-        if (!stream) {
-            error_report("Invalid stream id: %"PRIu32, stream_id);
-            cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-            return;
-        }
-        val = stream_default_info;
-        val.direction = stream->is_output ?
+
+        *val = stream_default_info;
+        val->direction = virtio_snd_is_output_stream(s, stream_id) ?
                 VIRTIO_SND_D_OUTPUT : VIRTIO_SND_D_INPUT;
         /*
          * 5.14.6.6.2.1 Device Requirements: Stream Information The device MUST
          * NOT set undefined feature, format, rate and direction values. The
          * device MUST initialize the padding bytes to 0.
          */
-        pcm_info[i] = val;
-        memset(&pcm_info[i].padding, 0, 5);
+        memset(&val->padding, 0, 5);
     }
 
     cmd->payload_size = sizeof(virtio_snd_pcm_info) * count;
@@ -1067,7 +1081,6 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
     virtio_snd_pcm_set_params default_params = { 0 };
     uint32_t status;
-    uint32_t num_output_streams;
 
     trace_virtio_snd_realize(vsnd);
 
@@ -1122,8 +1135,6 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
     default_params.format = VIRTIO_SND_PCM_FMT_S16;
     default_params.rate = VIRTIO_SND_PCM_RATE_48000;
 
-    num_output_streams = (vsnd->snd_conf.streams + 1U) / 2;
-
     for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
         VirtIOSoundPCMStream* stream;
 
@@ -1136,7 +1147,7 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
         }
 
         vsnd->pcm_items[i].stream = virtio_snd_create_new_stream(
-            vsnd, i, (i < num_output_streams));
+            vsnd, i, virtio_snd_is_output_stream(vsnd, i));
     }
 
     return;
