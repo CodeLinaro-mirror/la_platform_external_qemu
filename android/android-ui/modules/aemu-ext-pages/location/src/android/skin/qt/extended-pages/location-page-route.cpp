@@ -185,6 +185,7 @@ void LocationPage::routeWidget_editButtonClicked(CCListItem* listItem) {
     QAction* deleteAction = popMenu->addAction(tr("Delete"));
 
     QAction* theAction = popMenu->exec(QCursor::pos());
+    bool routeDeleted = false;
     if (theAction == editAction && editRoute(routeWidgetItem->routeElement())) {
         // We don't need to send any updates to the map since we aren't editing any
         // of the routing points.
@@ -206,10 +207,14 @@ void LocationPage::routeWidget_editButtonClicked(CCListItem* listItem) {
         if (selection == QMessageBox::Apply) {
             deleteRoute(routeWidgetItem);
             mPrevSelectedRoutes.clear();
+            routeDeleted = true;
         }
         QApplication::restoreOverrideCursor();
     }
     mUi->loc_routeList->blockSignals(false);
+    if (routeDeleted) {
+        on_loc_routeList_itemSelectionChanged();
+    }
 }
 
 void LocationPage::updateRouteWidgetItemsColor() {
