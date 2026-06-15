@@ -367,7 +367,7 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
 static uint32_t virtio_snd_handle_pcm_set_params(VirtIOSound *s,
                                                  VirtQueueElement *elem)
 {
-    virtio_snd_pcm_set_params req = { 0 };
+    virtio_snd_pcm_set_params req;
     uint32_t stream_id;
     size_t msg_sz = iov_to_buf(elem->out_sg,
                                elem->out_num,
