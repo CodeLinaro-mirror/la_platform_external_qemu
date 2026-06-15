@@ -155,13 +155,13 @@ static bool virtio_snd_is_output_stream(const VirtIOSound *s,
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
 static uint32_t virtio_snd_handle_pcm_info(VirtIOSound *s,
-                                       virtio_snd_ctrl_command *cmd)
+                                           VirtQueueElement *elem,
+                                           size_t *payload_size)
 {
     uint32_t start_id, count, size;
     virtio_snd_query_info req;
     g_autofree virtio_snd_pcm_info *pcm_info = NULL;
-    size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
-                               cmd->elem->out_num,
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
                                0, &req, sizeof(req));
 
     if (msg_sz != sizeof(req)) {
@@ -186,13 +186,13 @@ static uint32_t virtio_snd_handle_pcm_info(VirtIOSound *s,
 
     size = le32_to_cpu(req.size);
 
-    if (iov_size(cmd->elem->in_sg, cmd->elem->in_num) <
+    if (iov_size(elem->in_sg, elem->in_num) <
         sizeof(virtio_snd_hdr) + size * count) {
         /*
          * TODO: do we need to set DEVICE_NEEDS_RESET?
          */
         error_report("pcm info: buffer too small, got: %zu, needed: %zu",
-                iov_size(cmd->elem->in_sg, cmd->elem->in_num),
+                iov_size(elem->in_sg, elem->in_num),
                 sizeof(virtio_snd_pcm_info));
         return VIRTIO_SND_S_BAD_MSG;
     }
@@ -214,12 +214,10 @@ static uint32_t virtio_snd_handle_pcm_info(VirtIOSound *s,
         memset(&val->padding, 0, 5);
     }
 
-    cmd->payload_size = sizeof(virtio_snd_pcm_info) * count;
-    iov_from_buf(cmd->elem->in_sg,
-                 cmd->elem->in_num,
+    *payload_size = sizeof(virtio_snd_pcm_info) * count;
+    iov_from_buf(elem->in_sg, elem->in_num,
                  sizeof(virtio_snd_hdr),
-                 pcm_info,
-                 cmd->payload_size);
+                 pcm_info, *payload_size);
 
     return VIRTIO_SND_S_OK;
 }
@@ -367,12 +365,12 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
 static uint32_t virtio_snd_handle_pcm_set_params(VirtIOSound *s,
-                                             virtio_snd_ctrl_command *cmd)
+                                                 VirtQueueElement *elem)
 {
     virtio_snd_pcm_set_params req = { 0 };
     uint32_t stream_id;
-    size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
-                               cmd->elem->out_num,
+    size_t msg_sz = iov_to_buf(elem->out_sg,
+                               elem->out_num,
                                0, &req, sizeof(req));
 
     if (msg_sz != sizeof(req)) {
@@ -577,11 +575,10 @@ static const char *print_code(uint32_t code)
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
 static uint32_t virtio_snd_handle_pcm_prepare(VirtIOSound *s,
-                                          virtio_snd_ctrl_command *cmd)
+                                              VirtQueueElement *elem)
 {
     uint32_t stream_id;
-    size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
-                               cmd->elem->out_num,
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
                                sizeof(virtio_snd_hdr),
                                &stream_id,
                                sizeof(stream_id));
@@ -600,14 +597,13 @@ static uint32_t virtio_snd_handle_pcm_prepare(VirtIOSound *s,
  * @start: whether to start or stop the device
  */
 static uint32_t virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
-                                             virtio_snd_ctrl_command *cmd,
-                                             bool start)
+                                                 VirtQueueElement *elem,
+                                                 bool start)
 {
     VirtIOSoundPCMStream *stream;
     virtio_snd_pcm_hdr req;
     uint32_t stream_id;
-    size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
-                               cmd->elem->out_num,
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
                                0, &req, sizeof(req));
 
     if (msg_sz != sizeof(req)) {
@@ -669,12 +665,11 @@ static size_t virtio_snd_pcm_get_io_msgs_count(VirtIOSoundPCMStream *stream)
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
 static uint32_t virtio_snd_handle_pcm_release(VirtIOSound *s,
-                                              virtio_snd_ctrl_command *cmd)
+                                              VirtQueueElement *elem)
 {
     uint32_t stream_id;
     VirtIOSoundPCMStream *stream;
-    size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
-                               cmd->elem->out_num,
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
                                sizeof(virtio_snd_hdr),
                                &stream_id,
                                sizeof(stream_id));
@@ -726,26 +721,28 @@ static uint32_t virtio_snd_handle_pcm_release(VirtIOSound *s,
  * @s: VirtIOSound device
  * @cmd: control command request
  */
-static void
-process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
+static size_t
+process_cmd(VirtIOSound *s, VirtQueueElement *elem)
 {
+    virtio_snd_hdr ctrl;
+    virtio_snd_hdr resp;
+    size_t payload_size = 0;
     uint32_t code;
     uint32_t resp_code;
-    size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
-                               cmd->elem->out_num,
-                               0, &cmd->ctrl, sizeof(cmd->ctrl));
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
+                               0, &ctrl, sizeof(ctrl));
 
-    if (msg_sz != sizeof(cmd->ctrl)) {
+    if (msg_sz != sizeof(ctrl)) {
         /*
          * TODO: do we need to set DEVICE_NEEDS_RESET?
          */
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(cmd->ctrl));
-        return;
+                %zu\n", __func__, msg_sz, sizeof(ctrl));
+        return 0;
     }
 
-    code = le32_to_cpu(cmd->ctrl.code);
+    code = le32_to_cpu(ctrl.code);
 
     trace_virtio_snd_handle_code(code, print_code(code));
 
@@ -757,22 +754,22 @@ process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
         resp_code = VIRTIO_SND_S_NOT_SUPP;
         break;
     case VIRTIO_SND_R_PCM_INFO:
-        resp_code = virtio_snd_handle_pcm_info(s, cmd);
+        resp_code = virtio_snd_handle_pcm_info(s, elem, &payload_size);
         break;
     case VIRTIO_SND_R_PCM_START:
-        resp_code = virtio_snd_handle_pcm_start_stop(s, cmd, true);
+        resp_code = virtio_snd_handle_pcm_start_stop(s, elem, true);
         break;
     case VIRTIO_SND_R_PCM_STOP:
-        resp_code = virtio_snd_handle_pcm_start_stop(s, cmd, false);
+        resp_code = virtio_snd_handle_pcm_start_stop(s, elem, false);
         break;
     case VIRTIO_SND_R_PCM_SET_PARAMS:
-        resp_code = virtio_snd_handle_pcm_set_params(s, cmd);
+        resp_code = virtio_snd_handle_pcm_set_params(s, elem);
         break;
     case VIRTIO_SND_R_PCM_PREPARE:
-        resp_code = virtio_snd_handle_pcm_prepare(s, cmd);
+        resp_code = virtio_snd_handle_pcm_prepare(s, elem);
         break;
     case VIRTIO_SND_R_PCM_RELEASE:
-        resp_code = virtio_snd_handle_pcm_release(s, cmd);
+        resp_code = virtio_snd_handle_pcm_release(s, elem);
         break;
     case VIRTIO_SND_R_CHMAP_INFO:
         qemu_log_mask(LOG_UNIMP,
@@ -786,13 +783,12 @@ process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
         resp_code = VIRTIO_SND_S_BAD_MSG;
     }
 
-    cmd->resp.code = cpu_to_le32(resp_code);
+    resp.code = cpu_to_le32(resp_code);
 
-    iov_from_buf(cmd->elem->in_sg,
-                 cmd->elem->in_num,
-                 0, &cmd->resp, sizeof(cmd->resp));
-    virtqueue_push(vq, cmd->elem,
-                   sizeof(cmd->resp) + cmd->payload_size);
+    iov_from_buf(elem->in_sg, elem->in_num,
+                 0, &resp, sizeof(resp));
+
+    return sizeof(resp) + payload_size;
 }
 
 /*
@@ -804,25 +800,20 @@ process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
 static void virtio_snd_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
 {
     VirtIOSound *s = VIRTIO_SND(vdev);
-    VirtQueueElement *elem;
-    virtio_snd_ctrl_command cmd;
-
     trace_virtio_snd_handle_ctrl(vdev, vq);
 
     if (!virtio_queue_ready(vq)) {
         return;
     }
 
-    elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
-    while (elem) {
-        memset(&cmd, 0, sizeof(cmd));
-        cmd.elem = elem;
-        cmd.resp.code = cpu_to_le32(VIRTIO_SND_S_OK);
-
-        process_cmd(s, &cmd, vq);
-        g_free(elem);
-
-        elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
+    while (true) {
+        VirtQueueElement *elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
+        if (elem) {
+            virtqueue_push(vq, elem, process_cmd(s, elem));
+            g_free(elem);
+        } else {
+            break;
+        }
     }
 
     virtio_notify(vdev, vq);

@@ -231,10 +231,4 @@ struct VirtIOSound {
     virtio_snd_config snd_conf;
 };
 
-struct virtio_snd_ctrl_command {
-    VirtQueueElement *elem;
-    virtio_snd_hdr ctrl;
-    virtio_snd_hdr resp;
-    size_t payload_size;
-};
 #endif
