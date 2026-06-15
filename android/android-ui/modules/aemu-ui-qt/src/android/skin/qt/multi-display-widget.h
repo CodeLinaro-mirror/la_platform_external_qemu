@@ -16,6 +16,9 @@
 #include "GLES3/gl3.h"
 #include "android/skin/qt/gl-widget.h"
 #include "android/skin/qt/mouse-event-handler.h"
+#include "android/skin/qt/SharedStreamEmulator.h"
+
+#include <QPixmap>
 
 class MultiDisplayWidget : public GLWidget {
     Q_OBJECT
@@ -26,6 +29,9 @@ public:
                        QWidget* parent = 0);
     ~MultiDisplayWidget();
     void paintWindow(uint32_t colorBufferId);
+    void initializeStreamer(StreamTransport transport_type);
+signals:
+    void frameReady(const QImage& frame);
 private:
     uint32_t mFrameWidth;
     uint32_t mFrameHeight;
@@ -50,6 +56,9 @@ private:
     MouseEventHandler mMouseEvHandler;
     GLuint createShader(GLint shaderType, const char* shaderText);
     void clearGL();
+    std::unique_ptr<SharedStreamEmulator> mStreamer;
+    QPixmap mGuestScreenPixmap;
+    void slot_updateGuestScreen(const QImage& frame);
 
 protected:
     // This is called once, after the GL context is created, to do some one-off
@@ -62,6 +71,7 @@ protected:
     // Called every time the widget needs to be repainted.
     void repaintGL() override;
     bool event(QEvent *event) override;
+    void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;

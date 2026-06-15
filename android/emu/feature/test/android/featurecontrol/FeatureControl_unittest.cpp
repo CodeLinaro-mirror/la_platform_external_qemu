@@ -394,6 +394,7 @@ Feature: 'QemuCameraSensorOrientation' (119), value: 0, default: 0, is overridde
 Feature: 'NetsimX' (120), value: 0, default: 0, is overridden: 0
 Feature: 'VulkanProtectedMemoryEmulation' (121), value: 0, default: 0, is overridden: 0
 Feature: 'XrDimming' (122), value: 0, default: 0, is overridden: 0
+Feature: 'XrHandAndEyePointers' (123), value: 0, default: 0, is overridden: 0
 )#";
     EXPECT_EQ(feature_list, ss.str());
 }

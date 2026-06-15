@@ -93,6 +93,7 @@ protected:
     virtual void showEvent(QShowEvent*) override;
 
     QImage mOffscreenImage;
+    void paintEvent(QPaintEvent*) override;
 
 public:
     bool ensureInit();
@@ -100,7 +101,6 @@ public:
     //for resizable, when display config changes, we have to reinitgl
     virtual bool reInitGL() { return true; }
 private:
-    void paintEvent(QPaintEvent*) override;
     void resizeEvent(QResizeEvent*) override;
 
     void destroyContext();

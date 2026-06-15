@@ -1822,6 +1822,29 @@ int convert_frame_slow(const void* src_frame,
     }
 
     for (n = 0; n < fbs_num; n++) {
+        if (!framebuffers[n].framebuffer) {
+            E("%s: framebuffers[%d].framebuffer is NULL", __FUNCTION__, n);
+            return -1;
+        }
+
+        if (framebuffers[n].framebuffer_size) {
+            size_t size_required = 0;
+
+            if (!calculate_framebuffer_size(framebuffers[n].pixel_format,
+                                            width, height, &size_required)) {
+                E("%s: Can't calculate the required size for framebuffer[%d]",
+                __FUNCTION__, n);
+                return -1;
+            }
+
+            if (size_required > framebuffers[n].framebuffer_size) {
+                E("%s: framebuffer[%d] framebuffer is too small (%zu bytes), %zu bytes are required",
+                __FUNCTION__, n, framebuffers[n].framebuffer_size, size_required);
+                return -1;
+
+            }
+        }
+
         /* Note that we need to apply white balance, exposure compensation, etc.
          * when we transfer the captured frame to the user framebuffer. So, even
          * if source and destination formats are the same, we will have to go
@@ -2132,6 +2155,29 @@ int convert_frame_fast(const void* src_frame,
 
         // Convert to the target framebuffer formats.
         void* dest = result_frame->framebuffers[n].framebuffer;
+        if (!dest) {
+            E("%s: framebuffers[n].framebuffer is NULL", __FUNCTION__, n);
+            return -1;
+        }
+
+        if (result_frame->framebuffers[n].framebuffer_size) {
+            const framebuffer_size = result_frame->framebuffers[n].framebuffer_size;
+            size_t size_required = 0;
+
+            if (!calculate_framebuffer_size(result_frame->framebuffers[n].pixel_format,
+                                            result_width, result_height, &size_required)) {
+                E("%s: Can't calculate the required size for framebuffer[%d]",
+                __FUNCTION__, n);
+                return -1;
+            }
+
+            if (size_required > framebuffer_size) {
+                E("%s: framebuffer[%d] framebuffer is too small (%zu bytes), %zu bytes are required",
+                __FUNCTION__, n, framebuffer_size, size_required);
+                return -1;
+            }
+        }
+
         const uint32_t dest_format = pixel_format_to_libyuv(
                 result_frame->framebuffers[n].pixel_format);
 

@@ -64,7 +64,12 @@ std::optional<Notification> NotificationStream::getDisplayNotificationEvent() {
         // This will make sure we will not include partially created/configured
         // displays in the event (See b/290831895).
         bool isPartiallyCreatedEvent = width == 0 && height == 0 && dpi == 0;
-        if (receivedDisplayStatus && !isPartiallyCreatedEvent) {
+
+        uint32_t cb = 0;
+        mAgents->multi_display->getDisplayColorBuffer(i, &cb);
+        bool isActive = (i == 0) || (cb != 0);
+
+        if (receivedDisplayStatus && !isPartiallyCreatedEvent && isActive) {
             auto cfg = displayConfig->add_displays();
             cfg->set_width(width);
             cfg->set_height(height);
@@ -169,6 +174,7 @@ NotificationStreamWriter* NotificationStream::notificationStream() {
     if (android_is_xr_mode()) {
         stream->eventArrived(getXrOptionsNotificationEvent());
     }
+    stream->eventArrived(getDisplayNotificationEvent());
     return stream;
 }
 
@@ -241,9 +247,6 @@ void NotificationStream::registerListeners() {
     MultiDisplay::getInstance()->registerOnce(
             [&](const android::DisplayChangeEvent state) {
                 DD("Displaychange event: %d", state.change);
-                if (state.change == DisplayChange::DisplayAdded) {
-                    return;
-                }
                 mNotificationListeners.fireEvent(getDisplayNotificationEvent());
             });
     auto foldableListener =

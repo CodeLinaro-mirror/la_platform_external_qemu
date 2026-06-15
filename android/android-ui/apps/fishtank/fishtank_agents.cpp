@@ -38,6 +38,12 @@
 #include "host-common/record_screen_agent.h"
 #include "host-common/vm_operations.h"
 #include "host-common/window_agent.h"
+#include "android/skin/qt/emulator-qt-window.h"
+#include "android/skin/qt/tool-window.h"
+#include "android/emulation/resizable_display_config.h"
+#include "android/hw-sensors.h"
+
+#include <set>
 
 #define ANDROID_AGENTS_LIST(X)   \
     X(QAndroidAutomationAgent)   \
@@ -87,4 +93,118 @@ public:
 
 void injectFishtankConsoleAgents() {
     android::emulation::injectConsoleAgents(FishtankAgentConsoleFactory());
+}
+
+static std::set<uint32_t> sOpenedDisplays;
+
+void initializeGrpcNotifications(
+        android::emulation::control::EmulatorControlClient* client) {
+    // Ensure the local physical model is initialized so local UI posture indicators and
+    // hinge calculations evaluate correctly before processing incoming gRPC notifications.
+    android_hw_sensors_init(getFishtankEmulatorWindowAgent());
+    client->registerNotificationListener(
+            [](const android::emulation::control::Notification* event) {
+                // Synchronize incoming foldable posture state from the remote emulator backend
+                // with the local physical model.
+                if (event && event->has_posture()) {
+                    float postureVal = static_cast<float>(event->posture().value());
+                    android_physical_model_set(PHYSICAL_PARAMETER_POSTURE, &postureVal, 1,
+                                               PHYSICAL_INTERPOLATION_STEP);
+                }
+
+                if (event && event->has_displayconfigurationschangednotification()) {
+                    const auto& displayConfigs =
+                            event->displayconfigurationschangednotification()
+                                    .displayconfigurations();
+
+                    if (resizableEnabled()) {
+                        // Figure out what resizable configuration display 0 is based on the
+                        // resolution. Compare it against the preset sizes.
+                        for (const auto& display : displayConfigs.displays()) {
+                            if (display.display() == 0) {
+                                uint32_t width = display.width();
+                                uint32_t height = display.height();
+                                PresetEmulatorSizeType matchedPreset = PRESET_SIZE_PHONE;
+                                bool found = false;
+                                for (int i = 0; i < PRESET_SIZE_MAX; ++i) {
+                                    struct PresetEmulatorSizeInfo info;
+                                    auto pt = static_cast<PresetEmulatorSizeType>(i);
+                                    if (getResizableConfig(pt, &info)) {
+                                        if (info.width == width && info.height == height) {
+                                            matchedPreset = pt;
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (found) {
+                                    if (const auto win = EmulatorQtWindow::getInstance()) {
+                                        win->runOnUiThread([win, matchedPreset]() {
+                                            win->toolWindow()->presetSizeAdvance(matchedPreset);
+                                        });
+                                    }
+                                } else {
+                                    derror("FishtankAgents: Display 0 config size %dx%d "
+                                           "does not match any preset", width, height);
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    std::set<uint32_t> activeIds;
+                    // Restrict secondary display pop-up windows to AVDs explicitly
+                    // configured with multi-display window hardware support. This prevents
+                    // opening unwanted secondary windows on foldable devices where the
+                    // emu-main-next backend transmits the folded outer buffer over gRPC.
+                    if (const auto md = getConsoleAgents()->multi_display;
+                        md && md->isMultiDisplayWindow()) {
+                        for (const auto& display : displayConfigs.displays()) {
+                            if (display.display() > 0) {
+                                activeIds.insert(display.display());
+                            }
+                        }
+                    }
+
+                    const auto windowAgent = getFishtankEmulatorWindowAgent();
+                    if (!windowAgent) {
+                        derror("FishtankAgents: No window agent to apply display changes");
+                        return;
+                    }
+
+                    // Open new displays
+                    for (uint32_t id : activeIds) {
+                        if (sOpenedDisplays.count(id) == 0) {
+                            // Find config to get width/height
+                            for (const auto& display : displayConfigs.displays()) {
+                                if (display.display() == id) {
+                                    windowAgent->addMultiDisplayWindow(
+                                            id, true, display.width(),
+                                            display.height());
+                                    windowAgent->updateUIMultiDisplayPage(id);
+                                    sOpenedDisplays.insert(id);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Close removed displays
+                    for (auto it = sOpenedDisplays.begin();
+                         it != sOpenedDisplays.end();) {
+                        uint32_t id = *it;
+                        if (activeIds.count(id) == 0) {
+                            windowAgent->addMultiDisplayWindow(id, false, 0, 0);
+                            windowAgent->updateUIMultiDisplayPage(id);
+                            it = sOpenedDisplays.erase(it);
+                        } else {
+                            ++it;
+                        }
+                    }
+                }
+            },
+            [](absl::Status status) {
+                dwarning("FishtankAgents: Notification stream finished with status: %s",
+                         status.ToString().c_str());
+            });
 }
