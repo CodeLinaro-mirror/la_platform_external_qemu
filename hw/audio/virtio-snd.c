@@ -162,17 +162,15 @@ static uint32_t virtio_snd_handle_pcm_info(VirtIOSound *s,
     g_autofree virtio_snd_pcm_info *pcm_info = NULL;
     size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
                                cmd->elem->out_num,
-                               0,
-                               &req,
-                               sizeof(virtio_snd_query_info));
+                               0, &req, sizeof(req));
 
-    if (msg_sz != sizeof(virtio_snd_query_info)) {
+    if (msg_sz != sizeof(req)) {
         /*
          * TODO: do we need to set DEVICE_NEEDS_RESET?
          */
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(virtio_snd_query_info));
+                %zu\n", __func__, msg_sz, sizeof(req));
         return VIRTIO_SND_S_BAD_MSG;
     }
 
@@ -375,17 +373,15 @@ static uint32_t virtio_snd_handle_pcm_set_params(VirtIOSound *s,
     uint32_t stream_id;
     size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
                                cmd->elem->out_num,
-                               0,
-                               &req,
-                               sizeof(virtio_snd_pcm_set_params));
+                               0, &req, sizeof(req));
 
-    if (msg_sz != sizeof(virtio_snd_pcm_set_params)) {
+    if (msg_sz != sizeof(req)) {
         /*
          * TODO: do we need to set DEVICE_NEEDS_RESET?
          */
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(virtio_snd_pcm_set_params));
+                %zu\n", __func__, msg_sz, sizeof(req));
         return VIRTIO_SND_S_BAD_MSG;
     }
     stream_id = le32_to_cpu(req.hdr.stream_id);
@@ -612,14 +608,12 @@ static uint32_t virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
     uint32_t stream_id;
     size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
                                cmd->elem->out_num,
-                               0,
-                               &req,
-                               sizeof(virtio_snd_pcm_hdr));
+                               0, &req, sizeof(req));
 
-    if (msg_sz != sizeof(virtio_snd_pcm_hdr)) {
+    if (msg_sz != sizeof(req)) {
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(virtio_snd_pcm_hdr));
+                %zu\n", __func__, msg_sz, sizeof(req));
         return VIRTIO_SND_S_BAD_MSG;
     }
 
@@ -739,17 +733,15 @@ process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
     uint32_t resp_code;
     size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
                                cmd->elem->out_num,
-                               0,
-                               &cmd->ctrl,
-                               sizeof(virtio_snd_hdr));
+                               0, &cmd->ctrl, sizeof(cmd->ctrl));
 
-    if (msg_sz != sizeof(virtio_snd_hdr)) {
+    if (msg_sz != sizeof(cmd->ctrl)) {
         /*
          * TODO: do we need to set DEVICE_NEEDS_RESET?
          */
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(virtio_snd_hdr));
+                %zu\n", __func__, msg_sz, sizeof(cmd->ctrl));
         return;
     }
 
@@ -798,11 +790,9 @@ process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
 
     iov_from_buf(cmd->elem->in_sg,
                  cmd->elem->in_num,
-                 0,
-                 &cmd->resp,
-                 sizeof(virtio_snd_hdr));
+                 0, &cmd->resp, sizeof(cmd->resp));
     virtqueue_push(vq, cmd->elem,
-                   sizeof(virtio_snd_hdr) + cmd->payload_size);
+                   sizeof(cmd->resp) + cmd->payload_size);
 }
 
 /*
