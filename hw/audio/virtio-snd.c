@@ -153,7 +153,7 @@ static bool virtio_snd_is_output_stream(const VirtIOSound *s,
  * @s: VirtIOSound device
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
-static void virtio_snd_handle_pcm_info(VirtIOSound *s,
+static uint32_t virtio_snd_handle_pcm_info(VirtIOSound *s,
                                        virtio_snd_ctrl_command *cmd)
 {
     uint32_t start_id, count, size, tmp;
@@ -169,8 +169,7 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
                 %zu\n", __func__, msg_sz, sizeof(virtio_snd_query_info));
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     start_id = le32_to_cpu(req.start_id);
@@ -189,8 +188,7 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
         error_report("pcm info: start_id + count is greater than the total "
                      "number of streams, got: start_id = %u, count = %u",
                      start_id, count);
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     /*
@@ -205,8 +203,7 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
         error_report("pcm info: buffer too small, got: %zu, needed: %zu",
                 iov_size(cmd->elem->in_sg, cmd->elem->in_num),
                 sizeof(virtio_snd_pcm_info) * count);
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     pcm_info = g_new0(virtio_snd_pcm_info, count);
@@ -227,12 +224,13 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
     }
 
     cmd->payload_size = sizeof(virtio_snd_pcm_info) * count;
-    cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_OK);
     iov_from_buf(cmd->elem->in_sg,
                  cmd->elem->in_num,
                  sizeof(virtio_snd_hdr),
                  pcm_info,
                  cmd->payload_size);
+
+    return VIRTIO_SND_S_OK;
 }
 
 /*
@@ -347,12 +345,12 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
 
     if (stream_id >= s->snd_conf.streams || s->pcm_items == NULL) {
         virtio_error(VIRTIO_DEVICE(s), "Streams have not been initialized.\n");
-        return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     if (virtio_snd_get_qemu_audsettings(
             &as_ignored, params->channels, params->format, params->rate)) {
-        return cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
+        return VIRTIO_SND_S_NOT_SUPP;
     }
 
     st_params = virtio_snd_pcm_get_params(s, stream_id);
@@ -365,7 +363,7 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
     st_params->format = params->format;
     st_params->rate = params->rate;
 
-    return cpu_to_le32(VIRTIO_SND_S_OK);
+    return VIRTIO_SND_S_OK;
 }
 
 /*
@@ -374,7 +372,7 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
  * @s: VirtIOSound device
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
-static void virtio_snd_handle_pcm_set_params(VirtIOSound *s,
+static uint32_t virtio_snd_handle_pcm_set_params(VirtIOSound *s,
                                              virtio_snd_ctrl_command *cmd)
 {
     virtio_snd_pcm_set_params req = { 0 };
@@ -389,12 +387,11 @@ static void virtio_snd_handle_pcm_set_params(VirtIOSound *s,
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
                 %zu\n", __func__, msg_sz, sizeof(virtio_snd_pcm_set_params));
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
     stream_id = le32_to_cpu(req.hdr.stream_id);
     trace_virtio_snd_handle_pcm_set_params(stream_id);
-    cmd->resp.code = virtio_snd_set_pcm_params(s, stream_id, &req);
+    return virtio_snd_set_pcm_params(s, stream_id, &req);
 }
 
 /*
@@ -583,7 +580,7 @@ static const char *print_code(uint32_t code)
  * @s: VirtIOSound device
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
-static void virtio_snd_handle_pcm_prepare(VirtIOSound *s,
+static uint32_t virtio_snd_handle_pcm_prepare(VirtIOSound *s,
                                           virtio_snd_ctrl_command *cmd)
 {
     uint32_t stream_id;
@@ -594,9 +591,9 @@ static void virtio_snd_handle_pcm_prepare(VirtIOSound *s,
                                sizeof(stream_id));
 
     stream_id = le32_to_cpu(stream_id);
-    cmd->resp.code = msg_sz == sizeof(stream_id)
+    return (msg_sz == sizeof(stream_id))
                    ? virtio_snd_pcm_prepare(s, stream_id)
-                   : cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
+                   : VIRTIO_SND_S_BAD_MSG;
 }
 
 /*
@@ -606,7 +603,7 @@ static void virtio_snd_handle_pcm_prepare(VirtIOSound *s,
  * @cmd: The request command queue element from VirtIOSound cmdq field
  * @start: whether to start or stop the device
  */
-static void virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
+static uint32_t virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
                                              virtio_snd_ctrl_command *cmd,
                                              bool start)
 {
@@ -623,26 +620,22 @@ static void virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
                 %zu\n", __func__, msg_sz, sizeof(virtio_snd_pcm_hdr));
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     stream_id = le32_to_cpu(req.stream_id);
-    cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_OK);
     trace_virtio_snd_handle_pcm_start_stop(start ? "VIRTIO_SND_R_PCM_START" :
             "VIRTIO_SND_R_PCM_STOP", stream_id);
 
     stream = virtio_snd_pcm_get_stream(s, stream_id);
     if (!stream) {
         error_report("Invalid stream id: %"PRIu32, stream_id);
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     WITH_QEMU_LOCK_GUARD(&stream->mtx) {
         if (!stream->voice.raw) {
-            cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-            return;
+            return VIRTIO_SND_S_BAD_MSG;
         }
 
         if (stream->is_output) {
@@ -653,6 +646,8 @@ static void virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
 
         stream->active = start;
     }
+
+    return VIRTIO_SND_S_OK;
 }
 
 /*
@@ -679,8 +674,8 @@ static size_t virtio_snd_pcm_get_io_msgs_count(VirtIOSoundPCMStream *stream)
  * @s: VirtIOSound device
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
-static void virtio_snd_handle_pcm_release(VirtIOSound *s,
-                                          virtio_snd_ctrl_command *cmd)
+static uint32_t virtio_snd_handle_pcm_release(VirtIOSound *s,
+                                              virtio_snd_ctrl_command *cmd)
 {
     uint32_t stream_id;
     VirtIOSoundPCMStream *stream;
@@ -694,8 +689,7 @@ static void virtio_snd_handle_pcm_release(VirtIOSound *s,
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
                 %zu\n", __func__, msg_sz, sizeof(stream_id));
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     stream_id = le32_to_cpu(stream_id);
@@ -706,8 +700,7 @@ static void virtio_snd_handle_pcm_release(VirtIOSound *s,
         virtio_error(VIRTIO_DEVICE(s),
                      "already released stream %"PRIu32,
                      stream_id);
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        return;
+        return VIRTIO_SND_S_BAD_MSG;
     }
 
     if (virtio_snd_pcm_get_io_msgs_count(stream)) {
@@ -724,7 +717,7 @@ static void virtio_snd_handle_pcm_release(VirtIOSound *s,
         virtio_snd_pcm_flush(stream);
     }
 
-    cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_OK);
+    return VIRTIO_SND_S_OK;
 }
 
 /*
@@ -737,6 +730,7 @@ static void
 process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
 {
     uint32_t code;
+    uint32_t resp_code;
     size_t msg_sz = iov_to_buf(cmd->elem->out_sg,
                                cmd->elem->out_num,
                                0,
@@ -759,37 +753,39 @@ process_cmd(VirtIOSound *s, virtio_snd_ctrl_command *cmd, VirtQueue *vq)
     case VIRTIO_SND_R_JACK_REMAP:
         qemu_log_mask(LOG_UNIMP,
                      "virtio_snd: jack functionality is unimplemented.\n");
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
+        resp_code = VIRTIO_SND_S_NOT_SUPP;
         break;
     case VIRTIO_SND_R_PCM_INFO:
-        virtio_snd_handle_pcm_info(s, cmd);
+        resp_code = virtio_snd_handle_pcm_info(s, cmd);
         break;
     case VIRTIO_SND_R_PCM_START:
-        virtio_snd_handle_pcm_start_stop(s, cmd, true);
+        resp_code = virtio_snd_handle_pcm_start_stop(s, cmd, true);
         break;
     case VIRTIO_SND_R_PCM_STOP:
-        virtio_snd_handle_pcm_start_stop(s, cmd, false);
+        resp_code = virtio_snd_handle_pcm_start_stop(s, cmd, false);
         break;
     case VIRTIO_SND_R_PCM_SET_PARAMS:
-        virtio_snd_handle_pcm_set_params(s, cmd);
+        resp_code = virtio_snd_handle_pcm_set_params(s, cmd);
         break;
     case VIRTIO_SND_R_PCM_PREPARE:
-        virtio_snd_handle_pcm_prepare(s, cmd);
+        resp_code = virtio_snd_handle_pcm_prepare(s, cmd);
         break;
     case VIRTIO_SND_R_PCM_RELEASE:
-        virtio_snd_handle_pcm_release(s, cmd);
+        resp_code = virtio_snd_handle_pcm_release(s, cmd);
         break;
     case VIRTIO_SND_R_CHMAP_INFO:
         qemu_log_mask(LOG_UNIMP,
                      "virtio_snd: chmap info functionality is unimplemented.\n");
         trace_virtio_snd_handle_chmap_info();
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
+        resp_code = VIRTIO_SND_S_NOT_SUPP;
         break;
     default:
         /* error */
         error_report("virtio snd header not recognized: %"PRIu32, code);
-        cmd->resp.code = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
+        resp_code = VIRTIO_SND_S_BAD_MSG;
     }
+
+    cmd->resp.code = cpu_to_le32(resp_code);
 
     iov_from_buf(cmd->elem->in_sg,
                  cmd->elem->in_num,
