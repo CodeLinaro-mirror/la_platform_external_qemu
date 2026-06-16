@@ -39,6 +39,7 @@ extern "C" {
 #include "android/snapshot/Snapshotter.h"         // for Snapshotter
 #include "android/utils/debug.h"
 #include "android/utils/path.h"              // for path_copy_file
+#include <cctype>
 #include "host-common/FeatureControl.h"      // for isEnabled
 #include "host-common/HostmemIdMapping.h"    // for android_emulati...
 #include "host-common/VmLock.h"              // for RecursiveScoped...
@@ -383,11 +384,35 @@ static bool rebase_on_top_of(std::string src,
     return res;
 }
 
+// SECURITY: Reject shell-unsafe characters in snapshot names to prevent
+// command injection via cmd.exe on Windows.
+static bool isShellSafeSnapshotName(const char* s) {
+    if (!s || !*s) {
+        return false;
+    }
+    for (size_t i = 0; s[i]; ++i) {
+        if (i >= 128) {
+            return false;
+        }
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if (!(std::isalnum(c) || c == '.' || c == '_' || c == '-' || c >= 128)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool extract_snapshot(const char* srcImg,
                              const char* dstImg,
                              const char* snapshot,
                              void* opaque,
                              LineConsumerCallback errConsumer) {
+    if (!isShellSafeSnapshotName(snapshot)) {
+        std::string err = std::string("Refusing unsafe snapshot name '") +
+                          snapshot + "' for qemu-img.\n";
+        errConsumer(opaque, err.c_str(), err.size());
+        return false;
+    }
     auto qemu_img = System::get()->findBundledExecutable("qemu-img");
     // Extract the snapshot into a standalone qcow2 file.
     auto res = System::get()->runCommandWithResult({qemu_img, "convert", "-O",

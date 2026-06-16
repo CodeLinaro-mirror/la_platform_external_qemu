@@ -11,6 +11,8 @@
 
 #include "android/snapshot/PathUtils.h"
 
+#include <cctype>
+
 #include "android/avd/info.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
@@ -51,14 +53,16 @@ std::string getSnapshotBaseDir() {
 
 std::string getSnapshotDir(const char* snapshotName) {
     auto baseDir = getSnapshotBaseDir();
-    // SECURITY: snapshotName arrives verbatim from gRPC SnapshotService
-    // (Push/Save/DeleteSnapshot). PathUtils::join() returns an absolute
-    // second arg verbatim and does not strip "..". Callers immediately
-    // path_delete_dir() / move() / mkdir the result, so a hostile name like
-    // "/home/<u>" or "../../.." escapes the AVD. Force a single component.
+    // SECURITY: Sanitize snapshot names to prevent path traversal and
+    // downstream command injection.
     std::string safe(snapshotName ? snapshotName : "");
-    std::replace(safe.begin(), safe.end(), '/',  '_');
-    std::replace(safe.begin(), safe.end(), '\\', '_');
+    for (char& c : safe) {
+        unsigned char u = static_cast<unsigned char>(c);
+        if (!(std::isalnum(u) || u == '.' || u == '_' || u == '-' || u >= 128)) {
+            c = '_';
+        }
+    }
+    if (safe.empty() || safe == "." || safe == "..") safe = "_";
     return base::PathUtils::join(baseDir, safe);
 }
 
