@@ -1140,7 +1140,6 @@ public:
                                           std::to_string(cPixels),
                                   "");
                 }
-                cPixels = shm->size();
                 pixels = reinterpret_cast<uint8_t*>(shm->get());
 
                 auto transport = format->mutable_transport();
@@ -1169,11 +1168,13 @@ public:
 
         Stopwatch sw;
         if (isPNG) {
-            memcpy(pixels, img.getPixelBuf(), cPixels);
+            memcpy(pixels, img.getPixelBuf(), img.getPixelCount());
         } else {
+            size_t cap = shm ? shm->size() : cPixels;
             ScreenshotUtils::getScreenshot(
                     myDisplayId >= 0 ? myDisplayId : request->display(), request->format(), rotation, newWidth,
-                    newHeight, pixels, &cPixels, &width, &height, rect);
+                    newHeight, pixels, &cap, &width, &height, rect);
+            cPixels = cap;
         }
         // Update format information with the retrieved width, height.
         format->set_height(height);
