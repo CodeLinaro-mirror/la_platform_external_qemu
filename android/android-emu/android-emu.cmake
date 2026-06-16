@@ -683,6 +683,7 @@ if(NOT LINUX_AARCH64)
       android/snapshot/RamLoader_unittest.cpp
       android/snapshot/RamSaver_unittest.cpp
       android/snapshot/RamSnapshot_unittest.cpp
+      android/snapshot/PathUtils_unittest.cpp
       android/snapshot/Snapshot_unittest.cpp
       android/userspace-boot-properties_unittest.cpp
       android/verified-boot/load_config_unittest.cpp)
