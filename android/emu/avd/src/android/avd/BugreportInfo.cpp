@@ -106,8 +106,8 @@ BugreportInfo::BugreportInfo() {
         StringAppendFormat(&avdDetails, "Path: %s\n",
                            PathUtils::canonicalPath(contentPath).c_str());
         auto tag = avdInfo_getTag(getConsoleAgents()->settings->avdInfo());
-        StringAppendFormat(&avdDetails, "Target: %s (API level %d)\n", tag,
-                           avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo()));
+        StringAppendFormat(&avdDetails, "Target: %s (API level %s)\n", tag,
+                           avdInfo_getApiLevelStr(getConsoleAgents()->settings->avdInfo()));
         AFREE((char*)tag);
 
         char* skinName = nullptr;
