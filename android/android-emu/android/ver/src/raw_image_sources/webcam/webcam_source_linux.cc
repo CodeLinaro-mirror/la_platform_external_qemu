@@ -247,11 +247,11 @@ class LinuxImpl : public WebcamSource::Impl {
 public:
     explicit LinuxImpl(std::shared_ptr<const WebcamSource::WebcamInfo> info)
         : webcam_info_(std::move(info)) {}
-    ~LinuxImpl() override { Stop(); }
+    ~LinuxImpl() override { StopLocked(); }
 
-    int Start(uint32_t pixel_format,
-              int frame_width,
-              int frame_height) override {
+    int StartLocked(uint32_t pixel_format,
+                    int frame_width,
+                    int frame_height) override {
         if (pixel_format != V4L2_PIX_FMT_RGB32) {
             derror("Scene system currently only supports V4L2_PIX_FMT_RGB32");
             return -1;
@@ -272,14 +272,14 @@ public:
         if (_xioctl(fd_.get(), VIDIOC_QUERYCAP, &caps) < 0) {
             derror("Unable to query capabilities for camera device '%s'",
                    webcam_info_->friendly_name.c_str());
-            Stop();
+            StopLocked();
             return -1;
         }
 
         if (!(caps.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
             derror("Camera '%s' is not a video capture device",
                    webcam_info_->friendly_name.c_str());
-            Stop();
+            StopLocked();
             return -1;
         }
 
@@ -309,7 +309,7 @@ public:
             derror("Camera '%s' does not support pixel format %s with dimensions %dx%d",
                    webcam_info_->friendly_name.c_str(),
                    FourccToString(pixel_format), res.width, res.height);
-            Stop();
+            StopLocked();
             return -1;
         }
 
@@ -324,13 +324,13 @@ public:
             if (!(caps.capabilities & V4L2_CAP_READWRITE)) {
                 derror("Don't know how to access frames on device '%s'",
                        webcam_info_->friendly_name.c_str());
-                Stop();
+                StopLocked();
                 return -1;
             }
             if (InitDirect() == 0) {
                 io_type_ = CameraIoType::CAMERA_IO_DIRECT;
             } else {
-                Stop();
+                StopLocked();
                 return -1;
             }
         }
@@ -339,7 +339,7 @@ public:
             enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             if (_xioctl(fd_.get(), VIDIOC_STREAMON, &type) < 0) {
                 derror("VIDIOC_STREAMON failed: %s", strerror(errno));
-                Stop();
+                StopLocked();
                 return -1;
             }
         }
@@ -349,7 +349,7 @@ public:
         return 0;
     }
 
-    int Stop() override {
+    int StopLocked() override {
         if (streaming_ && io_type_ != CameraIoType::CAMERA_IO_DIRECT) {
             enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             _xioctl(fd_.get(), VIDIOC_STREAMOFF, &type);
@@ -365,10 +365,8 @@ public:
         return 0;
     }
 
-    absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
-            int64_t target_time_us,
-            std::optional<RawImageToken> token,
-            std::function<absl::Status(const RawImageBufferView*)> updater)
+    absl::StatusOr<bool> FetchNextFrame(
+            std::function<absl::Status(const RawImageBufferView*)> new_frame_cb)
             override {
         if (!streaming_) {
             return absl::InternalError("Camera not streaming");
@@ -380,7 +378,7 @@ public:
                     read(fd_.get(), buff, actual_pixel_format_.sizeimage));
             if (read_bytes < 0) {
                 if (errno == EAGAIN) {
-                    return std::nullopt;
+                    return false;
                 }
                 return absl::InternalError(std::string("Read failed: ") +
                                            strerror(errno));
@@ -401,11 +399,11 @@ public:
                 }
             }
             auto ver_view = RawImageBufferViewFourCCBridge(&view);
-            absl::Status status = updater(&ver_view);
+            absl::Status status = new_frame_cb(&ver_view);
             if (!status.ok()) {
                 return status;
             }
-            return RawImageToken{++token_counter_};
+            return true;
         } else {
             struct v4l2_buffer buf;
             memset(&buf, 0, sizeof(buf));
@@ -416,7 +414,7 @@ public:
 
             if (_xioctl(fd_.get(), VIDIOC_DQBUF, &buf) < 0) {
                 if (errno == EAGAIN) {
-                    return std::nullopt;
+                    return false;
                 }
                 return absl::InternalError(
                         std::string("VIDIOC_DQBUF failed: ") + strerror(errno));
@@ -446,7 +444,7 @@ public:
                 }
             }
             auto ver_view = RawImageBufferViewFourCCBridge(&view);
-            absl::Status status = updater(&ver_view);
+            absl::Status status = new_frame_cb(&ver_view);
 
             if (_xioctl(fd_.get(), VIDIOC_QBUF, &buf) < 0) {
                 dwarning("VIDIOC_QBUF failed: %s", strerror(errno));
@@ -455,7 +453,7 @@ public:
             if (!status.ok()) {
                 return status;
             }
-            return RawImageToken{++token_counter_};
+            return true;
         }
     }
 
@@ -579,7 +577,6 @@ public:
     // Buffers to convert to RGB32
     std::vector<uint8_t> conversion_storage_;
     std::vector<uint8_t> staging_buffer_;
-    int64_t token_counter_ = 0;
 };
 
 std::unique_ptr<WebcamSource::Impl> CreatePlatformWebcamImpl(

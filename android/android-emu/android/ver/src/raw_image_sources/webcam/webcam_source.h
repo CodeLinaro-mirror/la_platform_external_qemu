@@ -34,6 +34,8 @@ namespace ver {
 
 class WebcamSource : public RawImageSource {
 public:
+    class Impl;  // Forward declaration
+
     struct Resolution {
         unsigned int width;
         unsigned int height;
@@ -60,8 +62,7 @@ public:
         std::vector<WebcamPixelFormat> supported_formats;
         int preferred_format_index = -1;  // -1 if no format is supported
 
-        // Indicates whether the webcam is currently in use by a WebcamSource.
-        std::atomic<bool> in_use{false};
+        std::weak_ptr<Impl> shared_impl;
     };
 
     static size_t GetWebcamCount();
@@ -81,16 +82,41 @@ public:
     class Impl {
     public:
         virtual ~Impl() = default;
-        virtual int Start(uint32_t pixel_format, int width, int height) = 0;
-        virtual absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
+        int Start(uint32_t pixel_format, int width, int height);
+        int Stop();
+        absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
                 int64_t target_time_us,
                 std::optional<RawImageToken> token,
+                std::function<absl::Status(const RawImageBufferView*)> updater);
+
+    protected:
+        virtual int StartLocked(uint32_t pixel_format,
+                                int width,
+                                int height) = 0;
+        virtual int StopLocked() = 0;
+        virtual absl::StatusOr<bool> FetchNextFrame(
                 std::function<absl::Status(const RawImageBufferView*)>
-                        updater) = 0;
-        virtual int Stop() = 0;
+                        new_frame_cb) = 0;
+
+    private:
+        std::mutex mMutex;
+        int mStartCount = 0;
+        int mStartStatus = 0;
+        uint32_t mPixelFormat = 0;
+        int mWidth = 0;
+        int mHeight = 0;
+
+        std::optional<RawImageToken> mLatestToken;
+        std::vector<uint8_t> mCacheBuffer;
+        VerImageFormat mLatestFormat = VerImageFormat::UNKNOWN;
+        int mLatestWidth = 0;
+        int mLatestHeight = 0;
+        int64_t mLatestTimeUs = -1;
+        int64_t mTokenCounter = 0;
     };
 
 private:
+    friend class WebcamSourceTestHelper;
     explicit WebcamSource(std::shared_ptr<WebcamInfo> info);
     // The list of webcams available on the system. This is a shared ptr so we
     // can refresh it safely without distrupting webcams which are using data
@@ -103,7 +129,7 @@ private:
     static std::optional<std::vector<std::shared_ptr<WebcamInfo>>>
             s_webcam_info_list_;
     std::shared_ptr<WebcamInfo> webcam_info_;
-    std::unique_ptr<Impl> impl_;
+    std::shared_ptr<Impl> impl_;
 };
 
 std::unique_ptr<WebcamSource::Impl> CreatePlatformWebcamImpl(

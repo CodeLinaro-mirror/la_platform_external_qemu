@@ -33,17 +33,21 @@ std::optional<std::vector<std::shared_ptr<WebcamSource::WebcamInfo>>>
         WebcamSource::s_webcam_info_list_;
 
 WebcamSource::WebcamSource(std::shared_ptr<WebcamInfo> info)
-    : webcam_info_(std::move(info)),
-      impl_(CreatePlatformWebcamImpl(webcam_info_)) {}
+    : webcam_info_(std::move(info)) {
+    if (auto shared = webcam_info_->shared_impl.lock()) {
+        impl_ = shared;
+    } else {
+        impl_ = std::shared_ptr<Impl>(CreatePlatformWebcamImpl(webcam_info_));
+        webcam_info_->shared_impl = impl_;
+    }
+}
 
 WebcamSource::~WebcamSource() {
-    if (webcam_info_) {
-        bool expected = true;
-        if (!webcam_info_->in_use.compare_exchange_strong(expected, false)) {
-            derror("Webcam '%s' freed, but was not marked as in use!",
-                   webcam_info_->friendly_name.c_str());
-        }
-    }
+    // We hold this lock to ensure impl_ is not in the middle of deconstructing
+    // when we attempt to recreate the same webcam source, which could attempt
+    // to grab OS resources that not yet freed.
+    std::lock_guard<std::mutex> lock(s_webcam_info_list_lock_);
+    impl_.reset();
 }
 
 int WebcamSource::Start(VerImageFormat ver_image_format,
@@ -120,14 +124,7 @@ std::unique_ptr<WebcamSource> WebcamSource::Create(
     }
     for (const std::shared_ptr<WebcamInfo>& info : *s_webcam_info_list_) {
         if (info->os_alias == camera_arg || info->os_name == camera_arg) {
-            bool expected = false;
-            if (info->in_use.compare_exchange_strong(expected, true)) {
-                return std::unique_ptr<WebcamSource>(new WebcamSource(info));
-            } else {
-                derror("Webcam '%s' already in use!",
-                       info->friendly_name.c_str());
-                return nullptr;
-            }
+            return std::unique_ptr<WebcamSource>(new WebcamSource(info));
         }
     }
     derror("No webcam found matching '%.*s'!",
@@ -224,6 +221,85 @@ std::shared_ptr<WebcamSource::WebcamInfo> WebcamSource::GetWebcamInfo(
         return nullptr;
     }
     return (*s_webcam_info_list_)[index];
+}
+
+int WebcamSource::Impl::Start(uint32_t pixel_format, int width, int height) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mStartCount == 0) {
+        mStartStatus = StartLocked(pixel_format, width, height);
+        if (mStartStatus == 0) {
+            mStartCount = 1;
+            mPixelFormat = pixel_format;
+            mWidth = width;
+            mHeight = height;
+        }
+        return mStartStatus;
+    } else {
+        mStartCount++;
+        return 0;
+    }
+}
+
+int WebcamSource::Impl::Stop() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mStartCount > 0) {
+        if (--mStartCount == 0) {
+            return StopLocked();
+        }
+    }
+    return 0;
+}
+
+absl::StatusOr<std::optional<RawImageToken>> WebcamSource::Impl::UpdateImage(
+        int64_t target_time_us,
+        std::optional<RawImageToken> token,
+        std::function<absl::Status(const RawImageBufferView*)> updater) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (mLatestToken.has_value() &&
+        (!token.has_value() || token->token < mLatestToken->token)) {
+        RawImageBufferView view = {mCacheBuffer.data(), mCacheBuffer.size(),
+                                   mLatestFormat, mLatestWidth, mLatestHeight};
+        absl::Status status = updater(&view);
+        if (!status.ok()) {
+            return status;
+        }
+        return mLatestToken;
+    }
+
+    absl::Status updater_status = absl::OkStatus();
+    bool fetched_new_frame = false;
+
+    auto new_frame_cb = [&](const RawImageBufferView* view) -> absl::Status {
+        size_t needed_size = view->buffer_size;
+        if (mCacheBuffer.size() < needed_size) {
+            mCacheBuffer.resize(needed_size);
+        }
+        memcpy(mCacheBuffer.data(), view->buffer, needed_size);
+        mLatestFormat = view->pixel_format;
+        mLatestWidth = view->width;
+        mLatestHeight = view->height;
+        mLatestTimeUs = target_time_us;
+        mLatestToken = RawImageToken{++mTokenCounter};
+        fetched_new_frame = true;
+
+        updater_status = updater(view);
+        return updater_status;
+    };
+
+    auto fetch_res = FetchNextFrame(new_frame_cb);
+    if (!fetch_res.ok()) {
+        return fetch_res.status();
+    }
+
+    if (*fetch_res && fetched_new_frame) {
+        if (!updater_status.ok()) {
+            return updater_status;
+        }
+        return mLatestToken;
+    }
+
+    return std::nullopt;
 }
 
 }  // namespace ver
