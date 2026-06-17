@@ -937,7 +937,6 @@ void SettingsPage::on_set_resetNotifications_pressed() {
     settings.remove(Ui::Settings::SHOW_GPU_WARNING);
     settings.remove(Ui::Settings::SHOW_ADB_WARNING);
     settings.remove(Ui::Settings::SHOW_VIRTUALSCENE_INFO);
-    settings.remove(Ui::Settings::SHOW_VGK_WARNING);
     settings.remove(Ui::Settings::SHOW_NESTED_WARNING);
 }
 
