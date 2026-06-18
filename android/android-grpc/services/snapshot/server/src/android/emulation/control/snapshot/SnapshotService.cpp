@@ -279,13 +279,6 @@ public:
 
         auto snapshot =
                 snapshot::Snapshot::getSnapshotById(request->snapshot_id());
-        if (snapshot) {
-            // Nope, the snapshot already exists.
-            reply->set_success(false);
-            reply->set_err("SnapshotPackage with " + request->snapshot_id() +
-                           " already exists!");
-            return Status::OK;
-        }
 
         using android::snapshot::Snapshotter;
         Snapshotter::get().stopVulkanAppsIfApplicable();
