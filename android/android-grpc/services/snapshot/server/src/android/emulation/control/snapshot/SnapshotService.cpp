@@ -115,18 +115,13 @@ public:
                         }));
                 streamBufPtr = csb.get();
             } else {
-                dstFile.reset(new std::ofstream(
-                        android::base::PathUtils::asUnicodePath(
-                                request->path().data())
-                                .data(),
-                        std::ios::binary | std::ios::out));
-                if (!dstFile->is_open()) {
-                    result.set_success(false);
-                    result.set_err("Failed to write to " + request->path());
-                    writer->Write(result);
-                    return Status::OK;
-                }
-                streamBufPtr = dstFile->rdbuf();
+                // Do not let a (possibly guest-via-slirp) gRPC client choose an
+                // arbitrary host output path; stream the tar back instead.
+                result.set_success(false);
+                result.set_err("Server-side path output is disabled; "
+                               "omit `path` and read the stream.");
+                writer->Write(result);
+                return Status::OK;
             }
         }
 

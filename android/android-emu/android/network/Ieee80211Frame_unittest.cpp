@@ -199,3 +199,30 @@ TEST_F(Ieee80211FrameTest, toEthernetTest) {
     // Test if unprotected frame return false.
     EXPECT_FALSE(dataFrame.decrypt(CipherScheme::CCMP));
 }*/
+
+TEST_F(Ieee80211FrameTest, FrameInfoOOBRatesClamping) {
+    MacAddress transmitter(MACARG(kMac));
+    uint64_t cookie = 0x12345678ULL;
+    uint32_t flags = 0x1;
+    uint32_t channel = 2412;
+    android::network::hwsim_tx_rate rates[4] = {
+            {.idx = 10, .count = 0},
+            {.idx = 20, .count = 0},
+            {.idx = 30, .count = 0},
+            {.idx = 40, .count = 0}};
+
+    // Attempt to pass an oversized numRates = 256 (attacker-controlled)
+    size_t maliciousNumRates = 256;
+
+    android::network::FrameInfo info(transmitter, cookie, flags, channel, rates,
+                                     maliciousNumRates);
+
+    // Verify that mTxRates is safely clamped to 4 elements and not overflowed.
+    // The first 4 elements should be successfully copied.
+    EXPECT_EQ(info.mTxRates[0].idx, 10);
+    EXPECT_EQ(info.mTxRates[1].idx, 20);
+    EXPECT_EQ(info.mTxRates[2].idx, 30);
+    EXPECT_EQ(info.mTxRates[3].idx, 40);
+
+    // The stack was not corrupted, and we successfully clamped the copy.
+}

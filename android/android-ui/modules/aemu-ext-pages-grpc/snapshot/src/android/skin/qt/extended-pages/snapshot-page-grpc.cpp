@@ -1034,9 +1034,11 @@ void SnapshotPageGrpc::slot_snapshotSaveCompleted(PackageData status) {
     setOperationInProgress(false);
     setEnabled(true);
     if (!status.ok()) {
+        std::string errorMessage = std::string(status.status().message());
+        derror("Snapshot save failed: '%s'", errorMessage.c_str());
         enableActions();
         QApplication::restoreOverrideCursor();
-        showErrorDialog(tr("Could not save snapshot"), tr("Take snapshot"));
+        showErrorDialog(QString::fromStdString(errorMessage), tr("Take snapshot"));
         return;
     }
     // Refresh the list of available snapshots

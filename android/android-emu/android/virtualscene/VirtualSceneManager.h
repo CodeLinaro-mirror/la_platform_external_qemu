@@ -95,6 +95,8 @@ public:
     static void enumeratePosters(void* context,
                                  EnumeratePostersCallback callback);
 
+    static void enumerateWebcams(void* context,
+                                 EnumerateWebcamsCallback callback);
     // Set the scale of a poster.
     //
     // |posterName| - Name of the poster position, such as "wall" or "table".

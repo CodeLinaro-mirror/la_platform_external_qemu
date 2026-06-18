@@ -193,6 +193,7 @@ private:
     // Check the input or viewport control button which matches the
     // `currentMode` command, otherwise uncheck the button.
     void updateXrNavigationButtonsChecked(QtUICommand currentMode);
+    QMenu* createEnvironmentMenu();
 
     // Notify guest (Android) about the hand gesture selection for left hand.
     void notifyGuestOnLeftHandGesture(const QString& gesture);
@@ -368,11 +369,12 @@ private slots:
     void on_xr_viewport_pan_button_clicked();
     void on_xr_viewport_dolly_button_clicked();
     void on_xr_viewport_rotate_button_clicked();
-    void on_default_environment_selected();
-    void on_none_selected();
-    void on_custom_image_selected();
-    void on_custom_video_selected();
-    void on_custom_360_image_selected();
+    void defaultEnvironmentSelected();
+    void noneSelected();
+    void customImageSelected();
+    void customVideoSelected();
+    void custom360ImageSelected();
+    void webcamSelected(const std::string& id);
     void on_glasses_button_pressed();
     void on_glasses_button_released();
     void setViewportControlMode(XrViewportControlMode control,

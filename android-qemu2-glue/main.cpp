@@ -3063,6 +3063,12 @@ extern "C" int main(int argc, char** argv) {
         args.add2("-device", "virtconsole,chardev=uwb,name=uwb");
     }
 
+    if (feature_is_enabled(kFeature_Nfc)) {
+        D("Nfc feature is enabled");
+        args.add2("-chardev", "netsim,id=nfc");
+        args.add2("-device", "virtconsole,chardev=nfc,name=nfc");
+    }
+
     bool bluetooth_explicitly_disabled =
             !feature_is_enabled(kFeature_BluetoothEmulation) &&
             fc::isOverridden(fc::BluetoothEmulation);

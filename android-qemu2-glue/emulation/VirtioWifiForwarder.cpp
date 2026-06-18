@@ -77,6 +77,7 @@ namespace android {
 namespace qemu2 {
 
 struct WifiForwardHeader {
+    WifiForwardHeader() = default;
     WifiForwardHeader(FrameType type,
                       MacAddress transmitter,
                       uint32_t fullLength,
@@ -565,8 +566,14 @@ void VirtioWifiForwarder::registerEventLoop() {
 size_t VirtioWifiForwarder::onRemoteData(const uint8_t* data, size_t size) {
     size_t offset = 0;
     while (offset < size) {
-        const WifiForwardHeader* header =
-                reinterpret_cast<const WifiForwardHeader*>(data + offset);
+        // Ensure enough data remains for a complete header before casting.
+        if (size - offset < sizeof(WifiForwardHeader)) {
+            break;
+        }
+
+        WifiForwardHeader localHeader;
+        std::memcpy(&localHeader, data + offset, sizeof(WifiForwardHeader));
+        const WifiForwardHeader* header = &localHeader;
         // Magic or version is wrong.
         if (header->magic != kWifiForwardMagic ||
             header->version != kWifiForwardVersion) {
@@ -595,9 +602,12 @@ size_t VirtioWifiForwarder::onRemoteData(const uint8_t* data, size_t size) {
             if (payloadSize > 0) {  // Data frame type
                 // The total amount of data is bigger than payload size due to
                 // generic netlink message.
+                // Clamp numRates to prevent OOB write in FrameInfo constructor.
+                uint32_t safeNumRates = std::min(header->numRates,
+                                                 Ieee80211Frame::TX_MAX_RATES);
                 FrameInfo info(header->transmitter, header->cookie,
                                header->flags, header->channel, header->rates,
-                               header->numRates);
+                               safeNumRates);
                 auto frame = std::make_unique<Ieee80211Frame>(
                         payload, payloadSize, info);
                 if (sendToGuest(std::move(frame)) >= payloadSize) {

@@ -11,6 +11,8 @@
 
 #include "android/snapshot/PathUtils.h"
 
+#include <cctype>
+
 #include "android/avd/info.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
@@ -51,8 +53,17 @@ std::string getSnapshotBaseDir() {
 
 std::string getSnapshotDir(const char* snapshotName) {
     auto baseDir = getSnapshotBaseDir();
-    auto path = base::PathUtils::join(baseDir, snapshotName);
-    return path;
+    // SECURITY: Sanitize snapshot names to prevent path traversal and
+    // downstream command injection.
+    std::string safe(snapshotName ? snapshotName : "");
+    for (char& c : safe) {
+        unsigned char u = static_cast<unsigned char>(c);
+        if (!(std::isalnum(u) || u == '.' || u == '_' || u == '-' || u >= 128)) {
+            c = '_';
+        }
+    }
+    if (safe.empty() || safe == "." || safe == "..") safe = "_";
+    return base::PathUtils::join(baseDir, safe);
 }
 
 std::string getSnapshotDepsFileName() {

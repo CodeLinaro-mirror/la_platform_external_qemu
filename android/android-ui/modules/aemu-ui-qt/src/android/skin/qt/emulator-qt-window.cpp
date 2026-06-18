@@ -1762,8 +1762,8 @@ void EmulatorQtWindow::paintEvent(QPaintEvent*) {
         }
     }
     if (!mGuestScreenPixmap.isNull()) {
-        // Draw the pixmap to fill the frame's contents rect
-        auto r = contentsRect();
+        // Draw the pixmap to fill the frame's contents rect or device geometry if available
+        auto r = (mBackingSurface && mDeviceGeometry.isValid()) ? mDeviceGeometry : contentsRect();
         painter.drawPixmap(r, mGuestScreenPixmap);
     }
 }

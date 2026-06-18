@@ -40,6 +40,9 @@ void LocationPage::on_loc_playRouteButton_clicked() {
         bool isGpxKml = false;
         if (parsePointsFromJson(&isGpxKml)) {
             locationPlaybackStart_v2(isGpxKml);
+        } else {
+            playRouteStateChanged(true);
+            emit mMapBridge->showRoutePlaybackOverlay(false);
         }
     }
     ++mPlayRouteCount;

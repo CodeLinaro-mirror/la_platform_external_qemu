@@ -334,5 +334,42 @@ TEST_F(TarStreamTest, read_write_large_gzip_optimized) {
     }
 }
 
+TEST_F(TarStreamTest, reject_path_traversal_extract) {
+    // We mock a TarInfo entry with a malicious path traversal name.
+    TarInfo malicious_relative;
+    malicious_relative.valid = true;
+    malicious_relative.name = "../../malicious.txt";
+    malicious_relative.offset = 512;
+    malicious_relative.size = 12;
+    malicious_relative.type = TarType::REGTYPE;
+
+    TarInfo malicious_absolute;
+    malicious_absolute.valid = true;
+    malicious_absolute.name = "/tmp/malicious.txt";
+    malicious_absolute.offset = 512;
+    malicious_absolute.size = 12;
+    malicious_absolute.type = TarType::REGTYPE;
+
+    TarInfo malicious_windows_ads;
+    malicious_windows_ads.valid = true;
+    malicious_windows_ads.name = "hello.txt:ads";
+    malicious_windows_ads.offset = 512;
+    malicious_windows_ads.size = 12;
+    malicious_windows_ads.type = TarType::REGTYPE;
+
+    std::stringstream ss;
+    TarReader tr(outdir, ss);
+
+    // Verify that extract() returns false (rejected) for all of them
+    EXPECT_FALSE(tr.extract(malicious_relative));
+    EXPECT_NE(tr.error_msg().find("Refusing to extract entry outside archive root"), std::string::npos);
+
+    EXPECT_FALSE(tr.extract(malicious_absolute));
+    EXPECT_NE(tr.error_msg().find("Refusing to extract entry outside archive root"), std::string::npos);
+
+    EXPECT_FALSE(tr.extract(malicious_windows_ads));
+    EXPECT_NE(tr.error_msg().find("Refusing to extract entry outside archive root"), std::string::npos);
+}
+
 }  // namespace base
 }  // namespace android

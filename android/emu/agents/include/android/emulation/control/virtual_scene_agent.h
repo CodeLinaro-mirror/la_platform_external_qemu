@@ -29,6 +29,12 @@ typedef void (*EnumeratePostersCallback)(void* context,
                                          const char* filename,
                                          float scale);
 
+// Callback called to enumerate webcams available on the host.
+typedef void (*EnumerateWebcamsCallback)(void* context,
+                                         const char* userFacingName,
+                                         const char* label,
+                                         const char* id);
+
 typedef struct QAndroidVirtualSceneAgent {
     // Set the initial poster of the scene, loaded from persisted settings.
     // Command line flags take precedence, so if the -virtualscene-poster flag
@@ -83,6 +89,10 @@ typedef struct QAndroidVirtualSceneAgent {
     // Returns a pointer to the event listener that can be used to track changes
     // to the animation state.
     void* (*getAnimationStateEventListener)();
+
+    // Enumerate webcams available on the host. Synchronously calls the callback
+    // for each webcam.
+    void (*enumerateWebcams)(void* context, EnumerateWebcamsCallback callback);
 } QAndroidVirtualSceneAgent;
 
 ANDROID_END_HEADER
