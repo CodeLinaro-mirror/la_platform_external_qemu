@@ -15,6 +15,15 @@
 
 #include <grpc/support/log.h> // for gpr_log_func_args
 
+struct gpr_log_func_args {
+    const char* file;
+    int line;
+    gpr_log_severity severity;
+    const char* message;
+};
+
+inline void gpr_set_log_function(void (*)(gpr_log_func_args*)) {}
+
 namespace android {
 namespace emulation {
 namespace control {

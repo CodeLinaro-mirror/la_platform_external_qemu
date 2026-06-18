@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <grpcpp/grpcpp.h>     // for Clie...
+
 /* BLE */
 #include "nimble/ble.h"            // for BLE_...
 #include "nimble/ble_hci_trans.h"  // for ble_...
@@ -31,7 +33,6 @@
 //
 
 #include <assert.h>            // for assert
-#include <grpcpp/grpcpp.h>     // for Clie...
 #include <stdint.h>            // for uint8_t
 #include <stdlib.h>            // for malloc
 #include <chrono>              // for oper...
