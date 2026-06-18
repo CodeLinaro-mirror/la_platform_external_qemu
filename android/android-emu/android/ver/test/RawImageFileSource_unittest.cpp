@@ -301,6 +301,92 @@ static void compareSumOfSquaredDifferences(const std::vector<uint8_t>& image,
     }
 }
 
+TEST_F(RawImageFileSourceTest, ExifRotation) {
+    // 1. Test JPEG
+    {
+        ImageResult base_golden;
+        loadGoldenBmp("ver/exif_rotation/corner_jpeg_golden.bmp", &base_golden);
+
+        for (int orientation = 1; orientation <= 8; ++orientation) {
+            std::string path = PathUtils::join(
+                    System::get()->getProgramDirectory(), "testdata",
+                    "ver/exif_rotation",
+                    "corner_" + std::to_string(orientation) + ".jpg");
+
+            auto source = RawImageFileSource::Create(path);
+            ASSERT_NE(source, nullptr)
+                    << "Failed for JPEG orientation " << orientation;
+
+            EXPECT_EQ(0, source->Start(VerImageFormat::RGBA8, 0, 0));
+
+            std::vector<uint8_t> buffer;
+            uint32_t image_width = 0;
+            uint32_t image_height = 0;
+            auto updater = [&](const RawImageBufferView* view) {
+                buffer.assign(view->buffer, view->buffer + view->buffer_size);
+                image_width = view->width;
+                image_height = view->height;
+                return absl::OkStatus();
+            };
+
+            auto tokenOrError = source->UpdateImage(0, std::nullopt, updater);
+            ASSERT_TRUE(tokenOrError.ok());
+            ASSERT_TRUE(tokenOrError.value().has_value());
+            EXPECT_EQ(0, source->Stop());
+
+            EXPECT_EQ(base_golden.width, image_width)
+                    << "Failed for JPEG orientation " << orientation;
+            EXPECT_EQ(base_golden.height, image_height)
+                    << "Failed for JPEG orientation " << orientation;
+
+            compareSumOfSquaredDifferences(buffer, base_golden.buffer,
+                                           kCompareThreshold);
+        }
+    }
+
+    // 2. Test PNG
+    {
+        ImageResult base_golden;
+        loadGoldenBmp("ver/exif_rotation/corner_png_golden.bmp", &base_golden);
+
+        for (int orientation = 1; orientation <= 8; ++orientation) {
+            std::string path = PathUtils::join(
+                    System::get()->getProgramDirectory(), "testdata",
+                    "ver/exif_rotation",
+                    "corner_" + std::to_string(orientation) + ".png");
+
+            auto source = RawImageFileSource::Create(path);
+            ASSERT_NE(source, nullptr)
+                    << "Failed for PNG orientation " << orientation;
+
+            EXPECT_EQ(0, source->Start(VerImageFormat::RGBA8, 0, 0));
+
+            std::vector<uint8_t> buffer;
+            uint32_t image_width = 0;
+            uint32_t image_height = 0;
+            auto updater = [&](const RawImageBufferView* view) {
+                buffer.assign(view->buffer, view->buffer + view->buffer_size);
+                image_width = view->width;
+                image_height = view->height;
+                return absl::OkStatus();
+            };
+
+            auto tokenOrError = source->UpdateImage(0, std::nullopt, updater);
+            ASSERT_TRUE(tokenOrError.ok());
+            ASSERT_TRUE(tokenOrError.value().has_value());
+            EXPECT_EQ(0, source->Stop());
+
+            EXPECT_EQ(base_golden.width, image_width)
+                    << "Failed for PNG orientation " << orientation;
+            EXPECT_EQ(base_golden.height, image_height)
+                    << "Failed for PNG orientation " << orientation;
+
+            compareSumOfSquaredDifferences(buffer, base_golden.buffer,
+                                           kCompareThreshold);
+        }
+    }
+}
+
 class RawImageFileSourceCompareTest
     : public ::testing::TestWithParam<ImageTestParam> {
 protected:
