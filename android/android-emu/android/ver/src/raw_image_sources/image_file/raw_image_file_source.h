@@ -62,7 +62,7 @@ struct ImageData {
 
 class RawImageFileSource : public RawImageSource {
 public:
-    static std::unique_ptr<RawImageFileSource> Create(std::string filename);
+    static std::unique_ptr<RawImageFileSource> Create(const std::string& filename);
     int Start(VerImageFormat pixel_format, int width, int height) override;
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
@@ -72,7 +72,7 @@ public:
     int Stop() override;
 
 private:
-    explicit RawImageFileSource(std::string file, ImageData&& image);
+    explicit RawImageFileSource(const std::string& file, ImageData&& image);
     std::string file_;
     ImageData image_;
 };

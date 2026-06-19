@@ -299,10 +299,10 @@ static void transformImage(ImageData& img, ExifOrientation orientation) {
     img.line_size = dst_line_size;
 }
 
-std::optional<ImageData> loadPNGImage(std::string& filename) {
+std::optional<ImageData> loadPNGImage(const std::string& filename) {
     ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
     if (!fp) {
-        derror("Failed to open file %s", filename);
+        derror("Failed to open file %s", filename.c_str());
         return {};
     }
 
@@ -453,7 +453,7 @@ static void jpeg_error_exit(j_common_ptr cinfoPtr) {
     longjmp(myerr->setjmp_buffer, 1);
 }
 
-std::optional<ImageData> loadJPEGImage(std::string& filename) {
+std::optional<ImageData> loadJPEGImage(const std::string& filename) {
     struct jpeg_decompress_struct cinfo;
     JpegErrorManager jerr;
 
@@ -546,9 +546,8 @@ std::optional<ImageData> loadJPEGImage(std::string& filename) {
     return img;
 }
 
-std::optional<ImageData> loadImageFromFile(std::string& filename) {
-    const std::string filename_str{filename};
-    const std::string_view extension{PathUtils::extension(filename_str)};
+std::optional<ImageData> loadImageFromFile(const std::string& filename) {
+    const std::string_view extension{PathUtils::extension(filename)};
 
     if (strncasecmp(extension.data(), ".png", extension.size()) == 0) {
         return loadPNGImage(filename);
@@ -563,7 +562,7 @@ std::optional<ImageData> loadImageFromFile(std::string& filename) {
 }
 
 std::unique_ptr<RawImageFileSource> RawImageFileSource::Create(
-        std::string filename) {
+        const std::string& filename) {
     std::optional<ImageData> maybeImage = loadImageFromFile(filename);
     if (maybeImage) {
         return std::unique_ptr<RawImageFileSource>(
@@ -572,8 +571,8 @@ std::unique_ptr<RawImageFileSource> RawImageFileSource::Create(
     return nullptr;
 }
 
-RawImageFileSource::RawImageFileSource(std::string filename, ImageData&& image)
-    : file_(std::move(filename)), image_(std::move(image)) {}
+RawImageFileSource::RawImageFileSource(const std::string& filename, ImageData&& image)
+    : file_(filename), image_(std::move(image)) {}
 
 int RawImageFileSource::Start(VerImageFormat pixel_format,
                                      int width,

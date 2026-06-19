@@ -34,7 +34,7 @@ namespace ver {
 
 class RawVideofileSource : public RawImageSource {
 public:
-    static std::unique_ptr<RawVideofileSource> Create(std::string filename);
+    static std::unique_ptr<RawVideofileSource> Create(const std::string& filename);
     int Start(VerImageFormat pixel_format, int width, int height) override;
     absl::StatusOr<std::optional<RawImageToken>> UpdateImage(
             int64_t target_time_us,
