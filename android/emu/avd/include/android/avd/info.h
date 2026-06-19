@@ -168,6 +168,7 @@ const char*  avdInfo_getId( const AvdInfo*  i );
  */
 static const int kUnknownApiLevel = 1000;
 int    avdInfo_getApiLevel( const AvdInfo*  i );
+const char* avdInfo_getApiLevelStr( const AvdInfo*  i );
 
 
 /* Return the last QEMU version of the emulator used to run this AVD. */
