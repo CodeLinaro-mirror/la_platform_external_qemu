@@ -7,6 +7,7 @@
 cc_binary(
    copts = ['-fwrapv', '-Wno-implicit-function-declaration', '-Wno-error=unguarded-availability-new'],
    deps = ['@glib//glib', '@zlib//:zlib', ':libauthz', ':libblock', ':libcrypto', ':libevent-loop-base', ':libio', ':libprintstub', ':libqemuutil', ':libqom', ':qemu-headers', ':trace_backend_deps'],
+   dynamic_deps = ['@glib//glib:glib_shared', '@glib//gmodule:gmodule_shared'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-framework CoreFoundation', '-framework IOKit'],
@@ -18,6 +19,7 @@ cc_binary(
 cc_interface_binary(
    copts = ['-fwrapv', '-Wno-implicit-function-declaration', '-Wno-error=unguarded-availability-new'],
    deps = ['@dtc//:libfdt', '@glib//glib', '@libslirp', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@rutabaga_gfx//:rutabaga_c_ffi', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-aarch64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', ':trace_backend_deps'],
+   dynamic_deps = ['@glib//glib:glib_shared', '@glib//gmodule:gmodule_shared'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-framework CoreAudio', '-framework CoreFoundation', '-framework Hypervisor', '-framework IOKit', '-framework vmnet', '-Wl,-export_dynamic'],
@@ -29,6 +31,7 @@ cc_interface_binary(
 cc_interface_binary(
    copts = ['-fwrapv', '-Wno-implicit-function-declaration', '-Wno-error=unguarded-availability-new'],
    deps = ['@dtc//:libfdt', '@glib//glib', '@libslirp', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@rutabaga_gfx//:rutabaga_c_ffi', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-riscv64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', ':trace_backend_deps'],
+   dynamic_deps = ['@glib//glib:glib_shared', '@glib//gmodule:gmodule_shared'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-framework CoreAudio', '-framework CoreFoundation', '-framework IOKit', '-framework vmnet', '-Wl,-export_dynamic'],
@@ -40,6 +43,7 @@ cc_interface_binary(
 cc_interface_binary(
    copts = ['-fwrapv', '-Wno-implicit-function-declaration', '-Wno-error=unguarded-availability-new'],
    deps = ['@dtc//:libfdt', '@glib//glib', '@libslirp', '@pixman//:pixman-1', '@pixman//:pixman_simd', '@rutabaga_gfx//:rutabaga_c_ffi', '@zlib//:zlib', ':libauthz', ':libblock', ':libblockdev', ':libchardev', ':libcrypto', ':libevent-loop-base', ':libgdb_system', ':libhwcore', ':libio', ':libmigration', ':libqemu-x86_64-softmmu', ':libqemuutil', ':libqmp', ':libqom', ':libtcg_system', ':qemu-headers', ':trace_backend_deps'],
+   dynamic_deps = ['@glib//glib:glib_shared', '@glib//gmodule:gmodule_shared'],
    # buildifier: leave-alone
    includes = ['.', 'qapi'],
    linkopts = ['-framework CoreAudio', '-framework CoreFoundation', '-framework IOKit', '-framework vmnet', '-Wl,-export_dynamic'],
