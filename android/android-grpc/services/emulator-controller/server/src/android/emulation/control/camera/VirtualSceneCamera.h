@@ -28,14 +28,13 @@ namespace android {
 namespace emulation {
 namespace control {
 
-// The VirtualSceneCamera will register a callback with the camera qemud service
-// and will get notified when camera is connected or disconnected.
+// The VirtualSceneCamera will register a callback with the virtual scene manager
+// and will get notified when the number of users are changed to enable/disable
+// physical model and trigger events for the notification stream.
 class VirtualSceneCamera : public base::EventNotificationSupport<bool> {
 public:
-    using Callback = std::function<void(bool)>;
-
-    VirtualSceneCamera(const QAndroidSensorsAgent* sensorsAgent,
-                       Callback cb = nullptr);
+    VirtualSceneCamera(const QAndroidSensorsAgent* sensorsAgent);
+    ~VirtualSceneCamera();
     bool isConnected() const { return mConnected; };
     // delta in radian
     bool rotate(const glm::vec3 delta);
@@ -46,10 +45,10 @@ public:
 
 private:
     DISALLOW_COPY_AND_ASSIGN(VirtualSceneCamera);
-    static void virtualSceneCameraCallback(void* context, bool connected);
+    void virtualSceneControlsChangeCallback(bool connected);
+
     std::atomic<bool> mConnected;
     EventWaiter mEventWaiter;
-    Callback mCallback;
 
     android::virtualscene::PhysicalModel mModel;
     // Track base velocity because it is possible

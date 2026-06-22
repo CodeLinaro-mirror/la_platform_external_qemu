@@ -28,7 +28,4 @@ extern void android_camera_service_init(void);
 
 typedef void (*camera_callback_t)(void* context, bool connected);
 
-extern void register_camera_status_change_callback(camera_callback_t cb,
-                                                   void* ctx,
-                                                   CameraSourceType src);
 ANDROID_END_HEADER

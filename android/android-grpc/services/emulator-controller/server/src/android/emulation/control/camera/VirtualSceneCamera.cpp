@@ -15,15 +15,17 @@
 #include "android/emulation/control/camera/VirtualSceneCamera.h"
 
 #include "aemu/base/memory/LazyInstance.h"  // for LazyInstance
-#include "android/camera/camera-common.h"      // for kVirtualScene
-#include "android/camera/camera-service.h"     // for register_ca...
+#include "android/camera/camera-common.h"   // for kEnvironment
+#include "android/camera/camera-service.h"  // for register_ca...
 #include "android/physics/GlmHelpers.h"
 #include "android/physics/PhysicalModel.h"
+#include "android/virtualscene/VirtualSceneManager.h"
 #include "android/virtualscene/WASDInputHandler.h"
 
 using android::virtualscene::kMaxVerticalRotationDegrees;
 using android::virtualscene::kMinVerticalRotationDegrees;
 using android::virtualscene::kPixelsToRotationRadians;
+using android::virtualscene::VirtualSceneManager;
 
 namespace android {
 namespace emulation {
@@ -34,26 +36,29 @@ static const float kAmbientMotionExtentMeters = 0.005f;
 // mVirtualSceneConnected will be updated in three scenarios:
 // 1, snapshot load 2, virtual scene camera connected 3, virtual scene camera
 // disconnected.
-VirtualSceneCamera::VirtualSceneCamera(const QAndroidSensorsAgent* sensorsAgent,
-                                       Callback cb)
-    : mModel(sensorsAgent), mConnected(false), mCallback(std::move(cb)) {
-    register_camera_status_change_callback(
-            &VirtualSceneCamera::virtualSceneCameraCallback, this,
-            kVirtualScene);
+VirtualSceneCamera::VirtualSceneCamera(const QAndroidSensorsAgent* sensorsAgent)
+    : mModel(sensorsAgent), mConnected(false) {
+    VirtualSceneManager::setSceneControlsChangeCallback([this](bool connected) {
+        this->virtualSceneControlsChangeCallback(connected);
+    });
 }
 
-void VirtualSceneCamera::virtualSceneCameraCallback(void* context,
-                                                    bool connected) {
-    auto self = static_cast<VirtualSceneCamera*>(context);
-    self->mConnected = connected;
-    if (self->mCallback != nullptr)
-        self->mCallback(connected);
-    self->mEventWaiter.newEvent();
-    self->fireEvent(connected);
+VirtualSceneCamera::~VirtualSceneCamera(){
+    // Reset the callback as it's not safe to run it anymore
+    VirtualSceneManager::setSceneControlsChangeCallback(nullptr);
+}
+
+void VirtualSceneCamera::virtualSceneControlsChangeCallback(bool connected) {
+    if (mConnected == connected) {
+        return;
+    }
+    mConnected = connected;
+    mEventWaiter.newEvent();
+    fireEvent(connected);
     if (connected) {
-        self->mModel.onEnable();
+        mModel.onEnable();
     } else {
-        self->mModel.onDisable();
+        mModel.onDisable();
     }
 }
 
