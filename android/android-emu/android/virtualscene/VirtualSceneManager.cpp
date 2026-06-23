@@ -259,20 +259,10 @@ private:
 
 static LazyInstance<Settings> sSettings = LAZY_INSTANCE_INIT;
 
-// Structured data loaded from environment.ini file
-struct EnvironmentConfig {
-    static const float defaultBackgroundBlur = 5.0f;
-    static const int defaultFps = 30;
-    VerSceneConfig::Mode sceneMode = VerSceneConfig::Mode::Unknown;
-    std::string sceneArgument;
-    bool backgroundEnabled = true;
-    float backgroundBlur = defaultBackgroundBlur;
-    int fps;
-};
-
-static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
-                                              bool warnMissing,
-                                              bool showBackground) {
+VirtualSceneManager::EnvironmentConfig
+VirtualSceneManager::getEnvironmentConfig(const AvdInfo* avdInfo,
+                                          bool warnMissing,
+                                          bool showBackground) {
     EnvironmentConfig ret;
 
     // Environment is required, set it up
@@ -361,6 +351,8 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
  ******************************************************************************/
 
 StaticLock VirtualSceneManager::mLock;
+std::optional<VirtualSceneManager::EnvironmentConfig>
+        VirtualSceneManager::mEnvConfig;
 VerSceneHandle VirtualSceneManager::mEnvironmentScene = nullptr;
 std::deque<std::string> VirtualSceneManager::mPosterFilenameUpdates;
 std::optional<std::thread> VirtualSceneManager::mBackgroundUpdateThread;
@@ -453,10 +445,11 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
 
     if (mEnvironmentScene == VER_INVALID_HANDLE) {
         // If the config cannot be loaded, try with the fallback config
-        const VerSceneConfig::Mode fallbackMode = VerSceneConfig::Mode::ImageFile;
-        const VerSceneConfig fallbackConfig(
-                fallbackMode,
-                VerSceneConfig::defaultArgumentForMode(fallbackMode));
+        envConfig.sceneMode = VerSceneConfig::Mode::ImageFile;
+        envConfig.sceneArgument =
+                VerSceneConfig::defaultArgumentForMode(envConfig.sceneMode);
+        const VerSceneConfig fallbackConfig(envConfig.sceneMode,
+                                            envConfig.sceneArgument);
         mEnvironmentScene = ver_create_scene(fallbackConfig);
 
         if (mEnvironmentScene == VER_INVALID_HANDLE) {
@@ -480,6 +473,7 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
     }
 
     mKeepUpdating = false;
+    mEnvConfig = envConfig;
 
     lock.unlock();
 
@@ -882,6 +876,11 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
         avdInfo_saveEnvironmentIni(avdInfo);
     }
 
+    {
+        AutoLock lock(mLock);
+        mEnvConfig = envConfig;
+    }
+
     // Update background service parameters
     BackgroundUpdateService::updateBackgroundEnabled(
             envConfig.backgroundEnabled);
@@ -891,6 +890,27 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
           envConfig.sceneArgument.c_str());
 
     return true;
+}
+
+void VirtualSceneManager::getEnvironment(void* context,
+                                         KeyValueCallback callback) {
+    AutoLock lock(mLock);
+    if (!mEnvConfig) {
+        return;
+    }
+
+    callback(context, "version", "1");
+
+    std::string modeStr = VerSceneConfig::modeToString(mEnvConfig->sceneMode);
+    std::string sceneModeVal = modeStr + ":" + mEnvConfig->sceneArgument;
+    callback(context, "scene.mode", sceneModeVal.c_str());
+
+    char blurStr[32];
+    snprintf(blurStr, sizeof(blurStr), "%.1f", mEnvConfig->backgroundBlur);
+    callback(context, "background.blurAmount", blurStr);
+
+    callback(context, "background.enabled",
+             mEnvConfig->backgroundEnabled ? "true" : "false");
 }
 
 void VirtualSceneManager::updateSceneWorker() {

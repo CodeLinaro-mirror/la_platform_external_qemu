@@ -35,6 +35,11 @@ typedef void (*EnumerateWebcamsCallback)(void* context,
                                          const char* label,
                                          const char* id);
 
+// Callback called to return key/value pairs.
+typedef void (*KeyValueCallback)(void* context,
+                                 const char* key,
+                                 const char* value);
+
 typedef struct QAndroidVirtualSceneAgent {
     // Set the initial poster of the scene, loaded from persisted settings.
     // Command line flags take precedence, so if the -virtualscene-poster flag
@@ -85,6 +90,9 @@ typedef struct QAndroidVirtualSceneAgent {
     // AVD's file will be used.
     // Returns true on success, false for failure.
     bool (*reloadEnvironment)(const char* environmentData);
+
+    // Get the environment key/value pairs.
+    void (*getEnvironment)(void* context, KeyValueCallback callback);
 
     // Returns a pointer to the event listener that can be used to track changes
     // to the animation state.
