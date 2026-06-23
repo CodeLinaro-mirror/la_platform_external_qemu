@@ -424,6 +424,17 @@ bool TarReader::extract(TarInfo src) {
 
     // Seek if the underlying stream supports it..
     seekg(src.offset);
+
+    // SECURITY: src.name is read straight out of a tar header that may have
+    // arrived over an untrusted gRPC stream (SnapshotService::PushSnapshot).
+    // PathUtils::join() returns an absolute |path2| verbatim and does not
+    // strip "..". Reject anything that escapes |mCwd|.
+    if (PathUtils::isAbsolute(src.name.c_str()) ||
+        src.name.find("..") != std::string::npos ||
+        src.name.find(':')  != std::string::npos /* Windows drive / ADS */) {
+        return error("Refusing to extract entry outside archive root: " +
+                     src.name);
+    }
     std::string fname = base::PathUtils::join(mCwd, src.name);
     DD("Size: %lu, name:%s", src.size, fname.c_str());
     if (src.type == DIRTYPE) {

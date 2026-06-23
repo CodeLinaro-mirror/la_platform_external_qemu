@@ -743,7 +743,10 @@ OperationStatus Snapshotter::save(bool isOnExit, const char* name) {
         mVmOperations.setSnapshotProtobuf(mCompatiblePb.get());
     }
 
-    mVmOperations.snapshotSave(name, this, nullptr);
+    bool success = mVmOperations.snapshotSave(name, this, nullptr);
+    if (!success) {
+        return OperationStatus::Error;
+    }
 
     if (mVmOperations.setSnapshotProtobuf) {
         std::string compatiblePbPath =

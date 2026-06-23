@@ -19,6 +19,7 @@ android_add_library(
   DARWIN android/camera/camera-capture-mac.m
   DEPS android-emu-agents-headers
        android-emu-base
+       virtual_environment_renderer
        android-emu-base-headers
        android-emu-cmdline
        android-emu-files
@@ -203,18 +204,21 @@ set(virtual_environment_renderer_src
     android/ver/src/Scene.cpp
     android/ver/src/SceneObject.cpp
     android/ver/src/TextureUtils.cpp
+    android/ver/src/raw_image_sources/fourcc_utils.cc
     android/ver/src/raw_image_sources/raw_image_source.cc
     android/ver/src/raw_image_sources/image_file/raw_image_file_source.cc
-    android/ver/src/raw_image_sources/video_file/raw_video_file_source.cc)
+    android/ver/src/raw_image_sources/video_file/raw_video_file_source.cc
+    android/ver/src/raw_image_sources/webcam/webcam_source.cc)
 
 android_add_library(
   TARGET virtual_environment_renderer
   LICENSE Apache-2.0
   SRC ${virtual_environment_renderer_src}
-  DEPS android-emu-base-headers
-       qemu-host-common-headers
+  WINDOWS android/ver/src/raw_image_sources/webcam/webcam_source_windows.cc
+  LINUX android/ver/src/raw_image_sources/webcam/webcam_source_linux.cc
+  DARWIN android/ver/src/raw_image_sources/webcam/webcam_source_mac.mm
+  DEPS qemu-host-common-headers
        android-emu-base
-       gfxstream_glm_headers
        png
        zlib
        FFMPEG::FFMPEG
@@ -222,6 +226,10 @@ android_add_library(
        emulator-tinyobjloader
        webrtc-yuv
 )
+target_link_libraries(
+  virtual_environment_renderer
+  PUBLIC android-emu-base-headers
+         gfxstream_glm_headers)
 target_include_directories(
   virtual_environment_renderer
   PUBLIC  android/ver/include
@@ -675,6 +683,7 @@ if(NOT LINUX_AARCH64)
       android/snapshot/RamLoader_unittest.cpp
       android/snapshot/RamSaver_unittest.cpp
       android/snapshot/RamSnapshot_unittest.cpp
+      android/snapshot/PathUtils_unittest.cpp
       android/snapshot/Snapshot_unittest.cpp
       android/userspace-boot-properties_unittest.cpp
       android/verified-boot/load_config_unittest.cpp)
@@ -753,7 +762,9 @@ if(NOT LINUX_AARCH64)
   android_add_test(TARGET virtual_environment_renderer_unittests
                    SRC android/ver/test/TextureUtils_unittest.cpp
                        android/ver/test/RawImageFileSource_unittest.cpp
-                       android/ver/test/SceneRendering_unittests.cpp)
+                       android/ver/test/SceneRendering_unittests.cpp
+                       android/ver/test/WebcamSource_unittest.cpp
+                       android/ver/src/raw_image_sources/webcam/webcam_source_virtual.cc)
   target_compile_options(
     virtual_environment_renderer_unittests PRIVATE -O0 -Wno-invalid-constexpr
                                   -Wno-string-plus-int)

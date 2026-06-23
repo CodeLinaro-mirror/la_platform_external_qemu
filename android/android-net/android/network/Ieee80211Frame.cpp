@@ -73,7 +73,9 @@ FrameInfo::FrameInfo(MacAddress transmitter,
       mFlags(flags),
       mChannel(channel) {
     size_t i = 0;
-    for (; i < numRates; ++i) {
+    // Defense-in-depth: clamp numRates to array capacity.
+    size_t safeNumRates = std::min(numRates, mTxRates.size());
+    for (; i < safeNumRates; ++i) {
         mTxRates[i].count = 0;
         mTxRates[i].idx = rates[i].idx;
     }

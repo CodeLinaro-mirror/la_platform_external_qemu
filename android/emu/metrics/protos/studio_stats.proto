@@ -917,6 +917,9 @@ message AndroidStudioEvent {
   // set when kind = PLAY_PUBLISHING_EVENT
   optional PlayPublishingEvent play_publishing_event = 256 [lazy = true];
 
+  // set when kind = CHANGE_REVIEW_EVENT
+  optional ChangeReviewEvent change_review_event = 258 [lazy = true];
+
   enum EventCategory {
     // The event was not grouped into any specific category (default).
     NO_EVENT_CATEGORY = 0;
@@ -1962,6 +1965,9 @@ message AndroidStudioEvent {
 
     // Rollback tool call event.
     ROLLBACK_TOOL_CALL_EVENT = 381;
+
+    // Change review event.
+    CHANGE_REVIEW_EVENT = 382;
   }
 
   // Represents different Performance Monitoring types.
@@ -3330,6 +3336,7 @@ message EmulatorAvdInfo {
     XR_HEADSET_DEVICE = 58;
     XR_GLASSES_DEVICE = 59;
     AI_GLASSES_DEVICE = 60;
+    PIXEL_10A = 61;
   }
   // Name of the AVD. Deprecated as it could potentially contain PII.
   optional string name = 1 [deprecated = true];
@@ -17723,7 +17730,12 @@ message GeminiTelemetryEvent {
     }
   }
 
-  message UiEvent {}
+  message UiEvent {
+    message ChangesDrawerEvent {
+      optional SmlChatBotEvent.ChangeResolved change_resolved = 1;
+    }
+    optional ChangesDrawerEvent changes_drawer_event = 1;
+  }
 
   message AgentEvent {
     // A single, comprehensive log for the entire tool lifecycle
@@ -17848,8 +17860,43 @@ message GeminiTelemetryEvent {
 
       // Tool-Specific Metadata
       oneof tool_specific_metadata {
-        // Data for a find declaration tool call.
+        // Data for a find_declaration tool call.
         FindDeclarationToolCallData find_declaration_tool_call_data = 8;
+        // Data for a find_files tool call.
+        FindFilesToolCallData find_files_tool_call_data = 9;
+        // Data for a find_usages tool call.
+        FindUsagesToolCallData find_usages_tool_call_data = 10;
+        // Data for a grep tool call.
+        GrepToolCallData grep_tool_call_data = 11;
+        // Data for a code_search tool call.
+        RagToolCallData rag_tool_call_data = 12;
+        // Data for a read_file tool call.
+        ReadFileToolCallData read_file_tool_call_data = 13;
+      }
+
+      message SearchArguments {
+        // Number of lines to show after the match (like grep -A).
+        optional int32 lines_after = 1;
+        // Number of lines to show before the match (like grep -B).
+        optional int32 lines_before = 2;
+        // Number of lines to show around the match (like grep -C).
+        optional int32 lines_context = 3;
+        // Pattern to filter results (like grep -E).
+        optional string filter = 4;
+        // Type to search, e.g., "all" kinds, function "call", etc.
+        optional string type = 5;
+        // Glob-like patterns to filter in results.
+        optional string include_pattern = 6;
+        // Glob-like patterns to filter out results.
+        optional string exclude_pattern = 7;
+      }
+
+      message SearchResponse {
+        // The number of characters in the final response.
+        optional int32 response_length = 1;
+        // The number of characters in the search results before path
+        // deduplication.
+        optional int32 raw_result_length = 2;
       }
 
       message FindDeclarationToolCallData {
@@ -17857,6 +17904,80 @@ message GeminiTelemetryEvent {
         optional string exception = 1;
         // The number of files in the find_declaration.
         optional int32 result_count = 2;
+        // The search arguments used for find_declaration.
+        optional SearchArguments search_arguments = 3;
+        // The search response.
+        optional SearchResponse response = 4;
+      }
+
+      message FindFilesToolCallData {
+        // Comma separated exceptions from the find_files tool call.
+        // We will use "IndexerInactive" to indicate the indexer is not active.
+        optional string exception = 1;
+        // The number of files in the combined file search result.
+        optional int32 combined_result_count = 2;
+        // The number of files in the bm25 file search result.
+        optional int32 bm25_search_count = 3;
+        // The number of files in the original find_files search result.
+        optional int32 found_files_count = 4;
+        // The number of docs (a doc is a file in the current RAG indexer) that
+        // are indexed.
+        optional int32 total_indexed_docs = 5;
+        // The search response.
+        optional SearchResponse response = 6;
+      }
+
+      message FindUsagesToolCallData {
+        // The exception the find_usages tool encountered.
+        optional string exception = 1;
+        // The number of files in the find_usages.
+        optional int32 result_count = 2;
+        // The search arguments used for find_usages.
+        optional SearchArguments search_arguments = 3;
+        // The search response.
+        optional SearchResponse response = 4;
+      }
+
+      message GrepToolCallData {
+        // The number of files in the grep result.
+        optional int32 result_count = 1;
+        // Whether the query contains any regex of ".*+?^$|(){}" or not.
+        optional bool regex_query = 2;
+        // The number of files in the grep BM25 backend result.
+        optional int32 bm25_result_count = 3;
+        // The number of files in the original grep backend result.
+        optional int32 grep_result_count = 4;
+        // The number of docs (a doc is a file in the current RAG indexer) that
+        // are indexed.
+        optional int32 total_indexed_docs = 5;
+        // The search arguments used for grep.
+        optional SearchArguments search_arguments = 6;
+        // The search response.
+        optional SearchResponse response = 7;
+      }
+
+      message RagToolCallData {
+        // The exception the code_search encountered.
+        // We will use "IndexerInactive" to indicate the indexer is not active.
+        optional string exception = 1;
+        // The number of files in code_search.
+        optional int32 result_count = 2;
+        // The number of resource files code_search returned.
+        optional int32 resource_count = 3;
+        // The number of files from out/ and builds/ that code_search returned.
+        optional int32 generated_files = 4;
+        // The number of docs (a doc is a file in the current RAG indexer) that
+        // are indexed.
+        optional int32 total_indexed_docs = 5;
+        // The search response.
+        optional SearchResponse response = 6;
+      }
+
+      message ReadFileToolCallData {
+        // Indicates if the read tool call read a skill file.
+        optional bool is_skill_file = 1;
+        // The name of the skill if it's a bundled skill.
+        optional SkillsEvent.SkillName skill_name = 2;
       }
     }
   }
@@ -20009,6 +20130,8 @@ message MarketingEmailEvent {
   optional bool opted_in = 1;
   // The source of the event.
   optional EventSource event_source = 2;
+  // User clicked "Do not show again for one year" in the dialog
+  optional bool do_not_show_again_clicked = 3;
 }
 
 message ServerPushNotificationEvent {
@@ -20234,6 +20357,17 @@ message NextEditPredictionEvent {
     }
   }
 
+  message RequestSent {
+    enum ModelType {
+      UNKNOWN = 0;
+      DEFAULT_MODEL_FREE_TIER = 1;
+      DEFAULT_MODEL_PAID_TIER = 2;
+      OTHER_MODEL = 3;
+    }
+    optional string model_id = 1;
+    optional ModelType model_type = 2;
+  }
+
   oneof next_edit_prediction {
     PredictionShown shown = 1 [lazy = true];
     PredictionAccepted accepted = 2 [lazy = true];
@@ -20241,6 +20375,7 @@ message NextEditPredictionEvent {
     EnabledStatus enabled_status = 4 [lazy = true];
     PredictionFailure failure = 5 [lazy = true];
     Session session = 6 [lazy = true];
+    RequestSent request_sent = 7 [lazy = true];
   }
 }
 
@@ -20298,6 +20433,24 @@ message SkillsEvent {
   // Pre-built skill names.
   enum SkillName {
     UNKNOWN_SKILL_NAME = 0;
+    CAMERA1_TO_CAMERAX = 1;
+    APPFUNCTIONS = 2;
+    ANDROID_CLI = 3;
+    FIREBASE_AUTH_BASICS = 4;
+    FIREBASE_BASICS = 5;
+    VERIFIED_EMAIL = 6;
+    ADAPTIVE = 7;
+    MIGRATE_XML_VIEWS_TO_JETPACK_COMPOSE = 8;
+    STYLES = 9;
+    NAVIGATION3 = 10;
+    R8_ANALYZER = 11;
+    ENGAGE_SDK_INTEGRATION = 12;
+    PLAY_BILLING_LIBRARY_VERSION_UPGRADE = 13;
+    PERFETTO_SQL = 14;
+    PERFETTO_TRACE_ANALYSIS = 15;
+    EDGE_TO_EDGE = 16;
+    TESTING_SETUP = 17;
+    DISPLAY_GLASSES_WITH_JETPACK_COMPOSE_GLIMMER = 18;
   }
 }
 
@@ -20431,4 +20584,57 @@ message PlayPublishingEvent {
   optional CreateAppDetails create_app_details = 4 [lazy = true];
   // set when event_type is CREATE_RELEASE.
   optional CreateReleaseDetails create_release_details = 5 [lazy = true];
+}
+
+// Telemetry event for the Change Review feature.
+message ChangeReviewEvent {
+  // The entry point in the UI from which the Change Review was invoked.
+  enum EntryPoint {
+    UNKNOWN_ENTRY_POINT = 0;
+    PENDING_CHANGES = 1;
+    COMMIT_HISTORY = 2;
+    AGENT_DRAWER = 3;
+    // The session was restored from a previously saved state.
+    RESTORED = 4;
+  }
+
+  // The final outcome status of the Change Review generation session.
+  enum Status {
+    UNKNOWN_STATUS = 0;
+    COMPLETED = 1;
+    FAILED = 2;
+    CANCELLED = 3;
+  }
+
+  // Telemetry data for a single Change Review generation session.
+  message Session {
+    optional string session_id = 1;
+    optional EntryPoint entry_point = 2;
+    optional string model_id = 3;
+    optional Status status = 4;
+    optional int64 total_duration_ms = 5;
+    optional int64 analysis_duration_ms = 6;
+    optional int64 summary_duration_ms = 7;
+    optional int64 themes_duration_ms = 8;
+    optional int64 theme_details_duration_ms = 9;
+    optional int32 num_files = 10;
+    optional int32 num_chunks = 11;
+    optional int32 num_suggestions_generated = 12;
+    optional string failure_reason = 13;
+  }
+
+  message FixBatch {
+    optional string session_id = 1;
+    optional int32 num_suggestions_selected = 2;
+    optional int32 num_suggestions_successful = 3;
+    optional int32 num_suggestions_failed = 4;
+    optional int64 total_duration_ms = 5;
+  }
+
+  oneof event {
+    // Logged when a change review generation session ends.
+    Session session = 1;
+    // Logged when a batch of suggested fixes is applied.
+    FixBatch fix_batch = 2;
+  }
 }

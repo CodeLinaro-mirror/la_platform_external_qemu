@@ -26,6 +26,8 @@
 #include "android/console_internal.h"
 #include "aemu/base/ProcessControl.h"
 #include "aemu/base/files/PathUtils.h"
+#include "android/base/system/System.h"
+#include "android/utils/path.h"
 #include "aemu/base/misc/StringUtils.h"
 #include "android/android.h"
 #include "android/automation/AutomationController.h"
@@ -372,6 +374,55 @@ static int control_write(ControlClient client, const char* format, ...) {
     va_end(args);
 
     return ret;
+}
+
+/* -------------------------------------------------------------------------
+ * Helper: confine a user-supplied output filename to
+ *   <avd-content-path>/console_out/<basename>
+ * b/511539305
+ *
+ * Rejects:
+ *   - empty argument
+ *   - any directory separator ('/' or '\\')
+ *   - any ".." component (defence-in-depth; separators already rejected)
+ *
+ * On success writes the joined absolute path into |out| and returns true.
+ * On failure writes a "KO: ..." line to |client| (if non-null) and returns
+ * false.
+ *
+ * This is intentionally strict: console commands that previously accepted
+ * arbitrary host paths now accept only a bare filename.  The common use
+ * ("network capture start foo.pcap") still works; the file lands under the
+ * AVD's content directory instead of the emulator's CWD.
+ * ---------------------------------------------------------------------- */
+static bool console_resolve_output_path(ControlClient client,
+                                        const char*   user_arg,
+                                        std::string*  out) {
+    using android::base::PathUtils;
+    if (!user_arg || !*user_arg) {
+        if (client) control_write(client, "KO: missing <file> argument\r\n");
+        return false;
+    }
+    std::string name(user_arg);
+    if (name.find('/')  != std::string::npos ||
+        name.find('\\') != std::string::npos ||
+        name.find("..") != std::string::npos) {
+        if (client)
+            control_write(client,
+                "KO: <file> must be a bare filename (written under the AVD "
+                "content directory); path separators and '..' are not allowed\r\n");
+        return false;
+    }
+    const char* content =
+            avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo());
+    if (!content || !*content) {
+        if (client) control_write(client, "KO: AVD content path unavailable\r\n");
+        return false;
+    }
+    std::string dir = PathUtils::join(content, "console_out");
+    path_mkdir_if_needed(dir.c_str(), 0700);
+    *out = PathUtils::join(dir, name);
+    return true;
 }
 
 static int control_write_out_cb(void* opaque, const char* str, int strsize) {
@@ -991,17 +1042,16 @@ static void describe_network_delay(ControlClient client) {
 }
 
 static int do_network_capture_start(ControlClient client, char* args) {
-    if (!args) {
-        control_write(client,
-                      "KO: missing <file> argument, see 'help network capture "
-                      "start'\r\n");
+    std::string safe;
+    if (!console_resolve_output_path(client, args, &safe)) {
         return -1;
     }
-    if (qemu_tcpdump_start(args) < 0) {
-        control_write(client, "KO: could not start capture: %s",
+    if (qemu_tcpdump_start(safe.c_str()) < 0) {
+        control_write(client, "KO: could not start capture: %s\r\n",
                       strerror(errno));
         return -1;
     }
+    control_write(client, "OK: capturing to %s\r\n", safe.c_str());
     return 0;
 }
 
@@ -2607,7 +2657,11 @@ static int do_snapshot_pull(ControlClient client, char* args) {
                       arg_strings.size());
         return -1;
     }
-    std::string& filename = arg_strings[1];
+    std::string filename;
+    if (!console_resolve_output_path(client, arg_strings[1].c_str(),
+                                     &filename)) {
+        return -1;
+    }
     dinfo("Snapshot pull: raw filename from command: %s", filename.c_str());
     const char* directory = nullptr;
     std::unique_ptr<std::ofstream> dstFile;
@@ -2626,7 +2680,7 @@ static int do_snapshot_pull(ControlClient client, char* args) {
     if (format != android::emulation::control::DIRECTORY) {
         dinfo("Snapshot pull: opening destination file: %s", filename.c_str());
         dstFile.reset(new std::ofstream(
-                android::base::PathUtils::asUnicodePath(filename.data()).c_str(),
+                android::base::PathUtils::asUnicodePath(filename.c_str()).c_str(),
                 std::ios::binary | std::ios::out));
         if (!dstFile->is_open()) {
             dinfo("Snapshot pull: FAILED to open file: %s", filename.c_str());
@@ -3514,7 +3568,11 @@ static const CommandDefRec sensor_commands[] = {
 static int do_automation_record(ControlClient client, char* args) {
     using namespace android::automation;
 
-    auto result = AutomationController::get().startRecording(args);
+    std::string safe;
+    if (!console_resolve_output_path(client, args, &safe)) {
+        return -1;
+    }
+    auto result = AutomationController::get().startRecording(safe.c_str());
     if (result.err()) {
         std::ostringstream str;
         str << "KO: " << result.unwrapErr();
@@ -3599,9 +3657,13 @@ static const CommandDefRec automation_commands[] = {
 
 // Start recording of ground truth to the given file.
 static int do_physics_record_ground_truth(ControlClient client, char* args) {
-    int res = android_physical_model_record_ground_truth(args);
+    std::string safe;
+    if (!console_resolve_output_path(client, args, &safe)) {
+        return -1;
+    }
+    int res = android_physical_model_record_ground_truth(safe.c_str());
     if (res < 0) {
-        control_write(client, "KO: failed to record to file %s\r\n", args);
+        control_write(client, "KO: failed to record to file %s\r\n", safe.c_str());
     }
     return res;
 }

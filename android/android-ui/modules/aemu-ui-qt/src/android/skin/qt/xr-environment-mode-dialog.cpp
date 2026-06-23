@@ -34,6 +34,19 @@ XrEnvironmentModeDialog::XrEnvironmentModeDialog(QWidget* parent)
     ui->setupUi(this);
     setWindowFlags(Qt::Popup);
 
+    auto cached_options = xr_service::retrieveXrOptionsCache();
+    bool hasReceivedInitialValue = cached_options.has_dimming_value() ||
+                                   cached_options.has_passthrough_coefficient();
+    bool passthroughOn = true;
+    if (cached_options.has_passthrough_coefficient()) {
+        passthroughOn = (cached_options.passthrough_coefficient() > 0.0f);
+    }
+    if (passthroughOn) {
+        ui->btn_xr_environment_passthrough_on->setChecked(true);
+    } else {
+        ui->btn_xr_environment_passthrough_off->setChecked(true);
+    }
+
     const char* levelsStr =
             getConsoleAgents()->settings->hw()->hw_dimmingLevels;
     if (levelsStr && levelsStr[0] != '\0') {
@@ -58,7 +71,8 @@ XrEnvironmentModeDialog::XrEnvironmentModeDialog(QWidget* parent)
                 &XrEnvironmentModeDialog::onExternalXROptionsChanged);
         // Enable the slider once we have received the initial value from the
         // guest, and will be able to respond to changes
-        ui->slider_xr_dimming_value->setEnabled(false);
+        ui->slider_xr_dimming_value->setEnabled(hasReceivedInitialValue &&
+                                                passthroughOn);
         xrServiceCallbackHandle = xr_service::registerCallback(
                 XrEnvironmentModeDialogHandleXrOptionsEvent, this);
     }
@@ -126,21 +140,36 @@ void XrEnvironmentModeDialog::on_slider_xr_dimming_value_valueChanged(
 
 void XrEnvironmentModeDialog::on_btn_xr_environment_passthrough_on_clicked() {
     emit onXrPassthroughCoefficientRequested(1.0f);
-    accept();  // hides dialog
+    if (mDimmingLevels.empty()) {
+        accept();  // hides dialog
+    }
 }
 
 void XrEnvironmentModeDialog::on_btn_xr_environment_passthrough_off_clicked() {
     emit onXrPassthroughCoefficientRequested(0.0f);
-    accept();  // hides dialog
+    if (mDimmingLevels.empty()) {
+        accept();  // hides dialog
+    }
 }
 
 void XrEnvironmentModeDialog::onExternalXROptionsChanged(
         xr_emulator_proto::XrOptions options) {
-    // Enable the element once the listener is connected and we receive an
-    // update with the initial value
-    if (!ui->slider_xr_dimming_value->isEnabled()) {
-        ui->slider_xr_dimming_value->setEnabled(true);
+    bool hasPassthrough = options.has_passthrough_coefficient();
+    bool passthroughOn = true;
+    if (hasPassthrough) {
+        float coeff = options.passthrough_coefficient();
+        passthroughOn = (coeff > 0.0f);
+        if (passthroughOn) {
+            ui->btn_xr_environment_passthrough_on->setChecked(true);
+        } else {
+            ui->btn_xr_environment_passthrough_off->setChecked(true);
+        }
+    } else {
+        passthroughOn = ui->btn_xr_environment_passthrough_on->isChecked();
     }
+
+    ui->slider_xr_dimming_value->setEnabled(passthroughOn);
+
     if (options.has_dimming_value()) {
         float val = options.dimming_value();
         int value = static_cast<int>(val * kSliderScale);

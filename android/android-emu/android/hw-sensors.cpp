@@ -881,9 +881,11 @@ static int _hwSensors_load(Stream* f, QemudService* s, void* opaque) {
     }
 
     /* check number of sensors */
-    const int32_t num_sensors = stream_get_be32(f);
+    /* SECURITY: Use uint32_t to match stream_get_be32() return type.
+     * int32_t causes negative values to bypass the > MAX_SENSORS check. */
+    const uint32_t num_sensors = stream_get_be32(f);
     if (num_sensors > MAX_SENSORS) {
-        D("%s: cannot load: snapshot requires %d sensors, %d available",
+        D("%s: cannot load: snapshot requires %u sensors, %d available",
           __FUNCTION__, num_sensors, MAX_SENSORS);
         return -EIO;
     }

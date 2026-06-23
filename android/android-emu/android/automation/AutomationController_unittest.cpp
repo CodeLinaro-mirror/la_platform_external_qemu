@@ -74,6 +74,10 @@ protected:
     }
 
     void SetUp() override {
+        mTestFile = android::base::PathUtils::join(
+                mTestSystem.getHomeDirectory(), "testRecording.txt");
+        mOtherFile = android::base::PathUtils::join(
+                mTestSystem.getHomeDirectory(), "otherFile.txt");
         mLooper.reset(new TestLooper());
         mPhysicalModel.reset(physicalModel_new());
         mController = AutomationController::createForTest(
@@ -126,6 +130,8 @@ protected:
     std::unique_ptr<TestLooper> mLooper;
     PhysicalModelPtr mPhysicalModel;
     std::unique_ptr<AutomationController> mController;
+    std::string mTestFile;
+    std::string mOtherFile;
     static int sCallbackInt;
 };
 
@@ -148,11 +154,11 @@ TEST_F(AutomationControllerTest, InvalidInput) {
 }
 
 TEST_F(AutomationControllerTest, SimpleRecordPlayEmpty) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
     // Recordings now always contain a simple final empty event.
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
 
     // Advancing time because of simple end of file event.
     advanceTimeToNs(secondsToNs(1));
@@ -161,7 +167,7 @@ TEST_F(AutomationControllerTest, SimpleRecordPlayEmpty) {
 
 TEST_F(AutomationControllerTest, SimpleRecordPlay) {
     // Non empty recording.
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const vec3 kPosition1 = {0.5f, 10.0f, 0.0f};
@@ -172,19 +178,19 @@ TEST_F(AutomationControllerTest, SimpleRecordPlay) {
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
     // Playback stops before all commands are excecuted.
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
     EXPECT_THAT(mController->stopPlayback(), IsOk());
 }
 
 TEST_F(AutomationControllerTest, DuplicateRecord) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
-    EXPECT_THAT(mController->startRecording("otherFile.txt"),
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
+    EXPECT_THAT(mController->startRecording(mOtherFile.c_str()),
                 IsErr(StartError::AlreadyStarted));
 }
 
 TEST_F(AutomationControllerTest, DuplicatePlay) {
     // Non empty recording.
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const vec3 kPosition1 = {0.5f, 10.0f, 0.0f};
@@ -195,8 +201,8 @@ TEST_F(AutomationControllerTest, DuplicatePlay) {
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
     // Start second recording before first ends.
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"),
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()),
                 IsErr(StartError::AlreadyStarted));
 }
 
@@ -219,7 +225,7 @@ TEST_F(AutomationControllerTest, PlaybackFileCorrupt) {
 }
 
 TEST_F(AutomationControllerTest, RecordPlayEvents) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const vec3 kVecZero = {0.0f, 0.0f, 0.0f};
 
@@ -252,7 +258,7 @@ TEST_F(AutomationControllerTest, RecordPlayEvents) {
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
     advanceTimeToNs(kPlaybackStartTime);
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
 
     // Verify that the initial state was properly reset.
     EXPECT_EQ(physicalModel_getParameterPosition(mPhysicalModel.get(),
@@ -295,7 +301,7 @@ TEST_F(AutomationControllerTest, RecordPlayEvents) {
 }
 
 TEST_F(AutomationControllerTest, PlaybackStops) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const uint64_t kEventTime2 = secondsToNs(1);
@@ -309,7 +315,7 @@ TEST_F(AutomationControllerTest, PlaybackStops) {
 
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
 
     // Check Playback stops after last event.
     advanceTimeToNs(kEventTime2 + secondsToNs(1));
@@ -317,13 +323,13 @@ TEST_F(AutomationControllerTest, PlaybackStops) {
 }
 
 TEST_F(AutomationControllerTest, PlaybackWithCallback) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
     sCallbackInt = 0;
 
     EXPECT_THAT(mController->startPlaybackWithCallback(
-                        "testRecording.txt",
+                        mTestFile.c_str(),
                         &AutomationControllerTest::onStopCallback),
                 IsOk());
 
@@ -333,7 +339,7 @@ TEST_F(AutomationControllerTest, PlaybackWithCallback) {
 }
 
 TEST_F(AutomationControllerTest, DestructWhileRecording) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const uint64_t kEventTime2 = secondsToNs(1);
@@ -350,7 +356,7 @@ TEST_F(AutomationControllerTest, DestructWhileRecording) {
 
     EXPECT_THAT(mController->stopRecording(), IsErr(StopError::NotStarted));
 
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
 
     // Now go through the events and validate.
     advanceTimeToNs(kEventTime1);
@@ -367,7 +373,7 @@ TEST_F(AutomationControllerTest, DestructWhileRecording) {
 }
 
 TEST_F(AutomationControllerTest, DestructWhilePlaying) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const vec3 kPosition1 = {0.5f, 10.0f, 0.0f};
@@ -377,17 +383,17 @@ TEST_F(AutomationControllerTest, DestructWhilePlaying) {
 
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
 }
 
 TEST_F(AutomationControllerTest, PlayWhileRecording) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"),
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()),
                 IsErr(StartError::FileOpenError));
 }
 
 TEST_F(AutomationControllerTest, RecordWhilePlaying) {
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const vec3 kPosition1 = {0.5f, 10.0f, 0.0f};
@@ -397,8 +403,8 @@ TEST_F(AutomationControllerTest, RecordWhilePlaying) {
 
     EXPECT_THAT(mController->stopRecording(), IsOk());
 
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
-    EXPECT_THAT(mController->startRecording("testRecording.txt"),
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()),
                 IsErr(StartError::FileOpenError));
 }
 
@@ -759,7 +765,7 @@ TEST_F(AutomationControllerTest, ReplayBlocksPlayback) {
     // Recording
     //
 
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const vec3 kPosition1 = {0.5f, 10.0f, 0.0f};
@@ -781,7 +787,7 @@ TEST_F(AutomationControllerTest, ReplayBlocksPlayback) {
     ASSERT_EQ(events.size(), 1);
     EXPECT_THAT(mController->replayEvent(pipe, events[0], 790), IsOk());
 
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"),
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()),
                 IsErr(StartError::AlreadyStarted));
 
     EXPECT_CALL(*this, offworldSendResponse(Eq(pipe), _)).Times(1);
@@ -801,7 +807,7 @@ TEST_F(AutomationControllerTest, PlaybackBlocksReplay) {
     // Recording
     //
 
-    EXPECT_THAT(mController->startRecording("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startRecording(mTestFile.c_str()), IsOk());
 
     const uint64_t kEventTime1 = secondsToNs(0.5);
     const vec3 kPosition1 = {0.5f, 10.0f, 0.0f};
@@ -820,7 +826,7 @@ TEST_F(AutomationControllerTest, PlaybackBlocksReplay) {
     // Playback
     //
 
-    EXPECT_THAT(mController->startPlayback("testRecording.txt"), IsOk());
+    EXPECT_THAT(mController->startPlayback(mTestFile.c_str()), IsOk());
 
     ASSERT_EQ(events.size(), 1);
     EXPECT_THAT(mController->replayEvent(pipe, events[0], 790),
