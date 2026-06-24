@@ -228,7 +228,7 @@ pkg_zip(
     srcs = [":zip_files"],
     package_file_name = select({
         "@platforms//os:linux": "bazel-linux-x86_64-{build_id}.zip",
-        "@platforms//os:macos": "bazel-darwin-aarch64-{build_id}.zip",
+        "@platforms//os:macos": "bazel-darwin-arm64-{build_id}.zip",
         "@platforms//os:windows": "bazel-windows-x86_64-{build_id}.zip",
     }),
     package_variables = ":build_id",
