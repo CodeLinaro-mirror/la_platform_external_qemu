@@ -51,6 +51,12 @@ const QAndroidVirtualSceneAgent sFishtankQAndroidVirtualSceneAgent = {
                     NOT_IMPLEMENTED("QAndroidVirtualSceneAgent.reloadScene(environmentData: %s)", environmentData);
                     return false;
                 },
+        .getEnvironment =
+                [](void* opaque, KeyValueCallback cb) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidVirtualSceneAgent.getEnvironment(opaque: %p, cb: %p)",
+                            opaque, cb);
+                },
         .getAnimationStateEventListener = []() -> void* {
             NOT_IMPLEMENTED(
                     "QAndroidVirtualSceneAgent.getAnimationStateEventListener");
