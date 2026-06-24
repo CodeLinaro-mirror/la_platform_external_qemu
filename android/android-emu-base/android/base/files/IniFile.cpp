@@ -432,13 +432,55 @@ int IniFile::getInt(const string& key, int defaultValue) const {
     auto value = getString(key, "");
     char* end;
     errno = 0;
-    const int result = strtol(value.c_str(), &end, 10);
+    const long result = strtol(value.c_str(), &end, 10);
     if (errno || *end != 0) {
-        VLOG(ini) << "Malformed int value " << value << " for key "
-                         << key;
+        if (errno == 0 && *end != 0 && (key == "hw.ramSize" || key == "vm.heapSize")) {
+            char suffix = *end;
+            long long val = result;
+            bool valid = true;
+            if (suffix == 'k' || suffix == 'K') {
+                val /= 1024;
+            } else if (suffix == 'm' || suffix == 'M') {
+                // Megabytes, do nothing
+            } else if (suffix == 'g' || suffix == 'G') {
+                val *= 1024;
+            } else if (suffix == 't' || suffix == 'T') {
+                val *= 1024 * 1024;
+            } else {
+                valid = false;
+            }
+            if (valid && *(end + 1) != '\0') {
+                valid = *(end + 1) == 'B' && *(end + 2) == '\0';
+            }
+            if (valid) {
+                // Sanity check: reject <= 0 or > 1 Terabyte (1,048,576 MB)
+                if (val <= 0 || val > 1048576) {
+                    valid = false;
+                }
+            }
+            if (valid) {
+                return static_cast<int>(val);
+            }
+            LOG(WARNING) << "Malformed memory size '" << value
+                         << "' for key '" << key
+                         << "'. Only integer values between 1MB and 1TB (with optional KB, MB, GB, TB suffixes) are supported. "
+                         << "Falling back to default value: " << defaultValue;
+        } else {
+            VLOG(ini) << "Malformed int value " << value << " for key "
+                             << key;
+        }
         return defaultValue;
     }
-    return result;
+    if (key == "hw.ramSize" || key == "vm.heapSize") {
+        if (result <= 0 || result > 1048576) {
+            LOG(WARNING) << "Malformed memory size '" << value
+                         << "' for key '" << key
+                         << "'. Only integer values between 1MB and 1TB (with optional KB, MB, GB, TB suffixes) are supported. "
+                         << "Falling back to default value: " << defaultValue;
+            return defaultValue;
+        }
+    }
+    return static_cast<int>(result);
 }
 
 int64_t IniFile::getInt64(const string& key, int64_t defaultValue) const {
