@@ -219,6 +219,12 @@ AndroidAsyncMessagePipe::OutgoingPacket::OutgoingPacket(base::Stream* stream) {
 
     const std::string dataStr = stream->getString();
     data = std::vector<uint8_t>(dataStr.begin(), dataStr.end());
+
+    // SECURITY: Validate offset against length() to prevent underflow
+    // and subsequent host heap OOB read in copyToBuffer().
+    if (offset > length()) {
+        offset = length();
+    }
 }
 
 bool AndroidAsyncMessagePipe::OutgoingPacket::complete() const {
@@ -267,6 +273,15 @@ AndroidAsyncMessagePipe::IncomingPacket::IncomingPacket(base::Stream* stream) {
 
     const std::string dataStr = stream->getString();
     data = std::vector<uint8_t>(dataStr.begin(), dataStr.end());
+
+    // SECURITY: Validate headerBytesRead and messageLength to prevent
+    // undefined behavior and underflows in bytesRemaining().
+    if (headerBytesRead > sizeof(uint32_t)) {
+        headerBytesRead = sizeof(uint32_t);
+    }
+    if (headerBytesRead == sizeof(uint32_t) && data.size() > messageLength) {
+        messageLength = static_cast<uint32_t>(data.size());
+    }
 }
 
 bool AndroidAsyncMessagePipe::IncomingPacket::lengthKnown() const {
