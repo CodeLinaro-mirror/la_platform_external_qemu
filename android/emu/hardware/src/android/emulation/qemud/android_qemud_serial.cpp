@@ -58,16 +58,16 @@ int qemud_serial_load(Stream* f, QemudSerial* s) {
     /* s->header and s->payload are only ever connected to s->data0 */
     s->header->buff = s->payload->buff = s->data0;
 
-    int len = stream_get_be32(f);
+    uint32_t len = stream_get_be32(f);
     if (len - 1 > MAX_SERIAL_PAYLOAD) {
-        D("%s: load failed: size of saved payload buffer (%d) exceeds "
+        D("%s: load failed: size of saved payload buffer (%u) exceeds "
                   "current maximum (%d)\n",
           __FUNCTION__, len - 1, MAX_SERIAL_PAYLOAD);
         return -EIO;
     }
     int ret;
-    if ((ret = stream_read(f, s->data0, len)) != len) {
-        D("%s: failed to load serial buffer contents (tried reading %d bytes, got %d)\n",
+    if ((ret = stream_read(f, s->data0, len)) != (int)len) {
+        D("%s: failed to load serial buffer contents (tried reading %u bytes, got %d)\n",
           __FUNCTION__, len, ret);
         return -EIO;
     }
