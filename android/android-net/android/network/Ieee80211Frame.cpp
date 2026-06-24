@@ -362,19 +362,25 @@ std::string Ieee80211Frame::toStr() {
 }
 
 bool Ieee80211Frame::isValid() const {
-    bool isValid = true;
+    if (size() < 2) {
+        return false;
+    }
     if (size() < IEEE80211_HDRLEN) {
         LOG(DEBUG) << "Frame length is less than " << IEEE80211_HDRLEN;
-        isValid = false;
+        return false;
+    }
+    if (size() < hdrLength()) {
+        LOG(DEBUG) << "Frame length " << size() << " is less than header length " << hdrLength();
+        return false;
     }
     if (isData() && !isProtected() && !isDataNull()) {
-        isValid = validEtherType(getEtherType());
-        if (!isValid) {
+        if (!validEtherType(getEtherType())) {
             LOG(DEBUG) << "Data frame has invalid ether type "
                          << getEtherType();
+            return false;
         }
     }
-    return isValid;
+    return true;
 }
 
 bool Ieee80211Frame::isData() const {
@@ -588,6 +594,8 @@ void Ieee80211Frame::setGTKForTesting(std::vector<uint8_t> keyMaterial,
 
 // Return true if decryption is successful
 bool Ieee80211Frame::decrypt(const CipherScheme cs) {
+    if (!isValid())
+        return false;
     if (!isProtected())
         return false;
     if (!isData() && !isRobustMgmt())
@@ -610,12 +618,12 @@ bool Ieee80211Frame::decrypt(const CipherScheme cs) {
         return false;
     }
     // compute special ccmp block
-    int dataLen = size() - hdrLength() - IEEE80211_CCMP_HDR_LEN -
-                  IEEE80211_CCMP_MIC_LEN;
-    if (dataLen < 0) {
+    if (size() < hdrLength() + IEEE80211_CCMP_HDR_LEN + IEEE80211_CCMP_MIC_LEN) {
         LOG(ERROR) << "Not enough data in the encrypted message";
         return false;
     }
+    int dataLen = size() - hdrLength() - IEEE80211_CCMP_HDR_LEN -
+                  IEEE80211_CCMP_MIC_LEN;
 
     auto pn = getPacketNumber(cs);
     auto aad = getAad();
@@ -641,6 +649,8 @@ bool Ieee80211Frame::decrypt(const CipherScheme cs) {
 }
 
 bool Ieee80211Frame::encrypt(const CipherScheme cs) {
+    if (!isValid())
+        return false;
     if (cs == CipherScheme::NONE) {
         return true;
     } else if (cs != CipherScheme::CCMP) {
@@ -730,6 +740,9 @@ const IOVector Ieee80211Frame::toEthernetIOVector() {
 
 const std::vector<uint8_t> Ieee80211Frame::toEthernet() {
     std::vector<uint8_t> ret;
+    if (!isValid()) {
+        return ret;
+    }
     uint16_t ethertype = getEtherType();
     if (!validEtherType(ethertype)) {
         LOG(DEBUG) << "Unexpected ether type: " << ethertype
@@ -748,6 +761,9 @@ const std::vector<uint8_t> Ieee80211Frame::toEthernet() {
 }
 
 uint16_t Ieee80211Frame::getEtherType() const {
+    if (size() < hdrLength()) {
+        return 0;
+    }
     size_t payloadSize = size() - hdrLength();
     if (payloadSize >= ETH_HLEN) {
         if (!memcmp(frameBody(), kRfc1042Header, ETH_ALEN)) {
