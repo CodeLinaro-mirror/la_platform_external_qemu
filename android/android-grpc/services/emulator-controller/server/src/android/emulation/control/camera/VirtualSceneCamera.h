@@ -17,7 +17,7 @@
 #include <functional>
 
 #include "aemu/base/Compiler.h"
-#include "aemu/base/EventNotificationSupport.h"        // for EventNotifi...
+#include "aemu/base/EventNotificationSupport.h"           // for EventNotifi...
 #include "android/emulation/control/utils/EventWaiter.h"  // for EventWaiter
 #include "android/virtualscene/WASDInputHandler.h"
 
@@ -28,9 +28,9 @@ namespace android {
 namespace emulation {
 namespace control {
 
-// The VirtualSceneCamera will register a callback with the virtual scene manager
-// and will get notified when the number of users are changed to enable/disable
-// physical model and trigger events for the notification stream.
+// The VirtualSceneCamera will register a callback with the virtual scene
+// manager and will get notified when the number of users are changed to
+// enable/disable physical model and trigger events for the notification stream.
 class VirtualSceneCamera : public base::EventNotificationSupport<bool> {
 public:
     VirtualSceneCamera(const QAndroidSensorsAgent* sensorsAgent);

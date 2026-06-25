@@ -43,7 +43,7 @@ VirtualSceneCamera::VirtualSceneCamera(const QAndroidSensorsAgent* sensorsAgent)
     });
 }
 
-VirtualSceneCamera::~VirtualSceneCamera(){
+VirtualSceneCamera::~VirtualSceneCamera() {
     // Reset the callback as it's not safe to run it anymore
     VirtualSceneManager::setSceneControlsChangeCallback(nullptr);
 }

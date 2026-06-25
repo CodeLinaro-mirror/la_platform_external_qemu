@@ -58,26 +58,6 @@ constexpr size_t kMaxStreamDim = 16384;
 constexpr size_t kMaxStreamBytes =
         kMaxStreamDim * kMaxStreamDim * sizeof(uint32_t);
 
-// TODO(b/173651912): remove this thing and call the callback from
-// camera_XYZ_(start|stop)_capturing instead.
-struct CameraCallbackDesc {
-    void set(camera_callback_t cb, void* ctx, CameraSourceType src) {
-        callback = cb;
-        context = ctx;
-        source = src;
-    }
-
-    void operator()(CameraSourceType src, bool value) const {
-        if (callback && (source == src)) {
-            callback(context, value);
-        }
-    }
-
-    camera_callback_t callback = nullptr;
-    void* context = nullptr;
-    CameraSourceType source = {};
-};
-
 struct WhiteBalance {
     float red, green, blue;
 };
