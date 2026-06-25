@@ -617,7 +617,11 @@ tcp_tos(struct socket *so)
 	while(tcptos[i].tos) {
 		if ((tcptos[i].fport && (ntohs(so->so_fport) == tcptos[i].fport)) ||
 		    (tcptos[i].lport && (ntohs(so->so_lport) == tcptos[i].lport))) {
-			so->so_emu = tcptos[i].emu;
+			/* Android emulator: the tcp_emu() ALGs (FTP PORT, IRC
+			 * DCC, ident, RealAudio PNA) are unused by the guest
+			 * and every case has a CVE.  Keep the TOS hint but
+			 * never enter tcp_emu(). */
+			so->so_emu = 0;
 			return tcptos[i].tos;
 		}
 		i++;
@@ -687,6 +691,12 @@ tcp_emu(struct socket *so, struct mbuf *m)
 			socklen_t addrlen = sizeof(struct sockaddr_in);
 			struct sbuf *so_rcv = &so->so_rcv;
 
+			/* CVE-2019-6778: don't accumulate past sb_datalen */
+			if (m->m_len >
+			    so_rcv->sb_datalen - (so_rcv->sb_wptr - so_rcv->sb_data)) {
+				m_free(m);
+				return 0;
+			}
 			memcpy(so_rcv->sb_wptr, m->m_data, m->m_len);
 			so_rcv->sb_wptr += m->m_len;
 			so_rcv->sb_rptr += m->m_len;
@@ -751,9 +761,12 @@ tcp_emu(struct socket *so, struct mbuf *m)
 			n4 =  (laddr & 0xff);
 
 			m->m_len = bptr - m->m_data; /* Adjust length */
-                        m->m_len += snprintf(bptr, m->m_size - m->m_len,
-                                             "ORT %d,%d,%d,%d,%d,%d\r\n%s",
-                                             n1, n2, n3, n4, n5, n6, x==7?buff:"");
+			/* CVE-2020-8608: clamp snprintf return to room */
+			i = snprintf(bptr, M_FREEROOM(m),
+			             "ORT %d,%d,%d,%d,%d,%d\r\n%s",
+			             n1, n2, n3, n4, n5, n6, x == 7 ? buff : "");
+			if (i < 0) i = 0;
+			m->m_len += MIN(i, M_FREEROOM(m));
 			return 1;
 		} else if ((bptr = (char *)strstr(m->m_data, "27 Entering")) != NULL) {
 			/*
@@ -784,10 +797,11 @@ tcp_emu(struct socket *so, struct mbuf *m)
 			n4 =  (laddr & 0xff);
 
 			m->m_len = bptr - m->m_data; /* Adjust length */
-			m->m_len += snprintf(bptr, m->m_size - m->m_len,
-                                             "27 Entering Passive Mode (%d,%d,%d,%d,%d,%d)\r\n%s",
-                                             n1, n2, n3, n4, n5, n6, x==7?buff:"");
-
+			i = snprintf(bptr, M_FREEROOM(m),
+			             "27 Entering Passive Mode (%d,%d,%d,%d,%d,%d)\r\n%s",
+			             n1, n2, n3, n4, n5, n6, x == 7 ? buff : "");
+			if (i < 0) i = 0;
+			m->m_len += MIN(i, M_FREEROOM(m));
 			return 1;
 		}
 
@@ -830,10 +844,13 @@ tcp_emu(struct socket *so, struct mbuf *m)
 				return 1;
 			}
 			m->m_len = bptr - m->m_data; /* Adjust length */
-                        m->m_len += snprintf(bptr, m->m_size,
-                                             "DCC CHAT chat %lu %u%c\n",
-                                             (unsigned long)ntohl(so->so_faddr.s_addr),
-                                             ntohs(so->so_fport), 1);
+			/* CVE-2020-7039: size must be remaining room from bptr */
+			i = snprintf(bptr, M_FREEROOM(m),
+			             "DCC CHAT chat %lu %u%c\n",
+			             (unsigned long)ntohl(so->so_faddr.s_addr),
+			             ntohs(so->so_fport), 1);
+			if (i < 0) i = 0;
+			m->m_len += MIN(i, M_FREEROOM(m));
 		} else if (sscanf(bptr, "DCC SEND %256s %u %u %u", buff, &laddr, &lport, &n1) == 4) {
 			if ((so = tcp_listen(slirp, INADDR_ANY, 0,
 			                     htonl(laddr), htons(lport),
@@ -841,10 +858,12 @@ tcp_emu(struct socket *so, struct mbuf *m)
 				return 1;
 			}
 			m->m_len = bptr - m->m_data; /* Adjust length */
-                        m->m_len += snprintf(bptr, m->m_size,
-                                             "DCC SEND %s %lu %u %u%c\n", buff,
-                                             (unsigned long)ntohl(so->so_faddr.s_addr),
-                                             ntohs(so->so_fport), n1, 1);
+			i = snprintf(bptr, M_FREEROOM(m),
+			             "DCC SEND %s %lu %u %u%c\n", buff,
+			             (unsigned long)ntohl(so->so_faddr.s_addr),
+			             ntohs(so->so_fport), n1, 1);
+			if (i < 0) i = 0;
+			m->m_len += MIN(i, M_FREEROOM(m));
 		} else if (sscanf(bptr, "DCC MOVE %256s %u %u %u", buff, &laddr, &lport, &n1) == 4) {
 			if ((so = tcp_listen(slirp, INADDR_ANY, 0,
 			                     htonl(laddr), htons(lport),
@@ -852,10 +871,12 @@ tcp_emu(struct socket *so, struct mbuf *m)
 				return 1;
 			}
 			m->m_len = bptr - m->m_data; /* Adjust length */
-                        m->m_len += snprintf(bptr, m->m_size,
-                                             "DCC MOVE %s %lu %u %u%c\n", buff,
-                                             (unsigned long)ntohl(so->so_faddr.s_addr),
-                                             ntohs(so->so_fport), n1, 1);
+			i = snprintf(bptr, M_FREEROOM(m),
+			             "DCC MOVE %s %lu %u %u%c\n", buff,
+			             (unsigned long)ntohl(so->so_faddr.s_addr),
+			             ntohs(so->so_fport), n1, 1);
+			if (i < 0) i = 0;
+			m->m_len += MIN(i, M_FREEROOM(m));
 		}
 		return 1;
 
@@ -944,16 +965,26 @@ tcp_emu(struct socket *so, struct mbuf *m)
 				 * 2.0 is here. For future versions of
 				 * the player this may need to be modified.
 				 */
-				if (*(bptr + 1) == 0x02)
-				   bptr += 8;
-				else
-				   bptr += 4;
+				/* CVE-2020-7039: don't step past the mbuf */
+				if (bptr + 1 >= m->m_data + m->m_len) {
+					return 1;
+				}
+				if (*(bptr + 1) == 0x02) {
+					if (bptr + 8 > m->m_data + m->m_len) return 1;
+					bptr += 8;
+				} else {
+					if (bptr + 4 > m->m_data + m->m_len) return 1;
+					bptr += 4;
+				}
 				break;
 
 			 case 6:
 				/* This is the field containing the port
 				 * number that RA-player is listening to.
 				 */
+				if (bptr + 2 > m->m_data + m->m_len) {
+					return 1;
+				}
 				lport = (((u_char*)bptr)[0] << 8)
 				+ ((u_char *)bptr)[1];
 				if (lport < 6970)

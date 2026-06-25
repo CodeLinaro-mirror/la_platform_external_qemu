@@ -33,6 +33,9 @@
 #define T(...) ((void)0)
 #endif
 
+// SECURED: Limit maximum frame size to 32MB to prevent OOM/crashes.
+#define MAX_CLUSTER_FRAME_SIZE (32 * 1024 * 1024)
+
 
 struct HwCarCluster {
     QemudService* service;
@@ -59,8 +62,21 @@ static void _hwCarClusterClient_recv(void* opaque,
             D("%s: size not sent prior to data", __func__);
             return;
         }
-        hwCarCluster->nextSize = ((int32_t*) msg)[0];
+        int32_t size = ((int32_t*) msg)[0];
+        if (size <= 0 || size > MAX_CLUSTER_FRAME_SIZE) {
+            D("%s: invalid frame size %d", __func__, size);
+            return;
+        }
+        hwCarCluster->nextSize = (unsigned int)size;
     } else if (hwCarCluster->callback != nullptr) {
+        // SECURITY: Validate that the actual message length is at least
+        // as large as the expected frame size to prevent host heap OOB read.
+        if (msglen < (int)hwCarCluster->nextSize) {
+            D("%s: message too short: got %d, expected %u", __func__,
+              msglen, hwCarCluster->nextSize);
+            hwCarCluster->nextSize = UINT_MAX;
+            return;
+        }
         hwCarCluster->callback(msg, hwCarCluster->nextSize);
         hwCarCluster->nextSize = UINT_MAX;
     }

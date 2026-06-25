@@ -334,7 +334,13 @@ static void bootp_reply(Slirp *slirp, const struct bootp_t *bp)
 
 void bootp_input(struct mbuf *m)
 {
-    struct bootp_t *bp = mtod(m, struct bootp_t *);
+    struct bootp_t *bp;
+
+    if (m->m_len < sizeof(struct bootp_t)) {
+        return;
+    }
+
+    bp = mtod(m, struct bootp_t *);
 
     if (bp->bp_op == BOOTP_REQUEST) {
         bootp_reply(m->slirp, bp);

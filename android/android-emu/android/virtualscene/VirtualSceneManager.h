@@ -20,6 +20,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -33,6 +34,8 @@
 #include "android/emulation/control/virtual_scene_agent.h"
 #include "android/utils/compiler.h"
 #include "ver/virtual_environment_renderer.h"
+
+struct AvdInfo;
 
 namespace android {
 namespace virtualscene {
@@ -131,6 +134,8 @@ public:
     // Returns false on error.
     static bool reloadEnvironment(const char* environmentData);
 
+    static void getEnvironment(void* context, KeyValueCallback callback);
+
     // Returns the rotation amount needed to display the scene upright.
     static int getSceneBaseRotation();
 
@@ -138,6 +143,16 @@ public:
     static int getSceneBaseRotationLocked();
 
 private:
+    struct EnvironmentConfig {
+        static constexpr float defaultBackgroundBlur = 5.0f;
+        static constexpr int defaultFps = 30;
+        VerSceneConfig::Mode sceneMode = VerSceneConfig::Mode::Unknown;
+        std::string sceneArgument;
+        bool backgroundEnabled = true;
+        float backgroundBlur = defaultBackgroundBlur;
+        int fps;
+    };
+    static std::optional<EnvironmentConfig> mEnvConfig;
     static android::base::StaticLock mLock;
     static VerSceneHandle mEnvironmentScene;
     static std::deque<std::string> mPosterFilenameUpdates;
@@ -147,6 +162,9 @@ private:
     static bool mShowBackground;
     static std::atomic<bool> mKeepUpdating;
 
+    static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
+                                                  bool warnMissing,
+                                                  bool showBackground);
     static void updateSceneWorker();
     static void startSceneUpdateThread();
     static void stopSceneUpdateThread();

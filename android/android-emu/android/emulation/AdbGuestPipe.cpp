@@ -331,6 +331,14 @@ void AdbGuestPipe::onLoad(android::base::Stream* stream) {
     stream->read(mBuffer, sizeof(mBuffer));
     mBufferSize = stream->getBe32();
     mBufferPos = stream->getBe32();
+    // SECURITY: Validate against fixed buffer size to prevent OOB read
+    // in onGuestRecvReply where memcpy reads mBufferSize-mBufferPos bytes.
+    if (mBufferSize > sizeof(mBuffer)) {
+        mBufferSize = sizeof(mBuffer);
+    }
+    if (mBufferPos > mBufferSize) {
+        mBufferPos = mBufferSize;
+    }
     mState = static_cast<State>(stream->getBe32());
     int socket = stream->getBe32();
     if (socket) {

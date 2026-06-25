@@ -329,10 +329,19 @@ insert:
                 return NULL;
 
 	/*
+	 * CVE-2019-14378: Ensure total reassembled length does not
+	 * exceed IP_MAXPACKET (65535) to prevent uint16_t truncation
+	 * and wild-pointer write through M_EXT relocation.
+	 */
+	if (next + (ip->ip_hl << 2) > IP_MAXPACKET)
+		goto dropfrag;
+
+	/*
 	 * Reassembly is complete; concatenate fragments.
 	 */
-    q = fp->frag_link.next;
+	q = fp->frag_link.next;
 	m = dtom(slirp, q);
+	int delta = (char *)q - (m->m_flags & M_EXT ? m->m_ext : m->m_dat);
 
 	q = (struct ipasfrag *) q->ipf_next;
 	while (q != (struct ipasfrag*)&fp->frag_link) {
@@ -357,7 +366,6 @@ insert:
 	 * into the new buffer.
 	 */
 	if (m->m_flags & M_EXT) {
-	  int delta = (char *)q - m->m_dat;
 	  q = (struct ipasfrag *)(m->m_ext + delta);
 	}
 

@@ -796,5 +796,6 @@ if(NOT LINUX_AARCH64)
 
   android_copy_test_files(virtual_environment_renderer_unittests
                           "${virtual_environment_renderer-testdata}" testdata)
+  android_copy_test_dir(virtual_environment_renderer_unittests ver/exif_rotation testdata/ver/exif_rotation)
 
 endif()
