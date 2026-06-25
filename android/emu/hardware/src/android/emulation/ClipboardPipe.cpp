@@ -30,6 +30,9 @@ static void emptyCallback(const uint8_t*, size_t) {}
 
 bool ClipboardPipe::sEnabled = false;
 
+// 32768 is an arbitrary constant which confirmed working on API36.
+static const size_t kMaxClipboardSize = 32768;
+
 // A storage for the current clipboard pipe instance data.
 // Shared pointer is required as there are potential races between clipboard
 // data changing from the host and guest's request to close the pipe. We need
@@ -107,6 +110,11 @@ int ClipboardPipe::processOperation(OperationType operation,
             if (operation == OperationType::ReadFromGuest) {
                 // If we're reading from the guest clipboard, make sure the
                 // buffer on our side has enough space.
+                if (state->dataSize > kMaxClipboardSize) {
+                    LOG(WARNING) << "ClipboardPipe: guest clipboard size too large ("
+                                 << state->dataSize << "), rejecting.";
+                    return PIPE_ERROR_INVAL;
+                }
                 state->buffer.resize(state->dataSize);
             }
         }
@@ -193,8 +201,7 @@ void ClipboardPipe::setGuestClipboardContents(const uint8_t* buf, size_t len) {
         return;  // who cares.
     }
 
-    // 32786 is an arbitrary constant which confirmed working on API36.
-    if (len > 32768) {
+    if (len > kMaxClipboardSize) {
         LOG(WARNING) << "ClipboardPipe: the clipboard is too "
                         "large (" << len << "), ignoring.";
         return;
