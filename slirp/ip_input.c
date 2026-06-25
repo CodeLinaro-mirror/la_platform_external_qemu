@@ -307,9 +307,10 @@ ip_reass(Slirp *slirp, struct ip *ip, struct ipq *fp)
 			m_adj(dtom(slirp, q), i);
 			break;
 		}
+		struct ipasfrag *prev = q;
 		q = q->ipf_next;
-		m_free(dtom(slirp, q->ipf_prev));
-		ip_deq(q->ipf_prev);
+		ip_deq(prev);
+		m_free(dtom(slirp, prev));
 	}
 
 insert:
