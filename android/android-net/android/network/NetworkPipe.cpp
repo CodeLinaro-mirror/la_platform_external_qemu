@@ -18,6 +18,7 @@
 #include <cstring>
 #include <ctime>
 #include <limits>
+#include <algorithm>
 #include <unordered_set>
 #include <vector>
 
@@ -34,27 +35,36 @@ public:
 
         AndroidPipe* create(void* hwPipe, const char* /*args*/,
                             enum AndroidPipeFlags flags) override {
-            auto pipe = new NetworkPipe(hwPipe, this);
+            auto pipe = std::shared_ptr<NetworkPipe>(new NetworkPipe(hwPipe, this));
             onPipeOpen(pipe);
-            return pipe;
+            return pipe.get();
         }
 
-        void onPipeOpen(NetworkPipe* pipe) {
+        void onPipeOpen(std::shared_ptr<NetworkPipe> pipe) {
+            android::base::AutoLock lock(mPipesLock);
             mPipes.insert(pipe);
         }
 
         void onPipeClose(NetworkPipe* pipe) {
-            mPipes.erase(pipe);
+            android::base::AutoLock lock(mPipesLock);
+            auto it = std::find_if(mPipes.begin(), mPipes.end(), [pipe](const std::shared_ptr<NetworkPipe>& p) {
+                return p.get() == pipe;
+            });
+            if (it != mPipes.end()) {
+                mPipes.erase(it);
+            }
         }
 
-        NetworkPipe* getPipe() {
+        std::shared_ptr<NetworkPipe> getPipeShared() {
+            android::base::AutoLock lock(mPipesLock);
             if (!mPipes.empty()) {
                 return *mPipes.begin();
             }
             return nullptr;
         }
     private:
-        std::unordered_set<NetworkPipe*> mPipes;
+        std::unordered_set<std::shared_ptr<NetworkPipe>> mPipes;
+        android::base::Lock mPipesLock;
     };
 
     NetworkPipe(void* hwPipe, Service* service)
@@ -65,19 +75,24 @@ public:
 
 
     int send(const char* data, size_t size) {
+        android::base::AutoLock lock(mLock);
+        if (mClosed) {
+            return -1;
+        }
         if (size == 0) {
             return 0;
         }
-        {
-            android::base::AutoLock lock(mLock);
-            mTxBuffer.insert(mTxBuffer.end(), data, data + size);
-        }
+        mTxBuffer.insert(mTxBuffer.end(), data, data + size);
         mDataAvailable = true;
         signalWake(PIPE_WAKE_READ);
         return size;
     }
 
     void onGuestClose(PipeCloseReason reason) override {
+        {
+            android::base::AutoLock lock(mLock);
+            mClosed = true;
+        }
         mNetworkPipeService->onPipeClose(this);
     }
 
@@ -141,6 +156,7 @@ private:
     std::vector<char> mTxBuffer;
     android::base::Lock mLock;
     time_t mLastRead = 0;
+    bool mClosed = false;
 };
 
 
@@ -161,7 +177,7 @@ void registerNetworkPipeService() {
 
 int sendNetworkCommand(const char* command, size_t size) {
     if (sNetworkPipeService) {
-        NetworkPipe* pipe = sNetworkPipeService->getPipe();
+        std::shared_ptr<NetworkPipe> pipe = sNetworkPipeService->getPipeShared();
         if (pipe) {
             return pipe->send(command, size);
         }
