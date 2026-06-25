@@ -1058,6 +1058,9 @@ void slirp_pollfds_poll(GArray *pollfds, int select_error)
 
 static void arp_input(Slirp *slirp, const uint8_t *pkt, int pkt_len)
 {
+    if (pkt_len < ETH_HLEN + sizeof(struct slirp_arphdr)) {
+        return;
+    }
     struct slirp_arphdr *ah = (struct slirp_arphdr *)(pkt + ETH_HLEN);
     uint8_t arp_reply[MAX(ETH_HLEN + sizeof(struct slirp_arphdr), 64)];
     struct ethhdr *reh = (struct ethhdr *)arp_reply;
