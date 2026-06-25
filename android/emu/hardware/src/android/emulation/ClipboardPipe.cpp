@@ -48,6 +48,10 @@ ClipboardPipe::ClipboardPipe(void* hwPipe, Service* svc)
     : AndroidPipe(hwPipe, svc) {}
 
 void ClipboardPipe::onGuestClose(PipeCloseReason reason) {
+    {
+        android::base::AutoLock lock(mLock);
+        mClosed = true;
+    }
     ClipboardPipe::Service::closePipe();
 }
 
@@ -176,6 +180,9 @@ void ClipboardPipe::wakeGuestIfNeeded() {
 }
 
 void ClipboardPipe::wakeGuestIfNeededLocked() {
+    if (mClosed) {
+        return;
+    }
     if (sEnabled && mGuestWriteState.hasData()) {
         signalWake(PIPE_WAKE_READ);
     }
@@ -207,12 +214,13 @@ ClipboardPipe::Service::Service() : AndroidPipe::Service("clipboard") {}
 AndroidPipe* ClipboardPipe::Service::create(void* hwPipe,
                                             const char* args,
                                             enum AndroidPipeFlags flags) {
-    const auto pipe = new ClipboardPipe(hwPipe, this);
-    {
-        android::base::AutoLock lock(sInstance->pipeLock);
-        assert(!sInstance->pipe);
-        sInstance->pipe.reset(pipe);
+    android::base::AutoLock lock(sInstance->pipeLock);
+    if (sInstance->pipe) {
+        LOG(WARNING) << "ClipboardPipe connection rejected: service already active.";
+        return nullptr;
     }
+    const auto pipe = new ClipboardPipe(hwPipe, this);
+    sInstance->pipe.reset(pipe);
     return pipe;
 }
 
