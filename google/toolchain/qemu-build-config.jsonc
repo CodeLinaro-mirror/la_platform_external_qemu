@@ -60,7 +60,7 @@
       },
       "gmodule": {
         "lib_type": "bazel",
-        "bazel_target": "@glib//gmodule",
+        "bazel_target": "@glib//gmodule:gmodule_import",
         "version": "2.77.2",
         "shim": {
           "name": "gmodule-export-2.0",
@@ -75,7 +75,7 @@
       },
       "glib": {
         "lib_type": "bazel",
-        "bazel_target": "@glib//glib",
+        "bazel_target": "@glib//glib:glib_import",
         "version": "2.77.2",
         "shim": {
           "name": "glib-2.0",
@@ -480,10 +480,10 @@
     ],
     "external_deps": {
       "glib-2.0": [
-        "@glib//glib"
+        "@glib//glib:glib_import"
       ],
       "gmodule-export-2.0": [
-        "@glib//gmodule"
+        "@glib//gmodule:gmodule_import"
       ],
       "zlib": [
         "@zlib//:zlib"
@@ -531,7 +531,7 @@
         },
         "gmodule": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//gmodule",
+          "bazel_target": "@glib//gmodule:gmodule_import",
           "version": "2.77.2",
           "shim": {
             "name": "gmodule-export-2.0",
@@ -649,7 +649,7 @@
         },
         "gmodule": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//gmodule",
+          "bazel_target": "@glib//gmodule:gmodule_import",
           "version": "2.77.2",
           "shim": {
             "name": "gmodule-export-2.0",
@@ -663,7 +663,7 @@
       "dependencies": {
         "gmodule": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//gmodule",
+          "bazel_target": "@glib//gmodule:gmodule_import",
           "version": "2.77.2",
           "shim": {
             "name": "gmodule-export-2.0",
@@ -673,7 +673,7 @@
         },
         "glib": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//glib",
+          "bazel_target": "@glib//glib:glib_import",
           "version": "2.77.2",
           "shim": {
             "name": "glib-2.0",
@@ -766,7 +766,7 @@
       "dependencies": {
         "gmodule": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//gmodule",
+          "bazel_target": "@glib//gmodule:gmodule_import",
           "version": "2.77.2",
           "shim": {
             "name": "gmodule-export-2.0",
@@ -776,7 +776,7 @@
         },
         "glib": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//glib",
+          "bazel_target": "@glib//glib:glib_import",
           "version": "2.77.2",
           "shim": {
             "name": "glib-2.0",
@@ -869,7 +869,7 @@
       "dependencies": {
         "gmodule": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//gmodule",
+          "bazel_target": "@glib//gmodule:gmodule_import",
           "version": "2.77.2",
           "shim": {
             "name": "gmodule-export-2.0",
@@ -878,7 +878,7 @@
         },
         "glib": {
           "lib_type": "bazel",
-          "bazel_target": "@glib//glib",
+          "bazel_target": "@glib//glib:glib_import",
           "version": "2.77.2",
           "shim": {
             "name": "glib-2.0",
@@ -1005,8 +1005,8 @@
       ],
       "external_deps": {
         "glib-2.0": [
-          "@glib//glib",
-          "@glib//gmodule"
+          "@glib//glib:glib_import",
+          "@glib//gmodule:gmodule_import"
         ]
       },
       "export": [

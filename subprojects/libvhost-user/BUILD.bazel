@@ -66,7 +66,7 @@ cc_library(
     deps = [
         "vhost-user",
         "//google/compat/linux:compat",
-        "@glib//glib",
-        "@glib//gmodule",
+        "@glib//glib:glib_import",
+        "@glib//gmodule:gmodule_import",
     ],
 )
