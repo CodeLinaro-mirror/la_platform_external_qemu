@@ -897,8 +897,6 @@ private:
     std::vector<char> mBuffer;
 };
 
-CameraCallbackDesc g_cameraCallbackDesc;
-
 struct BaseCameraClient : public ICppQemudClient {
     BaseCameraClient(CameraInfo& ci, CameraDevice& cd)
             : mCameraInfo(ci)
@@ -951,7 +949,6 @@ protected:
         }
 
         camera_metrics_report_start_result(CLIENT_START_RESULT_SUCCESS);
-        g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, true);
         mFrameCounter = 0;
         return true;
     }
@@ -987,7 +984,6 @@ protected:
     }
 
     void stopCapturingImpl() const {
-        g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, false);
         camera_metrics_report_stop_session(mFrameCounter);
 
         const int res = (mCameraInfo.vtbl->stop_capturing)(&mCameraDevice);
@@ -1874,10 +1870,4 @@ ICppQemudClient* CameraService::cameraClientCreate(const std::string_view params
 void android_camera_service_init(void) {
     // All the interesting things happen in the ctor.
     static CameraService s_cameraService;
-}
-
-void register_camera_status_change_callback(camera_callback_t cb,
-                                            void* ctx,
-                                            CameraSourceType src) {
-    g_cameraCallbackDesc.set(cb, ctx, src);
 }

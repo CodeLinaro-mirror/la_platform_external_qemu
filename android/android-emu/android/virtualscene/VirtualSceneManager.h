@@ -122,12 +122,12 @@ public:
     // to the animation state.
     static void* getAnimationStateEventListener();
 
-    static void setSceneControlsParameters(bool show);
-
     static bool addSceneUser();
     static void removeSceneUser();
 
     static void setUpdateCallback(std::function<void()> callback);
+    static void setSceneControlsChangeCallback(
+            std::function<void(bool show)> callback);
 
     static VerSceneConfig::Mode getSceneMode();
 
@@ -158,7 +158,8 @@ private:
     static std::deque<std::string> mPosterFilenameUpdates;
     static std::optional<std::thread> mBackgroundUpdateThread;
     static std::function<void()> mUpdateCallback;
-    static std::atomic<int> mNumUsers;
+    static std::function<void(bool)> mSceneControlsChangeCallback;
+    static int mNumUsers;
     static bool mShowBackground;
     static std::atomic<bool> mKeepUpdating;
 
@@ -169,6 +170,7 @@ private:
     static void startSceneUpdateThread();
     static void stopSceneUpdateThread();
     static bool reloadScene(const VerSceneConfig& config);
+    static void onSceneControlsChanged(bool enableSceneControls);
 };
 
 // TODO(virtualscene): move into a regular service
