@@ -1267,6 +1267,10 @@ private:
     ClientStartResult start3(const uint32_t width,
                              const uint32_t height,
                              const uint32_t pixFormat) {
+        if (width == 0 || width > kMaxStreamDim || height == 0 ||
+            height > kMaxStreamDim) {
+            return CLIENT_START_RESULT_INCORRECT_PARAMS;
+        }
         if (!has_converter(mCameraInfo.pixel_format, pixFormat) ||
             !has_converter(mCameraInfo.pixel_format, V4L2_PIX_FMT_RGB32)) {
             return CLIENT_START_RESULT_NO_PIXEL_CONVERSION;

@@ -135,7 +135,7 @@ TEST_P(SceneRenderingTest, RenderSceneMode) {
 
     int width = 640;
     int height = 480;
-    ver_render_view_set_dimensions(view, width, height);
+    ASSERT_TRUE(ver_render_view_set_dimensions(view, width, height));
 
     // View projection from the initial SceneCamera values
     const float viewProj[16] = {1.500f,  0.000f,  0.000f,  0.000f,   //
@@ -194,6 +194,51 @@ TEST_P(SceneRenderingTest, RenderSceneMode) {
 
     ver_destroy_render_view(view);
     ver_destroy_scene(scene);
+}
+
+TEST(SceneRenderingTestSimple, InvalidDimensions) {
+    VerRenderViewHandle view = ver_create_render_view();
+    ASSERT_NE(view, (VerRenderViewHandle)VER_INVALID_HANDLE);
+
+    int32_t width = -1;
+    int32_t height = -1;
+
+    // Default dimensions should be 0
+    ver_render_view_get_dimensions(view, &width, &height);
+    EXPECT_EQ(width, 0);
+    EXPECT_EQ(height, 0);
+
+    // Set valid dimensions - should return true
+    EXPECT_TRUE(ver_render_view_set_dimensions(view, 640, 480));
+    ver_render_view_get_dimensions(view, &width, &height);
+    EXPECT_EQ(width, 640);
+    EXPECT_EQ(height, 480);
+
+    // Set invalid negative dimensions - should return false and be rejected
+    EXPECT_FALSE(ver_render_view_set_dimensions(view, -10, 480));
+    ver_render_view_get_dimensions(view, &width, &height);
+    EXPECT_EQ(width, 640);
+    EXPECT_EQ(height, 480);
+
+    // Set invalid too large dimensions - should return false and be rejected
+    EXPECT_FALSE(ver_render_view_set_dimensions(view, 20000, 480));
+    ver_render_view_get_dimensions(view, &width, &height);
+    EXPECT_EQ(width, 640);
+    EXPECT_EQ(height, 480);
+
+    // Set invalid height - should return false and be rejected
+    EXPECT_FALSE(ver_render_view_set_dimensions(view, 640, -1));
+    ver_render_view_get_dimensions(view, &width, &height);
+    EXPECT_EQ(width, 640);
+    EXPECT_EQ(height, 480);
+
+    // Set invalid too large height - should return false and be rejected
+    EXPECT_FALSE(ver_render_view_set_dimensions(view, 640, 20000));
+    ver_render_view_get_dimensions(view, &width, &height);
+    EXPECT_EQ(width, 640);
+    EXPECT_EQ(height, 480);
+
+    ver_destroy_render_view(view);
 }
 
 INSTANTIATE_TEST_SUITE_P(SceneModes,

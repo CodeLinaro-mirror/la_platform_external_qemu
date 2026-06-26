@@ -129,7 +129,11 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
     }
 
     mActiveView = ver_create_render_view();
-    ver_render_view_set_dimensions(mActiveView, frameWidth, frameHeight);
+    if (!ver_render_view_set_dimensions(mActiveView, frameWidth, frameHeight)) {
+        LOG(ERROR) << "Failed to set camera render view dimensions!";
+        stopCapturing();
+        return -1;
+    }
 
     return 0;
 }

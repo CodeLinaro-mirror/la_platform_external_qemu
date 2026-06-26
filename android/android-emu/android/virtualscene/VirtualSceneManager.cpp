@@ -1032,8 +1032,14 @@ bool BackgroundUpdateService::start(int displayWidth,
     // TODO(virtualscene): do not call renderView if it's a static
     // image, adjust fps based on environment.ini
     mBackgroundView = ver_create_render_view();
-    ver_render_view_set_dimensions(mBackgroundView, displayWidth,
-                                   displayHeight);
+    if (!ver_render_view_set_dimensions(mBackgroundView, displayWidth,
+                                        displayHeight)) {
+        LOG(ERROR) << "Failed to set background render view dimensions!";
+        ver_destroy_render_view(mBackgroundView);
+        mBackgroundView = VER_INVALID_HANDLE;
+        mSceneCamera.reset();
+        return false;
+    }
     ver_render_view_set_blur_factor(mBackgroundView, backgroundBlur);
     mReadbackDataCopy.resize(displayWidth * displayHeight * 4);
 
