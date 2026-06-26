@@ -1058,7 +1058,13 @@ void slirp_pollfds_poll(GArray *pollfds, int select_error)
 
 static void arp_input(Slirp *slirp, const uint8_t *pkt, int pkt_len)
 {
-    if (pkt_len < ETH_HLEN + sizeof(struct slirp_arphdr)) {
+    /*
+     * Require at least 14 (Ethernet header) + 28 (ARP payload) = 42 bytes.
+     * We use a hardcoded 28 instead of sizeof(struct slirp_arphdr) because
+     * compilers may pad/align the structure size to 32 bytes on some platforms,
+     * which would incorrectly drop valid 42-byte ARP packets.
+     */
+    if (pkt_len < ETH_HLEN + 28) {
         return;
     }
     struct slirp_arphdr *ah = (struct slirp_arphdr *)(pkt + ETH_HLEN);
