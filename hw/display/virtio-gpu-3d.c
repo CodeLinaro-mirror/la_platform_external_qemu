@@ -743,11 +743,28 @@ static void virgl_cmd_resource_map(VirtIOGPU *g,
         return;
     }
 
+    if (size > UINT32_MAX) {
+        fprintf(stderr, "%s: size 0x%llx is not supported for resource %u\n", __func__,
+                m.resource_id, (unsigned long long)size);
+        cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
+        return;
+    }
+
+    uint64_t host_coherent_size =
+        object_property_get_uint(OBJECT(&g->host_coherent_memory), "size", NULL);
+
+    if (host_coherent_size && (offset >= host_coherent_size || size > host_coherent_size - offset)) {
+        fprintf(stderr, "%s: error: resource %u offset 0x%llx + size 0x%llx exceeds coherent memory size 0x%llx\n",
+                __func__, m.resource_id, (unsigned long long)offset,
+                (unsigned long long)size, (unsigned long long)host_coherent_size);
+        cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
+        return;
+    }
+
     uint64_t host_coherent_start =
         object_property_get_uint(OBJECT(&g->host_coherent_memory), "addr", NULL);
 
-    uint64_t phys_addr =
-        host_coherent_start + offset;
+    uint64_t phys_addr = host_coherent_start + offset;
 
     virtio_gpu_map_slot(
         &g->host_coherent_memory,
