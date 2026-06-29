@@ -924,23 +924,39 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
 
 void VirtualSceneManager::getEnvironment(void* context,
                                          KeyValueCallback callback) {
-    AutoLock lock(mLock);
-    if (!mEnvConfig) {
-        return;
+    EnvironmentConfig config;
+    {
+        AutoLock lock(mLock);
+        if (mEnvConfig) {
+            config = *mEnvConfig;
+        } else {
+            if (!getConsoleAgents() || !getConsoleAgents()->settings ||
+                !getConsoleAgents()->settings->avdInfo() ||
+                !getConsoleAgents()->settings->hw()) {
+                derror("Could not get environment. console agents not present.");
+                return;
+            }
+            const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
+            const AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
+            const bool showBackground = hwCfg->hw_lcd_transparent;
+            config = getEnvironmentConfig(avdInfo, false, showBackground);
+        }
     }
 
     callback(context, "version", "1");
 
-    std::string modeStr = VerSceneConfig::modeToString(mEnvConfig->sceneMode);
-    std::string sceneModeVal = modeStr + ":" + mEnvConfig->sceneArgument;
-    callback(context, "scene.mode", sceneModeVal.c_str());
+    std::string modeStr = VerSceneConfig::modeToString(config.sceneMode);
+    if (!config.sceneArgument.empty()) {
+        modeStr += ":" + config.sceneArgument;
+    }
+    callback(context, "scene.mode", modeStr.c_str());
 
     char blurStr[32];
-    snprintf(blurStr, sizeof(blurStr), "%.1f", mEnvConfig->backgroundBlur);
+    snprintf(blurStr, sizeof(blurStr), "%.1f", config.backgroundBlur);
     callback(context, "background.blurAmount", blurStr);
 
     callback(context, "background.enabled",
-             mEnvConfig->backgroundEnabled ? "true" : "false");
+             config.backgroundEnabled ? "true" : "false");
 }
 
 void VirtualSceneManager::updateSceneWorker() {
