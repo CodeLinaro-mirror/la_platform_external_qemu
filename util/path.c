@@ -6,7 +6,6 @@
 #include "qemu/osdep.h"
 #include <sys/param.h>
 #include <dirent.h>
-#include <regex.h>
 #include "qemu/cutils.h"
 #include "qemu/path.h"
 #include "qemu/thread.h"
@@ -14,11 +13,11 @@
 static const char *base;
 static GHashTable *hash;
 static QemuMutex lock;
-static regex_t shared_library_regex;
+static GRegex *shared_library_regex;
 
 void init_paths(const char *prefix)
 {
-    int err;
+    GError *gerr = NULL;
     if (prefix[0] == '\0' || !strcmp(prefix, "/")) {
         return;
     }
@@ -34,10 +33,12 @@ void init_paths(const char *prefix)
     hash = g_hash_table_new(g_str_hash, g_str_equal);
     qemu_mutex_init(&lock);
 
-    err = regcomp(&shared_library_regex, "\\.so(\\.[[:digit:]]+)*$",
-                  REG_EXTENDED | REG_NOSUB);
-    if (err != 0) {
-        fprintf(stderr, "regcomp returns error code %d\n", err);
+    shared_library_regex = g_regex_new("\\.so(\\.[[:digit:]]+)*$",
+                                       G_REGEX_OPTIMIZE,
+                                       0, &gerr);
+    if (gerr != NULL) {
+        fprintf(stderr, "g_regex_new returns error: %s\n", gerr->message);
+        g_error_free(gerr);
         exit(EXIT_FAILURE);
     }
 }
@@ -48,7 +49,7 @@ void init_paths(const char *prefix)
  */
 static bool is_filename_shared_object(const char *name)
 {
-    return regexec(&shared_library_regex, name, 0, NULL, 0) == 0;
+    return g_regex_match(shared_library_regex, name, 0, NULL);
 }
 
 /*
