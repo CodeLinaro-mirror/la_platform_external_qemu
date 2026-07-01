@@ -87,10 +87,18 @@ int error_printf(const char *fmt, ...)
     return ret;
 }
 
-static Location std_loc = {
+static __thread Location std_loc = {
     .kind = LOC_NONE
 };
-static Location *cur_loc = &std_loc;
+static __thread Location *cur_loc_ptr = NULL;
+
+static inline Location *get_cur_loc(void)
+{
+    if (!cur_loc_ptr) {
+        cur_loc_ptr = &std_loc;
+    }
+    return cur_loc_ptr;
+}
 
 /*
  * Push location saved in LOC onto the location stack, return it.
@@ -100,8 +108,8 @@ static Location *cur_loc = &std_loc;
 Location *loc_push_restore(Location *loc)
 {
     assert(!loc->prev);
-    loc->prev = cur_loc;
-    cur_loc = loc;
+    loc->prev = get_cur_loc();
+    cur_loc_ptr = loc;
     return loc;
 }
 
@@ -124,8 +132,8 @@ Location *loc_push_none(Location *loc)
  */
 Location *loc_pop(Location *loc)
 {
-    assert(cur_loc == loc && loc->prev);
-    cur_loc = loc->prev;
+    assert(get_cur_loc() == loc && loc->prev);
+    cur_loc_ptr = loc->prev;
     loc->prev = NULL;
     return loc;
 }
@@ -135,7 +143,7 @@ Location *loc_pop(Location *loc)
  */
 Location *loc_save(Location *loc)
 {
-    *loc = *cur_loc;
+    *loc = *get_cur_loc();
     loc->prev = NULL;
     return loc;
 }
@@ -145,10 +153,10 @@ Location *loc_save(Location *loc)
  */
 void loc_restore(Location *loc)
 {
-    Location *prev = cur_loc->prev;
+    Location *prev = get_cur_loc()->prev;
     assert(!loc->prev);
-    *cur_loc = *loc;
-    cur_loc->prev = prev;
+    *get_cur_loc() = *loc;
+    get_cur_loc()->prev = prev;
 }
 
 /*
@@ -156,7 +164,7 @@ void loc_restore(Location *loc)
  */
 void loc_set_none(void)
 {
-    cur_loc->kind = LOC_NONE;
+    get_cur_loc()->kind = LOC_NONE;
 }
 
 /*
@@ -164,9 +172,9 @@ void loc_set_none(void)
  */
 void loc_set_cmdline(char **argv, int idx, int cnt)
 {
-    cur_loc->kind = LOC_CMDLINE;
-    cur_loc->num = cnt;
-    cur_loc->ptr = argv + idx;
+    get_cur_loc()->kind = LOC_CMDLINE;
+    get_cur_loc()->num = cnt;
+    get_cur_loc()->ptr = argv + idx;
 }
 
 /*
@@ -174,11 +182,11 @@ void loc_set_cmdline(char **argv, int idx, int cnt)
  */
 void loc_set_file(const char *fname, int lno)
 {
-    assert (fname || cur_loc->kind == LOC_FILE);
-    cur_loc->kind = LOC_FILE;
-    cur_loc->num = lno;
+    assert (fname || get_cur_loc()->kind == LOC_FILE);
+    get_cur_loc()->kind = LOC_FILE;
+    get_cur_loc()->num = lno;
     if (fname) {
-        cur_loc->ptr = fname;
+        get_cur_loc()->ptr = (void *)fname;
     }
 }
 
@@ -195,19 +203,19 @@ static void print_loc(Monitor *cur)
         fprintf(stderr, "%s:", g_get_prgname());
         sep = " ";
     }
-    switch (cur_loc->kind) {
+    switch (get_cur_loc()->kind) {
     case LOC_CMDLINE:
-        argp = cur_loc->ptr;
-        for (i = 0; i < cur_loc->num; i++) {
+        argp = get_cur_loc()->ptr;
+        for (i = 0; i < get_cur_loc()->num; i++) {
             error_printf_mon(cur, "%s%s", sep, argp[i]);
             sep = " ";
         }
         error_printf_mon(cur, ": ");
         break;
     case LOC_FILE:
-        error_printf_mon(cur, "%s:", (const char *)cur_loc->ptr);
-        if (cur_loc->num) {
-            error_printf_mon(cur, "%d:", cur_loc->num);
+        error_printf_mon(cur, "%s:", (const char *)get_cur_loc()->ptr);
+        if (get_cur_loc()->num) {
+            error_printf_mon(cur, "%d:", get_cur_loc()->num);
         }
         error_printf_mon(cur, " ");
         break;
@@ -224,11 +232,11 @@ char *real_time_iso8601(void)
 
 static char *format_cur_loc_cmdline(char * const dest, const int dest_cap) {
     int i = 0, size = 0;
-    const int cur_loc_num = cur_loc->num;
-    char * const *cur_loc_ptr = cur_loc->ptr;
+    const int cur_loc_num = get_cur_loc()->num;
+    char * const *cur_loc_ptr_val = get_cur_loc()->ptr;
     char *sep = "";
     for (i = 0; i < cur_loc_num; i++) {
-        int needed = snprintf(dest + size, dest_cap - size, "%s%s", sep, cur_loc_ptr[i]);
+        int needed = snprintf(dest + size, dest_cap - size, "%s%s", sep, cur_loc_ptr_val[i]);
         size += needed;
         if (size >= dest_cap) {
             dest[dest_cap - 4] = '.';
@@ -269,14 +277,14 @@ static void vreport(report_type type, const char *fmt, va_list ap)
             severity = 0;
             break;
         }
-        switch (cur_loc->kind) {
+        switch (get_cur_loc()->kind) {
         case LOC_CMDLINE:
             file = format_cur_loc_cmdline(cmdline_buf, cmdline_cap);
             break;
         case LOC_FILE:
-            file = (const char *)cur_loc->ptr;
-            if (cur_loc->num) {
-                line = cur_loc->num;
+            file = (const char *)get_cur_loc()->ptr;
+            if (get_cur_loc()->num) {
+                line = get_cur_loc()->num;
             }
             break;
         }
