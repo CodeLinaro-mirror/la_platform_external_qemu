@@ -61,10 +61,12 @@ TouchpadHolder::TouchpadHolder(QWidget* parent)
             &TouchpadHolder::handleLedStateChanged);
 
     mShowLeds = fc::isEnabled(fc::XrStatusLed);
-    if (mUi->worldLedIndicator)
+    if (mUi->worldLedIndicator) {
         mUi->worldLedIndicator->setVisible(mShowLeds);
-    if (mUi->userLedIndicator)
+    }
+    if (mUi->userLedIndicator) {
         mUi->userLedIndicator->setVisible(mShowLeds);
+    }
 
     const static AndroidHwXrLedFuncs sCallbacks = {
             .led_forwarder = &TouchpadHolder::ledCallback};
