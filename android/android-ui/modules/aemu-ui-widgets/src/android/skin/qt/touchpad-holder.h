@@ -11,15 +11,14 @@
 
 #pragma once
 
-#include <QCloseEvent>
 #include <QEvent>
 #include <QObject>      // for Q_OBJECT, slots
-#include <QSpacerItem>  // for QSpacerItem
-#include <QString>      // for QString
 #include <QWidget>      // for QWidget
 #include <memory>       // for shared_ptr, unique_ptr
 
+#include "android/emulation/control/hw_xr_led_agent.h"
 #include "android/skin/qt/qt-ui-commands.h"
+
 #include "ui_touchpad-holder.h"
 
 namespace android {
@@ -37,17 +36,27 @@ class TouchpadHolder : public QWidget {
 
 public:
     explicit TouchpadHolder(QWidget* parent = nullptr);
+    ~TouchpadHolder() override;
 
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
     bool handleQtKeyEvent(const QKeyEvent& event, QtKeyEventSource source);
     void setWidth(int width);
 
+signals:
+    void ledColorChanged(int id, int color);
+
+public slots:
+    void handleLedStateChanged(int id, int color);
+
 protected:
     std::unique_ptr<Ui::TouchpadHolder> mUi;
 
 private:
+    static void ledCallback(void* opaque, const AndroidHwXrLedEvent* event);
+
     int mTouchpadWidth;
     int mTouchpadHeight;
     static constexpr int mMargin = 10;
+    bool mShowLeds = false;
 };

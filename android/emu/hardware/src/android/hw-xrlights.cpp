@@ -41,7 +41,8 @@ std::once_flag sHwXrLightsOnceFlag;
 
 HwXrLights& getHwXrLights() {
     std::call_once(sHwXrLightsOnceFlag, []() {
-        android_hw_xrlights_init();
+        sHwXrLights = std::make_optional<HwXrLights>();
+        D("%s: HwXrLights qemud handler initialized", __func__);
     });
     return *sHwXrLights;
 }
@@ -116,11 +117,11 @@ void HwXrLights::qemudClientRecv(uint8_t* msg, int msglen) {
         // Success! You can now read the fields
         id = lightStatus.light_id();
         color = lightStatus.light_color();
-        D("Received LightStatus: id=%d, color=0x%x", id, color);
+        D("HwXrLights: Received LightStatus: id=%d, color=0x%x", id, color);
         setLightStatus(id, color);
     } else {
         // Failure
-        D("Failed to parse LightStatus from received array.");
+        D("HwXrLights: Failed to parse LightStatus from received array.");
     }
 
     std::lock_guard<std::mutex> guard(*mClientCallbacksLock);
@@ -157,8 +158,7 @@ uint32_t HwXrLights::getLightStatus(uint32_t id) {
 }
 
 void android_hw_xrlights_init() {
-    sHwXrLights = std::make_optional<HwXrLights>();
-    D("%s: HwXrLights qemud handler initialized", __func__);
+    getHwXrLights();
 }
 
 void android_hw_xrlights_set(void* opaque, const AndroidHwXrLedFuncs* funcs) {

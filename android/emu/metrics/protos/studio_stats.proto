@@ -991,6 +991,9 @@ message AndroidStudioEvent {
     GOOGLE_PLAY_SDK_INDEX = 30;
     // The event is related to Gradle JVM incompatible dialog
     GRADLE_JVM_INCOMPATIBLE_DIALOG = 31;
+    // The event is related to the modal Dialog to enable parallel Gradle sync
+    // for Gradle 9.4+.
+    PARALLEL_GRADLE_SYNC_MODAL_DIALOG = 32;
   }
 
   // Specific kind of event, primary separation key of all Android Studio
@@ -1968,6 +1971,12 @@ message AndroidStudioEvent {
 
     // Change review event.
     CHANGE_REVIEW_EVENT = 382;
+
+    // Events related to parallel sync activation's modal dialog.
+    PARALLEL_GRADLE_SYNC_MODAL_DIALOG_APPLY_SETTING = 383;
+    PARALLEL_GRADLE_SYNC_MODAL_DIALOG_IGNORE_SETTING = 384;
+    PARALLEL_GRADLE_SYNC_MODAL_DIALOG_ALWAYS_APPLY_SETTING = 385;
+    PARALLEL_GRADLE_SYNC_MODAL_DIALOG_CANCEL = 386;
   }
 
   // Represents different Performance Monitoring types.
@@ -3503,7 +3512,8 @@ message EmulatorFeatureFlagState {
     VULKAN_PROTECTED_MEMORY_EMULATION = 139;
     XR_DIMMING = 140;
     XR_HAND_AND_EYE_POINTERS = 141;
-    // Next tag: 142
+    XR_STATUS_LED = 142;
+    // Next tag: 143
   }
   // Which features were enabled by default or through the server-side config.
   repeated EmulatorFeatureFlag attempted_enabled_feature_flags = 1;
@@ -18975,6 +18985,7 @@ message AndroidCliInvocation {
     ANDROID_STUDIO = 4;
     OTHER = 5;
     CODEX = 6;
+    AI_STUDIO = 7;
   }
 }
 
