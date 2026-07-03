@@ -76,6 +76,9 @@ void FeatureControlImpl::initHostFeatureAndParseDefault(
         const char* featureNameStr) {
     std::string strHost =
             defaultIniHost.getString(featureNameStr, kIniSettingNull);
+    if (defaultIniHost.hasKey(featureNameStr)) {
+        dprint("FeatureControl::%s: %s = %s", __func__, featureNameStr, strHost.c_str());
+    }
 
     initEnabledDefault(featureName, false);
     switch (ParseIniStr(strHost)) {
@@ -101,9 +104,17 @@ void FeatureControlImpl::initGuestFeatureAndParseDefault(
         const char* featureNameStr) {
     std::string strHost =
             defaultIniHost.getString(featureNameStr, kIniSettingNull);
+    std::string strGuest =
+            defaultIniGuest.getString(featureNameStr, kIniSettingNull);
+    if (defaultIniHost.hasKey(featureNameStr)) {
+        dprint("FeatureControl::%s: %s = %s", __func__, featureNameStr, strHost.c_str());
+    }
+    if (defaultIniGuest.hasKey(featureNameStr)) {
+        dprint("FeatureControl::%s: %s (guest) = %s", __func__, featureNameStr, strGuest.c_str());
+    }
+
     IniSetting valHost = ParseIniStr(strHost);
-    IniSetting valGuest = ParseIniStr(
-            defaultIniGuest.getString(featureNameStr, kIniSettingNull));
+    IniSetting valGuest = ParseIniStr(strGuest);
     if (valGuest == ON) {
         setGuestTriedEnable(featureName);
     }
@@ -132,6 +143,9 @@ void FeatureControlImpl::loadUserOverrideFeature(
         android::featurecontrol::Feature featureName,
         const char* featureNameStr) {
     std::string val = userIni.getString(featureNameStr, kIniSettingDefault);
+    if (userIni.hasKey(featureNameStr)) {
+        dprint("FeatureControl::%s: %s = %s", __func__, featureNameStr, val.c_str());
+    }
     switch (ParseIniStr(val)) {
         case ON:
             setEnabledOverride(featureName, true);
@@ -434,7 +448,13 @@ void FeatureControlImpl::setIfNotOverriden(Feature feature, bool isEnabled) {
     if (currFeature.isOverridden) {
         return;
     }
+    const bool changed = currFeature.currentVal != isEnabled;
     currFeature.setCurrentVal(isEnabled);
+    if (changed) {
+        dprint("FeatureControl::%s: %s is changed to %s", __func__, 
+               toString(currFeature.name).data(),
+               (isEnabled ? "enabled" : "disabled"));
+    }
 }
 
 void FeatureControlImpl::setIfNotOverridenOrGuestDisabled(Feature feature,
@@ -446,7 +466,13 @@ void FeatureControlImpl::setIfNotOverridenOrGuestDisabled(Feature feature,
     if (isGuestFeature(feature) && !isEnabledByGuest(feature)) {
         return;
     }
+    const bool changed = currFeature.currentVal != isEnabled;
     currFeature.setCurrentVal(isEnabled);
+    if (changed) {
+        dprint("FeatureControl::%s: %s is changed to %s", __func__, 
+               toString(currFeature.name).data(),
+               (isEnabled ? "enabled" : "disabled"));
+    }
 }
 
 void FeatureControlImpl::makeReadOnly(Feature feature) {
