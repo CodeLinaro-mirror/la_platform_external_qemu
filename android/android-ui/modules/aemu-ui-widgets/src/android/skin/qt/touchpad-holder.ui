@@ -36,6 +36,9 @@
      </property>
      <item alignment="Qt::AlignHCenter">
       <widget class="LedIndicatorWidget" name="worldLedIndicator">
+       <property name="toolTip">
+        <string>World facing LED"</string>
+       </property>
        <property name="minimumSize">
         <size>
          <width>12</width>
@@ -52,6 +55,9 @@
      </item>
      <item alignment="Qt::AlignHCenter">
       <widget class="LedIndicatorWidget" name="userLedIndicator">
+       <property name="toolTip">
+        <string>User facing LED</string>
+       </property>
        <property name="minimumSize">
         <size>
          <width>12</width>
