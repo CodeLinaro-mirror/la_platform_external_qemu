@@ -16,7 +16,7 @@
 #include "qemu/osdep.h"
 #include "qemu/error-report.h"
 #include "qemu/main-loop.h"
-#include "system/accel-ops.h"
+#include "accel/accel-cpu-ops.h"
 #include "system/aehd.h"
 #include "system/runstate.h"
 #include "system/cpus.h"
@@ -48,13 +48,14 @@ static void *aehd_vcpu_thread_fn(void *arg)
     qemu_guest_random_seed_thread_part2(cpu->random_seed);
 
     do {
+        qemu_process_cpu_events(cpu);
         if (cpu_can_run(cpu)) {
             r = aehd_cpu_exec(cpu);
             if (r == EXCP_DEBUG) {
                 cpu_handle_guest_debug(cpu);
             }
         }
-        qemu_wait_io_event(cpu);
+        // TODO(b/532884958, hshan): check replacement with qemu_process_cpu_events above: qemu_wait_io_event(cpu);
     } while (!cpu->unplug || cpu_can_run(cpu));
 
     aehd_destroy_vcpu(cpu);
@@ -85,7 +86,7 @@ static void aehd_kick_vcpu_thread(CPUState *cpu)
     aehd_raise_event(cpu);
 }
 
-static void aehd_accel_ops_class_init(ObjectClass *oc, void *data)
+static void aehd_accel_ops_class_init(ObjectClass *oc, const void *data)
 {
     AccelOpsClass *ops = ACCEL_OPS_CLASS(oc);
 

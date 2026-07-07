@@ -14,7 +14,7 @@
 #include "qapi/error.h"
 #include "system/system.h"
 #include "system/aehd.h"
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 
 #include "aehd_i386.h"
 #include "accel/accel-cpu-target.h"
@@ -29,7 +29,7 @@ static void aehd_cpu_max_instance_init(X86CPU *cpu)
     CPUX86State *env = &cpu->env;
     AEHDState *s = aehd_state;
 
-    host_cpu_max_instance_init(cpu);
+    // TODO(b/532884958, hshan): Replace this: host_cpu_max_instance_init(cpu);
 
     env->cpuid_min_level =
         aehd_arch_get_supported_cpuid(s, 0x0, 0, R_EAX);
@@ -119,14 +119,15 @@ static void aehd_cpu_instance_init(CPUState *cs)
         x86_cpu_apply_props(cpu, aehd_default_props);
     }
 
-    if (cpu->max_features) {
+    // TODO(b/532884958, hshan): Check this replacement: if (cpu->max_features) {
+    if (xcc->max_features) {
         aehd_cpu_max_instance_init(cpu);
     }
 
     aehd_cpu_xsave_init();
 }
 
-static void aehd_cpu_accel_class_init(ObjectClass *oc, void *data)
+static void aehd_cpu_accel_class_init(ObjectClass *oc, const void *data)
 {
     AccelCPUClass *acc = ACCEL_CPU_CLASS(oc);
 

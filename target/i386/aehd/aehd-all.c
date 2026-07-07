@@ -14,13 +14,14 @@
  */
 
 #include "qemu/osdep.h"
+#include "cpu.h"
+#include "exec/target_page.h"
 
 #include "qemu/atomic.h"
 #include "qemu/option.h"
 #include "qemu/config-file.h"
 #include "qemu/error-report.h"
 #include "qapi/error.h"
-#include "hw/hw.h"
 #include "hw/pci/msi.h"
 #include "hw/pci/msix.h"
 #include "exec/gdbstub.h"
@@ -29,9 +30,10 @@
 #include "system/hw_accel.h"
 #include "system/aehd-interface.h"
 #include "qemu/bswap.h"
-#include "exec/memory.h"
-#include "exec/ram_addr.h"
-#include "exec/address-spaces.h"
+#include "system/memory.h"
+#include "system/ram_addr.h"
+#include "system/physmem.h"
+#include "system/address-spaces.h"
 #include "qemu/event_notifier.h"
 #include "qemu/main-loop.h"
 #include "trace.h"
@@ -42,7 +44,7 @@
 #include "aehd-accel-ops.h"
 #include "aehd_int.h"
 
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 
 #ifdef DEBUG_AEHD
 #define DPRINTF(fmt, ...) \
@@ -346,7 +348,7 @@ static int aehd_get_dirty_pages_log_range(MemoryRegionSection *section,
     ram_addr_t pages = int128_get64(section->size) /
                        qemu_real_host_page_size();
 
-    cpu_physical_memory_set_dirty_lebitmap(bitmap, start, pages);
+    physical_memory_set_dirty_lebitmap(bitmap, start, pages);
     return 0;
 }
 
@@ -905,7 +907,7 @@ static HANDLE aehd_open_device(void)
     return hDevice;
 }
 
-static int aehd_init(MachineState *ms)
+static int aehd_init(AccelState *as, MachineState *ms)
 {
     struct {
         const char *name;
@@ -1328,7 +1330,7 @@ int aehd_vcpu_ioctl(CPUState *cpu, int type, void *input, size_t input_size,
     return ret;
 }
 
-static void aehd_accel_class_init(ObjectClass *oc, void *data)
+static void aehd_accel_class_init(ObjectClass *oc, const void *data)
 {
     AccelClass *ac = ACCEL_CLASS(oc);
     ac->name = "AEHD";

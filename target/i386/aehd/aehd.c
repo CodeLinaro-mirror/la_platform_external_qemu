@@ -36,7 +36,7 @@
 #include "hw/i386/apic-msidef.h"
 #include "hw/i386/e820_memory_layout.h"
 
-#include "exec/ioport.h"
+#include "system/ioport.h"
 #include "hw/pci/pci.h"
 #include "hw/pci/msi.h"
 #include "migration/blocker.h"
@@ -1282,8 +1282,7 @@ static int aehd_get_msrs(X86CPU *cpu)
      */
 
     if (cpu->fill_mtrr_mask) {
-        QEMU_BUILD_BUG_ON(TARGET_PHYS_ADDR_SPACE_BITS > 52);
-        assert(cpu->phys_bits <= TARGET_PHYS_ADDR_SPACE_BITS);
+        assert(cpu->phys_bits <= 52);
         mtrr_top_bits = MAKE_64BIT_MASK(cpu->phys_bits, 52 - cpu->phys_bits);
     } else {
         mtrr_top_bits = 0;
@@ -1466,7 +1465,7 @@ static int aehd_get_mp_state(X86CPU *cpu)
 
 static int aehd_get_apic(X86CPU *cpu)
 {
-    DeviceState *apic = cpu->apic_state;
+    DeviceState *apic = DEVICE(cpu->apic_state);
     struct aehd_lapic_state gapic;
     int ret;
 
@@ -1484,7 +1483,7 @@ static int aehd_get_apic(X86CPU *cpu)
 
 static int aehd_put_apic(X86CPU *cpu)
 {
-    DeviceState *apic = cpu->apic_state;
+    DeviceState *apic = DEVICE(cpu->apic_state);
     struct aehd_lapic_state gapic;
 
     if (apic) {
