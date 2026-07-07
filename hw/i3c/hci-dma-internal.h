@@ -16,8 +16,8 @@
 typedef struct DataBufferDescr {
     uint16_t block_size;
     uint16_t res0:14;
-    bool ioc:1; /* Interrupt on completion. */
-    bool blp:1; /* Buffer vs list pointer (for scatter gather). */
+    uint16_t ioc:1; /* Interrupt on completion. */
+    uint16_t blp:1; /* Buffer vs list pointer (for scatter gather). */
     uint32_t buffer_ptr_lo;
     uint32_t buffer_ptr_hi;
 } __attribute__((packed)) DataBufferDescr;

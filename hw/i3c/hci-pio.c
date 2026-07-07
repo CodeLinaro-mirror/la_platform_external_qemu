@@ -22,6 +22,7 @@
 #include "hw/i3c/hci-pio.h"
 #include "hci-pio-internal.h"
 #include "qemu/fifo32.h"
+#include "qemu/bswap.h"
 
 #define DATA_BUFFER_THLD_CTRL_RESET 0x01010101
 #define QUEUE_THLD_CTRL_RESET 0x01010101
@@ -202,7 +203,7 @@ static void hci_pio_push_rx_fifo(MIPIHCIState *hci, const uint8_t *data,
         }
 
         /* We only support little-endian byte ordering. */
-        fifo32_push(&s->rx_data_fifo, htole32(*((uint32_t *)&data[i * 4])));
+        fifo32_push(&s->rx_data_fifo, cpu_to_le32(*((uint32_t *)&data[i * 4])));
     }
 
     if (fifo32_num_used(&s->rx_data_fifo) >= rx_buf_thld(s)) {
@@ -244,7 +245,7 @@ static void hci_pio_pop_tx_fifo(MIPIHCIState *hci, uint8_t *data, uint32_t len)
 
         uint32_t value = fifo32_pop(&s->tx_data_fifo);
         /* We only support little-endian byte ordering. */
-        *((uint32_t *)&data[i * 4]) = le32toh(value);
+        *((uint32_t *)&data[i * 4]) = le32_to_cpu(value);
     }
 
     if (fifo32_num_used(&s->tx_data_fifo) < tx_buf_thld(s)) {
@@ -563,7 +564,7 @@ static void hci_pio_ibi_push_fifo(MIPIHCIState *hci, IbiStatus *ibi)
             fifo32_push(&s->ibi_fifo, *(uint32_t *)&status_copy);
             for (int j = 0; j < num_bytes; j += 4) {
                 fifo32_push(&s->ibi_fifo,
-                            htole32(*((uint32_t *)&ibi->data[j])));
+                            cpu_to_le32(*((uint32_t *)&ibi->data[j])));
             }
         }
     }

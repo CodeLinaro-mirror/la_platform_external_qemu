@@ -28,30 +28,30 @@ typedef enum {
 } CmdAttr;
 
 typedef struct AddrCmd {
-  uint8_t cmd_attr:3;
-  uint8_t tid:4; /* Transaction ID. */
-  uint16_t cmd:8;
-  uint8_t rsvd:1;
-  uint8_t dev_index:7;
-  uint16_t rsvd2:3;
-  uint8_t dev_count:4;
-  uint8_t roc:1; /* Response on completion. */
-  uint8_t toc:1; /* Terminate on completion (STOP). */
+  uint32_t cmd_attr:3;
+  uint32_t tid:4; /* Transaction ID. */
+  uint32_t cmd:8;
+  uint32_t rsvd:1;
+  uint32_t dev_index:7;
+  uint32_t rsvd2:3;
+  uint32_t dev_count:4;
+  uint32_t roc:1; /* Response on completion. */
+  uint32_t toc:1; /* Terminate on completion (STOP). */
   uint32_t rsvd3;
 } __attribute__((packed)) AddrCmd;
 QEMU_BUILD_BUG_ON(sizeof(AddrCmd) != sizeof(uint64_t));
 
 typedef struct ImmediateXfer {
-  uint8_t cmd_attr:3;
-  uint8_t tid:4; /* Transaction ID. */
-  uint16_t cmd:8;
-  uint8_t cp:1; /* Command (CCC or HDR) present. */
-  uint8_t dev_index:7;
-  uint16_t dtt:3; /* Data transfer type. */
-  uint8_t mode:3;
-  uint8_t rnw:1;
-  uint8_t roc:1; /* Response on completion. */
-  uint8_t toc:1; /* Terminate on completion (STOP). */
+  uint32_t cmd_attr:3;
+  uint32_t tid:4; /* Transaction ID. */
+  uint32_t cmd:8;
+  uint32_t cp:1; /* Command (CCC or HDR) present. */
+  uint32_t dev_index:7;
+  uint32_t dtt:3; /* Data transfer type. */
+  uint32_t mode:3;
+  uint32_t rnw:1;
+  uint32_t roc:1; /* Response on completion. */
+  uint32_t toc:1; /* Terminate on completion (STOP). */
   uint8_t data[4];
 } __attribute__((packed)) ImmediateXfer;
 QEMU_BUILD_BUG_ON(sizeof(ImmediateXfer) != sizeof(uint64_t));
@@ -67,18 +67,18 @@ typedef enum {
 } TransferMode;
 
 typedef struct RegularXfer {
-  uint8_t cmd_attr:3;
-  uint8_t tid:4; /* Transaction ID. */
-  uint16_t cmd:8;
-  uint8_t cp:1; /* Command (CCC or HDR) present. */
-  uint8_t dev_index:7;
-  uint8_t rsvd:1;
-  uint8_t sre:1; /* Short read is error. */
-  uint8_t dbp:1; /* Defining byte present. */
-  uint8_t mode:3;
-  uint8_t rnw:1;
-  uint8_t roc:1; /* Response on completion. */
-  uint8_t toc:1; /* Terminate on completion (STOP). */
+  uint32_t cmd_attr:3;
+  uint32_t tid:4; /* Transaction ID. */
+  uint32_t cmd:8;
+  uint32_t cp:1; /* Command (CCC or HDR) present. */
+  uint32_t dev_index:7;
+  uint32_t rsvd:1;
+  uint32_t sre:1; /* Short read is error. */
+  uint32_t dbp:1; /* Defining byte present. */
+  uint32_t mode:3;
+  uint32_t rnw:1;
+  uint32_t roc:1; /* Response on completion. */
+  uint32_t toc:1; /* Terminate on completion (STOP). */
   uint8_t def_byte;
   uint8_t rsvd2;
   uint16_t data_length;
@@ -86,48 +86,48 @@ typedef struct RegularXfer {
 QEMU_BUILD_BUG_ON(sizeof(RegularXfer) != sizeof(uint64_t));
 
 typedef struct ComboXfer {
-  uint8_t cmd_attr:3;
-  uint8_t tid:4; /* Transaction ID. */
-  uint16_t cmd:8;
-  uint8_t cp:1; /* Command (CCC or HDR) present. */
-  uint8_t dev_index:5;
-  uint8_t rsvd:1;
-  uint8_t dlp:2; /* Data length present. */
-  uint8_t fpm:1; /* First phase mode. */
-  uint8_t sub_offset_16:1;
-  uint8_t mode:3;
-  uint8_t rnw:1;
-  uint8_t roc:1; /* Response on completion. */
-  uint8_t toc:1; /* Terminate on completion (STOP). */
+  uint32_t cmd_attr:3;
+  uint32_t tid:4; /* Transaction ID. */
+  uint32_t cmd:8;
+  uint32_t cp:1; /* Command (CCC or HDR) present. */
+  uint32_t dev_index:5;
+  uint32_t rsvd:1;
+  uint32_t dlp:2; /* Data length present. */
+  uint32_t fpm:1; /* First phase mode. */
+  uint32_t sub_offset_16:1;
+  uint32_t mode:3;
+  uint32_t rnw:1;
+  uint32_t roc:1; /* Response on completion. */
+  uint32_t toc:1; /* Terminate on completion (STOP). */
   uint16_t offset;
   uint16_t data_length;
 } __attribute__((packed)) ComboXfer;
 QEMU_BUILD_BUG_ON(sizeof(ComboXfer) != sizeof(uint64_t));
 
 typedef struct InternalControl {
-  uint8_t cmd_attr:3;
-  uint8_t tid:4; /* Transaction ID. */
-  uint8_t vip:1; /* Vendor info present. */
+  uint32_t cmd_attr:3;
+  uint32_t tid:4; /* Transaction ID. */
+  uint32_t vip:1; /* Vendor info present. */
   uint32_t mipi_rsvd:22;
   uint32_t rsvd;
 } __attribute__((packed)) InternalControl;
 QEMU_BUILD_BUG_ON(sizeof(InternalControl) != sizeof(uint64_t));
 
 typedef struct SharedFields {
-  uint8_t cmd_attr:3;
-  uint8_t tid:4; /* Transaction ID. */
-  uint16_t cmd:8;
-  uint8_t rsvd:1;
-  uint8_t dev_index:5;
-  uint16_t rsvd2:8;
+  uint32_t cmd_attr:3;
+  uint32_t tid:4; /* Transaction ID. */
+  uint32_t cmd:8;
+  uint32_t rsvd:1;
+  uint32_t dev_index:5;
+  uint32_t rsvd2:8;
   /*
    * Technically not a shared field for address assignment, but we know the RnW
    * state for address assignment commands, so we only use this field on every
    * other command, where the field is shared.
    */
-  uint8_t rnw:1;
-  uint8_t roc:1; /* Response on completion. */
-  uint8_t toc:1; /* Terminate on completion (STOP). */
+  uint32_t rnw:1;
+  uint32_t roc:1; /* Response on completion. */
+  uint32_t toc:1; /* Terminate on completion (STOP). */
   uint32_t rsvd3;
 } __attribute__((packed)) SharedFields;
 QEMU_BUILD_BUG_ON(sizeof(SharedFields) != sizeof(uint64_t));
