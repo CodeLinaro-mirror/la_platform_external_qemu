@@ -498,15 +498,13 @@ static pa_stream *qpa_simple_new (
             pa_threaded_mainloop_lock(c->mainloop);
 
             if (g_get_monotonic_time() > deadline_us) {
-                AUD_log(AUDIO_CAP,
-                        "Timeout waiting for stream to become ready");
+                error_report("pulseaudio: Timeout waiting for stream to become ready");
                 goto fail;
             }
             break;
 
         default:
-            AUD_log(AUDIO_CAP,
-                    "Stream failed while waiting to become ready");
+            error_report("pulseaudio: Stream failed while waiting to become ready");
             goto fail;
         }
     }
@@ -706,7 +704,7 @@ static void qpa_volume_out(HWVoiceOut *hw, Volume *vol)
     stream_index = pa_stream_get_index(pa->stream);
     if (stream_index == PA_INVALID_INDEX) {
         pa_threaded_mainloop_unlock(c->mainloop);
-        AUD_log(AUDIO_CAP, "Can't set volume: the audio stream is not ready");
+        error_report("pulseaudio: Can't set volume: the audio stream is not ready");
         return;
     }
 
@@ -752,7 +750,7 @@ static void qpa_volume_in(HWVoiceIn *hw, Volume *vol)
     stream_index = pa_stream_get_index(pa->stream);
     if (stream_index == PA_INVALID_INDEX) {
         pa_threaded_mainloop_unlock(c->mainloop);
-        AUD_log(AUDIO_CAP, "Can't set volume: the audio stream is not ready");
+        error_report("pulseaudio: Can't set volume: the audio stream is not ready");
         return;
     }
 
