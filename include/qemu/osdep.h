@@ -891,4 +891,14 @@ static inline int platform_does_not_support_system(const char *command)
 }
 #endif
 
+#ifdef _WIN32
+#  ifdef BUILDING_QEMU_BINARY
+#    define GOLDFISH_EXPORTED_VARIABLE __declspec(dllexport)
+#  else  /* BUILDING_QEMU_BINARY */
+#    define GOLDFISH_EXPORTED_VARIABLE __declspec(dllimport)
+#  endif  /* BUILDING_QEMU_BINARY */
+#else /* _WIN32 */
+#  define GOLDFISH_EXPORTED_VARIABLE
+#endif  /* _WIN32 */
+
 #endif

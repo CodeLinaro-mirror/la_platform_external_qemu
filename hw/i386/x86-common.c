@@ -28,6 +28,7 @@
 #include "qapi/error.h"
 #include "system/numa.h"
 #include "system/system.h"
+#include "system/aehd.h"
 #include "system/xen.h"
 #include "trace.h"
 
@@ -506,6 +507,8 @@ void ioapic_init_gsi(GSIState *gsi_state, Object *parent)
     assert(parent);
     if (kvm_ioapic_in_kernel()) {
         dev = qdev_new(TYPE_KVM_IOAPIC);
+    } else if (aehd_enabled()) {
+        dev = qdev_new(TYPE_AEHD_IOAPIC);
     } else {
         dev = qdev_new(TYPE_IOAPIC);
     }

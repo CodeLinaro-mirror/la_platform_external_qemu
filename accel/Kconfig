@@ -19,6 +19,9 @@ config MSHV
 config NITRO
     bool
 
+config AEHD
+    bool
+
 config XEN
     bool
     select FSDEV_9P if VIRTFS

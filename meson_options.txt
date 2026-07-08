@@ -75,6 +75,8 @@ option('kvm', type: 'feature', value: 'auto',
        description: 'KVM acceleration support')
 option('mshv', type: 'feature', value: 'auto',
        description: 'MSHV acceleration support')
+option('aehd', type: 'feature', value: 'auto',
+       description: 'AEHD acceleration support')
 option('whpx', type: 'feature', value: 'auto',
        description: 'WHPX acceleration support')
 option('hvf', type: 'feature', value: 'auto',

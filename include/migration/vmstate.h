@@ -231,40 +231,40 @@ struct VMStateDescription {
     const VMStateDescription * const *subsections;
 };
 
-extern const VMStateInfo vmstate_info_bool;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_bool;
 
-extern const VMStateInfo vmstate_info_int8;
-extern const VMStateInfo vmstate_info_int16;
-extern const VMStateInfo vmstate_info_int32;
-extern const VMStateInfo vmstate_info_int64;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_int8;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_int16;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_int32;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_int64;
 
-extern const VMStateInfo vmstate_info_uint8_equal;
-extern const VMStateInfo vmstate_info_uint16_equal;
-extern const VMStateInfo vmstate_info_int32_equal;
-extern const VMStateInfo vmstate_info_uint32_equal;
-extern const VMStateInfo vmstate_info_uint64_equal;
-extern const VMStateInfo vmstate_info_int32_le;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint8_equal;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint16_equal;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_int32_equal;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint32_equal;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint64_equal;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_int32_le;
 
-extern const VMStateInfo vmstate_info_uint8;
-extern const VMStateInfo vmstate_info_uint16;
-extern const VMStateInfo vmstate_info_uint32;
-extern const VMStateInfo vmstate_info_uint64;
-extern const VMStateInfo vmstate_info_fd;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint8;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint16;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint32;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_uint64;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_fd;
 
 /** Put this in the stream when migrating a null pointer.*/
 #define VMS_NULLPTR_MARKER (0x30U) /* '0' */
-extern const VMStateInfo vmstate_info_nullptr;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_nullptr;
 
-extern const VMStateInfo vmstate_info_cpudouble;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_cpudouble;
 
-extern const VMStateInfo vmstate_info_timer;
-extern const VMStateInfo vmstate_info_buffer;
-extern const VMStateInfo vmstate_info_unused_buffer;
-extern const VMStateInfo vmstate_info_tmp;
-extern const VMStateInfo vmstate_info_bitmap;
-extern const VMStateInfo vmstate_info_qtailq;
-extern const VMStateInfo vmstate_info_gtree;
-extern const VMStateInfo vmstate_info_qlist;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_timer;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_buffer;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_unused_buffer;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_tmp;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_bitmap;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_qtailq;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_gtree;
+extern GOLDFISH_EXPORTED_VARIABLE const VMStateInfo vmstate_info_qlist;
 
 #define type_check_2darray(t1,t2,n,m) ((t1(*)[n][m])0 - (t2*)0)
 /*

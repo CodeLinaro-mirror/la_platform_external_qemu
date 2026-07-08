@@ -56,24 +56,24 @@ typedef struct OnOffAutoBit64 {
 
 /*** qdev-properties.c ***/
 
-extern const PropertyInfo qdev_prop_bit;
-extern const PropertyInfo qdev_prop_bit64;
-extern const PropertyInfo qdev_prop_on_off_auto_bit64;
-extern const PropertyInfo qdev_prop_bool;
-extern const PropertyInfo qdev_prop_uint8;
-extern const PropertyInfo qdev_prop_uint16;
-extern const PropertyInfo qdev_prop_uint32;
-extern const PropertyInfo qdev_prop_usize;
-extern const PropertyInfo qdev_prop_int32;
-extern const PropertyInfo qdev_prop_uint64;
-extern const PropertyInfo qdev_prop_uint64_checkmask;
-extern const PropertyInfo qdev_prop_int64;
-extern const PropertyInfo qdev_prop_size;
-extern const PropertyInfo qdev_prop_string;
-extern const PropertyInfo qdev_prop_on_off_auto;
-extern const PropertyInfo qdev_prop_size32;
-extern const PropertyInfo qdev_prop_array;
-extern const PropertyInfo qdev_prop_link;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_bit;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_bit64;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_on_off_auto_bit64;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_bool;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_uint8;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_uint16;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_uint32;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_usize;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_int32;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_uint64;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_uint64_checkmask;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_int64;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_size;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_string;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_on_off_auto;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_size32;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_array;
+extern GOLDFISH_EXPORTED_VARIABLE const PropertyInfo qdev_prop_link;
 
 #define DEFINE_PROP(_name, _state, _field, _prop, _type, ...) {  \
         .name      = (_name),                                    \
