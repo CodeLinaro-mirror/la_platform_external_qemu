@@ -1008,6 +1008,31 @@ virtio_gpu_rutabaga_debug_cb(uint64_t user_data,
     }
 }
 
+static void
+virtio_gpu_rutabaga_debug_cb_ex(uint64_t user_data,
+                                const struct rutabaga_debug_ex *debug)
+{
+    Location loc;
+    loc_push_none(&loc);
+    loc_set_file(debug->file, debug->line);
+
+    switch (debug->type) {
+    case RUTABAGA_DEBUG_ERROR:
+        error_report("%s", debug->message);
+        break;
+    case RUTABAGA_DEBUG_WARN:
+        warn_report("%s", debug->message);
+        break;
+    case RUTABAGA_DEBUG_INFO:
+        info_report("%s", debug->message);
+        break;
+    default:
+        error_report("unknown debug type: %u", debug->type);
+    }
+
+    loc_pop(&loc);
+}
+
 static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
 {
     int result;
@@ -1045,7 +1070,7 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     }
 
     builder.fence_cb = virtio_gpu_rutabaga_fence_cb;
-    builder.debug_cb = virtio_gpu_rutabaga_debug_cb;
+    builder.debug_cb_ex = virtio_gpu_rutabaga_debug_cb_ex;
     builder.capset_mask = vr->capset_mask;
     builder.user_data = (uint64_t)g;
     builder.display_width = base->conf.xres;
@@ -1303,10 +1328,12 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         if (w > 0) {
             uint32_t h = qemu_get_be32(f);
             uint32_t stride = qemu_get_be32(f);
+            uint8_t flags = qemu_get_byte(f);
             if (vb->scanout[i].con) {
                 DisplaySurface *surface = qemu_console_surface(vb->scanout[i].con);
                 if (surface && surface_data(surface) && surface_width(surface) == w && surface_height(surface) == h && surface_stride(surface) == stride) {
                     qemu_get_buffer(f, surface_data(surface), h * stride);
+                    surface->flags = flags;
                 } else {
                     error_report("corrupted rutagaba surface data");
                     return -EINVAL;
@@ -1396,6 +1423,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
                 qemu_put_be32(f, w);
                 qemu_put_be32(f, h);
                 qemu_put_be32(f, stride);
+                qemu_put_byte(f, surface->flags);
                 qemu_put_buffer(f, surface_data(surface), h * stride);
             } else {
                 qemu_put_be32(f, 0);
