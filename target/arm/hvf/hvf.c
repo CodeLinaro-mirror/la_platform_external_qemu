@@ -1231,18 +1231,23 @@ void hvf_arch_vcpu_destroy(CPUState *cpu)
 hv_return_t hvf_arch_vm_create(MachineState *ms, uint32_t pa_range)
 {
     hv_return_t ret;
-    hv_vm_config_t config = hv_vm_config_create();
+    hv_vm_config_t config = NULL;
 
-    ret = hv_vm_config_set_ipa_size(config, pa_range);
-    if (ret != HV_SUCCESS) {
-        goto cleanup;
+    if (isMacOS13orAbove()) {
+        config = hv_vm_config_create();
+        ret = hv_vm_config_set_ipa_size(config, pa_range);
+        if (ret != HV_SUCCESS) {
+            goto cleanup;
+        }
     }
     chosen_ipa_bit_size = pa_range;
 
     ret = hv_vm_create(config);
 
 cleanup:
-    os_release(config);
+    if (isMacOS13orAbove()) {
+        os_release(config);
+    }
 
     return ret;
 }
