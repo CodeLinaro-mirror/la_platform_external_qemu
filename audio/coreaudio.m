@@ -420,7 +420,7 @@ static OSStatus init_out_device(CoreaudioVoiceOut *core)
         kAudioDevicePropertyScopeOutput,
         kAudioObjectPropertyElementMain
     };
-    status = AudioObjectGetPropertyData(core->outputDeviceID, &addr, 0, NULL, &size, &hw_asbd);
+    status = AudioObjectGetPropertyData(core->device_id, &addr, 0, NULL, &size, &hw_asbd);
     if (status != kAudioHardwareNoError) {
         coreaudio_playback_logerr (status, "Could not get device stream format\n");
         return status;
@@ -430,7 +430,7 @@ static OSStatus init_out_device(CoreaudioVoiceOut *core)
     if (hw_asbd.mChannelsPerFrame != core->hw.info.nchannels) {
         stream_basic_description.mChannelsPerFrame = hw_asbd.mChannelsPerFrame;
         stream_basic_description.mBytesPerFrame =
-                hw_asbd.mChannelsPerFrame * (core->hw.info.bits / CHAR_BIT);
+                hw_asbd.mChannelsPerFrame * (audio_format_bits(core->hw.info.af) / CHAR_BIT);
         stream_basic_description.mBytesPerPacket =
                 stream_basic_description.mBytesPerFrame;
     }
