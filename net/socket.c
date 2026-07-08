@@ -33,6 +33,10 @@
 #include "qemu/iov.h"
 #include "qemu/main-loop.h"
 
+#ifdef _WIN32
+typedef u_short sa_family_t;
+#endif
+
 typedef struct NetSocketState {
     NetClientState nc;
     int listen_fd;
