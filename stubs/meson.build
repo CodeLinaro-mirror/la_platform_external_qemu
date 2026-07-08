@@ -6,7 +6,7 @@ stub_ss.add(files('cpu-get-clock.c'))
 stub_ss.add(files('fdset.c'))
 stub_ss.add(files('iothread-lock.c'))
 stub_ss.add(files('is-daemonized.c'))
-stub_ss.add(files('monitor-core.c'))
+print_stub_ss.add(files('monitor-core.c'))
 stub_ss.add(files('replay-mode.c'))
 stub_ss.add(files('trace-control.c'))
 

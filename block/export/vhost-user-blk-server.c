@@ -13,7 +13,7 @@
 #include "qemu/bswap.h"
 #include "qemu/error-report.h"
 #include "block/block.h"
-#include "subprojects/libvhost-user/libvhost-user.h" /* only for the type definitions */
+#include "libvhost-user.h" /* only for the type definitions */
 #include "standard-headers/linux/virtio_blk.h"
 #include "qemu/vhost-user-server.h"
 #include "vhost-user-blk-server.h"

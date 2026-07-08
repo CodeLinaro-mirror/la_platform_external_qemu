@@ -33,7 +33,8 @@ endif
 if t.length() > 0
   alias_target('contrib-plugins', t)
 else
-  run_target('contrib-plugins', command: [python, '-c', ''])
+  true_cmd = find_program('../../scripts/true.py')
+  run_target('contrib-plugins', command: true_cmd)
 endif
 
 plugin_modules += t
