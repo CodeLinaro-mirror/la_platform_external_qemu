@@ -1061,6 +1061,22 @@ Object *object_ref(void *obj);
 void object_unref(void *obj);
 
 /**
+  * add_deletable_object:
+  * @obj: the object
+  *
+  * Add the object to those that will be cleaned up when deletable_cleanup is
+  * called.
+  */
+int add_deletable_object(Object *obj);
+
+/**
+  * deletable_cleanup:
+  *
+  * Clean-up all objects previously passed to a add_deletable_object call.
+  */
+void deletable_cleanup(void);
+
+/**
  * object_property_try_add:
  * @obj: the object to add a property to
  * @name: the name of the property.  This can contain any character except for
