@@ -200,6 +200,16 @@ static const MemMapEntry base_memmap[] = {
     [VIRT_SMBUS] =              { 0x090d0000, 0x00001000 },
     [VIRT_MMIO] =               { 0x0a000000, 0x00000200 },
     /* ...repeating for a total of NUM_VIRTIO_TRANSPORTS, each of that size */
+#ifdef CONFIG_ANDROID
+    [RANCHU_GOLDFISH_FB] =      { 0x0a020000, 0x00000100 },
+    [RANCHU_GOLDFISH_AUDIO] =   { 0x0a030000, 0x00000100 },
+    [RANCHU_GOLDFISH_BATTERY] = { 0x0a040000, 0x00001000 },
+    [RANCHU_GOLDFISH_EVDEV] =   { 0x0a050000, 0x00001000 },
+    [RANCHU_GOLDFISH_PIPE] =    { 0x0a060000, 0x00002000 },
+#if defined (__APPLE__) && defined(__aarch64__)
+    [RANCHU_GOLDFISH_SYNC] =    { 0x0a070000, 0x00002000 },
+#endif
+#endif
     [VIRT_PLATFORM_BUS] =       { 0x0c000000, 0x02000000 },
     [VIRT_SECURE_MEM] =         { 0x0e000000, 0x01000000 },
     [VIRT_PCIE_MMIO] =          { 0x10000000, 0x2eff0000 },
