@@ -1746,6 +1746,10 @@ static int goldfish_pipe_load_v2(QEMUFile* file, PipeDevice* dev) {
     for (i = 0; i < pipe_count; ++i) {
         HwPipe* pipe = hwpipe_new0(dev);
         pipe->id = qemu_get_be32(file);
+        if (pipe->id >= (uint32_t)dev->pipes_capacity) {
+            hwpipe_free(pipe, GOLDFISH_PIPE_CLOSE_ERROR);
+            goto done;
+        }
         pipe->command_buffer_addr = qemu_get_be64(file);
         pipe->command_buffer = (PipeCommand*)map_guest_buffer(
                 pipe->command_buffer_addr, COMMAND_BUFFER_SIZE, /*is_write*/1);
@@ -1790,6 +1794,9 @@ static int goldfish_pipe_load_v2(QEMUFile* file, PipeDevice* dev) {
     int wanted_pipes_count = qemu_get_be32(file);
     for (i = 0; i < wanted_pipes_count; ++i) {
         int id = qemu_get_be32(file);
+        if (id < 0 || id >= dev->pipes_capacity) {
+            goto done;
+        }
         HwPipe* pipe = dev->pipes[id];
         if (!pipe) {
             goto done;

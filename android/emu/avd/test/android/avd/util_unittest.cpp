@@ -200,3 +200,76 @@ TEST(AvdUtil, propertyFile_findProductName) {
   EXPECT_FALSE(propertyFile_findProductName(&fd, phone_names, ARRAY_SIZE(phone_names), false));
   EXPECT_FALSE(propertyFile_findProductName(&fd, car_names, ARRAY_SIZE(car_names), true));
 }
+
+#include "android/avd/info.h"
+
+TEST(AvdInfoTest, api_level_parsing) {
+    TestSystem sys("/home", 64, "/");
+    TestTempDir* tmp = sys.getTempRoot();
+    tmp->makeSubDir("android_home");
+    tmp->makeSubDir(pj("android_home", "avd"));
+    tmp->makeSubDir(pj("android_home", "platform-tools"));
+    tmp->makeSubDir(pj("android_home", "platforms"));
+    tmp->makeSubDir(pj("android_home", "tools"));
+
+    std::string sdkRoot = pj(tmp->pathString(), "android_home");
+    sys.envSet("ANDROID_AVD_HOME", sdkRoot);
+    sys.setLauncherDirectory(".");
+    sys.setCurrentDirectory(pj(sdkRoot, "tools"));
+
+    // Helper to create a mock AVD config
+    auto create_mock_avd = [&](const std::string& name, const std::string& target) {
+        std::string iniPath = pj(sdkRoot, name + ".ini");
+        std::string avdDir = pj({sdkRoot, "avd", name + ".avd"});
+        tmp->makeSubDir(pj({"android_home", "avd", name + ".avd"}));
+
+        writeToFile(iniPath,
+                    "path=" + avdDir + "\n"
+                    "target=" + target + "\n");
+
+        // config.ini inside the avd dir
+        writeToFile(pj(avdDir, "config.ini"),
+                    "target=" + target + "\n"
+                    "image.sysdir.1=dummy\n");
+    };
+
+    // Test case 1: Decimal version 36.1
+    create_mock_avd("avd_36_1", "android-36.1");
+    AvdInfo* info_36_1 = avdInfo_new("avd_36_1", NULL, "dummy_sysdir");
+    ASSERT_NE(nullptr, info_36_1);
+    EXPECT_EQ(36, avdInfo_getApiLevel(info_36_1));
+    EXPECT_STREQ("36.1", avdInfo_getApiLevelStr(info_36_1));
+    avdInfo_free(info_36_1);
+
+    // Test case 2: Decimal version 37.0
+    create_mock_avd("avd_37_0", "android-37.0");
+    AvdInfo* info_37_0 = avdInfo_new("avd_37_0", NULL, "dummy_sysdir");
+    ASSERT_NE(nullptr, info_37_0);
+    EXPECT_EQ(37, avdInfo_getApiLevel(info_37_0));
+    EXPECT_STREQ("37.0", avdInfo_getApiLevelStr(info_37_0));
+    avdInfo_free(info_37_0);
+
+    // Test case 3: Preview dessert Baklava (API 36)
+    create_mock_avd("avd_baklava", "android-Baklava");
+    AvdInfo* info_baklava = avdInfo_new("avd_baklava", NULL, "dummy_sysdir");
+    ASSERT_NE(nullptr, info_baklava);
+    EXPECT_EQ(36, avdInfo_getApiLevel(info_baklava));
+    EXPECT_STREQ("Baklava", avdInfo_getApiLevelStr(info_baklava));
+    avdInfo_free(info_baklava);
+
+    // Test case 4: Preview dessert CinnamonBun (API 37)
+    create_mock_avd("avd_cinnamon", "android-CinnamonBun");
+    AvdInfo* info_cinnamon = avdInfo_new("avd_cinnamon", NULL, "dummy_sysdir");
+    ASSERT_NE(nullptr, info_cinnamon);
+    EXPECT_EQ(37, avdInfo_getApiLevel(info_cinnamon));
+    EXPECT_STREQ("CinnamonBun", avdInfo_getApiLevelStr(info_cinnamon));
+    avdInfo_free(info_cinnamon);
+
+    // Test case 5: Standard integer 35
+    create_mock_avd("avd_35", "android-35");
+    AvdInfo* info_35 = avdInfo_new("avd_35", NULL, "dummy_sysdir");
+    ASSERT_NE(nullptr, info_35);
+    EXPECT_EQ(35, avdInfo_getApiLevel(info_35));
+    EXPECT_STREQ("35", avdInfo_getApiLevelStr(info_35));
+    avdInfo_free(info_35);
+}

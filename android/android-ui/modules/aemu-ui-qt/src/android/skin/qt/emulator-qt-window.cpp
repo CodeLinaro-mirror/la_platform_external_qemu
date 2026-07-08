@@ -564,15 +564,6 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
                      tr(""),
                      QMessageBox::Ok,
                      this),
-      mVgkWarningBox(QMessageBox::Information,
-                     tr("Incompatible Software Detected"),
-                     tr("Vanguard anti-cheat software is detected on your "
-                        "system. It is known to have compatibility issues "
-                        "with Android emulator. It is recommended to uninstall "
-                        "or deactivate Vanguard anti-cheat software while "
-                        "running Android emulator."),
-                     QMessageBox::Ok,
-                     this),
       mNestedWarningBox(QMessageBox::Information,
                         tr("Emulator Running in Nested Virtualization"),
                         tr("Emulator is running using nested virtualization. "
@@ -2562,7 +2553,6 @@ void EmulatorQtWindow::slot_showWindow(SkinSurface* surface,
         checkShouldShowGpuWarning();
         showGpuWarning();
         checkAdbVersionAndWarn();
-        checkVgkAndWarn();
         checkNestedAndWarn();
         displayCheckWarnings();
         mFirstShowWindowCall = false;
@@ -3884,39 +3874,6 @@ void EmulatorQtWindow::runAdbShellPowerDownAndQuit() {
                     },
                     5000);  // for qemu1, reboot -p will shutdown guest but
                             // hangs, allow 5s
-}
-
-void EmulatorQtWindow::checkVgkAndWarn() {
-    AndroidCpuAccelerator accelerator = androidCpuAcceleration_getAccelerator();
-
-    if (accelerator != ANDROID_CPU_ACCELERATOR_AEHD)
-        return;
-
-#ifdef _WIN32
-    if (::android::base::Win32Utils::getServiceStatus("vgk") <= SVC_NOT_FOUND)
-        return;
-#endif
-
-    QSettings settings;
-    if (settings.value(Ui::Settings::SHOW_VGK_WARNING, true).toBool()) {
-        QObject::connect(mVgkWarningBox.ptr(),
-                         SIGNAL(buttonClicked(QAbstractButton*)), this,
-                         SLOT(slot_vgkWarningMessageAccepted()));
-
-        QCheckBox* checkbox = new QCheckBox(tr("Never show this again."));
-        checkbox->setCheckState(Qt::Unchecked);
-        mVgkWarningBox->setWindowModality(Qt::NonModal);
-        mVgkWarningBox->setCheckBox(checkbox);
-        mVgkWarningBox->show();
-    }
-}
-
-void EmulatorQtWindow::slot_vgkWarningMessageAccepted() {
-    QCheckBox* checkbox = mVgkWarningBox->checkBox();
-    if (checkbox->checkState() == Qt::Checked) {
-        QSettings settings;
-        settings.setValue(Ui::Settings::SHOW_VGK_WARNING, false);
-    }
 }
 
 void EmulatorQtWindow::checkNestedAndWarn() {

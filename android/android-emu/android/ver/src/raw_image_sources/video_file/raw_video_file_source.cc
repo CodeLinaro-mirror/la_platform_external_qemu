@@ -191,7 +191,7 @@ RawVideofileSource::RawVideofileSource(RawVideofileSource::VideoFile videoFile)
 }
 
 std::unique_ptr<RawVideofileSource> RawVideofileSource::Create(
-        std::string filename) {
+        const std::string& filename) {
     std::optional<VideoFile> maybeVideofile = openVideoFile(filename.c_str());
     if (maybeVideofile) {
         return std::unique_ptr<RawVideofileSource>(

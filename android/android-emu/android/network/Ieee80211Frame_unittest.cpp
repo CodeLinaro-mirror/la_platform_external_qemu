@@ -226,3 +226,35 @@ TEST_F(Ieee80211FrameTest, FrameInfoOOBRatesClamping) {
 
     // The stack was not corrupted, and we successfully clamped the copy.
 }
+
+TEST_F(Ieee80211FrameTest, MalformedFrameUnderflow) {
+    // 1. Test extremely small packet (size < 2)
+    uint8_t data1[1] = {0x00};
+    Ieee80211Frame frame1(data1, 1);
+    EXPECT_FALSE(frame1.isValid());
+    EXPECT_EQ(frame1.toEthernet().size(), 0);
+    EXPECT_FALSE(frame1.decrypt(CipherScheme::CCMP));
+    EXPECT_FALSE(frame1.encrypt(CipherScheme::CCMP));
+
+    // 2. Test packet smaller than basic header length (size < 24)
+    uint8_t data2[10] = {0};
+    Ieee80211Frame frame2(data2, 10);
+    EXPECT_FALSE(frame2.isValid());
+
+    // 3. Test packet smaller than extended header length (size < 30)
+    // Create a 4-address data frame (which has header length 30)
+    struct ieee80211_hdr hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    // Set type = data (2), subtype = data (0)
+    // Set ToDS (0x0100) and FromDS (0x0200) to force 4-address layout
+    const uint16_t WLAN_FC_TODS = 0x0100;
+    hdr.frame_control =
+            toIEEE80211FrameControl(WLAN_FC_TYPE_DATA, WLAN_FC_STYPE_DATA);
+    hdr.frame_control |= WLAN_FC_TODS | WLAN_FC_FROMDS;
+
+    std::vector<uint8_t> packet(26, 0); // Size 26 is >= 24 but < 30
+    memcpy(packet.data(), &hdr, sizeof(hdr));
+
+    Ieee80211Frame frame3(packet.data(), packet.size());
+    EXPECT_FALSE(frame3.isValid());
+}

@@ -463,6 +463,23 @@ static bool _avdInfo_isApiExtension(const char* str, long val) {
     return *str != '\0' && !strncmp(str, "-ext", 4) && val == (int)val;
 }
 
+static bool _avdInfo_isDecimalVersion(const char* str) {
+    if (*str != '.') {
+        return false;
+    }
+    str++;
+    if (*str == '\0') {
+        return false;
+    }
+    while (*str != '\0') {
+        if (!isdigit(*str)) {
+            return false;
+        }
+        str++;
+    }
+    return true;
+}
+
 static int _avdInfo_getApiLevel(AvdInfo* i, bool* isMarshmallowOrHigher) {
     const char* p;
     const int defaultLevel = kUnknownApiLevel;
@@ -487,8 +504,9 @@ static int _avdInfo_getApiLevel(AvdInfo* i, bool* isMarshmallowOrHigher) {
      */
 
     /* First, extract the level */
-    if (!memcmp(target, "android-", 8))
+    if (!strncmp(target, "android-", 8)) {
         p = target + 8;
+    }
     else {
         /* skip two columns */
         p = strchr(target, ':');
@@ -520,6 +538,8 @@ static int _avdInfo_getApiLevel(AvdInfo* i, bool* isMarshmallowOrHigher) {
         // BUG: b/327220832 To handle the special case such as 34-ext10
         if (_avdInfo_isApiExtension(end, val)) {
             D("Found AVD target with extension: %s", p);
+        } else if (_avdInfo_isDecimalVersion(end)) {
+            D("Found AVD target with decimal version: %s", p);
         } else if (end == NULL || *end != '\0' || val != (int)val) {
             goto NOT_A_NUMBER;
         }
@@ -565,6 +585,30 @@ int avdInfo_getApiLevel(const AvdInfo* i) {
     return i->apiLevel;
 }
 
+const char* avdInfo_getApiLevelStr(const AvdInfo* i) {
+    if (i == NULL || i->target == NULL) {
+        return "unknown";
+    }
+    const char* target = i->target;
+    const char* p = NULL;
+    if (!strncmp(target, "android-", 8)) {
+        p = target + 8;
+    } else {
+        /* skip two columns */
+        p = strchr(target, ':');
+        if (p != NULL) {
+            p = strchr(p + 1, ':');
+            if (p != NULL) {
+                p += 1;
+            }
+        }
+    }
+    if (p == NULL) {
+        return "unknown";
+    }
+    return p;
+}
+
 const char* avdInfo_getTarget(const AvdInfo* i) {
     return i->target;
 }
@@ -604,6 +648,8 @@ static const struct {
         {33, "Tiramisu", "13.0 (T) - API 33"},
         {34, "UpsideDownCake", "14.0 (U) - API 34"},
         {35, "VanillaIceCream", "15.0 (V) - API 35"},
+        {36, "Baklava", "16.0 (B) - API 36"},
+        {37, "CinnamonBun", "17.0 (C) - API 37"},
 };
 
 const char* avdInfo_getApiDessertName(int apiLevel) {
@@ -733,7 +779,7 @@ static bool _avdInfo_getSearchPaths(AvdInfo* i) {
         // The user specified a path on the command line.
         // Use only that.
         i->numSearchPaths = 1;
-        i->searchPaths[0] = (char*) i->sysdir;
+        i->searchPaths[0] = ASTRDUP(i->sysdir);
         DD("using one search path from the command line for this AVD");
         return true;
     }
