@@ -14,6 +14,8 @@
 #include "monitor/monitor.h"
 #include "qemu/error-report.h"
 
+static logger override_logger = NULL;
+
 /*
  * @report_type is the type of message: error, warning or
  * informational.
@@ -26,6 +28,7 @@ typedef enum {
 
 /* Prepend timestamp to messages */
 bool message_with_timestamp;
+bool message_with_loc;
 bool error_with_guestname;
 const char *error_guest_name;
 
@@ -73,7 +76,13 @@ int error_printf(const char *fmt, ...)
     int ret;
 
     va_start(ap, fmt);
-    ret = error_vprintf_mon(monitor_cur(), fmt, ap);
+    if (override_logger) {
+        override_logger(/*severity=*/2, /*file=*/NULL, /*line=*/-1, fmt, ap);
+        ret = 0;
+    } else {
+        ret = error_vprintf(fmt, ap);
+        ret = error_vprintf_mon(monitor_cur(), fmt, ap);
+    }
     va_end(ap);
     return ret;
 }
@@ -213,6 +222,27 @@ char *real_time_iso8601(void)
     return g_date_time_format_iso8601(dt);
 }
 
+static char *format_cur_loc_cmdline(char * const dest, const int dest_cap) {
+    int i = 0, size = 0;
+    const int cur_loc_num = cur_loc->num;
+    char * const *cur_loc_ptr = cur_loc->ptr;
+    char *sep = "";
+    for (i = 0; i < cur_loc_num; i++) {
+        int needed = snprintf(dest + size, dest_cap - size, "%s%s", sep, cur_loc_ptr[i]);
+        size += needed;
+        if (size >= dest_cap) {
+            dest[dest_cap - 4] = '.';
+            dest[dest_cap - 3] = '.';
+            dest[dest_cap - 2] = '.';
+            size = dest_cap - 1;
+            break;
+        }
+        sep = " ";
+    }
+    dest[size] = '\0';
+    return dest;
+}
+
 /*
  * Print a message to current monitor if we have one, else to stderr.
  * @report_type is the type of message: error, warning or informational.
@@ -223,6 +253,37 @@ char *real_time_iso8601(void)
 G_GNUC_PRINTF(2, 0)
 static void vreport(report_type type, const char *fmt, va_list ap)
 {
+    if (override_logger) {
+        const int cmdline_cap = 64;
+        char cmdline_buf[cmdline_cap];
+
+        const char *file = NULL;
+        int line = -1;
+        // Default to ERROR.
+        int severity = 2;
+        switch (type) {
+        case REPORT_TYPE_WARNING:
+            severity = 1;
+            break;
+        case REPORT_TYPE_INFO:
+            severity = 0;
+            break;
+        }
+        switch (cur_loc->kind) {
+        case LOC_CMDLINE:
+            file = format_cur_loc_cmdline(cmdline_buf, cmdline_cap);
+            break;
+        case LOC_FILE:
+            file = (const char *)cur_loc->ptr;
+            if (cur_loc->num) {
+                line = cur_loc->num;
+            }
+            break;
+        }
+        override_logger(severity, file, line, fmt, ap);
+        return;
+    }
+
     Monitor *cur = monitor_cur();
     gchar *timestr;
 
@@ -248,7 +309,9 @@ static void vreport(report_type type, const char *fmt, va_list ap)
         fprintf(stderr, "%s ", error_guest_name);
     }
 
-    print_loc(cur);
+    if (message_with_loc) {
+        print_loc(cur);
+    }
 
     switch (type) {
     case REPORT_TYPE_ERROR:
@@ -444,4 +507,8 @@ void error_init(const char *argv0)
     g_log_set_default_handler(qemu_log_func, NULL);
     g_warn_if_fail(qemu_glog_domains == NULL);
     qemu_glog_domains = g_strdup(g_getenv("G_MESSAGES_DEBUG"));
+}
+
+void set_logger(logger logger) {
+    override_logger = logger;
 }
