@@ -8,7 +8,7 @@
 
 #include "qemu/osdep.h"
 #include <sys/ioctl.h>
-#include "qapi-visit-sockets.h"
+#include "qapi/qapi-visit-sockets.h"
 #include "qemu/error-report.h"
 
 #include "hw/core/qdev-properties.h"
