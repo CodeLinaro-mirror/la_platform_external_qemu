@@ -53,9 +53,37 @@ CarDataPage::CarDataPage(QWidget* parent)
 
 // static callback function wrapper
 void CarDataPage::carDataCallback(const char* msg, int len, void* context) {
-    CarDataPage* carDataPage = (CarDataPage*)context;
-    if (carDataPage != nullptr) {
-        carDataPage->onReceiveData(msg, len);
+    auto* page = static_cast<CarDataPage*>(context);
+    if (!page) return;
+    QByteArray buf(msg, len);
+    bool schedule = false;
+    {
+        std::lock_guard<std::mutex> lock(page->mMsgQueueMutex);
+        page->mMsgQueue.push_back(std::move(buf));
+        if (!page->mDrainScheduled) {
+            page->mDrainScheduled = true;
+            schedule = true;
+        }
+    }
+    if (schedule) {
+        QMetaObject::invokeMethod(
+                page,
+                [page]() {
+                    page->drainMsgQueue();
+                },
+                Qt::QueuedConnection);
+    }
+}
+
+void CarDataPage::drainMsgQueue() {
+    std::vector<QByteArray> batch;
+    {
+        std::lock_guard<std::mutex> lock(mMsgQueueMutex);
+        batch.swap(mMsgQueue);
+        mDrainScheduled = false;
+    }
+    for (const auto& buf : batch) {
+        onReceiveData(buf.constData(), buf.size());
     }
 }
 

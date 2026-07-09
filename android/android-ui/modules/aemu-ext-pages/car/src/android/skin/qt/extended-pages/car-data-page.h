@@ -11,10 +11,13 @@
 #pragma once
 
 #include <qobjectdefs.h>       // for Q_OBJECT
+#include <QByteArray>          // for QByteArray
 #include <QString>             // for QString
 #include <QWidget>             // for QWidget
 #include <memory>              // for unique_ptr
+#include <mutex>               // for mutex
 #include <string>              // for string
+#include <vector>              // for vector
 
 #include "ui_car-data-page.h"  // for CarDataPage
 
@@ -43,4 +46,9 @@ private:
 
     std::unique_ptr<Ui::CarDataPage> mUi;
     void updateReceivedData(const QString msg);
+
+    std::mutex mMsgQueueMutex;
+    std::vector<QByteArray> mMsgQueue;
+    bool mDrainScheduled = false;
+    void drainMsgQueue();
 };
