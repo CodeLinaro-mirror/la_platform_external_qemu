@@ -837,6 +837,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::XR_DIMMING;
         case android::featurecontrol::XrHandAndEyePointers:
             return android_studio::EmulatorFeatureFlagState::XR_HAND_AND_EYE_POINTERS;
+        case android::featurecontrol::XrStatusLed:
+            return android_studio::EmulatorFeatureFlagState::XR_STATUS_LED;
     }
     return android_studio::EmulatorFeatureFlagState::
             EMULATOR_FEATURE_FLAG_UNSPECIFIED;

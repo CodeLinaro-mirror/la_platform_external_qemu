@@ -21,7 +21,6 @@
 
 #include "android/skin/qt/qt-ui-commands.h"
 #include "android/skin/qt/touchpad-holder.h"
-#include "android/skin/qt/touchpad-window.h"
 
 namespace android {
 namespace metrics {

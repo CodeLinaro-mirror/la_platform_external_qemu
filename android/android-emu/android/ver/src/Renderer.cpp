@@ -76,6 +76,10 @@ static constexpr int kSuperSampleMultiple = 2;
 // backing framebuffer dimensions from the renderer.
 static constexpr int kRendererDefaultFramebufferWidth = 1024;
 static constexpr int kRendererDefaultFramebufferHeight = 1024;
+// Hard upper bound on per-view dimensions. 16384 matches GL_MAX_TEXTURE_SIZE on
+// all supported backends and keeps width*height*16 well inside size_t even on
+// 32-bit hosts.
+static constexpr int kMaxViewDimension = 16384;
 
 static constexpr char kTexturedVertexShader[] = R"(
 attribute vec3 in_position;
@@ -470,20 +474,29 @@ int ImageScaler::scaleToFill(int inputWidth,
  *                     RendererView routines
  ******************************************************************************/
 
-void RendererView::updateTarget(VerImageFormat format,
+bool RendererView::updateTarget(VerImageFormat format,
                                 int frameWidth,
                                 int frameHeight) {
     std::lock_guard lock(mLock);
+    if (frameWidth <= 0 || frameWidth > kMaxViewDimension || frameHeight <= 0 ||
+        frameHeight > kMaxViewDimension) {
+        derror("%s: rejecting out-of-range view dimensions %dx%d", __func__,
+               frameWidth, frameHeight);
+        // Leave the view in its previous (or default-zero) state; callers
+        // treat a zero-sized framebuffer as "render failed".
+        return false;
+    }
     if (mFormat == format && mFrameWidth == frameWidth &&
         mFrameHeight == frameHeight) {
         // Setting the same values should not invalidate the cache
-        return;
+        return true;
     }
 
     mFormat = format;
     mFrameWidth = frameWidth;
     mFrameHeight = frameHeight;
     mCache.invalidate();
+    return true;
 }
 
 void RendererView::updateViewProjection(const glm::mat4& viewProj) {
@@ -510,14 +523,16 @@ void RendererView::setBlurFactor(float factor) {
 
 void RendererView::preRenderLocked() {
     // Allocate space to cache render results on the CPU
-    auto viewCacheSize = mFrameWidth * mFrameHeight * 4;
+    const size_t viewCacheSize =
+            static_cast<size_t>(mFrameWidth) * mFrameHeight * 4;
     mCache.mFramebufferRGBA8.resize(viewCacheSize);
 
     // Caller should allocate CumulativeSum table of width * height * 16
     // bytes aligned to 16 byte boundary. height can be radius * 2 + 2 to
     // save memory as the buffer is treated as circular.
-    auto scratchBufferNumItems =
-            (mFrameWidth * (mFrameHeight + 1) * 16) / sizeof(uint32_t);
+    const size_t scratchBufferNumItems =
+            (static_cast<size_t>(mFrameWidth) * (mFrameHeight + 1) * 16) /
+            sizeof(uint32_t);
     if (mCache.mBlurScratchBuffer.size() < scratchBufferNumItems) {
         mCache.mBlurScratchBuffer.resize(scratchBufferNumItems);
     }
