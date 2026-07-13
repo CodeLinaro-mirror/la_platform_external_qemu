@@ -1802,6 +1802,9 @@ void EmulatorQtWindow::initializeStreamer(std::string_view shm_handle,
     mStreamer = std::make_unique<SharedStreamEmulator>(
             shm_handle,
             [this, transport_type](const Image* image) {
+                if (image && image->has_format()) {
+                    mActiveDisplayId = image->format().display();
+                }
                 if (transport_type == StreamTransport::MMAP) {
                     if (mSharedMemoryRenderer) {
                         mSharedMemoryRenderer->update();
@@ -2621,10 +2624,15 @@ void EmulatorQtWindow::screenshot() {
     }
 
     int displayId = 0;
-    const bool pixel_fold = android_foldable_is_pixel_fold();
-    if (pixel_fold) {
-        if (android_foldable_is_folded()) {
-            displayId = android_foldable_pixel_fold_second_display_id();
+    if (getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+        // Fishtank uses the display id of the last screenshot obtained from streamScreenshot.
+        displayId = mActiveDisplayId;
+    } else {
+        const bool pixel_fold = android_foldable_is_pixel_fold();
+        if (pixel_fold) {
+            if (android_foldable_is_folded()) {
+                displayId = android_foldable_pixel_fold_second_display_id();
+            }
         }
     }
 
