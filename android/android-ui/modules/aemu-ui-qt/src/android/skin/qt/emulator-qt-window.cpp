@@ -847,6 +847,8 @@ EmulatorQtWindow::EmulatorQtWindow(QWidget* parent)
     mPauseAvdWhenMinimized = SettingsPage::getPauseAvdWhenMinimized();
 
     ScreenMask::loadMask();
+    mScreenMaskPixmap = QPixmap::fromImage(ScreenMask::getMaskImage());
+    mScreenMaskChanged = true;
 
     using android::snapshot::Snapshotter;
     Snapshotter::get().addOperationCallback([this](Snapshotter::Operation op,
@@ -1756,6 +1758,12 @@ void EmulatorQtWindow::paintEvent(QPaintEvent*) {
         // Draw the pixmap to fill the frame's contents rect or device geometry if available
         auto r = (mBackingSurface && mDeviceGeometry.isValid()) ? mDeviceGeometry : contentsRect();
         painter.drawPixmap(r, mGuestScreenPixmap);
+        if (mScreenMaskChanged) {
+            updateScreenMask();
+        }
+        if (!mRotatedScreenMaskPixmap.isNull()) {
+            painter.drawPixmap(r, mRotatedScreenMaskPixmap);
+        }
     }
 }
 
@@ -2345,6 +2353,7 @@ void EmulatorQtWindow::queueSkinEvent(SkinEvent event) {
 
 void EmulatorQtWindow::slot_updateRotation(SkinRotation rotation) {
     mOrientation = rotation;
+    mScreenMaskChanged = true;
     emit(layoutChanged(rotation));
 
     // update the extended ui device pose page for foldable
@@ -3989,6 +3998,7 @@ void EmulatorQtWindow::rotateSkin(SkinRotation rot) {
     // start a regular scaling timer: we know that the scale is correct as
     // it was correct before the rotation.
     mOrientation = rot;
+    mScreenMaskChanged = true;
     mContainer.prepareForRotation();
 
     {
@@ -4147,6 +4157,8 @@ void EmulatorQtWindow::setFoldedSkin() {
         avdInfo_setCurrentSkin(getConsoleAgents()->settings->avdInfo(),
                                "closed");
         ScreenMask::loadMask();
+        mScreenMaskPixmap = QPixmap::fromImage(ScreenMask::getMaskImage());
+        mScreenMaskChanged = true;
         EmulatorSkin::getInstance()->reset();
     }
     runOnUiThread(
@@ -4178,6 +4190,8 @@ void EmulatorQtWindow::restoreSkin() {
                                "default");
         EmulatorSkin::getInstance()->reset();
         ScreenMask::loadMask();
+        mScreenMaskPixmap = QPixmap::fromImage(ScreenMask::getMaskImage());
+        mScreenMaskChanged = true;
     }
     runOnUiThread([this]() {
         char *skinName, *skinDir;
@@ -4458,4 +4472,35 @@ SkinEventType EmulatorQtWindow::translateMouseEventType(
     }
 
     return newType;
+}
+
+void EmulatorQtWindow::updateScreenMask() {
+    if (mScreenMaskPixmap.isNull()) {
+        mRotatedScreenMaskPixmap = QPixmap();
+        mScreenMaskChanged = false;
+        return;
+    }
+
+    QTransform rotater;
+    int rotationAmount = 0;
+    switch (mOrientation) {
+        case SKIN_ROTATION_0:
+            rotationAmount = 0;
+            break;
+        case SKIN_ROTATION_90:
+            rotationAmount = 90;
+            break;
+        case SKIN_ROTATION_180:
+            rotationAmount = 180;
+            break;
+        case SKIN_ROTATION_270:
+            rotationAmount = 270;
+            break;
+        default:
+            rotationAmount = 0;
+            break;
+    }
+    rotater.rotate(rotationAmount);
+    mRotatedScreenMaskPixmap = mScreenMaskPixmap.transformed(rotater);
+    mScreenMaskChanged = false;
 }

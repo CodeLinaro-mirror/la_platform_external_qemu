@@ -461,6 +461,10 @@ private:
     std::unique_ptr<SharedStreamEmulator> mStreamer;
     StreamTransport mTransportType = StreamTransport::MMAP;
     std::atomic<uint32_t> mActiveDisplayId{0};
+    QPixmap mScreenMaskPixmap;
+    QPixmap mRotatedScreenMaskPixmap;
+    bool mScreenMaskChanged = true;
+    void updateScreenMask();
 
     static const std::string_view kRemoteDownloadsDir;
     static const std::string_view kRemoteDownloadsDirApi10;
