@@ -33,9 +33,7 @@
 #define VIRTIO_SOUND_HDA_FN_NID 0
 
 static void virtio_snd_pcm_out_cb(void *data, int available);
-static void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream);
 static void virtio_snd_pcm_in_cb(void *data, int available);
-static void virtio_snd_unrealize(DeviceState *dev);
 
 static const uint32_t supported_formats = BIT(VIRTIO_SND_PCM_FMT_S8)
                                         | BIT(VIRTIO_SND_PCM_FMT_U8)
@@ -97,136 +95,250 @@ virtio_snd_get_config(VirtIODevice *vdev, uint8_t *config)
     cpu_to_le32s(&sndconfig->jacks);
     cpu_to_le32s(&sndconfig->streams);
     cpu_to_le32s(&sndconfig->chmaps);
-
 }
 
-static void
-virtio_snd_pcm_buffer_free(VirtIOSoundPCMBuffer *buffer)
+static void vqelems_alloc(VirtIOSoundVqElems* vqe, size_t capacity)
 {
-    g_free(buffer->elem);
-    g_free(buffer);
+    g_assert(vqe);
+    g_assert(capacity > 0);
+    g_assert(!vqe->data);
+    g_assert(!vqe->capacity);
+    g_assert(!vqe->size);
+
+    vqe->data = g_new0(VirtQueueElement *, capacity);
+    g_assert(vqe->data);
+    vqe->capacity = capacity;
+    vqe->producer_pos = 0;
+    vqe->consumer_pos = 0;
 }
 
-/*
- * Get a specific stream from the virtio sound card device.
- * Returns NULL if @stream_id is invalid or not allocated.
- *
- * @s: VirtIOSound device
- * @stream_id: stream id
- */
-static VirtIOSoundPCMStream *virtio_snd_pcm_get_stream(VirtIOSound *s,
-                                                       uint32_t stream_id)
+static void vqelems_free(VirtIOSoundVqElems* vqe)
 {
-    return stream_id >= s->snd_conf.streams ? NULL :
-        s->pcm_items[stream_id].stream;
+    g_assert(vqe);
+    g_assert(!vqe->size);  /* we cannot leak VirtQueueElement */
+    g_free(vqe->data);
+    vqe->data = NULL;
+    vqe->capacity = 0;
 }
 
-/*
- * Get params for a specific stream.
- *
- * @s: VirtIOSound device
- * @stream_id: stream id
- */
-static VirtIOPcmParams *virtio_snd_pcm_get_params(VirtIOSound *s,
-                                                  uint32_t stream_id)
+static bool vqelems_push(VirtIOSoundVqElems* vqe, VirtQueueElement *elem)
 {
-    return stream_id >= s->snd_conf.streams ? NULL
-        : &s->pcm_items[stream_id].params;
-}
+    size_t capacity;
+    size_t size;
+    size_t producer_pos;
 
-/*
- * Returns if a stream is output or input by its id.
- *
- * @s: VirtIOSound device
- * @stream_id: a stream id
- */
-static bool virtio_snd_is_output_stream(const VirtIOSound *s,
-                                        uint32_t stream_id)
-{
-    return stream_id < ((s->snd_conf.streams + 1U) / 2U);
-}
+    g_assert(vqe);
+    g_assert(elem);
+    g_assert(vqe->capacity > 0);
+    g_assert(vqe->size <= vqe->capacity);
+    g_assert(vqe->producer_pos < vqe->capacity);
+    g_assert(vqe->data);
 
-/*
- * Handle the VIRTIO_SND_R_PCM_INFO request.
- * The function writes the info structs to the request element.
- *
- * @s: VirtIOSound device
- * @cmd: The request command queue element from VirtIOSound cmdq field
- */
-static uint32_t virtio_snd_handle_pcm_info(VirtIOSound *s,
-                                           VirtQueueElement *elem,
-                                           size_t *payload_size)
-{
-    uint32_t start_id, count, size, tmp;
-    virtio_snd_query_info req;
-    g_autofree virtio_snd_pcm_info *pcm_info = NULL;
-    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
-                               0, &req, sizeof(req));
-
-    if (msg_sz != sizeof(req)) {
-        qemu_log_mask(LOG_GUEST_ERROR,
-                "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(req));
-        return VIRTIO_SND_S_BAD_MSG;
+    capacity = vqe->capacity;
+    size = vqe->size;
+    if (size >= capacity) {
+        return false;
     }
 
-    start_id = le32_to_cpu(req.start_id);
-    count = le32_to_cpu(req.count);
-    size = le32_to_cpu(req.size);
+    producer_pos = vqe->producer_pos;
+    vqe->data[producer_pos] = elem;
+    vqe->producer_pos = (producer_pos + 1) % capacity;
+    vqe->size = size + 1;
+    return true;
+}
 
-    /*
-     * 5.14.6.2 Driver Requirements: Item Information Request
-     * "The driver MUST NOT set start_id and count such that start_id + count
-     * is greater than the total number of particular items that is indicated
-     * in the device configuration space."
-     */
-    if (start_id > s->snd_conf.streams
-        || !g_uint_checked_add(&tmp, start_id, count)
-        || start_id + count > s->snd_conf.streams) {
-        error_report("pcm info: start_id + count is greater than the total "
-                     "number of streams, got: start_id = %u, count = %u",
-                     start_id, count);
-        return VIRTIO_SND_S_BAD_MSG;
+static VirtQueueElement *vqelems_pop(VirtIOSoundVqElems* vqe)
+{
+    size_t capacity;
+    size_t size;
+    size_t consumer_pos;
+
+    g_assert(vqe);
+    g_assert(vqe->capacity > 0);
+    g_assert(vqe->size <= vqe->capacity);
+    g_assert(vqe->consumer_pos < vqe->capacity);
+    g_assert(vqe->data);
+
+    size = vqe->size;
+    if (!size) {
+        return NULL;
     }
 
-    /*
-     * 5.14.6.2 Driver Requirements: Item Information Request
-     * "The driver MUST provide a buffer of sizeof(struct virtio_snd_hdr) +
-     * count * size bytes for the response."
-     */
-    if (!g_uint_checked_mul(&tmp, size, count)
-        || !g_uint_checked_add(&tmp, tmp, sizeof(virtio_snd_hdr))
-        || iov_size(elem->in_sg, elem->in_num) <
-           sizeof(virtio_snd_hdr) + size * count) {
-        error_report("pcm info: buffer too small, got: %zu, needed: %zu",
-                iov_size(elem->in_sg, elem->in_num),
-                sizeof(virtio_snd_pcm_info) * count);
-        return VIRTIO_SND_S_BAD_MSG;
+    consumer_pos = vqe->consumer_pos;
+    vqe->consumer_pos = (consumer_pos + 1U) % vqe->capacity;
+    vqe->size = size - 1U;
+    return vqe->data[consumer_pos];
+}
+
+static size_t vqelems_capacity(const VirtIOSoundVqElems* vqe)
+{
+    g_assert(vqe);
+    return vqe->capacity;
+}
+
+static size_t vqelems_size(const VirtIOSoundVqElems* vqe)
+{
+    g_assert(vqe);
+    g_assert(vqe->size <= vqe->capacity);
+    return vqe->size;
+}
+
+static VirtQueueElement *vqelems_peek(const VirtIOSoundVqElems* vqe,
+                                      size_t index)
+{
+    g_assert(vqe);
+    g_assert(vqe->capacity > 0);
+    g_assert(vqe->size <= vqe->capacity);
+    g_assert(vqe->consumer_pos < vqe->capacity);
+    g_assert(vqe->data);
+    g_assert(index < vqe->size);
+
+    return vqe->data[(vqe->consumer_pos + index) % vqe->capacity];
+}
+
+static void pcm_ring_buffer_alloc(VirtIOSoundPcmRingBuf *rb, size_t capacity)
+{
+    g_assert(capacity > 0);
+    g_assert(rb);
+    g_assert(!rb->data);
+    g_assert(!rb->capacity);
+
+    rb->data = g_new0(uint8_t, capacity);
+    g_assert(rb->data);
+    rb->capacity = capacity;
+    rb->size = 0;
+    rb->producer_pos = 0;
+    rb->consumer_pos = 0;
+}
+
+static void pcm_ring_buffer_free(VirtIOSoundPcmRingBuf *rb)
+{
+    g_free(rb->data);
+    rb->data = NULL;
+    rb->capacity = 0;
+    rb->size = 0;
+}
+
+static void* pcm_ring_buffer_get_consume_chunk(VirtIOSoundPcmRingBuf *rb,
+                                               size_t *chunk_size)
+{
+    g_assert(rb);
+    g_assert(rb->data);
+    g_assert(rb->capacity > 0);
+    g_assert(rb->size >= 0);
+    g_assert(rb->size <= rb->capacity);
+    g_assert(rb->consumer_pos < rb->capacity);
+    g_assert(rb->producer_pos < rb->capacity);
+
+    const uint32_t consumer_pos = rb->consumer_pos;
+    const uint32_t producer_pos = rb->producer_pos;
+    const uint32_t size = rb->size;
+    if (producer_pos > consumer_pos) {
+        *chunk_size = MIN(producer_pos - consumer_pos, size);
+    } else {
+        *chunk_size = MIN(rb->capacity - consumer_pos, size);
     }
 
-    pcm_info = g_new0(virtio_snd_pcm_info, count);
-    for (uint32_t i = 0; i < count; i++) {
-        uint32_t stream_id = i + start_id;
-        virtio_snd_pcm_info* val = &pcm_info[i];
-        trace_virtio_snd_handle_pcm_info(stream_id);
+    return &rb->data[consumer_pos];
+}
 
-        *val = stream_default_info;
-        val->direction = virtio_snd_is_output_stream(s, stream_id) ?
-                VIRTIO_SND_D_OUTPUT : VIRTIO_SND_D_INPUT;
-        /*
-         * 5.14.6.6.2.1 Device Requirements: Stream Information The device MUST
-         * NOT set undefined feature, format, rate and direction values. The
-         * device MUST initialize the padding bytes to 0.
-         */
-        memset(&val->padding, 0, 5);
+static size_t pcm_ring_buffer_consume(VirtIOSoundPcmRingBuf *rb,
+                                      size_t chunk_size)
+{
+    size_t new_size;
+
+    g_assert(rb);
+    g_assert(rb->data);
+    g_assert(rb->capacity > 0);
+    g_assert(rb->size >= 0);
+    g_assert(rb->size <= rb->capacity);
+    g_assert(rb->consumer_pos < rb->capacity);
+    g_assert(rb->producer_pos < rb->capacity);
+    g_assert(chunk_size <= rb->size);
+    g_assert((rb->consumer_pos + chunk_size) <= rb->capacity);
+
+    rb->consumer_pos = (rb->consumer_pos + chunk_size) % rb->capacity;
+
+    new_size = rb->size - chunk_size;
+    rb->size = new_size;
+    return new_size;
+}
+
+static void* pcm_ring_buffer_get_produce_chunk(VirtIOSoundPcmRingBuf *rb,
+                                               size_t want_free_space,
+                                               size_t *chunk_size)
+{
+    size_t capacity;
+    size_t size;
+    size_t consumer_pos;
+    size_t producer_pos;
+    size_t available_free;
+
+    g_assert(rb);
+    g_assert(rb->data);
+    g_assert(rb->capacity > 0);
+    g_assert(rb->size >= 0);
+    g_assert(rb->size <= rb->capacity);
+    g_assert(rb->consumer_pos < rb->capacity);
+    g_assert(rb->producer_pos < rb->capacity);
+    g_assert(want_free_space > 0);
+
+    capacity = rb->capacity;
+    size = rb->size;
+    consumer_pos = rb->consumer_pos;
+
+    want_free_space = MIN(want_free_space, capacity);
+    available_free = capacity - size;
+    if (available_free < want_free_space) {
+        const size_t to_drop = want_free_space - available_free;
+        g_assert(to_drop <= size);
+
+        size -= to_drop;
+        consumer_pos = (consumer_pos + to_drop) % capacity;
+        available_free += to_drop;
+
+        rb->size = size;
+        rb->consumer_pos = consumer_pos;
     }
 
-    *payload_size = sizeof(virtio_snd_pcm_info) * count;
-    iov_from_buf(elem->in_sg, elem->in_num,
-                 sizeof(virtio_snd_hdr),
-                 pcm_info, *payload_size);
+    producer_pos = rb->producer_pos;
+    if (producer_pos >= consumer_pos) {
+        *chunk_size = MIN(want_free_space,
+                          MIN(capacity - producer_pos, available_free));
+    } else {
+        *chunk_size = MIN(want_free_space,
+                          MIN(consumer_pos - producer_pos, available_free));
+    }
 
-    return VIRTIO_SND_S_OK;
+    return &rb->data[rb->producer_pos];
+}
+
+static uint32_t pcm_ring_buffer_produce(VirtIOSoundPcmRingBuf *rb,
+                                        size_t chunk_size)
+{
+    size_t new_size;
+
+    g_assert(rb);
+    g_assert(rb->data);
+    g_assert(rb->capacity > 0);
+    g_assert(rb->size <= rb->capacity);
+    g_assert(rb->consumer_pos < rb->capacity);
+    g_assert(rb->producer_pos < rb->capacity);
+    g_assert((rb->size + chunk_size) <= rb->capacity);
+    g_assert((rb->producer_pos + chunk_size) <= rb->capacity);
+
+    rb->producer_pos = (rb->producer_pos + chunk_size) % rb->capacity;
+    new_size = rb->size + chunk_size;
+    rb->size = new_size;
+    return new_size;
+}
+
+static uint32_t pcm_ring_buffer_size(const VirtIOSoundPcmRingBuf *rb)
+{
+    g_assert(rb);
+    g_assert(rb->capacity > 0);
+    g_assert(rb->size <= rb->capacity);
+    return rb->size;
 }
 
 /*
@@ -255,6 +367,27 @@ static int virtio_snd_get_qemu_format(AudioFormat *dst, uint32_t format)
     }
 
     #undef CASE
+}
+
+static size_t virtio_snd_get_sample_size(AudioFormat fmt)
+{
+    switch (fmt) {
+    case AUDIO_FORMAT_U8:
+    case AUDIO_FORMAT_S8:
+        return 1;
+
+    case AUDIO_FORMAT_U16:
+    case AUDIO_FORMAT_S16:
+        return 2;
+
+    case AUDIO_FORMAT_U32:
+    case AUDIO_FORMAT_S32:
+    case AUDIO_FORMAT_F32:
+        return 4;
+
+    default:
+        return 0;
+    }
 }
 
 /*
@@ -322,227 +455,16 @@ static int virtio_snd_get_qemu_audsettings(audsettings *as,
     return 0;
 }
 
-/*
- * Set the given stream params.
- * Called by both virtio_snd_handle_pcm_set_params and during device
- * initialization.
- * Returns the response status code. (VIRTIO_SND_S_*).
- *
- * @s: VirtIOSound device
- * @params: The PCM params as defined in the virtio specification
- */
-static
-uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
-                                   uint32_t stream_id,
-                                   virtio_snd_pcm_set_params *params)
+static uint32_t virtio_snd_get_period_us(size_t period_bytes,
+                                         AudioFormat fmt,
+                                         size_t nchannels,
+                                         size_t freq_hz)
 {
-    audsettings as_ignored;
-    VirtIOPcmParams *st_params;
-
-    if (stream_id >= s->snd_conf.streams || s->pcm_items == NULL) {
-        virtio_error(VIRTIO_DEVICE(s), "Streams have not been initialized.\n");
-        return VIRTIO_SND_S_BAD_MSG;
-    }
-
-    if (virtio_snd_get_qemu_audsettings(
-            &as_ignored, params->channels, params->format, params->rate)) {
-        return VIRTIO_SND_S_NOT_SUPP;
-    }
-
-    st_params = virtio_snd_pcm_get_params(s, stream_id);
-
-    st_params->buffer_bytes = le32_to_cpu(params->buffer_bytes);
-    st_params->period_bytes = le32_to_cpu(params->period_bytes);
-    st_params->features = le32_to_cpu(params->features);
-    /* the following are uint8_t, so there's no need to bswap the values. */
-    st_params->channels = params->channels;
-    st_params->format = params->format;
-    st_params->rate = params->rate;
-
-    return VIRTIO_SND_S_OK;
-}
-
-/*
- * Handles the VIRTIO_SND_R_PCM_SET_PARAMS request.
- *
- * @s: VirtIOSound device
- * @cmd: The request command queue element from VirtIOSound cmdq field
- */
-static uint32_t virtio_snd_handle_pcm_set_params(VirtIOSound *s,
-                                                 VirtQueueElement *elem)
-{
-    virtio_snd_pcm_set_params req;
-    uint32_t stream_id;
-    size_t msg_sz = iov_to_buf(elem->out_sg,
-                               elem->out_num,
-                               0, &req, sizeof(req));
-
-    if (msg_sz != sizeof(req)) {
-        qemu_log_mask(LOG_GUEST_ERROR,
-                "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(req));
-        return VIRTIO_SND_S_BAD_MSG;
-    }
-    stream_id = le32_to_cpu(req.hdr.stream_id);
-    trace_virtio_snd_handle_pcm_set_params(stream_id);
-    return virtio_snd_set_pcm_params(s, stream_id, &req);
-}
-
-/*
- * Creates a new blank stream with a reference to VirtIOSound.
- *
- * NOTE: the id field is zero and must be set outside.
- *
- * @s: VirtIOSound *s
- */
-static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
-                                                          uint32_t id,
-                                                          bool is_output)
-{
-    VirtIOSoundPCMStream *stream = g_new0(VirtIOSoundPCMStream, 1);
-    if (!stream) {
-        return NULL;
-    }
-
-    stream->s = s;
-    stream->id = id;
-    stream->is_output = is_output;
-
-    stream->active = false;
-    qemu_mutex_init(&stream->mtx);
-    QSIMPLEQ_INIT(&stream->queue);
-
-    return stream;
-}
-
-/*
- * Initializes the voice field in VirtIOSoundPCMStream and sets
- * the VirtIOPcmParams in the channel.
- *
- * @stream: VirtIOSoundPCMStream *stream
- * @const VirtIOPcmParams *params
- */
-static int virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
-                                               const VirtIOPcmParams *params)
-{
-    audsettings as;
-
-    g_assert(stream);
-    g_assert(params);
-    g_assert(stream->s);
-    g_assert(stream->s->audio_be);
-
-    if (virtio_snd_get_qemu_audsettings(
-            &as, params->channels, params->format, params->rate)) {
-        return -1;
-    }
-
-    if (stream->is_output) {
-        stream->voice.out = audio_be_open_out(stream->s->audio_be,
-                                         stream->voice.out,
-                                         "virtio-sound.out",
-                                         stream,
-                                         virtio_snd_pcm_out_cb,
-                                         &as);
-        if (!stream->voice.out) {
-            return -1;
-        }
-
-        audio_be_set_volume_out_lr(stream->s->audio_be, stream->voice.out, 0, 255, 255);
-    } else {
-        stream->voice.in = audio_be_open_in(stream->s->audio_be,
-                                        stream->voice.in,
-                                        "virtio-sound.in",
-                                        stream,
-                                        virtio_snd_pcm_in_cb,
-                                        &as);
-        if (!stream->voice.in) {
-            return -1;
-        }
-
-        audio_be_set_volume_in_lr(stream->s->audio_be, stream->voice.in, 0, 255, 255);
-    }
-
-    stream->effective_params = *params;
-    return 0;
-}
-
-/*
- * Closes the voice field in VirtIOSoundPCMStream and clears
- * `stream->as.nchannels` to mark that there is no voice on
- * the channel (e.g. when a stream is loaded from a snapshot).
- *
- * @stream: VirtIOSoundPCMStream *stream
- */
-static void virtio_snd_close_stream_voice(VirtIOSoundPCMStream *stream) {
-    g_assert(stream);
-
-    if (stream->voice.raw) {
-        g_assert(stream->effective_params.channels);
-
-        if (stream->is_output) {
-            audio_be_close_out(stream->s->audio_be, stream->voice.out);
-        } else {
-            audio_be_close_in(stream->s->audio_be, stream->voice.in);
-        }
-
-        stream->voice.raw = NULL;
-    }
-
-    stream->effective_params.channels = 0;
-}
-
-/*
- * Releases all resources owned by VirtIOSoundPCMStream and
- * frees its memory. The stream pointer must be non-NULL.
- *
- * @stream: VirtIOSoundPCMStream *stream
- */
-static void virtio_snd_destroy_stream(VirtIOSoundPCMStream *stream)
-{
-    g_assert(stream);
-
-    virtio_snd_pcm_flush(stream);
-    virtio_snd_close_stream_voice(stream);
-
-    qemu_mutex_destroy(&stream->mtx);
-    g_free(stream);
-}
-
-/*
- * Prepares a VirtIOSound card stream.
- * Returns the response status code. (VIRTIO_SND_S_*).
- *
- * @s: VirtIOSound device
- * @stream_id: stream id
- */
-static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
-{
-    VirtIOPcmParams *params;
-    VirtIOSoundPCMStream *stream;
-
-    if (s->pcm_items == NULL ||
-        stream_id >= s->snd_conf.streams) {
-        return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-    }
-
-    params = virtio_snd_pcm_get_params(s, stream_id);
-    if (params == NULL) {
-        return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-    }
-
-    stream = virtio_snd_pcm_get_stream(s, stream_id);
-    if (stream == NULL) {
-        return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-    }
-
-    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        if (virtio_snd_init_stream_voice_locked(stream, params)) {
-            return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        }
-    }
-
-    return cpu_to_le32(VIRTIO_SND_S_OK);
+    size_t frame_bytes = virtio_snd_get_sample_size(fmt) * nchannels;
+    g_assert(period_bytes > 0);
+    g_assert(frame_bytes > 0);
+    g_assert(freq_hz > 0);
+    return ((period_bytes / frame_bytes) * 1000000U) / freq_hz;
 }
 
 static const char *print_code(uint32_t code)
@@ -566,23 +488,632 @@ static const char *print_code(uint32_t code)
     }
 
     #undef CASE
-};
+}
+
+static void virtio_snd_virtqueue_consume_elem(VirtQueue *vq,
+                                              VirtQueueElement *elem,
+                                              size_t data_size)
+{
+    g_assert(vq);
+    g_assert(elem);
+    virtqueue_push(vq, elem, data_size);
+    g_free(elem);
+}
+
+static VirtQueue *virtio_snd_stream_get_vq(const VirtIOSoundPCMStream *stream)
+{
+    g_assert(stream);
+    return stream->s->queues[stream->is_output ? VIRTIO_SND_VQ_TX
+                                               : VIRTIO_SND_VQ_RX];
+}
+
+static size_t virtio_snd_stream_period_tx_elem(VirtIOSoundPCMStream *stream,
+                                               VirtQueueElement *elem,
+                                               bool main_path)
+{
+    virtio_snd_pcm_status resp;
+
+    g_assert(elem);
+
+    if (main_path) {
+        size_t data_size;
+        size_t offset;
+
+        data_size = iov_size(elem->out_sg, elem->out_num);
+        g_assert(data_size >= sizeof(virtio_snd_pcm_xfer));
+
+        data_size -= sizeof(virtio_snd_pcm_xfer);
+        if (data_size > stream->params.period_bytes) {
+            data_size = stream->params.period_bytes;
+        }
+
+        offset = sizeof(virtio_snd_pcm_xfer);
+        while (data_size > 0) {
+            size_t chunk_size;
+            void *chunk = pcm_ring_buffer_get_produce_chunk(
+                    &stream->pcm, data_size, &chunk_size);
+
+            chunk_size = MIN(chunk_size, data_size);
+            g_assert(chunk_size > 0);
+
+            iov_to_buf(elem->out_sg, elem->out_num,
+                    offset, chunk, chunk_size);
+
+            pcm_ring_buffer_produce(&stream->pcm, chunk_size);
+
+            data_size -= chunk_size;
+            offset += chunk_size;
+        }
+    }
+
+    resp.status = cpu_to_le32(VIRTIO_SND_S_OK);
+    resp.latency_bytes = cpu_to_le32(pcm_ring_buffer_size(&stream->pcm));
+    iov_from_buf(elem->in_sg, elem->in_num, 0, &resp, sizeof(resp));
+    return sizeof(resp);
+}
+
+static size_t virtio_snd_stream_period_rx_elem(VirtIOSoundPCMStream *stream,
+                                               VirtQueueElement *elem,
+                                               bool main_path)
+{
+    virtio_snd_pcm_status resp;
+    size_t data_size;
+    size_t offset;
+
+    g_assert(elem);
+
+    data_size = stream->params.period_bytes;
+    offset = 0;
+    while (data_size > 0) {
+        size_t chunk_size;
+        void *chunk = pcm_ring_buffer_get_consume_chunk(
+                &stream->pcm, &chunk_size);
+
+        if (!chunk_size) {
+            if (main_path) {
+                iov_from_buf(elem->in_sg, elem->in_num,
+                             offset, stream->silence_buf, data_size);
+                offset += data_size;
+                data_size = 0;
+            }
+            break;
+        }
+
+        chunk_size = MIN(chunk_size, data_size);
+        g_assert(chunk_size > 0);
+
+        iov_from_buf(elem->in_sg, elem->in_num,
+                     offset, chunk, chunk_size);
+
+        pcm_ring_buffer_consume(&stream->pcm, chunk_size);
+
+        offset += chunk_size;
+        data_size -= chunk_size;
+    }
+
+    resp.status = cpu_to_le32(VIRTIO_SND_S_OK);
+    resp.latency_bytes = cpu_to_le32(pcm_ring_buffer_size(&stream->pcm));
+    iov_from_buf(elem->in_sg, elem->in_num, offset, &resp, sizeof(resp));
+    return offset + sizeof(resp);
+
+}
+
+static size_t virtio_snd_stream_period_elem(VirtIOSoundPCMStream *stream,
+                                            VirtQueueElement *elem,
+                                            bool main_path)
+{
+    g_assert(elem);
+
+    if (stream->is_output) {
+        return virtio_snd_stream_period_tx_elem(stream, elem, main_path);
+    } else {
+        return virtio_snd_stream_period_rx_elem(stream, elem, main_path);
+    }
+}
+
+static void virtio_snd_stream_period_cb(void *opaque)
+{
+    VirtIOSoundPCMStream *stream = opaque;
+    uint64_t next_period_us;
+
+    do {
+        VirtQueue *vq;
+        VirtQueueElement *elem;
+        size_t data_size;
+
+        WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+            elem = vqelems_pop(&stream->vqelems);
+            if (elem) {
+                data_size = virtio_snd_stream_period_elem(stream, elem, true);
+                vq = virtio_snd_stream_get_vq(stream);
+            } else {
+                stream->num_missed_periods =
+                        MIN(stream->num_missed_periods + 1U,
+                            vqelems_capacity(&stream->vqelems));
+            }
+
+            g_assert(stream->next_period_us > 0);
+            g_assert(stream->period_us > 0);
+            next_period_us = stream->next_period_us + stream->period_us;
+            stream->next_period_us = next_period_us;
+        }
+
+        if (elem) {
+            virtio_snd_virtqueue_consume_elem(vq, elem, data_size);
+            virtio_notify(&stream->s->parent_obj, vq);
+        }
+    } while (next_period_us <= qemu_clock_get_us(QEMU_CLOCK_VIRTUAL));
+
+    timer_mod(&stream->period_timer, next_period_us);
+}
+
+static uint32_t virtio_snd_stream_start(VirtIOSoundPCMStream *stream)
+{
+    VirtQueueElement *elem = NULL;
+    size_t data_size;
+    uint64_t next_period_us;
+
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        if (stream->next_period_us) {
+            return VIRTIO_SND_S_OK;
+        }
+
+        g_assert(stream->period_us > 0);
+        stream->num_missed_periods = 0;
+        next_period_us =
+                qemu_clock_get_us(QEMU_CLOCK_VIRTUAL) + stream->period_us;
+        stream->next_period_us = next_period_us;
+
+        g_assert(stream->voice.raw);
+        g_assert(stream->s);
+        if (stream->is_output) {
+            elem = vqelems_pop(&stream->vqelems);
+            if (elem) {
+                data_size = virtio_snd_stream_period_tx_elem(
+                        stream, elem, true);
+            }
+
+            audio_be_set_active_out(stream->s->audio_be,
+                                    stream->voice.out, 1);
+        } else {
+            audio_be_set_active_in(stream->s->audio_be,
+                                   stream->voice.in, 1);
+        }
+    }
+
+    if (elem) {
+        VirtQueue *vq = virtio_snd_stream_get_vq(stream);
+        virtio_snd_virtqueue_consume_elem(vq, elem, data_size);
+        virtio_notify(&stream->s->parent_obj, vq);
+    }
+
+    timer_mod(&stream->period_timer, next_period_us);
+
+    return VIRTIO_SND_S_OK;
+}
+
+static uint32_t virtio_snd_stream_stop(VirtIOSoundPCMStream *stream)
+{
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        if (!stream->next_period_us) {
+            return VIRTIO_SND_S_OK;
+        }
+
+        timer_del(&stream->period_timer);
+        stream->num_missed_periods = 0;
+        stream->next_period_us = 0;
+
+        g_assert(stream->voice.raw);
+        g_assert(stream->s);
+        if (stream->is_output) {
+            audio_be_set_active_out(stream->s->audio_be,
+                                    stream->voice.out, 0);
+        } else {
+            audio_be_set_active_in(stream->s->audio_be,
+                                   stream->voice.in, 0);
+        }
+    }
+
+    return VIRTIO_SND_S_OK;
+}
+
+static void virtio_snd_stream_post_load(VirtIOSoundPCMStream *stream)
+{
+    g_assert(stream);
+
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        if (stream->next_period_us) {
+            timer_mod(&stream->period_timer, stream->next_period_us);
+
+            g_assert(stream->voice.raw);
+            g_assert(stream->s);
+            if (stream->is_output) {
+                audio_be_set_active_out(stream->s->audio_be,
+                                        stream->voice.out, 1);
+            } else {
+                audio_be_set_active_in(stream->s->audio_be,
+                                       stream->voice.in, 1);
+            }
+        }
+    }
+}
+
+static void *virtio_snd_alloc_silence_buf(const audsettings *as,
+                                          uint32_t period_bytes,
+                                          float amplitude)
+{
+    g_assert(period_bytes > 0);
+    g_assert(as->nchannels > 0);
+    void *buf = g_new0(char, period_bytes);
+    size_t sample_size = virtio_snd_get_sample_size(as->fmt);
+    g_assert(sample_size > 0);
+    size_t frame_bytes = sample_size * as->nchannels;
+
+    size_t frames = period_bytes / frame_bytes;
+    if (frames <= 1) {
+        return buf;
+    }
+
+    const float i_coeff = 2.0f / (frames - 1.0f);
+
+    for (size_t i = 0; i < frames; i++) {
+        float val = (i * i_coeff - 1.0f) * amplitude;
+
+        switch (as->fmt) {
+        case AUDIO_FORMAT_U8: {
+            uint8_t *ptr = ((uint8_t *)buf) + i * as->nchannels;
+            double scaled = 128.0 + val * 127.0;
+            uint8_t sample = scaled < 0.0 ? 0 : (scaled > 255.0 ? 255 : (uint8_t)scaled);
+            for (size_t c = 0; c < as->nchannels; c++) {
+                ptr[c] = sample;
+            }
+            break;
+        }
+        case AUDIO_FORMAT_S8: {
+            int8_t *ptr = ((int8_t *)buf) + i * as->nchannels;
+            double scaled = val * 127.0;
+            int8_t sample = scaled < -128.0 ? -128 : (scaled > 127.0 ? 127 : (int8_t)scaled);
+            for (size_t c = 0; c < as->nchannels; c++) {
+                ptr[c] = sample;
+            }
+            break;
+        }
+        case AUDIO_FORMAT_U16: {
+            uint16_t *ptr = ((uint16_t *)buf) + i * as->nchannels;
+            double scaled = 32768.0 + val * 32767.0;
+            uint16_t sample = scaled < 0.0 ? 0 : (scaled > 65535.0 ? 65535 : (uint16_t)scaled);
+            uint16_t stored = as->big_endian ? cpu_to_be16(sample) : cpu_to_le16(sample);
+            for (size_t c = 0; c < as->nchannels; c++) {
+                ptr[c] = stored;
+            }
+            break;
+        }
+        case AUDIO_FORMAT_S16: {
+            int16_t *ptr = ((int16_t *)buf) + i * as->nchannels;
+            double scaled = val * 32767.0;
+            int16_t sample = scaled < -32768.0 ? -32768 : (scaled > 32767.0 ? 32767 : (int16_t)scaled);
+            uint16_t stored = as->big_endian ? cpu_to_be16((uint16_t)sample) : cpu_to_le16((uint16_t)sample);
+            for (size_t c = 0; c < as->nchannels; c++) {
+                ptr[c] = (int16_t)stored;
+            }
+            break;
+        }
+        case AUDIO_FORMAT_U32: {
+            uint32_t *ptr = ((uint32_t *)buf) + i * as->nchannels;
+            double scaled = 2147483648.0 + val * 2147483647.0;
+            uint32_t sample = scaled < 0.0 ? 0 : (scaled > 4294967295.0 ? 4294967295U : (uint32_t)scaled);
+            uint32_t stored = as->big_endian ? cpu_to_be32(sample) : cpu_to_le32(sample);
+            for (size_t c = 0; c < as->nchannels; c++) {
+                ptr[c] = stored;
+            }
+            break;
+        }
+        case AUDIO_FORMAT_S32: {
+            int32_t *ptr = ((int32_t *)buf) + i * as->nchannels;
+            double scaled = val * 2147483647.0;
+            int32_t sample = scaled < -2147483648.0 ? -2147483648LL : (scaled > 2147483647.0 ? 2147483647LL : (int32_t)scaled);
+            uint32_t stored = as->big_endian ? cpu_to_be32((uint32_t)sample) : cpu_to_le32((uint32_t)sample);
+            for (size_t c = 0; c < as->nchannels; c++) {
+                ptr[c] = (int32_t)stored;
+            }
+            break;
+        }
+        case AUDIO_FORMAT_F32: {
+            uint32_t *ptr = ((uint32_t *)buf) + i * as->nchannels;
+            union {
+                float f;
+                uint32_t u;
+            } u;
+            u.f = (float)val;
+            uint32_t stored = as->big_endian ? cpu_to_be32(u.u) : cpu_to_le32(u.u);
+            for (size_t c = 0; c < as->nchannels; c++) {
+                ptr[c] = stored;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    return buf;
+}
+
+static VirtIOSoundPCMStream *virtio_snd_stream_create(
+        VirtIOSound *s,
+        const VirtIOPcmParams *params,
+        bool is_output)
+{
+    VirtIOSoundPCMStream *stream;
+    audsettings as;
+    size_t num_periods;
+
+    g_assert(s);
+    g_assert(params);
+    g_assert(params->buffer_bytes > 0);
+    g_assert(params->period_bytes > 0);
+
+    if (virtio_snd_get_qemu_audsettings(
+            &as, params->channels, params->format, params->rate)) {
+        return NULL;
+    }
+
+    stream = g_new0(VirtIOSoundPCMStream, 1);
+    if (!stream) {
+        return NULL;
+    }
+
+    if (is_output) {
+        stream->voice.out = audio_be_open_out(s->audio_be,
+                                              stream->voice.out,
+                                              "virtio-sound.out",
+                                              stream,
+                                              virtio_snd_pcm_out_cb,
+                                              &as);
+        if (!stream->voice.out) {
+err:        g_free(stream);
+            return NULL;
+        }
+
+        audio_be_set_volume_out_lr(s->audio_be, stream->voice.out,
+                                   0, 255, 255);
+    } else {
+        stream->voice.in = audio_be_open_in(s->audio_be,
+                                            stream->voice.in,
+                                            "virtio-sound.in",
+                                            stream,
+                                            virtio_snd_pcm_in_cb,
+                                            &as);
+        if (!stream->voice.in) {
+            goto err;
+        }
+
+        audio_be_set_volume_in_lr(s->audio_be, stream->voice.in,
+                                  0, 255, 255);
+    }
+
+    stream->s = s;
+    stream->is_output = is_output;
+    stream->params = *params;
+    stream->period_us = virtio_snd_get_period_us(
+            params->period_bytes, as.fmt, as.nchannels, as.freq);
+
+    pcm_ring_buffer_alloc(&stream->pcm, params->buffer_bytes);
+    stream->silence_buf =
+            virtio_snd_alloc_silence_buf(&as, params->period_bytes, 0.01f);
+
+    num_periods =
+            (params->buffer_bytes + params->period_bytes - 1) /
+            params->period_bytes;
+    vqelems_alloc(&stream->vqelems, num_periods * 2U);
+
+    timer_init_us(&stream->period_timer, QEMU_CLOCK_VIRTUAL,
+                  virtio_snd_stream_period_cb, stream);
+
+    qemu_mutex_init(&stream->mtx);
+    return stream;
+}
+
+static void virtio_snd_stream_destroy(VirtIOSoundPCMStream *stream)
+{
+    VirtQueue *vq;
+    bool need_notify = false;
+    g_assert(stream);
+
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        timer_del(&stream->period_timer);
+
+        g_assert(stream->voice.raw);
+        g_assert(stream->s);
+        if (stream->is_output) {
+            audio_be_close_out(stream->s->audio_be, stream->voice.out);
+        } else {
+            audio_be_close_in(stream->s->audio_be, stream->voice.in);
+        }
+    }
+
+    /* with the callbacks stopped above we no longer need the lock */
+    vq = virtio_snd_stream_get_vq(stream);
+    while (true) {
+        VirtQueueElement *elem = vqelems_pop(&stream->vqelems);
+        size_t data_size;
+        if (!elem) {
+            break;
+        }
+
+        data_size = virtio_snd_stream_period_elem(stream, elem, false);
+        virtio_snd_virtqueue_consume_elem(vq, elem, data_size);
+        need_notify = true;
+    }
+
+    g_assert(stream->silence_buf);
+
+    vqelems_free(&stream->vqelems);
+    pcm_ring_buffer_free(&stream->pcm);
+    g_free(stream->silence_buf);
+    qemu_mutex_destroy(&stream->mtx);
+
+    if (need_notify) {
+        virtio_notify(&stream->s->parent_obj, vq);
+    }
+
+    g_free(stream);
+}
+
+static bool virtio_snd_is_output_stream(VirtIOSound *s, uint32_t stream_id)
+{
+    return stream_id < ((s->snd_conf.streams + 1U) / 2U);
+}
+
+void virtio_snd_get_stream_pcm_info(VirtQueueElement *elem,
+                                    size_t offset,
+                                    VirtIOSound *s,
+                                    uint32_t stream_id) {
+    virtio_snd_pcm_info val = stream_default_info;
+
+    val.direction = virtio_snd_is_output_stream(s, stream_id) ?
+            VIRTIO_SND_D_OUTPUT : VIRTIO_SND_D_INPUT;
+
+    iov_from_buf(elem->in_sg, elem->in_num, offset, &val, sizeof(val));
+}
 
 /*
- * Handles VIRTIO_SND_R_PCM_PREPARE.
+ * Handle the VIRTIO_SND_R_PCM_INFO request.
+ * The function writes the info structs to the request element.
  *
  * @s: VirtIOSound device
  * @cmd: The request command queue element from VirtIOSound cmdq field
  */
+static uint32_t virtio_snd_handle_pcm_info(VirtIOSound *s,
+                                           VirtQueueElement *elem,
+                                           size_t *payload_size)
+{
+    void (*get_stream_pcm_info)(VirtQueueElement *elem, size_t offset,
+                                VirtIOSound *s, uint32_t stream_id);
+    uint32_t start_id, count, size, tmp;
+    size_t offset;
+    virtio_snd_query_info req;
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
+                               0, &req, sizeof(req));
+
+    if (msg_sz != sizeof(req)) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "%s: virtio-snd command size incorrect %zu vs \
+                %zu\n", __func__, msg_sz, sizeof(req));
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    size = le32_to_cpu(req.size);
+    switch (size) {
+    case sizeof(virtio_snd_pcm_info):
+        get_stream_pcm_info = &virtio_snd_get_stream_pcm_info;
+        break;
+
+    default:
+        error_report("pcm info: unsupported size: %u", size);
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    start_id = le32_to_cpu(req.start_id);
+    count = le32_to_cpu(req.count);
+
+    /*
+     * 5.14.6.2 Driver Requirements: Item Information Request
+     * "The driver MUST NOT set start_id and count such that start_id + count
+     * is greater than the total number of particular items that is indicated
+     * in the device configuration space."
+     */
+    if ((start_id > s->snd_conf.streams)
+        || !g_uint_checked_add(&tmp, start_id, count)
+        || ((start_id + count) > s->snd_conf.streams)) {
+        error_report("pcm info: start_id + count is greater than the total "
+                     "number of streams, got: start_id = %u, count = %u",
+                     start_id, count);
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    /*
+     * 5.14.6.2 Driver Requirements: Item Information Request
+     * "The driver MUST provide a buffer of sizeof(struct virtio_snd_hdr) +
+     * count * size bytes for the response."
+     */
+    if (!g_uint_checked_mul(&tmp, size, count)
+        || !g_uint_checked_add(&tmp, tmp, sizeof(virtio_snd_hdr))
+        || iov_size(elem->in_sg, elem->in_num) <
+           (sizeof(virtio_snd_hdr) + size * count)) {
+        error_report("pcm info: buffer too small, got: %zu, needed: %zu",
+                iov_size(elem->in_sg, elem->in_num),
+                (sizeof(virtio_snd_hdr) + size * count));
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    offset = sizeof(virtio_snd_hdr);
+    for (uint32_t i = 0; i < count; ++i, offset += size) {
+        uint32_t stream_id = i + start_id;
+        trace_virtio_snd_handle_pcm_info(stream_id);
+        get_stream_pcm_info(elem, offset, s, stream_id);
+    }
+
+    *payload_size = size * count;
+    return VIRTIO_SND_S_OK;
+}
+
+static uint32_t virtio_snd_handle_pcm_set_params(VirtIOSound *s,
+                                                 VirtQueueElement *elem)
+{
+    VirtIOPcmParams *st_params;
+    virtio_snd_pcm_set_params req;
+    uint32_t stream_id;
+    audsettings as_ignored;
+
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
+                               0, &req, sizeof(req));
+
+    if (msg_sz != sizeof(req)) {
+        /*
+         * TODO: do we need to set DEVICE_NEEDS_RESET?
+         */
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "%s: virtio-snd command size incorrect %zu vs \
+                %zu\n", __func__, msg_sz, sizeof(virtio_snd_pcm_set_params));
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    stream_id = le32_to_cpu(req.hdr.stream_id);
+    trace_virtio_snd_handle_pcm_set_params(stream_id);
+
+    if (stream_id > s->snd_conf.streams) {
+        error_report("Invalid stream id: %"PRIu32, stream_id);
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    if (virtio_snd_get_qemu_audsettings(
+            &as_ignored, req.channels, req.format, req.rate)) {
+        return VIRTIO_SND_S_NOT_SUPP;
+    }
+
+    st_params = &s->pcm_items[stream_id].params;
+
+    st_params->buffer_bytes = le32_to_cpu(req.buffer_bytes);
+    st_params->period_bytes = le32_to_cpu(req.period_bytes);
+    st_params->features = le32_to_cpu(req.features);
+    /* the following are uint8_t, so there's no need to bswap the values. */
+    st_params->channels = req.channels;
+    st_params->format = req.format;
+    st_params->rate = req.rate;
+
+    return VIRTIO_SND_S_OK;
+}
+
 static uint32_t virtio_snd_handle_pcm_prepare(VirtIOSound *s,
                                               VirtQueueElement *elem)
 {
+    VirtIOSoundPCMItem *item;
     uint32_t stream_id;
     size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
                                sizeof(virtio_snd_hdr),
                                &stream_id,
                                sizeof(stream_id));
-
     if (msg_sz != sizeof(stream_id)) {
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
@@ -590,16 +1121,63 @@ static uint32_t virtio_snd_handle_pcm_prepare(VirtIOSound *s,
         return VIRTIO_SND_S_BAD_MSG;
     }
 
-    return virtio_snd_pcm_prepare(s, le32_to_cpu(stream_id));
+    stream_id = le32_to_cpu(stream_id);
+    if (stream_id > s->snd_conf.streams) {
+        error_report("Invalid stream id: %"PRIu32, stream_id);
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    item = &s->pcm_items[stream_id];
+    if (item->stream) {
+        virtio_snd_stream_destroy(item->stream);
+        item->stream = NULL;
+    }
+
+    item->stream = virtio_snd_stream_create(
+            s, &item->params, virtio_snd_is_output_stream(s, stream_id));
+    if (!item->stream) {
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    return VIRTIO_SND_S_OK;
 }
 
-/*
- * Handles VIRTIO_SND_R_PCM_START.
- *
- * @s: VirtIOSound device
- * @cmd: The request command queue element from VirtIOSound cmdq field
- * @start: whether to start or stop the device
- */
+static uint32_t virtio_snd_handle_pcm_release(VirtIOSound *s,
+                                              VirtQueueElement *elem)
+{
+    VirtIOSoundPCMItem *item;
+    uint32_t stream_id;
+    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
+                               sizeof(virtio_snd_hdr),
+                               &stream_id,
+                               sizeof(stream_id));
+    if (msg_sz != sizeof(stream_id)) {
+        /*
+         * TODO: do we need to set DEVICE_NEEDS_RESET?
+         */
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "%s: virtio-snd command size incorrect %zu vs \
+                %zu\n", __func__, msg_sz, sizeof(stream_id));
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    stream_id = le32_to_cpu(stream_id);
+    trace_virtio_snd_handle_pcm_release(stream_id);
+
+    if (stream_id > s->snd_conf.streams) {
+        error_report("Invalid stream id: %"PRIu32, stream_id);
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    item = &s->pcm_items[stream_id];
+    if (item->stream) {
+        virtio_snd_stream_destroy(item->stream);
+        item->stream = NULL;
+    }
+
+    return VIRTIO_SND_S_OK;
+}
+
 static uint32_t virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
                                                  VirtQueueElement *elem,
                                                  bool start)
@@ -619,102 +1197,26 @@ static uint32_t virtio_snd_handle_pcm_start_stop(VirtIOSound *s,
 
     stream_id = le32_to_cpu(req.stream_id);
     trace_virtio_snd_handle_pcm_start_stop(start ? "VIRTIO_SND_R_PCM_START" :
-            "VIRTIO_SND_R_PCM_STOP", stream_id);
+            "VIRTIO_SND_R_PCM_STOP", req.stream_id);
 
-    stream = virtio_snd_pcm_get_stream(s, stream_id);
-    if (!stream) {
+    if (stream_id > s->snd_conf.streams) {
         error_report("Invalid stream id: %"PRIu32, stream_id);
         return VIRTIO_SND_S_BAD_MSG;
     }
 
-    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        if (!stream->voice.raw) {
-            return VIRTIO_SND_S_BAD_MSG;
-        }
-
-        if (stream->is_output) {
-            audio_be_set_active_out(s->audio_be, stream->voice.out, start);
-        } else {
-            audio_be_set_active_in(s->audio_be, stream->voice.in, start);
-        }
-
-        stream->active = start;
-    }
-
-    return VIRTIO_SND_S_OK;
-}
-
-/*
- * Returns the number of I/O messages that are being processed.
- *
- * @stream: VirtIOSoundPCMStream
- */
-static size_t virtio_snd_pcm_get_io_msgs_count(VirtIOSoundPCMStream *stream)
-{
-    VirtIOSoundPCMBuffer *buffer, *next;
-    size_t count = 0;
-
-    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        QSIMPLEQ_FOREACH_SAFE(buffer, &stream->queue, entry, next) {
-            count += 1;
-        }
-    }
-    return count;
-}
-
-/*
- * Handles VIRTIO_SND_R_PCM_RELEASE.
- *
- * @s: VirtIOSound device
- * @cmd: The request command queue element from VirtIOSound cmdq field
- */
-static uint32_t virtio_snd_handle_pcm_release(VirtIOSound *s,
-                                              VirtQueueElement *elem)
-{
-    uint32_t stream_id;
-    VirtIOSoundPCMStream *stream;
-    size_t msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
-                               sizeof(virtio_snd_hdr),
-                               &stream_id,
-                               sizeof(stream_id));
-
-    if (msg_sz != sizeof(stream_id)) {
-        qemu_log_mask(LOG_GUEST_ERROR,
-                "%s: virtio-snd command size incorrect %zu vs \
-                %zu\n", __func__, msg_sz, sizeof(stream_id));
+    stream = s->pcm_items[stream_id].stream;
+    if (!stream) {
+        error_report("Unprepared stream id: %"PRIu32, stream_id);
         return VIRTIO_SND_S_BAD_MSG;
     }
 
-    stream_id = le32_to_cpu(stream_id);
-    trace_virtio_snd_handle_pcm_release(stream_id);
-    stream = virtio_snd_pcm_get_stream(s, stream_id);
-    if (stream == NULL) {
-        error_report("already released stream %"PRIu32, stream_id);
-        virtio_error(VIRTIO_DEVICE(s),
-                     "already released stream %"PRIu32,
-                     stream_id);
-        return VIRTIO_SND_S_BAD_MSG;
-    }
-
-    if (virtio_snd_pcm_get_io_msgs_count(stream)) {
-        /*
-         * virtio-v1.2-csd01, 5.14.6.6.5.1,
-         * Device Requirements: Stream Release
-         *
-         * - The device MUST complete all pending I/O messages for the
-         *   specified stream ID.
-         * - The device MUST NOT complete the control request while there
-         *   are pending I/O messages for the specified stream ID.
-         */
-        trace_virtio_snd_pcm_stream_flush(stream_id);
-        virtio_snd_pcm_flush(stream);
-    }
-
-    return VIRTIO_SND_S_OK;
+    return start ?
+            virtio_snd_stream_start(stream) :
+            virtio_snd_stream_stop(stream);
 }
 
 /*
- * Processes the ctrl queue events.
+ * Processes a command from the VIRTIO_SND_VQ_CONTROL queue.
  *
  * @s: VirtIOSound device
  * @cmd: control command request
@@ -731,6 +1233,9 @@ process_cmd(VirtIOSound *s, VirtQueueElement *elem)
                                0, &ctrl, sizeof(ctrl));
 
     if (msg_sz != sizeof(ctrl)) {
+        /*
+         * TODO: do we need to set DEVICE_NEEDS_RESET?
+         */
         qemu_log_mask(LOG_GUEST_ERROR,
                 "%s: virtio-snd command size incorrect %zu vs \
                 %zu\n", __func__, msg_sz, sizeof(ctrl));
@@ -804,8 +1309,7 @@ static void virtio_snd_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
     while (true) {
         VirtQueueElement *elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
         if (elem) {
-            virtqueue_push(vq, elem, process_cmd(s, elem));
-            g_free(elem);
+            virtio_snd_virtqueue_consume_elem(vq, elem, process_cmd(s, elem));
         } else {
             break;
         }
@@ -827,36 +1331,77 @@ static void virtio_snd_handle_event(VirtIODevice *vdev, VirtQueue *vq)
     trace_virtio_snd_handle_event();
 }
 
-/*
- * Must only be called if `invalid` is not empty.
- */
-static void empty_invalid_queue(VirtIODevice *vdev, VirtQueue *vq,
-                                VirtIOSoundPCMBufferQueue *invalid)
+static void virtio_snd_handle_xfer(VirtIOSound *vsnd, VirtQueue *vq)
 {
-    VirtIOSoundPCMBuffer *buffer = NULL;
-    virtio_snd_pcm_status resp = { 0 };
+    bool need_notify = false;
 
-    g_assert(!QSIMPLEQ_EMPTY(invalid));
-
-    while (!QSIMPLEQ_EMPTY(invalid)) {
-        buffer = QSIMPLEQ_FIRST(invalid);
-        /* If buffer->vq != vq, our logic is fundamentally wrong, so bail out */
-        g_assert(buffer->vq == vq);
-
-        resp.status = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
-        iov_from_buf(buffer->elem->in_sg,
-                     buffer->elem->in_num,
-                     0,
-                     &resp,
-                     sizeof(virtio_snd_pcm_status));
-        virtqueue_push(vq,
-                       buffer->elem,
-                       sizeof(virtio_snd_pcm_status));
-        QSIMPLEQ_REMOVE_HEAD(invalid, entry);
-        virtio_snd_pcm_buffer_free(buffer);
+    if (!virtio_queue_ready(vq)) {
+        return;
     }
-    /* Notify vq about virtio_snd_pcm_status responses. */
-    virtio_notify(vdev, vq);
+
+    for (;;) {
+        VirtQueueElement *elem;
+        virtio_snd_pcm_xfer hdr;
+        size_t msg_sz;
+        size_t data_size;
+
+        elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
+        if (!elem) {
+            break;
+        }
+
+        /* get the message hdr object */
+        msg_sz = iov_to_buf(elem->out_sg, elem->out_num,
+                            0, &hdr, sizeof(hdr));
+        if (msg_sz != sizeof(hdr)) {
+            virtio_snd_virtqueue_consume_elem(vq, elem, 0);
+            need_notify = true;
+        } else {
+            VirtIOSoundPCMStream *stream;
+            virtio_snd_pcm_status err_resp;
+            uint32_t stream_id = le32_to_cpu(hdr.stream_id);
+            if (stream_id > vsnd->snd_conf.streams) {
+err:            err_resp.status = cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
+                err_resp.latency_bytes = 0;
+
+                iov_from_buf(elem->in_sg, elem->in_num,
+                             0, &err_resp, sizeof(err_resp));
+                virtio_snd_virtqueue_consume_elem(vq, elem, sizeof(err_resp));
+                need_notify = true;
+                continue;
+            }
+
+            stream = vsnd->pcm_items[stream_id].stream;
+            if (!stream) {
+                goto err;
+            }
+
+            WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+                if (stream->num_missed_periods) {
+                    data_size = virtio_snd_stream_period_elem(stream, elem, true);
+                    --stream->num_missed_periods;
+                } else if (vqelems_push(&stream->vqelems, elem)) {
+                    elem = NULL;
+                } else {
+                    /*
+                     * `stream->vqelems` should not overflow (it is allocated
+                     * with double capacity), but if it does then process
+                     * the `elem` right away.
+                     */
+                    data_size = virtio_snd_stream_period_elem(stream, elem, true);
+                }
+            }
+
+            if (elem) {
+                virtio_snd_virtqueue_consume_elem(vq, elem, data_size);
+                need_notify = true;
+            }
+        }
+    }
+
+    if (need_notify) {
+        virtio_notify(&vsnd->parent_obj, vq);
+    }
 }
 
 /*
@@ -868,76 +1413,8 @@ static void empty_invalid_queue(VirtIODevice *vdev, VirtQueue *vq,
  */
 static void virtio_snd_handle_tx_xfer(VirtIODevice *vdev, VirtQueue *vq)
 {
-    VirtIOSound *vsnd = VIRTIO_SND(vdev);
-    VirtIOSoundPCMBuffer *buffer;
-    VirtQueueElement *elem;
-    size_t msg_sz, size;
-    virtio_snd_pcm_xfer hdr;
-    uint32_t stream_id;
-    /*
-     * If any of the I/O messages are invalid, put them in `invalid` and
-     * return them after the for loop.
-     */
-    VirtIOSoundPCMBufferQueue invalid;
-    QSIMPLEQ_INIT(&invalid);
-
-    if (!virtio_queue_ready(vq)) {
-        return;
-    }
     trace_virtio_snd_handle_tx_xfer();
-
-    for (;;) {
-        VirtIOSoundPCMStream *stream;
-
-        elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
-        if (!elem) {
-            break;
-        }
-        /* get the message hdr object */
-        msg_sz = iov_to_buf(elem->out_sg,
-                            elem->out_num,
-                            0,
-                            &hdr,
-                            sizeof(virtio_snd_pcm_xfer));
-        if (msg_sz != sizeof(virtio_snd_pcm_xfer)) {
-            goto tx_err;
-        }
-        stream_id = le32_to_cpu(hdr.stream_id);
-
-        if (stream_id >= vsnd->snd_conf.streams
-            || vsnd->pcm_items[stream_id].stream == NULL) {
-            goto tx_err;
-        }
-
-        stream = vsnd->pcm_items[stream_id].stream;
-        if (!stream || !stream->is_output) {
-            goto tx_err;
-        }
-
-        size = iov_size(elem->out_sg, elem->out_num) - msg_sz;
-        buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
-        buffer->elem = elem;
-        buffer->populated = false;
-        buffer->vq = vq;
-        buffer->size = size;
-        buffer->offset = 0;
-
-        WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-            stream->latency_bytes += size;
-            QSIMPLEQ_INSERT_TAIL(&stream->queue, buffer, entry);
-        }
-        continue;
-
-tx_err:
-        buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer));
-        buffer->elem = elem;
-        buffer->vq = vq;
-        QSIMPLEQ_INSERT_TAIL(&invalid, buffer, entry);
-    }
-
-    if (!QSIMPLEQ_EMPTY(&invalid)) {
-        empty_invalid_queue(vdev, vq, &invalid);
-    }
+    virtio_snd_handle_xfer(VIRTIO_SND(vdev), vq);
 }
 
 /*
@@ -949,74 +1426,103 @@ tx_err:
  */
 static void virtio_snd_handle_rx_xfer(VirtIODevice *vdev, VirtQueue *vq)
 {
-    VirtIOSound *vsnd = VIRTIO_SND(vdev);
-    VirtIOSoundPCMBuffer *buffer;
-    VirtQueueElement *elem;
-    size_t msg_sz, size;
-    virtio_snd_pcm_xfer hdr;
-    uint32_t stream_id;
-    /*
-     * If any of the I/O messages are invalid, put them in `invalid` and
-     * return them after the for loop.
-     */
-    VirtIOSoundPCMBufferQueue invalid;
-    QSIMPLEQ_INIT(&invalid);
-
-    if (!virtio_queue_ready(vq)) {
-        return;
-    }
     trace_virtio_snd_handle_rx_xfer();
+    virtio_snd_handle_xfer(VIRTIO_SND(vdev), vq);
+}
 
-    for (;;) {
-        VirtIOSoundPCMStream *stream;
+/*
+ * audio_be_* output callback.
+ *
+ * @data: VirtIOSoundPCMStream stream
+ * @available: number of bytes that can be written with AUD_write()
+ */
+static void virtio_snd_pcm_out_cb(void *data, int available_bytes)
+{
+    VirtIOSoundPCMStream *stream = data;
 
-        elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
-        if (!elem) {
-            break;
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        g_assert(stream->s);
+        AudioBackend *audio_be = stream->s->audio_be;
+
+        while (available_bytes > 0) {
+            size_t chunk_size;
+            size_t written;
+            void* chunk_data = pcm_ring_buffer_get_consume_chunk(
+                    &stream->pcm, &chunk_size);
+
+            if (!chunk_size) {
+                /* insert silence to fill up available_bytes */
+                const size_t period_size = stream->params.period_bytes;
+                g_assert(period_size > 0);
+
+                do {
+                    size_t chunk_size =
+                            MIN((size_t)available_bytes, period_size);
+
+                    written = audio_be_write(audio_be, stream->voice.out,
+                                             stream->silence_buf, chunk_size);
+                    g_assert(written <= chunk_size);
+                    if (!written) {
+                        return;
+                    }
+
+                    available_bytes -= written;
+                } while (available_bytes > 0);
+
+                return;
+            } else if (chunk_size > available_bytes) {
+                chunk_size = available_bytes;
+            }
+
+            written = audio_be_write(audio_be, stream->voice.out,
+                                     chunk_data, chunk_size);
+            g_assert(written <= chunk_size);
+            if (!written) {
+                return;
+            }
+
+            pcm_ring_buffer_consume(&stream->pcm, written);
+            available_bytes -= written;
         }
-        /* get the message hdr object */
-        msg_sz = iov_to_buf(elem->out_sg,
-                            elem->out_num,
-                            0,
-                            &hdr,
-                            sizeof(virtio_snd_pcm_xfer));
-        if (msg_sz != sizeof(virtio_snd_pcm_xfer)) {
-            goto rx_err;
-        }
-        stream_id = le32_to_cpu(hdr.stream_id);
-
-        if (stream_id >= vsnd->snd_conf.streams
-            || !vsnd->pcm_items[stream_id].stream) {
-            goto rx_err;
-        }
-
-        stream = vsnd->pcm_items[stream_id].stream;
-        if (!stream || stream->is_output) {
-            goto rx_err;
-        }
-
-        size = iov_size(elem->in_sg, elem->in_num) -
-            sizeof(virtio_snd_pcm_status);
-        buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
-        buffer->elem = elem;
-        buffer->vq = vq;
-        buffer->size = 0;
-        buffer->offset = 0;
-
-        WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-            QSIMPLEQ_INSERT_TAIL(&stream->queue, buffer, entry);
-        }
-        continue;
-
-rx_err:
-        buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer));
-        buffer->elem = elem;
-        buffer->vq = vq;
-        QSIMPLEQ_INSERT_TAIL(&invalid, buffer, entry);
     }
+}
 
-    if (!QSIMPLEQ_EMPTY(&invalid)) {
-        empty_invalid_queue(vdev, vq, &invalid);
+/*
+ * audio_be_* input callback.
+ *
+ * @data: VirtIOSoundPCMStream stream
+ * @available: number of bytes that can be read with AUD_read()
+ */
+static void virtio_snd_pcm_in_cb(void *data, int available_bytes)
+{
+    VirtIOSoundPCMStream *stream = data;
+
+    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
+        g_assert(stream->s);
+        const size_t period_size = stream->params.period_bytes;
+        AudioBackend *audio_be = stream->s->audio_be;
+
+        while (available_bytes > 0) {
+            size_t chunk_size;
+            size_t read;
+            void* chunk_data = pcm_ring_buffer_get_produce_chunk(
+                    &stream->pcm, period_size, &chunk_size);
+
+            g_assert(chunk_size);
+            if (chunk_size > available_bytes) {
+                chunk_size = available_bytes;
+            }
+
+            read = audio_be_read(audio_be, stream->voice.in,
+                                 chunk_data, chunk_size);
+            g_assert(read <= chunk_size);
+            if (read) {
+                pcm_ring_buffer_produce(&stream->pcm, read);
+                available_bytes -= read;
+            } else {
+                return;
+            }
+        }
     }
 }
 
@@ -1085,8 +1591,7 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
     vsnd->vmstate =
         qemu_add_vm_change_state_handler(virtio_snd_vm_state_change, vsnd);
 
-    vsnd->pcm_items =
-        g_new0(VirtIOSoundPCMItem, vsnd->snd_conf.streams);
+    vsnd->pcm_items = g_new0(VirtIOSoundPCMItem, vsnd->snd_conf.streams);
 
     virtio_init(vdev, VIRTIO_ID_SOUND, sizeof(virtio_snd_config));
     virtio_add_feature(&vsnd->features, VIRTIO_F_VERSION_1);
@@ -1099,245 +1604,6 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
         virtio_add_queue(vdev, 64, virtio_snd_handle_tx_xfer);
     vsnd->queues[VIRTIO_SND_VQ_RX] =
         virtio_add_queue(vdev, 64, virtio_snd_handle_rx_xfer);
-
-    /* set default params for all streams */
-    default_params.features = stream_default_info.features;
-    default_params.buffer_bytes = cpu_to_le32(8192);
-    default_params.period_bytes = cpu_to_le32(2048);
-    default_params.channels = stream_default_info.channels_min;
-    default_params.format = VIRTIO_SND_PCM_FMT_S16;
-    default_params.rate = VIRTIO_SND_PCM_RATE_48000;
-
-    for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
-        VirtIOSoundPCMStream* stream;
-
-        status = virtio_snd_set_pcm_params(vsnd, i, &default_params);
-        if (status != cpu_to_le32(VIRTIO_SND_S_OK)) {
-            error_setg(errp,
-                       "Can't initialize stream params, device responded with %s.",
-                       print_code(status));
-            goto error_cleanup;
-        }
-
-        vsnd->pcm_items[i].stream = virtio_snd_create_new_stream(
-            vsnd, i, virtio_snd_is_output_stream(vsnd, i));
-    }
-
-    return;
-
-error_cleanup:
-    virtio_snd_unrealize(dev);
-}
-
-static void update_latency(VirtIOSoundPCMStream *s, size_t used)
-{
-    s->latency_bytes = s->latency_bytes > used ?
-                       s->latency_bytes - used : 0;
-}
-
-static void return_tx_buffer(VirtIOSoundPCMStream *stream,
-                             VirtIOSoundPCMBuffer *buffer)
-{
-    virtio_snd_pcm_status resp = { 0 };
-    resp.status = cpu_to_le32(VIRTIO_SND_S_OK);
-    update_latency(stream, buffer->size);
-    resp.latency_bytes = cpu_to_le32(stream->latency_bytes);
-    iov_from_buf(buffer->elem->in_sg,
-                 buffer->elem->in_num,
-                 0,
-                 &resp,
-                 sizeof(virtio_snd_pcm_status));
-    virtqueue_push(buffer->vq,
-                   buffer->elem,
-                   sizeof(virtio_snd_pcm_status));
-    virtio_notify(VIRTIO_DEVICE(stream->s), buffer->vq);
-    QSIMPLEQ_REMOVE(&stream->queue,
-                    buffer,
-                    VirtIOSoundPCMBuffer,
-                    entry);
-    virtio_snd_pcm_buffer_free(buffer);
-}
-
-/*
- * audio_be_* output callback.
- *
- * @data: VirtIOSoundPCMStream stream
- * @available: number of bytes that can be written with audio_be_write()
- */
-static void virtio_snd_pcm_out_cb(void *data, int available)
-{
-    VirtIOSoundPCMStream *stream = data;
-    VirtIOSoundPCMBuffer *buffer;
-    size_t size;
-
-    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        while (!QSIMPLEQ_EMPTY(&stream->queue)) {
-            buffer = QSIMPLEQ_FIRST(&stream->queue);
-            if (!virtio_queue_ready(buffer->vq)) {
-                return;
-            }
-            if (!stream->active) {
-                /* Stream has stopped, so do not perform audio_be_write. */
-                return_tx_buffer(stream, buffer);
-                continue;
-            }
-            if (!buffer->populated) {
-                iov_to_buf(buffer->elem->out_sg,
-                           buffer->elem->out_num,
-                           sizeof(virtio_snd_pcm_xfer),
-                           buffer->data,
-                           buffer->size);
-                buffer->populated = true;
-            }
-            for (;;) {
-                size = audio_be_write(stream->s->audio_be,
-                                 stream->voice.out,
-                                 buffer->data + buffer->offset,
-                                 MIN(buffer->size, available));
-                assert(size <= MIN(buffer->size, available));
-                if (size == 0) {
-                    /* break out of both loops */
-                    available = 0;
-                    break;
-                }
-                buffer->size -= size;
-                buffer->offset += size;
-                available -= size;
-                update_latency(stream, size);
-                if (buffer->size < 1) {
-                    return_tx_buffer(stream, buffer);
-                    break;
-                }
-                if (!available) {
-                    break;
-                }
-            }
-            if (!available) {
-                break;
-            }
-        }
-    }
-}
-
-/*
- * Flush all buffer data from this input stream's queue into the driver's
- * virtual queue.
- *
- * @stream: VirtIOSoundPCMStream *stream
- */
-static void return_rx_buffer(VirtIOSoundPCMStream *stream,
-                             VirtIOSoundPCMBuffer *buffer)
-{
-    virtio_snd_pcm_status resp = { 0 };
-    resp.status = cpu_to_le32(VIRTIO_SND_S_OK);
-    resp.latency_bytes = 0;
-    /* Copy data -if any- to guest */
-    iov_from_buf(buffer->elem->in_sg,
-                 buffer->elem->in_num,
-                 0,
-                 buffer->data,
-                 buffer->size);
-    iov_from_buf(buffer->elem->in_sg,
-                 buffer->elem->in_num,
-                 buffer->size,
-                 &resp,
-                 sizeof(virtio_snd_pcm_status));
-    virtqueue_push(buffer->vq,
-                   buffer->elem,
-                   sizeof(virtio_snd_pcm_status) + buffer->size);
-    virtio_notify(VIRTIO_DEVICE(stream->s), buffer->vq);
-    QSIMPLEQ_REMOVE(&stream->queue,
-                    buffer,
-                    VirtIOSoundPCMBuffer,
-                    entry);
-    virtio_snd_pcm_buffer_free(buffer);
-}
-
-
-/*
- * audio_be_* input callback.
- *
- * @data: VirtIOSoundPCMStream stream
- * @available: number of bytes that can be read with audio_be_read()
- */
-static void virtio_snd_pcm_in_cb(void *data, int available)
-{
-    VirtIOSoundPCMStream *stream = data;
-    VirtIOSoundPCMBuffer *buffer;
-    size_t size, max_size, to_read;
-
-    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        const size_t period_bytes = stream->effective_params.period_bytes;
-
-        while (!QSIMPLEQ_EMPTY(&stream->queue)) {
-            buffer = QSIMPLEQ_FIRST(&stream->queue);
-            if (!virtio_queue_ready(buffer->vq)) {
-                return;
-            }
-            if (!stream->active) {
-                /* Stream has stopped, so do not perform audio_be_read. */
-                return_rx_buffer(stream, buffer);
-                continue;
-            }
-
-            max_size = iov_size(buffer->elem->in_sg, buffer->elem->in_num);
-            if (max_size <= sizeof(virtio_snd_pcm_status)) {
-                return_rx_buffer(stream, buffer);
-                continue;
-            }
-            max_size -= sizeof(virtio_snd_pcm_status);
-
-            for (;;) {
-                if (buffer->size >= max_size) {
-                    return_rx_buffer(stream, buffer);
-                    break;
-                }
-                to_read = period_bytes - buffer->size;
-                to_read = MIN(to_read, available);
-                to_read = MIN(to_read, max_size - buffer->size);
-                size = audio_be_read(stream->s->audio_be,
-                                     stream->voice.in,
-                                     buffer->data + buffer->size,
-                                     to_read);
-                if (!size) {
-                    available = 0;
-                    break;
-                }
-                buffer->size += size;
-                available -= size;
-                if (buffer->size >= period_bytes) {
-                    return_rx_buffer(stream, buffer);
-                    break;
-                }
-                if (!available) {
-                    break;
-                }
-            }
-            if (!available) {
-                break;
-            }
-        }
-    }
-}
-
-/*
- * Flush all buffer data from this output stream's queue into the driver's
- * virtual queue.
- *
- * @stream: VirtIOSoundPCMStream *stream
- */
-static void virtio_snd_pcm_flush(VirtIOSoundPCMStream *stream)
-{
-    VirtIOSoundPCMBuffer *buffer;
-    void (*cb)(VirtIOSoundPCMStream *, VirtIOSoundPCMBuffer *) =
-        stream->is_output ? return_tx_buffer : return_rx_buffer;
-
-    WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        while (!QSIMPLEQ_EMPTY(&stream->queue)) {
-            buffer = QSIMPLEQ_FIRST(&stream->queue);
-            cb(stream, buffer);
-        }
-    }
 }
 
 static void virtio_snd_unrealize(DeviceState *dev)
@@ -1350,12 +1616,13 @@ static void virtio_snd_unrealize(DeviceState *dev)
 
     if (vsnd->pcm_items) {
         for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
-            VirtIOSoundPCMStream *stream = vsnd->pcm_items[i].stream;
+            VirtIOSoundPCMStream* stream = vsnd->pcm_items[i].stream;
             if (stream) {
-                virtio_snd_destroy_stream(stream);
+                virtio_snd_stream_destroy(stream);
             }
         }
         g_free(vsnd->pcm_items);
+        vsnd->pcm_items = NULL;
     }
 
     virtio_delete_queue(vsnd->queues[VIRTIO_SND_VQ_CONTROL]);
@@ -1365,91 +1632,35 @@ static void virtio_snd_unrealize(DeviceState *dev)
     virtio_cleanup(vdev);
 }
 
-static VirtIOSoundPCMBuffer
-*virtio_snd_VirtIOSoundPCMBuffer_get(QEMUFile *f, VirtIOSound *s)
+static int virtio_snd_device_pre_load(void *opaque)
 {
-    size_t size = qemu_get_be64(f);
-    VirtIOSoundPCMBuffer *buffer =
-            g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
-    unsigned vq_index;
+    VirtIOSound *s = opaque;
+    uint32_t i;
 
-    buffer->size = size;
-    buffer->offset = qemu_get_be64(f);
-    buffer->populated = qemu_get_byte(f);
-    vq_index = qemu_get_be16(f);
-    if (vq_index >= VIRTIO_SND_VQ_MAX) {
-        g_free(buffer);
-        return NULL;
-    }
-
-    buffer->vq = s->queues[vq_index];
-    g_assert(buffer->vq);
-
-    buffer->elem = qemu_get_virtqueue_element(&s->parent_obj, f,
-                                              sizeof(VirtQueueElement));
-    if (!buffer->elem) {
-        g_free(buffer);
-        return NULL;
-    }
-
-    if (qemu_get_buffer(f, &buffer->data[0], buffer->size) != buffer->size) {
-        g_free(buffer->elem);
-        g_free(buffer);
-        return NULL;
-    }
-
-    return buffer;
-}
-
-static void
-virtio_snd_VirtIOSoundPCMBuffer_put(QEMUFile *f,
-                                    VirtIOSoundPCMBuffer *buffer,
-                                    VirtIOSound *s)
-{
-    qemu_put_be64(f, buffer->size);
-    qemu_put_be64(f, buffer->offset);
-    qemu_put_byte(f, buffer->populated);
-    qemu_put_be16(f, virtio_get_queue_index(buffer->vq));
-    qemu_put_virtqueue_element(&s->parent_obj, f, buffer->elem);
-    qemu_put_buffer(f, &buffer->data[0], buffer->size);
-}
-
-static int
-virtio_snd_VirtIOSoundPCMBufferQueue_get(QEMUFile *f,
-                                         VirtIOSoundPCMBufferQueue *bq,
-                                         VirtIOSound *s)
-{
-    g_assert(QSIMPLEQ_EMPTY(bq));
-
-    uint32_t queue_size = qemu_get_be32(f);
-    for (; queue_size; --queue_size) {
-        VirtIOSoundPCMBuffer *buffer =
-                virtio_snd_VirtIOSoundPCMBuffer_get(f, s);
-        if (!buffer) {
-            return -EINVAL;
+    for (i = 0; i < s->snd_conf.streams; ++i) {
+        VirtIOSoundPCMStream* stream = s->pcm_items[i].stream;
+        if (stream) {
+            virtio_snd_stream_destroy(stream);
+            s->pcm_items[i].stream = NULL;
         }
-
-        QSIMPLEQ_INSERT_TAIL(bq, buffer, entry);
     }
 
     return 0;
 }
 
-static void
-virtio_snd_VirtIOSoundPCMBufferQueue_put(QEMUFile *f,
-                                         VirtIOSoundPCMBufferQueue *bq,
-                                         VirtIOSound *s)
+static int virtio_snd_device_post_load(void *opaque, int version_id)
 {
-    VirtIOSoundPCMBuffer *buffer;
-    uint32_t queue_size = 0;
-    QSIMPLEQ_FOREACH(buffer, bq, entry) {
-        ++queue_size;
+    VirtIOSound *s = opaque;
+    uint32_t i;
+
+    for (i = 0; i < s->snd_conf.streams; ++i) {
+        VirtIOSoundPCMStream* stream = s->pcm_items[i].stream;
+        if (stream) {
+            virtio_snd_stream_post_load(stream);
+        }
     }
 
-    qemu_put_be32(f, queue_size);
-    QSIMPLEQ_FOREACH(buffer, bq, entry) {
-        virtio_snd_VirtIOSoundPCMBuffer_put(f, buffer, s);
-    }
+    return 0;
 }
 
 static const VMStateDescription vmstate_VirtIOPcmParams = {
@@ -1467,98 +1678,110 @@ static const VMStateDescription vmstate_VirtIOPcmParams = {
     },
 };
 
-static const VMStateDescription vmstate_VirtIOSoundPCMStream = {
-    .name = "VirtIOSoundPCMStream",
-    .version_id = 1,
-    .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
-        VMSTATE_STRUCT(effective_params, VirtIOSoundPCMStream, 1,
-                       vmstate_VirtIOPcmParams, VirtIOPcmParams),
-        VMSTATE_UINT32(id, VirtIOSoundPCMStream),
-        VMSTATE_BOOL(is_output, VirtIOSoundPCMStream),
-        VMSTATE_BOOL(active, VirtIOSoundPCMStream),
-        /*
-         * NOTE: stream->queue is handled manually in
-         * the virtio_snd_pcm_VirtIOSoundPCMStream_put/get functions.
-         */
-        VMSTATE_END_OF_LIST()
-    }
-};
-
-static VirtIOSoundPCMStream
-*virtio_snd_pcm_VirtIOSoundPCMStream_get(QEMUFile *f,
-                                         VirtIOSound *s)
+static VirtIOSoundPCMStream *virtio_snd_stream_load(VirtIOSound *s,
+                                                 uint32_t stream_id,
+                                                 QEMUFile *f)
 {
-    VirtIOSoundPCMStream* stream = virtio_snd_create_new_stream(s, 0, true);
+    VirtIOPcmParams params;
+    VirtIOSoundPCMStream *stream;
+    size_t num_elems;
     Error *err = NULL;
-    int ret;
 
-    ret = vmstate_load_state(f, &vmstate_VirtIOSoundPCMStream, stream, 1, &err);
-    if (ret < 0) {
+    if (vmstate_load_state(f, &vmstate_VirtIOPcmParams, &params, 1, &err)) {
         error_report_err(err);
-        virtio_snd_destroy_stream(stream);
         return NULL;
     }
 
-    /*
-     * Locking `mtx` is not required because the stream
-     * was just created here.
-     */
-    ret = virtio_snd_VirtIOSoundPCMBufferQueue_get(f, &stream->queue, s);
-    if (ret < 0) {
-        virtio_snd_destroy_stream(stream);
+    stream = virtio_snd_stream_create(
+            s, &params, virtio_snd_is_output_stream(s, stream_id));
+    if (!stream) {
         return NULL;
     }
 
-    if (stream->effective_params.channels) {
-        virtio_snd_init_stream_voice_locked(stream, &stream->effective_params);
+    stream->next_period_us = qemu_get_be64(f);
+    stream->num_missed_periods = qemu_get_be16(f);
+
+    num_elems = qemu_get_be16(f);
+    for (; num_elems; --num_elems) {
+        VirtQueueElement *elem = qemu_get_virtqueue_element(
+                &s->parent_obj, f, sizeof(VirtQueueElement));
+        if (!elem) {
+            virtio_snd_stream_destroy(stream);
+            return NULL;
+        }
+        if (!vqelems_push(&stream->vqelems, elem)) {
+            VirtQueue *vq = s->queues[
+                    stream->is_output ? VIRTIO_SND_VQ_TX : VIRTIO_SND_VQ_RX];
+            virtqueue_detach_element(vq, elem, 0);
+            g_free(elem);
+            virtio_snd_stream_destroy(stream);
+            return NULL;
+        }
     }
 
     return stream;
 }
 
-static int
-virtio_snd_pcm_VirtIOSoundPCMStream_put(QEMUFile *f,
-                                        JSONWriter *vmdes,
-                                        VirtIOSoundPCMStream *stream)
+static int virtio_snd_stream_save(VirtIOSoundPCMStream *stream,
+                                  QEMUFile *f,
+                                  JSONWriter *vmdes)
 {
-    Error *err = NULL;
-    int ret;
-
-    ret = vmstate_save_state(f, &vmstate_VirtIOSoundPCMStream,
-                             stream, vmdes, &err);
-    if (ret < 0) {
-        error_report_err(err);
-        return ret;
-    }
-
     WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        virtio_snd_VirtIOSoundPCMBufferQueue_put(f, &stream->queue, stream->s);
+        size_t i;
+        size_t num_elems;
+        Error *err = NULL;
+        int ret;
+
+        ret = vmstate_save_state(f, &vmstate_VirtIOPcmParams,
+                                 &stream->params, vmdes, &err);
+        if (ret < 0) {
+            error_report_err(err);
+            return ret;
+        }
+
+        qemu_put_be64(f, stream->next_period_us);
+        qemu_put_be16(f, stream->num_missed_periods);
+
+        num_elems = vqelems_size(&stream->vqelems);
+        qemu_put_be16(f, num_elems);
+        for (i = 0; i < num_elems; ++i) {
+            qemu_put_virtqueue_element(
+                    &stream->s->parent_obj, f,
+                    vqelems_peek(&stream->vqelems, i));
+        }
     }
 
     return 0;
 }
 
 static int
-virtio_snd_device_remaining_get(QEMUFile *f,
-                                void *pv,
-                                size_t size,
-                                const VMStateField *field)
+vmstate_virtio_snd_device_streams_get(QEMUFile *f,
+                                      void *pv,
+                                      size_t size,
+                                      const VMStateField *field)
 {
     VirtIOSound *s = pv;
-    VirtIOSoundPCMStream *stream;
-    uint32_t i;
+    uint32_t stream_id;
 
-    for (i = 0; i < s->snd_conf.streams; ++i) {
-        g_assert(!s->pcm_items[i].stream);
+    for (stream_id = 0; stream_id < s->snd_conf.streams; ++stream_id) {
+        VirtIOSoundPCMStream *stream;
+        g_assert(!s->pcm_items[stream_id].stream);
 
-        if (qemu_get_byte(f)) {
-            stream = virtio_snd_pcm_VirtIOSoundPCMStream_get(f, s);
+        switch (qemu_get_byte(f)) {
+        case 0xAB:
+            stream = virtio_snd_stream_load(s, stream_id, f);
             if (!stream) {
                 return -EINVAL;
             }
 
-            s->pcm_items[i].stream = stream;
+            s->pcm_items[stream_id].stream = stream;
+            break;
+
+        case 0xBA:
+            break;
+
+        default:
+            return -EINVAL;
         }
     }
 
@@ -1566,89 +1789,47 @@ virtio_snd_device_remaining_get(QEMUFile *f,
 }
 
 static int
-virtio_snd_device_remaining_put(QEMUFile *f,
-                                void *pv,
-                                size_t size,
-                                const VMStateField *field,
-                                JSONWriter *vmdes) {
+vmstate_virtio_snd_device_streams_put(QEMUFile *f,
+                                      void *pv,
+                                      size_t size,
+                                      const VMStateField *field,
+                                      JSONWriter *vmdes) {
     VirtIOSound *s = pv;
     uint32_t i;
-    int ret;
 
     for (i = 0; i < s->snd_conf.streams; ++i) {
         VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
-
         if (stream) {
-            qemu_put_byte(f, 1);
-            ret = virtio_snd_pcm_VirtIOSoundPCMStream_put(f, vmdes, stream);
+            int ret;
+
+            qemu_put_byte(f, 0xAB);
+            ret = virtio_snd_stream_save(stream, f, vmdes);
             if (ret < 0) {
                 return ret;
             }
         } else {
-            qemu_put_byte(f, 0);
+            qemu_put_byte(f, 0xBA);
         }
     }
 
     return 0;
 }
 
-static const VMStateInfo vmstate_virtio_snd_device_remaining = {
-    .name = "virtio_snd_device_remaining",
-    .get  = virtio_snd_device_remaining_get,
-    .put  = virtio_snd_device_remaining_put,
+static const VMStateInfo vmstate_virtio_snd_device_streams = {
+    .name = "vmstate_virtio_snd_device_streams",
+    .get  = vmstate_virtio_snd_device_streams_get,
+    .put  = vmstate_virtio_snd_device_streams_put,
 };
 
-static int virtio_snd_device_pre_load(void *opaque)
-{
-    VirtIOSound *s = opaque;
-    uint32_t i;
-
-    for (i = 0; i < s->snd_conf.streams; ++i) {
-        VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
-        if (stream) {
-            virtio_snd_destroy_stream(stream);
-            s->pcm_items[i].stream = NULL;
-        }
-    }
-
-    return 0;
-}
-
-static int virtio_snd_device_post_load(void *opaque, int version_id)
-{
-    VirtIOSound *s = opaque;
-    uint32_t i;
-
-    for (i = 0; i < s->snd_conf.streams; ++i) {
-        VirtIOSoundPCMStream *stream = s->pcm_items[i].stream;
-        if (stream) {
-            WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-                if (stream->active) {
-                    if (stream->is_output) {
-                        audio_be_set_active_out(stream->s->audio_be,
-                                                stream->voice.out, 1);
-                    } else {
-                        audio_be_set_active_in(stream->s->audio_be,
-                                               stream->voice.in, 1);
-                    }
-                }
-            }
-        }
-    }
-
-    return 0;
-}
-
 static const VMStateDescription vmstate_VirtIOSoundPCMItem = {
-    .name = "VirtIOSoundPCMItem",
+    .name = "vmstate_VirtIOSoundPCMItem",
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (const VMStateField[]) {
         VMSTATE_STRUCT(params, VirtIOSoundPCMItem, 1,
                        vmstate_VirtIOPcmParams, VirtIOPcmParams),
         /*
-         * NOTE: the `stream` field is not saved/loaded here,
-         * see `vmstate_virtio_snd_device_remaining`
+         * The `stream` field is handled in `vmstate_virtio_snd_device_streams`
          */
         VMSTATE_END_OF_LIST()
     },
@@ -1691,8 +1872,8 @@ static const VMStateDescription vmstate_virtio_snd_device = {
                 pcm_items, VirtIOSound, snd_conf.streams,
                 vmstate_VirtIOSoundPCMItem, VirtIOSoundPCMItem),
         {
-            .name = "remaining",
-            .info = &vmstate_virtio_snd_device_remaining,
+            .name = "streams",
+            .info = &vmstate_virtio_snd_device_streams,
             .flags = VMS_SINGLE,
         },
         VMSTATE_END_OF_LIST()
@@ -1703,7 +1884,6 @@ static void virtio_snd_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
-
 
     set_bit(DEVICE_CATEGORY_SOUND, dc->categories);
     device_class_set_props(dc, virtio_snd_properties);

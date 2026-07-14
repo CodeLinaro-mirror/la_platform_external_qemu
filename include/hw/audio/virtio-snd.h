@@ -16,8 +16,10 @@
 #ifndef QEMU_VIRTIO_SOUND_H
 #define QEMU_VIRTIO_SOUND_H
 
-#include "hw/virtio/virtio.h"
 #include "qemu/audio.h"
+#include "qemu/timer.h"
+
+#include "hw/virtio/virtio.h"
 #include "standard-headers/linux/virtio_ids.h"
 #include "standard-headers/linux/virtio_snd.h"
 
@@ -75,56 +77,11 @@ typedef struct VirtIOPcmParams VirtIOPcmParams;
 
 typedef struct VirtIOSoundPCMStream VirtIOSoundPCMStream;
 
-typedef struct virtio_snd_ctrl_command virtio_snd_ctrl_command;
-
-typedef struct VirtIOSoundPCMBuffer VirtIOSoundPCMBuffer;
-
-typedef QSIMPLEQ_HEAD(VirtIOSoundPCMBufferQueue, VirtIOSoundPCMBuffer)
-        VirtIOSoundPCMBufferQueue;
-
 typedef struct VirtIOSoundPCMItem VirtIOSoundPCMItem;
 
-/*
- * The VirtIO sound spec reuses layouts and values from the High Definition
- * Audio spec (virtio/v1.2: 5.14 Sound Device). This struct handles each I/O
- * message's buffer (virtio/v1.2: 5.14.6.8 PCM I/O Messages).
- *
- * In the case of TX (i.e. playback) buffers, we defer reading the raw PCM data
- * from the virtqueue until QEMU's sound backsystem calls the output callback.
- * This is tracked by the `bool populated;` field, which is set to true when
- * data has been read into our own buffer for consumption.
- *
- * VirtIOSoundPCMBuffer has a dynamic size since it includes the raw PCM data
- * in its allocation. It must be initialized and destroyed as follows:
- *
- *   size_t size = [[derived from owned VQ element descriptor sizes]];
- *   buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
- *   buffer->elem = [[owned VQ element]];
- *
- *   [..]
- *
- *   g_free(buffer->elem);
- *   g_free(buffer);
- */
-struct VirtIOSoundPCMBuffer {
-    QSIMPLEQ_ENTRY(VirtIOSoundPCMBuffer) entry;
-    VirtQueueElement *elem;
-    VirtQueue *vq;
-    size_t size;
-    /*
-     * In TX / Plaback, `offset` represents the first unused position inside
-     * `data`. If `offset == size` then there are no unused data left.
-     */
-    uint64_t offset;
-    /* Used for the TX queue for lazy I/O copy from `elem` */
-    bool populated;
-    /*
-     * VirtIOSoundPCMBuffer is an unsized type because it ends with an array of
-     * bytes. The size of `data` is determined from the I/O message's read-only
-     * or write-only size when allocating VirtIOSoundPCMBuffer.
-     */
-    uint8_t data[];
-};
+typedef struct VirtIOSoundVqElems VirtIOSoundVqElems;
+
+typedef struct VirtIOSoundPcmRingBuf VirtIOSoundPcmRingBuf;
 
 struct VirtIOPcmParams {
     uint32_t buffer_bytes;
@@ -135,33 +92,54 @@ struct VirtIOPcmParams {
     uint8_t rate;
 };
 
+struct VirtIOSoundVqElems {
+    VirtQueueElement **data;
+    uint16_t capacity;
+    uint16_t size;
+    uint16_t producer_pos;
+    uint16_t consumer_pos;
+};
+
+struct VirtIOSoundPcmRingBuf {
+    uint8_t *data;
+    uint32_t capacity;
+    uint32_t size;
+    uint32_t producer_pos;
+    uint32_t consumer_pos;
+};
+
 struct VirtIOSoundPCMStream {
     VirtIOSound *s;
     union {
         SWVoiceIn *in;
         SWVoiceOut *out;
-        void *raw;  /* to check if the voice (`in` or `out`) is set */
+        void *raw;
     } voice;
+    void *silence_buf;  /* params.period_bytes of silence */
+    VirtIOSoundPcmRingBuf pcm;
+    QEMUTimer period_timer;
+    uint32_t period_us;
+    bool is_output;
     QemuMutex mtx;
 
     /* All the fields below are migratable. */
-    VirtIOPcmParams effective_params; /* latched by PCM_PREPARE */
-    VirtIOSoundPCMBufferQueue queue;
-    uint32_t id;
-    bool is_output;
-    bool active;
-    uint32_t latency_bytes;
+    VirtIOPcmParams params;
+    VirtIOSoundVqElems vqelems;
+    uint64_t next_period_us;
+    uint16_t num_missed_periods;
 };
 
 struct VirtIOSoundPCMItem {
     /*
-     * PCM parameters are a separate field instead of a VirtIOSoundPCMStream
-     * field, because the operation of PCM control requests is first
-     * VIRTIO_SND_R_PCM_SET_PARAMS and then VIRTIO_SND_R_PCM_PREPARE; this
-     * means that some times we get parameters without having an allocated
-     * stream yet.
+     * Set by VIRTIO_SND_R_PCM_SET_PARAMS.
+     * The `stream` is not required to be populated.
      */
     VirtIOPcmParams params;
+
+    /*
+     * Created by *_PREPARE and destroyed by *_RELEASE.
+     * Must be populated for *_START and *_STOP.
+     */
     VirtIOSoundPCMStream *stream;
 };
 
