@@ -47,6 +47,7 @@
 #include <QTabletEvent>
 #include <QWidget>
 
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -459,6 +460,7 @@ private:
     std::unique_ptr<SharedMemoryRenderer> mSharedMemoryRenderer;
     std::unique_ptr<SharedStreamEmulator> mStreamer;
     StreamTransport mTransportType = StreamTransport::MMAP;
+    std::atomic<uint32_t> mActiveDisplayId{0};
 
     static const std::string_view kRemoteDownloadsDir;
     static const std::string_view kRemoteDownloadsDirApi10;
