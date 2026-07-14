@@ -142,7 +142,9 @@ struct VirtIOSoundPCMStream {
         SWVoiceOut *out;
         void *raw;  /* to check if the voice (`in` or `out`) is set */
     } voice;
-    QemuMutex queue_mutex;
+    QemuMutex mtx;
+
+    /* All the fields below are migratable. */
     VirtIOSoundPCMBufferQueue queue;
     audsettings as;
     uint32_t id;
@@ -150,7 +152,6 @@ struct VirtIOSoundPCMStream {
     uint8_t hw_format;      /* from virtio_snd_pcm_set_params */
     bool is_output;
     bool active;
-    bool flushing;
     uint32_t latency_bytes;
 };
 
