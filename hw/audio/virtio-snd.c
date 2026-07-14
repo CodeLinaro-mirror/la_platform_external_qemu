@@ -406,18 +406,19 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
 }
 
 /*
- * Initializes the voice field in VirtIOSoundPCMStream. It assumes
- * that the `s` (the VirtIOSound pointer) and `as` (audsettings)
- * are already initilized.
+ * Initializes the voice field in VirtIOSoundPCMStream and sets
+ * the audsettings in the channel.
  *
  * @stream: VirtIOSoundPCMStream *stream
+ * @as: audsettings *as
  */
-static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream)
+static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream,
+                                         audsettings *as)
 {
     g_assert(stream->s);
     g_assert(stream->s->audio_be);
-    g_assert(stream->as.freq > 0);
-    g_assert(stream->as.nchannels > 0);
+    g_assert(as->freq > 0);
+    g_assert(as->nchannels > 0);
 
     if (stream->is_output) {
         stream->voice.out = audio_be_open_out(stream->s->audio_be,
@@ -425,7 +426,7 @@ static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream)
                                          "virtio-sound.out",
                                          stream,
                                          virtio_snd_pcm_out_cb,
-                                         &stream->as);
+                                         as);
         audio_be_set_volume_out_lr(stream->s->audio_be, stream->voice.out, 0, 255, 255);
     } else {
         stream->voice.in = audio_be_open_in(stream->s->audio_be,
@@ -433,9 +434,36 @@ static void virtio_snd_init_stream_voice(VirtIOSoundPCMStream *stream)
                                         "virtio-sound.in",
                                         stream,
                                         virtio_snd_pcm_in_cb,
-                                        &stream->as);
+                                        as);
         audio_be_set_volume_in_lr(stream->s->audio_be, stream->voice.in, 0, 255, 255);
     }
+
+    stream->as = *as;
+}
+
+/*
+ * Closes the voice field in VirtIOSoundPCMStream and clears
+ * `stream->as.nchannels` to mark that there is no voice on
+ * the channel (e.g. when a stream is loaded from a snapshot).
+ *
+ * @stream: VirtIOSoundPCMStream *stream
+ */
+static void virtio_snd_close_stream_voice(VirtIOSoundPCMStream *stream) {
+    g_assert(stream);
+
+    if (stream->voice.raw) {
+        g_assert(stream->as.nchannels);
+
+        if (stream->is_output) {
+            audio_be_close_out(stream->s->audio_be, stream->voice.out);
+        } else {
+            audio_be_close_in(stream->s->audio_be, stream->voice.in);
+        }
+
+        stream->voice.raw = NULL;
+    }
+
+    stream->as.nchannels = 0;
 }
 
 /*
@@ -449,16 +477,7 @@ static void virtio_snd_destroy_stream(VirtIOSoundPCMStream *stream)
     g_assert(stream);
 
     virtio_snd_pcm_flush(stream);
-    if (stream->is_output) {
-        if (stream->voice.out) {
-            audio_be_close_out(stream->s->audio_be, stream->voice.out);
-        }
-    } else {
-        if (stream->voice.in) {
-            audio_be_close_in(stream->s->audio_be, stream->voice.in);
-        }
-    }
-
+    virtio_snd_close_stream_voice(stream);
     qemu_mutex_destroy(&stream->queue_mutex);
     g_free(stream);
 }
@@ -492,11 +511,10 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
     }
 
     virtio_snd_get_qemu_audsettings(&as, params);
-    stream->as = as;
     stream->period_bytes = params->period_bytes;
     stream->hw_format = params->format;
 
-    virtio_snd_init_stream_voice(stream);
+    virtio_snd_init_stream_voice(stream, &as);
 
     return cpu_to_le32(VIRTIO_SND_S_OK);
 }
@@ -1465,10 +1483,11 @@ static VirtIOSoundPCMStream
         return NULL;
     }
 
-    stream->as.fmt = virtio_snd_get_qemu_format(stream->hw_format);
-    stream->as.big_endian = false;
-
-    virtio_snd_init_stream_voice(stream);
+    if (stream->as.nchannels) {
+        stream->as.fmt = virtio_snd_get_qemu_format(stream->hw_format);
+        stream->as.big_endian = false;
+        virtio_snd_init_stream_voice(stream, &stream->as);
+    }
 
     return stream;
 }
