@@ -195,6 +195,9 @@ OPT_PARAM( nand_limits, "<nlimits>", "enforce NAND/Flash read/write thresholds" 
 #endif
 
 OPT_PARAM( gpu, "<mode>", "set hardware GPU mode" )
+OPT_PARAM( vulkan_validation, "<mode>", "Vulkan validation mode (off|print|fail|crash)" )
+OPT_PARAM( vulkan_validation_include_filter, "<filters>", "Comma-separated list of app/engine filters to include for Vulkan validation" )
+OPT_PARAM( vulkan_validation_exclude_filter, "<filters>", "Comma-separated list of app/engine filters to exclude for Vulkan validation" )
 
 OPT_PARAM( vsync_rate, "<rate>", "set the vsync rate (refresh rate) in Hz for the guest display" )
 

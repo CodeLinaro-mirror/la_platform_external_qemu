@@ -12,6 +12,7 @@
 
 #include "host-common/opengles.h"
 #include "android/opengles-overrides.h"
+#include "android/cmdline-definitions.h"
 
 #include "aemu/base/CpuUsage.h"
 #include "aemu/base/async/ThreadLooper.h"
@@ -476,6 +477,38 @@ static int startOpenglesRendererImpl(
     }
 
     gfxstreamFeatures.EglOnEgl.setEnabled(sEgl2egl);
+
+    const AndroidOptions* opts = getConsoleAgents() ? getConsoleAgents()->settings->android_cmdLineOptions() : nullptr;
+    if (opts) {
+        if (opts->vulkan_validation) {
+            if (!gfxstreamFeatures.VulkanValidation.parseValue(opts->vulkan_validation)) {
+                derror("Could not set VulkanValidation to '%s'", opts->vulkan_validation);
+            } else {
+                absl::StrAppend(&reportGfxstreamFeatures, gfxstreamFeatures.VulkanValidation.getName(), "=", opts->vulkan_validation, ", ");
+            }
+            if (strcmp(opts->vulkan_validation, "off") != 0) {
+                if (!gfxstreamFeatures.VulkanDebugUtils.enabled()) {
+                    gfxstreamFeatures.VulkanDebugUtils.setEnabled(true);
+                    absl::StrAppend(&reportGfxstreamFeatures, gfxstreamFeatures.VulkanDebugUtils.getName(), ", ");
+                }
+            }
+        }
+        if (opts->vulkan_validation_include_filter) {
+            if (!gfxstreamFeatures.VulkanValidationIncludeFilter.parseValue(opts->vulkan_validation_include_filter)) {
+                derror("Could not set VulkanValidationIncludeFilter to '%s'", opts->vulkan_validation_include_filter);
+            } else {
+                absl::StrAppend(&reportGfxstreamFeatures, gfxstreamFeatures.VulkanValidationIncludeFilter.getName(), "=", opts->vulkan_validation_include_filter, ", ");
+            }
+        }
+        if (opts->vulkan_validation_exclude_filter) {
+            if (!gfxstreamFeatures.VulkanValidationExcludeFilter.parseValue(opts->vulkan_validation_exclude_filter)) {
+                derror("Could not set VulkanValidationExcludeFilter to '%s'", opts->vulkan_validation_exclude_filter);
+            } else {
+                absl::StrAppend(&reportGfxstreamFeatures, gfxstreamFeatures.VulkanValidationExcludeFilter.getName(), "=", opts->vulkan_validation_exclude_filter, ", ");
+            }
+        }
+    }
+
     crashhandler_add_string("gfxstream_features", reportGfxstreamFeatures.c_str());
 
     sRenderLib->setSyncDevice(
