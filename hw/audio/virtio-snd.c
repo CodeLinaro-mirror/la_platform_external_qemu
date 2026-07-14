@@ -583,10 +583,14 @@ static uint32_t virtio_snd_handle_pcm_prepare(VirtIOSound *s,
                                &stream_id,
                                sizeof(stream_id));
 
-    stream_id = le32_to_cpu(stream_id);
-    return (msg_sz == sizeof(stream_id))
-                   ? virtio_snd_pcm_prepare(s, stream_id)
-                   : VIRTIO_SND_S_BAD_MSG;
+    if (msg_sz != sizeof(stream_id)) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "%s: virtio-snd command size incorrect %zu vs \
+                %zu\n", __func__, msg_sz, sizeof(stream_id));
+        return VIRTIO_SND_S_BAD_MSG;
+    }
+
+    return virtio_snd_pcm_prepare(s, le32_to_cpu(stream_id));
 }
 
 /*
