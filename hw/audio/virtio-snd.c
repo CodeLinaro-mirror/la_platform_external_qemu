@@ -231,6 +231,99 @@ static void virtio_snd_handle_pcm_info(VirtIOSound *s,
 }
 
 /*
+ * Get a QEMU Audiosystem compatible format value from a VIRTIO_SND_PCM_FMT_*
+ */
+static int virtio_snd_get_qemu_format(AudioFormat *dst, uint32_t format)
+{
+    #define CASE(FMT)               \
+    case VIRTIO_SND_PCM_FMT_##FMT:  \
+        *dst = AUDIO_FORMAT_##FMT;  \
+        return 0;                   \
+
+    switch (format) {
+    CASE(U8)
+    CASE(S8)
+    CASE(U16)
+    CASE(S16)
+    CASE(U32)
+    CASE(S32)
+    case VIRTIO_SND_PCM_FMT_FLOAT:
+        *dst = AUDIO_FORMAT_F32;
+        return 0;
+
+    default:
+        return -1;
+    }
+
+    #undef CASE
+}
+
+/*
+ * Get a QEMU Audiosystem compatible frequency value from a
+ * VIRTIO_SND_PCM_RATE_*
+ */
+static int32_t virtio_snd_get_qemu_freq(uint32_t rate)
+{
+    #define CASE(RATE)               \
+    case VIRTIO_SND_PCM_RATE_##RATE: \
+        return RATE;
+
+    switch (rate) {
+    CASE(5512)
+    CASE(8000)
+    CASE(11025)
+    CASE(16000)
+    CASE(22050)
+    CASE(32000)
+    CASE(44100)
+    CASE(48000)
+    CASE(64000)
+    CASE(88200)
+    CASE(96000)
+    CASE(176400)
+    CASE(192000)
+    CASE(384000)
+    default:
+        return -1;
+    }
+
+    #undef CASE
+}
+
+/*
+ * Get QEMU Audiosystem compatible audsettings from virtio based pcm stream
+ * params.
+ */
+static int virtio_snd_get_qemu_audsettings(audsettings *as,
+                                           uint8_t channels,
+                                           uint8_t format,
+                                           uint8_t rate)
+{
+    int freq;
+
+    if ((channels < 1) || (channels > AUDIO_MAX_CHANNELS)) {
+        error_report("Invalid number of channels: %"PRIu8, channels);
+        return -1;
+    }
+    as->nchannels = channels;
+
+    if (virtio_snd_get_qemu_format(&as->fmt, format)) {
+        error_report("Unsupported format: %"PRIu8, format);
+        return -1;
+    }
+
+    freq = virtio_snd_get_qemu_freq(rate);
+    if (freq <= 0) {
+        error_report("Unsupported rate: %"PRIu8, rate);
+        return -1;
+    }
+    as->freq = freq;
+
+    as->big_endian = false; /* Conforming to VIRTIO 1.0: always little endian. */
+    return 0;
+}
+
+/*
  * Set the given stream params.
  * Called by both virtio_snd_handle_pcm_set_params and during device
  * initialization.
@@ -244,6 +337,7 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
                                    uint32_t stream_id,
                                    virtio_snd_pcm_set_params *params)
 {
+    audsettings as_ignored;
     VirtIOPcmParams *st_params;
 
     if (stream_id >= s->snd_conf.streams || s->pcm_items == NULL) {
@@ -251,22 +345,12 @@ uint32_t virtio_snd_set_pcm_params(VirtIOSound *s,
         return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
     }
 
-    st_params = virtio_snd_pcm_get_params(s, stream_id);
+    if (virtio_snd_get_qemu_audsettings(
+            &as_ignored, params->channels, params->format, params->rate)) {
+        return cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
+    }
 
-    if (params->channels < 1 || params->channels > AUDIO_MAX_CHANNELS) {
-        error_report("Number of channels is not supported.");
-        return cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
-    }
-    if (params->format >= sizeof(supported_formats) * BITS_PER_BYTE ||
-        !(supported_formats & BIT(params->format))) {
-        error_report("Stream format is not supported.");
-        return cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
-    }
-    if (params->rate >= sizeof(supported_rates) * BITS_PER_BYTE ||
-        !(supported_rates & BIT(params->rate))) {
-        error_report("Stream rate is not supported.");
-        return cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
-    }
+    st_params = virtio_snd_pcm_get_params(s, stream_id);
 
     st_params->buffer_bytes = le32_to_cpu(params->buffer_bytes);
     st_params->period_bytes = le32_to_cpu(params->period_bytes);
@@ -309,76 +393,6 @@ static void virtio_snd_handle_pcm_set_params(VirtIOSound *s,
 }
 
 /*
- * Get a QEMU Audiosystem compatible format value from a VIRTIO_SND_PCM_FMT_*
- */
-static AudioFormat virtio_snd_get_qemu_format(uint32_t format)
-{
-    #define CASE(FMT)               \
-    case VIRTIO_SND_PCM_FMT_##FMT:  \
-        return AUDIO_FORMAT_##FMT;
-
-    switch (format) {
-    CASE(U8)
-    CASE(S8)
-    CASE(U16)
-    CASE(S16)
-    CASE(U32)
-    CASE(S32)
-    case VIRTIO_SND_PCM_FMT_FLOAT:
-        return AUDIO_FORMAT_F32;
-    default:
-        g_assert_not_reached();
-    }
-
-    #undef CASE
-}
-
-/*
- * Get a QEMU Audiosystem compatible frequency value from a
- * VIRTIO_SND_PCM_RATE_*
- */
-static uint32_t virtio_snd_get_qemu_freq(uint32_t rate)
-{
-    #define CASE(RATE)               \
-    case VIRTIO_SND_PCM_RATE_##RATE: \
-        return RATE;
-
-    switch (rate) {
-    CASE(5512)
-    CASE(8000)
-    CASE(11025)
-    CASE(16000)
-    CASE(22050)
-    CASE(32000)
-    CASE(44100)
-    CASE(48000)
-    CASE(64000)
-    CASE(88200)
-    CASE(96000)
-    CASE(176400)
-    CASE(192000)
-    CASE(384000)
-    default:
-        g_assert_not_reached();
-    }
-
-    #undef CASE
-}
-
-/*
- * Get QEMU Audiosystem compatible audsettings from virtio based pcm stream
- * params.
- */
-static void virtio_snd_get_qemu_audsettings(audsettings *as,
-                                            VirtIOPcmParams *params)
-{
-    as->nchannels = MIN(AUDIO_MAX_CHANNELS, params->channels);
-    as->fmt = virtio_snd_get_qemu_format(params->format);
-    as->freq = virtio_snd_get_qemu_freq(params->rate);
-    as->big_endian = false; /* Conforming to VIRTIO 1.0: always little endian. */
-}
-
-/*
  * Creates a new blank stream with a reference to VirtIOSound.
  *
  * NOTE: the id field is zero and must be set outside.
@@ -412,9 +426,11 @@ static VirtIOSoundPCMStream *virtio_snd_create_new_stream(VirtIOSound *s,
  * @stream: VirtIOSoundPCMStream *stream
  * @as: audsettings *as
  */
-static void virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
-                                                audsettings *as)
+static int virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
+                                               audsettings *as)
 {
+    g_assert(stream);
+    g_assert(as);
     g_assert(stream->s);
     g_assert(stream->s->audio_be);
     g_assert(as->freq > 0);
@@ -427,6 +443,10 @@ static void virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
                                          stream,
                                          virtio_snd_pcm_out_cb,
                                          as);
+        if (!stream->voice.out) {
+            return -1;
+        }
+
         audio_be_set_volume_out_lr(stream->s->audio_be, stream->voice.out, 0, 255, 255);
     } else {
         stream->voice.in = audio_be_open_in(stream->s->audio_be,
@@ -435,10 +455,15 @@ static void virtio_snd_init_stream_voice_locked(VirtIOSoundPCMStream *stream,
                                         stream,
                                         virtio_snd_pcm_in_cb,
                                         as);
+        if (!stream->voice.in) {
+            return -1;
+        }
+
         audio_be_set_volume_in_lr(stream->s->audio_be, stream->voice.in, 0, 255, 255);
     }
 
     stream->as = *as;
+    return 0;
 }
 
 /*
@@ -492,7 +517,6 @@ static void virtio_snd_destroy_stream(VirtIOSoundPCMStream *stream)
  */
 static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
 {
-    audsettings as;
     VirtIOPcmParams *params;
     VirtIOSoundPCMStream *stream;
 
@@ -512,12 +536,19 @@ static uint32_t virtio_snd_pcm_prepare(VirtIOSound *s, uint32_t stream_id)
     }
 
     WITH_QEMU_LOCK_GUARD(&stream->mtx) {
-        virtio_snd_get_qemu_audsettings(&as, params);
+        audsettings as;
+
+        if (virtio_snd_get_qemu_audsettings(
+                &as, params->channels, params->format, params->rate)) {
+            return cpu_to_le32(VIRTIO_SND_S_NOT_SUPP);
+        }
+
+        if (virtio_snd_init_stream_voice_locked(stream, &as)) {
+            return cpu_to_le32(VIRTIO_SND_S_BAD_MSG);
+        }
 
         stream->period_bytes = params->period_bytes;
         stream->hw_format = params->format;
-
-        virtio_snd_init_stream_voice_locked(stream, &as);
     }
 
     return cpu_to_le32(VIRTIO_SND_S_OK);
@@ -1486,7 +1517,7 @@ static VirtIOSoundPCMStream
     }
 
     if (stream->as.nchannels) {
-        stream->as.fmt = virtio_snd_get_qemu_format(stream->hw_format);
+        virtio_snd_get_qemu_format(&stream->as.fmt, stream->hw_format);
         stream->as.big_endian = false;
         virtio_snd_init_stream_voice_locked(stream, &stream->as);
     }
