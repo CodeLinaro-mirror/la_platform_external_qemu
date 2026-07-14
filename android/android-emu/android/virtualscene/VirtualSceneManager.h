@@ -139,6 +139,10 @@ public:
     // Returns false on error.
     static bool reloadEnvironment(const char* environmentData);
 
+    // Called when the GPS location has changed. If the current scene mode is
+    // StreetView, reloads the environment to update the StreetView image.
+    static void onLocationChanged();
+
     static void getEnvironment(void* context, KeyValueCallback callback);
 
     // Returns the rotation amount needed to display the scene upright.

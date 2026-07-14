@@ -2036,6 +2036,14 @@ QMenu* ToolWindow::createEnvironmentMenu() {
     envMenu->addAction(tr("Custom 360 Image..."), this,
                        SLOT(custom360ImageSelected()));
 
+    // Check if the streetview feature is enabled:
+    const std::string streetViewFeatureVar = System::get()->envGet("ANDROID_EMU_ENABLE_STREETVIEW");
+    const bool streetViewEnabled = (streetViewFeatureVar == "1");
+    if (streetViewEnabled) {
+        envMenu->addAction(tr("Street View"), this,
+                           SLOT(streetViewSelected()));
+    }
+
     QMenu* webcamMenu = new QMenu(tr("Webcams"), this);
     const QAndroidVirtualSceneAgent* agent = getConsoleAgents()->virtual_scene;
     if (agent && agent->enumerateWebcams &&
@@ -2106,6 +2114,11 @@ void ToolWindow::custom360ImageSelected() {
         std::string command = "scene.mode = image360:" + fileName.toStdString();
         getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
     }
+}
+
+void ToolWindow::streetViewSelected() {
+    std::string command = "scene.mode = streetview";
+    getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
 }
 
 void ToolWindow::webcamSelected(const std::string& id) {

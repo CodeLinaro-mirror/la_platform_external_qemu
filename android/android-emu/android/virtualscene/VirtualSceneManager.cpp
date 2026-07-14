@@ -25,6 +25,7 @@
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/cmdline-option.h"
 #include "android/console.h"
+#include "android/gps.h"
 #include "android/skin/winsys.h"
 #include "android/utils/debug.h"
 #include "host-common/FeatureControl.h"
@@ -497,6 +498,9 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
         }
     }
 
+    android_gps_register_location_callback(
+            []() { VirtualSceneManager::onLocationChanged(); });
+
     return true;
 }
 
@@ -505,6 +509,7 @@ void VirtualSceneManager::uninitialize() {
 
     // Running the callbacks is no longer safe and necessary, reset it
     VirtualSceneManager::setSceneControlsChangeCallback(nullptr);
+    android_gps_register_location_callback(nullptr);
 
     // TODO(virtualscene): stop background update service before calling this
     // function
@@ -745,8 +750,8 @@ void VirtualSceneManager::removeSceneUser() {
         // Allow scene to unload resources when there are no users of it
         ver_scene_unload_user_resources(mEnvironmentScene);
 
-        // Call UI functions inside the lock to avoid unexpected parallel executions
-        // due to frequent add/remove user cases
+        // Call UI functions inside the lock to avoid unexpected parallel
+        // executions due to frequent add/remove user cases
         onSceneControlsChanged(false);
 
         lock.unlock();
@@ -802,12 +807,15 @@ bool VirtualSceneManager::reloadScene(const VerSceneConfig& config) {
     {
         AutoLock lock(mLock);
 
-        // Only reload if the config has changed
+        // Only reload if the config has changed or its contents are dynamic
         const VerSceneConfig* existingConfig =
                 ver_scene_get_config(mEnvironmentScene);
-        if (mEnvironmentScene && existingConfig && *existingConfig == config) {
-            D("%s: no changes to the scene config.", __func__);
-            return true;
+        if (!VerSceneConfig::modeHasDynamicContents(config.mSceneMode)) {
+            if (mEnvironmentScene && existingConfig &&
+                *existingConfig == config) {
+                D("%s: no changes to the scene config.", __func__);
+                return true;
+            }
         }
 
         D("%s: Reloading with mode:%s, argument:%s", __func__,
@@ -936,6 +944,33 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
           envConfig.sceneArgument.c_str());
 
     return true;
+}
+
+void VirtualSceneManager::onLocationChanged() {
+    VerSceneConfig config(VerSceneConfig::Mode::Unknown, "");
+    bool isStreetView = false;
+    {
+        AutoLock lock(mLock);
+        // TODO(virtualscene): scene should still be invalidated when there are
+        // no users to avoid cached scene being shown when new users are added.
+        if (mNumUsers == 0 || mEnvironmentScene == VER_INVALID_HANDLE) {
+            return;
+        }
+        const VerSceneConfig* existingConfig =
+                ver_scene_get_config(mEnvironmentScene);
+        if (existingConfig &&
+            existingConfig->mSceneMode == VerSceneConfig::Mode::StreetView) {
+            isStreetView = true;
+            config = *existingConfig;
+        }
+    }
+    if (isStreetView) {
+        // TODO(virtualscene): this or the download of the images for
+        // streeetview mode should be reloaded on a background thread, to avoid
+        // blocking the UI threads
+        D("%s: Reloading StreetView scene for updated location", __func__);
+        reloadScene(config);
+    }
 }
 
 void VirtualSceneManager::getEnvironment(void* context,

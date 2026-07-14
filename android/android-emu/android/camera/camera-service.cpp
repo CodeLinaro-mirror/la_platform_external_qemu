@@ -481,7 +481,6 @@ struct CameraService {
             return !strncmp(name, kImage360CamPrefix, kImage360CamPrefixSize);
         };
 
-
         static auto getCameraFilename =
                 [](const char* name,
                    const std::size_t prefixSize) -> const char* {
@@ -716,6 +715,9 @@ private:
                 break;
             case kImage360:
                 device_name = "image360";
+                break;
+            case kStreetView:
+                device_name = "streetview";
                 break;
             default: {
                 derror("%s: unknown camera source type", __func__);

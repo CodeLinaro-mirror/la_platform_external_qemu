@@ -374,6 +374,7 @@ private slots:
     void customImageSelected();
     void customVideoSelected();
     void custom360ImageSelected();
+    void streetViewSelected();
     void webcamSelected(const std::string& id);
     void on_glasses_button_pressed();
     void on_glasses_button_released();

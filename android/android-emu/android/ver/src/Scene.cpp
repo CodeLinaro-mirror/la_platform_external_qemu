@@ -16,13 +16,25 @@
 
 #include "Scene.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <memory>
 
-#include "absl/status/status.h"
-#include "absl/strings/str_format.h"
+// TODO(virtualscene): provide gps settings via VirtualSceneManager and
+//  avoid adding gps dependencies to VER library.
+#include "aemu/base/files/PathUtils.h"
+#include "aemu/base/files/ScopedStdioFile.h"
+#include "aemu/base/misc/StringUtils.h"
 #include "android/base/system/System.h"
+#include "android/gps.h"
+#include "android/location/MapsKey.h"
+#include "android/utils/file_io.h"
+
+using android::base::PathUtils;
+using android::base::ScopedStdioFile;
+
 #include "raw_image_sources/image_file/raw_image_file_source.h"
 #include "raw_image_sources/raw_image_source.h"
 #include "raw_image_sources/video_file/raw_video_file_source.h"
@@ -30,9 +42,11 @@
 
 #include "MeshSceneObject.h"
 #include "Renderer.h"
+#include "StreetViewUtils.h"
 #include "TextureUtils.h"
 
 using namespace android::base;
+using android::ver::StreetViewUtils;
 namespace fs = std::filesystem;
 
 #define E(...) derror(__VA_ARGS__)
@@ -46,7 +60,7 @@ std::string resolveSceneFilename(const std::string& sceneFilename,
                                  const std::vector<fs::path>& basePaths) {
     // Check if it's a fullpath
     fs::path inputPath(sceneFilename);
-    if (fs::exists(inputPath)) {
+    if (inputPath.is_absolute() && fs::exists(inputPath)) {
         return inputPath.string();
     }
 
@@ -54,8 +68,12 @@ std::string resolveSceneFilename(const std::string& sceneFilename,
     for (const fs::path& basePath : basePaths) {
         fs::path searchPath = fs::path(basePath) / inputPath;
         if (fs::exists(searchPath)) {
-            return searchPath.string();
+            return fs::absolute(searchPath).string();
         }
+    }
+
+    if (fs::exists(inputPath)) {
+        return fs::absolute(inputPath).string();
     }
 
     dwarning("Could not resolve environment scene filename '%s'",
@@ -107,8 +125,9 @@ std::unique_ptr<Scene> Scene::create(
 bool Scene::configArgumentFileExists(
         const SceneConfig& config,
         const std::vector<fs::path>& resourceBasePaths) {
-    if (config.mSceneMode == SceneConfig::Mode::Color) {
-        // Argument is not a file
+    if (config.mSceneMode == SceneConfig::Mode::Color ||
+        config.mSceneMode == SceneConfig::Mode::StreetView) {
+        // Argument is not a file, or resolved dynamically
         return true;
     }
     if (config.mSceneMode == SceneConfig::Mode::Webcam) {
@@ -134,13 +153,130 @@ bool Scene::initialize() {
     // to avoid or handle this case earlier.
     std::string sceneFilename;
     if (sceneMode != SceneConfig::Mode::Color &&
-        sceneMode != SceneConfig::Mode::Webcam) {
+        sceneMode != SceneConfig::Mode::Webcam &&
+        sceneMode != SceneConfig::Mode::StreetView) {
         sceneFilename =
                 resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
         if (sceneFilename.empty()) {
             derror("%s: Invalid scene argument: %s", __func__,
                    mConfig.mArgument.c_str());
             return false;
+        }
+    } else if (sceneMode == SceneConfig::Mode::StreetView) {
+        // Check if the feature is enabled:
+        const std::string streetViewFeatureVar =
+                System::get()->envGet("ANDROID_EMU_ENABLE_STREETVIEW");
+        const bool streetViewEnabled = (streetViewFeatureVar == "1");
+        if (!streetViewEnabled) {
+            derror("StreetView: feature is not enabled.");
+            return false;
+        }
+
+        std::string envImage =
+                System::get()->envGet("ANDROID_EMU_STREETVIEW_IMAGE_PATH");
+        if (!envImage.empty()) {
+            // For tests, a local test image will be provided via env variable
+            std::string filename =
+                    resolveSceneFilename(envImage, mResourceBasePaths);
+            if (!filename.empty()) {
+                dprint("StreetView: using environment variable image: %s -> %s",
+                       envImage.c_str(), filename.c_str());
+                mStreetViewImageResult = TextureUtils::load(
+                        filename.c_str(), TextureUtils::Orientation::OpenGL);
+            } else {
+                dwarning(
+                        "StreetView: environment variable specified '%s' but could not resolve file",
+                        envImage.c_str());
+            }
+        }
+
+        if (!mStreetViewImageResult) {
+            // Try downloading streetview image with Maps API
+            double latitude = 51.4816;
+            double longitude = 0;
+            double metersElevation = 0;
+            double velocityKnots = 0;
+            double heading = 0;
+            int nSatellites = 0;
+
+            if (android_gps_get_location(&latitude, &longitude,
+                                         &metersElevation, &velocityKnots,
+                                         &heading, &nSatellites) == 0) {
+                dprint("StreetView: using current GPS location: lat=%f, lon=%f",
+                       latitude, longitude);
+            } else {
+                dprint("StreetView: could not get current GPS location, using defaults");
+            }
+
+            auto mapsKeyHolder = android::location::MapsKey::get();
+            const char* rawMapsKey =
+                    mapsKeyHolder ? mapsKeyHolder->userMapsKey() : nullptr;
+            if (!rawMapsKey || strlen(rawMapsKey) == 0) {
+                rawMapsKey = mapsKeyHolder
+                                     ? mapsKeyHolder->androidStudioMapsKey()
+                                     : nullptr;
+            }
+
+            std::string mapsKey =
+                    rawMapsKey ? android::base::trim(rawMapsKey) : "";
+
+            // 1. Try to fetch and stitch 360 tiles via Map Tiles API
+            mStreetViewImageResult = StreetViewUtils::fetch360Panorama(
+                    latitude, longitude, mapsKey);
+
+            // 2. Fall back to static Street View request if tile stitching
+            // failed
+            if (!mStreetViewImageResult) {
+                dprint("StreetView: tile stitching unavailable, falling back to static request");
+                mStreetViewImageResult = StreetViewUtils::downloadStaticImage(
+                        latitude, longitude, mapsKey);
+            }
+
+            // 3. Fall back to default local file if network downloads failed
+            if (!mStreetViewImageResult) {
+                std::string filename = resolveSceneFilename(
+                        SceneConfig::defaultArgumentForMode(
+                                SceneConfig::Mode::StreetView),
+                        mResourceBasePaths);
+                if (!filename.empty()) {
+                    dprint("StreetView: falling back to %s: %s",
+                           SceneConfig::defaultArgumentForMode(
+                                   SceneConfig::Mode::StreetView),
+                           filename.c_str());
+                    mStreetViewImageResult = TextureUtils::load(
+                            filename.c_str(),
+                            TextureUtils::Orientation::OpenGL);
+                } else {
+                    derror("StreetView: could not find fallback file");
+                    return false;
+                }
+            }
+        }
+
+        if (!mStreetViewImageResult ||
+            mStreetViewImageResult->mBuffer.empty()) {
+            derror("StreetView: could not load streetview image");
+            return false;
+        }
+
+        if (mStreetViewImageResult->mFormat != TextureUtils::Format::RGBA32) {
+            std::vector<uint8_t> rgba(mStreetViewImageResult->mWidth *
+                                      mStreetViewImageResult->mHeight * 4);
+            size_t srcStride = (mStreetViewImageResult->mWidth * 3 + 3) / 4 * 4;
+            const uint8_t* src = mStreetViewImageResult->mBuffer.data();
+            for (uint32_t y = 0; y < mStreetViewImageResult->mHeight; ++y) {
+                const uint8_t* srcRow = src + y * srcStride;
+                uint8_t* dstRow =
+                        rgba.data() + y * mStreetViewImageResult->mWidth * 4;
+                for (uint32_t x = 0; x < mStreetViewImageResult->mWidth; ++x) {
+                    dstRow[x * 4 + 0] = srcRow[x * 3 + 0];
+                    dstRow[x * 4 + 1] = srcRow[x * 3 + 1];
+                    dstRow[x * 4 + 2] = srcRow[x * 3 + 2];
+                    dstRow[x * 4 + 3] = 255;
+                }
+            }
+            mStreetViewImageResult->mBuffer = std::move(rgba);
+            mStreetViewImageResult->mFormat = TextureUtils::Format::RGBA32;
         }
     }
 
@@ -224,6 +360,14 @@ bool Scene::initialize() {
             // image rotated 90 degrees
             mBaseRotation = 90;
         } break;
+        case SceneConfig::Mode::StreetView: {
+            if (!mStreetViewImageResult ||
+                mStreetViewImageResult->mBuffer.empty()) {
+                E("%s: Could not load StreetView image data", __func__);
+                return false;
+            }
+            mBaseRotation = 90;
+        } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
     }
@@ -275,8 +419,10 @@ bool Scene::loadRendererResources() {
 
     // Find the file, in case it's given as a local path
     std::string sceneFilename;
-    if (sceneMode != SceneConfig::Mode::Color) {
-        sceneFilename = resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
+    if (sceneMode != SceneConfig::Mode::Color &&
+        sceneMode != SceneConfig::Mode::StreetView) {
+        sceneFilename =
+                resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
         if (sceneFilename.empty()) {
             E("%s: Cannot find file '%s'", __FUNCTION__, mConfig.mArgument);
             return false;
@@ -300,6 +446,24 @@ bool Scene::loadRendererResources() {
                     MeshSceneObject::createSphere(*mRenderer);
             Texture sceneTexture =
                     mRenderer->loadTexture(sceneFilename.c_str());
+            if (sceneTexture.isValid()) {
+                photoSphereObject->setTexture(0, sceneTexture);
+                mRenderer->releaseTexture(sceneTexture);
+            }
+            mSceneObjects.push_back(std::move(photoSphereObject));
+        } break;
+        case SceneConfig::Mode::StreetView: {
+            if (!mStreetViewImageResult ||
+                mStreetViewImageResult->mBuffer.empty()) {
+                E("%s: StreetView image data is missing", __FUNCTION__);
+                return false;
+            }
+            std::unique_ptr<MeshSceneObject> photoSphereObject =
+                    MeshSceneObject::createSphere(*mRenderer);
+            Texture sceneTexture = mRenderer->createTextureRGBA(
+                    mStreetViewImageResult->mBuffer.data(),
+                    mStreetViewImageResult->mWidth,
+                    mStreetViewImageResult->mHeight);
             if (sceneTexture.isValid()) {
                 photoSphereObject->setTexture(0, sceneTexture);
                 mRenderer->releaseTexture(sceneTexture);
@@ -558,7 +722,8 @@ bool Scene::getBoundingBox(glm::vec3* outMin, glm::vec3* outMax) const {
     bool hasBounds = false;
 
     for (const auto& obj : mSceneObjects) {
-        if (!obj || !obj->isVisible()) continue;
+        if (!obj || !obj->isVisible())
+            continue;
         glm::vec3 objMin, objMax;
         if (obj->getBoundingBox(&objMin, &objMax)) {
             minP = glm::min(minP, objMin);
