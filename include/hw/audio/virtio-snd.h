@@ -145,11 +145,9 @@ struct VirtIOSoundPCMStream {
     QemuMutex mtx;
 
     /* All the fields below are migratable. */
+    VirtIOPcmParams effective_params; /* latched by PCM_PREPARE */
     VirtIOSoundPCMBufferQueue queue;
-    audsettings as;
     uint32_t id;
-    uint32_t period_bytes;  /* from virtio_snd_pcm_set_params */
-    uint8_t hw_format;      /* from virtio_snd_pcm_set_params */
     bool is_output;
     bool active;
     uint32_t latency_bytes;
