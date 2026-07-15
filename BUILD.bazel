@@ -2765,7 +2765,6 @@ cc_library(
     srcs = ["accel/accel-target.c"] + select({
         "@platforms//os:windows": [
             "accel/whpx/whpx-accel-ops.c",
-            "accel/whpx/whpx-common.c",
             "hw/i386/aehd/apic.c",
             "hw/i386/aehd/i8259.c",
             "hw/i386/aehd/ioapic.c",
