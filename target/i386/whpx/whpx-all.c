@@ -21,6 +21,7 @@
 #include "hw/core/boards.h"
 #include "hw/i386/apic_internal.h"
 #include "hw/intc/ioapic.h"
+#include "emulate/x86_flags.h"
 #include "migration/blocker.h"
 #include "qapi/error.h"
 #include "qapi/qapi-types-common.h"
@@ -172,6 +173,7 @@ struct AccelCPUState {
 
 bool whpx_allowed;
 bool whpx_irqchip_in_kernel;
+static bool whpx_in_loadvm = false;
 static bool whp_dispatch_initialized = false;
 static HMODULE hWinHvPlatform, hWinHvEmulation;
 static uint32_t max_vcpu_index;
@@ -270,6 +272,18 @@ static void whpx_set_xcrs_and_xss(CPUState* cpu) {
                                                       &reg_val);
     if (FAILED(hr)) {
         error_report("WHPX: Failed to set register IA32_XSS, hr=%08lx", hr);
+    }
+}
+
+void whpx_vcpu_kick_out_of_hlt(CPUState *cpu) {
+    WHV_REGISTER_NAME name = WHvRegisterInternalActivityState;
+    WHV_REGISTER_VALUE reg;
+    HRESULT hr = whp_dispatch.WHvGetVirtualProcessorRegisters(
+        whpx_global.partition, cpu->cpu_index, &name, 1, &reg);
+    if (SUCCEEDED(hr) && (reg.InternalActivity.StartupSuspend || reg.InternalActivity.HaltSuspend || reg.InternalActivity.IdleSuspend)) {
+        reg.InternalActivity.AsUINT64 = 0;
+        whp_dispatch.WHvSetVirtualProcessorRegisters(
+            whpx_global.partition, cpu->cpu_index, &name, 1, &reg);
     }
 }
 
@@ -604,7 +618,6 @@ static void whpx_get_registers(CPUState* cpu) {
 
     assert(whpx_register_names[idx] == WHvX64RegisterSysenterCs);
     env->sysenter_cs = vcxt.values[idx++].Reg64;
-    ;
     assert(whpx_register_names[idx] == WHvX64RegisterSysenterEip);
     env->sysenter_eip = vcxt.values[idx++].Reg64;
     assert(whpx_register_names[idx] == WHvX64RegisterSysenterEsp);
@@ -969,8 +982,8 @@ static void whpx_vcpu_process_async_events(CPUState* cpu) {
         apic_poll_irq(x86_cpu->apic_state);
     }
 
-    if (((cpu->interrupt_request & CPU_INTERRUPT_HARD) && (env->eflags & IF_MASK)) ||
-        (cpu->interrupt_request & CPU_INTERRUPT_NMI)) {
+    if (((cpu_test_interrupt(cpu, CPU_INTERRUPT_HARD)) && (env->eflags & IF_MASK)) ||
+        cpu_test_interrupt(cpu, CPU_INTERRUPT_NMI)) {
         cpu->halted = false;
     }
 
@@ -999,6 +1012,7 @@ static int whpx_vcpu_run(CPUState* cpu) {
     int ret;
 
     whpx_vcpu_process_async_events(cpu);
+    whpx_in_loadvm = false;
     if (cpu->halted && !whpx_irqchip_in_kernel()) {
         cpu->exception_index = EXCP_HLT;
         qatomic_set(&cpu->exit_request, false);
@@ -1197,10 +1211,15 @@ static void do_whpx_cpu_synchronize_post_reset(CPUState* cpu, run_on_cpu_data ar
 
 static void do_whpx_cpu_synchronize_post_init(CPUState* cpu, run_on_cpu_data arg) {
     whpx_set_registers(cpu);
+    if (whpx_in_loadvm) {
+        cpu->halted = false;
+        whpx_vcpu_kick_out_of_hlt(cpu);
+    }
     cpu->vcpu_dirty = false;
 }
 
 static void do_whpx_cpu_synchronize_pre_loadvm(CPUState* cpu, run_on_cpu_data arg) {
+    whpx_in_loadvm = true;
     cpu->vcpu_dirty = true;
 }
 
@@ -1415,7 +1434,7 @@ static void whpx_process_section(MemoryRegionSection* section, int add) {
 
     host_va = (uintptr_t)memory_region_get_ram_ptr(mr) + section->offset_within_region + delta;
 
-    whpx_update_mapping(start_pa, size, (void*)(uintptr_t)host_va, add, memory_region_is_rom(mr),
+    whpx_update_mapping(start_pa, size, (void*)(uintptr_t)host_va, add, memory_region_is_romd(mr),
                         mr->name);
 }
 
