@@ -78,15 +78,6 @@ std::unique_ptr<RenderTarget> RenderTarget::createTextureTarget(
     return result;
 }
 
-std::unique_ptr<RenderTarget> RenderTarget::createDefault(
-        Renderer& renderer,
-        const GLESv2Dispatch* gles2,
-        uint32_t width,
-        uint32_t height) {
-    return std::unique_ptr<RenderTarget>(
-            new RenderTarget(renderer, gles2, 0, 0, Texture(), width, height));
-}
-
 void RenderTarget::bind() const {
     mGles2->glBindFramebuffer(GL_FRAMEBUFFER,
                               mFramebuffer);

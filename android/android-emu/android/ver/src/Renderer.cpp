@@ -729,10 +729,6 @@ private:
         void destroy();
         ScopedEglContext makeEglCurrent();
 
-        void swapBuffers() {
-            mEglDispatch->eglSwapBuffers(mEglDisplay, mEglSurface);
-        }
-
         // Dispatch tables for EGL and GLESv2 APIs. Note that these will be
         // nullptr if there was a problem when loading the host libraries.
         const gfxstream::host::gl::EGLDispatch* mEglDispatch = nullptr;
@@ -782,8 +778,15 @@ bool RendererImpl::initialize() {
 
     mGles2 = mGL.mGles2;
 
-    mScreenRenderTarget = RenderTarget::createDefault(
-            *this, mGles2, mRenderWidth, mRenderHeight);
+    Texture screenTexture = createEmptyTexture(mRenderWidth, mRenderHeight);
+    if (!screenTexture.isValid()) {
+        E("%s: Failed creating renderer screen texture.", __FUNCTION__);
+        return false;
+    }
+
+    mScreenRenderTarget = RenderTarget::createTextureTarget(
+            *this, mGles2, getTextureId(screenTexture), screenTexture,
+            mRenderWidth, mRenderHeight);
     if (!mScreenRenderTarget) {
         E("%s: Failed creating screen render target.", __FUNCTION__);
         return false;
@@ -1306,7 +1309,7 @@ bool RendererImpl::render(RendererView* lockedView,
     }
 
     // Finish rendering and readback the framebuffer
-    mGL.swapBuffers();
+    // No swap buffers needed as we are rendering to FBOs.
 
     // TODO(virtualscene-perf): Implement non blocking readback
     auto readbackSize = mRenderWidth * mRenderHeight * 4;
@@ -1787,9 +1790,8 @@ bool RendererImpl::EglState::initialize(int frameWidth, int frameHeight) {
         return false;
     }
 
-    // Finally, create a window surface associated with this widget.
-    const EGLint pbufferAttribs[] = {EGL_WIDTH, frameWidth, EGL_HEIGHT,
-                                     frameHeight, EGL_NONE};
+    // Finally, create a dummy window surface associated with this renderer.
+    const EGLint pbufferAttribs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
     mEglSurface = mEglDispatch->eglCreatePbufferSurface(mEglDisplay, eglConfig,
                                                         pbufferAttribs);
     if (mEglSurface == EGL_NO_SURFACE) {
