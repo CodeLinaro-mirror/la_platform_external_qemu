@@ -12,6 +12,7 @@
 #include "android/verified-boot/load_config.h"
 
 #include "absl/log/log.h"
+#include "android/utils/file_io.h"
 #include "verified_boot_config.pb.h"
 
 #include <google/protobuf/io/tokenizer.h>
@@ -243,7 +244,7 @@ Status getParametersFromFile(const char* pathname,
         return Status::CouldNotOpenFile;
     }
 
-    const int fd = open(pathname, O_RDONLY);
+    const int fd = android_open(pathname, O_RDONLY);
     if (fd < 0) {
         LOG(INFO) << "Could not open " << pathname << ": " << strerror(errno);
         return Status::CouldNotOpenFile;
