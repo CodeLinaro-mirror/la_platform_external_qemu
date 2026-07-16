@@ -483,15 +483,15 @@ int qemud_serial_client_load(Stream* f,
 
         /* header buffer */
         c->need_header = stream_get_be32(f);
-        int header_size = stream_get_be32(f);
+        uint32_t header_size = stream_get_be32(f);
         if (header_size > FRAME_HEADER_SIZE) {
-            D("%s: load failed: payload buffer requires %d bytes, %d available\n",
+            D("%s: load failed: payload buffer requires %u bytes, %d available\n",
               __FUNCTION__, header_size, FRAME_HEADER_SIZE);
             return -EIO;
         }
         int ret;
-        if ((ret = stream_read(f, c->header0, header_size)) != header_size) {
-            D("%s: frame header buffer load failed: expected %d bytes, got %d\n",
+        if ((ret = stream_read(f, c->header0, header_size)) != (int)header_size) {
+            D("%s: frame header buffer load failed: expected %u bytes, got %d\n",
               __FUNCTION__, header_size, ret);
             return -EIO;
         }

@@ -364,16 +364,6 @@ void emulator_window_setup(EmulatorWindow* emulator) {
         }
     }
 
-    // Disable virtualscene in fishtank
-    if (!getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
-        // The environment file initializes the virtual scene system which is used
-        // when the display is transparent  to make the background visible through
-        // host composition.
-        if (!emulator_window_load_environment()) {
-            derror("%s: Could not setup environment", __func__);
-        }
-    }
-
     // For standalone gRPC UI clients (such as Fishtank), dynamically match the live physical model
     // rotation against the layout entries in the skin file. This guarantees perfect UI alignment
     // across diverse form factors (such as foldables and tablets whose base layout is landscape).
@@ -427,6 +417,18 @@ void emulator_window_setup(EmulatorWindow* emulator) {
     skin_winsys_set_ui_agent(emulator->uiEmuAgent);
     android_load_multi_display_config();
     skin_ui_reset_title(emulator->ui);
+
+    // Disable virtualscene in fishtank
+    if (!getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+        // The environment file initializes the virtual scene system which is used
+        // when the display is transparent  to make the background visible through
+        // host composition.
+        // This should be done after the UI agents are put in place to ensure UI
+        // and scene controls related initializations and callbacks work correctly.
+        if (!emulator_window_load_environment()) {
+            derror("%s: Could not setup environment", __func__);
+        }
+    }
 }
 
 static void emulator_window_fb_update(void* _emulator,

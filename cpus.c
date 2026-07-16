@@ -57,6 +57,12 @@
 #include "sysemu/replay.h"
 #include "hw/boards.h"
 
+#ifndef _WIN32
+static void dummy_signal(int signal)
+{
+}
+#endif
+
 #ifdef CONFIG_LINUX
 
 #include <sys/prctl.h>
@@ -1566,9 +1572,6 @@ static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
 }
 
 #ifdef CONFIG_HVF
-static void dummy_signal(int signal)
-{
-}
 
 /* The HVF-specific vCPU thread function. This one should only run when the host
  * CPU supports the VMX "unrestricted guest" feature. */
@@ -1750,6 +1753,20 @@ static void qemu_cpu_kick_thread(CPUState *cpu)
 {
 #ifndef _WIN32
     int err;
+
+    struct sigaction act;
+    sigaction(SIG_IPI, NULL, &act);
+    if (act.sa_handler == SIG_IGN) {
+        static bool warned = false;
+        if (!warned) {
+            fprintf(stderr, "WARNING: SIG_IPI (SIGUSR1) is IGNORED! Restoring handler...\n");
+            warned = true;
+        }
+        struct sigaction sigact;
+        memset(&sigact, 0, sizeof(sigact));
+        sigact.sa_handler = dummy_signal;
+        sigaction(SIG_IPI, &sigact, NULL);
+    }
 
     if (cpu->thread_kicked) {
         return;

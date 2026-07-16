@@ -11,6 +11,8 @@
  */
 #pragma once
 
+#include <QImage>
+
 namespace android {
 namespace emulation {
 class AdbInterface;
@@ -19,4 +21,5 @@ class AdbInterface;
 
 namespace ScreenMask {
     void loadMask();
+    const QImage& getMaskImage();
 };

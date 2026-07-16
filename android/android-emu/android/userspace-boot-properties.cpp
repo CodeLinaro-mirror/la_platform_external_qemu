@@ -357,13 +357,21 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
                             ":supportsExternalSemaphoreFd";
                 }
 
-                // Without turning off exposeNonConformantExtensionsAndVersions,
+                // - Without turning off exposeNonConformantExtensionsAndVersions,
                 // ANGLE will bypass the supported extensions check when guest
                 // creates a GL context, which means a ES 3.2 context can be
                 // created even without the above extensions.
+                //
+                // - Why we disable supportsBlendOperationAdvanced, supportsBlendOperationAdvanced:
+                // Starting on API 37, Android requires blend_operation_advanced support. While
+                // lavapipe claims support, a bunch of the GLES blend_operation_advanced tests fail
+                // (e.g. dEQP-GLES31.functional.blend_equation_advanced.basic#multiply) going
+                // through lavapipe. We don't know where the problem lies yet: b/515372950.
+                //
                 // TODO(b/238024366): this may not fit into character
                 // limitations
-                const char* extensionLimitStr = "exposeN*";
+                const char* extensionLimitStr =
+                        apiLevel == 37 ? "exposeN*:supportsBlend*" : "exposeN*";
                 const int MAX_PARAM_LENGTH = 92;
                 const bool safeToAdd =
                         (angle_overrides_disabled.size() +

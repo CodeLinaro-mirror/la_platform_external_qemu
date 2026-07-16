@@ -23,6 +23,7 @@ static const QAndroidVirtualSceneAgent sQAndroidVirtualSceneAgent = {
         VirtualSceneManager::setAnimationState,
         VirtualSceneManager::getAnimationState,
         VirtualSceneManager::reloadEnvironment,
+        VirtualSceneManager::getEnvironment,
         VirtualSceneManager::getAnimationStateEventListener,
         VirtualSceneManager::enumerateWebcams,
 };

@@ -334,7 +334,21 @@ static void bootp_reply(Slirp *slirp, const struct bootp_t *bp)
 
 void bootp_input(struct mbuf *m)
 {
-    struct bootp_t *bp = mtod(m, struct bootp_t *);
+    struct bootp_t *bp;
+
+    /*
+     * The packet must contain at least the IP header, UDP header, and the
+     * fixed BOOTP header fields (236 bytes), totaling 264 bytes.
+     * The vendor options area (bp_vend) is variable-length and can be much
+     * shorter than DHCP_OPT_LEN (312 bytes), so we must not check against
+     * the full sizeof(struct bootp_t) (576 bytes), which would incorrectly
+     * drop valid, unpadded DHCP requests from the guest.
+     */
+    if (m->m_len < sizeof(struct bootp_t) - DHCP_OPT_LEN) {
+        return;
+    }
+
+    bp = mtod(m, struct bootp_t *);
 
     if (bp->bp_op == BOOTP_REQUEST) {
         bootp_reply(m->slirp, bp);

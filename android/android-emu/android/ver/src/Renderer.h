@@ -114,7 +114,7 @@ private:
 class RendererView {
 public:
     // Updates render target related values, and re-creates the render target
-    void updateTarget(VerImageFormat format, int frameWidth, int frameHeight);
+    bool updateTarget(VerImageFormat format, int frameWidth, int frameHeight);
 
     // Updates positional values that do not require render target recreation
     void updateViewProjection(const glm::mat4& viewProj);

@@ -19,8 +19,8 @@
 #include "aemu/base/EventNotificationSupport.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/avd/info.h"
-#include "android/base/system/System.h"
 #include "android/base/logging/StudioMessage.h"
+#include "android/base/system/System.h"
 #include "android/camera/camera-metrics.h"
 #include "android/camera/camera-virtualscene-utils.h"
 #include "android/cmdline-option.h"
@@ -66,10 +66,12 @@ namespace android {
 namespace virtualscene {
 
 /**
- * @brief Parses a .posters file and returns a list of android::ver::PosterInfo structures.
+ * @brief Parses a .posters file and returns a list of android::ver::PosterInfo
+ * structures.
  *
  * @param filename The name of the posters file to parse.
- * @return A vector of android::ver::PosterInfo containing the parsed poster data.
+ * @return A vector of android::ver::PosterInfo containing the parsed poster
+ * data.
  */
 std::vector<android::ver::PosterInfo> parsePostersFile(const char* filename) {
     const std::string filePath = android::base::PathUtils::join(
@@ -259,20 +261,10 @@ private:
 
 static LazyInstance<Settings> sSettings = LAZY_INSTANCE_INIT;
 
-// Structured data loaded from environment.ini file
-struct EnvironmentConfig {
-    static const float defaultBackgroundBlur = 5.0f;
-    static const int defaultFps = 30;
-    VerSceneConfig::Mode sceneMode = VerSceneConfig::Mode::Unknown;
-    std::string sceneArgument;
-    bool backgroundEnabled = true;
-    float backgroundBlur = defaultBackgroundBlur;
-    int fps;
-};
-
-static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
-                                              bool warnMissing,
-                                              bool showBackground) {
+VirtualSceneManager::EnvironmentConfig
+VirtualSceneManager::getEnvironmentConfig(const AvdInfo* avdInfo,
+                                          bool warnMissing,
+                                          bool showBackground) {
     EnvironmentConfig ret;
 
     // Environment is required, set it up
@@ -306,8 +298,8 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
                 } else {
                     argpos = separator + 1;
                 }
-                ret.sceneMode =
-                        VerSceneConfig::modeFromString(mode.substr(0, separator));
+                ret.sceneMode = VerSceneConfig::modeFromString(
+                        mode.substr(0, separator));
                 if (ret.sceneMode == VerSceneConfig::Mode::Unknown) {
                     dwarning("%s: Invalid mode set.", __func__);
                 } else {
@@ -350,7 +342,8 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
     if (ret.sceneArgument.empty()) {
         dinfo("%s: Using default configuration for mode %s for the environment.",
               __func__, VerSceneConfig::modeToString(ret.sceneMode));
-        ret.sceneArgument = VerSceneConfig::defaultArgumentForMode(ret.sceneMode);
+        ret.sceneArgument =
+                VerSceneConfig::defaultArgumentForMode(ret.sceneMode);
     }
 
     return ret;
@@ -361,11 +354,14 @@ static EnvironmentConfig getEnvironmentConfig(const AvdInfo* avdInfo,
  ******************************************************************************/
 
 StaticLock VirtualSceneManager::mLock;
+std::optional<VirtualSceneManager::EnvironmentConfig>
+        VirtualSceneManager::mEnvConfig;
 VerSceneHandle VirtualSceneManager::mEnvironmentScene = nullptr;
 std::deque<std::string> VirtualSceneManager::mPosterFilenameUpdates;
 std::optional<std::thread> VirtualSceneManager::mBackgroundUpdateThread;
 std::function<void()> VirtualSceneManager::mUpdateCallback;
-std::atomic<int> VirtualSceneManager::mNumUsers = 0;
+std::function<void(bool)> VirtualSceneManager::mSceneControlsChangeCallback;
+int VirtualSceneManager::mNumUsers = 0;
 std::atomic<bool> VirtualSceneManager::mKeepUpdating = false;
 bool VirtualSceneManager::mShowBackground = false;
 
@@ -433,7 +429,8 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
     mShowBackground = transparentDisplay;
     EnvironmentConfig envConfig =
             getEnvironmentConfig(avdInfo, warnIfMissing, mShowBackground);
-    const VerSceneConfig sceneConfig(envConfig.sceneMode, envConfig.sceneArgument);
+    const VerSceneConfig sceneConfig(envConfig.sceneMode,
+                                     envConfig.sceneArgument);
 
     D("Initializing VirtualSceneManager with mode:%s, argument:%s",
       VerSceneConfig::modeToString(sceneConfig.mSceneMode),
@@ -453,10 +450,11 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
 
     if (mEnvironmentScene == VER_INVALID_HANDLE) {
         // If the config cannot be loaded, try with the fallback config
-        const VerSceneConfig::Mode fallbackMode = VerSceneConfig::Mode::ImageFile;
-        const VerSceneConfig fallbackConfig(
-                fallbackMode,
-                VerSceneConfig::defaultArgumentForMode(fallbackMode));
+        envConfig.sceneMode = VerSceneConfig::Mode::ImageFile;
+        envConfig.sceneArgument =
+                VerSceneConfig::defaultArgumentForMode(envConfig.sceneMode);
+        const VerSceneConfig fallbackConfig(envConfig.sceneMode,
+                                            envConfig.sceneArgument);
         mEnvironmentScene = ver_create_scene(fallbackConfig);
 
         if (mEnvironmentScene == VER_INVALID_HANDLE) {
@@ -480,6 +478,7 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
     }
 
     mKeepUpdating = false;
+    mEnvConfig = envConfig;
 
     lock.unlock();
 
@@ -503,6 +502,9 @@ bool VirtualSceneManager::initialize(bool initBackgroundService,
 
 void VirtualSceneManager::uninitialize() {
     D("Uninitializing VirtualSceneManager");
+
+    // Running the callbacks is no longer safe and necessary, reset it
+    VirtualSceneManager::setSceneControlsChangeCallback(nullptr);
 
     // TODO(virtualscene): stop background update service before calling this
     // function
@@ -689,21 +691,6 @@ bool VirtualSceneManager::getAnimationState() {
     return sSettings->getAnimationState();
 }
 
-void VirtualSceneManager::setSceneControlsParameters(bool show) {
-    AutoLock lock(mLock);
-    if (mEnvironmentScene == VER_INVALID_HANDLE) {
-        E("%s:%d VirtualSceneManager not initialized", __func__, __LINE__);
-        return;
-    }
-
-    // Only allow showing scene controls if it's a 3d scene
-    if (!show || VerSceneConfig::modeSupportsSceneControls(
-                         ver_scene_get_mode(mEnvironmentScene))) {
-        D("%s: show=%s", __func__, (show ? "true" : "false"));
-        skin_winsys_show_virtual_scene_controls(show);
-    }
-}
-
 bool VirtualSceneManager::addSceneUser() {
     AutoLock lock(mLock);
     if (mEnvironmentScene == VER_INVALID_HANDLE) {
@@ -732,6 +719,16 @@ bool VirtualSceneManager::addSceneUser() {
 
         startSceneUpdateThread();
     }
+
+    // Enable scene controls when supported
+    const bool shouldEnableSceneControls =
+            VerSceneConfig::modeSupportsSceneControls(
+                    ver_scene_get_mode(mEnvironmentScene));
+
+    // Call UI functions inside the lock to avoid unexpected parallel executions
+    // due to frequent add/remove user cases
+    onSceneControlsChanged(shouldEnableSceneControls);
+
     mNumUsers++;
 
     return true;
@@ -748,7 +745,12 @@ void VirtualSceneManager::removeSceneUser() {
         // Allow scene to unload resources when there are no users of it
         ver_scene_unload_user_resources(mEnvironmentScene);
 
+        // Call UI functions inside the lock to avoid unexpected parallel executions
+        // due to frequent add/remove user cases
+        onSceneControlsChanged(false);
+
         lock.unlock();
+
         stopSceneUpdateThread();
     }
 }
@@ -762,6 +764,12 @@ void VirtualSceneManager::setUpdateCallback(std::function<void()> callback) {
         return;
     }
     mUpdateCallback = callback;
+}
+
+void VirtualSceneManager::setSceneControlsChangeCallback(
+        std::function<void(bool)> callback) {
+    AutoLock lock(mLock);
+    mSceneControlsChangeCallback = callback;
 }
 
 VerSceneConfig::Mode VirtualSceneManager::getSceneMode() {
@@ -815,21 +823,26 @@ bool VirtualSceneManager::reloadScene(const VerSceneConfig& config) {
         // avoid resource exhaustion. Multiple webcams running through the
         // same hub could overwhelm the USB interface, leading to errors
         ver_destroy_scene(mEnvironmentScene);
+        mEnvironmentScene = VER_INVALID_HANDLE;
 
         // Attempting to load another webcam without unloading the other
         // may run into USB resource exhaustion
 
-        // If we're currently running, we need to load resources
+        // If we're currently running, we need to load resources and update
+        // scene controls based on the new scene mode
+        bool shouldEnableSceneControls = false;
         if (mNumUsers > 0) {
             ver_scene_load_user_resources(scene, []() {});
             ver_scene_update(scene, false);
+
+            shouldEnableSceneControls =
+                    VerSceneConfig::modeSupportsSceneControls(
+                            config.mSceneMode);
         }
 
-        // TODO(virtualscene) Handle virtual scene controls. Those should move
-        // out of the camera callback and be controlled here, since the camera
-        // has no knowledge of what the scene is when it changes.
-
         mEnvironmentScene = scene;
+
+        onSceneControlsChanged(shouldEnableSceneControls);
 
         D("%s: finished", __func__);
     }
@@ -838,6 +851,17 @@ bool VirtualSceneManager::reloadScene(const VerSceneConfig& config) {
     }
 
     return true;
+}
+
+void VirtualSceneManager::onSceneControlsChanged(bool enableSceneControls) {
+    // This will enable virtual scene controls for the standalone mode
+    skin_winsys_show_virtual_scene_controls(enableSceneControls);
+
+    // Using a callback and event notification system in VirtualSceneCamera to
+    // pass scene control enablement status to the users of embedded emulator
+    if (mSceneControlsChangeCallback) {
+        mSceneControlsChangeCallback(enableSceneControls);
+    }
 }
 
 bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
@@ -882,6 +906,11 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
         avdInfo_saveEnvironmentIni(avdInfo);
     }
 
+    {
+        AutoLock lock(mLock);
+        mEnvConfig = envConfig;
+    }
+
     // Update background service parameters
     BackgroundUpdateService::updateBackgroundEnabled(
             envConfig.backgroundEnabled);
@@ -891,6 +920,43 @@ bool VirtualSceneManager::reloadEnvironment(const char* environmentData) {
           envConfig.sceneArgument.c_str());
 
     return true;
+}
+
+void VirtualSceneManager::getEnvironment(void* context,
+                                         KeyValueCallback callback) {
+    EnvironmentConfig config;
+    {
+        AutoLock lock(mLock);
+        if (mEnvConfig) {
+            config = *mEnvConfig;
+        } else {
+            if (!getConsoleAgents() || !getConsoleAgents()->settings ||
+                !getConsoleAgents()->settings->avdInfo() ||
+                !getConsoleAgents()->settings->hw()) {
+                derror("Could not get environment. console agents not present.");
+                return;
+            }
+            const AvdInfo* avdInfo = getConsoleAgents()->settings->avdInfo();
+            const AndroidHwConfig* hwCfg = getConsoleAgents()->settings->hw();
+            const bool showBackground = hwCfg->hw_lcd_transparent;
+            config = getEnvironmentConfig(avdInfo, false, showBackground);
+        }
+    }
+
+    callback(context, "version", "1");
+
+    std::string modeStr = VerSceneConfig::modeToString(config.sceneMode);
+    if (!config.sceneArgument.empty()) {
+        modeStr += ":" + config.sceneArgument;
+    }
+    callback(context, "scene.mode", modeStr.c_str());
+
+    char blurStr[32];
+    snprintf(blurStr, sizeof(blurStr), "%.1f", config.backgroundBlur);
+    callback(context, "background.blurAmount", blurStr);
+
+    callback(context, "background.enabled",
+             config.backgroundEnabled ? "true" : "false");
 }
 
 void VirtualSceneManager::updateSceneWorker() {
@@ -982,8 +1048,14 @@ bool BackgroundUpdateService::start(int displayWidth,
     // TODO(virtualscene): do not call renderView if it's a static
     // image, adjust fps based on environment.ini
     mBackgroundView = ver_create_render_view();
-    ver_render_view_set_dimensions(mBackgroundView, displayWidth,
-                                   displayHeight);
+    if (!ver_render_view_set_dimensions(mBackgroundView, displayWidth,
+                                        displayHeight)) {
+        LOG(ERROR) << "Failed to set background render view dimensions!";
+        ver_destroy_render_view(mBackgroundView);
+        mBackgroundView = VER_INVALID_HANDLE;
+        mSceneCamera.reset();
+        return false;
+    }
     ver_render_view_set_blur_factor(mBackgroundView, backgroundBlur);
     mReadbackDataCopy.resize(displayWidth * displayHeight * 4);
 

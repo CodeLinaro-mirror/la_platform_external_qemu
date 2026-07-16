@@ -200,9 +200,20 @@ using android::crashreport::CrashReporter;
 extern "C" {
 
 void crashhandler_append_message(const char* message) {
+    if (!message) {
+        return;
+    }
     const auto reporter = CrashReporter::get();
     if (reporter && reporter->active()) {
         reporter->AppendDump(message);
+    }
+
+    // also print for verbose logs, avoid double newlines
+    size_t len = strlen(message);
+    if (len > 0 && message[len - 1] == '\n') {
+        dprint("Crash dump message: '%.*s'", (int)(len - 1), message);
+    } else {
+        dprint("Crash dump message: '%s'", message);
     }
 }
 

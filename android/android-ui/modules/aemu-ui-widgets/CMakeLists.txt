@@ -15,6 +15,8 @@ android_qt_lib(
       android/skin/qt/event-capturer.cpp
       android/skin/qt/event-serializer.cpp
       android/skin/qt/event-subscriber.cpp
+      android/skin/qt/ledindicator-widget.cpp
+      android/skin/qt/ledindicator-widget.h
       android/skin/qt/poster-image-well.cpp
       android/skin/qt/poster-image-well.h
       android/skin/qt/poster-image-well.ui

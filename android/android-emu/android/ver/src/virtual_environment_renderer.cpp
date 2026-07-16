@@ -404,13 +404,15 @@ void ver_destroy_render_view(VerRenderViewHandle view) {
     ScenesManager::removeView(reinterpret_cast<RendererView*>(view));
 }
 
-void ver_render_view_set_dimensions(VerRenderViewHandle view,
+bool ver_render_view_set_dimensions(VerRenderViewHandle view,
                                     int32_t frameWidth,
                                     int32_t frameHeight) {
     auto* viewPtr = reinterpret_cast<RendererView*>(view);
     if (viewPtr) {
-        viewPtr->updateTarget(VerImageFormat::RGBA8, frameWidth, frameHeight);
+        return viewPtr->updateTarget(VerImageFormat::RGBA8, frameWidth,
+                                     frameHeight);
     }
+    return false;
 }
 
 void ver_render_view_set_view_projection(VerRenderViewHandle view,

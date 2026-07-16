@@ -1624,6 +1624,25 @@ public:
                             "Unable to load environment");
     }
 
+    Status getEnvironment(ServerContext* context,
+                          const ::google::protobuf::Empty* empty,
+                          Environment* reply) override {
+        if (!mAgents->virtual_scene ||
+            !mAgents->virtual_scene->getEnvironment) {
+            return Status(::grpc::StatusCode::UNIMPLEMENTED,
+                          "getEnvironment not supported by this agent");
+        }
+        auto* envMap = reply->mutable_environment();
+        mAgents->virtual_scene->getEnvironment(
+                envMap, [](void* context, const char* key, const char* val) {
+                    auto* map = reinterpret_cast<
+                            ::google::protobuf::Map<std::string, std::string>*>(
+                            context);
+                    (*map)[key] = val;
+                });
+        return Status::OK;
+    }
+
     Status getHostCameras(ServerContext* /*context*/,
                           const ::google::protobuf::Empty* request,
                           CameraList* reply) override {

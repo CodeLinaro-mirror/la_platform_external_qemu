@@ -238,7 +238,7 @@ VER_EXPORT void ver_destroy_render_view(VerRenderViewHandle view);
  * @param frameWidth The width of the frame in pixels.
  * @param frameHeight The height of the frame in pixels.
  */
-VER_EXPORT void ver_render_view_set_dimensions(VerRenderViewHandle view,
+VER_EXPORT bool ver_render_view_set_dimensions(VerRenderViewHandle view,
                                                int32_t frameWidth,
                                                int32_t frameHeight);
 

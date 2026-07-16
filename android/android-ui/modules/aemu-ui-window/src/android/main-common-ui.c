@@ -372,6 +372,10 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
             feature_set_if_not_overridden_or_guest_disabled(
                     kFeature_GLDirectMem, true);
         }
+    } else {
+        // Not in android qemu mode, must be regular qemu
+        crashhandler_append_message_format(
+                "Not in android qemu mode, not enabling Vulkan or GLDirectMem\n");
     }
 
     AFREE(api_arch);
