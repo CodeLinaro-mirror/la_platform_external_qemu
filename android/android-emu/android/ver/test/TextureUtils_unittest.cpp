@@ -251,6 +251,16 @@ TEST(TextureUtilsBasic, InvalidPNG) {
     ASSERT_FALSE(TextureUtils::loadPNG(path.c_str()));
 }
 
+TEST(TextureUtilsBasic, LargeJPEG) {
+    const std::string path = testdataPathToAbsolute("jpeg_16k.jpg");
+    std::optional<TextureUtils::Result> result = TextureUtils::load(path.c_str());
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(16384u, result->mWidth);
+    EXPECT_EQ(16384u, result->mHeight);
+    EXPECT_EQ(TextureUtils::Format::RGB24, result->mFormat);
+    EXPECT_EQ(16384u * 16384u * 3u, result->mBuffer.size());
+}
+
 INSTANTIATE_TEST_CASE_P(
         TextureUtils,
         TextureUtilLoad,
