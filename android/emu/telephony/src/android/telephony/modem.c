@@ -1985,13 +1985,15 @@ handleOperatorSelection( const char*  cmd, AModem  modem )
                     if (len <= 0)
                         goto BadCommand;
 
-                    for (nn = 0; nn < modem->oper_count; nn++) {
-                        AOperator    oper = modem->operators + nn;
-                        char*        name = oper->name[ format ];
+                    if (len < sizeof(modem->operators[0].name[0])) {
+                        for (nn = 0; nn < modem->oper_count; nn++) {
+                            AOperator    oper = modem->operators + nn;
+                            char*        name = oper->name[ format ];
 
-                        if ( !memcpy( name, cmd, len ) && name[len] == 0 ) {
-                            found = nn;
-                            break;
+                            if ( !memcpy( name, cmd, len ) && name[len] == 0 ) {
+                                found = nn;
+                                break;
+                            }
                         }
                     }
 
