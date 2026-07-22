@@ -166,9 +166,12 @@ public:
 private:
     std::unique_ptr<EmulatorController::StubInterface> mService;
     std::shared_ptr<EmulatorGrpcClient> mClient;
-    SimpleClientWriter<InputEvent>* mInputEventWriter{nullptr};
-
-    std::mutex mInputWriterAccess;
+    struct InputWriterState {
+        std::mutex mutex;
+        SimpleClientWriter<InputEvent>* writer{nullptr};
+    };
+    std::shared_ptr<InputWriterState> mInputWriterState =
+            std::make_shared<InputWriterState>();
 };
 
 }  // namespace control

@@ -296,6 +296,29 @@ TEST_F(EmulatorControlClientTest, AsyncInputEventWriterCanWrite) {
             << "Failed to write input event";
 }
 
+TEST_F(EmulatorControlClientTest, AsyncInputEventWriterRecreatesOnCancel) {
+    auto writer = mClient->asyncInputEventWriter();
+    EXPECT_NE(writer, nullptr);
+
+    // Cancel the context of the writer to simulate stream closure.
+    writer->context()->TryCancel();
+
+    // Wait for the writer to be cleared and recreated.
+    SimpleClientWriter<InputEvent>* writer2 = nullptr;
+    int retries = 0;
+    while (retries < 100) {
+        writer2 = mClient->asyncInputEventWriter();
+        if (writer2 != writer) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        retries++;
+    }
+
+    EXPECT_NE(writer2, writer);
+    EXPECT_NE(writer2, nullptr);
+}
+
 TEST_F(EmulatorControlClientTest, RegisterNotificationListenerDoesNotHangOnDestruction) {
     auto future = service.mStreamStartedPromise.get_future();
     mClient->registerNotificationListener([](const Notification* n) {},
