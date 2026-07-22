@@ -774,9 +774,7 @@ smspdu_free( SmsPDU  pdu )
 {
     if (pdu) {
         free( pdu->base );
-        pdu->base = NULL;
-        pdu->end  = NULL;
-        pdu->tpdu = NULL;
+        free( pdu );
     }
 }
 
