@@ -335,17 +335,22 @@ static SimFileEFDedicatedRec  _const_files_dedicated[] =
 
 static char s_buffer[1024];
 
-static void make_SRES_Kc(char* data, int len, char* sres, char* kc) {
+static void make_SRES_Kc(char* data, unsigned int len, char* sres, char* kc) {
     // here we just fill in the sres and kc with original data
     // real USIM card will create appropriate SRES and Kc here
     // 3GPP TS 31.102 7.1.2
-    int i = 0;
+    if (!len) {
+        memset(sres, '0', 4);
+        memset(kc, '0', 8);
+        return;
+    }
+
     int j = 0;
-    for (i = 0; i < 4; ++i, ++j) {
+    for (int i = 0; i < 4; ++i, ++j) {
         sres[i] = (data[j % len]);
     }
 
-    for (i = 0; i < 8; ++i, ++j) {
+    for (int i = 0; i < 8; ++i, ++j) {
         kc[i] = (data[j % len]);
     }
 }
@@ -397,7 +402,7 @@ http://m2msupport.net/m2msupport/atcsim-generic-sim-access/
         + 8 /* 8 char for the 00880080 */
         ;
 
-    int data_len = 0;
+    unsigned int data_len = 0;
     sscanf(length_ptr, "%02x", &data_len);
 
     char* data_ptr = length_ptr + 2;
