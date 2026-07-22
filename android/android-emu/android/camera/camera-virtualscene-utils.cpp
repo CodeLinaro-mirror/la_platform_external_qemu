@@ -88,7 +88,8 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
         mOwnedScene = VER_INVALID_HANDLE;
         sceneMode = VirtualSceneManager::getSceneMode();
 
-        VirtualSceneManager::setSceneControlsParameters(true);
+        // This will enable scene controls when needed
+        // Scene controls are only supported with the environment scene
         VirtualSceneManager::addSceneUser();
     } else {
         // Create and own the scene
@@ -128,7 +129,11 @@ int RenderedCameraDevice::startCapturing(uint32_t pixelFormat,
     }
 
     mActiveView = ver_create_render_view();
-    ver_render_view_set_dimensions(mActiveView, frameWidth, frameHeight);
+    if (!ver_render_view_set_dimensions(mActiveView, frameWidth, frameHeight)) {
+        LOG(ERROR) << "Failed to set camera render view dimensions!";
+        stopCapturing();
+        return -1;
+    }
 
     return 0;
 }
@@ -144,7 +149,6 @@ void RenderedCameraDevice::stopCapturing() {
     }
 
     if (mUsingEnvironmentScene) {
-        VirtualSceneManager::setSceneControlsParameters(false);
         VirtualSceneManager::removeSceneUser();
         mUsingEnvironmentScene = false;
     } else if (mOwnedScene != VER_INVALID_HANDLE) {

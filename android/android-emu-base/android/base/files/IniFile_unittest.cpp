@@ -557,6 +557,91 @@ TEST_F(IniFileTest, makeValidKey) {
     EXPECT_STREQ("_some.20number.2010.20within",
                  IniFile::makeValidKey("some number 10 within").c_str());
 }
+TEST_F(IniFileTest, suffixMemorySizeParsing) {
+    // hw.ramSize standard and suffix values
+    mIni->setString("hw.ramSize", "6G");
+    EXPECT_EQ(6144, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "2g");
+    EXPECT_EQ(2048, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "2048M");
+    EXPECT_EQ(2048, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "2048MB");
+    EXPECT_EQ(2048, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "2048");
+    EXPECT_EQ(2048, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "1048576K");
+    EXPECT_EQ(1024, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "1048576KB");
+    EXPECT_EQ(1024, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "1T");
+    EXPECT_EQ(1048576, mIni->getInt("hw.ramSize", 99));
+
+    // vm.heapSize standard and suffix values
+    mIni->setString("vm.heapSize", "32M");
+    EXPECT_EQ(32, mIni->getInt("vm.heapSize", 99));
+
+    mIni->setString("vm.heapSize", "512MB");
+    EXPECT_EQ(512, mIni->getInt("vm.heapSize", 99));
+
+    mIni->setString("vm.heapSize", "1G");
+    EXPECT_EQ(1024, mIni->getInt("vm.heapSize", 99));
+
+    mIni->setString("vm.heapSize", "256");
+    EXPECT_EQ(256, mIni->getInt("vm.heapSize", 99));
+
+    // Malformed/Boundary cases
+    mIni->setString("hw.ramSize", "6GBextra");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "6G ");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "6X");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "abc");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("vm.heapSize", "512MBextra");
+    EXPECT_EQ(99, mIni->getInt("vm.heapSize", 99));
+
+    // Reject lowercase 'b' to prevent bits vs bytes confusion
+    mIni->setString("hw.ramSize", "6Gb");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("hw.ramSize", "6gb");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99));
+
+    mIni->setString("vm.heapSize", "512Mb");
+    EXPECT_EQ(99, mIni->getInt("vm.heapSize", 99));
+
+    // Strtol overflow (ridiculous value)
+    mIni->setString("hw.ramSize", "9999999999999999999999999999G");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99));
+
+    // 1TB boundary and overflow tests
+    mIni->setString("hw.ramSize", "1T");
+    EXPECT_EQ(1048576, mIni->getInt("hw.ramSize", 99)); // Valid: exactly 1TB
+
+    mIni->setString("hw.ramSize", "1048577"); // 1MB over 1TB (raw integer)
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99)); // Invalid: exceeds 1TB
+
+    mIni->setString("hw.ramSize", "2T");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99)); // Invalid: exceeds 1TB
+
+    mIni->setString("hw.ramSize", "0G");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99)); // Invalid: <= 0
+
+    mIni->setString("hw.ramSize", "-1G");
+    EXPECT_EQ(99, mIni->getInt("hw.ramSize", 99)); // Invalid: <= 0
+}
 
 TEST(IniFileTest2, parseInMemory) {
     static const char data[] =

@@ -58,26 +58,6 @@ constexpr size_t kMaxStreamDim = 16384;
 constexpr size_t kMaxStreamBytes =
         kMaxStreamDim * kMaxStreamDim * sizeof(uint32_t);
 
-// TODO(b/173651912): remove this thing and call the callback from
-// camera_XYZ_(start|stop)_capturing instead.
-struct CameraCallbackDesc {
-    void set(camera_callback_t cb, void* ctx, CameraSourceType src) {
-        callback = cb;
-        context = ctx;
-        source = src;
-    }
-
-    void operator()(CameraSourceType src, bool value) const {
-        if (callback && (source == src)) {
-            callback(context, value);
-        }
-    }
-
-    camera_callback_t callback = nullptr;
-    void* context = nullptr;
-    CameraSourceType source = {};
-};
-
 struct WhiteBalance {
     float red, green, blue;
 };
@@ -897,8 +877,6 @@ private:
     std::vector<char> mBuffer;
 };
 
-CameraCallbackDesc g_cameraCallbackDesc;
-
 struct BaseCameraClient : public ICppQemudClient {
     BaseCameraClient(CameraInfo& ci, CameraDevice& cd)
             : mCameraInfo(ci)
@@ -951,7 +929,6 @@ protected:
         }
 
         camera_metrics_report_start_result(CLIENT_START_RESULT_SUCCESS);
-        g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, true);
         mFrameCounter = 0;
         return true;
     }
@@ -987,7 +964,6 @@ protected:
     }
 
     void stopCapturingImpl() const {
-        g_cameraCallbackDesc(mCameraInfo.vtbl->camera_source, false);
         camera_metrics_report_stop_session(mFrameCounter);
 
         const int res = (mCameraInfo.vtbl->stop_capturing)(&mCameraDevice);
@@ -1291,6 +1267,10 @@ private:
     ClientStartResult start3(const uint32_t width,
                              const uint32_t height,
                              const uint32_t pixFormat) {
+        if (width == 0 || width > kMaxStreamDim || height == 0 ||
+            height > kMaxStreamDim) {
+            return CLIENT_START_RESULT_INCORRECT_PARAMS;
+        }
         if (!has_converter(mCameraInfo.pixel_format, pixFormat) ||
             !has_converter(mCameraInfo.pixel_format, V4L2_PIX_FMT_RGB32)) {
             return CLIENT_START_RESULT_NO_PIXEL_CONVERSION;
@@ -1874,10 +1854,4 @@ ICppQemudClient* CameraService::cameraClientCreate(const std::string_view params
 void android_camera_service_init(void) {
     // All the interesting things happen in the ctor.
     static CameraService s_cameraService;
-}
-
-void register_camera_status_change_callback(camera_callback_t cb,
-                                            void* ctx,
-                                            CameraSourceType src) {
-    g_cameraCallbackDesc.set(cb, ctx, src);
 }
