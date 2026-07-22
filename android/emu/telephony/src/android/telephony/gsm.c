@@ -1052,6 +1052,7 @@ gsm_bcdnum_to_ascii( cbytes_t  bcd, int  count, bytes_t  dst )
 
         if (dst) dst[result] = "0123456789*#,N"[c];
         result += 1;
+        --count;
 
         shift += 4;
         if (shift == 8) {
