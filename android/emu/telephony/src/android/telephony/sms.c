@@ -1588,8 +1588,8 @@ sms_receiver_add_submit_pdu( SmsReceiver  rec, SmsPDU       submit_pdu )
         return -1;
     }
     max = smspdu_get_max_index( submit_pdu );
-    if (max < 0) {
-        D( "%s: invalid max fragment value: %d should be >= 1\n",
+    if ((max < 1) || (max > 255)) {
+        D( "%s: invalid max fragment value: %d should be in [1, 255]\n",
            __FUNCTION__, max );
         return -1;
     }
