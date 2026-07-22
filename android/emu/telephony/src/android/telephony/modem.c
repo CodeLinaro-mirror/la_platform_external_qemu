@@ -544,21 +544,31 @@ amodem_begin_line( AModem  modem )
 static void
 amodem_add_line( AModem  modem, const char*  format, ... )
 {
-    if (modem->out_size > sizeof(modem->out_buff)) {
+    if (modem->out_size >= (int)sizeof(modem->out_buff)) {
         derror("modem->out_size cannot exceed the size of modem->out_buff");
         return;
     }
+    const int available = sizeof(modem->out_buff) - modem->out_size;
+
     va_list  args;
     va_start(args, format);
-    modem->out_size += vsnprintf( modem->out_buff + modem->out_size,
-                                  sizeof(modem->out_buff) - modem->out_size,
-                                  format, args );
+    const int ret = vsnprintf( modem->out_buff + modem->out_size,
+                               available,
+                               format, args );
     va_end(args);
+
+    if (ret > 0) {
+        modem->out_size += (ret < available) ? ret : (available - 1);
+    }
 }
 
 static const char*
 amodem_end_line( AModem  modem )
 {
+    if (modem->out_size >= (int)sizeof(modem->out_buff)) {
+        modem->out_size = sizeof(modem->out_buff) - 1;
+    }
+
     modem->out_buff[ modem->out_size ] = 0;
     return modem->out_buff;
 }
@@ -3121,7 +3131,12 @@ const char*  amodem_send( AModem  modem, const char*  cmd )
             if (answer != modem->out_buff)
                 REPLY( amodem_printf( modem, "%s\rOK", answer ) );
 
-            strcat( modem->out_buff, "\rOK" );
+            {
+                int len = strlen(modem->out_buff);
+                if ((len + 4) <= (int)sizeof(modem->out_buff)) {
+                    memcpy(modem->out_buff + len, "\rOK", 4);
+                }
+            }
             REPLY( answer );
         }
     }
