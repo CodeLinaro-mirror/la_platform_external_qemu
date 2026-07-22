@@ -1990,7 +1990,7 @@ handleOperatorSelection( const char*  cmd, AModem  modem )
                             AOperator    oper = modem->operators + nn;
                             char*        name = oper->name[ format ];
 
-                            if ( !memcpy( name, cmd, len ) && name[len] == 0 ) {
+                            if ((name[len] == 0) && !memcmp( name, cmd, len )) {
                                 found = nn;
                                 break;
                             }
