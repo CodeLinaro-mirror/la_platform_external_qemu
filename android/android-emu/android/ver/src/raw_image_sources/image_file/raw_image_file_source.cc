@@ -482,6 +482,10 @@ std::optional<ImageData> loadJPEGImage(const std::string& filename) {
 
     jpeg_create_decompress(&cinfo);
 
+    // Increase libjpeg memory limit to 256 MB to prevent failures when
+    // loading large images.
+    cinfo.mem->max_memory_to_use = 256 * 1024 * 1024;
+
     jpeg_stdio_src(&cinfo, fp.get());
     // Request to save APP1 marker (contains EXIF)
     jpeg_save_markers(&cinfo, JPEG_APP0 + 1, 0xFFFF);

@@ -245,6 +245,11 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
     }
 
     jpeg_create_decompress(&cinfo);
+
+    // Increase libjpeg memory limit to 256 MB to prevent failures when
+    // loading large images.
+    cinfo.mem->max_memory_to_use = 256 * 1024 * 1024;
+
     jpeg_stdio_src(&cinfo, fp.get());
 
     // We can safely ignore the return value since we're using a stdio source

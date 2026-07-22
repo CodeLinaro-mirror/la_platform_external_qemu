@@ -123,4 +123,8 @@ void loadMask() {
     AFREE(skinDir);
 }
 
+const QImage& getMaskImage() {
+    return sGlobals->screenMaskImage;
+}
+
 } // namespace ScreenMask

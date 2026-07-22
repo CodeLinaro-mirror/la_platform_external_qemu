@@ -27,6 +27,7 @@
 #include <QSet>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <cfloat>
 #include <cstdint>
 #include <functional>
@@ -69,11 +70,7 @@ using carpropertyutils::propMap;
 using carpropertyutils::changeModeToString;
 using carpropertyutils::loadDescriptionsFromJson;
 
-static constexpr int REFRESH_START = 1;
-static constexpr int REFRESH_STOP = 2;
-static constexpr int REFRESH_PAUSE = 3;
-
-static constexpr int64_t REFRESH_INTERVAL_USECONDS = 1000000LL;
+static constexpr int REFRESH_INTERVAL_MS = 1000;
 
 #include "android/utils/debug.h"
 
@@ -82,28 +79,22 @@ static constexpr int64_t REFRESH_INTERVAL_USECONDS = 1000000LL;
 VhalTable::VhalTable(QWidget* parent)
     : QWidget(parent),
       mUi(new Ui::VhalTable),
-      mVhalPropertyTableRefreshThread([this] {
-          initVhalPropertyTableRefreshThread();
-      }) {
+      mRefreshTimer(std::make_unique<QTimer>(this)) {
 
     initVhalPropertyTable();
 
     mUi->setupUi(this);
 
-    connect(this, SIGNAL(updateNewData(QStringList)), this,
-            SLOT(updateTable(QStringList)), Qt::QueuedConnection);
-    connect(this, SIGNAL(updateData(QStringList)), this,
-            SLOT(updateProperties(QStringList)), Qt::QueuedConnection);
     connect(mUi->property_search, SIGNAL(textEdited(QString)), this,
             SLOT(refresh_filter(QString)));
 
-    // start refresh thread
-    mRefreshMsg.trySend(REFRESH_START);
-    mVhalPropertyTableRefreshThread.start();
+    connect(mRefreshTimer.get(), &QTimer::timeout, this,
+            &VhalTable::flushPendingUpdates);
+    startRefreshTimer();
 }
 
 VhalTable::~VhalTable() {
-    stopVhalPropertyTableRefreshThread();
+    stopRefreshTimer();
 }
 
 void VhalTable::initVhalPropertyTable() {
@@ -117,6 +108,7 @@ void VhalTable::initVhalPropertyTable() {
                     ?: avdInfo_getSystemInitImagePath(getConsoleAgents()->settings->avdInfo());
     QFileInfo sysImgFileInfo(sysImagePath);
     QString sysImgPath(sysImgFileInfo.absolutePath());
+    free(sysImagePath);
 
     QString avdPath(avdInfo_getContentPath(getConsoleAgents()->settings->avdInfo()));
     QStringList paths = {sysImgPath, avdPath};
@@ -134,30 +126,18 @@ void VhalTable::initVhalPropertyTable() {
     LOG(INFO) << "Did not find a vhal json" << std::endl;
 }
 
-void VhalTable::initVhalPropertyTableRefreshThread() {
-    int msg;
-    while (true) {
-        // Receive only the last message (bug :210075881)
-        while(mRefreshMsg.tryReceive(&msg));
-        if (msg == REFRESH_STOP) {
-            break;
-        }
-        android::base::AutoLock lock(mVhalPropertyTableRefreshLock);
-        switch (msg) {
-            case REFRESH_START:
-                if (mSendEmulatorMsg != nullptr) {
-                    sendGetSelectedPropertyRequest();
-                }
-                mVhalPropertyTableRefreshCV.timedWait(
-                        &mVhalPropertyTableRefreshLock,
-                        nextRefreshAbsolute());
-                break;
-            case REFRESH_PAUSE:
-                mVhalPropertyTableRefreshCV.wait(
-                        &mVhalPropertyTableRefreshLock);
-                break;
-        }
+void VhalTable::flushPendingUpdates() {
+    if (!mPendingNewKeys.isEmpty()) {
+        QStringList newKeys = mPendingNewKeys.values();
+        newKeys.sort();
+        updateTable(newKeys);
+        mPendingNewKeys.clear();
     }
+    if (!mPendingUpdatedKeys.isEmpty()) {
+        updateProperties(mPendingUpdatedKeys.values());
+        mPendingUpdatedKeys.clear();
+    }
+    sendGetSelectedPropertyRequest();
 }
 
 void VhalTable::sendGetSelectedPropertyRequest() {
@@ -240,24 +220,34 @@ void VhalTable::showEvent(QShowEvent* event) {
     // ask for new data.
     mUi->property_list->clear();
     mVHalPropValuesMap.clear();
+    mPendingNewKeys.clear();
+    mPendingUpdatedKeys.clear();
     mSelectedKey = QString();
     clearPropertyDescription();
     sendGetAllPropertiesRequest();
-    setVhalPropertyTableRefreshThread();
+    startRefreshTimer();
 }
 
 void VhalTable::hideEvent(QHideEvent*) {
     // stop asking data
-    pauseVhalPropertyTableRefreshThread();
+    stopRefreshTimer();
 }
 
 void VhalTable::updateTable(QStringList sl) {
+    const int MAX_UI_PROPERTIES = 1000;
     int current_size = mUi->property_list->count();
+    if (current_size >= MAX_UI_PROPERTIES) return;
 
-    mUi->property_list->addItems(sl);
+    QStringList toAdd;
+    for (int i = 0; i < sl.size() && (current_size + toAdd.size()) < MAX_UI_PROPERTIES; i++) {
+        toAdd << sl.at(i);
+    }
+    if (toAdd.isEmpty()) return;
 
-    for (int i = 0; i < sl.size(); i++) {
-        QString key = sl.at(i);
+    mUi->property_list->addItems(toAdd);
+
+    for (int i = 0; i < toAdd.size(); i++) {
+        QString key = toAdd.at(i);
         VehiclePropValue currVal = mVHalPropValuesMap[key];
         PropertyDescription currPropDesc = propMap[currVal.prop()];
         QString label = currPropDesc.label;
@@ -274,7 +264,7 @@ void VhalTable::updateTable(QStringList sl) {
 
     // select first item if mSelectedKey is empty
     // This should only happen at the first time table is opened
-    if (mSelectedKey.isEmpty() && sl.size() > 0) {
+    if (mSelectedKey.isEmpty() && mUi->property_list->count() > 0) {
         mUi->property_list->setCurrentRow(0);
     }
 
@@ -293,29 +283,15 @@ void VhalTable::processMsg(EmulatorMessage emulatorMsg) {
         case (int32_t)MsgType::GET_PROPERTY_RESP:
         case (int32_t)MsgType::GET_PROPERTY_ALL_RESP:
             if (emulatorMsg.value_size() > 0) {
-                QStringList newKeys;
-                QStringList updatedKeys;
                 for (int valIndex = 0; valIndex < emulatorMsg.value_size();
                     valIndex++) {
                     VehiclePropValue val = emulatorMsg.value(valIndex);
                     QString key = getPropKey(val);
-                    // if the return value contains new property
-                    // like new sensors start during runtime
                     if (!mVHalPropValuesMap.count(key)) {
-                        newKeys << key;
+                        mPendingNewKeys.insert(key);
                     }
                     mVHalPropValuesMap[key] = val;
-                    updatedKeys << key;
-                }
-
-                if (newKeys.size() > 0) {
-                    // Sort the keys and emit the output based on keys
-                    // only delta properties will be emitted
-                    newKeys.sort();
-                    emit updateNewData(newKeys);
-                }
-                if (updatedKeys.size() > 0) {
-                    emit updateData(updatedKeys);
+                    mPendingUpdatedKeys.insert(key);
                 }
             }
             break;
@@ -616,21 +592,14 @@ void VhalTable::hide_all() {
 }
 
 // Ask property update every 1s
-android::base::System::Duration VhalTable::nextRefreshAbsolute() {
-    return android::base::System::get()->getUnixTimeUs() + REFRESH_INTERVAL_USECONDS;
+void VhalTable::startRefreshTimer() {
+    if (!mRefreshTimer->isActive()) {
+        mRefreshTimer->start(REFRESH_INTERVAL_MS);
+    }
 }
 
-void VhalTable::setVhalPropertyTableRefreshThread() {
-    mRefreshMsg.trySend(REFRESH_START);
-    mVhalPropertyTableRefreshCV.signal();
-}
-
-void VhalTable::stopVhalPropertyTableRefreshThread() {
-    mRefreshMsg.trySend(REFRESH_STOP);
-    mVhalPropertyTableRefreshCV.signal();
-    mVhalPropertyTableRefreshThread.wait();
-}
-
-void VhalTable::pauseVhalPropertyTableRefreshThread() {
-    mRefreshMsg.trySend(REFRESH_PAUSE);
+void VhalTable::stopRefreshTimer() {
+    if (mRefreshTimer->isActive()) {
+        mRefreshTimer->stop();
+    }
 }

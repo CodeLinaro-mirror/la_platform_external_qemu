@@ -2158,8 +2158,17 @@ void avdInfo_replaceMultiDisplayInConfigIni(AvdInfo* i,
     }
 
     char* iniPath = _avdInfo_getContentFilePath(i, CORE_CONFIG_INI);
-    if (iniPath && write)
-        iniFile_saveToFile(i->configIni, iniPath);
+    if (iniPath && write) {
+        struct CIniFile* oldconfig = iniFile_newFromFile(iniPath);
+        if (oldconfig) {
+            iniFile_setInteger(oldconfig, w_s, w);
+            iniFile_setInteger(oldconfig, h_s, h);
+            iniFile_setInteger(oldconfig, d_s, dpi);
+            iniFile_setInteger(oldconfig, f_s, flag);
+            iniFile_saveToFile(oldconfig, iniPath);
+            iniFile_free(oldconfig);
+        }
+    }
     if (iniPath)
         AFREE(iniPath);
 }

@@ -13,6 +13,7 @@
 #include <stddef.h>                                 // for size_t
 #include <cstdint>                                  // for uint8_t, uint32_t
 #include <functional>                               // for function
+#include <atomic>
 #include <memory>                                   // for shared_ptr
 #include <vector>                                   // for vector
 
@@ -129,6 +130,7 @@ private:
     mutable android::base::Lock mLock; // protects mWakeOnRead
 
     static bool sEnabled;
+    std::atomic<bool> mClosed{false};
 };
 
 void registerClipboardPipeService();

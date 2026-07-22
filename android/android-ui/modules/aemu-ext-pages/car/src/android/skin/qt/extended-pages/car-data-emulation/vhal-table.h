@@ -13,11 +13,7 @@
 // TODO: (b/120444474) rename ERROR_INVALID_OPERATION & remove this undef
 #undef ERROR_INVALID_OPERATION
 
-#include "aemu/base/synchronization/ConditionVariable.h"
-#include "aemu/base/synchronization/Lock.h"
-#include "aemu/base/synchronization/MessageChannel.h"
 #include "android/base/system/System.h"
-#include "aemu/base/threads/FunctorThread.h"
 #include "android/skin/qt/extended-pages/car-data-emulation/car-property-utils.h"
 #include "android/skin/qt/extended-pages/car-data-emulation/car-sensor-data.h"
 
@@ -39,6 +35,7 @@ class QListWidgetItem;
 class QObject;
 class QShowEvent;
 class QString;
+class QTimer;
 class QWidget;
 class VhalItem;
 
@@ -65,9 +62,6 @@ public:
     void processMsg(emulator::EmulatorMessage emulatorMsg);
     void setSendEmulatorMsgCallback(CarSensorData::EmulatorMsgCallback&&);
 
-signals:
-    void updateNewData(QStringList keys); // called when new property configs are received
-    void updateData(QStringList keys); // called when existing property values are received
 
 private slots:
     void on_property_list_currentItemChanged(QListWidgetItem* current,
@@ -76,6 +70,7 @@ private slots:
     void updateTable(QStringList keys);
     void updateProperties(QStringList keys);
     void refresh_filter(QString pattern);
+    void flushPendingUpdates();
 
 private:
     std::unique_ptr<Ui::VhalTable> mUi;
@@ -88,17 +83,19 @@ private:
     // Value is PropertyValue
     std::map<QString, emulator::VehiclePropValue> mVHalPropValuesMap;
 
+    QSet<QString> mPendingNewKeys;
+    QSet<QString> mPendingUpdatedKeys;
+
     QString mSelectedKey;
 
     void initVhalPropertyTable();
-    void initVhalPropertyTableRefreshThread();
 
     VhalItem* getItemWidget(QListWidgetItem* listItem);
     void setPropertyText(QLabel* label, QString text);
 
     void sendGetAllPropertiesRequest();
     void sendGetSelectedPropertyRequest();
-    
+
     CarSensorData::EmulatorMsgCallback mSendEmulatorMsg;
     emulator::EmulatorMessage makeGetPropMsg(int32_t prop, int areaId);
 
@@ -110,15 +107,10 @@ private:
     void hide_all();
     QString getPropKey(emulator::VehiclePropValue val);
 
-    // table refresh funcitons
-    FunctorThread mVhalPropertyTableRefreshThread;
-    android::base::MessageChannel<int, 2> mRefreshMsg;
-    android::base::ConditionVariable mVhalPropertyTableRefreshCV;
-    android::base::Lock mVhalPropertyTableRefreshLock;
-    android::base::System::Duration nextRefreshAbsolute();
-    void setVhalPropertyTableRefreshThread();
-    void stopVhalPropertyTableRefreshThread();
-    void pauseVhalPropertyTableRefreshThread();
+    // table refresh functions
+    const std::unique_ptr<QTimer> mRefreshTimer;
+    void startRefreshTimer();
+    void stopRefreshTimer();
 
     emulator::EmulatorMessage makeSetPropMsgInt32(int32_t propId, int val, int areaId);
     emulator::EmulatorMessage makeSetPropMsgFloat(int32_t propId, float val, int areaId);
