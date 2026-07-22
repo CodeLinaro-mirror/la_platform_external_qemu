@@ -1613,18 +1613,25 @@ sms_receiver_add_submit_pdu( SmsReceiver  rec, SmsPDU       submit_pdu )
             D("%s: created SMS index %d, from %.*s, ref %d, max %d\n", __FUNCTION__,
                frag->index, len, tmp, frag->ref, frag->max);
         }
-        *pnode = frag;
+        /* don't link until we know the fragment will hold at least one PDU */
+    } else if (max != frag->max) {
+        D("%s: SMS fragment max mismatch (%d vs allocated %d) for ref %d, "
+          "dropping\n", __FUNCTION__, max, frag->max, ref);
+        return -1;
     }
 
     cur = smspdu_get_cur_index( submit_pdu );
     if (cur < 0) {
         D("%s: SMS fragment index is too small: %d should be >= 1\n", __FUNCTION__, cur+1 );
+        if (*pnode != frag) sms_fragment_free(frag);
         return -1;
     }
-    if (cur >= max) {
-        D("%s: SMS fragment index is too large (%d >= %d)\n", __FUNCTION__, cur, max);
-        return -1;
+    if (cur >= frag->max) {
+        D("%s: SMS fragment index is too large (%d >= %d)\n", __FUNCTION__, cur, frag->max);
+        if (*pnode != frag) sms_fragment_free(frag);
     }
+    if (*pnode != frag)
+        *pnode = frag;   /* first fragment for this (dest,ref): now safe to link */
     if ( frag->pdus[cur] != NULL ) {
         D("%s: receiving duplicate SMS fragment for %d/%d, ref=%d, discarding old one\n",
           __FUNCTION__, cur+1, max, ref);
