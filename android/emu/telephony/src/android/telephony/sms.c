@@ -904,6 +904,8 @@ sms_get_text_utf8( cbytes_t        *pcur,
         goto Exit;
 
     len = *cur++;
+    if (len > ((end - cur) * 8 / 7))
+        goto Exit;
 
     /* skip user data header if any */
     int pad = 0;
