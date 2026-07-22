@@ -1240,10 +1240,6 @@ static int startEmulatorWithMinConfig(int argc,
                 [] { skin_winsys_quit_request(); });
     });
 
-#if (SNAPSHOT_PROFILE > 1)
-    dinfo("skin_winsys_init and UI finishing at uptime %" PRIu64 " ms",
-          get_uptime_ms());
-#endif
 
     // Use advancedFeatures to override renderer if the user has
     // selected in UI that the preferred renderer is "autoselected".
@@ -3327,10 +3323,6 @@ extern "C" int main(int argc, char** argv) {
          * the blocking mask of the QT main loop thread.
          */
         enableSignalTermination();
-#if (SNAPSHOT_PROFILE > 1)
-        dprint("skin_winsys_init and UI starting at uptime %" PRIu64 " ms",
-               get_uptime_ms());
-#endif
         skin_winsys_init_args(qt_argc, &qt_argv);
         if (!emulator_initUserInterface(opts, &uiEmuAgent)) {
             return 1;
@@ -3356,10 +3348,6 @@ extern "C" int main(int argc, char** argv) {
                     [] { skin_winsys_quit_request(); });
         });
 
-#if (SNAPSHOT_PROFILE > 1)
-        dprint("skin_winsys_init and UI finishing at uptime %" PRIu64 " ms",
-               get_uptime_ms());
-#endif
 
         // Feature flags-related last-microsecond renderer changes
         {

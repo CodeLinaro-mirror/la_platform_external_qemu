@@ -12,8 +12,7 @@
 #include "android/snapshot/RamSaver.h"
 
 #include "aemu/base/memory/ContiguousRangeMapper.h"
-#include "aemu/base/Profiler.h"
-#include "aemu/base/Stopwatch.h"
+
 #include "aemu/base/EintrWrapper.h"
 #include "aemu/base/files/FileShareOpen.h"
 #include "aemu/base/files/MemStream.h"
@@ -50,7 +49,7 @@ namespace snapshot {
 using android::base::ContiguousRangeMapper;
 using android::base::MemStream;
 using android::base::MemoryHint;
-using android::base::ScopedMemoryProfiler;
+
 using android::base::System;
 
 using StatAction = IncrementalStats::Action;
@@ -182,10 +181,6 @@ void RamSaver::savePage(int64_t blockOffset,
 
     if (mLastBlockIndex < 0) {
         mLastBlockIndex = 0;
-#if SNAPSHOT_PROFILE > 1
-        dprint("From ctor to first savePage: %.03f",
-                (mSystem->getHighResTimeUs() - mStartTime) / 1000.0);
-#endif
     }
 
     assert(!mIndex.blocks.empty());
@@ -274,9 +269,7 @@ void RamSaver::savePage(int64_t blockOffset,
                     android::base::memoryHint((void*)start, size, MemoryHint::DontNeed);
                 }, kDecommitChunkSize);
 
-#if SNAPSHOT_PROFILE > 1
-                ScopedMemoryProfiler mem("zeroCheck");
-#endif
+
 
                 for (int32_t i = 0; i < numPages;
                      ++i,
@@ -347,9 +340,7 @@ void RamSaver::savePage(int64_t blockOffset,
         // snapshot, computing all changed nonzero pages
         mIncStats.measure(StatTime::Hashing, [&] {
 
-#if SNAPSHOT_PROFILE > 1
-            ScopedMemoryProfiler mem("hashing");
-#endif
+
 
             uint8_t* hashPtr = block.ramBlock.hostPtr;
             for (int32_t i = 0; i < numPages; ++i,
@@ -467,9 +458,7 @@ void RamSaver::passToSaveHandler(QueuedPageInfo&& pi) {
 
         mEndTime = System::get()->getHighResTimeUs();
 
-#if SNAPSHOT_PROFILE > 1
-        dprint("RAM saving time: %.03f", (mEndTime - mStartTime) / 1000.0);
-#endif
+
     }
 }
 
