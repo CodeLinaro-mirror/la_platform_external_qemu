@@ -1103,8 +1103,9 @@ smspdu_get_user_data_ref( SmsPDU  pdu )
             return data + 2;
         }
 
-        data += hlen;
-        len  -= hlen - 2;
+        /* skip (htype)(hlen)(hlen number of bytes) */
+        data += (2 + hlen);
+        len  -= (2 + hlen);
     }
 Fail:
     return NULL;
