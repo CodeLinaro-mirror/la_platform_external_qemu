@@ -565,7 +565,9 @@ class RendererImpl : public Renderer {
     DISALLOW_COPY_AND_ASSIGN(RendererImpl);
 
 public:
-    RendererImpl(int width, int height);
+    RendererImpl(int width,
+                 int height,
+                 const std::filesystem::path& vulkanBasePath);
     ~RendererImpl();
 
     bool initialize();
@@ -680,6 +682,7 @@ private:
 
     const int mRenderWidth;
     const int mRenderHeight;
+    const std::filesystem::path mVulkanBasePath;
 
     std::unique_ptr<RenderTarget> mRenderTargets[2];
     std::unique_ptr<RenderTarget> mScreenRenderTarget;
@@ -724,11 +727,12 @@ private:
             nullptr;  // Same as mGL.mGles2, kept for legacy reasons
 };
 
-std::unique_ptr<Renderer> Renderer::create() {
+std::unique_ptr<Renderer> Renderer::create(
+        const std::filesystem::path& vulkanBasePath) {
     dprint("virtualscene: Creating renderer.");
-    std::unique_ptr<RendererImpl> renderer;
-    renderer.reset(new RendererImpl(kRendererDefaultFramebufferWidth,
-                                    kRendererDefaultFramebufferHeight));
+    std::unique_ptr<RendererImpl> renderer(new RendererImpl(
+            kRendererDefaultFramebufferWidth, kRendererDefaultFramebufferHeight,
+            vulkanBasePath));
     if (!renderer->initialize()) {
         derror("virtualscene: could not create renderer.");
         return nullptr;
@@ -739,9 +743,12 @@ std::unique_ptr<Renderer> Renderer::create() {
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
 
-RendererImpl::RendererImpl(int width, int height)
+RendererImpl::RendererImpl(int width,
+                           int height,
+                           const std::filesystem::path& vulkanBasePath)
     : mRenderWidth(width),
       mRenderHeight(height),
+      mVulkanBasePath(vulkanBasePath),
       mLoaderThread([this](LoaderCommand&& command) {
           return onLoaderCommand(std::move(command));
       }) {}

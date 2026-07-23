@@ -48,11 +48,14 @@ using android::ver::VerWebcamHandle;
  * resources.
  * @param eglDispatch Pointer to the EGL dispatch table.
  * @param gles2Dispatch Pointer to the GLESv2 dispatch table.
+ * @param vulkanBasePath The base path for Vulkan drivers.
+ * @return true if successful, false otherwise.
  */
-VER_EXPORT void ver_initialize(
+VER_EXPORT bool ver_initialize(
         const std::vector<std::filesystem::path>& resourceBasePaths,
         const void* eglDispatch,
-        const void* gles2Dispatch);
+        const void* gles2Dispatch,
+        const std::filesystem::path& vulkanBasePath);
 
 /**
  * @brief Removes all virtual scenes and cleans up the renderer resources.

@@ -38,6 +38,9 @@ public:
     static void setSearchPaths(
             const std::vector<std::filesystem::path>& resourceSearchPaths);
 
+    static void setVulkanBasePath(
+            const std::filesystem::path& vulkanBasePath);
+
     static bool configArgumentFileExists(const SceneConfig& config);
 
     static Scene* createScene(const SceneConfig& config);
@@ -66,6 +69,7 @@ private:
     static android::base::StaticLock mScenesLock;
     static std::vector<std::unique_ptr<Scene>> mScenes;
     static std::vector<std::filesystem::path> mResourceSearchPaths;
+    static std::filesystem::path mVulkanBasePath;
 
     static android::base::StaticLock mViewsLock;
     static std::vector<std::unique_ptr<RendererView>> mViews;

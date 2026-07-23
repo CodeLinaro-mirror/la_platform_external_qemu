@@ -40,6 +40,7 @@ namespace ver {
 android::base::StaticLock ScenesManager::mScenesLock;
 std::vector<std::unique_ptr<Scene>> ScenesManager::mScenes;
 std::vector<std::filesystem::path> ScenesManager::mResourceSearchPaths;
+std::filesystem::path ScenesManager::mVulkanBasePath;
 
 android::base::StaticLock ScenesManager::mViewsLock;
 std::vector<std::unique_ptr<RendererView>> ScenesManager::mViews;
@@ -51,6 +52,12 @@ void ScenesManager::setSearchPaths(
         const std::vector<std::filesystem::path>& resourceSearchPaths) {
     android::base::AutoLock lock(mScenesLock);
     mResourceSearchPaths = resourceSearchPaths;
+}
+
+void ScenesManager::setVulkanBasePath(
+        const std::filesystem::path& vulkanBasePath) {
+    android::base::AutoLock lock(mScenesLock);
+    mVulkanBasePath = vulkanBasePath;
 }
 
 bool ScenesManager::configArgumentFileExists(const SceneConfig& config) {
@@ -68,7 +75,8 @@ Scene* ScenesManager::createScene(const SceneConfig& config) {
           SceneConfig::modeToString(config.mSceneMode),
           config.mArgument.c_str());
 
-    std::unique_ptr<Scene> scene = Scene::create(config, mResourceSearchPaths);
+    std::unique_ptr<Scene> scene =
+            Scene::create(config, mResourceSearchPaths, mVulkanBasePath);
     if (!scene) {
         derror("%s: scene failed to load", __func__);
         return nullptr;
@@ -272,13 +280,19 @@ using android::ver::RendererView;
 using android::ver::Scene;
 using android::ver::ScenesManager;
 
-void ver_initialize(const std::vector<std::filesystem::path>& resourceBasePaths,
+bool ver_initialize(const std::vector<std::filesystem::path>& resourceBasePaths,
                     const void* eglDispatch,
-                    const void* gles2Dispatch) {
+                    const void* gles2Dispatch,
+                    const std::filesystem::path& vulkanBasePath) {
     dprint("%s: Setting search paths with %d entries", __func__,
            static_cast<int>(resourceBasePaths.size()));
     ScenesManager::setSearchPaths(resourceBasePaths);
     ScenesManager::setDispatch(eglDispatch, gles2Dispatch);
+
+    // TODO(virtualscene): Initialize the dispatch table once for all scenes
+    ScenesManager::setVulkanBasePath(vulkanBasePath);
+
+    return true;
 }
 
 bool ver_scene_config_file_exists(const VerSceneConfig& config) {

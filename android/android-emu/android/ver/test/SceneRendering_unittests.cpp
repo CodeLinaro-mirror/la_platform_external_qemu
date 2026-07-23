@@ -46,9 +46,14 @@ protected:
                 System::get()->getProgramDirectory(), "resources");
         resourcePaths.push_back(resourcesDir);
 
+        std::filesystem::path vulkanDir = PathUtils::join(
+                System::get()->getProgramDirectory(), "lib64", "vulkan");
+
         // Initialize with lazy-loaded GL dispatch
-        ver_initialize(resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
-                       (const void*)LazyLoadedGLESv2Dispatch::get());
+        bool success = ver_initialize(
+                resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
+                (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
+        ASSERT_TRUE(success) << "Failed to initialize VER";
     }
 
     void TearDown() override { ver_cleanup(); }
@@ -263,8 +268,11 @@ TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
     resourcePaths.push_back(resourcesDir);
     resourcePaths.push_back(testdataDir);
 
+    std::filesystem::path vulkanDir = PathUtils::join(
+            System::get()->getProgramDirectory(), "lib64", "vulkan");
+
     ver_initialize(resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
-                   (const void*)LazyLoadedGLESv2Dispatch::get());
+                   (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
 
     VerSceneConfig config(VerSceneConfig::Mode::Mesh3D, "poster_test.obj");
     VerSceneHandle scene = ver_create_scene(config);
