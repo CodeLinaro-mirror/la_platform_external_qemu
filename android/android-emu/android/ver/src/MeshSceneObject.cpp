@@ -70,9 +70,9 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
         const tinyobj::mesh_t& mesh = shape.mesh;
 
         std::vector<VertexPositionUV> vertices;
-        std::unordered_map<VertexPositionUV, GLuint, VertexPositionUVHash>
+        std::unordered_map<VertexPositionUV, uint32_t, VertexPositionUVHash>
                 existingVertexToIndex;
-        std::vector<GLuint> indices;
+        std::vector<uint32_t> indices;
         Texture texture;
 
         bool useCheckerboardMaterial = false;
@@ -125,7 +125,7 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::load(Renderer& renderer,
             } else {
                 vertices.push_back(vertex);
 
-                const GLuint index = vertices.size() - 1;
+                const uint32_t index = vertices.size() - 1;
                 indices.push_back(index);
 
                 existingVertexToIndex[vertex] = index;
@@ -233,7 +233,7 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::createSphere(
     }
 
     // Generate faces
-    std::vector<GLuint> indices;
+    std::vector<uint32_t> indices;
     indices.reserve(segments * segments * 2);
     for (int i = 0; i < segments; ++i) {
         int row1 = i * (segments + 1);

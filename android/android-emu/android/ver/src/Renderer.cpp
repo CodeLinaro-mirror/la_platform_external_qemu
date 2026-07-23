@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
@@ -51,24 +52,6 @@ using namespace android::base;
 #else
 #define T(...) ((void)0)
 #endif
-
-struct ScopeTimer {
-    ScopeTimer(const char* name) {
-#if T_ACTIVE
-        mFuncName = name;
-        mStartTime = get_uptime_ms();
-#endif
-    }
-
-#if T_ACTIVE
-    ~ScopeTimer() {
-        const uint64_t scopeTime = get_uptime_ms() - mStartTime;
-        dinfo("ScopeTimer: '%s' took %llu ms", mFuncName, scopeTime);
-    }
-    const char* mFuncName;
-    int64_t mStartTime;
-#endif
-};
 
 static constexpr int kSuperSampleMultiple = 2;
 
@@ -243,7 +226,7 @@ static constexpr android::ver::VertexPositionUV kScreenQuadVerts[] = {
         {glm::vec3(-1.f, 3.f, 0.f), glm::vec2(0.f, 2.f)},
 };
 
-static constexpr GLuint kScreenQuadIndices[] = {
+static constexpr uint32_t kScreenQuadIndices[] = {
         0,
         1,
         2,
@@ -557,8 +540,6 @@ void RendererView::applyBlurInPlaceCPU(int width,
         return;
     }
 
-    ScopeTimer timerObj(__func__);
-
     // Limit blur factor to avoid large kernels with low performance
     const int blurRadius = std::min((int)sigma, 16);
     const int stride = width * 4;
@@ -606,7 +587,7 @@ public:
 
     Mesh createMesh(const VertexPositionUV* vertices,
                     size_t verticesSize,
-                    const GLuint* indices,
+                    const uint32_t* indices,
                     size_t indicesSize) override;
 
     Texture loadTexture(const char* filename) override;
@@ -1102,7 +1083,7 @@ Material RendererImpl::createMaterialScreenSpace(const char* frag) {
 
 Mesh RendererImpl::createMesh(const VertexPositionUV* vertices,
                               size_t verticesSize,
-                              const GLuint* indices,
+                              const uint32_t* indices,
                               size_t indicesSize) {
     GLuint vertexBuffer = 0;
     GLuint indexBuffer = 0;
@@ -1116,8 +1097,9 @@ Mesh RendererImpl::createMesh(const VertexPositionUV* vertices,
 
     mGles2->glGenBuffers(1, &indexBuffer);
     mGles2->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    mGles2->glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize * sizeof(GLuint),
-                         indices, GL_STATIC_DRAW);
+    mGles2->glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                         indicesSize * sizeof(uint32_t), indices,
+                         GL_STATIC_DRAW);
     mGles2->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     VertexInfo info;
@@ -1159,7 +1141,8 @@ Texture RendererImpl::loadTexture(const char* filename) {
         return cachedTexture;
     }
 
-    std::optional<TextureUtils::Result> result = TextureUtils::load(path.c_str());
+    std::optional<TextureUtils::Result> result =
+            TextureUtils::load(path.c_str());
     if (!result) {
         E("%s: Failed to load texture from file '%s'", __FUNCTION__,
           path.c_str());
@@ -1229,7 +1212,6 @@ Texture RendererImpl::duplicateTexture(Texture texture) {
 bool RendererImpl::render(RendererView* lockedView,
                           const std::vector<RenderableObject>& renderables,
                           float time) {
-    ScopeTimer timerObj(__func__);
     mRenderTargets[0]->bind();
 
     mGles2->glEnable(GL_CULL_FACE);
