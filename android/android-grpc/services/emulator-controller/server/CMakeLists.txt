@@ -38,7 +38,8 @@ android_add_test(
   TARGET emulator_controller-server-impl_unittest
   SOURCE_DIR test
   SRC android/emulation/control/logcat/LogcatParser_unittest.cpp
-  DEPS android-emu-base emulator_controller-server-impl
+      android/emulation/control/utils/SharedMemoryLibrary_unittest.cpp
+  DEPS android-emu-base android-emu-base-headers emulator_controller-server-impl
        emulator_controller-service gmock_main grpc++)
 target_include_directories(emulator_controller-server-impl_unittest
                            PRIVATE src test)
