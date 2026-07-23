@@ -468,16 +468,7 @@ static bool _avdInfo_isDecimalVersion(const char* str) {
         return false;
     }
     str++;
-    if (*str == '\0') {
-        return false;
-    }
-    while (*str != '\0') {
-        if (!isdigit(*str)) {
-            return false;
-        }
-        str++;
-    }
-    return true;
+    return isdigit(*str);
 }
 
 static int _avdInfo_getApiLevel(AvdInfo* i, bool* isMarshmallowOrHigher) {
@@ -648,8 +639,8 @@ static const struct {
         {33, "Tiramisu", "13.0 (T) - API 33"},
         {34, "UpsideDownCake", "14.0 (U) - API 34"},
         {35, "VanillaIceCream", "15.0 (V) - API 35"},
-        {36, "Baklava", "16.0 (B) - API 36"},
-        {37, "CinnamonBun", "17.0 (C) - API 37"},
+        {36, "Baklava", "16 (B) - API 36"},
+        {37, "CinnamonBun", "17 (C) - API 37"},
 };
 
 const char* avdInfo_getApiDessertName(int apiLevel) {
@@ -676,6 +667,49 @@ void avdInfo_getFullApiName(int apiLevel, char* nameStr, int strLen) {
         }
     }
     snprintf(nameStr, strLen, "API %d", apiLevel);
+}
+
+void avdInfo_getFullApiNameFromAvd(const AvdInfo* i, char* nameStr, int strLen) {
+    if (nameStr == NULL || strLen <= 0) {
+        return;
+    }
+
+    if (i == NULL) {
+        snprintf(nameStr, strLen, "Unknown API version");
+        return;
+    }
+
+    int apiLevel = avdInfo_getApiLevel(i);
+    const char* apiLevelStr = avdInfo_getApiLevelStr(i);
+
+    int idx = -1;
+    int j = 0;
+    for (; j < ARRAY_SIZE(kApiLevelInfo); ++j) {
+        if (kApiLevelInfo[j].apiLevel == apiLevel) {
+            idx = j;
+            break;
+        }
+    }
+
+    if (idx >= 0) {
+        const char* full = kApiLevelInfo[idx].fullName;
+        char searchStr[32];
+        snprintf(searchStr, sizeof(searchStr), "API %d", apiLevel);
+        const char* pos = strstr(full, searchStr);
+        if (pos != NULL && apiLevelStr != NULL && *apiLevelStr != '\0') {
+            int prefixLen = (int)(pos - full);
+            snprintf(nameStr, strLen, "%.*sAPI %s", prefixLen, full, apiLevelStr);
+            return;
+        }
+        snprintf(nameStr, strLen, "%s", full);
+        return;
+    }
+
+    if (apiLevelStr != NULL && *apiLevelStr != '\0') {
+        snprintf(nameStr, strLen, "API %s", apiLevelStr);
+    } else {
+        snprintf(nameStr, strLen, "API %d", apiLevel);
+    }
 }
 
 int avdInfo_getApiLevelFromDessertName(const char* dessertName) {

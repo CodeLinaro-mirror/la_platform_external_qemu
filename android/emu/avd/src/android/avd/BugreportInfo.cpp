@@ -59,8 +59,7 @@ BugreportInfo::BugreportInfo() {
                               accelVersion.toString()));
     }
     char versionString[128];
-    int apiLevel = avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo());
-    avdInfo_getFullApiName(apiLevel, versionString, 128);
+    avdInfo_getFullApiNameFromAvd(getConsoleAgents()->settings->avdInfo(), versionString, 128);
     androidVer = versionString;
 
     Version studioVersion = android::studio::lastestAndroidStudioVersion();

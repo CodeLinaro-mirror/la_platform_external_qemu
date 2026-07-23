@@ -233,12 +233,16 @@ TEST(AvdInfoTest, api_level_parsing) {
                     "image.sysdir.1=dummy\n");
     };
 
+    char fullNameBuf[128];
+
     // Test case 1: Decimal version 36.1
     create_mock_avd("avd_36_1", "android-36.1");
     AvdInfo* info_36_1 = avdInfo_new("avd_36_1", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_36_1);
     EXPECT_EQ(36, avdInfo_getApiLevel(info_36_1));
     EXPECT_STREQ("36.1", avdInfo_getApiLevelStr(info_36_1));
+    avdInfo_getFullApiNameFromAvd(info_36_1, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("16 (B) - API 36.1", fullNameBuf);
     avdInfo_free(info_36_1);
 
     // Test case 2: Decimal version 37.0
@@ -247,29 +251,61 @@ TEST(AvdInfoTest, api_level_parsing) {
     ASSERT_NE(nullptr, info_37_0);
     EXPECT_EQ(37, avdInfo_getApiLevel(info_37_0));
     EXPECT_STREQ("37.0", avdInfo_getApiLevelStr(info_37_0));
+    avdInfo_getFullApiNameFromAvd(info_37_0, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("17 (C) - API 37.0", fullNameBuf);
     avdInfo_free(info_37_0);
 
-    // Test case 3: Preview dessert Baklava (API 36)
+    // Test case 3: Decimal version 37.1
+    create_mock_avd("avd_37_1", "android-37.1");
+    AvdInfo* info_37_1 = avdInfo_new("avd_37_1", NULL, "dummy_sysdir");
+    ASSERT_NE(nullptr, info_37_1);
+    EXPECT_EQ(37, avdInfo_getApiLevel(info_37_1));
+    EXPECT_STREQ("37.1", avdInfo_getApiLevelStr(info_37_1));
+    avdInfo_getFullApiNameFromAvd(info_37_1, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("17 (C) - API 37.1", fullNameBuf);
+    avdInfo_free(info_37_1);
+
+    // Test case 3b: Decimal version with beta suffix 37.2-beta1
+    create_mock_avd("avd_37_2_beta1", "android-37.2-beta1");
+    AvdInfo* info_37_2_beta1 = avdInfo_new("avd_37_2_beta1", NULL, "dummy_sysdir");
+    ASSERT_NE(nullptr, info_37_2_beta1);
+    EXPECT_EQ(37, avdInfo_getApiLevel(info_37_2_beta1));
+    EXPECT_STREQ("37.2-beta1", avdInfo_getApiLevelStr(info_37_2_beta1));
+    avdInfo_getFullApiNameFromAvd(info_37_2_beta1, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("17 (C) - API 37.2-beta1", fullNameBuf);
+    avdInfo_free(info_37_2_beta1);
+
+    // Test case 4: Preview dessert Baklava (API 36)
     create_mock_avd("avd_baklava", "android-Baklava");
     AvdInfo* info_baklava = avdInfo_new("avd_baklava", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_baklava);
     EXPECT_EQ(36, avdInfo_getApiLevel(info_baklava));
     EXPECT_STREQ("Baklava", avdInfo_getApiLevelStr(info_baklava));
+    avdInfo_getFullApiNameFromAvd(info_baklava, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("16 (B) - API Baklava", fullNameBuf);
     avdInfo_free(info_baklava);
 
-    // Test case 4: Preview dessert CinnamonBun (API 37)
+    // Test case 5: Preview dessert CinnamonBun (API 37)
     create_mock_avd("avd_cinnamon", "android-CinnamonBun");
     AvdInfo* info_cinnamon = avdInfo_new("avd_cinnamon", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_cinnamon);
     EXPECT_EQ(37, avdInfo_getApiLevel(info_cinnamon));
     EXPECT_STREQ("CinnamonBun", avdInfo_getApiLevelStr(info_cinnamon));
+    avdInfo_getFullApiNameFromAvd(info_cinnamon, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("17 (C) - API CinnamonBun", fullNameBuf);
     avdInfo_free(info_cinnamon);
 
-    // Test case 5: Standard integer 35
+    // Test case 6: Standard integer 35
     create_mock_avd("avd_35", "android-35");
     AvdInfo* info_35 = avdInfo_new("avd_35", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_35);
     EXPECT_EQ(35, avdInfo_getApiLevel(info_35));
     EXPECT_STREQ("35", avdInfo_getApiLevelStr(info_35));
+    avdInfo_getFullApiNameFromAvd(info_35, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("15.0 (V) - API 35", fullNameBuf);
     avdInfo_free(info_35);
+
+    // Test case 7: NULL AvdInfo
+    avdInfo_getFullApiNameFromAvd(nullptr, fullNameBuf, sizeof(fullNameBuf));
+    EXPECT_STREQ("Unknown API version", fullNameBuf);
 }
