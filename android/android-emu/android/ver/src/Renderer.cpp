@@ -37,6 +37,8 @@
 
 #include "RenderTarget.h"
 #include "TextureUtils.h"
+#include "VulkanDispatch.h"
+#include "VulkanShaders.h"
 
 using namespace android::base;
 
@@ -684,6 +686,7 @@ private:
     const int mRenderHeight;
     const std::filesystem::path mVulkanBasePath;
 
+    VulkanDispatchTable mVk;
     std::unique_ptr<RenderTarget> mRenderTargets[2];
     std::unique_ptr<RenderTarget> mScreenRenderTarget;
     Mesh mEffectsMesh;
@@ -755,8 +758,13 @@ RendererImpl::RendererImpl(int width,
 
 bool RendererImpl::initialize() {
     if (!mGL.initialize(mRenderWidth, mRenderHeight)) {
-        LOG(ERROR) << "Cannot initilize Egl";
+        LOG(ERROR) << "VER: Cannot initialize GL dispatcher";
         return false;
+    }
+
+    if (!mVk.initDriver(mVulkanBasePath)) {
+        // Non-blocking for now
+        LOG(WARNING) << "VER: Cannot initialize Vulkan dispatcher";
     }
 
     auto context = mGL.makeEglCurrent();
