@@ -750,7 +750,10 @@ if(NOT LINUX_AARCH64)
       testdata/ver/scene_imagefile_golden.png
       testdata/ver/scene_videofile_golden.png
       testdata/ver/scene_mesh3d_golden.png
-      testdata/ver/scene_image360_golden.png)
+      testdata/ver/scene_image360_golden.png
+      testdata/ver/scene_poster_side_by_side_golden.png
+      testdata/ver/poster_test.obj
+      testdata/ver/poster_test.posters)
 
   prebuilt(VIRTUALSCENE)
   android_copy_test_files(android-emu_unittests "${android-emu-testdata}"
