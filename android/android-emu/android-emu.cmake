@@ -733,6 +733,7 @@ if(NOT LINUX_AARCH64)
       testdata/textureutils/indexed.png
       testdata/textureutils/interlaced_golden.bmp
       testdata/textureutils/interlaced.png
+      testdata/textureutils/jpeg_16k.jpg
       testdata/textureutils/jpeg_gray_golden.bmp
       testdata/textureutils/jpeg_gray.jpg
       testdata/textureutils/jpeg_gray_progressive_golden.bmp

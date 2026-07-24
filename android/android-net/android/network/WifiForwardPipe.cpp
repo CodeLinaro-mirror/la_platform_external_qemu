@@ -20,6 +20,7 @@
 #include "aemu/base/sockets/SocketUtils.h"
 #include "host-common/AndroidPipe.h"
 
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <thread>
@@ -75,21 +76,23 @@ public:
 
         AndroidPipe* create(void* hwPipe, const char* /*args*/,
                             enum AndroidPipeFlags flags) override {
+            android::base::AutoLock lock(mPipeLock);
             if (mPipe) {
                 // Only one pipe can exist at a time, otherwise different pipes
                 // will compete for reading data from another emulator and will
                 // not receive a complete packet stream.
                 return nullptr;
             }
-            mPipe = new WifiForwardPipe(hwPipe, this);
-            return mPipe;
+            mPipe = std::shared_ptr<WifiForwardPipe>(new WifiForwardPipe(hwPipe, this));
+            return mPipe.get();
         }
 
         void onClose(WifiForwardPipe* pipe) {
-            if (mPipe == pipe) {
+            android::base::AutoLock lock(mPipeLock);
+            if (mPipe.get() == pipe) {
                 // The pipe is closing, forget about it so that a new one can
                 // be created if the guest opens another pipe.
-                mPipe = nullptr;
+                mPipe.reset();
             }
         }
 
@@ -99,15 +102,21 @@ public:
 
     private:
         size_t onDataAvailable(const uint8_t* data, size_t size) {
-            if (mPipe) {
-                return mPipe->onDataAvailable(data, size);
+            std::shared_ptr<WifiForwardPipe> pipe;
+            {
+                android::base::AutoLock lock(mPipeLock);
+                pipe = mPipe;
+            }
+            if (pipe) {
+                return pipe->onDataAvailable(data, size);
             } else {
                 return 0;
             }
         }
 
-        WifiForwardPipe* mPipe;
+        std::shared_ptr<WifiForwardPipe> mPipe;
         std::unique_ptr<WifiForwardPeer> mPeer;
+        android::base::Lock mPipeLock;
     };
 
     WifiForwardPipe(void* hwPipe, Service* service)
@@ -120,6 +129,10 @@ public:
     }
 
     void onGuestClose(PipeCloseReason /*reason*/) override {
+        {
+            android::base::AutoLock lock(mReceiveBufferLock);
+            mClosed = true;
+        }
         mService->onClose(this);
     }
 
@@ -198,6 +211,9 @@ public:
 
     size_t onDataAvailable(const uint8_t* data, size_t size) {
         android::base::AutoLock lock(mReceiveBufferLock);
+        if (mClosed) {
+            return 0;
+        }
         size_t ret = 0;
         if (mReceivePos >= mForwardPos) {
             // We're receiving at the end of the buffer and possibly at the
@@ -236,7 +252,6 @@ public:
             }
         }
         mDataAvailable = mForwardPos != mReceivePos;
-        lock.unlock();
         signalWake(PIPE_WAKE_READ);
         return ret;
     }
@@ -248,6 +263,7 @@ private:
     size_t mReceivePos;
     size_t mForwardPos;
     android::base::Lock mReceiveBufferLock;
+    bool mClosed = false;
 };
 
 }

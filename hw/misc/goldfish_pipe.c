@@ -831,6 +831,9 @@ static void pipeDevice_doCommand_v1(PipeDevice* dev, uint32_t command) {
     }
 }
 
+#define GOLDFISH_PIPE_MAX_RW_PARAMS \
+    (COMMAND_BUFFER_SIZE / (sizeof(uint64_t) + sizeof(uint32_t)))
+
 static void pipeDevice_doOpenClose_v2(PipeDevice* dev, uint32_t id) {
     PipeCommand* commandBuffer = (PipeCommand*)map_guest_buffer(
             dev->open_command->command_buffer_ptr,
@@ -839,7 +842,8 @@ static void pipeDevice_doOpenClose_v2(PipeDevice* dev, uint32_t id) {
         // well, what can we do here?
         return;
     }
-    if (dev->open_command->rw_params_max_count < 1) {
+    if ((dev->open_command->rw_params_max_count < 1) ||
+            (dev->open_command->rw_params_max_count > GOLDFISH_PIPE_MAX_RW_PARAMS)) {
         commandBuffer->status = GOLDFISH_PIPE_ERROR_INVAL;
         unmap_command_buffer(commandBuffer);
         return;
@@ -934,95 +938,31 @@ static void pipeDevice_doCommand_v2(HwPipe* pipe) {
                 buffers_count = pipe->rw_params_max_count;
             }
 
-            // This isn't supposed to happen, what's the puprose of calling
-            // us with no data?
-            assert(buffers_count);
+            if (!buffers_count || (buffers_count > GOLDFISH_PIPE_MAX_RW_PARAMS)) {
+                pipe->command_buffer->status = GOLDFISH_PIPE_ERROR_INVAL;
+                return;
+            }
 
             // We know that the |rw_params| fit into single page as of now, so
             // we're free to estimate the maximum size this way.
             uint64_t* const rwPtrs = hwpipe_get_command_rw_ptrs(pipe);
             uint32_t* const rwSizes = hwpipe_get_command_rw_sizes(pipe);
-            assert(buffers_count <=
-                   COMMAND_BUFFER_SIZE / (sizeof(*rwPtrs) + sizeof(*rwSizes)));
-            GoldfishPipeBuffer buffers[
-                    COMMAND_BUFFER_SIZE / (sizeof(*rwPtrs) + sizeof(*rwSizes))];
 
-#if defined(TARGET_MIPS)
-// MIPS Ranchu memory layout has device IO space hole between
-// 0x1f000000 - 0x20000000 and has two RAM regions for
-// each of them, below 0x1f000000 and after 0x20000000.
-// Tweak RAM_SPLIT_BOUNDARY accordingly to use interpolated
-// guest buffer mappings optimization on MIPS.
-#define RAM_SPLIT_BOUNDARY    0x20000000
-#elif defined(TARGET_I386)
-// If given memory around or bigger then 4G, emulator will split physical
-// memory to two parts, one is mapped below 4g, another one is mapped over
-// 4G. This is for reserving address space for PCI devices. So actually we
-// can't always map guest physical address to host virtual address with only
-// one offset. We have to use two offsets: one for memory below 4G and one
-// for memory over 4G.
-#define RAM_SPLIT_BOUNDARY    0xFFFFFFFF
-#elif defined(TARGET_ARM)
-// ARM Memory layout:
-// 0..128MB is space for a flash device bootrom code such as UEFI.
-// 128MB..256MB is used for miscellaneous device I/O.
-// 256MB..1GB is reserved for possible future PCI support (ie where the
-// PCI memory window will go if we add a PCI host controller).
-// 1GB and up is RAM (which may happily spill over into the
-// high memory region beyond 4GB).
-// For ARM this means, there will always be one single RAM region
-// (no splitting) so all buffer address interpolation will be done
-// using diffFromGuestPostSplit.
-#define RAM_SPLIT_BOUNDARY    0x40000000
-#else
-#error Unsupported architecture!
-#endif
-            // All passed buffers are allocated in the same guest process, so
-            // know they all have the same offset from the host address if they
-            // are in the same RAM region: below RAM_SPLIT_BOUNDARY or after.
-            // Use '1' as invalid value since real offsets always are aligned
-            // to page size.
-            ptrdiff_t diffFromGuestPreSplit = 1, diffFromGuestPostSplit = 1;
-            int count = 0;
-            int unmapIndex[2];
-            unsigned i;
-            for (i = 0; i < buffers_count; ++i) {
-                if ((rwPtrs[i] <= RAM_SPLIT_BOUNDARY && diffFromGuestPreSplit == 1) ||
-                    (rwPtrs[i] > RAM_SPLIT_BOUNDARY && diffFromGuestPostSplit == 1)) {
-                    buffers[i].data =
-                        map_guest_buffer(rwPtrs[i], rwSizes[i], willModifyData);
-                    if (rwPtrs[i] <= RAM_SPLIT_BOUNDARY) {
-                        diffFromGuestPreSplit =
-                            (intptr_t)buffers[i].data - (intptr_t)rwPtrs[i];
-                    } else {
-                        diffFromGuestPostSplit =
-                            (intptr_t)buffers[i].data - (intptr_t)rwPtrs[i];
+            GoldfishPipeBuffer buffers[GOLDFISH_PIPE_MAX_RW_PARAMS];
+            for (unsigned i = 0; i < buffers_count; ++i) {
+                buffers[i].data = map_guest_buffer(rwPtrs[i], rwSizes[i], willModifyData);
+                if (!buffers[i].data || !rwSizes[i]) {
+                    for (unsigned j = 0; j < i; ++j) {
+                        cpu_physical_memory_unmap(buffers[j].data,
+                                                  buffers[j].size,
+                                                  willModifyData,
+                                                  buffers[j].size);
                     }
-                    unmapIndex[count++] = i;
-                } else {
-                    if (rwPtrs[i] <= RAM_SPLIT_BOUNDARY) {
-                        buffers[i].data =
-                            (void*)(intptr_t)(rwPtrs[i] + diffFromGuestPreSplit);
-                    } else {
-                        buffers[i].data =
-                            (void*)(intptr_t)(rwPtrs[i] + diffFromGuestPostSplit);
-                    }
+                    pipe->command_buffer->status = GOLDFISH_PIPE_ERROR_INVAL;
+                    return;
                 }
                 buffers[i].size = rwSizes[i];
-                assert(buffers[i].data != NULL);
-                assert(buffers[i].size != 0);
             }
-
-#ifndef NDEBUG
-            // Verify that our interpolated mappings are actually correct
-            for (i = 1; i < buffers_count; ++i) {
-                void* const mapping = map_guest_buffer(rwPtrs[i], rwSizes[i],
-                                                       willModifyData);
-                assert(mapping == buffers[i].data);
-                cpu_physical_memory_unmap(mapping, rwSizes[i],
-                                          willModifyData, rwSizes[i]);
-            }
-#endif
 
             GoldfishPipeBuffer* send_buffers = NULL;
             unsigned send_buffers_count = 0;
@@ -1034,7 +974,11 @@ static void pipeDevice_doCommand_v2(HwPipe* pipe) {
                 // |read_index| is the first buffer used for receiving.
                 if (isCall) {
                     uint32_t read_index = hwpipe_get_command_rw_read_index(pipe);
-                    assert(read_index <= buffers_count);
+                    if (read_index > buffers_count) {
+                        pipe->command_buffer->status =
+                            GOLDFISH_PIPE_ERROR_INVAL;
+                        goto unmap_all;
+                    }
                     send_buffers = buffers;
                     send_buffers_count = read_index;
                     recv_buffers = &buffers[read_index];
@@ -1082,10 +1026,9 @@ static void pipeDevice_doCommand_v2(HwPipe* pipe) {
                (willModifyData ? (isCall ? "CALL" : "READ") : "WRITE"),
                (int)pipe->id, (int)buffers_count, pipe->command_buffer->status);
 
-            for (i = 0; i < count; ++i) {
-                const int j = unmapIndex[i];
-                cpu_physical_memory_unmap(buffers[j].data, buffers[j].size,
-                                          willModifyData, buffers[j].size);
+unmap_all:  for (unsigned i = 0; i < buffers_count; ++i) {
+                cpu_physical_memory_unmap(buffers[i].data, buffers[i].size,
+                                          willModifyData, buffers[i].size);
             }
             break;
         }

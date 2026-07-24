@@ -280,8 +280,14 @@ if(WIN32 AND MSVC)
 
   find_library(DISMAPI_LIBRARY NAMES dismapi.lib HINTS ${DISMAPI_INCLUDE_DIR}/../lib/amd64)
   message(STATUS "Found dismapi Library: ${DISMAPI_LIBRARY}")
-  set_target_properties(dismapi::dismapi
-                        PROPERTIES INTERFACE_LINK_LIBRARIES ${DISMAPI_LIBRARY} INTERFACE_INCLUDE_DIRECTORIES
-                                   ${DISMAPI_INCLUDE_DIR})
+  if(DISMAPI_INCLUDE_DIR AND NOT DISMAPI_INCLUDE_DIR MATCHES "-NOTFOUND" AND DISMAPI_LIBRARY AND NOT DISMAPI_LIBRARY MATCHES "-NOTFOUND")
+    set_target_properties(dismapi::dismapi
+                          PROPERTIES INTERFACE_LINK_LIBRARIES ${DISMAPI_LIBRARY} INTERFACE_INCLUDE_DIRECTORIES
+                                     ${DISMAPI_INCLUDE_DIR})
+  else()
+    set_target_properties(dismapi::dismapi
+                          PROPERTIES INTERFACE_LINK_LIBRARIES "" INTERFACE_INCLUDE_DIRECTORIES
+                                     "")
+  endif()
 
 endif()
