@@ -27,6 +27,7 @@
 
 #include "VertexTypes.h"
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -272,7 +273,7 @@ public:
     //
     // Returns a Mesh instance or an invalid value if there was an error.
     Mesh createMesh(const std::vector<VertexPositionUV>& vertices,
-                    const std::vector<GLuint>& indices) {
+                    const std::vector<uint32_t>& indices) {
         return createMesh(vertices.data(), vertices.size(), indices.data(),
                           indices.size());
     }
@@ -285,7 +286,7 @@ public:
     // Returns a Mesh instance or an invalid value if there was an error.
     template <size_t verticesSize, size_t indicesSize>
     Mesh createMesh(const VertexPositionUV (&vertices)[verticesSize],
-                    const GLuint (&indices)[indicesSize]) {
+                    const uint32_t (&indices)[indicesSize]) {
         return createMesh(vertices, verticesSize, indices, indicesSize);
     }
 
@@ -299,7 +300,7 @@ public:
     // Returns a Mesh instance or an invalid value if there was an error.
     virtual Mesh createMesh(const VertexPositionUV* vertices,
                             size_t verticesSize,
-                            const GLuint* indices,
+                            const uint32_t* indices,
                             size_t indicesSize) = 0;
 
     // Load an image from a file and create a Texture from it.
