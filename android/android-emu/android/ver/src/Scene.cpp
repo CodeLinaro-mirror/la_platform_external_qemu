@@ -74,8 +74,11 @@ namespace android {
 namespace ver {
 
 Scene::Scene(const SceneConfig& config,
-             const std::vector<std::filesystem::path>& basePaths)
-    : mConfig(config), mResourceBasePaths(basePaths) {
+             const std::vector<std::filesystem::path>& basePaths,
+             const std::filesystem::path& vulkanBasePath)
+    : mConfig(config),
+      mResourceBasePaths(basePaths),
+      mVulkanBasePath(vulkanBasePath) {
     D("%s: creating Scene", __func__);
 }
 
@@ -90,9 +93,10 @@ Scene::~Scene() {
 
 std::unique_ptr<Scene> Scene::create(
         const SceneConfig& config,
-        const std::vector<fs::path>& resourceBasePaths) {
+        const std::vector<fs::path>& resourceBasePaths,
+        const std::filesystem::path& vulkanBasePath) {
     std::unique_ptr<Scene> scene;
-    scene.reset(new Scene(config, resourceBasePaths));
+    scene.reset(new Scene(config, resourceBasePaths, vulkanBasePath));
     if (!scene->initialize()) {
         return nullptr;
     }
@@ -256,7 +260,7 @@ bool Scene::loadRendererResources() {
         return true;
     }
 
-    mRenderer = Renderer::create();
+    mRenderer = Renderer::create(mVulkanBasePath);
     if (!mRenderer) {
         E("VirtualSceneManager renderer failed to construct");
         return false;

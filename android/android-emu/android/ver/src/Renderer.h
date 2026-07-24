@@ -28,6 +28,7 @@
 #include "VertexTypes.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -202,7 +203,8 @@ public:
     //
     // Returns a Renderer instance if the renderer was successfully created or
     // null if there was an error.
-    static std::unique_ptr<Renderer> create();
+    static std::unique_ptr<Renderer> create(
+            const std::filesystem::path& vulkanBasePath);
 
     // Get the aspect ratio of the frame, w/h.
     virtual float getAspectRatio() = 0;
