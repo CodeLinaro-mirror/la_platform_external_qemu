@@ -35,21 +35,26 @@ SharedMemoryLibrary::LibraryEntry SharedMemoryLibrary::borrow(
         size_t size) {
     const std::lock_guard<std::mutex> lock(mAccess);
 
-    if (mHandlesCnt.count(handle) == 0) {
-        // Shared memory handle needs to be opened and created.
-        mHandlesCnt[handle] = 1;
+    bool needsCreate = (mHandlesCnt.count(handle) == 0) ||
+                       !mMemMap[handle]->isOpen() ||
+                       !mMemMap[handle]->isMapped() ||
+                       (size > 0 && mMemMap[handle]->size() < size);
+
+    if (needsCreate) {
         auto shm = std::make_unique<SharedMemory>(handle, size);
-        shm->open(SharedMemory::AccessMode::READ_WRITE);
-        mMemMap.emplace(handle, std::move(shm));
+        if (shm->open(SharedMemory::AccessMode::READ_WRITE) != 0 || !shm->isOpen() || !shm->isMapped()) {
+            shm->create(0600);
+        }
+        if (mHandlesCnt.count(handle) == 0) {
+            mHandlesCnt[handle] = 1;
+        }
+        mMemMap[handle] = std::move(shm);
     } else {
         // Increase the refcount.
         mHandlesCnt[handle]++;
     }
 
-    // Invariant: mHandlesCnt.count(handle) == mMemMap.count(handle)
-    // And mHandlesCnt.count(handle) > 0
     SharedMemory* shm = mMemMap[handle].get();
-    assert(shm->size() >= size);
 
     return android::base::makeCustomScopedPtr(
             shm, [this, handle](SharedMemory* shm) { release(handle); });
