@@ -407,5 +407,6 @@ void* android_get_posture_listener();
 bool android_is_xr_vst_headset_mode();
 bool android_is_xr_glasses_mode();
 bool android_is_xr_mode();
+bool android_is_glasses_mode();
 
 ANDROID_END_HEADER

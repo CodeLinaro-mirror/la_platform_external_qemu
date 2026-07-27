@@ -886,6 +886,9 @@ bool Device3DWidget::initTextures() {
 }
 
 std::string Device3DWidget::getModelBasePath() {
+    if (android_is_glasses_mode()) {
+        return ":/glasses-model";
+    }
     return ":/phone-model";
 }
 
