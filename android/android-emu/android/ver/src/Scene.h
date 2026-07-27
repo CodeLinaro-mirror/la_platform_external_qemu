@@ -133,6 +133,9 @@ public:
     void unloadUserResources();
 
     uint64_t getFrameTimeUs() const { return mFrameTimeUs; }
+    void setFrameTimeUs(uint64_t timeUs);
+
+    bool getBoundingBox(glm::vec3* outMin, glm::vec3* outMax) const;
 
 private:
     // Private constructor, use Scene::create to create an instance.

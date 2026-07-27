@@ -393,6 +393,11 @@ void Scene::update(bool updateTime) {
     }
 }
 
+void Scene::setFrameTimeUs(uint64_t timeUs) {
+    mFrameTimeUs = timeUs;
+    mStartTimeUs = System::get()->getUnixTimeUs() - mFrameTimeUs;
+}
+
 uint64_t Scene::getVersionHashForView(
         const RendererView* /*lockedView*/) const {
     const uint64_t sceneHash = reinterpret_cast<uint64_t>(this);
@@ -535,6 +540,31 @@ void Scene::unloadUserResources() {
     if (mRawImageSource) {
         mRawImageSource->Stop();
     }
+}
+
+bool Scene::getBoundingBox(glm::vec3* outMin, glm::vec3* outMax) const {
+    if (!outMin || !outMax) {
+        return false;
+    }
+    glm::vec3 minP(std::numeric_limits<float>::max());
+    glm::vec3 maxP(std::numeric_limits<float>::lowest());
+    bool hasBounds = false;
+
+    for (const auto& obj : mSceneObjects) {
+        if (!obj || !obj->isVisible()) continue;
+        glm::vec3 objMin, objMax;
+        if (obj->getBoundingBox(&objMin, &objMax)) {
+            minP = glm::min(minP, objMin);
+            maxP = glm::max(maxP, objMax);
+            hasBounds = true;
+        }
+    }
+    if (hasBounds) {
+        *outMin = minP;
+        *outMax = maxP;
+        return true;
+    }
+    return false;
 }
 
 }  // namespace ver

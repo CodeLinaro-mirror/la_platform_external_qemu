@@ -594,8 +594,15 @@ public:
                     const uint32_t* indices,
                     size_t indicesSize) override;
 
+    bool updateMesh(Mesh mesh,
+                    const VertexPositionUV* vertices,
+                    size_t verticesSize) override;
+
     Texture loadTexture(const char* filename) override;
     Texture loadTextureAsync(const char* filename) override;
+    Texture createTextureRGBA(const uint8_t* rgba,
+                              uint32_t width,
+                              uint32_t height) override;
     Texture duplicateTexture(Texture texture) override;
 
     bool render(RendererView* view,
@@ -1140,6 +1147,33 @@ Mesh RendererImpl::createMesh(const VertexPositionUV* vertices,
     }
 }
 
+bool RendererImpl::updateMesh(Mesh meshHandle,
+                              const VertexPositionUV* vertices,
+                              size_t verticesSize) {
+    if (!meshHandle.isValid() || !vertices || verticesSize == 0) {
+        return false;
+    }
+    auto context = makeCurrent();
+    AutoLock lock(mResourceLock);
+    auto it = mMeshes.find(meshHandle.id);
+    if (it == mMeshes.end()) {
+        return false;
+    }
+    GLuint vertexBuffer = it->second.mVertexBuffer;
+    mGles2->glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    mGles2->glBufferSubData(GL_ARRAY_BUFFER, 0,
+                           verticesSize * sizeof(VertexPositionUV), vertices);
+    mGles2->glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    const GLenum error = mGles2->glGetError();
+    if (error != GL_NO_ERROR) {
+        E("%s: GL error %d", __FUNCTION__, error);
+        return false;
+    }
+
+    return true;
+}
+
 Texture RendererImpl::loadTexture(const char* filename) {
     const uint64_t loadStartUs = System::get()->getHighResTimeUs();
 
@@ -1201,6 +1235,22 @@ Texture RendererImpl::loadTextureAsync(const char* filename) {
     mLoaderThread.enqueue(
             LoaderCommand(LoaderCommandType::LoadTexture, texture.id));
     return texture;
+}
+
+Texture RendererImpl::createTextureRGBA(const uint8_t* rgba,
+                                        uint32_t width,
+                                        uint32_t height) {
+    if (!rgba || width == 0 || height == 0) {
+        return Texture();
+    }
+    TextureUtils::Result result;
+    result.mWidth = width;
+    result.mHeight = height;
+    result.mFormat = TextureUtils::Format::RGBA32;
+    result.mBuffer.assign(
+            rgba, rgba + (static_cast<size_t>(width) * height * 4));
+
+    return createTextureInternal(TextureState::Loaded, nullptr, result);
 }
 
 Texture RendererImpl::duplicateTexture(Texture texture) {
