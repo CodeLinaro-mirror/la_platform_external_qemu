@@ -791,32 +791,40 @@ bool Snapshotter::isSavingCanceled(const char* name) const {
 }
 
 bool Snapshotter::stopVulkanAppsIfApplicable() {
+    const bool vulkanSnapshotsEnabled = android::featurecontrol::isEnabled(
+            android::featurecontrol::VulkanSnapshots);
+    // No need to check or stop the apps when vulkan snapshots are enabled
+    if (vulkanSnapshotsEnabled) {
+        return true;
+    }
 
+    // Vulkan snapshots are not enabled, check and to stop vulkan apps
     uint32_t count = 0;
     auto* vm = getConsoleAgents()->vm;
     vm->vulkanInstanceEnumerate(&count, nullptr, nullptr);
     if (!count) {
-        // No vulkan apps are running
+        // No vulkan apps are running, nothing to do
         return true;
     }
 
+    // Check if we really need to save a snapshot
     bool needToSaveSnapshot =
             !(getConsoleAgents()->settings->avdParams()->flags &
               AVDINFO_NO_SNAPSHOT_SAVE_ON_EXIT);
-    if(getConsoleAgents()->settings->android_cmdLineOptions()->no_snapshot_save) {
-            needToSaveSnapshot = false;
+    if (getConsoleAgents()
+                ->settings->android_cmdLineOptions()
+                ->no_snapshot_save) {
+        needToSaveSnapshot = false;
     }
-    if(isEnabled(android::featurecontrol::XrModeUI) &&
+
+    // In XR and GuestAngle modes, we don't support snapshotting by
+    // stopping the vulkan apps.
+    if (isEnabled(android::featurecontrol::XrModeUI) &&
         isEnabled(android::featurecontrol::GuestAngle)) {
         needToSaveSnapshot = false;
     }
 
-    const bool needToSaveVulkanApps = android::featurecontrol::isEnabled(
-            android::featurecontrol::VulkanSnapshots);
-
-    if (needToSaveSnapshot && !needToSaveVulkanApps) {
-        // stop vulkan apps
-    } else {
+    if (!needToSaveSnapshot) {
         // do nothing
         return false;
     }
