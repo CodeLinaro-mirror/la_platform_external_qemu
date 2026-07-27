@@ -567,7 +567,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     updateFoldableButtonVisibility();
     updateXrButtonsVisibility();
 
-    if (avdFlavor == AVD_GLASSES) {
+    const bool isGlassesAVD = (avdFlavor == AVD_GLASSES);
+    if (isGlassesAVD) {
         mToolsUi->zoom_button->setHidden(true);
         mToolsUi->prev_layout_button->setHidden(true);
         mToolsUi->next_layout_button->setHidden(true);
@@ -577,13 +578,24 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         if (getConsoleAgents()->settings->hw()->hw_touchpad0) {
             mTouchpadWindow->get();
         }
+    } else {
+        mToolsUi->glasses_button->setVisible(false);
+    }
 
+    bool showEnvironmentMenu = isGlassesAVD;
+    if (!showEnvironmentMenu &&
+        android::base::System::get()->getEnvironmentVariable(
+                "ANDROID_EMU_ENABLE_ENVIRONMENT_MENU") == "1") {
+        dinfo("ANDROID_EMU_ENABLE_ENVIRONMENT_MENU is set, enabling environmentMenu");
+        showEnvironmentMenu = true;
+    }
+
+    if (showEnvironmentMenu) {
         QMenu* envMenu = createEnvironmentMenu();
         mToolsUi->environment_button->setMenu(envMenu);
         mToolsUi->environment_button->setEnabled(true);
     } else {
         mToolsUi->environment_button->setVisible(false);
-        mToolsUi->glasses_button->setVisible(false);
     }
 
     connect(mPostureSelectionDialog, SIGNAL(newPostureRequested(int)), this,
