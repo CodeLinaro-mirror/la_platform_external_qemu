@@ -3460,10 +3460,6 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
         = QSIMPLEQ_HEAD_INITIALIZER(bdo_queue);
     bool wear_auto_forward = false;
 
-#if defined(CONFIG_ANDROID) && (SNAPSHOT_PROFILE > 1)
-    printf("Entering QEMU main with uptime %lld ms\n",
-           (long long)get_uptime_ms());
-#endif
 
 #ifdef CONFIG_ANDROID
     if (getConsoleAgents()->settings->android_qemu_mode()) {
@@ -5648,9 +5644,6 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
 
     if (getConsoleAgents()->settings->android_qemu_mode()) {
 
-#if SNAPSHOT_PROFILE > 1
-        printf("Starting VM at uptime %lld ms\n", (long long)get_uptime_ms());
-#endif
 
         if (mem_path) {
             androidSnapshot_setRamFile(mem_path, mem_file_shared);

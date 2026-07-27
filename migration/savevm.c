@@ -783,9 +783,6 @@ void vmstate_unregister(DeviceState *dev, const VMStateDescription *vmsd,
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
 {
     int res = 0;
-#if SNAPSHOT_PROFILE > 1
-    int64_t beginTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#endif
 
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
@@ -793,11 +790,6 @@ static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
     } else {
         res = vmstate_load_state(f, se->vmsd, se->opaque, se->load_version_id);
     }
-#if SNAPSHOT_PROFILE > 1
-    int64_t endTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("load_state(%s) time %.03f ms\n", se->idstr,
-            (endTime - beginTime)/1000000.0);
-#endif
     return res;
 }
 
@@ -1107,21 +1099,11 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
         }
         trace_savevm_section_start(se->idstr, se->section_id);
 
-#if SNAPSHOT_PROFILE > 1
-        int64_t beginTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#endif
-
         save_section_header(f, se, QEMU_VM_SECTION_PART);
 
         ret = se->ops->save_live_iterate(f, se->opaque);
         trace_savevm_section_end(se->idstr, se->section_id, ret);
         save_section_footer(f, se);
-
-#if SNAPSHOT_PROFILE > 1
-        int64_t endTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-        printf("savevm_state_iterate(%s) time %.03f ms\n", se->idstr,
-                (endTime - beginTime)/1000000.0);
-#endif
 
         if (ret < 0) {
             qemu_file_set_error(f, ret);
@@ -1212,21 +1194,11 @@ int qemu_savevm_state_complete_precopy(QEMUFile *f, bool iterable_only,
         }
         trace_savevm_section_start(se->idstr, se->section_id);
 
-#if SNAPSHOT_PROFILE > 1
-        int64_t beginTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#endif
-
         save_section_header(f, se, QEMU_VM_SECTION_END);
 
         ret = se->ops->save_live_complete_precopy(f, se->opaque);
         trace_savevm_section_end(se->idstr, se->section_id, ret);
         save_section_footer(f, se);
-
-#if SNAPSHOT_PROFILE > 1
-        int64_t endTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-        printf("savevm_complete_precopy(%s) time %.03f ms\n", se->idstr,
-                (endTime - beginTime)/1000000.0);
-#endif
 
         if (ret < 0) {
             qemu_file_set_error(f, ret);
@@ -1253,10 +1225,6 @@ int qemu_savevm_state_complete_precopy(QEMUFile *f, bool iterable_only,
 
         trace_savevm_section_start(se->idstr, se->section_id);
 
-#if SNAPSHOT_PROFILE > 1
-        int64_t beginTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#endif
-
         json_start_object(vmdesc, NULL);
         json_prop_str(vmdesc, "name", se->idstr);
         json_prop_int(vmdesc, "instance_id", se->instance_id);
@@ -1269,12 +1237,6 @@ int qemu_savevm_state_complete_precopy(QEMUFile *f, bool iterable_only,
         }
         trace_savevm_section_end(se->idstr, se->section_id, 0);
         save_section_footer(f, se);
-
-#if SNAPSHOT_PROFILE > 1
-        int64_t endTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-        printf("vmstate_save, old style (%s) time %.03f ms\n", se->idstr,
-                (endTime - beginTime)/1000000.0);
-#endif
 
         json_end_object(vmdesc);
     }
@@ -2227,10 +2189,6 @@ out:
 
 int qemu_loadvm_state(QEMUFile *f)
 {
-#if SNAPSHOT_PROFILE > 1
-    int64_t beginTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#endif
-
     MigrationIncomingState *mis = migration_incoming_get_current();
     Error *local_err = NULL;
     unsigned int v;
@@ -2273,11 +2231,7 @@ int qemu_loadvm_state(QEMUFile *f)
         }
     }
 
-#if SNAPSHOT_PROFILE > 1
-    int64_t vmstateLoadedTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("vmstate load time %.03f ms\n",
-           (vmstateLoadedTime - beginTime)/1000000.0);
-#endif
+
 
     cpu_synchronize_all_pre_loadvm();
     ret = qemu_loadvm_state_main(f, mis);
@@ -2332,11 +2286,7 @@ int qemu_loadvm_state(QEMUFile *f)
     qemu_loadvm_state_cleanup();
     cpu_synchronize_all_post_init();
 
-#if SNAPSHOT_PROFILE > 1
-    int64_t endTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("loadvm_state() time %.03f ms\n",
-           (endTime - beginTime)/1000000.0);
-#endif
+
 
 
     return ret;
@@ -2396,9 +2346,6 @@ void hmp_savevm(Monitor *mon, const QDict *qdict)
 
 int qemu_savevm(const char* name, const QEMUMessageCallback* messages)
 {
-#if SNAPSHOT_PROFILE
-    int64_t beginTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#endif
     BlockDriverState *bs, *bs1;
     QEMUSnapshotInfo sn1, *sn = &sn1, old_sn1, *old_sn = &old_sn1;
     int ret = -1;
@@ -2503,12 +2450,6 @@ int qemu_savevm(const char* name, const QEMUMessageCallback* messages)
 
     qemu_file_set_pb(f, s_protobuf);
 
-#if SNAPSHOT_PROFILE > 1
-    int64_t beginSaveStateTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("preparation time %.03f ms\n",
-           (beginSaveStateTime - beginTime)/1000000.0);
-#endif
-
     ret = qemu_savevm_state(f, &local_err);
     vm_state_size = qemu_ftell(f);
     qemu_fclose(f);
@@ -2516,12 +2457,6 @@ int qemu_savevm(const char* name, const QEMUMessageCallback* messages)
         messages->err(messages->opaque, local_err, NULL);
         goto the_end;
     }
-
-#if SNAPSHOT_PROFILE > 1
-    int64_t endSaveStateBeginSnapTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("qemu_savevm_state time %.03f ms\n",
-            (endSaveStateBeginSnapTime - beginSaveStateTime)/1000000.0);
-#endif
     /* The bdrv_all_create_snapshot() call that follows acquires the AioContext
      * for itself.  BDRV_POLL_WHILE() does not support nested locking because
      * it only releases the lock once.  Therefore synchronous I/O will deadlock
@@ -2547,16 +2482,6 @@ int qemu_savevm(const char* name, const QEMUMessageCallback* messages)
     if (s_snapshot_callbacks.savevm.on_end) {
         s_snapshot_callbacks.savevm.on_end(name, ret);
     }
-
-#if SNAPSHOT_PROFILE
-    int64_t endTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#if SNAPSHOT_PROFILE > 1
-    printf("snapshotting block devices time %.03f ms\n",
-           (endTime - endSaveStateBeginSnapTime)/1000000.0);
-#endif // > 1
-    printf("savevm time %.03f ms\n",
-           (endTime - beginTime)/1000000.0);
-#endif // > 0
 
     bdrv_drain_all_end();
 
@@ -2667,9 +2592,6 @@ int load_snapshot(const char *name, Error **errp)
 
 int qemu_loadvm(const char* name, const QEMUMessageCallback* messages)
 {
-#if SNAPSHOT_PROFILE
-    int64_t beginTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#endif
     BlockDriverState *bs, *bs_vm_state;
     QEMUSnapshotInfo sn;
     QEMUFile *f;
@@ -2746,11 +2668,6 @@ int qemu_loadvm(const char* name, const QEMUMessageCallback* messages)
     /* Flush all IO requests so they don't interfere with the new state.  */
     bdrv_drain_all_begin();
 
-#if SNAPSHOT_PROFILE > 1
-    int64_t gotoTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("preparation time %.03f ms\n", (gotoTime - beginTime)/1000000.0);
-#endif
-
     ret = bdrv_all_goto_snapshot(name, &bs, &local_err);
     if (ret < 0) {
         if (s_snapshot_callbacks.loadvm.on_end) {
@@ -2761,11 +2678,6 @@ int qemu_loadvm(const char* name, const QEMUMessageCallback* messages)
                      ret, name, bdrv_get_device_name(bs));
         goto err_drain;
     }
-
-#if SNAPSHOT_PROFILE > 1
-    int64_t gotoEndTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("goto snapshot time %.03f ms\n", (gotoEndTime - gotoTime)/1000000.0);
-#endif
 
     /* restore the VM state */
     f = qemu_fopen_bdrv(bs_vm_state, 0);
@@ -2783,12 +2695,6 @@ int qemu_loadvm(const char* name, const QEMUMessageCallback* messages)
 
     qemu_system_reset(SHUTDOWN_CAUSE_NONE);
     mis->from_src_file = f;
-
-#if SNAPSHOT_PROFILE > 1
-    int64_t resetEndTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-    printf("system reset time %.03f ms\n",
-           (resetEndTime - gotoEndTime)/1000000.0);
-#endif
 
     aio_context_acquire(aio_context);
     ret = qemu_loadvm_state(f);
@@ -2809,14 +2715,6 @@ err_drain:
                      "Error %d while loading VM state", ret);
         return ret;
     }
-
-#if SNAPSHOT_PROFILE
-    int64_t endTime = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-#if SNAPSHOT_PROFILE > 1
-    printf("loadvm_state() time %.03f ms\n", (endTime - resetEndTime)/1000000.0);
-#endif // > 1
-    printf("loadvm time %.03f ms\n", (endTime - beginTime)/1000000.0);
-#endif // > 0
 
     return 0;
 }
