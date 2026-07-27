@@ -48,8 +48,8 @@ EmulatorControlClient::~EmulatorControlClient() {
         mClient->cancelAll();
     }
     {
-        std::lock_guard<std::mutex> lock(mInputWriterAccess);
-        mInputEventWriter = nullptr;
+        std::lock_guard<std::mutex> lock(mInputWriterState->mutex);
+        mInputWriterState->writer = nullptr;
     }
     mService.reset();
     mClient.reset();
@@ -217,17 +217,22 @@ absl::StatusOr<GpsState> EmulatorControlClient::getGps() {
 
 SimpleClientWriter<InputEvent>*
 EmulatorControlClient::asyncInputEventWriter() {
-    std::lock_guard<std::mutex> lock(mInputWriterAccess);
-    if (mInputEventWriter)
-        return mInputEventWriter;
+    std::lock_guard<std::mutex> lock(mInputWriterState->mutex);
+    if (mInputWriterState->writer)
+        return mInputWriterState->writer;
 
     static Empty empty;
     auto context = mClient->newContext();
-    mInputEventWriter = new SimpleClientWriter<InputEvent>(std::move(context));
-    mService->async()->streamInputEvent(mInputEventWriter->context(), &empty,
-                                        mInputEventWriter);
-    mInputEventWriter->StartCall();
-    return mInputEventWriter;
+    auto inputWriterState = mInputWriterState;
+    mInputWriterState->writer = new SimpleClientWriter<InputEvent>(
+            std::move(context), [inputWriterState](const grpc::Status& status) {
+                std::lock_guard<std::mutex> lock(inputWriterState->mutex);
+                inputWriterState->writer = nullptr;
+            });
+    mService->async()->streamInputEvent(mInputWriterState->writer->context(),
+                                        &empty, mInputWriterState->writer);
+    mInputWriterState->writer->StartCall();
+    return mInputWriterState->writer;
 }
 
 }  // namespace control
