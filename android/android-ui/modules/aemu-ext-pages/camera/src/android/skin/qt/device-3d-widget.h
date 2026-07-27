@@ -131,6 +131,7 @@ private:
     bool initProgram();
     bool initModel();
     bool initTextures();
+    std::string getModelBasePath();
 
     // only applicable to resizable
     int mDisplayConfig {-1};

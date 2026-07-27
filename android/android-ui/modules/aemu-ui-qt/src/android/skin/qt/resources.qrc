@@ -1037,20 +1037,22 @@
         <file alias="center_point">images/multitouch/center_point.png</file>
         <file alias="center_point_2x">images/multitouch/center_point_2x.png</file>
     </qresource>
+    <qresource prefix="/model-shared">
+        <file alias="env-map-bottom.png">model-shared/env-map-bottom.png</file>
+        <file alias="env-map-back.png">model-shared/env-map-back.png</file>
+        <file alias="env-map-front.png">model-shared/env-map-front.png</file>
+        <file alias="env-map-left.png">model-shared/env-map-left.png</file>
+        <file alias="env-map-right.png">model-shared/env-map-right.png</file>
+        <file alias="env-map-top.png">model-shared/env-map-top.png</file>
+        <file alias="frag.glsl">model-shared/frag.glsl</file>
+        <file alias="frag-abstract-device.glsl">model-shared/frag-abstract-device.glsl</file>
+        <file alias="vert.glsl">model-shared/vert.glsl</file>
+    </qresource>
     <qresource prefix="/phone-model">
         <file alias="model.obj">phone-model/model.obj</file>
         <file alias="specular-map.png">phone-model/model-specular-map.png</file>
         <file alias="gloss-map.png">phone-model/model-gloss-map.png</file>
-        <file alias="env-map-back.png">phone-model/env-map-back.png</file>
-        <file alias="env-map-bottom.png">phone-model/env-map-bottom.png</file>
-        <file alias="env-map-front.png">phone-model/env-map-front.png</file>
-        <file alias="env-map-left.png">phone-model/env-map-left.png</file>
-        <file alias="env-map-right.png">phone-model/env-map-right.png</file>
-        <file alias="env-map-top.png">phone-model/env-map-top.png</file>
         <file alias="diffuse-map.png">phone-model/model-diffuse-map.png</file>
-        <file alias="frag.glsl">phone-model/frag.glsl</file>
-        <file alias="frag-abstract-device.glsl">phone-model/frag-abstract-device.glsl</file>
-        <file alias="vert.glsl">phone-model/vert.glsl</file>
     </qresource>
     <qresource prefix="/virtualscene">
         <file alias="mouse">images/virtualscene/ic_mouse_white_48dp.svg</file>

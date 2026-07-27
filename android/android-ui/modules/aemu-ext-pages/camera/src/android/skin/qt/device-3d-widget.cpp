@@ -40,8 +40,14 @@
 #include "android/physics/Physics.h"
 #include "android/skin/EmulatorSkin.h"
 #include "android/skin/backend-defs.h"
+#include <tiny_obj_loader.h>
+
+#include <map>
+#include <sstream>
+#include <string>
+#include <tuple>
+
 #include "android/skin/qt/gl-common.h"
-#include "android/skin/qt/wavefront-obj-parser.h"
 #include "android/utils/debug.h"
 #include "host-common/hw-config.h"
 #include "host-common/opengles.h"
@@ -60,6 +66,97 @@ static glm::vec3 clampPosition(glm::vec3 position) {
                       glm::vec3(Device3DWidget::MaxX, Device3DWidget::MaxY,
                                 Device3DWidget::MaxZ));
 }
+
+static bool parseWavefrontOBJ(QFile& model_file,
+                              std::vector<float>& model_vertex_data,
+                              std::vector<GLuint>& indices) {
+    QByteArray data = model_file.readAll();
+    std::string content(data.constData(), data.size());
+    std::istringstream stream(content);
+
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string err;
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
+                                      &stream);
+    if (!ret) {
+        dwarning("Failed to load model OBJ with tinyobjloader: %s",
+                 err.empty() ? "<no message>" : err.c_str());
+        return false;
+    }
+
+    std::map<std::tuple<int, int, int>, GLuint> vertex_to_index;
+    const size_t vertexCount = attrib.vertices.size() / 3;
+    const size_t normalCount = attrib.normals.size() / 3;
+    const size_t texcoordCount = attrib.texcoords.size() / 2;
+
+    for (const auto& shape : shapes) {
+        for (const auto& idx : shape.mesh.indices) {
+            if (idx.vertex_index < 0 ||
+                static_cast<size_t>(idx.vertex_index) >= vertexCount) {
+                dwarning("Invalid vertex index %d in OBJ",
+                         idx.vertex_index);
+                return false;
+            }
+
+            auto key = std::make_tuple(idx.vertex_index,
+                                       idx.normal_index,
+                                       idx.texcoord_index);
+            auto it = vertex_to_index.find(key);
+            if (it != vertex_to_index.end()) {
+                indices.push_back(it->second);
+            } else {
+                GLuint new_idx = static_cast<GLuint>(
+                        model_vertex_data.size() / 8);
+                indices.push_back(new_idx);
+                vertex_to_index[key] = new_idx;
+
+                // Position (X, Y, Z)
+                model_vertex_data.push_back(
+                        attrib.vertices[3 * idx.vertex_index + 0]);
+                model_vertex_data.push_back(
+                        attrib.vertices[3 * idx.vertex_index + 1]);
+                model_vertex_data.push_back(
+                        attrib.vertices[3 * idx.vertex_index + 2]);
+
+                // Normal (NX, NY, NZ)
+                if (idx.normal_index >= 0 &&
+                    static_cast<size_t>(idx.normal_index) <
+                            normalCount) {
+                    model_vertex_data.push_back(
+                            attrib.normals[3 * idx.normal_index + 0]);
+                    model_vertex_data.push_back(
+                            attrib.normals[3 * idx.normal_index + 1]);
+                    model_vertex_data.push_back(
+                            attrib.normals[3 * idx.normal_index + 2]);
+                } else {
+                    model_vertex_data.push_back(0.0f);
+                    model_vertex_data.push_back(0.0f);
+                    model_vertex_data.push_back(0.0f);
+                }
+
+                // UV (U, V)
+                if (idx.texcoord_index >= 0 &&
+                    static_cast<size_t>(idx.texcoord_index) <
+                            texcoordCount) {
+                    model_vertex_data.push_back(
+                            attrib.texcoords
+                                    [2 * idx.texcoord_index + 0]);
+                    model_vertex_data.push_back(
+                            attrib.texcoords
+                                    [2 * idx.texcoord_index + 1]);
+                } else {
+                    model_vertex_data.push_back(0.0f);
+                    model_vertex_data.push_back(0.0f);
+                }
+            }
+        }
+    }
+    return true;
+}
+
 
 Device3DWidget::Device3DWidget(QWidget* parent)
     : GLWidget(parent),
@@ -231,10 +328,10 @@ bool Device3DWidget::initGL() {
 
 bool Device3DWidget::initProgram() {
     // Compile & link shaders.
-    QFile vertex_shader_file(":/phone-model/vert.glsl");
+    QFile vertex_shader_file(":/model-shared/vert.glsl");
     QString shader_file_name =
-            mUseAbstractDevice ? ":/phone-model/frag-abstract-device.glsl"
-                               : ":/phone-model/frag.glsl";
+            mUseAbstractDevice ? ":/model-shared/frag-abstract-device.glsl"
+                               : ":/model-shared/frag.glsl";
     QFile fragment_shader_file(shader_file_name);
     vertex_shader_file.open(QFile::ReadOnly | QFile::Text);
     fragment_shader_file.open(QFile::ReadOnly | QFile::Text);
@@ -269,6 +366,7 @@ bool Device3DWidget::initProgram() {
 
 bool Device3DWidget::initModel() {
     if (mUseAbstractDevice) {
+        dprint("%s: Generating abstract device model", __func__);
         mGLES2->glGenBuffers(1, &mVertexDataBuffer);
         mGLES2->glGenBuffers(1, &mVertexIndexBuffer);
         return initAbstractDeviceModel();
@@ -276,16 +374,17 @@ bool Device3DWidget::initModel() {
         // Load the model and set up buffers.
         std::vector<float> model_vertex_data;
         std::vector<GLuint> indices;
-        QFile model_file(android_is_automotive() ? ":/car-model/model.obj"
-                                                 : ":/phone-model/model.obj");
+        std::string basePath = getModelBasePath();
+        std::string modelPath = basePath + "/model.obj";
+        dprint("%s: Loading model: %s", __func__, modelPath.c_str());
+        QFile model_file(QString::fromStdString(modelPath));
         if (model_file.open(QFile::ReadOnly)) {
-            QTextStream file_stream(&model_file);
-            if (!parseWavefrontOBJ(file_stream, model_vertex_data, indices)) {
-                dwarning("Failed to load model");
+            if (!parseWavefrontOBJ(model_file, model_vertex_data, indices)) {
                 return false;
             }
+            dprint("%s: Loaded model vertices: %zu", __func__, model_vertex_data.size());
         } else {
-            dwarning("Failed to open model file for reading");
+            dwarning("Failed to open model %s for reading", modelPath.c_str());
             return false;
         }
         mElementsCount = indices.size();
@@ -746,12 +845,13 @@ bool Device3DWidget::initTextures() {
         }
     } else {
         // Create textures.
-        mDiffuseMap = create2DTexture(mGLES2, ":/phone-model/diffuse-map.png",
+        std::string basePath = getModelBasePath();
+        mDiffuseMap = create2DTexture(mGLES2, (basePath + "/diffuse-map.png").c_str(),
                                       GL_TEXTURE_2D, GL_RGBA,
                                       GL_LINEAR_MIPMAP_LINEAR);
-        mSpecularMap = create2DTexture(mGLES2, ":/phone-model/specular-map.png",
+        mSpecularMap = create2DTexture(mGLES2, (basePath + "/specular-map.png").c_str(),
                                        GL_TEXTURE_2D, GL_LUMINANCE);
-        mGlossMap = create2DTexture(mGLES2, ":/phone-model/gloss-map.png",
+        mGlossMap = create2DTexture(mGLES2, (basePath + "/gloss-map.png").c_str(),
                                     GL_TEXTURE_2D, GL_LUMINANCE);
 
         if (!mDiffuseMap || !mSpecularMap || !mGlossMap) {
@@ -759,17 +859,17 @@ bool Device3DWidget::initTextures() {
         }
         mGLES2->glGenTextures(1, &mEnvMap);
         mGLES2->glBindTexture(GL_TEXTURE_CUBE_MAP, mEnvMap);
-        loadTexture(mGLES2, ":/phone-model/env-map-front.png",
+        loadTexture(mGLES2, ":/model-shared/env-map-front.png",
                     GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_RGBA);
-        loadTexture(mGLES2, ":/phone-model/env-map-back.png",
+        loadTexture(mGLES2, ":/model-shared/env-map-back.png",
                     GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, GL_RGBA);
-        loadTexture(mGLES2, ":/phone-model/env-map-right.png",
+        loadTexture(mGLES2, ":/model-shared/env-map-right.png",
                     GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_RGBA);
-        loadTexture(mGLES2, ":/phone-model/env-map-left.png",
+        loadTexture(mGLES2, ":/model-shared/env-map-left.png",
                     GL_TEXTURE_CUBE_MAP_NEGATIVE_X, GL_RGBA);
-        loadTexture(mGLES2, ":/phone-model/env-map-top.png",
+        loadTexture(mGLES2, ":/model-shared/env-map-top.png",
                     GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_RGBA);
-        loadTexture(mGLES2, ":/phone-model/env-map-bottom.png",
+        loadTexture(mGLES2, ":/model-shared/env-map-bottom.png",
                     GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, GL_RGBA);
         mGLES2->glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER,
                                 GL_LINEAR_MIPMAP_LINEAR);
@@ -783,6 +883,10 @@ bool Device3DWidget::initTextures() {
         CHECK_GL_ERROR_RETURN("Failed to initialize cubemap", false);
     }
     return true;
+}
+
+std::string Device3DWidget::getModelBasePath() {
+    return ":/phone-model";
 }
 
 void Device3DWidget::resizeGL(int w, int h) {
