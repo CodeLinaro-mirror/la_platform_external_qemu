@@ -24,6 +24,7 @@
 
 #include "Renderer.h"
 
+#include <limits>
 #include <glm/glm.hpp>
 
 namespace android {
@@ -53,6 +54,8 @@ public:
     // Returns true if the SceneObject is visible.
     bool isVisible() const;
 
+    // Returns the world-space bounding box for this object.
+    virtual bool getBoundingBox(glm::vec3* outMin, glm::vec3* outMax) const;
 
     // Update the texture of a renderable.
     void setTexture(int renderableIndex, Texture texture);
@@ -63,6 +66,10 @@ protected:
     glm::mat4 mTransform = glm::mat4();
     std::vector<Renderable> mRenderables;
     bool mVisible = true;
+
+    glm::vec3 mMinBounds = glm::vec3(std::numeric_limits<float>::max());
+    glm::vec3 mMaxBounds = glm::vec3(std::numeric_limits<float>::lowest());
+    bool mHasBounds = false;
 };
 
 }  // namespace ver

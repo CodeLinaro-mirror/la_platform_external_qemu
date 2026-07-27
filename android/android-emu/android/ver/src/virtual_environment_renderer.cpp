@@ -384,6 +384,38 @@ uint64_t ver_scene_get_frame_time_us(VerSceneHandle scene) {
     return scenePtr ? scenePtr->getFrameTimeUs() : 0;
 }
 
+void ver_scene_set_frame_time_us(VerSceneHandle scene, uint64_t timeUs) {
+    auto* scenePtr = reinterpret_cast<Scene*>(scene);
+    if (scenePtr) {
+        scenePtr->setFrameTimeUs(timeUs);
+    }
+}
+
+bool ver_scene_get_bounding_box(VerSceneHandle scene,
+                                float* outMinX,
+                                float* outMinY,
+                                float* outMinZ,
+                                float* outMaxX,
+                                float* outMaxY,
+                                float* outMaxZ) {
+    auto* scenePtr = reinterpret_cast<Scene*>(scene);
+    if (!scenePtr || !outMinX || !outMinY || !outMinZ || !outMaxX || !outMaxY ||
+        !outMaxZ) {
+        return false;
+    }
+    glm::vec3 minP, maxP;
+    if (scenePtr->getBoundingBox(&minP, &maxP)) {
+        *outMinX = minP.x;
+        *outMinY = minP.y;
+        *outMinZ = minP.z;
+        *outMaxX = maxP.x;
+        *outMaxY = maxP.y;
+        *outMaxZ = maxP.z;
+        return true;
+    }
+    return false;
+}
+
 void ver_scene_update_poster_scale(VerSceneHandle scene,
                                    const char* posterName,
                                    float scale) {

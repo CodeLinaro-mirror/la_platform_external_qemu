@@ -180,6 +180,35 @@ ver_scene_get_version_hash_for_view(VerSceneHandle scene,
  */
 VER_EXPORT uint64_t ver_scene_get_frame_time_us(VerSceneHandle scene);
 
+/**
+ * @brief Sets the current frame time of the scene in microseconds.
+ *
+ * @param scene The handle of the scene.
+ * @param timeUs The frame time in microseconds.
+ */
+VER_EXPORT void ver_scene_set_frame_time_us(VerSceneHandle scene,
+                                            uint64_t timeUs);
+
+/**
+ * @brief Retrieves the bounding box of the scene in world coordinates.
+ *
+ * @param scene The handle of the scene.
+ * @param outMinX Pointer to receive min X coordinate.
+ * @param outMinY Pointer to receive min Y coordinate.
+ * @param outMinZ Pointer to receive min Z coordinate.
+ * @param outMaxX Pointer to receive max X coordinate.
+ * @param outMaxY Pointer to receive max Y coordinate.
+ * @param outMaxZ Pointer to receive max Z coordinate.
+ * @return true if bounding box was calculated, false otherwise.
+ */
+VER_EXPORT bool ver_scene_get_bounding_box(VerSceneHandle scene,
+                                           float* outMinX,
+                                           float* outMinY,
+                                           float* outMinZ,
+                                           float* outMaxX,
+                                           float* outMaxY,
+                                           float* outMaxZ);
+
 // --- Poster Management ---
 
 /**
