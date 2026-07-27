@@ -31,8 +31,6 @@ namespace android {
 namespace emulation {
 namespace control {
 
-static const float kAmbientMotionExtentMeters = 0.005f;
-
 // mVirtualSceneConnected will be updated in three scenarios:
 // 1, snapshot load 2, virtual scene camera connected 3, virtual scene camera
 // disconnected.

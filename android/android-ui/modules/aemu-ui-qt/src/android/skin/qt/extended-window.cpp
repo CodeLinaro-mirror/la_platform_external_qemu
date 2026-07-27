@@ -266,7 +266,22 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->cameraButton->setVisible(false);
     }
 
-    if (avdFlavor != AVD_XR  &&  avdFlavor != AVD_GLASSES ) {
+    bool enableVirtualSensors = true;
+    if (avdFlavor == AVD_XR || avdFlavor == AVD_GLASSES) {
+        enableVirtualSensors = false;
+
+        // Enable the UI with a temporary envvar flag for now
+        if (avdFlavor == AVD_GLASSES) {
+            std::string enableVirtualSensorsVar =
+                    System::get()->envGet("ANDROID_EMU_ENABLE_VIRTUAL_SENSORS");
+            if (enableVirtualSensorsVar == "1") {
+                dinfo("Enabling virtual sensors UI for glasses AVD");
+                enableVirtualSensors = true;
+            }
+        }
+    }
+
+    if (enableVirtualSensors) {
         mSidebarButtons.addButton(mExtendedUi->virtSensorsButton);
     }
 
@@ -379,6 +394,8 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
         mExtendedUi->dpadButton->setVisible(false);
         mExtendedUi->fingerButton->setVisible(false);
         mExtendedUi->telephoneButton->setVisible(false);
+    }
+    if (!enableVirtualSensors) {
         mExtendedUi->virtSensorsButton->setVisible(false);
     }
 
