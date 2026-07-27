@@ -752,6 +752,17 @@ if(NOT LINUX_AARCH64)
       testdata/ver/scene_mesh3d_golden.png
       testdata/ver/scene_image360_golden.png
       testdata/ver/scene_poster_side_by_side_golden.png
+      testdata/ver/gltf/Box.glb
+      testdata/ver/gltf/BoxTextured.glb
+      testdata/ver/gltf/Duck/Duck.gltf
+      testdata/ver/gltf/Duck/Duck0.bin
+      testdata/ver/gltf/Duck/DuckCM.png
+      testdata/ver/gltf/SimpleSkin.gltf
+      testdata/ver/gltf_box_golden.png
+      testdata/ver/gltf_box_textured_golden.png
+      testdata/ver/gltf_duck_golden.png
+      testdata/ver/gltf_simple_skin_0s_golden.png
+      testdata/ver/gltf_simple_skin_1s_golden.png
       testdata/ver/poster_test.obj
       testdata/ver/poster_test.posters)
 
@@ -767,6 +778,7 @@ if(NOT LINUX_AARCH64)
                    SRC android/ver/test/TextureUtils_unittest.cpp
                        android/ver/test/RawImageFileSource_unittest.cpp
                        android/ver/test/SceneRendering_unittests.cpp
+                       android/ver/test/SceneRenderingGltf_unittests.cpp
                        android/ver/test/WebcamSource_unittest.cpp
                        android/ver/src/raw_image_sources/webcam/webcam_source_virtual.cc)
   target_compile_options(

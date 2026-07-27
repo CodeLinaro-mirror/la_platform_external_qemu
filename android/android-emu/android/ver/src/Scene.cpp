@@ -361,6 +361,13 @@ void Scene::update(bool updateTime) {
         mStartTimeUs = System::get()->getUnixTimeUs() - mFrameTimeUs;
     }
 
+    float timeSec = static_cast<float>(mFrameTimeUs) / 1000000.0f;
+    for (auto& obj : mSceneObjects) {
+        if (obj) {
+            obj->setAnimationTime(timeSec);
+        }
+    }
+
     if (mRawImageSource) {
         auto res = mRawImageSource->UpdateImage(
                 mFrameTimeUs, mRawImageSourceToken,
