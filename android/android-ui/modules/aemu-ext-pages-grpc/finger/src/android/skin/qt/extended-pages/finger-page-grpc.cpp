@@ -60,7 +60,7 @@ FingerPageGrpc::FingerPageGrpc(QWidget* parent)
                 tr("This emulated device is using API level %1%2.<br>"
                    "Fingerprint recognition is available with API level "
                    "23 (Marshmallow) and higher only.")
-                        .arg(apiLevel)
+                        .arg(avdInfo_getApiLevelStr(getConsoleAgents()->settings->avdInfo()))
                         .arg(dessertName);
 
         mUi->finger_noFinger_mask->setTextFormat(Qt::RichText);

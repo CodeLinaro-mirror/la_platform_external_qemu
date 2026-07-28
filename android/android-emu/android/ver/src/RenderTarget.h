@@ -55,22 +55,6 @@ public:
             uint32_t width,
             uint32_t height);
 
-    // Create a render target referring to no framebuffer (i.e. use to render to
-    // the current display).
-    //
-    // |renderer| - Renderer reference.
-    // |gles2| - Pointer to GLESv2Dispatch, must be non-null.
-    // |width| - Requested render width.
-    // |height| - Requested render height.
-    //
-    // Returns a RenderTarget instance if successful or null if there was an
-    // error.
-    static std::unique_ptr<RenderTarget> createDefault(
-            Renderer& renderer,
-            const GLESv2Dispatch* gles2,
-            uint32_t width,
-            uint32_t height);
-
     // Binds the framebuffer of this RenderTarget and sets the viewport size to
     // the size set when this RenderTarget was created.
     void bind() const;

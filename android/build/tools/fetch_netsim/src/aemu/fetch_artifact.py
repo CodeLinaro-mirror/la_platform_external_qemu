@@ -14,6 +14,7 @@
 
 import logging
 import os
+import shutil
 import subprocess
 import zipfile
 from pathlib import Path
@@ -37,6 +38,17 @@ class ZipFileWithAttr(zipfile.ZipFile):
         if attr != 0:
             os.chmod(targetpath, attr)
         return targetpath
+
+
+def find_fetch_artifact_tool():
+    for candidate in [
+        shutil.which("fetch_artifact"),
+        "/google/bin/releases/android-build-team/fetch_artifact/fetch_artifact.par",
+        "/google/bin/releases/android-build-team/fetch_artifact/fetch_artifact",
+    ]:
+        if candidate and os.path.exists(candidate) and not os.path.isdir(candidate):
+            return candidate
+    return None
 
 
 def fetch_artifact(
@@ -66,6 +78,28 @@ def fetch_artifact(
         location.parent.mkdir(parents=True)
 
     logging.info("Fetching: %s/%s/%s -> %s", bid, build_target, artifact, location)
+
+    v4_tool = find_fetch_artifact_tool()
+    if v4_tool:
+        logging.info("Using V4 fetch_artifact tool (%s) for %s", v4_tool, build_target)
+        cmd = [
+            v4_tool,
+            "--bid",
+            str(bid),
+            "--target",
+            build_target,
+            artifact,
+            str(location),
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode == 0 and location.exists():
+            return location
+        logging.warning(
+            "V4 fetch_artifact tool failed (code %s): %s. Falling back to REST API.",
+            res.returncode,
+            res.stderr,
+        )
+
     try:
         go_ab_service.fetch_bits(location, bid, build_target, artifact=artifact)
     except googleapiclient.errors.HttpError as e:

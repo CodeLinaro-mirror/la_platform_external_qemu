@@ -76,9 +76,8 @@ HelpPage::HelpPage(QWidget* parent)
 
     mUi->help_versionBox->setPlainText(verStr);
 
-    int apiLevel = avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo());
     char versionString[128];
-    avdInfo_getFullApiName(apiLevel, versionString, 128);
+    avdInfo_getFullApiNameFromAvd(getConsoleAgents()->settings->avdInfo(), versionString, 128);
     mUi->help_androidVersionBox->setPlainText(versionString);
     mUi->help_adbSerialNumberBox->setPlainText(
             "emulator-" + QString::number(android_serial_number_port));

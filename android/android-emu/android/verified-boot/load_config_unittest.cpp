@@ -42,38 +42,51 @@ TEST(VerifiedBootLoadConfigTest, Baseline) {
     EXPECT_EQ("bar", params[1]);
 }
 
-// Create a file and read the proto from it
-TEST(VerifiedBootLoadConfigTest, ReadFromFile) {
-    const char* path = tmpnam(NULL);
+static void runReadFromFileTest(const char* path) {
     const std::string textproto =
             "major_version: 1\n"
             "dm_param: \"foo\"\n"
             "param: \"bar\"";
-    int fd = open(path, O_CREAT | O_WRONLY | O_EXCL, 0666);
+    int fd = android_open(path, O_CREAT | O_WRONLY | O_EXCL, 0666);
     ASSERT_LT(-1, fd);
     write(fd, textproto.c_str(), textproto.length());
     close(fd);
 
     std::vector<std::string> params;
     EXPECT_EQ(Status::OK, getParametersFromFile(path, &params));
-    EXPECT_EQ(2, params.size());
+    ASSERT_EQ(2, params.size());
     EXPECT_EQ("dm=\"foo\"", params[0]);
     EXPECT_EQ("bar", params[1]);
 
     android_unlink(path);
 }
 
+// Create a file and read the proto from it
+TEST(VerifiedBootLoadConfigTest, ReadFromFile) {
+    std::string path = tmpnam(nullptr);
+    runReadFromFileTest(path.c_str());
+}
+
+// Create a file with a  nonascii name and read the proto from it
+TEST(VerifiedBootLoadConfigTest, ReadFromNonAsciiPath) {
+    std::string base_path = tmpnam(nullptr);
+    std::string path = base_path + "_テスト";
+    runReadFromFileTest(path.c_str());
+}
+
 // Pass a NULL to the file API
 TEST(VerifiedBootLoadConfigTest, NullPathname) {
     std::vector<std::string> params;
-    EXPECT_EQ(Status::CouldNotOpenFile, getParametersFromFile(NULL, &params));
+    EXPECT_EQ(Status::CouldNotOpenFile,
+              getParametersFromFile(nullptr, &params));
 }
 
 // Try to read from invalid pathname
 TEST(VerifiedBootLoadConfigTest, ReadFromInvalidPathname) {
-    const char* path = tmpnam(NULL);
+    std::string path = tmpnam(nullptr);
     std::vector<std::string> params;
-    EXPECT_EQ(Status::CouldNotOpenFile, getParametersFromFile(path, &params));
+    EXPECT_EQ(Status::CouldNotOpenFile,
+              getParametersFromFile(path.c_str(), &params));
 }
 
 // Use real-world parameters to flush out problems that might come up with

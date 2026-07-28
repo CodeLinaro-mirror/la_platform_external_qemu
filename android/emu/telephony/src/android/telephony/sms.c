@@ -774,9 +774,7 @@ smspdu_free( SmsPDU  pdu )
 {
     if (pdu) {
         free( pdu->base );
-        pdu->base = NULL;
-        pdu->end  = NULL;
-        pdu->tpdu = NULL;
+        free( pdu );
     }
 }
 
@@ -906,6 +904,8 @@ sms_get_text_utf8( cbytes_t        *pcur,
         goto Exit;
 
     len = *cur++;
+    if (len > ((end - cur) * 8 / 7))
+        goto Exit;
 
     /* skip user data header if any */
     int pad = 0;
@@ -1105,8 +1105,9 @@ smspdu_get_user_data_ref( SmsPDU  pdu )
             return data + 2;
         }
 
-        data += hlen;
-        len  -= hlen - 2;
+        /* skip (htype)(hlen)(hlen number of bytes) */
+        data += (2 + hlen);
+        len  -= (2 + hlen);
     }
 Fail:
     return NULL;
@@ -1587,8 +1588,8 @@ sms_receiver_add_submit_pdu( SmsReceiver  rec, SmsPDU       submit_pdu )
         return -1;
     }
     max = smspdu_get_max_index( submit_pdu );
-    if (max < 0) {
-        D( "%s: invalid max fragment value: %d should be >= 1\n",
+    if ((max < 1) || (max > 255)) {
+        D( "%s: invalid max fragment value: %d should be in [1, 255]\n",
            __FUNCTION__, max );
         return -1;
     }
@@ -1612,18 +1613,25 @@ sms_receiver_add_submit_pdu( SmsReceiver  rec, SmsPDU       submit_pdu )
             D("%s: created SMS index %d, from %.*s, ref %d, max %d\n", __FUNCTION__,
                frag->index, len, tmp, frag->ref, frag->max);
         }
-        *pnode = frag;
+        /* don't link until we know the fragment will hold at least one PDU */
+    } else if (max != frag->max) {
+        D("%s: SMS fragment max mismatch (%d vs allocated %d) for ref %d, "
+          "dropping\n", __FUNCTION__, max, frag->max, ref);
+        return -1;
     }
 
     cur = smspdu_get_cur_index( submit_pdu );
     if (cur < 0) {
         D("%s: SMS fragment index is too small: %d should be >= 1\n", __FUNCTION__, cur+1 );
+        if (*pnode != frag) sms_fragment_free(frag);
         return -1;
     }
-    if (cur >= max) {
-        D("%s: SMS fragment index is too large (%d >= %d)\n", __FUNCTION__, cur, max);
-        return -1;
+    if (cur >= frag->max) {
+        D("%s: SMS fragment index is too large (%d >= %d)\n", __FUNCTION__, cur, frag->max);
+        if (*pnode != frag) sms_fragment_free(frag);
     }
+    if (*pnode != frag)
+        *pnode = frag;   /* first fragment for this (dest,ref): now safe to link */
     if ( frag->pdus[cur] != NULL ) {
         D("%s: receiving duplicate SMS fragment for %d/%d, ref=%d, discarding old one\n",
           __FUNCTION__, cur+1, max, ref);

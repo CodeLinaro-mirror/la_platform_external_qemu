@@ -1721,9 +1721,17 @@ private:
 
     void save(Stream* f) const override {
         BaseCameraClient::save(f);
+
         stream_put_be32(f, mStreams.size());
-        stream_write(f, mStreams.data(),
-                     mStreams.size() * sizeof(Streams::value_type));
+        for (const auto& ss : mStreams) {
+            stream_put_be32(f, ss.id);
+            stream_put_be32(f, ss.width);
+            stream_put_be32(f, ss.height);
+            stream_put_be32(f, ss.format);
+
+            stream_put_be32(f, ss.frameBuffer.size());
+            stream_write(f, ss.frameBuffer.data(), ss.frameBuffer.size());
+        }
     }
 
     int load(Stream* f) override {
@@ -1735,10 +1743,22 @@ private:
         Streams streams(nStreams);
 
         if (nStreams) {
-            const ssize_t readSize =
-                nStreams * sizeof(Streams::value_type);
-            if (stream_read(f, streams.data(), readSize) != readSize) {
-                return -EIO;
+            for (auto& ss : streams) {
+                ss.id = stream_get_be32(f);
+                ss.width = stream_get_be32(f);
+                ss.height = stream_get_be32(f);
+                ss.format = stream_get_be32(f);
+
+                const uint32_t fbSize = stream_get_be32(f);
+                if (fbSize > 64 * 1024 * 1024) {  // 64MB sanity limit
+                    return -EIO;
+                }
+
+                ss.frameBuffer.resize(fbSize);
+                if (stream_read(f, ss.frameBuffer.data(), fbSize) !=
+                        static_cast<ssize_t>(fbSize)) {
+                    return -EIO;
+                }
             }
 
             const auto [width, height] = getMaxResolution(

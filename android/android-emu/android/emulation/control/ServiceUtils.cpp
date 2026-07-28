@@ -53,8 +53,8 @@ std::unordered_map<std::string, std::string> getQemuConfig() {
 
 #include "android/avd/hw-config-defs.h"
 
-    int apiLevel = avdInfo_getApiLevel(getConsoleAgents()->settings->avdInfo());
-    cfg["avd.api_level"] = std::to_string(apiLevel);
+    const char* apiLevelStr = avdInfo_getApiLevelStr(getConsoleAgents()->settings->avdInfo());
+    cfg["avd.api_level"] = apiLevelStr ? apiLevelStr : "";
 
     return cfg;
 }
