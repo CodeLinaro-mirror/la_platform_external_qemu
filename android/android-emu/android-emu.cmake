@@ -200,6 +200,8 @@ set(virtual_environment_renderer_src
     android/ver/src/MeshSceneObject.cpp
     android/ver/src/PosterSceneObject.cpp
     android/ver/src/Renderer.cpp
+    android/ver/src/RendererGLES.cpp
+    android/ver/src/RendererVulkan.cpp
     android/ver/src/RenderTarget.cpp
     android/ver/src/Scene.cpp
     android/ver/src/SceneObject.cpp
