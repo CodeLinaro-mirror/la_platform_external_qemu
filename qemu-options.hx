@@ -5169,6 +5169,13 @@ SRST
     Start right away with a saved state (``loadvm`` in monitor)
 ERST
 
+DEF("strict-loadvm", 0, QEMU_OPTION_strict_loadvm, \
+    "-strict-loadvm    exit if loadvm fails\n", QEMU_ARCH_ALL)
+SRST
+``-loadvm``
+    Exit on loadvm failure.
+ERST
+
 DEF("savevm", HAS_ARG, QEMU_OPTION_savevm, \
     "-savevm [tag|id]\n" \
     "                save the current state to a snapshot when exiting\n",

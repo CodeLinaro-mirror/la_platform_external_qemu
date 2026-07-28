@@ -169,6 +169,7 @@ static const char *incoming;
 static const char *incoming_str[MIGRATION_CHANNEL_TYPE__MAX];
 static MigrationChannel *incoming_channels[MIGRATION_CHANNEL_TYPE__MAX];
 static const char *loadvm;
+static bool strict_loadvm;
 static const char *savevm = NULL;
 static const char *accelerators;
 static bool have_custom_ram_size;
@@ -2818,6 +2819,9 @@ static int try_loadvm(void)
             return 0;
         } else {
             error_reportf_err(local_err, "Failed to load snapshot '%s': ", loadvm);
+            if (strict_loadvm) {
+              exit(1);
+            }
             fprintf(stderr, "Falling back to cold boot...\n");
 
             /* Issue a cold reset to clear any partial state from the failed load attempt */
@@ -3423,6 +3427,9 @@ void qemu_init(int argc, char **argv)
             case QEMU_OPTION_loadvm:
                 loadvm = optarg;
                 break;
+            case QEMU_OPTION_strict_loadvm:
+              strict_loadvm = true;
+              break;
             case QEMU_OPTION_savevm:
                 savevm = optarg;
                 break;
