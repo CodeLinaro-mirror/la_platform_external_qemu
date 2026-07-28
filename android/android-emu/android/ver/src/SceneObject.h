@@ -60,6 +60,9 @@ public:
     // Update the texture of a renderable.
     void setTexture(int renderableIndex, Texture texture);
 
+    // Update object animation for a given time in seconds.
+    virtual void setAnimationTime(float timeSec) {}
+
 protected:
     Renderer& mRenderer;
 
