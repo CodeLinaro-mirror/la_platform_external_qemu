@@ -193,7 +193,8 @@ int RenderedCameraDevice::readFrame(ClientFrame* resultFrame,
 
     // TODO(virtualscene-perf): update the view here to avoid resizing?
     // Update camera based on physical model and set view projection accordingly
-    const bool supportsPosition = (sceneMode == VerSceneConfig::Mode::Mesh3D);
+    const bool supportsPosition =
+            VerSceneConfig::modeSupportsCameraTranslation(sceneMode);
     mSceneCamera.setExtraRotationEulerDegrees(extraRotationEulerDegrees);
     mSceneCamera.update(supportsPosition);
 

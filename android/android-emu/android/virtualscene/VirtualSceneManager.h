@@ -131,6 +131,11 @@ public:
 
     static VerSceneConfig::Mode getSceneMode();
 
+    static bool modeSupportsSceneControls(VerSceneConfig::Mode mode);
+    static bool modeSupportsSceneControls();
+    static bool modeSupportsCameraTranslation(VerSceneConfig::Mode mode);
+    static bool modeSupportsCameraTranslation();
+
     // Returns false on error.
     static bool reloadEnvironment(const char* environmentData);
 

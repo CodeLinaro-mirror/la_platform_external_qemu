@@ -781,6 +781,22 @@ VerSceneConfig::Mode VirtualSceneManager::getSceneMode() {
     return ver_scene_get_mode(mEnvironmentScene);
 }
 
+bool VirtualSceneManager::modeSupportsSceneControls(VerSceneConfig::Mode mode) {
+    return VerSceneConfig::modeSupportsSceneControls(mode);
+}
+
+bool VirtualSceneManager::modeSupportsSceneControls() {
+    return modeSupportsSceneControls(getSceneMode());
+}
+
+bool VirtualSceneManager::modeSupportsCameraTranslation(VerSceneConfig::Mode mode) {
+    return VerSceneConfig::modeSupportsCameraTranslation(mode);
+}
+
+bool VirtualSceneManager::modeSupportsCameraTranslation() {
+    return modeSupportsCameraTranslation(getSceneMode());
+}
+
 bool VirtualSceneManager::reloadScene(const VerSceneConfig& config) {
     bool shouldNotifyAnimation = false;
     {
