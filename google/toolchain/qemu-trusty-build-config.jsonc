@@ -71,7 +71,7 @@
       },
       "gmodule": {
         "lib_type": "bazel",
-        "bazel_target": "@glib//gmodule",
+        "bazel_target": "@glib//gmodule:gmodule_import",
         "version": "2.77.2",
         "shim": {
           "name": "gmodule-export-2.0",
@@ -86,7 +86,7 @@
       },
       "glib": {
         "lib_type": "bazel",
-        "bazel_target": "@glib//glib",
+        "bazel_target": "@glib//glib:glib_import",
         "version": "2.77.2",
         "shim": {
           "name": "glib-2.0",
