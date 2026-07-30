@@ -197,6 +197,13 @@ struct SceneConfig {
         return (mode == SceneConfig::Mode::Mesh3D) ||
                (mode == SceneConfig::Mode::Image360);
     }
+
+    /**
+     * @brief Checks if the mode supports camera translation movement (e.g., WASDQE).
+     */
+    static bool modeSupportsCameraTranslation(SceneConfig::Mode mode) {
+        return (mode == SceneConfig::Mode::Mesh3D);
+    }
 };
 
 inline bool operator==(const SceneConfig& lhs, const SceneConfig& rhs) {

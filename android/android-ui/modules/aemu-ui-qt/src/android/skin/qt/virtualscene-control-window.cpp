@@ -61,6 +61,7 @@
 #include "android/skin/qt/shortcut-key-store.h"
 #include "android/skin/qt/stylesheet.h"
 #include "android/skin/qt/tool-window.h"
+#include "android/virtualscene/VirtualSceneManager.h"
 #include "android/virtualscene/WASDInputHandler.h"
 // #include "glm/gtc/../detail/func_geometric.inl"
 // #include "glm/gtc/../detail/func_trigonometric.inl"
@@ -597,7 +598,13 @@ void VirtualSceneControlWindow::updateHighlightAndFocusStyle() {
 
 QString VirtualSceneControlWindow::getInfoText() {
     if (mCaptureMouse) {
-        return tr("Control view with mouse + WASDQE.");
+        bool supportsTranslation = android::virtualscene::VirtualSceneManager::
+                modeSupportsCameraTranslation();
+        if (supportsTranslation) {
+            return tr("Control view with mouse + WASDQE.");
+        } else {
+            return tr("Control view with mouse.");
+        }
     } else {
 #ifdef Q_OS_MAC
         return tr("Press \u2325 Option to move camera.");
