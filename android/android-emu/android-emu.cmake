@@ -224,6 +224,7 @@ android_add_library(
        FFMPEG::FFMPEG
        emulator-libjpeg
        emulator-tinyobjloader
+       emulator-tinygltf
        webrtc-yuv
 )
 target_link_libraries(
