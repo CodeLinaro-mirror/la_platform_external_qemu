@@ -764,7 +764,7 @@ bool androidSnapshot_quickbootSave(const char* _name) {
     }
 
     const auto nowTimeMs = System::get()->getHighResTimeUs() / 1000;
-    LOG(INFO) << "Saving snapshot '" << name << "' using " << int64_t(nowTimeMs - startTimeMs) << " ms";
+    LOG(INFO) << "Saving snapshot '" << name << "' took " << int64_t(nowTimeMs - startTimeMs) << " ms";
     return saveResult;
 }
 

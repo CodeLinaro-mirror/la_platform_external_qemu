@@ -62,5 +62,31 @@ void SceneObject::setTexture(int renderableIndex, Texture texture) {
     mRenderables[renderableIndex].texture = mRenderer.duplicateTexture(texture);
 }
 
+bool SceneObject::getBoundingBox(glm::vec3* outMin, glm::vec3* outMax) const {
+    if (!mHasBounds || !outMin || !outMax) {
+        return false;
+    }
+    glm::vec3 corners[8] = {
+        {mMinBounds.x, mMinBounds.y, mMinBounds.z},
+        {mMaxBounds.x, mMinBounds.y, mMinBounds.z},
+        {mMinBounds.x, mMaxBounds.y, mMinBounds.z},
+        {mMaxBounds.x, mMaxBounds.y, mMinBounds.z},
+        {mMinBounds.x, mMinBounds.y, mMaxBounds.z},
+        {mMaxBounds.x, mMinBounds.y, mMaxBounds.z},
+        {mMinBounds.x, mMaxBounds.y, mMaxBounds.z},
+        {mMaxBounds.x, mMaxBounds.y, mMaxBounds.z},
+    };
+    glm::vec3 minP(std::numeric_limits<float>::max());
+    glm::vec3 maxP(std::numeric_limits<float>::lowest());
+    for (int i = 0; i < 8; ++i) {
+        glm::vec4 transformed = mTransform * glm::vec4(corners[i], 1.0f);
+        minP = glm::min(minP, glm::vec3(transformed));
+        maxP = glm::max(maxP, glm::vec3(transformed));
+    }
+    *outMin = minP;
+    *outMax = maxP;
+    return true;
+}
+
 }  // namespace ver
 }  // namespace android

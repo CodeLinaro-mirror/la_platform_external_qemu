@@ -49,7 +49,6 @@ extern "C" {
 #include "aemu/base/Tracing.h"
 #include "aemu/base/Uuid.h"
 #include "aemu/base/async/ThreadLooper.h"
-#include "aemu/base/files/MemStream.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/memory/ScopedPtr.h"
 #include "aemu/base/process/Process.h"
@@ -209,15 +208,14 @@ extern "C" void rng_random_generic_read_random_bytes(void* buf, int size) {
     if (size <= 0)
         return;
 
-    android::base::MemStream stream;
     static std::random_device rd;
     static std::mt19937 gen(rd());
     std::uniform_int_distribution<int> uniform_dist(0, 255);  // fill a byte
 
+    uint8_t* byte_buf = (uint8_t*)buf;
     for (int i = 0; i < size; ++i) {
-        stream.putByte(uniform_dist(gen));
+        byte_buf[i] = uniform_dist(gen);
     }
-    stream.read(buf, size);
 }
 
 bool qemu_android_emulation_early_setup() {

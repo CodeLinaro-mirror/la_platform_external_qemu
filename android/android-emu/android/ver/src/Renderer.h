@@ -27,6 +27,8 @@
 
 #include "VertexTypes.h"
 
+#include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -201,7 +203,8 @@ public:
     //
     // Returns a Renderer instance if the renderer was successfully created or
     // null if there was an error.
-    static std::unique_ptr<Renderer> create();
+    static std::unique_ptr<Renderer> create(
+            const std::filesystem::path& vulkanBasePath);
 
     // Get the aspect ratio of the frame, w/h.
     virtual float getAspectRatio() = 0;
@@ -272,7 +275,7 @@ public:
     //
     // Returns a Mesh instance or an invalid value if there was an error.
     Mesh createMesh(const std::vector<VertexPositionUV>& vertices,
-                    const std::vector<GLuint>& indices) {
+                    const std::vector<uint32_t>& indices) {
         return createMesh(vertices.data(), vertices.size(), indices.data(),
                           indices.size());
     }
@@ -285,7 +288,7 @@ public:
     // Returns a Mesh instance or an invalid value if there was an error.
     template <size_t verticesSize, size_t indicesSize>
     Mesh createMesh(const VertexPositionUV (&vertices)[verticesSize],
-                    const GLuint (&indices)[indicesSize]) {
+                    const uint32_t (&indices)[indicesSize]) {
         return createMesh(vertices, verticesSize, indices, indicesSize);
     }
 
@@ -299,8 +302,13 @@ public:
     // Returns a Mesh instance or an invalid value if there was an error.
     virtual Mesh createMesh(const VertexPositionUV* vertices,
                             size_t verticesSize,
-                            const GLuint* indices,
+                            const uint32_t* indices,
                             size_t indicesSize) = 0;
+
+    // Update the vertex buffer of an existing Mesh object.
+    virtual bool updateMesh(Mesh mesh,
+                            const VertexPositionUV* vertices,
+                            size_t verticesSize) = 0;
 
     // Load an image from a file and create a Texture from it.
     //
@@ -328,6 +336,17 @@ public:
     // Returns a Texture. If there was an error, the Texture will be invalid,
     // which can be queried with Texture::isValid().
     virtual Texture loadTextureAsync(const char* filename) = 0;
+
+    // Create a Texture directly from in-memory RGBA pixel data.
+    //
+    // |rgba| - Pointer to RGBA pixel buffer.
+    // |width| - Width of the texture in pixels.
+    // |height| - Height of the texture in pixels.
+    //
+    // Returns a Texture instance.
+    virtual Texture createTextureRGBA(const uint8_t* rgba,
+                                      uint32_t width,
+                                      uint32_t height) = 0;
 
     // Duplicate a Texture instance.
     //

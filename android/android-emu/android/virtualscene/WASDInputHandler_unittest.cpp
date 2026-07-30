@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "android/virtualscene/WASDInputHandler.h"
+#include "android/avd/info.h"
 #include "android/base/testing/GlmTestHelpers.h"
 #include "android/base/testing/MockUtils.h"
+#include "android/console.h"
 #include "android/emulation/testing/MockAndroidSensorsAgent.h"
 #include "android/physics/PhysicalModel.h"
 
@@ -368,4 +370,54 @@ TEST_F(WASDInputHandlerTest, MouseToggleWithZRotation) {
         ExpectTargetRotationNear(initialRotation);
         handler.mouseMove(kPixelsFor180 * 80 / 90, -kPixelsFor180 / 4);
     }
+}
+
+TEST_F(WASDInputHandlerTest, PhoneAmbientMotion) {
+    AvdInfo* avdInfo = avdInfo_new_for_testing(AVD_PHONE);
+    getConsoleAgents()->settings->inject_AvdInfo(avdInfo);
+
+    WASDInputHandler handler = createHandler();
+    EXPECT_CALL(mMock,
+                getPhysicalParameter(Eq(PHYSICAL_PARAMETER_ROTATION), _, _,
+                                     Eq(PARAMETER_VALUE_TYPE_TARGET)));
+    EXPECT_CALL(mMock,
+                setPhysicalParameterTarget(
+                        Eq(PHYSICAL_PARAMETER_AMBIENT_MOTION), _, _, _))
+            .WillOnce(Invoke([](int, const float* val, size_t count, int) {
+                EXPECT_EQ(1u, count);
+                EXPECT_NEAR(0.005f, val[0], 1e-4f);
+                return PHYSICAL_PARAMETER_STATUS_OK;
+            }));
+    handler.enable();
+    Mock::VerifyAndClear(&mMock);
+
+    disable(handler);
+
+    getConsoleAgents()->settings->inject_AvdInfo(nullptr);
+    avdInfo_free(avdInfo);
+}
+
+TEST_F(WASDInputHandlerTest, NonPhoneAmbientMotion) {
+    AvdInfo* avdInfo = avdInfo_new_for_testing(AVD_TV);
+    getConsoleAgents()->settings->inject_AvdInfo(avdInfo);
+
+    WASDInputHandler handler = createHandler();
+    EXPECT_CALL(mMock,
+                getPhysicalParameter(Eq(PHYSICAL_PARAMETER_ROTATION), _, _,
+                                     Eq(PARAMETER_VALUE_TYPE_TARGET)));
+    EXPECT_CALL(mMock,
+                setPhysicalParameterTarget(
+                        Eq(PHYSICAL_PARAMETER_AMBIENT_MOTION), _, _, _))
+            .WillOnce(Invoke([](int, const float* val, size_t count, int) {
+                EXPECT_EQ(1u, count);
+                EXPECT_NEAR(0.0f, val[0], 1e-4f);
+                return PHYSICAL_PARAMETER_STATUS_OK;
+            }));
+    handler.enable();
+    Mock::VerifyAndClear(&mMock);
+
+    disable(handler);
+
+    getConsoleAgents()->settings->inject_AvdInfo(nullptr);
+    avdInfo_free(avdInfo);
 }

@@ -29,7 +29,7 @@ static constexpr android::ver::VertexPositionUV kQuadVerts[] = {
         {glm::vec3(0.5f, 0.5f, 0.f), glm::vec2(1.f, 1.f)},
 };
 
-static constexpr GLuint kQuadIndices[] = {0, 1, 2, 2, 1, 3};
+static constexpr uint32_t kQuadIndices[] = {0, 1, 2, 2, 1, 3};
 
 namespace android {
 namespace ver {

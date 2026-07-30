@@ -10,8 +10,8 @@
 // GNU General Public License for more details.
 #include "android/opengl/OpenglEsPipe.h"
 
+
 #include "aemu/base/Optional.h"
-#include "aemu/base/Stopwatch.h"
 #include "aemu/base/async/Looper.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/StreamSerializing.h"
@@ -54,8 +54,8 @@ using gfxstream::RenderChannel;
 using gfxstream::RenderChannelPtr;
 using ChannelState = gfxstream::RenderChannel::State;
 using IoResult = gfxstream::RenderChannel::IoResult;
-using android::base::Stopwatch;
 using android::snapshot::Snapshotter;
+
 
 // Note: this is only used for a validation check, and mismatches would
 // crash the emulator with a fatal error. For updating the snapshot file
@@ -95,9 +95,6 @@ public:
         bool canLoad() const override { return true; }
 
         virtual void preLoad(android::base::Stream* stream) override {
-#ifdef SNAPSHOT_PROFILE
-            mLoadMeter.restartUs();
-#endif
             const bool hasRenderer = stream->getByte();
             const auto& renderer = android_getOpenglesRenderer();
             if (hasRenderer != (bool)renderer) {
@@ -113,26 +110,15 @@ public:
             }
             android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
             renderer->load(&gfxstreamStream, Snapshotter::get().loader().textureLoader());
-#ifdef SNAPSHOT_PROFILE
-            printf("OpenglEs preload time: %lld ms\n",
-                   (long long)(mLoadMeter.elapsedUs() / 1000));
-#endif
         }
 
         void postLoad(android::base::Stream* stream) override {
             if (const auto& renderer = android_getOpenglesRenderer()) {
                 renderer->resumeAll();
             }
-#ifdef SNAPSHOT_PROFILE
-            printf("OpenglEs total load time: %lld ms\n",
-                   (long long)(mLoadMeter.elapsedUs() / 1000));
-#endif
         }
 
         void preSave(android::base::Stream* stream) override {
-#ifdef SNAPSHOT_PROFILE
-            mSaveMeter.restartUs();
-#endif
             if (const auto& renderer = android_getOpenglesRenderer()) {
                 renderer->pauseAllPreSave();
                 stream->putByte(1); // hasRenderer
@@ -152,10 +138,6 @@ public:
             if (const auto& renderer = android_getOpenglesRenderer()) {
                 renderer->resumeAll();
             }
-#ifdef SNAPSHOT_PROFILE
-            printf("OpenglEs total save time: %lld ms\n",
-                   (long long)(mSaveMeter.elapsedUs() / 1000));
-#endif
         }
 
         virtual AndroidPipe* load(void* hwPipe,
@@ -189,9 +171,6 @@ public:
         }
 
         void writeScreenshot(gfxstream::Renderer& renderer) {
-#if SNAPSHOT_PROFILE > 1
-            Stopwatch sw;
-#endif
             if (!mSnapshotCallbackRegistered) {
                 // We have to wait for the screenshot saving thread, but
                 // there's no need to join it too soon: it is ok to only
@@ -237,28 +216,17 @@ public:
                 height = 0;
             }
 
-#if SNAPSHOT_PROFILE > 1
-            printf("Screenshot load texture time %lld ms\n",
-                   (long long)(sw.elapsedUs() / 1000));
-#endif
             if (width > 0 && height > 0) {
                 std::string dataDir(Snapshotter::get().saver().snapshot().dataDir());
                 mScreenshotSaver.emplace([nChannels, width, height,
                                           dataDir = std::move(dataDir),
                                           pixels = std::move(pixels)] {
-#if SNAPSHOT_PROFILE > 1
-                    Stopwatch sw;
-#endif
                     std::string fileName = android::base::PathUtils::join(
                             dataDir, "screenshot.png");
                     // TODO: fix the screenshot rotation?
                     savepng(fileName.c_str(), nChannels, width, height,
                             SKIN_ROTATION_0,
                             const_cast<unsigned char*>(pixels.data()));
-#if SNAPSHOT_PROFILE > 1
-                    printf("Screenshot image write time %lld ms\n",
-                           (long long)(sw.elapsedUs() / 1000));
-#endif
                 });
                 mScreenshotSaver->start();
             }
@@ -266,10 +234,6 @@ public:
 
         bool mSnapshotCallbackRegistered = false;
         base::Optional<base::FunctorThread> mScreenshotSaver;
-#ifdef SNAPSHOT_PROFILE
-        Stopwatch mSaveMeter;
-        Stopwatch mLoadMeter;
-#endif
     };
 
     /////////////////////////////////////////////////////////////////////////

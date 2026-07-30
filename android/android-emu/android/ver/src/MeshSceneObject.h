@@ -32,7 +32,7 @@ protected:
     MeshSceneObject(Renderer& renderer);
 
 public:
-    // Loads an object mesh from an .obj file.
+    // Loads an object mesh from an .obj or .gltf/.glb file.
     //
     // |renderer| - Renderer context.
     // |filename| - Filename to load.
@@ -42,7 +42,7 @@ public:
     static std::unique_ptr<MeshSceneObject> load(Renderer& renderer,
                                                  const char* filename);
 
-    // Checks if the .obj file can be loaded, without using a renderer
+    // Checks if the .obj or .gltf/.glb file can be loaded, without using a renderer
     //
     // |filename| - Filename to load.
     //
@@ -55,6 +55,61 @@ public:
     //
     // Returns a MeshSceneObject instance of the sphere object
     static std::unique_ptr<MeshSceneObject> createSphere(Renderer& renderer);
+
+    void setAnimationTime(float timeSec) override;
+
+private:
+    struct GltfNodeData {
+        std::string name;
+        int parent = -1;
+        std::vector<int> children;
+        glm::vec3 translation = glm::vec3(0.0f);
+        glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 scale = glm::vec3(1.0f);
+        glm::mat4 matrix = glm::mat4(1.0f);
+        bool hasMatrix = false;
+    };
+
+    struct GltfAnimChannel {
+        int targetNode = -1;
+        std::string targetPath;
+        std::vector<float> keyTimes;
+        std::vector<glm::vec3> keyTranslations;
+        std::vector<glm::quat> keyRotations;
+        std::vector<glm::vec3> keyScales;
+    };
+
+    struct GltfAnimData {
+        float minTime = 0.0f;
+        float maxTime = 0.0f;
+        std::vector<GltfAnimChannel> channels;
+    };
+
+    struct GltfSkinData {
+        std::vector<int> joints;
+        std::vector<glm::mat4> inverseBindMatrices;
+    };
+
+    struct GltfSkinnedPrimitive {
+        size_t renderableIndex = 0;
+        std::vector<VertexPositionUV> baseVertices;
+        std::vector<glm::uvec4> joints;
+        std::vector<glm::vec4> weights;
+        int nodeIdx = -1;
+        int skinIdx = -1;
+    };
+
+    std::vector<GltfNodeData> mGltfNodes;
+    std::vector<GltfSkinData> mGltfSkins;
+    std::vector<GltfAnimData> mGltfAnimations;
+    std::vector<GltfSkinnedPrimitive> mGltfSkinnedPrimitives;
+
+    static bool canLoadObj(const char* filename);
+    static bool canLoadGltf(const char* filename);
+    static std::unique_ptr<MeshSceneObject> loadObj(Renderer& renderer,
+                                                    const char* filename);
+    static std::unique_ptr<MeshSceneObject> loadGltf(Renderer& renderer,
+                                                     const char* filename);
 };
 
 }  // namespace ver

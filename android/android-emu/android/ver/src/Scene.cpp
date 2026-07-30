@@ -74,8 +74,11 @@ namespace android {
 namespace ver {
 
 Scene::Scene(const SceneConfig& config,
-             const std::vector<std::filesystem::path>& basePaths)
-    : mConfig(config), mResourceBasePaths(basePaths) {
+             const std::vector<std::filesystem::path>& basePaths,
+             const std::filesystem::path& vulkanBasePath)
+    : mConfig(config),
+      mResourceBasePaths(basePaths),
+      mVulkanBasePath(vulkanBasePath) {
     D("%s: creating Scene", __func__);
 }
 
@@ -90,9 +93,10 @@ Scene::~Scene() {
 
 std::unique_ptr<Scene> Scene::create(
         const SceneConfig& config,
-        const std::vector<fs::path>& resourceBasePaths) {
+        const std::vector<fs::path>& resourceBasePaths,
+        const std::filesystem::path& vulkanBasePath) {
     std::unique_ptr<Scene> scene;
-    scene.reset(new Scene(config, resourceBasePaths));
+    scene.reset(new Scene(config, resourceBasePaths, vulkanBasePath));
     if (!scene->initialize()) {
         return nullptr;
     }
@@ -256,7 +260,7 @@ bool Scene::loadRendererResources() {
         return true;
     }
 
-    mRenderer = Renderer::create();
+    mRenderer = Renderer::create(mVulkanBasePath);
     if (!mRenderer) {
         E("VirtualSceneManager renderer failed to construct");
         return false;
@@ -357,6 +361,13 @@ void Scene::update(bool updateTime) {
         mStartTimeUs = System::get()->getUnixTimeUs() - mFrameTimeUs;
     }
 
+    float timeSec = static_cast<float>(mFrameTimeUs) / 1000000.0f;
+    for (auto& obj : mSceneObjects) {
+        if (obj) {
+            obj->setAnimationTime(timeSec);
+        }
+    }
+
     if (mRawImageSource) {
         auto res = mRawImageSource->UpdateImage(
                 mFrameTimeUs, mRawImageSourceToken,
@@ -387,6 +398,11 @@ void Scene::update(bool updateTime) {
             E("Failed to Update Image Source: %s", res.status().message());
         }
     }
+}
+
+void Scene::setFrameTimeUs(uint64_t timeUs) {
+    mFrameTimeUs = timeUs;
+    mStartTimeUs = System::get()->getUnixTimeUs() - mFrameTimeUs;
 }
 
 uint64_t Scene::getVersionHashForView(
@@ -531,6 +547,31 @@ void Scene::unloadUserResources() {
     if (mRawImageSource) {
         mRawImageSource->Stop();
     }
+}
+
+bool Scene::getBoundingBox(glm::vec3* outMin, glm::vec3* outMax) const {
+    if (!outMin || !outMax) {
+        return false;
+    }
+    glm::vec3 minP(std::numeric_limits<float>::max());
+    glm::vec3 maxP(std::numeric_limits<float>::lowest());
+    bool hasBounds = false;
+
+    for (const auto& obj : mSceneObjects) {
+        if (!obj || !obj->isVisible()) continue;
+        glm::vec3 objMin, objMax;
+        if (obj->getBoundingBox(&objMin, &objMax)) {
+            minP = glm::min(minP, objMin);
+            maxP = glm::max(maxP, objMax);
+            hasBounds = true;
+        }
+    }
+    if (hasBounds) {
+        *outMin = minP;
+        *outMax = maxP;
+        return true;
+    }
+    return false;
 }
 
 }  // namespace ver

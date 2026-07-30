@@ -15,8 +15,7 @@
 #include "aemu/base/ArraySize.h"
 #include "aemu/base/memory/ContiguousRangeMapper.h"
 #include "aemu/base/EintrWrapper.h"
-#include "aemu/base/Profiler.h"
-#include "aemu/base/Stopwatch.h"
+
 #include "aemu/base/files/MemStream.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/preadwrite.h"
@@ -40,8 +39,7 @@ using android::base::ContiguousRangeMapper;
 using android::base::MemoryHint;
 using android::base::MemStream;
 using android::base::PathUtils;
-using android::base::ScopedMemoryProfiler;
-using android::base::Stopwatch;
+
 using android::base::ThreadPoolWorkerId;
 
 namespace android {
@@ -148,11 +146,6 @@ bool RamLoader::start(bool isQuickboot) {
 
     if (!mAccessWatch) {
         bool res = readAllPages();
-        mEndTime = base::System::get()->getHighResTimeUs();
-#if SNAPSHOT_PROFILE > 1
-        printf("Eager RAM load complete in %.03f ms\n",
-               (mEndTime - mStartTime) / 1000.0);
-#endif
         return res;
     }
 
@@ -167,10 +160,6 @@ bool RamLoader::start(bool isQuickboot) {
 }
 
 void RamLoader::join() {
-#if SNAPSHOT_PROFILE > 1
-    printf("Finishing background RAM load\n");
-    Stopwatch sw;
-#endif
 
     if (mAccessWatch) {
         // Unprotect all. Warning: this assumes the VM is stopped.
@@ -199,9 +188,7 @@ void RamLoader::join() {
     }
     mStream.close();
 
-#if SNAPSHOT_PROFILE > 1
-    printf("Finished remaining RAM load in %f ms\n", sw.elapsedUs() / 1000.0f);
-#endif
+
 }
 
 void RamLoader::interrupt() {
@@ -260,9 +247,6 @@ void RamLoader::zeroOutPage(const Page& page) {
 }
 
 bool RamLoader::readIndex() {
-#if SNAPSHOT_PROFILE > 1
-    auto start = base::System::get()->getHighResTimeUs();
-#endif
     mStreamFd = fileno(mStream.get());
     base::System::FileSize size;
     if (!base::System::get()->fileSize(mStreamFd, &size)) {
@@ -313,10 +297,6 @@ bool RamLoader::readIndex() {
         mGaps->load(stream);
     }
 
-#if SNAPSHOT_PROFILE > 1
-    printf("readIndex() time: %.03f\n",
-           (base::System::get()->getHighResTimeUs() - start) / 1000.0);
-#endif
     return true;
 }
 
@@ -542,11 +522,7 @@ void RamLoader::readerWorker() {
         }
     }
 
-    mEndTime = base::System::get()->getHighResTimeUs();
-#if SNAPSHOT_PROFILE > 1
-    printf("Background loading complete in %.03f ms\n",
-           (mEndTime - mStartTime) / 1000.0);
-#endif
+
 }
 
 MemoryAccessWatch::IdleCallbackResult RamLoader::backgroundPageLoad() {
@@ -569,13 +545,7 @@ MemoryAccessWatch::IdleCallbackResult RamLoader::backgroundPageLoad() {
                     return state == uint8_t(State::Empty) ||
                            (state == uint8_t(State::Read) && !page.data);
                 });
-#if SNAPSHOT_PROFILE > 2
-        const auto count = int(mBackgroundPageIt - mIndex.pages.begin());
-        if ((count % 10000) == 0 || count == int(mIndex.pages.size())) {
-            printf("Background loading: at page #%d of %d\n", count,
-                   int(mIndex.pages.size()));
-        }
-#endif
+
 
         if (mBackgroundPageIt == mIndex.pages.end()) {
             if (!mSentEndOfPagesMarker) {
@@ -752,9 +722,7 @@ void RamLoader::fillPageData(Page* pagePtr) {
         return;
     }
 
-#if SNAPSHOT_PROFILE > 2
-    printf("%s: loading page %p\n", __func__, this->pagePtr(page));
-#endif
+
     if (mAccessWatch) {
         void* guestRam = this->pagePtr(page);
         uint32_t guestRamSize = pageSize(page);
@@ -780,10 +748,6 @@ void RamLoader::fillPageData(Page* pagePtr) {
 }
 
 bool RamLoader::readAllPages() {
-#if SNAPSHOT_PROFILE > 1
-    auto startTime = base::System::get()->getHighResTimeUs();
-#endif
-
     if (nonzero(mIndex.flags & IndexFlags::CompressedPages) && !mAccessWatch) {
         startDecompressor();
     }
@@ -793,10 +757,6 @@ bool RamLoader::readAllPages() {
     std::vector<Page*> sortedPages;
     sortedPages.reserve(mIndex.pages.size());
 
-#if SNAPSHOT_PROFILE > 1
-    auto startTime1 = base::System::get()->getHighResTimeUs();
-#endif
-
     for (Page& page : mIndex.pages) {
         if (page.sizeOnDisk) {
             sortedPages.emplace_back(&page);
@@ -805,24 +765,11 @@ bool RamLoader::readAllPages() {
         }
     }
 
-#if SNAPSHOT_PROFILE > 1
-    printf("zeroing took %.03f ms\n",
-           (base::System::get()->getHighResTimeUs() - startTime1) / 1000.0);
-#endif
-
     std::sort(sortedPages.begin(), sortedPages.end(),
               [](const Page* l, const Page* r) {
                   return l->filePos < r->filePos;
               });
 
-#if SNAPSHOT_PROFILE > 1
-    printf("Starting unpacker + sorting took %.03f ms\n",
-           (base::System::get()->getHighResTimeUs() - startTime) / 1000.0);
-#endif
-
-#if SNAPSHOT_PROFILE > 1
-    ScopedMemoryProfiler memProf("readingDataFromDisk to decompress finish");
-#endif
     for (Page* page : sortedPages) {
         if (!readDataFromDisk(page, pagePtr(*page))) {
             mHasError = true;
