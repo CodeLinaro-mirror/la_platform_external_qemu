@@ -93,9 +93,14 @@ TEST(MeshSceneObjectTest, LoadGltf) {
     std::filesystem::remove(tempGltfPath);
 }
 
-class SceneRenderingGltfTest : public ::testing::TestWithParam<std::tuple<std::string, std::string, bool>> {
+class SceneRenderingGltfTest
+    : public ::testing::TestWithParam<
+          std::tuple<std::string, std::tuple<std::string, std::string, bool>>> {
 protected:
     void SetUp() override {
+        const auto& [backend, modelInfo] = GetParam();
+        System::get()->envSet("VER_RENDERER_BACKEND", backend);
+
         std::vector<std::filesystem::path> resourcePaths;
         std::string resourcesDir = PathUtils::join(
                 System::get()->getProgramDirectory(), "resources");
@@ -110,10 +115,13 @@ protected:
         bool success = ver_initialize(
                 resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
                 (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
-        ASSERT_TRUE(success) << "Failed to initialize VER";
+        ASSERT_TRUE(success) << "Failed to initialize VER with backend: " << backend;
     }
 
-    void TearDown() override { ver_cleanup(); }
+    void TearDown() override {
+        ver_cleanup();
+        System::get()->envSet("VER_RENDERER_BACKEND", "");
+    }
 };
 
 static double calculateSSD(const uint8_t* data1,
@@ -168,12 +176,16 @@ static bool compareWithGolden(const uint8_t* actualData,
 }
 
 TEST_P(SceneRenderingGltfTest, RenderGltfModel) {
-    auto [testName, modelPath, isAnimated] = GetParam();
+    auto [backend, modelInfo] = GetParam();
+    auto [testName, modelPath, isAnimated] = modelInfo;
 
 #ifndef __APPLE__
-    GTEST_SKIP()
-            << "GLES renderer is currently not supported on this platform for testing.";
-    return;
+    if (backend == "gles") {
+        // TODO(virtualscene-library): Fix software GLES initialization on linux&windows
+      GTEST_SKIP()
+              << "GLES renderer is currently not supported on this platform for testing.";
+      return;
+    }
 #endif
 
     VerSceneConfig config(VerSceneConfig::Mode::Mesh3D, modelPath);
@@ -266,11 +278,14 @@ TEST_P(SceneRenderingGltfTest, RenderGltfModel) {
 INSTANTIATE_TEST_SUITE_P(
     GltfModels,
     SceneRenderingGltfTest,
-    ::testing::Values(
-        std::make_tuple("box", "Box.glb", false),
-        std::make_tuple("box_textured", "BoxTextured.glb", false),
-        std::make_tuple("duck", "Duck.gltf", false),
-        std::make_tuple("simple_skin", "SimpleSkin.gltf", true)
+    ::testing::Combine(
+        ::testing::Values("vulkan", "gles"),
+        ::testing::Values(
+            std::make_tuple("box", "Box.glb", false),
+            std::make_tuple("box_textured", "BoxTextured.glb", false),
+            std::make_tuple("duck", "Duck.gltf", false),
+            std::make_tuple("simple_skin", "SimpleSkin.gltf", true)
+        )
     )
 );
 

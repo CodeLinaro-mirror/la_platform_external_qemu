@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "OpenGLESDispatch/OpenGLDispatchLoader.h"
+#include "Renderer.h"
 #include "aemu/base/Debug.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
@@ -38,9 +39,12 @@ namespace {
 // Threshold for golden image comparison (Sum of Squared Differences per pixel)
 static constexpr double kCompareThreshold = 512.0;
 
-class SceneRenderingTest : public ::testing::TestWithParam<std::string> {
+class SceneRenderingTest : public ::testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
     void SetUp() override {
+        const auto& [backend, modeName] = GetParam();
+        System::get()->envSet("VER_RENDERER_BACKEND", backend);
+
         std::vector<std::filesystem::path> resourcePaths;
         std::string resourcesDir = PathUtils::join(
                 System::get()->getProgramDirectory(), "resources");
@@ -53,10 +57,13 @@ protected:
         bool success = ver_initialize(
                 resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
                 (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
-        ASSERT_TRUE(success) << "Failed to initialize VER";
+        ASSERT_TRUE(success) << "Failed to initialize VER with backend: " << backend;
     }
 
-    void TearDown() override { ver_cleanup(); }
+    void TearDown() override {
+        ver_cleanup();
+        System::get()->envSet("VER_RENDERER_BACKEND", "");
+    }
 };
 
 static double calculateSSD(const uint8_t* data1,
@@ -113,16 +120,52 @@ static bool compareWithGolden(const uint8_t* actualData,
     }
 }
 
+static void verifyOrCompareWithGolden(const uint8_t* fbData,
+                                       int width,
+                                       int height,
+                                       const std::string& goldenFilename,
+                                       const std::string& testLabel) {
+    std::string goldenPath =
+            PathUtils::join(System::get()->getProgramDirectory(), "testdata",
+                            goldenFilename);
+
+    if (!std::filesystem::exists(goldenPath)) {
+        std::string outputPath =
+                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
+                                testLabel + "_output.png");
+        std::filesystem::create_directories(
+                std::filesystem::path(outputPath).parent_path());
+        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
+                (void*)fbData);
+        FAIL() << "Golden image not found at: " << goldenPath
+               << ". Output saved to: " << outputPath;
+    }
+
+    bool match = compareWithGolden(fbData, width, height, goldenPath);
+
+    if (!match) {
+        std::string outputPath =
+                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
+                                testLabel + "_failed.png");
+        std::filesystem::create_directories(
+                std::filesystem::path(outputPath).parent_path());
+        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
+                (void*)fbData);
+        FAIL() << "Golden image comparison failed for: " << testLabel
+               << ". Output saved to: " << outputPath;
+    }
+}
+
 TEST_P(SceneRenderingTest, RenderSceneMode) {
-    std::string modeName = GetParam();
+    const auto& [backend, modeName] = GetParam();
     VerSceneConfig::Mode mode = VerSceneConfig::modeFromString(modeName);
 
     // Fail on invalid modes
     ASSERT_NE(mode, VerSceneConfig::Mode::Unknown);
 
 #ifndef __APPLE__
-    // TODO(virtualscene-library): Fix software GLES initialization on linux&windows
-    if (VerSceneConfig::modeRequiresRenderer(mode)) {
+    if (backend == "gles" && VerSceneConfig::modeRequiresRenderer(mode)) {
+        // TODO(virtualscene-library): Fix software GLES initialization on linux&windows
         GTEST_SKIP()
                 << "GLES renderer is currently not supported on this platform for testing.";
         return;
@@ -166,37 +209,9 @@ TEST_P(SceneRenderingTest, RenderSceneMode) {
     ASSERT_NE(fbData, nullptr);
     ASSERT_EQ(fbSize, (uint64_t)width * height * 4);
 
-    std::string goldenPath =
-            PathUtils::join(System::get()->getProgramDirectory(), "testdata",
-                            "scene_" + modeName + "_golden.png");
-
-    // If golden image doesn't exist, we might want to skip or fail.
-    // Here we fail to ensure all modes have goldens.
-    if (!std::filesystem::exists(goldenPath)) {
-        std::string outputPath =
-                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
-                                modeName + "_output.png");
-        std::filesystem::create_directories(
-                std::filesystem::path(outputPath).parent_path());
-        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
-                (void*)fbData);
-        FAIL() << "Golden image not found at: " << goldenPath
-               << ". Output saved to: " << outputPath;
-    }
-
-    bool match = compareWithGolden(fbData, width, height, goldenPath);
-
-    if (!match) {
-        std::string outputPath =
-                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
-                                "scene_" + modeName + "_failed.png");
-        std::filesystem::create_directories(
-                std::filesystem::path(outputPath).parent_path());
-        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
-                (void*)fbData);
-        FAIL() << "Golden image comparison failed for mode: " << modeName
-               << ". Output saved to: " << outputPath;
-    }
+    verifyOrCompareWithGolden(fbData, width, height,
+                              "scene_" + modeName + "_golden.png",
+                              "scene_" + modeName);
 
     ver_destroy_render_view(view);
     ver_destroy_scene(scene);
@@ -245,6 +260,39 @@ TEST(SceneRenderingTestSimple, InvalidDimensions) {
     EXPECT_EQ(height, 480);
 
     ver_destroy_render_view(view);
+}
+
+TEST(SceneRenderingTestSimple, BackendSelectionEnvVar) {
+    std::vector<std::filesystem::path> resourcePaths;
+    std::string resourcesDir = PathUtils::join(
+            android::base::System::get()->getProgramDirectory(), "resources");
+    resourcePaths.push_back(resourcesDir);
+
+    std::filesystem::path vulkanDir = PathUtils::join(
+            android::base::System::get()->getProgramDirectory(), "lib64", "vulkan");
+
+    // Test Vulkan forcing
+    android::base::System::get()->envSet("VER_RENDERER_BACKEND", "vulkan");
+    EXPECT_TRUE(ver_initialize(
+            resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
+            (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir));
+    ver_cleanup();
+
+    // Test GLES forcing
+    android::base::System::get()->envSet("VER_RENDERER_BACKEND", "gles");
+    EXPECT_TRUE(ver_initialize(
+            resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
+            (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir));
+    ver_cleanup();
+
+    // Test Auto mode
+    android::base::System::get()->envSet("VER_RENDERER_BACKEND", "auto");
+    EXPECT_TRUE(ver_initialize(
+            resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
+            (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir));
+    ver_cleanup();
+
+    android::base::System::get()->envSet("VER_RENDERER_BACKEND", "");
 }
 
 TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
@@ -399,13 +447,15 @@ TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
     ver_cleanup();
 }
 
-INSTANTIATE_TEST_SUITE_P(SceneModes,
-                         SceneRenderingTest,
-                         ::testing::Values("mesh3d",
-                                           "videofile",
-                                           "imagefile",
-                                           "color",
-                                           "image360"));
+INSTANTIATE_TEST_SUITE_P(
+        SceneModes,
+        SceneRenderingTest,
+        ::testing::Combine(::testing::Values("vulkan", "gles"),
+                           ::testing::Values("mesh3d",
+                                             "videofile",
+                                             "imagefile",
+                                             "color",
+                                             "image360")));
 
 }  // namespace
 

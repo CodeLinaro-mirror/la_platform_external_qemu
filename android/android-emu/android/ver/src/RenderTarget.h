@@ -26,6 +26,8 @@
 
 #include <memory>
 
+using namespace gfxstream::host::gl;
+
 namespace android {
 namespace ver {
 
