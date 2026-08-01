@@ -1270,7 +1270,7 @@ int hvf_arch_init_vcpu(CPUState *cpu)
     int i;
 
     if (__builtin_available(macOS 15.2, *)) {
-        if (hvf_arm_sme2_supported()) {
+        if (cpu_isar_feature(aa64_sme, arm_cpu) && hvf_arm_sme2_supported()) {
             sregs_match_len += ARRAY_SIZE(hvf_sreg_list_sme2) + 1;
         }
 
@@ -1309,7 +1309,7 @@ int hvf_arch_init_vcpu(CPUState *cpu)
         }
     }
     if (__builtin_available(macOS 15.2, *)) {
-        if (hvf_arm_sme2_supported()) {
+        if (cpu_isar_feature(aa64_sme, arm_cpu) && hvf_arm_sme2_supported()) {
             for (i = 0; i < ARRAY_SIZE(hvf_sreg_list_sme2); i++) {
                 hv_sys_reg_t hvf_id = hvf_sreg_list_sme2[i];
                 uint64_t kvm_id = HVF_TO_KVMID(hvf_id);
@@ -1325,7 +1325,14 @@ int hvf_arch_init_vcpu(CPUState *cpu)
              * Add SVCR last. It is elsewhere assumed its index is after
              * hvf_sreg_list and hvf_sreg_list_sme2.
              */
-            arm_cpu->cpreg_indexes[sregs_cnt++] = HVF_TO_KVMID(SVCR);
+            uint64_t svcr_id = HVF_TO_KVMID(SVCR);
+            uint32_t svcr_key = kvm_to_cpreg_id(svcr_id);
+            const ARMCPRegInfo *svcr_ri =
+                get_arm_cp_reginfo(arm_cpu->cp_regs, svcr_key);
+            if (svcr_ri) {
+                assert(!(svcr_ri->type & ARM_CP_NO_RAW));
+                arm_cpu->cpreg_indexes[sregs_cnt++] = svcr_id;
+            }
         }
     }
     arm_cpu->cpreg_array_len = sregs_cnt;
