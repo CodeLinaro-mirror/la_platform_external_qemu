@@ -22,4 +22,4 @@ endif
 # as it relies on audio system
 executable('test-audio',
     sources: [files('test-audio.c', 'audio-stubs.c'), dbus_display1],
-    dependencies: [audio, qemuutil, modinfo_dep, gio, spice, sdl])
+    dependencies: [audio, qemuutil, print_stub, modinfo_dep, gio, spice, sdl])
