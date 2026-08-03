@@ -2046,9 +2046,18 @@ QMenu* ToolWindow::createEnvironmentMenu() {
 
     QMenu* webcamMenu = new QMenu(tr("Webcams"), this);
     const QAndroidVirtualSceneAgent* agent = getConsoleAgents()->virtual_scene;
-    if (agent && agent->enumerateWebcams &&
+    bool enableWebcamMenu = agent && agent->enumerateWebcams;
+
+    // Allow users to disable webcam menu, this flag can be removed once the
+    // feature is stable enough for all users.
+    if (enableWebcamMenu &&
         android::base::System::get()->getEnvironmentVariable(
-                "ANDROID_EMU_ENABLE_WEBCAM_MENU") != "") {
+                "ANDROID_EMU_ENABLE_WEBCAM_MENU") == "0") {
+        dinfo("ANDROID_EMU_ENABLE_WEBCAM_MENU is set to 0, disabling webcam menu");
+        enableWebcamMenu = false;
+    }
+
+    if (enableWebcamMenu) {
         struct Context {
             QMenu* menu;
             ToolWindow* window;
