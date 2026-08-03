@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 extern "C" {
 typedef size_t (*CurlWriteCallback)(char* ptr,
                                     size_t size,
@@ -57,6 +59,19 @@ namespace android {
 namespace ver {
 
 namespace {
+
+constexpr char kTileCreateSessionUrl[] =
+        "https://tile.googleapis.com/v1/createSession";
+constexpr char kTileMetadataUrl[] =
+        "https://tile.googleapis.com/v1/streetview/metadata";
+constexpr char kMapsMetadataUrl[] =
+        "https://maps.googleapis.com/maps/api/streetview/metadata";
+constexpr char kTileTilesUrl[] =
+        "https://tile.googleapis.com/v1/streetview/tiles";
+constexpr char kMapsStreetViewUrl[] =
+        "https://maps.googleapis.com/maps/api/streetview";
+constexpr char kStreetViewPixelsTileUrl[] =
+        "https://streetviewpixels-pa.googleapis.com/v1/tile";
 
 size_t curlWriteCallback(char* contents,
                          size_t size,
@@ -104,21 +119,11 @@ std::string downloadUrl(const std::string& requestUrl,
 
 std::string parseJsonField(const std::string& jsonStr,
                            const std::string& fieldName) {
-    std::string pattern = "\"" + fieldName + "\"";
-    size_t pos = jsonStr.find(pattern);
-    if (pos == std::string::npos)
-        return "";
-    pos += pattern.length();
-    pos = jsonStr.find(':', pos);
-    if (pos == std::string::npos)
-        return "";
-    pos = jsonStr.find('"', pos + 1);
-    if (pos == std::string::npos)
-        return "";
-    size_t endPos = jsonStr.find('"', pos + 1);
-    if (endPos == std::string::npos)
-        return "";
-    return jsonStr.substr(pos + 1, endPos - pos - 1);
+    auto j = nlohmann::json::parse(jsonStr, nullptr, false);
+    if (!j.is_discarded() && j.contains(fieldName) && j[fieldName].is_string()) {
+        return j[fieldName].get<std::string>();
+    }
+    return "";
 }
 
 std::string fetchPanoId(double latitude,
@@ -128,7 +133,7 @@ std::string fetchPanoId(double latitude,
     std::string sessionToken;
     if (!mapsKey.empty()) {
         std::string createSessionUrl =
-                "https://tile.googleapis.com/v1/createSession?key=" + mapsKey;
+                std::string(kTileCreateSessionUrl) + "?key=" + mapsKey;
         std::string postBody =
                 "{\"mapType\": \"streetview\", \"language\": \"en-US\"}";
         std::string sessionResp = downloadUrl(createSessionUrl, postBody);
@@ -144,9 +149,8 @@ std::string fetchPanoId(double latitude,
     std::string panoId;
     if (!sessionToken.empty()) {
         std::string metaUrl = StringFormat(
-                "https://tile.googleapis.com/v1/streetview/"
-                "metadata?session=%s&key=%s&lat=%.6f&lng=%.6f",
-                sessionToken, mapsKey, latitude, longitude);
+                "%s?session=%s&key=%s&lat=%.6f&lng=%.6f",
+                kTileMetadataUrl, sessionToken, mapsKey, latitude, longitude);
         std::string metaResp = downloadUrl(metaUrl);
         panoId = parseJsonField(metaResp, "panoId");
         if (panoId.empty()) {
@@ -158,14 +162,12 @@ std::string fetchPanoId(double latitude,
         std::string metaUrl;
         if (!mapsKey.empty()) {
             metaUrl = StringFormat(
-                    "https://maps.googleapis.com/maps/api/streetview/"
-                    "metadata?location=%.6f,%.6f&key=%s",
-                    latitude, longitude, mapsKey);
+                    "%s?location=%.6f,%.6f&key=%s",
+                    kMapsMetadataUrl, latitude, longitude, mapsKey);
         } else {
             metaUrl = StringFormat(
-                    "https://maps.googleapis.com/maps/api/streetview/"
-                    "metadata?location=%.6f,%.6f",
-                    latitude, longitude);
+                    "%s?location=%.6f,%.6f",
+                    kMapsMetadataUrl, latitude, longitude);
         }
         std::string metaResp = downloadUrl(metaUrl);
         panoId = parseJsonField(metaResp, "pano_id");
@@ -187,38 +189,33 @@ std::string downloadTile(int zoom,
         char tileUrl[1024];
         snprintf(
                 tileUrl, sizeof(tileUrl),
-                "https://tile.googleapis.com/v1/streetview/tiles/%d/%d/%d?session=%s&key=%s&panoId=%s",
-                zoom, x, y, sessionToken.c_str(), mapsKey.c_str(),
+                "%s/%d/%d/%d?session=%s&key=%s&panoId=%s",
+                kTileTilesUrl, zoom, x, y, sessionToken.c_str(), mapsKey.c_str(),
                 panoId.c_str());
         tileData = downloadUrl(tileUrl);
     }
     if (tileData.empty() && !mapsKey.empty()) {
         char tileUrl[1024];
         snprintf(tileUrl, sizeof(tileUrl),
-                 "https://tile.googleapis.com/v1/streetview/"
-                 "tiles/%d/%d/%d?key=%s&panoId=%s",
-                 zoom, x, y, mapsKey.c_str(), panoId.c_str());
+                 "%s/%d/%d/%d?key=%s&panoId=%s",
+                 kTileTilesUrl, zoom, x, y, mapsKey.c_str(), panoId.c_str());
         tileData = downloadUrl(tileUrl);
     }
     if (tileData.empty()) {
         char tileUrl[1024];
         snprintf(
                 tileUrl, sizeof(tileUrl),
-                "https://streetviewpixels-pa.googleapis.com/v1/tile?cb_client=maps_sv.tactile&panoid=%s&x=%d&y=%d&zoom=%d",
-                panoId.c_str(), x, y, zoom);
+                "%s?cb_client=maps_sv.tactile&panoid=%s&x=%d&y=%d&zoom=%d",
+                kStreetViewPixelsTileUrl, panoId.c_str(), x, y, zoom);
         tileData = downloadUrl(tileUrl);
     }
     if (tileData.empty()) {
-        char tileUrl[1024];
-        snprintf(
-                tileUrl, sizeof(tileUrl),
-                "https://cbk0.google.com/cbk?output=tile&panoid=%s&zoom=%d&x=%d&y=%d",
-                panoId.c_str(), zoom, x, y);
-        tileData = downloadUrl(tileUrl);
+        dprint("StreetView: could not retrieve tile data for panoId=%s", panoId.c_str());
     }
     return tileData;
 }
 
+// TODO(virtualscene): Use a specific sphere mesh with multiple tiles/textures to avoid stitching.
 std::vector<uint8_t> stitchTilesToRGBA(
         const std::vector<std::vector<android::ver::TextureUtils::Result>>&
                 tiles,
@@ -418,14 +415,12 @@ std::optional<TextureUtils::Result> StreetViewUtils::downloadStaticImage(
     char url[1024];
     if (!mapsKey.empty()) {
         snprintf(url, sizeof(url),
-                 "https://maps.googleapis.com/maps/api/"
-                 "streetview?size=1024x512&location=%.6f,%.6f&fov=120&key=%s",
-                 latitude, longitude, mapsKey.c_str());
+                 "%s?size=1024x512&location=%.6f,%.6f&fov=120&key=%s",
+                 kMapsStreetViewUrl, latitude, longitude, mapsKey.c_str());
     } else {
         snprintf(url, sizeof(url),
-                 "https://maps.googleapis.com/maps/api/"
-                 "streetview?size=1024x512&location=%.6f,%.6f&fov=120",
-                 latitude, longitude);
+                 "%s?size=1024x512&location=%.6f,%.6f&fov=120",
+                 kMapsStreetViewUrl, latitude, longitude);
     }
     std::string res = downloadUrl(url);
     if (!res.empty()) {
