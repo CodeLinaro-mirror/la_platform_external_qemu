@@ -420,7 +420,7 @@ static OSStatus init_out_device(CoreaudioVoiceOut *core)
         kAudioDevicePropertyScopeOutput,
         kAudioObjectPropertyElementMain
     };
-    status = AudioObjectGetPropertyData(core->device_id, &addr, 0, NULL, &size, &hw_asbd);
+    status = AudioObjectGetPropertyData(device_id, &addr, 0, NULL, &size, &hw_asbd);
     if (status != kAudioHardwareNoError) {
         coreaudio_playback_logerr (status, "Could not get device stream format\n");
         return status;
