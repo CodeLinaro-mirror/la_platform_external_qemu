@@ -138,6 +138,8 @@ typedef struct coreaudioVoiceBase {
     bool aliased;
     bool hasAlias;
     bool playing;
+    AudioObjectPropertyAddress formatChangeAddr;
+    bool hasFormatChangeListener;
 } coreaudioVoiceBase;
 
 typedef struct coreaudioVoiceOut {
@@ -1217,6 +1219,20 @@ static OSStatus coreaudio_check_and_fixup_streamformat(coreaudioVoiceBase* core,
     return kAudioHardwareNoError;
 }
 
+static void coreaudio_remove_format_change_listener(coreaudioVoiceBase *core,
+                                                    Boolean isInput)
+{
+    if (core->hasFormatChangeListener) {
+        AudioObjectRemovePropertyListener(
+            core->deviceID,
+            &core->formatChangeAddr,
+            isInput ? audioFormatChangeListenerProcForInput :
+                audioFormatChangeListenerProcForOutput,
+            core);
+        core->hasFormatChangeListener = false;
+    }
+}
+
 static int coreaudio_init_base(coreaudioVoiceBase *core,
                                struct audsettings *as,
                                void *drv_opaque,
@@ -1383,26 +1399,69 @@ static int coreaudio_init_base(coreaudioVoiceBase *core,
         return -1;
     }
 
-    /* The sample rate can change during playback, which makes it so we either
-     * have to introduce or cease sample rate conversion, or change to a
-     * different conversion object. Use a callback to listen for this so that
-     * we don't have to query the stream format evey ioproc call. */
-
-    AudioObjectPropertyAddress addrForFormatChangeCallback = {
-        kAudioDevicePropertyNominalSampleRate,
-        kAudioObjectPropertyScopeGlobal,
-        kAudioObjectPropertyElementMasterOrMain
+    /* The sample rate can change during playback/recording (e.g. when
+     * headphones, USB DACs, or Bluetooth profiles connect/disconnect),
+     * which requires dynamically adjusting the AudioConverter resampler.
+     *
+     * Depending on macOS version and device type (input vs output,
+     * built-in vs aggregate or virtual devices), format change
+     * notifications are published under different property selectors
+     * (kAudioDevicePropertyNominalSampleRate vs
+     * kAudioDevicePropertyStreamFormat) and scopes (Input/Output scope
+     * vs Global scope).
+     *
+     * We probe candidate addresses in order using AudioObjectHasProperty()
+     * before registering AudioObjectAddPropertyListener() to prevent
+     * receiving kAudioHardwareUnknownPropertyError ('nope').
+     */
+    AudioObjectPropertyAddress candidateAddrs[] = {
+        {
+            kAudioDevicePropertyNominalSampleRate,
+            isInput ? kAudioDevicePropertyScopeInput :
+                kAudioDevicePropertyScopeOutput,
+            kAudioObjectPropertyElementMasterOrMain
+        },
+        {
+            kAudioDevicePropertyStreamFormat,
+            isInput ? kAudioDevicePropertyScopeInput :
+                kAudioDevicePropertyScopeOutput,
+            kAudioObjectPropertyElementMasterOrMain
+        },
+        {
+            kAudioDevicePropertyNominalSampleRate,
+            kAudioObjectPropertyScopeGlobal,
+            kAudioObjectPropertyElementMasterOrMain
+        },
     };
 
-    status = AudioObjectAddPropertyListener(
-        core->deviceID,
-        &addrForFormatChangeCallback,
-        isInput ? audioFormatChangeListenerProcForInput :
-            audioFormatChangeListenerProcForOutput,
-        core);
+    core->hasFormatChangeListener = false;
+    for (size_t i = 0;
+         i < sizeof(candidateAddrs) / sizeof(candidateAddrs[0]);
+         ++i) {
+        if (AudioObjectHasProperty(core->deviceID, &candidateAddrs[i])) {
+            status = AudioObjectAddPropertyListener(
+                core->deviceID,
+                &candidateAddrs[i],
+                isInput ? audioFormatChangeListenerProcForInput :
+                    audioFormatChangeListenerProcForOutput,
+                core);
+            if (status == kAudioHardwareNoError) {
+                core->formatChangeAddr = candidateAddrs[i];
+                core->hasFormatChangeListener = true;
+                break;
+            }
+        }
+    }
 
-    if (status != kAudioHardwareNoError) {
-        coreaudio_logerr2 (status, typ, "Could not set audio format change listener\n");
+    if (!core->hasFormatChangeListener) {
+        /* Such errors may occur on certain host hardware configurations or
+         * virtual/aggregated audio devices. Returning -1 here aborts audio
+         * initialization. In the future, if a fallback becomes needed, we
+         * should change this case to be non-fatal. */
+        coreaudio_logerr2(status != kAudioHardwareNoError ?
+                          status : kAudioHardwareUnknownPropertyError,
+                          typ,
+                          "Could not set audio format change listener\n");
         core->deviceID = kAudioDeviceUnknown;
         return -1;
     }
@@ -1417,6 +1476,7 @@ static int coreaudio_init_base(coreaudioVoiceBase *core,
                                        &core->ioprocid);
     if (status != kAudioHardwareNoError || core->ioprocid == NULL) {
         coreaudio_logerr2 (status, typ, "Could not set IOProc\n");
+        coreaudio_remove_format_change_listener(core, isInput);
         core->deviceID = kAudioDeviceUnknown;
         return -1;
     }
@@ -1427,6 +1487,7 @@ static int coreaudio_init_base(coreaudioVoiceBase *core,
             status = AudioDeviceStart(core->deviceID, core->ioprocid);
             if (status != kAudioHardwareNoError) {
                 coreaudio_logerr2 (status, typ, "Could not start playback\n");
+                coreaudio_remove_format_change_listener(core, isInput);
                 AudioDeviceDestroyIOProcID(core->deviceID, core->ioprocid);
                 core->deviceID = kAudioDeviceUnknown;
                 return -1;
@@ -1464,6 +1525,9 @@ static void coreaudio_fini_base (coreaudioVoiceBase *core)
 
         /* cleanup the sample rate converter */
         coreaudio_destroy_sample_rate_conversion_object(core);
+
+        /* remove format change listener if registered */
+        coreaudio_remove_format_change_listener(core, core->isInput);
     }
     core->deviceID = kAudioDeviceUnknown;
 
