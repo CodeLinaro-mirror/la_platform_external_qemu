@@ -67,9 +67,6 @@ void TextureLoader::loadTexture(uint32_t texId, const loader_t& loader) {
 }
 
 bool TextureLoader::readIndex() {
-#if SNAPSHOT_PROFILE > 1
-    auto start = android::base::System::get()->getHighResTimeUs();
-#endif
     assert(mIndex.size() == 0);
     base::System::FileSize size;
     if (base::System::get()->fileSize(fileno(mStream.get()), &size)) {
@@ -88,10 +85,6 @@ bool TextureLoader::readIndex() {
         uint64_t filePos = mStream.getBe64();
         mIndex.emplace(tex, filePos);
     }
-#if SNAPSHOT_PROFILE > 1
-    dprint("Texture readIndex() time: %.03f",
-           (android::base::System::get()->getHighResTimeUs() - start) / 1000.0);
-#endif
     return true;
 }
 

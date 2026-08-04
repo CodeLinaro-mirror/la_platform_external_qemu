@@ -787,12 +787,6 @@ public:
                             const ImageFormat* request,
                             ServerWriter<Image>* writer) override {
         SharedMemoryLibrary::LibraryEntry entry;
-        if (request->transport().channel() == ImageTransport::MMAP) {
-            entry = mSharedMemoryLibrary.borrow(
-                    request->transport().handle(),
-                    request->width() * request->height() *
-                            ScreenshotUtils::getBytesPerPixel(*request));
-        }
 
         // Make sure we always write the first frame, this can be
         // a completely empty frame if the screen is not active.
@@ -874,11 +868,22 @@ public:
                 frame += framesArrived;                Stopwatch sw;
                 auto status = getScreenshot(context, request, &reply);
                 if (status.error_code() == grpc::StatusCode::FAILED_PRECONDITION) {
+                    entry.reset();
                     continue;
                 }
 
                 if (!status.ok()) {
                     return status;
+                }
+
+                if (request->transport().channel() == ImageTransport::MMAP && !entry) {
+                    size_t frameSize = reply.format().width() *
+                                       reply.format().height() *
+                                       ScreenshotUtils::getBytesPerPixel(*request);
+                    if (frameSize > 0) {
+                        entry = mSharedMemoryLibrary.borrow(
+                                request->transport().handle(), frameSize);
+                    }
                 }
 
                 firstTime = false;
@@ -1131,21 +1136,23 @@ public:
         if (request->transport().channel() == ImageTransport::MMAP) {
             shm = mSharedMemoryLibrary.borrow(
                     request->transport().handle(), cPixels);
-            if (shm->isOpen() && shm->isMapped()) {
-                if (cPixels > shm->size()) {
-                    // Oh oh, this will not work.
-                    return Status(::grpc::StatusCode::FAILED_PRECONDITION,
-                                  "The shared memory region needs to have a "
-                                  "size of at least: " +
-                                          std::to_string(cPixels),
-                                  "");
-                }
-                pixels = reinterpret_cast<uint8_t*>(shm->get());
-
-                auto transport = format->mutable_transport();
-                transport->set_handle(request->transport().handle());
-                transport->set_channel(ImageTransport::MMAP);
+            if (!shm || !shm->isOpen() || !shm->isMapped()) {
+                return Status(::grpc::StatusCode::INVALID_ARGUMENT,
+                              "Unable to open or map shared memory region: " +
+                                      request->transport().handle());
             }
+            if (cPixels > shm->size()) {
+                // Oh oh, this will not work.
+                return Status(::grpc::StatusCode::FAILED_PRECONDITION,
+                              "The shared memory region needs to have a "
+                              "size of at least: " +
+                                      std::to_string(cPixels));
+            }
+            pixels = reinterpret_cast<uint8_t*>(shm->get());
+
+            auto transport = format->mutable_transport();
+            transport->set_handle(request->transport().handle());
+            transport->set_channel(ImageTransport::MMAP);
         } else {
             // Make sure the image field has a string that is large enough.
             // Usually there are 2 cases:

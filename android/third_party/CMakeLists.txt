@@ -117,6 +117,21 @@ android_license(
     "https://android.googlesource.com/platform/external/qemu/+/refs/heads/emu-master-dev/android/third_party/picosha2/LICENSE"
   LOCAL "${ANDROID_QEMU2_TOP_DIR}/android/third_party/picosha2/LICENSE")
 
+add_library(emulator-tinygltf INTERFACE)
+target_include_directories(
+  emulator-tinygltf INTERFACE
+  ${ANDROID_QEMU2_TOP_DIR}/android/android-emu/android/ver/src/third_party/tinygltf)
+
+android_license(
+  TARGET emulator-tinygltf
+  LIBNAME tinygltf
+  URL "https://android.googlesource.com/platform/external/qemu/+/refs/heads/emu-master-dev/android/android-emu/android/ver/src/third_party/tinygltf/"
+  SPDX "MIT"
+  LICENSE
+    "https://android.googlesource.com/platform/external/qemu/+/refs/heads/emu-master-dev/android/android-emu/android/ver/src/third_party/tinygltf/LICENSE"
+  LOCAL "${ANDROID_QEMU2_TOP_DIR}/android/android-emu/android/ver/src/third_party/tinygltf/LICENSE")
+
+
 if(WINDOWS)
   add_subdirectory(mman-win32)
   add_subdirectory(regex-win32)

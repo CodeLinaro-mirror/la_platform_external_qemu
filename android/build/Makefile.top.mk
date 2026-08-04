@@ -239,9 +239,6 @@ endif
 
 BUILD_TARGET_CFLAGS += $(BUILD_OPT_CFLAGS)
 
-ifdef BUILD_SNAPSHOT_PROFILE
-    BUILD_TARGET_CFLAGS += -DSNAPSHOT_PROFILE=$(BUILD_SNAPSHOT_PROFILE)
-endif
 
 # Generate position-independent binaries. Don't add -fPIC when targetting
 # Windows, because newer toolchain complain loudly about it, since all

@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
@@ -36,6 +37,8 @@
 
 #include "RenderTarget.h"
 #include "TextureUtils.h"
+#include "VulkanDispatch.h"
+#include "VulkanShaders.h"
 
 using namespace android::base;
 
@@ -51,24 +54,6 @@ using namespace android::base;
 #else
 #define T(...) ((void)0)
 #endif
-
-struct ScopeTimer {
-    ScopeTimer(const char* name) {
-#if T_ACTIVE
-        mFuncName = name;
-        mStartTime = get_uptime_ms();
-#endif
-    }
-
-#if T_ACTIVE
-    ~ScopeTimer() {
-        const uint64_t scopeTime = get_uptime_ms() - mStartTime;
-        dinfo("ScopeTimer: '%s' took %llu ms", mFuncName, scopeTime);
-    }
-    const char* mFuncName;
-    int64_t mStartTime;
-#endif
-};
 
 static constexpr int kSuperSampleMultiple = 2;
 
@@ -243,7 +228,7 @@ static constexpr android::ver::VertexPositionUV kScreenQuadVerts[] = {
         {glm::vec3(-1.f, 3.f, 0.f), glm::vec2(0.f, 2.f)},
 };
 
-static constexpr GLuint kScreenQuadIndices[] = {
+static constexpr uint32_t kScreenQuadIndices[] = {
         0,
         1,
         2,
@@ -557,8 +542,6 @@ void RendererView::applyBlurInPlaceCPU(int width,
         return;
     }
 
-    ScopeTimer timerObj(__func__);
-
     // Limit blur factor to avoid large kernels with low performance
     const int blurRadius = std::min((int)sigma, 16);
     const int stride = width * 4;
@@ -584,7 +567,9 @@ class RendererImpl : public Renderer {
     DISALLOW_COPY_AND_ASSIGN(RendererImpl);
 
 public:
-    RendererImpl(int width, int height);
+    RendererImpl(int width,
+                 int height,
+                 const std::filesystem::path& vulkanBasePath);
     ~RendererImpl();
 
     bool initialize();
@@ -606,11 +591,18 @@ public:
 
     Mesh createMesh(const VertexPositionUV* vertices,
                     size_t verticesSize,
-                    const GLuint* indices,
+                    const uint32_t* indices,
                     size_t indicesSize) override;
+
+    bool updateMesh(Mesh mesh,
+                    const VertexPositionUV* vertices,
+                    size_t verticesSize) override;
 
     Texture loadTexture(const char* filename) override;
     Texture loadTextureAsync(const char* filename) override;
+    Texture createTextureRGBA(const uint8_t* rgba,
+                              uint32_t width,
+                              uint32_t height) override;
     Texture duplicateTexture(Texture texture) override;
 
     bool render(RendererView* view,
@@ -699,7 +691,9 @@ private:
 
     const int mRenderWidth;
     const int mRenderHeight;
+    const std::filesystem::path mVulkanBasePath;
 
+    VulkanDispatchTable mVk;
     std::unique_ptr<RenderTarget> mRenderTargets[2];
     std::unique_ptr<RenderTarget> mScreenRenderTarget;
     Mesh mEffectsMesh;
@@ -743,11 +737,12 @@ private:
             nullptr;  // Same as mGL.mGles2, kept for legacy reasons
 };
 
-std::unique_ptr<Renderer> Renderer::create() {
+std::unique_ptr<Renderer> Renderer::create(
+        const std::filesystem::path& vulkanBasePath) {
     dprint("virtualscene: Creating renderer.");
-    std::unique_ptr<RendererImpl> renderer;
-    renderer.reset(new RendererImpl(kRendererDefaultFramebufferWidth,
-                                    kRendererDefaultFramebufferHeight));
+    std::unique_ptr<RendererImpl> renderer(new RendererImpl(
+            kRendererDefaultFramebufferWidth, kRendererDefaultFramebufferHeight,
+            vulkanBasePath));
     if (!renderer->initialize()) {
         derror("virtualscene: could not create renderer.");
         return nullptr;
@@ -758,17 +753,25 @@ std::unique_ptr<Renderer> Renderer::create() {
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
 
-RendererImpl::RendererImpl(int width, int height)
+RendererImpl::RendererImpl(int width,
+                           int height,
+                           const std::filesystem::path& vulkanBasePath)
     : mRenderWidth(width),
       mRenderHeight(height),
+      mVulkanBasePath(vulkanBasePath),
       mLoaderThread([this](LoaderCommand&& command) {
           return onLoaderCommand(std::move(command));
       }) {}
 
 bool RendererImpl::initialize() {
     if (!mGL.initialize(mRenderWidth, mRenderHeight)) {
-        LOG(ERROR) << "Cannot initilize Egl";
+        LOG(ERROR) << "VER: Cannot initialize GL dispatcher";
         return false;
+    }
+
+    if (!mVk.initDriver(mVulkanBasePath)) {
+        // Non-blocking for now
+        LOG(WARNING) << "VER: Cannot initialize Vulkan dispatcher";
     }
 
     auto context = mGL.makeEglCurrent();
@@ -1102,7 +1105,7 @@ Material RendererImpl::createMaterialScreenSpace(const char* frag) {
 
 Mesh RendererImpl::createMesh(const VertexPositionUV* vertices,
                               size_t verticesSize,
-                              const GLuint* indices,
+                              const uint32_t* indices,
                               size_t indicesSize) {
     GLuint vertexBuffer = 0;
     GLuint indexBuffer = 0;
@@ -1116,8 +1119,9 @@ Mesh RendererImpl::createMesh(const VertexPositionUV* vertices,
 
     mGles2->glGenBuffers(1, &indexBuffer);
     mGles2->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    mGles2->glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize * sizeof(GLuint),
-                         indices, GL_STATIC_DRAW);
+    mGles2->glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                         indicesSize * sizeof(uint32_t), indices,
+                         GL_STATIC_DRAW);
     mGles2->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     VertexInfo info;
@@ -1143,6 +1147,33 @@ Mesh RendererImpl::createMesh(const VertexPositionUV* vertices,
     }
 }
 
+bool RendererImpl::updateMesh(Mesh meshHandle,
+                              const VertexPositionUV* vertices,
+                              size_t verticesSize) {
+    if (!meshHandle.isValid() || !vertices || verticesSize == 0) {
+        return false;
+    }
+    auto context = makeCurrent();
+    AutoLock lock(mResourceLock);
+    auto it = mMeshes.find(meshHandle.id);
+    if (it == mMeshes.end()) {
+        return false;
+    }
+    GLuint vertexBuffer = it->second.mVertexBuffer;
+    mGles2->glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    mGles2->glBufferSubData(GL_ARRAY_BUFFER, 0,
+                           verticesSize * sizeof(VertexPositionUV), vertices);
+    mGles2->glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    const GLenum error = mGles2->glGetError();
+    if (error != GL_NO_ERROR) {
+        E("%s: GL error %d", __FUNCTION__, error);
+        return false;
+    }
+
+    return true;
+}
+
 Texture RendererImpl::loadTexture(const char* filename) {
     const uint64_t loadStartUs = System::get()->getHighResTimeUs();
 
@@ -1159,7 +1190,8 @@ Texture RendererImpl::loadTexture(const char* filename) {
         return cachedTexture;
     }
 
-    std::optional<TextureUtils::Result> result = TextureUtils::load(path.c_str());
+    std::optional<TextureUtils::Result> result =
+            TextureUtils::load(path.c_str());
     if (!result) {
         E("%s: Failed to load texture from file '%s'", __FUNCTION__,
           path.c_str());
@@ -1205,6 +1237,22 @@ Texture RendererImpl::loadTextureAsync(const char* filename) {
     return texture;
 }
 
+Texture RendererImpl::createTextureRGBA(const uint8_t* rgba,
+                                        uint32_t width,
+                                        uint32_t height) {
+    if (!rgba || width == 0 || height == 0) {
+        return Texture();
+    }
+    TextureUtils::Result result;
+    result.mWidth = width;
+    result.mHeight = height;
+    result.mFormat = TextureUtils::Format::RGBA32;
+    result.mBuffer.assign(
+            rgba, rgba + (static_cast<size_t>(width) * height * 4));
+
+    return createTextureInternal(TextureState::Loaded, nullptr, result);
+}
+
 Texture RendererImpl::duplicateTexture(Texture texture) {
     if (!texture.isValid()) {
         return Texture();
@@ -1229,7 +1277,6 @@ Texture RendererImpl::duplicateTexture(Texture texture) {
 bool RendererImpl::render(RendererView* lockedView,
                           const std::vector<RenderableObject>& renderables,
                           float time) {
-    ScopeTimer timerObj(__func__);
     mRenderTargets[0]->bind();
 
     mGles2->glEnable(GL_CULL_FACE);

@@ -51,7 +51,11 @@ static bool emulatorSetupEnvironment() {
         return false;
     }
 
+    const std::filesystem::path launcherDir = std::filesystem::path(
+            android::base::System::get()->getLauncherDirectory());
+
     std::vector<std::filesystem::path> resourceBasePaths;
+    std::filesystem::path vulkanBasePath;
     {
         // If it's not a usable full path, try AVD local
         const char* avdBasePath = avdInfo_getContentPath(avdInfo);
@@ -60,14 +64,18 @@ static bool emulatorSetupEnvironment() {
         }
 
         // If not in AVD folder, check 'resources' folder
-        std::filesystem::path resourcesBasePath =
-                std::filesystem::path(
-                        android::base::System::get()->getLauncherDirectory()) /
-                "resources";
+        std::filesystem::path resourcesBasePath = launcherDir / "resources";
         resourceBasePaths.push_back(resourcesBasePath);
+
+        vulkanBasePath = launcherDir / "lib64" / "vulkan";
     }
-    ver_initialize(resourceBasePaths, android_getEGLDispatch(),
-                   android_getGLESv2Dispatch());
+
+    bool success = ver_initialize(resourceBasePaths, android_getEGLDispatch(),
+                                  android_getGLESv2Dispatch(), vulkanBasePath);
+    if (!success) {
+        derror("%s: Cannot initialize virtual environment renderer", __func__);
+        return false;
+    }
 
     int envWidth, envHeight;
     androidHwConfig_getScreenDimensions(hwCfg, &envWidth, &envHeight);

@@ -11,10 +11,7 @@
 
 #pragma once
 
-#include "aemu/base/Stopwatch.h"
-
-#include <array>
-#include <atomic>
+#include <cstdint>
 #include <utility>
 
 namespace android {
@@ -23,15 +20,6 @@ namespace snapshot {
 //
 //   IncrementalStats - a class to track incremental snapshot
 // statistics.
-//
-// Tracking is only enabled for SNAPSHOT_PROFILE > 1, otherwise
-// it won't do anything more than call the passed callbacks as-is.
-//
-// It can track two types of values - counts and time measurements, and
-// got separate enums and separate functions for those.
-//
-// print() function outputs the tracked stats to stdout, using the supplied
-// format string and arguments to format the prefix for the information.
 //
 
 class IncrementalStats {
@@ -75,7 +63,6 @@ public:
             "lz4 %.03f, waitdisk %.03f, totalHandlingPageSave %.03f, "
             "diskWriteCombine %.03f, diskIndexWrite %.03f\n";
 
-#if SNAPSHOT_PROFILE <= 1
     template <class Func>
     auto measure(Time time, Func&& func) -> decltype(func()) {
         return func();
@@ -85,27 +72,6 @@ public:
     void countMultiple(Action action, int64_t howMany) {}
 
     void print(const char* prefixFormat, ...) {}
-
-#else   // SNAPSHOT_PROFILE > 1
-    template <class Func>
-    auto measure(Time time, Func&& func) -> decltype(func()) {
-        return base::measure(mTimes[int(time)], std::forward<Func>(func));
-    }
-
-    void count(Action action) {
-        countMultiple(action, 1);
-    }
-
-    void countMultiple(Action action, int64_t howMany) {
-        mActions[int(action)].fetch_add(howMany, std::memory_order_relaxed);
-    }
-
-    void print(const char* prefixFormat, ...);
-
-private:
-    std::array<std::atomic<int64_t>, int(Action::Count)> mActions{};
-    std::array<std::atomic<int64_t>, int(Time::Count)> mTimes{};
-#endif  // SNAPSHOT_PROFILE > 1
 };
 
 }  // namespace snapshot

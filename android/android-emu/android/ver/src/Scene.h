@@ -62,7 +62,8 @@ public:
     // null if there was an error.
     static std::unique_ptr<Scene> create(
             const SceneConfig& config,
-            const std::vector<std::filesystem::path>& resourceBasePaths);
+            const std::vector<std::filesystem::path>& resourceBasePaths,
+            const std::filesystem::path& vulkanBasePath);
 
     // Check if the argument file for the scene config exists
     static bool configArgumentFileExists(
@@ -132,11 +133,15 @@ public:
     void unloadUserResources();
 
     uint64_t getFrameTimeUs() const { return mFrameTimeUs; }
+    void setFrameTimeUs(uint64_t timeUs);
+
+    bool getBoundingBox(glm::vec3* outMin, glm::vec3* outMax) const;
 
 private:
     // Private constructor, use Scene::create to create an instance.
     Scene(const SceneConfig& config,
-          const std::vector<std::filesystem::path>& basePaths);
+          const std::vector<std::filesystem::path>& basePaths,
+          const std::filesystem::path& vulkanBasePath);
 
     // Load the scene and create SceneObjects.
     //
@@ -162,6 +167,7 @@ private:
 
     const SceneConfig mConfig;
     const std::vector<std::filesystem::path> mResourceBasePaths;
+    const std::filesystem::path mVulkanBasePath;
     std::unique_ptr<Renderer> mRenderer;
 
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;

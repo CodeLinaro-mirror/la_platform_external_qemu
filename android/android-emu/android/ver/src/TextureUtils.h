@@ -63,6 +63,12 @@ public:
     // for asynchronous texture loading.
     static Result createPlaceholder();
 
+    // Writes an RGBA image buffer to a PNG file.
+    static bool writePNG(const char* filename,
+                         uint32_t width,
+                         uint32_t height,
+                         const uint8_t* rgba);
+
     // Loads an image from disk, converting to either RGB or RGBA if necessary.
     // The format loaded is determined by the file's extension.
     //

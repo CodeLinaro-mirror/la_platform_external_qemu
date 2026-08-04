@@ -300,9 +300,9 @@ static bool featureSetsEqual(
     // snapshot \subset emulatorFeatures
     for (const auto& element : snapshotFeatures) {
         if (emulatorFeatures.find(element) == emulatorFeatures.end()) {
-            derror("The snapshot requires the feature: %d, which the emulator "
+            derror("The snapshot requires the feature: %d (%s), which the emulator "
                    "does not support",
-                   element);
+                   element, fc::featureToString(element).data());
             return false;
         }
     }
@@ -310,8 +310,9 @@ static bool featureSetsEqual(
     // emulatorFeatures \subset snapshot
     for (const auto& element : emulatorFeatures) {
         if (snapshotFeatures.find(element) == snapshotFeatures.end()) {
-            derror("The emulator has the feature: %d, which is missing in the "
-                   "snapshot", element);
+            derror("The emulator has the feature: %d (%s), which is missing in the "
+                   "snapshot",
+                   element, fc::featureToString(element).data());
             return false;
         }
     }

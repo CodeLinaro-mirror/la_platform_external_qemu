@@ -14,6 +14,8 @@
 
 #include "android/virtualscene/WASDInputHandler.h"
 #include "aemu/base/Log.h"
+#include "android/avd/info.h"
+#include "android/console.h"
 #include "android/utils/debug.h"
 #include "android/physics/GlmHelpers.h"
 #include "android/physics/PhysicalModel.h"
@@ -59,7 +61,14 @@ void PhysicalModel::onEnable() {
                        << mEulerRotationRadians.y << ", "
                        << mEulerRotationRadians.z << ")";
 
-    std::vector<float> val = {kAmbientMotionExtentMeters};
+    bool isPhone = true;
+    const auto agents = getConsoleAgents();
+    if (agents && agents->settings && agents->settings->avdInfo()) {
+        isPhone = (avdInfo_getAvdFlavor(agents->settings->avdInfo()) == AVD_PHONE);
+    }
+    const float ambientMotion = isPhone ? kAmbientMotionExtentMeters : 0.0f;
+
+    std::vector<float> val = {ambientMotion};
     mSensorsAgent->setPhysicalParameterTarget(PHYSICAL_PARAMETER_AMBIENT_MOTION,
                                               val.data(), val.size(),
                                               PHYSICAL_INTERPOLATION_SMOOTH);

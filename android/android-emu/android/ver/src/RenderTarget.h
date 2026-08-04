@@ -63,6 +63,9 @@ public:
     // this is not a texture-backed target.
     const Texture& getTexture() const;
 
+    uint32_t getWidth() const { return mWidth; }
+    uint32_t getHeight() const { return mHeight; }
+
 private:
     // Private constructor, use Texture::load to create an instance.
     RenderTarget(Renderer& renderer,

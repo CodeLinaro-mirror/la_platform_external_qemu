@@ -531,15 +531,14 @@ void main_host_thread() {
                 LOG(DEBUG) << "received exit request from parent process";
                 s_stop_requested = true;
                 break;
-            } else if (buf.compare(0, 3, "REM") ==
-                       0) {  // REMO for modem id 0 ...
+            } else if ((buf.size() == 4) && buf.compare(0, 3, "REM") == 0) {  // REMx
                 // Remote request from other cuttlefish instance
                 DD("got a call");
-                int id = std::stoi(buf.substr(3, 1));
+                const size_t id = static_cast<size_t>(buf[3] - '0');
                 if (id >= modem_simulators.size()) {
-                    DD("Not supported modem simulator count: %d", id);
+                    DD("Not supported modem simulator count: %c", buf[3]);
                 } else {
-                    DD("pass to channel monitior %d", id);
+                    DD("pass to channel monitior %zu", id);
                     modem_simulators[id]->SetRemoteClient(conn, true);
                 }
             } else {
