@@ -172,6 +172,7 @@ EXPORTS
     qemu_bh_delete
     qemu_bh_new_full
     qemu_bh_schedule
+    qemu_chr_be_event
     qemu_chr_be_write
     qemu_clock_deadline_ns_all
     qemu_clock_enable
