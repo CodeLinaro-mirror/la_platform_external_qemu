@@ -208,6 +208,7 @@ private:
         bool mEglInitialized = false;
     } mGL;
     const gfxstream::host::gl::GLESv2Dispatch* mGles2 = nullptr;
+    GLint mMaxTextureSize = 0;
 };
 
 }  // namespace ver
