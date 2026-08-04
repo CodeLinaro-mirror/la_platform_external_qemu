@@ -652,12 +652,17 @@ bool VirtualSceneControlWindow::handleKeyEvent(QKeyEvent* event) {
         return false;
     }
 
-    if (event->type() == QEvent::KeyPress) {
-        mInputHandler->keyDown(controlKey.value());
-    } else {
-        mInputHandler->keyUp(controlKey.value());
+    // Keys are used for translation of the virtual scene camera. Not all modes
+    // support translation.
+    const bool supportsTranslation = android::virtualscene::
+            VirtualSceneManager::modeSupportsCameraTranslation();
+    if (supportsTranslation) {
+        if (event->type() == QEvent::KeyPress) {
+            mInputHandler->keyDown(controlKey.value());
+        } else {
+            mInputHandler->keyUp(controlKey.value());
+        }
     }
-
     return true;
 }
 
