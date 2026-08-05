@@ -614,10 +614,11 @@ static size_t virtio_snd_stream_period_elem(VirtIOSoundPCMStream *stream,
 static void virtio_snd_stream_period_cb(void *opaque)
 {
     VirtIOSoundPCMStream *stream = opaque;
+    VirtQueue *vq = virtio_snd_stream_get_vq(stream);
     uint64_t next_period_us;
+    bool need_notify = false;
 
     do {
-        VirtQueue *vq;
         VirtQueueElement *elem;
         size_t data_size;
 
@@ -625,7 +626,6 @@ static void virtio_snd_stream_period_cb(void *opaque)
             elem = vqelems_pop(&stream->vqelems);
             if (elem) {
                 data_size = virtio_snd_stream_period_elem(stream, elem, true);
-                vq = virtio_snd_stream_get_vq(stream);
             } else {
                 stream->num_missed_periods =
                         MIN(stream->num_missed_periods + 1U,
@@ -640,11 +640,15 @@ static void virtio_snd_stream_period_cb(void *opaque)
 
         if (elem) {
             virtio_snd_virtqueue_consume_elem(vq, elem, data_size);
-            virtio_notify(&stream->s->parent_obj, vq);
+            need_notify = true;
         }
     } while (next_period_us <= qemu_clock_get_us(QEMU_CLOCK_VIRTUAL));
 
     timer_mod(&stream->period_timer, next_period_us);
+
+    if (need_notify) {
+        virtio_notify(&stream->s->parent_obj, vq);
+    }
 }
 
 static uint32_t virtio_snd_stream_start(VirtIOSoundPCMStream *stream)
