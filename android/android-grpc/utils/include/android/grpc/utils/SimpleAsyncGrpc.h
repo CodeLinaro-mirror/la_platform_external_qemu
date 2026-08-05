@@ -244,6 +244,9 @@ public:
         : mContext(std::move(context)), mOnDone(onDone) {}
 
     ::grpc::ClientContext* context() { return mContext.get(); }
+    std::shared_ptr<::grpc::ClientContext> context_shared() const {
+        return mContext;
+    }
 
     virtual void OnDone(const grpc::Status& status) override {
         mOnDone(status);
