@@ -423,7 +423,11 @@ static int startOpenglesRendererImpl(
                     {android::featurecontrol::VulkanRobustness,
                      &gfxstream::host::FeatureSet::VulkanRobustness},
                     {android::featurecontrol::VulkanProtectedMemoryEmulation,
-                     &gfxstream::host::FeatureSet::VulkanProtectedMemoryEmulation},
+                     &gfxstream::host::FeatureSet::
+                             VulkanProtectedMemoryEmulation},
+                    {android::featurecontrol::VulkanUseDedicatedAhbMemoryType,
+                     &gfxstream::host::FeatureSet::
+                             VulkanUseDedicatedAhbMemoryType},
             };
 
     std::string reportGfxstreamFeatures;

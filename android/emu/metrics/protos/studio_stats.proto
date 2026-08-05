@@ -3548,7 +3548,8 @@ message EmulatorFeatureFlagState {
     XR_DIMMING = 140;
     XR_HAND_AND_EYE_POINTERS = 141;
     XR_STATUS_LED = 142;
-    // Next tag: 143
+    VULKAN_USE_DEDICATED_AHB_MEMORY_TYPE = 143;
+    // Next tag: 144
   }
   // Which features were enabled by default or through the server-side config.
   repeated EmulatorFeatureFlag attempted_enabled_feature_flags = 1;
