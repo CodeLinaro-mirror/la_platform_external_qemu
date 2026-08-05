@@ -34,6 +34,9 @@ if(LINUX_X86_64)
       "${PREBUILT_ROOT}/icds/libncurses.so.6>lib64/vulkan/libncurses.so.6"
       # for translating shaders to SPIRV
       "${PREBUILT_ROOT}/glslangValidator>lib64/vulkan/glslangValidator"
+      # Validation layer
+      "${PREBUILT_ROOT}/layers/libVkLayer_khronos_validation.so>lib64/vulkan/layers/libVkLayer_khronos_validation.so"
+      "${PREBUILT_ROOT}/layers/VkLayer_khronos_validation.json>lib64/vulkan/layers/VkLayer_khronos_validation.json"
       ${VULKAN_COMMON_DEPENDENCIES})
   set(VULKAN_TEST_DEPENDENCIES
       # Loader (for testing)
@@ -68,6 +71,9 @@ elseif(DARWIN_X86_64 OR DARWIN_AARCH64)
       # MoltenVK
       "${PREBUILT_ROOT}/icds/libMoltenVK.dylib>lib64/vulkan/libMoltenVK.dylib"
       "${PREBUILT_ROOT}/icds/MoltenVK_icd.json>lib64/vulkan/MoltenVK_icd.json"
+      # Validation layer
+      "${PREBUILT_ROOT}/layers/libVkLayer_khronos_validation.dylib>lib64/vulkan/layers/libVkLayer_khronos_validation.dylib"
+      "${PREBUILT_ROOT}/layers/VkLayer_khronos_validation.json>lib64/vulkan/layers/VkLayer_khronos_validation.json"
       # Shaders
       ${VULKAN_COMMON_DEPENDENCIES})
       # KosmicKrisp is only necessary for mac_aarch64
@@ -102,6 +108,9 @@ elseif(WINDOWS)
       "${PREBUILT_ROOT}/icds/vk_swiftshader_icd.json>lib64/vulkan/vk_swiftshader_icd.json"
       # for translating shaders to SPIRV
       "${PREBUILT_ROOT}/glslangValidator.exe>lib64/vulkan/glslangValidator.exe"
+      # Validation layer
+      "${PREBUILT_ROOT}/layers/VkLayer_khronos_validation.dll>lib64/vulkan/layers/VkLayer_khronos_validation.dll"
+      "${PREBUILT_ROOT}/layers/VkLayer_khronos_validation.json>lib64/vulkan/layers/VkLayer_khronos_validation.json"
       ${VULKAN_COMMON_DEPENDENCIES})
   set(VULKAN_TEST_DEPENDENCIES
       # Loader (for testing) - Use the unsafe variant to allow ICD changes with admin mode. ref: b/449967039
@@ -111,6 +120,8 @@ elseif(WINDOWS)
       "${PREBUILT_ROOT}/layers/VkLayer_api_dump.json>testlib64/layers/VkLayer_api_dump.json"
       "${PREBUILT_ROOT}/layers/VkLayer_gfxreconstruct.dll>testlib64/layers/VkLayer_gfxreconstruct.dll"
       "${PREBUILT_ROOT}/layers/VkLayer_gfxreconstruct.json>testlib64/layers/VkLayer_gfxreconstruct.json"
+      "${PREBUILT_ROOT}/layers/VkLayer_khronos_synchronization2.dll>testlib64/layers/VkLayer_khronos_synchronization2.dll"
+      "${PREBUILT_ROOT}/layers/VkLayer_khronos_synchronization2.json>testlib64/layers/VkLayer_khronos_synchronization2.json"
       "${PREBUILT_ROOT}/layers/VkLayer_khronos_validation.dll>testlib64/layers/VkLayer_khronos_validation.dll"
       "${PREBUILT_ROOT}/layers/VkLayer_khronos_validation.json>testlib64/layers/VkLayer_khronos_validation.json"
       "${PREBUILT_ROOT}/layers/VkLayer_monitor.dll>testlib64/layers/VkLayer_monitor.dll"
