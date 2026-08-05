@@ -900,7 +900,7 @@ err:        g_free(stream);
 
     pcm_ring_buffer_alloc(&stream->pcm, params->buffer_bytes);
     stream->silence_buf =
-            virtio_snd_alloc_silence_buf(&as, params->period_bytes, 0.01f);
+            virtio_snd_alloc_silence_buf(&as, params->period_bytes, 0.0002f);
 
     num_periods =
             (params->buffer_bytes + params->period_bytes - 1) /
