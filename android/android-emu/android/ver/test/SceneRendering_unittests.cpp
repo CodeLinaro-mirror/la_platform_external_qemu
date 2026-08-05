@@ -53,7 +53,12 @@ protected:
         std::filesystem::path vulkanDir = PathUtils::join(
                 System::get()->getProgramDirectory(), "lib64", "vulkan");
 
+        // Enable flags for upcoming features
         System::get()->envSet("ANDROID_EMU_ENABLE_STREETVIEW", "1");
+        System::get()->envSet("ANDROID_EMU_ENABLE_VIDEO360", "1");
+
+        // Set test parameters for streetview mode to avoid dependency on
+        // internet connection
         System::get()->envSet("ANDROID_EMU_STREETVIEW_IMAGE_PATH",
                               "testdata/streetview.jpg");
 
@@ -141,7 +146,8 @@ INSTANTIATE_TEST_SUITE_P(SceneModes,
                                                               "imagefile",
                                                               "color",
                                                               "image360",
-                                                              "streetview")));
+                                                              "streetview",
+                                                              "video360")));
 
 TEST(SceneRenderingTestSimple, InvalidDimensions) {
     VerRenderViewHandle view = ver_create_render_view();

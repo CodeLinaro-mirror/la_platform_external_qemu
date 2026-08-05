@@ -11,6 +11,7 @@ set(VIRTUAL_SCENE_DEPENDENCIES
     ${PREBUILT_ROOT}/virtualscene/default/default360.jpg>resources/default360.jpg;
     ${PREBUILT_ROOT}/virtualscene/default/default.jpg>resources/default.jpg;
     ${PREBUILT_ROOT}/virtualscene/default/default.mp4>resources/default.mp4;
+    ${PREBUILT_ROOT}/virtualscene/default/default360.mp4>resources/default360.mp4;
     ${PREBUILT_ROOT}/virtualscene/Toren1BD/poster.png>resources/poster.png;)
 android_license(TARGET "VIRTUAL_SCENE_DEPENDENCIES" LIBNAME None SPDX None
                 LICENSE None LOCAL None)

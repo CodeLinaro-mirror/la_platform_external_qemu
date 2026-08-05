@@ -145,7 +145,8 @@ bool ScenesManager::renderView(Scene* scene,
     switch (mode) {
         case SceneConfig::Mode::Mesh3D:
         case SceneConfig::Mode::Image360:
-        case SceneConfig::Mode::StreetView: {
+        case SceneConfig::Mode::StreetView:
+        case SceneConfig::Mode::Video360: {
             const auto renderables =
                     scene->getRenderableObjects(view->mViewProjection);
             if (!renderer || !renderer->render(view, renderables, renderTime)) {

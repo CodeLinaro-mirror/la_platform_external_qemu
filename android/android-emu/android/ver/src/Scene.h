@@ -78,7 +78,7 @@ public:
     const SceneConfig::Mode getSceneMode() const { return mConfig.mSceneMode; }
     const SceneConfig& getSceneConfig() const { return mConfig; }
 
-    int getSceneRotation() { return mBaseRotation; }
+    int getSceneRotation() const { return mBaseRotation; }
 
     // Update the scene for the next frame.
     // updateTime: Some animations are controlled by the global renderTime, use
@@ -134,6 +134,8 @@ public:
     void loadUserResources();
     void unloadUserResources();
 
+    void updateVideo360Texture();
+
     uint64_t getFrameTimeUs() const { return mFrameTimeUs; }
     void setFrameTimeUs(uint64_t timeUs);
 
@@ -178,6 +180,7 @@ private:
     std::unordered_map<std::string, PosterStorage> mPosters;
     std::unique_ptr<RawImageSource> mRawImageSource;
     std::optional<RawImageToken> mRawImageSourceToken;
+    std::optional<RawImageToken> mVideo360TextureToken;
     std::unique_ptr<SceneOverlayObject> mOverlayObject;
     uint64_t mObjectsVersion = 0;
     uint64_t mFrameTimeUs = 0;
