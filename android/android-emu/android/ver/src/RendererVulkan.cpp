@@ -155,10 +155,23 @@ bool RendererVulkan::initialize() {
     mVk.vkGetPhysicalDeviceMemoryProperties(mPhysicalDevice,
                                             &mMemoryProperties);
 
-    VkPhysicalDeviceProperties deviceProperties = {};
-    mVk.vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProperties);
-    dinfo("VER: Using Vulkan device: %s, driver version: %u",
-          deviceProperties.deviceName, deviceProperties.driverVersion);
+    VkPhysicalDeviceDriverProperties driverProperties = {};
+    driverProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+
+    VkPhysicalDeviceProperties2 deviceProperties2 = {};
+    deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    deviceProperties2.pNext = &driverProperties;
+
+    if (mVk.vkGetPhysicalDeviceProperties2) {
+        mVk.vkGetPhysicalDeviceProperties2(mPhysicalDevice, &deviceProperties2);
+    } else {
+        mVk.vkGetPhysicalDeviceProperties(mPhysicalDevice,
+                                           &deviceProperties2.properties);
+    }
+
+    dinfo("VER: Using Vulkan device: %s, driver name: %s, driver version: %u",
+          deviceProperties2.properties.deviceName, driverProperties.driverName,
+          deviceProperties2.properties.driverVersion);
 
     uint32_t queueFamilyCount = 0;
     mVk.vkGetPhysicalDeviceQueueFamilyProperties(mPhysicalDevice,

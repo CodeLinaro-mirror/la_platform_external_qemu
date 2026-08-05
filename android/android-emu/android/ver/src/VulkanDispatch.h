@@ -75,6 +75,7 @@ struct VulkanDispatchTable {
     PFN_vkDestroyInstance vkDestroyInstance = nullptr;
     PFN_vkEnumeratePhysicalDevices vkEnumeratePhysicalDevices = nullptr;
     PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties = nullptr;
+    PFN_vkGetPhysicalDeviceProperties2 vkGetPhysicalDeviceProperties2 = nullptr;
     PFN_vkGetPhysicalDeviceFeatures vkGetPhysicalDeviceFeatures = nullptr;
     PFN_vkGetPhysicalDeviceFeatures2 vkGetPhysicalDeviceFeatures2 = nullptr;
     PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties = nullptr;
@@ -237,6 +238,10 @@ struct VulkanDispatchTable {
         LOAD_INS_PROC(vkDestroyInstance);
         LOAD_INS_PROC(vkEnumeratePhysicalDevices);
         LOAD_INS_PROC(vkGetPhysicalDeviceProperties);
+        LOAD_INS_PROC(vkGetPhysicalDeviceProperties2);
+        if (!vkGetPhysicalDeviceProperties2) {
+            vkGetPhysicalDeviceProperties2 = (PFN_vkGetPhysicalDeviceProperties2)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR");
+        }
         LOAD_INS_PROC(vkGetPhysicalDeviceFeatures);
         LOAD_INS_PROC(vkGetPhysicalDeviceFeatures2);
         LOAD_INS_PROC(vkGetPhysicalDeviceQueueFamilyProperties);
