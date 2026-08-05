@@ -321,6 +321,7 @@ bool RendererGLES::initialize() {
     }
 
     mGles2 = mGL.mGles2;
+    mGles2->glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mMaxTextureSize);
 
     Texture screenTexture = createEmptyTexture(mRenderWidth, mRenderHeight);
     if (!screenTexture.isValid()) {
@@ -983,10 +984,12 @@ bool RendererGLES::isStandardMaterial(Material material) {
 }
 
 bool RendererGLES::isTextureSizeValid(uint32_t width, uint32_t height) {
-    GLint maxTextureSize = 0;
-    mGles2->glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-    return width != 0 && height != 0 && width <= maxTextureSize &&
-           height <= maxTextureSize;
+    if (mMaxTextureSize == 0 && mGles2) {
+        mGles2->glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mMaxTextureSize);
+    }
+    return width != 0 && height != 0 &&
+           width <= static_cast<uint32_t>(mMaxTextureSize) &&
+           height <= static_cast<uint32_t>(mMaxTextureSize);
 }
 
 Texture RendererGLES::tryGetCachedTexture(const char* filename) {
@@ -1008,7 +1011,7 @@ Texture RendererGLES::createEmptyTexture(uint32_t width, uint32_t height) {
     if (!isTextureSizeValid(width, height)) {
         E("createEmptyTexture: Invalid texture size, %d x %d, "
           "GL_MAX_TEXTURE_SIZE = %d",
-          width, height, GL_MAX_TEXTURE_SIZE);
+          width, height, mMaxTextureSize);
         return Texture();
     }
 
@@ -1120,7 +1123,7 @@ bool RendererGLES::replaceTextureInternal(Texture texture,
                                           const TextureUtils::Result& data) {
     if (!isTextureSizeValid(data.mWidth, data.mHeight)) {
         E("Invalid texture size, %d x %d, GL_MAX_TEXTURE_SIZE = %d",
-          data.mWidth, data.mHeight, GL_MAX_TEXTURE_SIZE);
+          data.mWidth, data.mHeight, mMaxTextureSize);
         return false;
     }
 
