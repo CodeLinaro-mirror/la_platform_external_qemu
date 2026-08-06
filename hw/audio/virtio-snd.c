@@ -507,6 +507,20 @@ static VirtQueue *virtio_snd_stream_get_vq(const VirtIOSoundPCMStream *stream)
                                                : VIRTIO_SND_VQ_RX];
 }
 
+static void virtio_snd_stream_be_set_active(const VirtIOSoundPCMStream *stream,
+                                            bool on)
+{
+    g_assert(stream->voice.raw);
+    g_assert(stream->s);
+    if (stream->is_output) {
+        audio_be_set_active_out(stream->s->audio_be,
+                                stream->voice.out, on);
+    } else {
+        audio_be_set_active_in(stream->s->audio_be,
+                               stream->voice.in, on);
+    }
+}
+
 static size_t virtio_snd_stream_period_tx_elem(VirtIOSoundPCMStream *stream,
                                                VirtQueueElement *elem,
                                                bool main_path)
@@ -614,10 +628,11 @@ static size_t virtio_snd_stream_period_elem(VirtIOSoundPCMStream *stream,
 static void virtio_snd_stream_period_cb(void *opaque)
 {
     VirtIOSoundPCMStream *stream = opaque;
+    VirtQueue *vq = virtio_snd_stream_get_vq(stream);
     uint64_t next_period_us;
+    bool need_notify = false;
 
     do {
-        VirtQueue *vq;
         VirtQueueElement *elem;
         size_t data_size;
 
@@ -625,7 +640,6 @@ static void virtio_snd_stream_period_cb(void *opaque)
             elem = vqelems_pop(&stream->vqelems);
             if (elem) {
                 data_size = virtio_snd_stream_period_elem(stream, elem, true);
-                vq = virtio_snd_stream_get_vq(stream);
             } else {
                 stream->num_missed_periods =
                         MIN(stream->num_missed_periods + 1U,
@@ -640,11 +654,15 @@ static void virtio_snd_stream_period_cb(void *opaque)
 
         if (elem) {
             virtio_snd_virtqueue_consume_elem(vq, elem, data_size);
-            virtio_notify(&stream->s->parent_obj, vq);
+            need_notify = true;
         }
     } while (next_period_us <= qemu_clock_get_us(QEMU_CLOCK_VIRTUAL));
 
     timer_mod(&stream->period_timer, next_period_us);
+
+    if (need_notify) {
+        virtio_notify(&stream->s->parent_obj, vq);
+    }
 }
 
 static uint32_t virtio_snd_stream_start(VirtIOSoundPCMStream *stream)
@@ -672,12 +690,6 @@ static uint32_t virtio_snd_stream_start(VirtIOSoundPCMStream *stream)
                 data_size = virtio_snd_stream_period_tx_elem(
                         stream, elem, true);
             }
-
-            audio_be_set_active_out(stream->s->audio_be,
-                                    stream->voice.out, 1);
-        } else {
-            audio_be_set_active_in(stream->s->audio_be,
-                                   stream->voice.in, 1);
         }
     }
 
@@ -702,16 +714,6 @@ static uint32_t virtio_snd_stream_stop(VirtIOSoundPCMStream *stream)
         timer_del(&stream->period_timer);
         stream->num_missed_periods = 0;
         stream->next_period_us = 0;
-
-        g_assert(stream->voice.raw);
-        g_assert(stream->s);
-        if (stream->is_output) {
-            audio_be_set_active_out(stream->s->audio_be,
-                                    stream->voice.out, 0);
-        } else {
-            audio_be_set_active_in(stream->s->audio_be,
-                                   stream->voice.in, 0);
-        }
     }
 
     return VIRTIO_SND_S_OK;
@@ -721,19 +723,11 @@ static void virtio_snd_stream_post_load(VirtIOSoundPCMStream *stream)
 {
     g_assert(stream);
 
+    virtio_snd_stream_be_set_active(stream, true);
+
     WITH_QEMU_LOCK_GUARD(&stream->mtx) {
         if (stream->next_period_us) {
             timer_mod(&stream->period_timer, stream->next_period_us);
-
-            g_assert(stream->voice.raw);
-            g_assert(stream->s);
-            if (stream->is_output) {
-                audio_be_set_active_out(stream->s->audio_be,
-                                        stream->voice.out, 1);
-            } else {
-                audio_be_set_active_in(stream->s->audio_be,
-                                       stream->voice.in, 1);
-            }
         }
     }
 }
@@ -1139,6 +1133,7 @@ static uint32_t virtio_snd_handle_pcm_prepare(VirtIOSound *s,
         return VIRTIO_SND_S_BAD_MSG;
     }
 
+    virtio_snd_stream_be_set_active(item->stream, true);
     return VIRTIO_SND_S_OK;
 }
 
@@ -1171,6 +1166,7 @@ static uint32_t virtio_snd_handle_pcm_release(VirtIOSound *s,
 
     item = &s->pcm_items[stream_id];
     if (item->stream) {
+        virtio_snd_stream_be_set_active(item->stream, false);
         virtio_snd_stream_destroy(item->stream);
         item->stream = NULL;
     }
@@ -1640,6 +1636,7 @@ static int virtio_snd_device_pre_load(void *opaque)
     for (i = 0; i < s->snd_conf.streams; ++i) {
         VirtIOSoundPCMStream* stream = s->pcm_items[i].stream;
         if (stream) {
+            virtio_snd_stream_be_set_active(stream, false);
             virtio_snd_stream_destroy(stream);
             s->pcm_items[i].stream = NULL;
         }
