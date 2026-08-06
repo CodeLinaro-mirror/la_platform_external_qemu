@@ -1359,7 +1359,7 @@ bool RendererGLES::EglState::initialize(int frameWidth, int frameHeight) {
                               EGL_RED_SIZE,
                               8,
                               EGL_DEPTH_SIZE,
-                              16,
+                              24,
                               EGL_NONE};
     EGLint numConfig = 0;
     EGLConfig eglConfig;
