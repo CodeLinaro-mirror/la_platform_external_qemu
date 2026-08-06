@@ -1351,7 +1351,7 @@ bool RendererGLES::EglState::initialize(int frameWidth, int frameHeight) {
     const EGLint attribs[] = {EGL_SURFACE_TYPE,
                               EGL_PBUFFER_BIT,
                               EGL_RENDERABLE_TYPE,
-                              EGL_OPENGL_ES_BIT,
+                              EGL_OPENGL_ES2_BIT,
                               EGL_BLUE_SIZE,
                               8,
                               EGL_GREEN_SIZE,
@@ -1396,7 +1396,7 @@ bool RendererGLES::EglState::initialize(int frameWidth, int frameHeight) {
 }
 
 std::unique_ptr<RendererContext> RendererGLES::EglState::makeEglCurrent() {
-    if (!mEglDispatch) {
+    if (!mEglDispatch || mEglContext == EGL_NO_CONTEXT) {
         LOG(ERROR) << "eglMakeCurrent failed, no EGL";
         return std::unique_ptr<RendererContext>(
                 new ScopedEglContext(nullptr, EGL_NO_DISPLAY));
