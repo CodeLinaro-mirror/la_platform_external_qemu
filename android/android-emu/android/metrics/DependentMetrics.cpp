@@ -833,6 +833,8 @@ toClearcutFeatureFlag(android::featurecontrol::Feature feature) {
             return android_studio::EmulatorFeatureFlagState::QEMU_CAMERA_SENSOR_ORIENTATION;
         case android::featurecontrol::VulkanProtectedMemoryEmulation:
             return android_studio::EmulatorFeatureFlagState::VULKAN_PROTECTED_MEMORY_EMULATION;
+        case android::featurecontrol::VulkanUseDedicatedAhbMemoryType:
+            return android_studio::EmulatorFeatureFlagState::VULKAN_USE_DEDICATED_AHB_MEMORY_TYPE;
         case android::featurecontrol::XrDimming:
             return android_studio::EmulatorFeatureFlagState::XR_DIMMING;
         case android::featurecontrol::XrHandAndEyePointers:

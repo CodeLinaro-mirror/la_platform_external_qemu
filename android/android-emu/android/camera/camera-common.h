@@ -169,6 +169,8 @@ typedef enum CameraSourceType {
     kImagefile,
     /* A panaromic image playback camera. */
     kImage360,
+    /* A streetview image camera. */
+    kStreetView,
     /* An environment camera, feeds content from environment.ini. */
     kEnvironment,
 } CameraSourceType;

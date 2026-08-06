@@ -261,6 +261,28 @@ TEST(TextureUtilsBasic, LargeJPEG) {
     EXPECT_EQ(16384u * 16384u * 3u, result->mBuffer.size());
 }
 
+TEST(TextureUtilsBasic, LoadJPEGFromMemory) {
+    const std::string path = testdataPathToAbsolute("jpeg_rgb24.jpg");
+    ScopedStdioFile fp(android_fopen(path.c_str(), "rb"));
+    ASSERT_TRUE(fp);
+    fseek(fp.get(), 0, SEEK_END);
+    long size = ftell(fp.get());
+    fseek(fp.get(), 0, SEEK_SET);
+    std::vector<uint8_t> buffer(size);
+    ASSERT_EQ(size, fread(buffer.data(), 1, size, fp.get()));
+
+    auto memResult = TextureUtils::loadJPEGFromMemory(buffer.data(), buffer.size());
+    ASSERT_TRUE(memResult.has_value());
+
+    auto fileResult = TextureUtils::loadJPEG(path.c_str());
+    ASSERT_TRUE(fileResult.has_value());
+
+    EXPECT_EQ(fileResult->mWidth, memResult->mWidth);
+    EXPECT_EQ(fileResult->mHeight, memResult->mHeight);
+    EXPECT_EQ(fileResult->mFormat, memResult->mFormat);
+    EXPECT_EQ(fileResult->mBuffer, memResult->mBuffer);
+}
+
 INSTANTIATE_TEST_CASE_P(
         TextureUtils,
         TextureUtilLoad,

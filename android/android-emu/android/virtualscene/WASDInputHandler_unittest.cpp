@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "android/virtualscene/WASDInputHandler.h"
+#include "android/virtualscene/VirtualSceneManager.h"
 #include "android/avd/info.h"
 #include "android/base/testing/GlmTestHelpers.h"
 #include "android/base/testing/MockUtils.h"
@@ -421,3 +422,17 @@ TEST_F(WASDInputHandlerTest, NonPhoneAmbientMotion) {
     getConsoleAgents()->settings->inject_AvdInfo(nullptr);
     avdInfo_free(avdInfo);
 }
+
+TEST(VerSceneConfigTest, modeSupportsCameraTranslation) {
+    using android::virtualscene::VirtualSceneManager;
+    EXPECT_TRUE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::Mesh3D));
+    EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::Image360));
+    EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::ImageFile));
+    EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::VideoFile));
+    EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::Color));
+    EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::Webcam));
+
+    EXPECT_TRUE(VirtualSceneManager::modeSupportsCameraTranslation(VerSceneConfig::Mode::Mesh3D));
+    EXPECT_FALSE(VirtualSceneManager::modeSupportsCameraTranslation(VerSceneConfig::Mode::Image360));
+}
+

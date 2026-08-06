@@ -21,9 +21,9 @@
  * file.
  */
 
-#include <vector>
-#include <optional>
 #include <cstdint>
+#include <optional>
+#include <vector>
 
 namespace android {
 namespace ver {
@@ -107,6 +107,21 @@ public:
     // If the load was successful, returns a Result.
     static std::optional<Result> loadJPEG(
             const char* filename,
+            Orientation orientation = Orientation::OpenGL);
+
+    // Loads a JPEG from a memory buffer.
+    //
+    // The image is oriented bottom-up by default to match the rgba8
+    // data layout.
+    //
+    // |buffer| - Pointer to JPEG data in memory.
+    // |size| - Size of JPEG data in bytes.
+    // |orientation| - Image orientation, match OpenGL by default.
+    //
+    // If the load was successful, returns a Result.
+    static std::optional<Result> loadJPEGFromMemory(
+            const uint8_t* buffer,
+            size_t size,
             Orientation orientation = Orientation::OpenGL);
 };
 

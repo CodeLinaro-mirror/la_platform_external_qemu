@@ -200,9 +200,12 @@ set(virtual_environment_renderer_src
     android/ver/src/MeshSceneObject.cpp
     android/ver/src/PosterSceneObject.cpp
     android/ver/src/Renderer.cpp
+    android/ver/src/RendererGLES.cpp
+    android/ver/src/RendererVulkan.cpp
     android/ver/src/RenderTarget.cpp
     android/ver/src/Scene.cpp
     android/ver/src/SceneObject.cpp
+    android/ver/src/StreetViewUtils.cpp
     android/ver/src/TextureUtils.cpp
     android/ver/src/raw_image_sources/fourcc_utils.cc
     android/ver/src/raw_image_sources/raw_image_source.cc
@@ -226,6 +229,7 @@ android_add_library(
        emulator-tinyobjloader
        emulator-tinygltf
        webrtc-yuv
+       android-emu-location
 )
 target_link_libraries(
   virtual_environment_renderer
@@ -243,7 +247,11 @@ target_include_directories(
           ${ANDROID_QEMU2_TOP_DIR}/../zlib
           ${ANDROID_QEMU2_TOP_DIR}/../tinyobjloader
           ${ANDROID_QEMU2_TOP_DIR}/android/third_party/jpeg-6b
-          ${ANDROID_QEMU2_TOP_DIR}/../webrtc/third_party/libyuv/include)
+          ${ANDROID_QEMU2_TOP_DIR}/../webrtc/third_party/libyuv/include
+          ${ANDROID_QEMU2_TOP_DIR}/android/emu/gps/include
+          ${ANDROID_QEMU2_TOP_DIR}/android/emu/curl/include
+          ${ANDROID_QEMU2_TOP_DIR}/android/emu/location/include
+          ${ANDROID_QEMU2_TOP_DIR}/android/emu/hardware/include)
 
 android_target_link_libraries(
   virtual_environment_renderer darwin
@@ -752,7 +760,9 @@ if(NOT LINUX_AARCH64)
       testdata/ver/scene_videofile_golden.png
       testdata/ver/scene_mesh3d_golden.png
       testdata/ver/scene_image360_golden.png
+      testdata/ver/scene_streetview_golden.png
       testdata/ver/scene_poster_side_by_side_golden.png
+      testdata/ver/streetview.jpg
       testdata/ver/gltf/Box.glb
       testdata/ver/gltf/BoxTextured.glb
       testdata/ver/gltf/Duck/Duck.gltf

@@ -2036,11 +2036,28 @@ QMenu* ToolWindow::createEnvironmentMenu() {
     envMenu->addAction(tr("Custom 360 Image..."), this,
                        SLOT(custom360ImageSelected()));
 
+    // Check if the streetview feature is enabled:
+    const std::string streetViewFeatureVar = System::get()->envGet("ANDROID_EMU_ENABLE_STREETVIEW");
+    const bool streetViewEnabled = (streetViewFeatureVar == "1");
+    if (streetViewEnabled) {
+        envMenu->addAction(tr("Street View"), this,
+                           SLOT(streetViewSelected()));
+    }
+
     QMenu* webcamMenu = new QMenu(tr("Webcams"), this);
     const QAndroidVirtualSceneAgent* agent = getConsoleAgents()->virtual_scene;
-    if (agent && agent->enumerateWebcams &&
+    bool enableWebcamMenu = agent && agent->enumerateWebcams;
+
+    // Allow users to disable webcam menu, this flag can be removed once the
+    // feature is stable enough for all users.
+    if (enableWebcamMenu &&
         android::base::System::get()->getEnvironmentVariable(
-                "ANDROID_EMU_ENABLE_WEBCAM_MENU") != "") {
+                "ANDROID_EMU_ENABLE_WEBCAM_MENU") == "0") {
+        dinfo("ANDROID_EMU_ENABLE_WEBCAM_MENU is set to 0, disabling webcam menu");
+        enableWebcamMenu = false;
+    }
+
+    if (enableWebcamMenu) {
         struct Context {
             QMenu* menu;
             ToolWindow* window;
@@ -2106,6 +2123,11 @@ void ToolWindow::custom360ImageSelected() {
         std::string command = "scene.mode = image360:" + fileName.toStdString();
         getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
     }
+}
+
+void ToolWindow::streetViewSelected() {
+    std::string command = "scene.mode = streetview";
+    getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
 }
 
 void ToolWindow::webcamSelected(const std::string& id) {

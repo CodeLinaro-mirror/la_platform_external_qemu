@@ -2165,6 +2165,7 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
 bool emulator_parseFeatureCommandLineOptions(AndroidOptions* opts,
                                              AvdInfo* avd,
                                              AndroidHwConfig* hw) {
+    // 'streetview' mode is intentionally not added to the command line argument list.
     if (opts->camera_back) {
         if (memcmp(opts->camera_back, "webcam", 6) &&
             strcmp(opts->camera_back, "emulated") &&
