@@ -141,6 +141,28 @@ static OSStatus ca_get_os_device(bool is_output, AudioDeviceID *id)
             &size, id);
 }
 
+static OSStatus cs_is_aggregate_device(AudioDeviceID id, bool *result)
+{
+    static const AudioObjectPropertyAddress addr = {
+        kAudioAggregateDevicePropertyActiveSubDeviceList,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+
+    UInt32 size = 0;
+    OSStatus status = AudioObjectGetPropertyDataSize(id, &addr, 0, NULL, &size);
+    switch (status) {
+    case kAudioHardwareNoError:
+        *result = (size > sizeof(AudioObjectID));
+        break;
+    case kAudioHardwareUnknownPropertyError:
+        *result = false;
+        status = kAudioHardwareNoError;
+        break;
+    }
+    return status;
+}
+
 static OSStatus ca_get_device_period_size_frames(bool is_output,
                                                  AudioDeviceID id,
                                                  UInt32 *period_sz)
@@ -464,6 +486,21 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
         } else if (device_id == kAudioDeviceUnknown) {
             status = kAudioHardwareUnspecifiedError;
             goto no_voice;
+        }
+
+        bool is_aggregate_device;
+        status = cs_is_aggregate_device(device_id, &is_aggregate_device);
+        if (status != kAudioHardwareNoError) {
+            if (status == kAudioHardwareBadObjectError) {
+                continue;
+            }
+            ca_logerr2(core->is_output, status, "%s",
+                       "Could not detect if an aggregate device");
+            return false;
+        } else if (is_aggregate_device) {
+            ca_logerr2(core->is_output, status, "%s",
+                       "Aggregate devices are not supported");
+            return false;
         }
 
         status = AudioObjectAddPropertyListener(device_id,
