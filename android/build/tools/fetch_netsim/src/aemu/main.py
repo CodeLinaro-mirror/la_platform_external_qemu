@@ -87,8 +87,6 @@ def git_commit(bid, destination_dir, args):
     versions = []
     if args.netsim_version:
         versions.append(f"Netsim {args.netsim_version}")
-    if args.netsimx_version:
-        versions.append(f"NetsimX {args.netsimx_version}")
 
     versions_str = ", ".join(versions)
     if versions_str and args.canary_version:
@@ -346,11 +344,6 @@ def main():
         "--netsim-version",
         type=str,
         help="Include Netsim version in the gerrit commit description"
-    )
-    parser.add_argument(
-        "--netsimx-version",
-        type=str,
-        help="Include Netsim Next version in the gerrit commit description"
     )
     parser.add_argument(
         "--canary-version",
