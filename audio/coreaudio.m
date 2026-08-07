@@ -48,7 +48,10 @@ struct AudioCoreaudio {
 };
 
 typedef struct coreaudioVoice {
-    HWVoiceOut hw;  /* TODO: microphone */
+    union {
+        HWVoiceOut out;
+        HWVoiceIn in;
+    } hw;
     AudioDeviceIOProcID ioprocid;
     //AudioConverterRef converter;
     void *converter_buf;
@@ -293,11 +296,7 @@ static OSStatus ca_handle_voice_change(
     return kAudioHardwareNoError;
 }
 
-/*
- * callback to feed audiooutput buffer. called without BQL.
- * allowed to lock "buf_mutex", but disallowed to have any other locks.
- */
-static OSStatus ca_out_device_ioproc(
+static OSStatus ca_out_device_out_ioproc(
     AudioDeviceID inDevice,
     const AudioTimeStamp *inNow,
     const AudioBufferList *inInputData,
@@ -324,31 +323,31 @@ zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
     }
 
     const unsigned q_frame_size =
-            core->hw.info.nchannels * core->hw.info.bytes_per_frame;
+            core->hw.out.info.nchannels * core->hw.out.info.bytes_per_frame;
     ASSERT(q_frame_size > 0);
     const unsigned h_frame_size =
-            core->hw_channels * core->hw.info.bytes_per_frame;
+            core->hw_channels * core->hw.out.info.bytes_per_frame;
     ASSERT(h_frame_size > 0);
 
     size_t len = outOutputData->mBuffers[0].mDataByteSize / h_frame_size * q_frame_size;
-    size_t pending_emul = core->hw.pending_emul;
+    size_t pending_emul = core->hw.out.pending_emul;
     if (pending_emul < len) {
         goto zero;
     }
 
-    const size_t size_emul = core->hw.size_emul;
+    const size_t size_emul = core->hw.out.size_emul;
     ASSERT(size_emul > 0);
-    const size_t pos_emul = core->hw.pos_emul;
+    const size_t pos_emul = core->hw.out.pos_emul;
     ASSERT(pos_emul < size_emul);
-    const char *const buf_emul = core->hw.buf_emul;
-    ASSERT(buf_emul);
+    const char *const buf_emul8 = core->hw.out.buf_emul;
+    ASSERT(buf_emul8);
 
     while (len) {
         const size_t start = audio_ring_posb(pos_emul, pending_emul, size_emul);
         ASSERT(start < size_emul);
         const size_t write_len = MIN(MIN(pending_emul, len), size_emul - start);
         ASSERT(!(write_len % q_frame_size));
-        const char *input8 = (const char *)(buf_emul + start);
+        const char *input8 = (const char *)(buf_emul8 + start);
 
         if (q_frame_size == h_frame_size) {
             memcpy(out8, input8, write_len);
@@ -376,7 +375,97 @@ zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
         len -= write_len;
     }
 
-    core->hw.pending_emul = pending_emul;
+    core->hw.out.pending_emul = pending_emul;
+    ca_voice_unlock(core);
+    return kAudioHardwareNoError;
+}
+
+static OSStatus ca_out_device_in_ioproc(
+    AudioDeviceID inDevice,
+    const AudioTimeStamp *inNow,
+    const AudioBufferList *inInputData,
+    const AudioTimeStamp *inInputTime,
+    AudioBufferList *outOutputData,
+    const AudioTimeStamp *inOutputTime,
+    void *hwptr)
+{
+    ASSERT(inInputData->mNumberBuffers == 1);
+    if (!inInputData->mBuffers[0].mDataByteSize) {
+        return kAudioHardwareNoError;
+    }
+
+    CoreaudioVoice *core = hwptr;
+    ASSERT(!core->is_output);
+
+    ca_voice_lock(core);
+    ASSERT(core->device_id != kAudioDeviceUnknown);
+    if (inDevice != core->device_id) {
+        ca_voice_unlock(core);
+        return kAudioHardwareNoError;
+    }
+
+    const unsigned q_frame_size =
+            core->hw.in.info.nchannels * core->hw.in.info.bytes_per_frame;
+    ASSERT(q_frame_size > 0);
+    const unsigned h_frame_size =
+            core->hw_channels * core->hw.in.info.bytes_per_frame;
+    ASSERT(h_frame_size > 0);
+
+    size_t len = inInputData->mBuffers[0].mDataByteSize / h_frame_size * q_frame_size;
+    const size_t size_emul = core->hw.in.size_emul;
+    ASSERT(size_emul > 0);
+
+    size_t pending_emul = core->hw.in.pending_emul;
+    ASSERT(pending_emul <= size_emul);
+
+    size_t pos_emul = core->hw.in.pos_emul;
+    ASSERT(pos_emul < size_emul);
+
+    size_t space_in_hw = size_emul - pending_emul;
+    if (len > space_in_hw) {
+        len = space_in_hw;
+    }
+
+    char *const buf_emul8 = core->hw.out.buf_emul;
+    ASSERT(buf_emul8);
+
+    const char *input8 = inInputData->mBuffers[0].mData;
+    ASSERT(input8);
+
+    while (len) {
+        const size_t write_len = MIN(len, size_emul - pos_emul);
+        ASSERT(!(write_len % q_frame_size));
+        char *out8 = buf_emul8 + pos_emul;
+
+        if (q_frame_size == h_frame_size) {
+            memcpy(out8, input8, write_len);
+            input8 += write_len;
+        } else if (q_frame_size < h_frame_size) {
+            size_t frames = write_len / q_frame_size;
+            for (; frames; --frames) {
+                memcpy(out8, input8, q_frame_size);
+                out8 += q_frame_size;
+                input8 += h_frame_size;
+            }
+        } else {  /* q_frame_size > h_frame_size */
+            const unsigned zeroes = q_frame_size - h_frame_size;
+            size_t frames = write_len / q_frame_size;
+            for (; frames; --frames) {
+                memcpy(out8, input8, h_frame_size);
+                input8 += h_frame_size;
+                out8 += h_frame_size;
+                memset(out8, 0, zeroes);
+                out8 += zeroes;
+            }
+        }
+
+        pos_emul = (pos_emul + write_len) % size_emul;
+        pending_emul += write_len;
+        len -= write_len;
+    }
+
+    core->hw.in.pos_emul = pos_emul % size_emul;
+    core->hw.in.pending_emul = pending_emul;
     ca_voice_unlock(core);
     return kAudioHardwareNoError;
 }
@@ -545,7 +634,9 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
         }
 
         const uint32_t hw_channels = hw_stream_fmt.mChannelsPerFrame;
-        if (core->hw.info.freq == 0) {
+        struct audio_pcm_info *info = core->is_output ? &core->hw.out.info
+                                                      : &core->hw.in.info;
+        if (info->freq == 0) {
             /*
              * This is a new voice, try using the sound card
              * values to avoid double conversion.
@@ -556,7 +647,7 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
                  * This accomodates 5 channel guest streams on
                  * a 16 channel sound card in MacOS.
                  */
-                .nchannels = MIN(core->hw.info.nchannels, hw_channels),
+                .nchannels = MIN(info->nchannels, hw_channels),
                 .big_endian = false,
             };
 
@@ -565,14 +656,14 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
                  * A converter will be created anyway, use
                  * the format QEMU suggested.
                  */
-                as.fmt = core->hw.info.af;
+                as.fmt = info->af;
             }
 
-            audio_pcm_init_info(&core->hw.info, &as);
+            audio_pcm_init_info(info, &as);
         }
 
         uint32_t qemu_period_size_frames = hw_period_size_frames;
-        if (ca_is_converter_required(&hw_stream_fmt, &core->hw.info)) {
+        if (ca_is_converter_required(&hw_stream_fmt, info)) {
             ca_unlisten_fmt_change_locked(device_id, core);
             ca_logerr2(core->is_output, kAudioHardwareUnsupportedOperationError,
                        "%s", "A resampler is required but not implemented");
@@ -591,7 +682,8 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
          */
         AudioDeviceIOProcID ioprocid = NULL;
         status = AudioDeviceCreateIOProcID(device_id,
-                                           ca_out_device_ioproc,
+                                           (core->is_output ? ca_out_device_out_ioproc
+                                                            : ca_out_device_in_ioproc),
                                            core,
                                            &ioprocid);
         if ((status != kAudioHardwareNoError) || !ioprocid) {
@@ -607,8 +699,25 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
         core->device_id = device_id;
         core->ioprocid = ioprocid;
         core->hw_channels = hw_channels;
-        core->hw.samples = core->periods_count * qemu_period_size_frames;
-        audio_generic_initialize_buffer_out(&core->hw);
+
+        const size_t buffer_size_samples =
+                core->periods_count * qemu_period_size_frames;
+        if (core->is_output) {
+            HWVoiceOut *hw = &core->hw.out;
+
+            ASSERT(hw->samples == 0);
+            hw->samples = buffer_size_samples;
+            audio_generic_initialize_buffer_out(hw);
+        } else {
+            HWVoiceIn *hw = &core->hw.in;
+
+            ASSERT(hw->samples == 0);
+            hw->samples = buffer_size_samples;
+            hw->size_emul = hw->samples * info->bytes_per_frame;
+            hw->buf_emul = g_malloc(hw->size_emul);
+            hw->pos_emul = 0;
+            hw->pending_emul = 0;
+        }
         return true;
     }
 
@@ -621,7 +730,8 @@ static int coreaudio_init_impl(const bool is_output,
                                CoreaudioVoice *core,
                                struct audsettings *input_as)
 {
-    Audiodev *dev = core->hw.s->dev;
+    const Audiodev *dev = is_output ? core->hw.out.s->dev
+                                    : core->hw.in.s->dev;
     const AudiodevCoreaudioPerDirectionOptions *cpdo =
             is_output ? dev->u.coreaudio.out : dev->u.coreaudio.in;
     OSStatus status;
@@ -632,26 +742,29 @@ static int coreaudio_init_impl(const bool is_output,
     core->periods_count = cpdo->has_buffer_count ? cpdo->buffer_count : 4;
     ASSERT(core->periods_count > 0);
 
+    struct audio_pcm_info *info = is_output ? &core->hw.out.info
+                                            : &core->hw.in.info;
+
     /*
      * `0` means we will use the actual sound card frequency.
      * A non-zero value (for existing voices, when the hardware
      * changes) a converter will be created if the frequency
      * does not match.
      */
-    core->hw.info.freq = 0;
+    info->freq = 0;
 
     /*
      * The fallback audio format if the sound card format is
      * too tricky. An additonal converter will be required.
      */
-    core->hw.info.af = input_as->fmt;
+    info->af = input_as->fmt;
 
     /*
      * The number of channels the guest requested.
      * It will be checked with the sound card.
      */
     ASSERT(input_as->nchannels > 0);
-    core->hw.info.nchannels = input_as->nchannels;
+    info->nchannels = input_as->nchannels;
 
     err = pthread_mutex_init(&core->buf_mutex, NULL);
     if (err) {
@@ -683,11 +796,6 @@ static int coreaudio_init_impl(const bool is_output,
     return 0;
 }
 
-static int coreaudio_init_out(HWVoiceOut *hw, struct audsettings *as)
-{
-    return coreaudio_init_impl(true, (CoreaudioVoice *)hw, as);
-}
-
 static void ca_fini_voice_locked(CoreaudioVoice *core)
 {
     ASSERT(core->device_id != kAudioDeviceUnknown);
@@ -703,12 +811,22 @@ static void ca_fini_voice_locked(CoreaudioVoice *core)
         ca_logerr2(core->is_output, status, "%s", "Could not remove IOProc");
     }
 
-    g_free(core->hw.buf_emul);
-    core->hw.buf_emul = NULL;
-    core->hw.samples = 0;
-    core->hw.size_emul = 0;
-    core->hw.pos_emul = 0;
-    core->hw.pending_emul = 0;
+    if (core->is_output) {
+        HWVoiceOut *hw = &core->hw.out;
+
+        g_free(hw->buf_emul);
+        hw->buf_emul = NULL;
+        hw->size_emul = 0;
+        hw->samples = 0;
+    } else {
+        HWVoiceIn *hw = &core->hw.in;
+
+        g_free(hw->buf_emul);
+        hw->buf_emul = NULL;
+        hw->size_emul = 0;
+        hw->samples = 0;
+    }
+
     core->device_id = kAudioDeviceUnknown;
 }
 
@@ -723,11 +841,6 @@ static void coreaudio_fini_impl(CoreaudioVoice *core)
     pthread_mutex_destroy(&core->buf_mutex);
 }
 
-static void coreaudio_fini_out(HWVoiceOut *hw)
-{
-    coreaudio_fini_impl((CoreaudioVoice *)hw);
-}
-
 static void coreaudio_enable_impl(CoreaudioVoice *core,
                                   const bool enable)
 {
@@ -736,9 +849,51 @@ static void coreaudio_enable_impl(CoreaudioVoice *core,
     ca_voice_unlock(core);
 }
 
+static int coreaudio_init_out(HWVoiceOut *hw, struct audsettings *as)
+{
+    return coreaudio_init_impl(true, (CoreaudioVoice *)hw, as);
+}
+
+static void coreaudio_fini_out(HWVoiceOut *hw)
+{
+    coreaudio_fini_impl((CoreaudioVoice *)hw);
+}
+
 static void coreaudio_enable_out(HWVoiceOut *hw, bool enable)
 {
     coreaudio_enable_impl((CoreaudioVoice *)hw, enable);
+}
+
+static int coreaudio_init_in(HWVoiceIn *hw, struct audsettings *as)
+{
+    return coreaudio_init_impl(false, (CoreaudioVoice *)hw, as);
+}
+
+static void coreaudio_fini_in(HWVoiceIn *hw)
+{
+    coreaudio_fini_impl((CoreaudioVoice *)hw);
+}
+
+static void coreaudio_enable_in(HWVoiceIn *hw, bool enable)
+{
+    coreaudio_enable_impl((CoreaudioVoice *)hw, enable);
+}
+
+static void *coreaudio_get_buffer_in(HWVoiceIn *hw, size_t *size)
+{
+    CoreaudioVoice *core = (CoreaudioVoice *)hw;
+    ca_voice_lock(core);
+    void* ret = audio_generic_get_buffer_in(hw, size);
+    ca_voice_unlock(core);
+    return ret;
+}
+
+static void coreaudio_put_buffer_in(HWVoiceIn *hw, void *buf, size_t size)
+{
+    CoreaudioVoice *core = (CoreaudioVoice *)hw;
+    ca_voice_lock(core);
+    audio_generic_put_buffer_in(hw, buf, size);
+    ca_voice_unlock(core);
 }
 
 static void audio_coreaudio_class_init(ObjectClass *klass, const void *data)
@@ -746,9 +901,9 @@ static void audio_coreaudio_class_init(ObjectClass *klass, const void *data)
     AudioMixengBackendClass *k = AUDIO_MIXENG_BACKEND_CLASS(klass);
 
     k->max_voices_out = 1;
-    k->max_voices_in = 0;
+    k->max_voices_in = 1;
     k->voice_size_out = sizeof(CoreaudioVoice);
-    k->voice_size_in = 0;
+    k->voice_size_in = sizeof(CoreaudioVoice);
 
     k->init_out = coreaudio_init_out;
     k->fini_out = coreaudio_fini_out;
@@ -761,6 +916,26 @@ static void audio_coreaudio_class_init(ObjectClass *klass, const void *data)
     /* wrapper for audio_generic_put_buffer_out */
     k->put_buffer_out = coreaudio_put_buffer_out;
     k->enable_out = coreaudio_enable_out;
+
+    /*
+     * The ring buffer (`hw.buf_emul`) is initialized in `init_in_device`.
+     * The audio callback (`audioDeviceIOProcIn`) writes into the ring
+     * buffer directly (under a lock, `buf_mutex`), therefore we don't
+     * need `run_buffer_in`.
+     *
+     * `coreaudio_get_buffer_in` and `coreaudio_put_buffer_in` are lock
+     * aware wrappers for QEMU ring buffer functions.
+     *
+     * The `read` call is the default QEMU function built with
+     * `get_buffer_in` and `put_buffer_in`.
+     */
+    k->init_in = coreaudio_init_in;
+    k->fini_in = coreaudio_fini_in;
+    k->read    = audio_generic_read;
+    k->run_buffer_in = NULL;
+    k->get_buffer_in = coreaudio_get_buffer_in;
+    k->put_buffer_in = coreaudio_put_buffer_in;
+    k->enable_in = coreaudio_enable_in;
 }
 
 static const TypeInfo audio_types[] = {
