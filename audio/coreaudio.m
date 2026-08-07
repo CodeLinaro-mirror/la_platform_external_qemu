@@ -23,7 +23,6 @@
  */
 
 #include "qemu/osdep.h"
-//#include <AudioToolbox/AudioToolbox.h> TODO
 #include <CoreAudio/CoreAudio.h>
 #include <pthread.h>            /* pthread_X */
 
@@ -53,15 +52,11 @@ typedef struct coreaudioVoice {
         HWVoiceIn in;
     } hw;
     AudioDeviceIOProcID ioprocid;
-    //AudioConverterRef converter;
-    void *converter_buf;
     pthread_mutex_t buf_mutex;
     AudioDeviceID device_id;
-    uint32_t qemu_period_size_frames : 20;
     uint32_t hw_channels : 10;
     uint32_t is_running : 1;
     uint32_t is_output : 1;
-    uint8_t periods_count;
 } CoreaudioVoice;
 
 static const char* ca_OSStatus_str(OSStatus status)
@@ -558,10 +553,22 @@ static bool ca_is_converter_required(const AudioStreamBasicDescription *hw,
            (hw_af != sw->af);
 }
 
+/* This value fomes from the command line. */
+static size_t ca_get_periods_count(const CoreaudioVoice *core)
+{
+    const AudiodevCoreaudioPerDirectionOptions *cpdo;
+    if (core->is_output) {
+        cpdo = core->hw.out.s->dev->u.coreaudio.out;
+    } else {
+        cpdo = core->hw.in.s->dev->u.coreaudio.in;
+    }
+
+    return cpdo->has_buffer_count ? cpdo->buffer_count : 4;
+}
+
 static bool ca_init_voice_locked(CoreaudioVoice *core)
 {
     ASSERT(core->device_id == kAudioDeviceUnknown);
-    ASSERT(core->periods_count > 0);
 
     for (unsigned retry = 10; retry; --retry) {
         OSStatus status;
@@ -701,7 +708,8 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
         core->hw_channels = hw_channels;
 
         const size_t buffer_size_samples =
-                core->periods_count * qemu_period_size_frames;
+                ca_get_periods_count(core) * qemu_period_size_frames;
+        ASSERT(buffer_size_samples > 0);
         if (core->is_output) {
             HWVoiceOut *hw = &core->hw.out;
 
@@ -730,17 +738,11 @@ static int coreaudio_init_impl(const bool is_output,
                                CoreaudioVoice *core,
                                struct audsettings *input_as)
 {
-    const Audiodev *dev = is_output ? core->hw.out.s->dev
-                                    : core->hw.in.s->dev;
-    const AudiodevCoreaudioPerDirectionOptions *cpdo =
-            is_output ? dev->u.coreaudio.out : dev->u.coreaudio.in;
     OSStatus status;
     int err;
 
     core->is_output = is_output ? 1 : 0;
     core->is_running = 0;
-    core->periods_count = cpdo->has_buffer_count ? cpdo->buffer_count : 4;
-    ASSERT(core->periods_count > 0);
 
     struct audio_pcm_info *info = is_output ? &core->hw.out.info
                                             : &core->hw.in.info;
