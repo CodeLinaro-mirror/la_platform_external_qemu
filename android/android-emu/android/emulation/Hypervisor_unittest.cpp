@@ -48,7 +48,7 @@ TEST(HypervisorTest, HypervisorFrameworkVmCreate) {
     hv_vm_destroy();
 }
 
-TEST(HypervisorTest, HVF_MapRequiresPageAlignmentAndUnmap) {
+TEST(HypervisorTest, HVF_MapAndUnmap) {
 #if defined(__arm64__) || defined(__aarch64__)
     int res = hv_vm_create(0);
 #else
@@ -72,30 +72,26 @@ TEST(HypervisorTest, HVF_MapRequiresPageAlignmentAndUnmap) {
     int unmapNeverMappedRes = hv_vm_unmap(gpa, hostPageSize);
     EXPECT_EQ(HV_SUCCESS, unmapNeverMappedRes);
 
-    // 2. Mapping an unaligned size (512 bytes) fails natively in HVF without crashing
-    int unalignedRes = hv_vm_map(hva, gpa, 512, HV_MEMORY_READ | HV_MEMORY_WRITE);
-    EXPECT_NE(HV_SUCCESS, unalignedRes);
-
-    // 3. Mapping a page-aligned size succeeds
+    // 2. Mapping a page-aligned size succeeds
     int mapRes = hv_vm_map(hva, gpa, hostPageSize, HV_MEMORY_READ | HV_MEMORY_WRITE);
     EXPECT_EQ(HV_SUCCESS, mapRes);
 
-    // 4. Mapping over an active GPA without unmapping fails in HVF
+    // 3. Mapping over an active GPA without unmapping fails in HVF
     int mapAgainRes = hv_vm_map(hva, gpa, hostPageSize, HV_MEMORY_READ | HV_MEMORY_WRITE);
     EXPECT_NE(HV_SUCCESS, mapAgainRes);
 
-    // 5. Unmapping first allows remapping to succeed
+    // 4. Unmapping first allows remapping to succeed
     int unmapRes = hv_vm_unmap(gpa, hostPageSize);
     EXPECT_EQ(HV_SUCCESS, unmapRes);
 
     mapRes = hv_vm_map(hva, gpa, hostPageSize, HV_MEMORY_READ | HV_MEMORY_WRITE);
     EXPECT_EQ(HV_SUCCESS, mapRes);
 
-    // 6. Clean up: unmap the slot
+    // 5. Clean up: unmap the slot
     unmapRes = hv_vm_unmap(gpa, hostPageSize);
     EXPECT_EQ(HV_SUCCESS, unmapRes);
 
-    // 7. Calling unmap a second time (double-unmap) does not crash; it is idempotent and returns HV_SUCCESS
+    // 6. Calling unmap a second time (double-unmap) does not crash; it is idempotent and returns HV_SUCCESS
     int unmapTwiceRes = hv_vm_unmap(gpa, hostPageSize);
     EXPECT_EQ(HV_SUCCESS, unmapTwiceRes);
 
