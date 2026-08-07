@@ -324,7 +324,8 @@ int __hvf_set_memory(hvf_slot *slot);
 int __hvf_set_memory_with_flags_locked(hvf_slot *slot, hv_memory_flags_t flags);
 
 int hvf_map_safe(void* hva, uint64_t gpa, uint64_t size, uint64_t flags) {
-    size = ALIGN(size, 0x4000);
+    // Align size to host page size (0x1000 on x86_64, 0x4000 on Apple Silicon ARM64)
+    size = ALIGN(size, qemu_real_host_page_size);
 
     pthread_rwlock_wrlock(&mem_lock);
     DPRINTF("%s: hva: [%p 0x%llx] gpa: [0x%llx 0x%llx]\n", __func__,
@@ -465,14 +466,12 @@ int __hvf_set_memory_with_flags_locked(hvf_slot *slot, hv_memory_flags_t flags) 
     macslot = &mac_slots[slot->slot_id];
 
     if (macslot->present) {
-        if (macslot->size != slot->size) {
-            macslot->present = 0;
-            DPRINTF("%s: hv_vm_unmap for gpa [0x%llx 0x%llx]\n", __func__,
-                    (unsigned long long)macslot->gpa_start,
-                    (unsigned long long)(macslot->gpa_start + macslot->size));
-            int unmapres = hv_vm_unmap(macslot->gpa_start, macslot->size);
-            assert_hvf_ok(unmapres);
-        }
+        macslot->present = 0;
+        DPRINTF("%s: hv_vm_unmap for gpa [0x%llx 0x%llx]\n", __func__,
+                (unsigned long long)macslot->gpa_start,
+                (unsigned long long)(macslot->gpa_start + macslot->size));
+        int unmapres = hv_vm_unmap(macslot->gpa_start, macslot->size);
+        assert_hvf_ok(unmapres);
     }
 
     if (!slot->size) {

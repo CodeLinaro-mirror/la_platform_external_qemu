@@ -939,6 +939,9 @@ static void kvm_user_backed_ram_map(uint64_t gpa, void* hva, uint64_t size, int 
     KVMMemoryListener* kml;
     int err;
 
+    // Align size to host page size (0x1000 on x86_64, 0x4000 on Apple Silicon ARM64)
+    size = ALIGN(size, qemu_real_host_page_size);
+
     if (!kvm_state) {
         qemu_abort("%s: attempted to map RAM before KVM initialized\n", __func__);
     }
@@ -963,6 +966,9 @@ static void kvm_user_backed_ram_unmap(uint64_t gpa, uint64_t size) {
     KVMSlot *slot;
     KVMMemoryListener* kml;
     int err;
+
+    // Align size to host page size (0x1000 on x86_64, 0x4000 on Apple Silicon ARM64)
+    size = ALIGN(size, qemu_real_host_page_size);
 
     if (!kvm_state) {
         qemu_abort("%s: attempted to map RAM before KVM initialized\n", __func__);

@@ -1628,9 +1628,16 @@ user_backed_flags_to_whpx(int flags) {
     return whpx_flags;
 }
 
+#ifndef ALIGN
+#define ALIGN(x, y) (((x)+(y)-1) & ~((y)-1))
+#endif
+
 static void whpx_user_backed_ram_map(uint64_t gpa, void* hva, uint64_t size, int flags) {
     struct whpx_state *whpx = &whpx_global;
     HRESULT hr;
+
+    // Align size to host page size (0x1000 on x86_64)
+    size = ALIGN(size, qemu_real_host_page_size);
 
     hr = whpx_set_ram(hva, gpa, size, user_backed_flags_to_whpx(flags), 1 /* add */);
 
@@ -1647,6 +1654,9 @@ static void whpx_user_backed_ram_map(uint64_t gpa, void* hva, uint64_t size, int
 static void whpx_user_backed_ram_unmap(uint64_t gpa, uint64_t size) {
     struct whpx_state *whpx = &whpx_global;
     HRESULT hr;
+
+    // Align size to host page size (0x1000 on x86_64)
+    size = ALIGN(size, qemu_real_host_page_size);
 
     hr = whpx_set_ram(0, gpa, size, 0 /* no flags */, 0 /* for delete */);
 
