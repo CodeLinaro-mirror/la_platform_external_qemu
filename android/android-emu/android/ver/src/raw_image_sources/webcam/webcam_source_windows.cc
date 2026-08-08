@@ -540,22 +540,18 @@ public:
                                  int frame_width,
                                  int frame_height,
                                  GUID* out_native_subtype) {
-        WebcamSource::WebcamPixelFormat format =
-                webcam_info_->supported_formats
-                        [webcam_info_->preferred_format_index];
-
-        for (const auto& supported : webcam_info_->supported_formats) {
-            if (pixel_format == supported.pixel_format) {
-                format = supported;
-                break;
-            }
+        auto format = webcam_info_->NegotiateFormat(pixel_format);
+        if (!format.has_value()) {
+            LOG(ERROR) << "Camera" << webcam_info_->friendly_name.c_str()
+                       << " is not supported by the emulator";
+            return E_FAIL;
         }
 
         WebcamSource::Resolution requested_res = {
                 static_cast<unsigned int>(frame_width),
                 static_cast<unsigned int>(frame_height)};
         WebcamSource::Resolution best_res =
-                format.FindBestMatchForResolution(requested_res);
+                format->FindBestMatchForResolution(requested_res);
 
         ComPtr<IMFMediaTypeHandler> mediaHandler;
         HRESULT hr = getMediaHandler(source, &mediaHandler);
@@ -591,7 +587,7 @@ public:
                     continue;
                 }
 
-                if (pf == format.pixel_format && w == best_res.width &&
+                if (pf == format->pixel_format && w == best_res.width &&
                     h == best_res.height) {
                     bestMediaType = type;
                     break;

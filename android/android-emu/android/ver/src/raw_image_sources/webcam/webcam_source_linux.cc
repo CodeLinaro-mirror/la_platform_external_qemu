@@ -285,24 +285,21 @@ public:
 
         struct v4l2_format fmt;
         memset(&fmt, 0, sizeof(fmt));
-        // Check if we directly support the requested format. Otherwise use the
-        // already chosen preferred format.
-        WebcamSource::WebcamPixelFormat format =
-                webcam_info_->supported_formats
-                        [webcam_info_->preferred_format_index];
 
-        for (const WebcamSource::WebcamPixelFormat& supported :
-             webcam_info_->supported_formats) {
-            if (pixel_format == supported.pixel_format) {
-                format = supported;
-            }
+        auto format = webcam_info_->NegotiateFormat(pixel_format);
+        if (!format.has_value()) {
+            derror("Camera '%s' is not supported by the emulator",
+                   webcam_info_->friendly_name.c_str());
+            StopLocked();
+            return -1;
         }
+
         WebcamSource::Resolution res = {frame_width, frame_height};
-        res = format.FindBestMatchForResolution(res);
+        res = format->FindBestMatchForResolution(res);
         fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         fmt.fmt.pix.width = res.width;
         fmt.fmt.pix.height = res.height;
-        fmt.fmt.pix.pixelformat = format.pixel_format;
+        fmt.fmt.pix.pixelformat = format->pixel_format;
         fmt.fmt.pix.field = V4L2_FIELD_ANY;
 
         if (_xioctl(fd_.get(), VIDIOC_S_FMT, &fmt) < 0) {

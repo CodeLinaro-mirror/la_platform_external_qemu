@@ -169,6 +169,33 @@ WebcamSource::WebcamPixelFormat::FindBestMatchForResolution(
     return {w, h};
 }
 
+std::optional<WebcamSource::WebcamPixelFormat>
+WebcamSource::WebcamInfo::NegotiateFormat(uint32_t requested_format) const {
+    WebcamSource::WebcamPixelFormat format;
+    if (preferred_format_index >= 0 &&
+        preferred_format_index < static_cast<int>(supported_formats.size())) {
+        format = supported_formats[preferred_format_index];
+    } else if (!supported_formats.empty()) {
+        dwarning(
+                "No preferred format found for camera '%s', using first supported format as fallback.",
+                friendly_name.c_str());
+        format = supported_formats[0];
+    } else {
+        derror("No supported pixel format found for camera '%s'",
+               friendly_name.c_str());
+        return std::nullopt;
+    }
+
+    // If we directly support the requested format, prefer using that
+    for (const auto& supported : supported_formats) {
+        if (requested_format == supported.pixel_format) {
+            format = supported;
+            break;
+        }
+    }
+    return format;
+}
+
 std::string WebcamSource::ResolveWebcamId(std::string_view camera_arg) {
     std::lock_guard<std::mutex> lock(s_webcam_info_list_lock_);
     if (!s_webcam_info_list_) {
