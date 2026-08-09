@@ -569,6 +569,7 @@ static size_t ca_get_periods_count(const CoreaudioVoice *core)
 static bool ca_init_voice_locked(CoreaudioVoice *core)
 {
     ASSERT(core->device_id == kAudioDeviceUnknown);
+    ASSERT(!core->ioprocid);
 
     for (unsigned retry = 10; retry; --retry) {
         OSStatus status;
@@ -801,6 +802,7 @@ static int coreaudio_init_impl(const bool is_output,
 static void ca_fini_voice_locked(CoreaudioVoice *core)
 {
     ASSERT(core->device_id != kAudioDeviceUnknown);
+    ASSERT(core->ioprocid);
 
     OSStatus status;
 
@@ -809,6 +811,7 @@ static void ca_fini_voice_locked(CoreaudioVoice *core)
     }
     ca_unlisten_fmt_change_locked(core->device_id, core);
     status = AudioDeviceDestroyIOProcID(core->device_id, core->ioprocid);
+    core->ioprocid = NULL;
     if (is_printable_OSStatus(status)) {
         ca_logerr2(core->is_output, status, "%s", "Could not remove IOProc");
     }
