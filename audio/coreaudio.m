@@ -254,7 +254,8 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
     return status == kAudioHardwareNoError;
 }
 
-static bool ca_init_voice_locked(CoreaudioVoice *core);
+static bool ca_init_voice_locked(CoreaudioVoice *core,
+                                 const struct audsettings *sw_as);
 static void ca_fini_voice_locked(CoreaudioVoice *core);
 
 /* This handles both device and format changes */
@@ -271,7 +272,7 @@ static OSStatus ca_handle_voice_change(
         ca_fini_voice_locked(core);
     }
 
-    if (ca_init_voice_locked(core)) {
+    if (ca_init_voice_locked(core, NULL)) {
         if (core->is_running) {
             ca_update_voice_running_state_locked(core, true);
         }
@@ -558,7 +559,8 @@ static size_t ca_get_periods_count(const CoreaudioVoice *core)
     return cpdo->has_buffer_count ? cpdo->buffer_count : 4;
 }
 
-static bool ca_init_voice_locked(CoreaudioVoice *core)
+static bool ca_init_voice_locked(CoreaudioVoice *core,
+                                 const struct audsettings *sw_as)
 {
     ASSERT(core->device_id == kAudioDeviceUnknown);
     ASSERT(!core->ioprocid);
@@ -644,7 +646,9 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
         const uint32_t hw_channels = hw_stream_fmt.mChannelsPerFrame;
         struct audio_pcm_info *info = core->is_output ? &core->hw.out.info
                                                       : &core->hw.in.info;
-        if (info->freq == 0) {
+        if (sw_as) {
+            ASSERT(sw_as->nchannels > 0);
+
             /*
              * This is a new voice, try using the sound card
              * values to avoid double conversion.
@@ -655,7 +659,7 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
                  * This accomodates 5 channel guest streams on
                  * a 16 channel sound card in MacOS.
                  */
-                .nchannels = MIN(info->nchannels, hw_channels),
+                .nchannels = MIN(sw_as->nchannels, hw_channels),
                 .big_endian = false,
             };
 
@@ -664,7 +668,7 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
                  * A converter will be created anyway, use
                  * the format QEMU suggested.
                  */
-                as.fmt = info->af;
+                as.fmt = sw_as->fmt;
             }
 
             audio_pcm_init_info(info, &as);
@@ -737,37 +741,13 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
 
 static int coreaudio_init_impl(const bool is_output,
                                CoreaudioVoice *core,
-                               struct audsettings *input_as)
+                               struct audsettings *sw_as)
 {
     OSStatus status;
     int err;
 
     core->is_output = is_output ? 1 : 0;
     core->is_running = 0;
-
-    struct audio_pcm_info *info = is_output ? &core->hw.out.info
-                                            : &core->hw.in.info;
-
-    /*
-     * `0` means we will use the actual sound card frequency.
-     * A non-zero value (for existing voices, when the hardware
-     * changes) a converter will be created if the frequency
-     * does not match.
-     */
-    info->freq = 0;
-
-    /*
-     * The fallback audio format if the sound card format is
-     * too tricky. An additonal converter will be required.
-     */
-    info->af = input_as->fmt;
-
-    /*
-     * The number of channels the guest requested.
-     * It will be checked with the sound card.
-     */
-    ASSERT(input_as->nchannels > 0);
-    info->nchannels = input_as->nchannels;
 
     err = pthread_mutex_init(&core->buf_mutex, NULL);
     if (err) {
@@ -788,7 +768,7 @@ static int coreaudio_init_impl(const bool is_output,
         return -1;
     }
 
-    if (!ca_init_voice_locked(core)) {
+    if (!ca_init_voice_locked(core, sw_as)) {
         ca_unlisten_dev_change_locked(core);
         ca_voice_unlock(core);
         pthread_mutex_destroy(&core->buf_mutex);
