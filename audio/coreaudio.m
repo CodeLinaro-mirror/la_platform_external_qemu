@@ -617,6 +617,14 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
             ca_logerr2(core->is_output, status, "%s",
                        "Could not get device stream format");
             return false;
+        } else if ((hw_stream_fmt.mSampleRate < 8000) ||
+                !hw_stream_fmt.mChannelsPerFrame) {
+            ca_unlisten_fmt_change_locked(device_id, core);
+            ca_logerr2(core->is_output, status, "Bad audio device: "
+                       "freq=%fHz nChannels=%" PRIu32,
+                       hw_stream_fmt.mSampleRate,
+                       hw_stream_fmt.mChannelsPerFrame);
+            return false;
         }
 
         UInt32 hw_period_size_frames;
