@@ -80,17 +80,6 @@ static const char* ca_OSStatus_str(OSStatus status)
 #undef HANDLE_STATUS
 }
 
-static bool is_printable_OSStatus(OSStatus s)
-{
-    switch (s) {
-    case kAudioHardwareNoError:
-    case kAudioHardwareBadObjectError:
-        return false;
-    default:
-        return true;
-    }
-}
-
 #define ca_logwrn(fmt, ...) warn_report("coreaudio: " fmt, __VA_ARGS__)
 #define ca_logwrn2(is_output, status, fmt, ...) \
     warn_report("coreaudio(%s, %s): " fmt, \
@@ -255,7 +244,8 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
         ca_voice_lock(core);
     }
 
-    if (is_printable_OSStatus(status)) {
+    if ((status != kAudioHardwareNoError) &&
+            (status != kAudioHardwareBadDeviceError)) {
         ca_logerr2(core->is_output, status, "Could not %s the device",
                    (enable ? "resume" : "pause"));
     }
@@ -481,7 +471,8 @@ static void ca_unlisten_dev_change_locked(CoreaudioVoice *core)
             ca_get_os_device_addr(core->is_output),
             ca_handle_voice_change,
             core);
-    if (is_printable_OSStatus(status)) {
+    if ((status != kAudioHardwareNoError) &&
+            (status != kAudioHardwareBadObjectError)) {
         ca_logerr2(core->is_output, status, "%s",
                    "Could not remove the device change callback");
     }
@@ -499,7 +490,8 @@ static void ca_unlisten_fmt_change_locked(AudioDeviceID device_id,
             &ca_stream_format_addr,
             ca_handle_voice_change,
             core);
-    if (is_printable_OSStatus(status)) {
+    if ((status != kAudioHardwareNoError) &&
+            (status != kAudioHardwareBadObjectError)) {
         ca_logerr2(core->is_output, status, "%s",
                    "Could not remove the format change callback");
     }
@@ -812,7 +804,8 @@ static void ca_fini_voice_locked(CoreaudioVoice *core)
     ca_unlisten_fmt_change_locked(core->device_id, core);
     status = AudioDeviceDestroyIOProcID(core->device_id, core->ioprocid);
     core->ioprocid = NULL;
-    if (is_printable_OSStatus(status)) {
+    if ((status != kAudioHardwareNoError) &&
+            (status != kAudioHardwareBadDeviceError)) {
         ca_logerr2(core->is_output, status, "%s", "Could not remove IOProc");
     }
 
