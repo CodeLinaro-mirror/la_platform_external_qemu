@@ -230,7 +230,10 @@ COREAUDIO_WRAPPER_FUNC(write, size_t, (HWVoiceOut *hw, void *buf, size_t size),
 static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
                                                  const bool enable)
 {
-    ASSERT(core->device_id != kAudioDeviceUnknown);
+    if (core->device_id == kAudioDeviceUnknown) {
+        ASSERT(!core->ioprocid);
+        return false;
+    }
     ASSERT(core->ioprocid);
 
     OSStatus status;
