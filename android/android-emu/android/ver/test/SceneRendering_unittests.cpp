@@ -133,6 +133,16 @@ TEST_P(SceneRenderingTest, RenderSceneMode) {
     ver_destroy_scene(scene);
 }
 
+INSTANTIATE_TEST_SUITE_P(SceneModes,
+                         SceneRenderingTest,
+                         ::testing::Combine(::testing::Values("vulkan", "gles"),
+                                            ::testing::Values("mesh3d",
+                                                              "videofile",
+                                                              "imagefile",
+                                                              "color",
+                                                              "image360",
+                                                              "streetview")));
+
 TEST(SceneRenderingTestSimple, InvalidDimensions) {
     VerRenderViewHandle view = ver_create_render_view();
     ASSERT_NE(view, (VerRenderViewHandle)VER_INVALID_HANDLE);
@@ -213,10 +223,23 @@ TEST(SceneRenderingTestSimple, BackendSelectionEnvVar) {
     android::base::System::get()->envSet("VER_RENDERER_BACKEND", "");
 }
 
-TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
-    setupTestLibraryPaths();
+class PosterSideBySideTest : public ::testing::TestWithParam<std::string> {
+protected:
+    void SetUp() override {
+        setupTestLibraryPaths();
+        const std::string& backend = GetParam();
+        System::get()->envSet("VER_RENDERER_BACKEND", backend);
+    }
+    void TearDown() override {
+        ver_cleanup();
+        System::get()->envSet("VER_RENDERER_BACKEND", "");
+    }
+};
+
+TEST_P(PosterSideBySideTest, PosterSideBySide) {
+    const std::string& backend = GetParam();
 #ifndef __APPLE__
-    {
+    if (backend == "gles") {
         // TODO(virtualscene-library): Fix software GLES initialization on
         // linux&windows
         GTEST_SKIP()
@@ -239,9 +262,11 @@ TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
     std::filesystem::path vulkanDir = PathUtils::join(
             System::get()->getProgramDirectory(), "lib64", "vulkan");
 
-    ver_initialize(resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
-                   (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
-
+    bool success = ver_initialize(
+            resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
+            (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
+    ASSERT_TRUE(success) << "Failed to initialize VER with backend: "
+                         << backend;
     VerSceneConfig config(VerSceneConfig::Mode::Mesh3D, "poster_test.obj");
     VerSceneHandle scene = ver_create_scene(config);
     ASSERT_NE(scene, (VerSceneHandle)VER_INVALID_HANDLE);
@@ -338,17 +363,9 @@ TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
 
     ver_destroy_render_view(view);
     ver_destroy_scene(scene);
-    ver_cleanup();
 }
-
-INSTANTIATE_TEST_SUITE_P(SceneModes,
-                         SceneRenderingTest,
-                         ::testing::Combine(::testing::Values("vulkan", "gles"),
-                                            ::testing::Values("mesh3d",
-                                                              "videofile",
-                                                              "imagefile",
-                                                              "color",
-                                                              "image360",
-                                                              "streetview")));
+INSTANTIATE_TEST_SUITE_P(PosterSideBySide,
+                         PosterSideBySideTest,
+                         ::testing::Values("vulkan", "gles"));
 
 }  // namespace
