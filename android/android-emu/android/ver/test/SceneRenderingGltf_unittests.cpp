@@ -128,15 +128,6 @@ TEST_P(SceneRenderingGltfTest, RenderGltfModel) {
     auto [backend, modelInfo] = GetParam();
     auto [testName, modelPath, isAnimated] = modelInfo;
 
-#ifndef __APPLE__
-    if (backend == "gles") {
-        // TODO(virtualscene-library): Fix software GLES initialization on linux&windows
-      GTEST_SKIP()
-              << "GLES renderer is currently not supported on this platform for testing.";
-      return;
-    }
-#endif
-
     VerSceneConfig config(VerSceneConfig::Mode::Mesh3D, modelPath);
     VerSceneHandle scene = ver_create_scene(config);
     ASSERT_NE(scene, (VerSceneHandle)VER_INVALID_HANDLE)

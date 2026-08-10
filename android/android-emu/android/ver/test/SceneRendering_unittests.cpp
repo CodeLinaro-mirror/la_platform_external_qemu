@@ -78,15 +78,6 @@ TEST_P(SceneRenderingTest, RenderSceneMode) {
     // Fail on invalid modes
     ASSERT_NE(mode, VerSceneConfig::Mode::Unknown);
 
-#ifndef __APPLE__
-    if (backend == "gles" && VerSceneConfig::modeRequiresRenderer(mode)) {
-        // TODO(virtualscene-library): Fix software GLES initialization on
-        // linux&windows
-        GTEST_SKIP()
-                << "GLES renderer is currently not supported on this platform for testing.";
-        return;
-    }
-#endif
     VerSceneConfig config(mode, VerSceneConfig::defaultArgumentForMode(mode));
     VerSceneHandle scene = ver_create_scene(config);
     ASSERT_NE(scene, (VerSceneHandle)VER_INVALID_HANDLE)
@@ -238,15 +229,6 @@ protected:
 
 TEST_P(PosterSideBySideTest, PosterSideBySide) {
     const std::string& backend = GetParam();
-#ifndef __APPLE__
-    if (backend == "gles") {
-        // TODO(virtualscene-library): Fix software GLES initialization on
-        // linux&windows
-        GTEST_SKIP()
-                << "GLES renderer is currently not supported on this platform for testing.";
-        return;
-    }
-#endif
     std::string testdataDir =
             PathUtils::join(System::get()->getProgramDirectory(), "testdata");
     std::string objPath = PathUtils::join(testdataDir, "poster_test.obj");
