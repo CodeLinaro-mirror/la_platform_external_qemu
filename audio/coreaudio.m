@@ -461,12 +461,6 @@ static OSStatus ca_out_device_in_ioproc(
     return kAudioHardwareNoError;
 }
 
-static const AudioObjectPropertyAddress ca_stream_format_addr = {
-    kAudioDevicePropertyStreamFormat,
-    kAudioObjectPropertyScopeGlobal,
-    kAudioObjectPropertyElementMain
-};
-
 static void ca_unlisten_dev_change_locked(CoreaudioVoice *core)
 {
     OSStatus status;
@@ -485,23 +479,93 @@ static void ca_unlisten_dev_change_locked(CoreaudioVoice *core)
     ca_voice_lock(core);
 }
 
-static void ca_unlisten_fmt_change_locked(AudioDeviceID device_id,
-                                          CoreaudioVoice *core)
+static const AudioObjectPropertySelector ca_fmt_change_selectors[] = {
+    kAudioDevicePropertyNominalSampleRate,
+    kAudioDevicePropertyStreamFormat,
+    kAudioDevicePropertyStreamConfiguration,
+    kAudioDevicePropertyStreams,
+};
+
+static void ca_unlisten_fmt_change_locked_impl(const bool is_output,
+                                               const AudioDeviceID device_id,
+                                               CoreaudioVoice *core,
+                                               unsigned i)
 {
+    ASSERT(device_id != kAudioDeviceUnknown);
+    ASSERT(i > 0);
+    const AudioObjectPropertyScope scope = ca_get_os_dir_scope(is_output);
     OSStatus status;
 
     ca_voice_unlock(core);
-    status = AudioObjectRemovePropertyListener(
-            device_id,
-            &ca_stream_format_addr,
-            ca_handle_voice_change,
-            core);
-    if ((status != kAudioHardwareNoError) &&
-            (status != kAudioHardwareBadObjectError)) {
-        ca_logerr2(core->is_output, status, "%s",
-                   "Could not remove the format change callback");
+    for (; i; --i) {
+        const AudioObjectPropertyAddress addr = {
+            ca_fmt_change_selectors[i - 1],
+            scope,
+            kAudioObjectPropertyElementMain
+        };
+
+        status = AudioObjectRemovePropertyListener(
+                device_id, &addr,
+                ca_handle_voice_change, core);
+        if ((status != kAudioHardwareNoError) &&
+                (status != kAudioHardwareBadObjectError)) {
+            ca_logerr2(is_output, status,
+                       "Could not remove a format change property "
+                       "listener (selector=%" PRIu32 ")",
+                       addr.mSelector);
+        }
     }
     ca_voice_lock(core);
+}
+
+static OSStatus ca_listen_fmt_change_locked(const bool is_output,
+                                            const AudioDeviceID device_id,
+                                            CoreaudioVoice *core)
+{
+    ASSERT(device_id != kAudioDeviceUnknown);
+    const AudioObjectPropertyScope scope = ca_get_os_dir_scope(is_output);
+
+    for (unsigned i = 0; i < sizeof(ca_fmt_change_selectors) /
+                             sizeof(ca_fmt_change_selectors[0]); ++i) {
+        const AudioObjectPropertyAddress addr = {
+            ca_fmt_change_selectors[i],
+            scope,
+            kAudioObjectPropertyElementMain
+        };
+
+        OSStatus status = AudioObjectAddPropertyListener(device_id, &addr,
+                                                         ca_handle_voice_change,
+                                                         core);
+        if (status != kAudioHardwareNoError) {
+            /* if the device changes we cannot unlisten */
+            if (status != kAudioHardwareBadObjectError) {
+                ca_logerr2(is_output, status,
+                           "Could not add a format change property "
+                           "listener (selector=%" PRIu32 ")",
+                           addr.mSelector);
+
+                if (i > 0) {
+                    ca_unlisten_fmt_change_locked_impl(is_output,
+                                                       device_id,
+                                                       core,
+                                                       i);
+                }
+            }
+
+            return status;
+        }
+    }
+
+    return kAudioHardwareNoError;
+}
+
+static void ca_unlisten_fmt_change_locked(const AudioDeviceID device_id,
+                                          CoreaudioVoice *core)
+{
+    ca_unlisten_fmt_change_locked_impl(
+            core->is_output, device_id, core,
+            sizeof(ca_fmt_change_selectors) /
+                    sizeof(ca_fmt_change_selectors[0]));
 }
 
 static bool ca_get_sample_format(const AudioStreamBasicDescription *hw,
@@ -599,17 +663,13 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
             return false;
         }
 
-        status = AudioObjectAddPropertyListener(device_id,
-                                                &ca_stream_format_addr,
-                                                ca_handle_voice_change,
-                                                core);
+        status = ca_listen_fmt_change_locked(core->is_output, device_id, core);
         if (status != kAudioHardwareNoError) {
             if (status == kAudioHardwareBadObjectError) {
                 continue;
+            } else {
+                return false;
             }
-            ca_logerr2(core->is_output, status, "%s",
-                       "Could not add the format change listener");
-            return false;
         }
 
         AudioStreamBasicDescription hw_stream_fmt;
