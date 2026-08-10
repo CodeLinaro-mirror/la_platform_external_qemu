@@ -271,12 +271,14 @@ static OSStatus ca_handle_voice_change(
     CoreaudioVoice *core = (CoreaudioVoice *)in_client_data;
 
     ca_voice_lock(core);
+    bool is_running = false;
     if (core->device_id) {
+        is_running = core->is_running;
         ca_fini_voice_locked(core);
     }
 
     if (ca_init_voice_locked(core, NULL)) {
-        if (core->is_running) {
+        if (is_running) {
             ca_update_voice_running_state_locked(core, true);
         }
     }
