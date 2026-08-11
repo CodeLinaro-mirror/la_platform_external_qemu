@@ -331,6 +331,16 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.getDisplayColorTransform");
                     return -1;
                 },
+        .getDisplayPowerMode =
+                [](uint32_t displayId, uint32_t* mode) -> int {
+                    NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.getDisplayPowerMode");
+                    return -1;
+                },
+        .setDisplayPowerMode =
+                [](uint32_t displayId, uint32_t mode) -> int {
+                    NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.setDisplayPowerMode");
+                    return -1;
+                },
         .getDisplayColorBuffer =
                 [](uint32_t displayId, uint32_t* colorBuffer) {
                     NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.getDisplayColorBuffer");
