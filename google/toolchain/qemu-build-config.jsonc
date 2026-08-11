@@ -285,7 +285,7 @@
         "content": {
           "common": {
             "GENISOIMAGE": "False",
-            "TARGET_DIRS": "aarch64-softmmu riscv64-softmmu x86_64-softmmu",
+            "TARGET_DIRS": "aarch64-softmmu x86_64-softmmu",
             "CONFIG_DEFAULT_TARGETS": "y"
           }
         }
@@ -629,8 +629,7 @@
       },
       "export": [
         "qemu-system-x86_64",
-        "qemu-system-aarch64",
-        "qemu-system-riscv64"
+        "qemu-system-aarch64"
       ],
       "exclude": [
         "vhost-user",
@@ -722,12 +721,6 @@
           }
         },
         {
-          "target": "qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "qemu-system-riscv64"
-          }
-        },
-        {
           "target": "qemu-system-x86_64-unsigned",
           "shims": {
             "name": "qemu-system-x86_64"
@@ -737,12 +730,6 @@
           "target": "libcommon_qemu-system-aarch64-unsigned",
           "shims": {
             "name": "libcommon_qemu-system-aarch64"
-          }
-        },
-        {
-          "target": "libcommon_qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "libcommon_qemu-system-riscv64"
           }
         },
         {
@@ -766,8 +753,7 @@
       "external_deps": {},
       "export": [
         "qemu-system-x86_64-unsigned",
-        "qemu-system-aarch64-unsigned",
-        "qemu-system-riscv64-unsigned"
+        "qemu-system-aarch64-unsigned"
       ],
       "exclude": []
     },
@@ -825,12 +811,6 @@
           }
         },
         {
-          "target": "qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "qemu-system-riscv64"
-          }
-        },
-        {
           "target": "qemu-system-x86_64-unsigned",
           "shims": {
             "name": "qemu-system-x86_64"
@@ -840,12 +820,6 @@
           "target": "libcommon_qemu-system-aarch64-unsigned",
           "shims": {
             "name": "libcommon_qemu-system-aarch64"
-          }
-        },
-        {
-          "target": "libcommon_qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "libcommon_qemu-system-riscv64"
           }
         },
         {
@@ -869,8 +843,7 @@
       "external_deps": {},
       "export": [
         "qemu-system-x86_64-unsigned",
-        "qemu-system-aarch64-unsigned",
-        "qemu-system-riscv64-unsigned"
+        "qemu-system-aarch64-unsigned"
       ],
       "exclude": []
     },
@@ -942,12 +915,6 @@
           "target": "qemu-system-aarch64",
           "shims": {
             "win_def_file": "google/build/qemu-system-aarch64.def"
-          }
-        },
-        {
-          "target": "qemu-system-riscv64",
-          "shims": {
-            "win_def_file": "google/build/qemu-system-riscv64.def"
           }
         },
         {
