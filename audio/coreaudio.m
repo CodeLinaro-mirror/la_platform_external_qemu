@@ -323,9 +323,8 @@ static OSStatus ca_out_device_ioproc(
     char *out8 = outOutputData->mBuffers[0].mData;
 
     CoreaudioVoice *core = hwptr;
-    ASSERT(core->is_output);
-
     ca_voice_lock(core);
+    ASSERT(core->is_output);
     ASSERT(core->device_id != kAudioDeviceUnknown);
     if (inDevice != core->device_id) {
 zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
@@ -406,9 +405,8 @@ static OSStatus ca_in_device_ioproc(
     }
 
     CoreaudioVoice *core = hwptr;
-    ASSERT(!core->is_output);
-
     ca_voice_lock(core);
+    ASSERT(!core->is_output);
     ASSERT(core->device_id != kAudioDeviceUnknown);
     if (inDevice != core->device_id) {
         ca_voice_unlock(core);
