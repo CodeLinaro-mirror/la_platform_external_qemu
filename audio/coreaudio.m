@@ -23,6 +23,7 @@
  */
 
 #include "qemu/osdep.h"
+#include <AudioToolbox/AudioToolbox.h>
 #include <CoreAudio/CoreAudio.h>
 #include <pthread.h>            /* pthread_X */
 
@@ -58,9 +59,11 @@ typedef struct coreaudioVoice {
         HWVoiceIn in;
     } hw;
     AudioDeviceIOProcID ioprocid;
+    AudioConverterRef converter;
     pthread_mutex_t buf_mutex;
     AudioDeviceID device_id;
     uint32_t hw_channels : 10;
+    uint32_t hw_frame_size : 16;
     uint32_t running_state : 2;
     uint32_t is_output : 1;
 } CoreaudioVoice;
@@ -326,6 +329,7 @@ static OSStatus ca_out_device_ioproc(
     ca_voice_lock(core);
     ASSERT(core->is_output);
     ASSERT(core->device_id != kAudioDeviceUnknown);
+    ASSERT(!core->converter);
     if (inDevice != core->device_id) {
 zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
         ca_voice_unlock(core);
@@ -390,6 +394,95 @@ zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
     return kAudioHardwareNoError;
 }
 
+static OSStatus ca_out_conv_proc_locked(AudioConverterRef converter,
+                                        UInt32* frames_to_consume,
+                                        AudioBufferList* data_to_consume,
+                                        AudioStreamPacketDescription** spd,
+                                        void* hwptr)
+{
+    if (spd) {
+        /* not required for PCM, QEMU only works with PCM. */
+        *spd = NULL;
+    }
+
+    HWVoiceOut *q_voice = hwptr;
+    ASSERT(q_voice->size_emul > 0);
+    ASSERT(q_voice->pending_emul <= q_voice->size_emul);
+    ASSERT(q_voice->pos_emul < q_voice->size_emul);
+
+    const size_t q_read_pos = audio_ring_posb(q_voice->pos_emul,
+                                              q_voice->pending_emul,
+                                              q_voice->size_emul);
+    ASSERT(q_read_pos < q_voice->size_emul);
+
+    const size_t q_read_len = MIN(MIN(q_voice->pending_emul, q_voice->size_emul - q_read_pos),
+                                  *frames_to_consume * q_voice->info.bytes_per_frame);
+    ASSERT(!(q_read_len % q_voice->info.bytes_per_frame));
+
+    data_to_consume->mNumberBuffers = 1;
+    data_to_consume->mBuffers[0].mData = ((char*)q_voice->buf_emul) + q_read_pos;
+    data_to_consume->mBuffers[0].mDataByteSize = q_read_len;
+    q_voice->pending_emul -= q_read_len;
+    *frames_to_consume = q_read_len / q_voice->info.bytes_per_frame;
+
+    return kAudioHardwareNoError;
+}
+
+static OSStatus ca_out_device_wconv_ioproc(
+    AudioDeviceID inDevice,
+    const AudioTimeStamp *inNow,
+    const AudioBufferList *inInputData,
+    const AudioTimeStamp *inInputTime,
+    AudioBufferList *outOutputData,
+    const AudioTimeStamp *inOutputTime,
+    void *hwptr)
+{
+    ASSERT(outOutputData->mNumberBuffers == 1);
+    if (!outOutputData->mBuffers[0].mDataByteSize ||
+            !outOutputData->mBuffers[0].mData) {
+        return kAudioHardwareNoError;
+    }
+
+    CoreaudioVoice *core = hwptr;
+    ca_voice_lock(core);
+    ASSERT(core->is_output);
+    ASSERT(core->device_id != kAudioDeviceUnknown);
+    ASSERT(core->converter);
+    ASSERT(core->hw_frame_size > 0);
+
+    if (inDevice != core->device_id) {
+        ca_voice_unlock(core);
+        memset(outOutputData->mBuffers[0].mData, 0,
+               outOutputData->mBuffers[0].mDataByteSize);
+        return kAudioHardwareNoError;
+    }
+
+    const UInt32 requested_size_frames =
+            outOutputData->mBuffers[0].mDataByteSize /
+            core->hw_frame_size;
+    UInt32 output_size_frames = requested_size_frames;
+
+    OSStatus status =
+            AudioConverterFillComplexBuffer(core->converter,
+                                            &ca_out_conv_proc_locked,
+                                            core,
+                                            &output_size_frames,
+                                            outOutputData,
+                                            NULL);
+    ca_voice_unlock(core);
+
+    if ((status != kAudioHardwareNoError) ||
+            (output_size_frames < requested_size_frames)) {
+        const size_t filled_bytes = output_size_frames * core->hw_frame_size;
+        ASSERT(filled_bytes <= outOutputData->mBuffers[0].mDataByteSize);
+
+        memset(((char *)outOutputData->mBuffers[0].mData) + filled_bytes, 0,
+               outOutputData->mBuffers[0].mDataByteSize - filled_bytes);
+    }
+
+    return kAudioHardwareNoError;
+}
+
 static OSStatus ca_in_device_ioproc(
     AudioDeviceID inDevice,
     const AudioTimeStamp *inNow,
@@ -400,7 +493,8 @@ static OSStatus ca_in_device_ioproc(
     void *hwptr)
 {
     ASSERT(inInputData->mNumberBuffers == 1);
-    if (!inInputData->mBuffers[0].mDataByteSize) {
+    if (!inInputData->mBuffers[0].mDataByteSize ||
+            !inInputData->mBuffers[0].mData) {
         return kAudioHardwareNoError;
     }
 
@@ -408,6 +502,7 @@ static OSStatus ca_in_device_ioproc(
     ca_voice_lock(core);
     ASSERT(!core->is_output);
     ASSERT(core->device_id != kAudioDeviceUnknown);
+    ASSERT(!core->converter);
     if (inDevice != core->device_id) {
         ca_voice_unlock(core);
         return kAudioHardwareNoError;
@@ -476,6 +571,119 @@ static OSStatus ca_in_device_ioproc(
     core->hw.in.pos_emul = pos_emul % size_emul;
     core->hw.in.pending_emul = pending_emul;
     ca_voice_unlock(core);
+    return kAudioHardwareNoError;
+}
+
+static OSStatus ca_in_conv_proc_locked(AudioConverterRef converter,
+                                       UInt32 *frames_to_consume,
+                                       AudioBufferList *data_to_consume,
+                                       AudioStreamPacketDescription **spd,
+                                       void *input_data_raw)
+{
+    if (spd) {
+        *spd = NULL;
+    }
+
+    AudioBufferList *input_data = input_data_raw;
+    const uint32_t available_frames = input_data->mBuffers[0].mDataByteSize;
+    const uint32_t hacked_channels = input_data->mBuffers[0].mNumberChannels;
+    const uint32_t frame_size = hacked_channels >> 10;
+    const size_t num_frames = MIN(*frames_to_consume, available_frames);
+
+    input_data->mBuffers[0].mData =
+            ((char*)input_data->mBuffers[0].mData) + num_frames * frame_size;
+    input_data->mBuffers[0].mDataByteSize -= num_frames;
+
+    *data_to_consume = *input_data;
+    data_to_consume->mBuffers[0].mDataByteSize = num_frames * frame_size;
+    data_to_consume->mBuffers[0].mNumberChannels = hacked_channels & 0x3FF;
+    *frames_to_consume = num_frames;
+    return kAudioHardwareNoError;
+}
+
+static OSStatus ca_in_device_wconv_ioproc(
+    AudioDeviceID inDevice,
+    const AudioTimeStamp *inNow,
+    const AudioBufferList *inInputData,
+    const AudioTimeStamp *inInputTime,
+    AudioBufferList *outOutputData,
+    const AudioTimeStamp *inOutputTime,
+    void *hwptr)
+{
+    ASSERT(inInputData->mNumberBuffers == 1);
+    if (!inInputData->mBuffers[0].mDataByteSize ||
+            !inInputData->mBuffers[0].mData) {
+        return kAudioHardwareNoError;
+    }
+
+    CoreaudioVoice *core = hwptr;
+    ca_voice_lock(core);
+    ASSERT(!core->is_output);
+    ASSERT(core->device_id != kAudioDeviceUnknown);
+    ASSERT(core->converter);
+    ASSERT(core->hw_frame_size > 0);
+
+    if (inDevice != core->device_id) {
+        ca_voice_unlock(core);
+        return kAudioHardwareNoError;
+    }
+
+    UInt32 requested_size_frames =
+            inInputData->mBuffers[0].mDataByteSize /
+            core->hw_frame_size;
+
+    AudioBufferList input_data = *inInputData;
+    input_data.mBuffers[0].mDataByteSize = requested_size_frames;
+    input_data.mBuffers[0].mNumberChannels =
+            (core->hw_frame_size << 10) |
+            inInputData->mBuffers[0].mNumberChannels;
+
+    HWVoiceIn *q_voice = &core->hw.in;
+    const size_t q_bytes_per_frame = q_voice->info.bytes_per_frame;
+    ASSERT(q_bytes_per_frame > 0);
+    const size_t size_emul = q_voice->size_emul;
+    ASSERT(size_emul > 0);
+    size_t pending_emul = q_voice->pending_emul;
+    ASSERT(pending_emul <= size_emul);
+    size_t pos_emul = q_voice->pos_emul;
+    ASSERT(pos_emul < size_emul);
+    char* buf_emul8 = q_voice->buf_emul;
+    ASSERT(buf_emul8);
+
+    while (requested_size_frames) {
+        UInt32 size_frames =
+                MIN(requested_size_frames,
+                    MIN(size_emul - pending_emul, size_emul - pos_emul) /
+                            q_bytes_per_frame);
+
+        AudioBufferList output_data;
+        output_data.mNumberBuffers = 1;
+        output_data.mBuffers[0].mData = buf_emul8 + pos_emul;
+        output_data.mBuffers[0].mDataByteSize = size_frames * q_bytes_per_frame;
+        output_data.mBuffers[0].mNumberChannels = q_voice->info.nchannels;
+
+        OSStatus status =
+                AudioConverterFillComplexBuffer(core->converter,
+                                                &ca_in_conv_proc_locked,
+                                                &input_data,
+                                                &size_frames,
+                                                &output_data,
+                                                NULL);
+        if (status || !size_frames) {
+            break;
+        }
+
+        const size_t q_size = size_frames * q_bytes_per_frame;
+        pending_emul += q_size;
+        pos_emul = (pos_emul + q_size) % size_emul;
+
+        requested_size_frames -= size_frames;
+    }
+
+    q_voice->pending_emul = pending_emul;
+    q_voice->pos_emul = pos_emul;
+    ca_voice_unlock(core);
+
     return kAudioHardwareNoError;
 }
 
@@ -633,6 +841,69 @@ static bool ca_is_converter_required(const AudioStreamBasicDescription *hw,
            (hw_af != sw->af);
 }
 
+static AudioStreamBasicDescription
+ca_to_AudioStreamBasicDescription(const size_t freq,
+                                  const size_t nchannels,
+                                  const AudioFormat fmt)
+{
+    size_t bytes_per_sample;
+    AudioFormatFlags flags;
+
+    switch (fmt) {
+    case AUDIO_FORMAT_S8:
+        flags = kAudioFormatFlagIsPacked | kAudioFormatFlagIsSignedInteger;
+        bytes_per_sample = sizeof(int8_t);
+        break;
+
+    case AUDIO_FORMAT_S16:
+        flags = kAudioFormatFlagIsPacked | kAudioFormatFlagIsSignedInteger;
+        bytes_per_sample = sizeof(int16_t);
+        break;
+
+    case AUDIO_FORMAT_S32:
+        flags = kAudioFormatFlagIsPacked | kAudioFormatFlagIsSignedInteger;
+        bytes_per_sample = sizeof(int32_t);
+        break;
+
+    default:
+        ASSERT(fmt == AUDIO_FORMAT_F32);
+        flags = kAudioFormatFlagIsPacked | kAudioFormatFlagIsFloat;
+        bytes_per_sample = sizeof(float);
+        break;
+    }
+
+    AudioStreamBasicDescription result = {
+        .mFormatID = kAudioFormatLinearPCM,
+        .mFormatFlags = flags,
+        .mSampleRate = freq,
+        .mBitsPerChannel = bytes_per_sample * CHAR_BIT,
+        .mBytesPerFrame = bytes_per_sample * nchannels,
+        .mChannelsPerFrame = nchannels,
+        .mBytesPerPacket = bytes_per_sample * nchannels,
+        .mFramesPerPacket = 1,
+    };
+
+    return result;
+}
+
+static AudioFormat ca_to_safe_AudioFormat(const AudioFormat fmt)
+{
+    switch (fmt) {
+    case AUDIO_FORMAT_S8:   /* avoid using 8bit samples */
+    case AUDIO_FORMAT_U8:   /* avoid using 8bit samples */
+    case AUDIO_FORMAT_S16:
+    case AUDIO_FORMAT_U16:
+        return AUDIO_FORMAT_S16;
+
+    case AUDIO_FORMAT_S32:
+    case AUDIO_FORMAT_U32:
+        return AUDIO_FORMAT_S32;
+
+    default:
+        return AUDIO_FORMAT_F32;
+    }
+}
+
 /* This value fomes from the command line. */
 static size_t ca_get_periods_count(const CoreaudioVoice *core)
 {
@@ -651,6 +922,7 @@ static bool ca_init_voice_locked(CoreaudioVoice *core,
 {
     ASSERT(core->device_id == kAudioDeviceUnknown);
     ASSERT(!core->ioprocid);
+    ASSERT(!core->converter);
 
     for (unsigned retry = 10; retry; --retry) {
         OSStatus status;
@@ -726,7 +998,6 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
             return false;
         }
 
-        const uint32_t hw_channels = hw_stream_fmt.mChannelsPerFrame;
         struct audio_pcm_info *info = core->is_output ? &core->hw.out.info
                                                       : &core->hw.in.info;
         if (sw_as) {
@@ -742,7 +1013,8 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
                  * This accomodates 5 channel guest streams on
                  * a 16 channel sound card in MacOS.
                  */
-                .nchannels = MIN(sw_as->nchannels, hw_channels),
+                .nchannels = MIN(sw_as->nchannels,
+                                 hw_stream_fmt.mChannelsPerFrame),
                 .big_endian = false,
             };
 
@@ -751,19 +1023,44 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
                  * A converter will be created anyway, use
                  * the format QEMU suggested.
                  */
-                as.fmt = sw_as->fmt;
+                as.fmt = ca_to_safe_AudioFormat(sw_as->fmt);
             }
 
             audio_pcm_init_info(info, &as);
         }
 
         uint32_t qemu_period_size_frames = hw_period_size_frames;
+        AudioConverterRef converter = NULL;
         if (ca_is_converter_required(&hw_stream_fmt, info)) {
-            ca_unlisten_fmt_change_locked(device_id, core);
-            ca_logerr2(core->is_output, kAudioHardwareUnsupportedOperationError,
-                       "%s", "A resampler is required but not implemented");
-            return false;
+            const AudioStreamBasicDescription sw_stream_fmt =
+                    ca_to_AudioStreamBasicDescription(info->freq,
+                                                      info->nchannels,
+                                                      info->af);
+            /* AudioConverterNew(src, dst, ) */
+            if (core->is_output) {
+                status = AudioConverterNew(&sw_stream_fmt, &hw_stream_fmt,
+                                           &converter);
+            } else {
+                status = AudioConverterNew(&hw_stream_fmt, &sw_stream_fmt,
+                                           &converter);
+            }
+
+            if ((status != kAudioHardwareNoError) || !converter) {
+                ca_unlisten_fmt_change_locked(device_id, core);
+                ca_logerr2(core->is_output, status, "%s",
+                           "Could not create AudioConverter");
+                return false;
+            }
+
+            qemu_period_size_frames =
+                    ((uint64_t)hw_period_size_frames) * ((uint64_t)info->freq) /
+                    hw_stream_fmt.mSampleRate;
         }
+
+        static const AudioDeviceIOProc ioprocs[2][2] = {
+            {ca_in_device_ioproc, ca_in_device_wconv_ioproc},
+            {ca_out_device_ioproc, ca_out_device_wconv_ioproc},
+        };
 
         /*
          * set Callback.
@@ -777,11 +1074,14 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
          */
         AudioDeviceIOProcID ioprocid = NULL;
         status = AudioDeviceCreateIOProcID(device_id,
-                                           (core->is_output ? ca_out_device_ioproc
-                                                            : ca_in_device_ioproc),
+                                           ioprocs[core->is_output][converter != NULL],
                                            core,
                                            &ioprocid);
         if ((status != kAudioHardwareNoError) || !ioprocid) {
+            if (converter) {
+                AudioConverterDispose(converter);
+            }
+
             ca_unlisten_fmt_change_locked(device_id, core);
             if (status == kAudioHardwareBadObjectError) {
                 continue;
@@ -793,7 +1093,9 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
 
         core->device_id = device_id;
         core->ioprocid = ioprocid;
-        core->hw_channels = hw_channels;
+        core->converter = converter;
+        core->hw_channels = hw_stream_fmt.mChannelsPerFrame;
+        core->hw_frame_size = hw_stream_fmt.mBytesPerFrame;
 
         const size_t buffer_size_samples =
                 ca_get_periods_count(core) * qemu_period_size_frames;
@@ -877,6 +1179,11 @@ static void ca_fini_voice_locked(CoreaudioVoice *core)
     if ((status != kAudioHardwareNoError) &&
             (status != kAudioHardwareBadDeviceError)) {
         ca_logerr2(core->is_output, status, "%s", "Could not remove IOProc");
+    }
+
+    if (core->converter) {
+        AudioConverterDispose(core->converter);
+        core->converter = NULL;
     }
 
     if (core->is_output) {
