@@ -545,6 +545,7 @@ cc_interface_binary(
     linkopts = select({
         "@platforms//os:windows": ["-Wl,/SUBSYSTEM:CONSOLE"],
         "@platforms//os:macos": [
+            "-framework AudioToolbox",
             "-framework CoreAudio",
             "-framework CoreFoundation",
             "-framework Hypervisor",
@@ -642,6 +643,7 @@ cc_interface_binary(
     }),
     linkopts = select({
         "@platforms//os:macos": [
+            "-framework AudioToolbox",
             "-framework CoreAudio",
             "-framework CoreFoundation",
             "-framework IOKit",
@@ -752,6 +754,7 @@ cc_interface_binary(
     linkopts = select({
         "@platforms//os:windows": ["-Wl,/SUBSYSTEM:CONSOLE"],
         "@platforms//os:macos": [
+            "-framework AudioToolbox",
             "-framework CoreAudio",
             "-framework CoreFoundation",
             "-framework IOKit",
@@ -3217,7 +3220,10 @@ cc_library(
         "//conditions:default": [],
     }),
     linkopts = select({
-        "@platforms//os:macos": ["-framework CoreAudio"],
+        "@platforms//os:macos": [
+            "-framework AudioToolbox",
+            "-framework CoreAudio",
+        ],
         "//conditions:default": [],
     }),
     local_defines = [
@@ -7088,6 +7094,7 @@ cc_library(
         "tcg/aarch64",
     ],
     linkopts = [
+        "-framework AudioToolbox",
         "-framework CoreAudio",
         "-framework CoreFoundation",
         "-framework IOKit",
@@ -8765,6 +8772,7 @@ cc_library(
         "tcg/aarch64",
     ],
     linkopts = [
+        "-framework AudioToolbox",
         "-framework CoreAudio",
         "-framework CoreFoundation",
         "-framework IOKit",
@@ -10656,6 +10664,7 @@ cc_library(
         "tcg/aarch64",
     ],
     linkopts = [
+        "-framework AudioToolbox",
         "-framework CoreAudio",
         "-framework CoreFoundation",
         "-framework IOKit",
@@ -14292,7 +14301,10 @@ objc_library(
         ".",
         "qapi",
     ],
-    linkopts = ["-framework CoreAudio"],
+    linkopts = [
+        "-framework AudioToolbox",
+        "-framework CoreAudio",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":qemu-headers",
@@ -14326,6 +14338,7 @@ objc_library(
     # buildifier: leave-alone
     includes = ["."],
     linkopts = [
+        "-framework AudioToolbox",
         "-framework CoreAudio",
         "-framework CoreFoundation",
         "-framework IOKit",
@@ -14370,6 +14383,7 @@ objc_library(
     # buildifier: leave-alone
     includes = ["."],
     linkopts = [
+        "-framework AudioToolbox",
         "-framework CoreAudio",
         "-framework CoreFoundation",
         "-framework IOKit",
@@ -14414,6 +14428,7 @@ objc_library(
     # buildifier: leave-alone
     includes = ["."],
     linkopts = [
+        "-framework AudioToolbox",
         "-framework CoreAudio",
         "-framework CoreFoundation",
         "-framework IOKit",
