@@ -21,11 +21,13 @@
  */
 
 #include "PosterSceneObject.h"
+#include "TextureUtils.h"
 #include "raw_image_sources/raw_image_source.h"
 #include "ver/virtual_environment_renderer_types.h"
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -169,6 +171,8 @@ private:
     const std::vector<std::filesystem::path> mResourceBasePaths;
     const std::filesystem::path mVulkanBasePath;
     std::unique_ptr<Renderer> mRenderer;
+
+    std::optional<TextureUtils::Result> mStreetViewImageResult;
 
     std::vector<std::unique_ptr<SceneObject>> mSceneObjects;
     std::unordered_map<std::string, PosterStorage> mPosters;

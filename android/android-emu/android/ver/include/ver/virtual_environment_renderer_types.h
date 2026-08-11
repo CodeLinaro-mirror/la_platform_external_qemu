@@ -72,6 +72,7 @@ struct SceneConfig {
         ImageFile,  ///< Single image file rendered as a plane
         Color,      ///< Uniform background color
         Image360,   ///< 360-degree panoramic image
+        StreetView, ///< 360-degree street view panoramic image
         Webcam,     ///< Single webcam feed rendered as a plane
     };
 
@@ -111,6 +112,8 @@ struct SceneConfig {
             return SceneConfig::Mode::Color;
         } else if (sceneModeStr == "image360") {
             return SceneConfig::Mode::Image360;
+        } else if (sceneModeStr == "streetview") {
+            return SceneConfig::Mode::StreetView;
         } else if (sceneModeStr == "webcam") {
             return SceneConfig::Mode::Webcam;
         } else {
@@ -133,6 +136,8 @@ struct SceneConfig {
             return "color";
         } else if (mode == SceneConfig::Mode::Image360) {
             return "image360";
+        } else if (mode == SceneConfig::Mode::StreetView) {
+            return "streetview";
         } else if (mode == SceneConfig::Mode::Webcam) {
             return "webcam";
         } else {
@@ -152,7 +157,8 @@ struct SceneConfig {
             return kDefaultImageFile;
         } else if (mode == SceneConfig::Mode::Color) {
             return kDefaultColor;
-        } else if (mode == SceneConfig::Mode::Image360) {
+        } else if (mode == SceneConfig::Mode::Image360 ||
+                   mode == SceneConfig::Mode::StreetView) {
             return kDefaultImage360File;
         } else if (mode == SceneConfig::Mode::Webcam) {
             return kDefaultWebcam;
@@ -167,7 +173,8 @@ struct SceneConfig {
      */
     static bool modeRequiresRenderer(SceneConfig::Mode mode) {
         return (mode == SceneConfig::Mode::Mesh3D) ||
-               (mode == SceneConfig::Mode::Image360);
+               (mode == SceneConfig::Mode::Image360) ||
+               (mode == SceneConfig::Mode::StreetView);
     }
 
     /**
@@ -176,7 +183,8 @@ struct SceneConfig {
     static bool modeSupportsViewRotations(SceneConfig::Mode mode) {
         // Currently, only Mesh3D supports view rotations
         return (mode == SceneConfig::Mode::Mesh3D) ||
-               (mode == SceneConfig::Mode::Image360);
+               (mode == SceneConfig::Mode::Image360) ||
+               (mode == SceneConfig::Mode::StreetView);
     }
 
     /**
@@ -195,7 +203,23 @@ struct SceneConfig {
     static bool modeSupportsSceneControls(SceneConfig::Mode mode) {
         // These modes should enable scene controls for movement or rotation
         return (mode == SceneConfig::Mode::Mesh3D) ||
-               (mode == SceneConfig::Mode::Image360);
+               (mode == SceneConfig::Mode::Image360) ||
+               (mode == SceneConfig::Mode::StreetView);
+    }
+
+    /**
+     * @brief Checks if the mode has dynamic contents and should always be
+     *    recreated on reload.
+     */
+    static bool modeHasDynamicContents(SceneConfig::Mode mode) {
+        return (mode == SceneConfig::Mode::StreetView);
+    }
+
+    /**
+     * @brief Checks if the mode supports camera translation movement (e.g., WASDQE).
+     */
+    static bool modeSupportsCameraTranslation(SceneConfig::Mode mode) {
+        return (mode == SceneConfig::Mode::Mesh3D);
     }
 };
 

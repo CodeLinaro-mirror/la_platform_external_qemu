@@ -55,9 +55,9 @@ extern void  android_gps_send_location(double latitude, double longitude,
 // Get the devices' current GPS location.
 //
 // Outputs:
-//    Return value:     1 on success, 0 if failed
+//    Return value:     0 on success, -1 if failed
 //
-//    Valid only if the return is 1:
+//    Valid only if the return is 0:
 //    *outLatitude:        Degrees
 //    *outLongitude:       Degrees
 //    *outMetersElevation: Meters above sea level
@@ -94,5 +94,8 @@ void android_gps_refresh();
 // For gps signal emulation
 extern bool android_gps_get_gps_signal();
 extern void android_gps_set_gps_signal(bool enable);
+
+typedef void (*android_gps_location_callback_t)(void);
+extern void android_gps_register_location_callback(android_gps_location_callback_t callback);
 
 ANDROID_END_HEADER

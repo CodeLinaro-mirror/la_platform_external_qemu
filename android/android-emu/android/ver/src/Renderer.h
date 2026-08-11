@@ -20,7 +20,6 @@
  * Defines the Virtual Scene Renderer, used by the Virtual Scene Camera
  */
 
-#include "OpenGLESDispatch/GLESv2Dispatch.h"
 #include "aemu/base/AlignedBuf.h"
 #include "aemu/base/synchronization/Lock.h"
 #include "ver/virtual_environment_renderer_types.h"
@@ -30,9 +29,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <vector>
-
-using namespace gfxstream::host::gl;
 
 namespace android {
 namespace ver {
@@ -44,12 +42,16 @@ struct Material {
     int id = -1;
 
     bool isValid() const { return id >= 0; }
+    bool operator==(const Material& rhs) const { return id == rhs.id; }
+    bool operator!=(const Material& rhs) const { return id != rhs.id; }
 };
 
 struct Mesh {
     int id = -1;
 
     bool isValid() const { return id >= 0; }
+    bool operator==(const Mesh& rhs) const { return id == rhs.id; }
+    bool operator!=(const Mesh& rhs) const { return id != rhs.id; }
 };
 
 struct Texture {
@@ -145,6 +147,8 @@ public:
 
 protected:
     friend class RendererImpl;
+    friend class RendererGLES;
+    friend class RendererVulkan;
     friend class ScenesManager;
     friend class VirtualSceneManager;
 
@@ -200,6 +204,7 @@ public:
     virtual ~Renderer();
 
     // Create a virtual scene Renderer.
+    // Tries to initialize Vulkan backend first. If that fails, falls back to GLES backend.
     //
     // Returns a Renderer instance if the renderer was successfully created or
     // null if there was an error.

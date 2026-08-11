@@ -15,9 +15,9 @@
  */
 
 #include "TextureUtils.h"
+#include <cstdint>
 #include <string>
 #include <string_view>
-#include <cstdint>
 #include "aemu/base/Log.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/files/ScopedStdioFile.h"
@@ -74,8 +74,9 @@ TextureUtils::Result TextureUtils::createPlaceholder() {
     return result;
 }
 
-std::optional<TextureUtils::Result> TextureUtils::load(const char* filename,
-                                                  Orientation orientation) {
+std::optional<TextureUtils::Result> TextureUtils::load(
+        const char* filename,
+        Orientation orientation) {
     const std::string filename_str{filename};
     const std::string_view extension{PathUtils::extension(filename_str)};
 
@@ -91,8 +92,9 @@ std::optional<TextureUtils::Result> TextureUtils::load(const char* filename,
     }
 }
 
-std::optional<TextureUtils::Result> TextureUtils::loadPNG(const char* filename,
-                                                     Orientation orientation) {
+std::optional<TextureUtils::Result> TextureUtils::loadPNG(
+        const char* filename,
+        Orientation orientation) {
     ScopedStdioFile fp(android_fopen(filename, "rb"));
     if (!fp) {
         E("%s: Failed to open file %s", __FUNCTION__, filename);
@@ -212,8 +214,9 @@ struct ErrorManager {
     jmp_buf setjmp_buffer;
 };
 
-std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
-                                                      Orientation orientation) {
+std::optional<TextureUtils::Result> TextureUtils::loadJPEG(
+        const char* filename,
+        Orientation orientation) {
     ScopedStdioFile fp(android_fopen(filename, "rb"));
     if (!fp) {
         E("%s: Failed to open file %s", __FUNCTION__, filename);
@@ -296,16 +299,132 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEG(const char* filename,
     return result;
 }
 
+static void initSource(j_decompress_ptr cinfo) {}
+
+static boolean fillInputBuffer(j_decompress_ptr cinfo) {
+    static const JOCTET kEOI[2] = {0xFF, JPEG_EOI};
+    cinfo->src->next_input_byte = kEOI;
+    cinfo->src->bytes_in_buffer = 2;
+    return TRUE;
+}
+
+static void skipInputData(j_decompress_ptr cinfo, long numBytes) {
+    if (numBytes > 0) {
+        if (static_cast<size_t>(numBytes) > cinfo->src->bytes_in_buffer) {
+            cinfo->src->next_input_byte += cinfo->src->bytes_in_buffer;
+            cinfo->src->bytes_in_buffer = 0;
+        } else {
+            cinfo->src->next_input_byte += static_cast<size_t>(numBytes);
+            cinfo->src->bytes_in_buffer -= static_cast<size_t>(numBytes);
+        }
+    }
+}
+
+static void termSource(j_decompress_ptr cinfo) {}
+
+static void jpeg_mem_src_custom(j_decompress_ptr cinfo,
+                                const uint8_t* buffer,
+                                size_t size) {
+    if (cinfo->src == nullptr) {
+        cinfo->src =
+                static_cast<struct jpeg_source_mgr*>((*cinfo->mem->alloc_small)(
+                        reinterpret_cast<j_common_ptr>(cinfo), JPOOL_PERMANENT,
+                        sizeof(struct jpeg_source_mgr)));
+    }
+    cinfo->src->init_source = initSource;
+    cinfo->src->fill_input_buffer = fillInputBuffer;
+    cinfo->src->skip_input_data = skipInputData;
+    cinfo->src->resync_to_restart = jpeg_resync_to_restart;
+    cinfo->src->term_source = termSource;
+    cinfo->src->bytes_in_buffer = size;
+    cinfo->src->next_input_byte = reinterpret_cast<const JOCTET*>(buffer);
+}
+
+std::optional<TextureUtils::Result> TextureUtils::loadJPEGFromMemory(
+        const uint8_t* buffer,
+        size_t size,
+        Orientation orientation) {
+    if (!buffer || size == 0) {
+        return {};
+    }
+
+    jpeg_decompress_struct cinfo;
+    ErrorManager jerr;
+    std::vector<uint8_t> data;
+
+    std::unique_ptr<jpeg_decompress_struct, decltype(&jpeg_destroy_decompress)>
+            cinfo_guard(&cinfo, &jpeg_destroy_decompress);
+
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = [](j_common_ptr cinfoPtr) {
+        ErrorManager* err = reinterpret_cast<ErrorManager*>(cinfoPtr->err);
+        longjmp(err->setjmp_buffer, 1);
+    };
+
+    if (setjmp(jerr.setjmp_buffer)) {
+        E("%s: JPEG library error", __FUNCTION__);
+        (cinfo.err->output_message)(
+                reinterpret_cast<jpeg_common_struct*>(&cinfo));
+        return {};
+    }
+
+    jpeg_create_decompress(&cinfo);
+    cinfo.mem->max_memory_to_use = 256 * 1024 * 1024;
+
+    jpeg_mem_src_custom(&cinfo, buffer, size);
+
+    (void)jpeg_read_header(&cinfo, TRUE);
+    cinfo.out_color_space = JCS_RGB;
+    (void)jpeg_start_decompress(&cinfo);
+
+    const uint32_t width = cinfo.output_width;
+    const uint32_t height = cinfo.output_height;
+
+    if (cinfo.output_components != 3) {
+        E("%s: Unsupported output_components %d, should be 3.", __FUNCTION__,
+          cinfo.output_components);
+        return {};
+    }
+
+    const size_t rowBytes = width * cinfo.output_components;
+    const size_t stride = alignRowBytes(rowBytes);
+    data.resize(stride * height);
+
+    while (cinfo.output_scanline < height) {
+        uint8_t* rowPtrs[1];
+        if (orientation == Orientation::BottomUp) {
+            rowPtrs[0] =
+                    data.data() + (height - cinfo.output_scanline - 1) * stride;
+        } else {
+            rowPtrs[0] = data.data() + cinfo.output_scanline * stride;
+        }
+        (void)jpeg_read_scanlines(&cinfo, rowPtrs, 1);
+    }
+
+    jpeg_finish_decompress(&cinfo);
+
+    Result result;
+    result.mBuffer = std::move(data);
+    result.mWidth = width;
+    result.mHeight = height;
+    result.mFormat = Format::RGB24;
+    return result;
+}
+
 bool TextureUtils::writePNG(const char* filename,
                             uint32_t width,
                             uint32_t height,
                             const uint8_t* rgba) {
-    if (!filename || !rgba || width == 0 || height == 0) return false;
+    if (!filename || !rgba || width == 0 || height == 0)
+        return false;
     ScopedStdioFile fp(android_fopen(filename, "wb"));
-    if (!fp) return false;
+    if (!fp)
+        return false;
 
-    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-    if (!png) return false;
+    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr,
+                                              nullptr, nullptr);
+    if (!png)
+        return false;
     png_infop info = png_create_info_struct(png);
     if (!info) {
         png_destroy_write_struct(&png, nullptr);

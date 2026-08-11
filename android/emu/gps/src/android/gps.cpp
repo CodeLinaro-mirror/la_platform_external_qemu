@@ -29,6 +29,12 @@ static bool s_enable_passive_location_update = true;
 static bool s_enable_gps_signal = true;
 static bool s_enable_gnssgrpcv1 = false;
 static std::mutex s_set_location_mutex;
+static android_gps_location_callback_t s_location_callback = nullptr;
+
+void android_gps_register_location_callback(android_gps_location_callback_t callback) {
+    const std::lock_guard<std::mutex> lock(s_set_location_mutex);
+    s_location_callback = callback;
+}
 std::unique_ptr<PassiveGpsUpdater> s_updater;
 
 // Last state of the gps, initial coordinates point to Googleplex.
@@ -331,22 +337,31 @@ void android_gps_send_location(double latitude,
                                double headingDegrees,
                                int nSatellites,
                                const struct timeval* time) {
-    const std::lock_guard<std::mutex> lock(s_set_location_mutex);
+    android_gps_location_callback_t location_callback = nullptr;
+    {
+        const std::lock_guard<std::mutex> lock(s_set_location_mutex);
 
-    s_latitude = latitude;
-    s_longitude = longitude;
-    s_metersElevation = metersElevation;
-    s_speedKnots = speedKnots;
-    s_headingDegrees = headingDegrees;
-    s_nSatellites = nSatellites;
+        s_latitude = latitude;
+        s_longitude = longitude;
+        s_metersElevation = metersElevation;
+        s_speedKnots = speedKnots;
+        s_headingDegrees = headingDegrees;
+        s_nSatellites = nSatellites;
 
-    if (s_enable_gnssgrpcv1) {
-        send_location_to_device_gnssrpcv1(latitude, longitude, metersElevation,
-                                          speedKnots, headingDegrees, time);
-    } else {
-        send_location_to_device_internal(latitude, longitude, metersElevation,
-                                         speedKnots, headingDegrees, nSatellites,
-                                         time);
+        if (s_enable_gnssgrpcv1) {
+            send_location_to_device_gnssrpcv1(latitude, longitude, metersElevation,
+                                            speedKnots, headingDegrees, time);
+        } else {
+            send_location_to_device_internal(latitude, longitude, metersElevation,
+                                            speedKnots, headingDegrees, nSatellites,
+                                            time);
+        }
+        location_callback = s_location_callback;
+    }
+
+    // Call outside of the lock to prevent deadlocks
+    if (location_callback) {
+        location_callback();
     }
 }
 

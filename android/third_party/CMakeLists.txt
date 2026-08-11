@@ -117,10 +117,17 @@ android_license(
     "https://android.googlesource.com/platform/external/qemu/+/refs/heads/emu-master-dev/android/third_party/picosha2/LICENSE"
   LOCAL "${ANDROID_QEMU2_TOP_DIR}/android/third_party/picosha2/LICENSE")
 
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install OFF CACHE INTERNAL "")
+add_subdirectory(json)
+
 add_library(emulator-tinygltf INTERFACE)
 target_include_directories(
   emulator-tinygltf INTERFACE
   ${ANDROID_QEMU2_TOP_DIR}/android/android-emu/android/ver/src/third_party/tinygltf)
+target_link_libraries(
+  emulator-tinygltf INTERFACE
+  nlohmann_json::nlohmann_json)
 
 android_license(
   TARGET emulator-tinygltf
@@ -131,7 +138,6 @@ android_license(
     "https://android.googlesource.com/platform/external/qemu/+/refs/heads/emu-master-dev/android/android-emu/android/ver/src/third_party/tinygltf/LICENSE"
   LOCAL "${ANDROID_QEMU2_TOP_DIR}/android/android-emu/android/ver/src/third_party/tinygltf/LICENSE")
 
-
 if(WINDOWS)
   add_subdirectory(mman-win32)
   add_subdirectory(regex-win32)
@@ -140,10 +146,6 @@ if(WINDOWS)
   endif()
   add_subdirectory(usbpassthrough-prebuilt-win32)
 endif()
-
-set(JSON_BuildTests OFF CACHE INTERNAL "")
-set(JSON_Install OFF CACHE INTERNAL "")
-add_subdirectory(json)
 
 if(EXISTS ${ANDROID_QEMU2_TOP_DIR}/../perfetto AND (NOT LINUX_AARCH64)
    AND (NOT CROSSCOMPILE))

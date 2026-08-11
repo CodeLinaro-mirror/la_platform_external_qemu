@@ -298,25 +298,28 @@ TEST_F(EmulatorControlClientTest, AsyncInputEventWriterCanWrite) {
 
 TEST_F(EmulatorControlClientTest, AsyncInputEventWriterRecreatesOnCancel) {
     auto writer = mClient->asyncInputEventWriter();
-    EXPECT_NE(writer, nullptr);
+    ASSERT_NE(writer, nullptr);
+
+    auto oldContext = writer->context_shared();
+    ASSERT_NE(oldContext, nullptr);
 
     // Cancel the context of the writer to simulate stream closure.
-    writer->context()->TryCancel();
+    oldContext->TryCancel();
 
     // Wait for the writer to be cleared and recreated.
     SimpleClientWriter<InputEvent>* writer2 = nullptr;
     int retries = 0;
     while (retries < 100) {
         writer2 = mClient->asyncInputEventWriter();
-        if (writer2 != writer) {
+        if (writer2 && writer2->context() != oldContext.get()) {
             break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         retries++;
     }
 
-    EXPECT_NE(writer2, writer);
-    EXPECT_NE(writer2, nullptr);
+    ASSERT_NE(writer2, nullptr);
+    EXPECT_NE(writer2->context(), oldContext.get());
 }
 
 TEST_F(EmulatorControlClientTest, RegisterNotificationListenerDoesNotHangOnDestruction) {

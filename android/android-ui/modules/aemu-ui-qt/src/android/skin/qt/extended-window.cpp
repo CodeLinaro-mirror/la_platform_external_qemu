@@ -267,16 +267,23 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
     }
 
     bool enableVirtualSensors = true;
+    bool enableLocation = true;
     if (avdFlavor == AVD_XR || avdFlavor == AVD_GLASSES) {
         enableVirtualSensors = false;
+        enableLocation = false;
+
+        const char* virtualSensorsEnabledVar = "ANDROID_EMU_ENABLE_VIRTUAL_SENSORS";
+        const char* streetviewEnabledVar = "ANDROID_EMU_ENABLE_STREETVIEW";
 
         // Enable the UI with a temporary envvar flag for now
         if (avdFlavor == AVD_GLASSES) {
-            std::string enableVirtualSensorsVar =
-                    System::get()->envGet("ANDROID_EMU_ENABLE_VIRTUAL_SENSORS");
-            if (enableVirtualSensorsVar == "1") {
+            if (System::get()->envGet(virtualSensorsEnabledVar) == "1") {
                 dinfo("Enabling virtual sensors UI for glasses AVD");
                 enableVirtualSensors = true;
+            }
+            if (System::get()->envGet(streetviewEnabledVar) == "1") {
+                dinfo("Enabling location/streetview UI for glasses AVD");
+                enableLocation = true;
             }
         }
     }
@@ -389,14 +396,17 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
     }
 
     if (avdFlavor == AVD_XR || avdFlavor == AVD_GLASSES) {
-        mExtendedUi->locationButton->setVisible(false);
         mExtendedUi->cellularButton->setVisible(false);
         mExtendedUi->dpadButton->setVisible(false);
         mExtendedUi->fingerButton->setVisible(false);
         mExtendedUi->telephoneButton->setVisible(false);
     }
+
     if (!enableVirtualSensors) {
         mExtendedUi->virtSensorsButton->setVisible(false);
+    }
+    if (!enableLocation) {
+        mExtendedUi->locationButton->setVisible(false);
     }
 
     if (!avdInfo_isDesktopApi36OrHigher(avdInfo)) {

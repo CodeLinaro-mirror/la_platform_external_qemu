@@ -131,8 +131,17 @@ public:
 
     static VerSceneConfig::Mode getSceneMode();
 
+    static bool modeSupportsSceneControls(VerSceneConfig::Mode mode);
+    static bool modeSupportsSceneControls();
+    static bool modeSupportsCameraTranslation(VerSceneConfig::Mode mode);
+    static bool modeSupportsCameraTranslation();
+
     // Returns false on error.
     static bool reloadEnvironment(const char* environmentData);
+
+    // Called when the GPS location has changed. If the current scene mode is
+    // StreetView, reloads the environment to update the StreetView image.
+    static void onLocationChanged();
 
     static void getEnvironment(void* context, KeyValueCallback callback);
 
