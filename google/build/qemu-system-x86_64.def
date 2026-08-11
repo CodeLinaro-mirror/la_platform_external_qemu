@@ -15,6 +15,10 @@ EXPORTS
     aml_method
     aml_return
     async_run_on_cpu
+    audio_be_add_capture
+    audio_be_by_name
+    audio_be_del_capture
+    audio_get_default_audio_be
     bdrv_all_find_vmstate_bs
     bdrv_snapshot_list
     blk_commit_all
