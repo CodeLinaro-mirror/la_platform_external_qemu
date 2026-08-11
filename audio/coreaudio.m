@@ -307,7 +307,7 @@ static OSStatus ca_handle_voice_change(
     return kAudioHardwareNoError;
 }
 
-static OSStatus ca_out_device_out_ioproc(
+static OSStatus ca_out_device_ioproc(
     AudioDeviceID inDevice,
     const AudioTimeStamp *inNow,
     const AudioBufferList *inInputData,
@@ -391,7 +391,7 @@ zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
     return kAudioHardwareNoError;
 }
 
-static OSStatus ca_out_device_in_ioproc(
+static OSStatus ca_in_device_ioproc(
     AudioDeviceID inDevice,
     const AudioTimeStamp *inNow,
     const AudioBufferList *inInputData,
@@ -779,8 +779,8 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
          */
         AudioDeviceIOProcID ioprocid = NULL;
         status = AudioDeviceCreateIOProcID(device_id,
-                                           (core->is_output ? ca_out_device_out_ioproc
-                                                            : ca_out_device_in_ioproc),
+                                           (core->is_output ? ca_out_device_ioproc
+                                                            : ca_in_device_ioproc),
                                            core,
                                            &ioprocid);
         if ((status != kAudioHardwareNoError) || !ioprocid) {
