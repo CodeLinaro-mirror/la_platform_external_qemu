@@ -22,9 +22,9 @@ import sys
 from pathlib import Path
 
 import oauth2client.client
-from aemu.android_build_client import AndroidBuildClient
-from aemu.fetch_artifact import unzip_artifact
-from aemu.log import configure_logging
+from ab.android_build_client import AndroidBuildClient
+from ab.fetch_artifact import unzip_artifact
+from ab.log import configure_logging
 from tqdm import tqdm
 
 
