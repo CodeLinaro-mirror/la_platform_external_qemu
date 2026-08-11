@@ -46,6 +46,12 @@ struct AudioCoreaudio {
     AudioMixengBackend parent_obj;
 };
 
+typedef enum coreaudioVoiceRunningState {
+    CA_VOICE_STOPPED = 0,
+    CA_VOICE_STOPPING = 1,
+    CA_VOICE_RUNNING = 2,
+} CoreaudioVoiceRunningState;
+
 typedef struct coreaudioVoice {
     union {
         HWVoiceOut out;
@@ -55,7 +61,7 @@ typedef struct coreaudioVoice {
     pthread_mutex_t buf_mutex;
     AudioDeviceID device_id;
     uint32_t hw_channels : 10;
-    uint32_t is_running : 1;
+    uint32_t running_state : 2;
     uint32_t is_output : 1;
 } CoreaudioVoice;
 
@@ -236,15 +242,30 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
     }
     ASSERT(core->ioprocid);
 
+    while (core->running_state == CA_VOICE_STOPPING) {
+        ca_voice_unlock(core);
+        usleep(1000);
+        ca_voice_lock(core);
+    }
+
+    if (core->running_state ==
+            (enable ? CA_VOICE_RUNNING : CA_VOICE_STOPPED)) {
+        return true;
+    }
+
     OSStatus status;
-    UInt32 isrunning;
 
     if (enable) {
         status = AudioDeviceStart(core->device_id, core->ioprocid);
+        if (status == kAudioHardwareNoError) {
+            core->running_state = CA_VOICE_RUNNING;
+        }
     } else {
+        core->running_state = CA_VOICE_STOPPING;
         ca_voice_unlock(core);
         status = AudioDeviceStop(core->device_id, core->ioprocid);
         ca_voice_lock(core);
+        core->running_state = CA_VOICE_STOPPED;
     }
 
     if ((status != kAudioHardwareNoError) &&
@@ -253,7 +274,6 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
                    (enable ? "resume" : "pause"));
     }
 
-    core->is_running = (enable && (status == kAudioHardwareNoError)) ? 1 : 0;
     return status == kAudioHardwareNoError;
 }
 
@@ -273,7 +293,7 @@ static OSStatus ca_handle_voice_change(
     ca_voice_lock(core);
     bool is_running = false;
     if (core->device_id) {
-        is_running = core->is_running;
+        is_running = (core->running_state == CA_VOICE_RUNNING);
         ca_fini_voice_locked(core);
     }
 
@@ -812,7 +832,7 @@ static int coreaudio_init_impl(const bool is_output,
     int err;
 
     core->is_output = is_output ? 1 : 0;
-    core->is_running = 0;
+    core->running_state = CA_VOICE_STOPPED;
 
     err = pthread_mutex_init(&core->buf_mutex, NULL);
     if (err) {
@@ -851,10 +871,9 @@ static void ca_fini_voice_locked(CoreaudioVoice *core)
 
     OSStatus status;
 
-    if (core->is_running) {
-        ca_update_voice_running_state_locked(core, false);
-    }
+    ca_update_voice_running_state_locked(core, false);
     ca_unlisten_fmt_change_locked(core->device_id, core);
+
     status = AudioDeviceDestroyIOProcID(core->device_id, core->ioprocid);
     core->ioprocid = NULL;
     if ((status != kAudioHardwareNoError) &&
