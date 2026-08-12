@@ -331,7 +331,7 @@ static OSStatus ca_out_device_ioproc(
     ASSERT(core->device_id != kAudioDeviceUnknown);
     ASSERT(!core->converter);
     if (inDevice != core->device_id) {
-zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
+        memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
         ca_voice_unlock(core);
         return kAudioHardwareNoError;
     }
@@ -346,7 +346,10 @@ zero:   memset(out8, 0, outOutputData->mBuffers[0].mDataByteSize);
     size_t len = outOutputData->mBuffers[0].mDataByteSize / h_frame_size * q_frame_size;
     size_t pending_emul = core->hw.out.pending_emul;
     if (pending_emul < len) {
-        goto zero;
+        const size_t hw_size = pending_emul / q_frame_size * h_frame_size;
+        memset(out8 + hw_size, 0,
+               outOutputData->mBuffers[0].mDataByteSize - hw_size);
+        len = pending_emul;
     }
 
     const size_t size_emul = core->hw.out.size_emul;
