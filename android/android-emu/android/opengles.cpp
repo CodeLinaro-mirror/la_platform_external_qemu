@@ -570,6 +570,8 @@ static int startOpenglesRendererImpl(
         .set_display_pose = multi_display_agent->setDisplayPose,
         .get_color_transform_matrix = multi_display_agent->getDisplayColorTransform,
         .set_color_transform_matrix = multi_display_agent->setDisplayColorTransform,
+        .get_display_power_mode = multi_display_agent->getDisplayPowerMode,
+        .set_display_power_mode = multi_display_agent->setDisplayPowerMode,
     });
 
     sRenderer = sRenderLib->initRenderer(width, height, gfxstreamFeatures,
