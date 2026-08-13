@@ -2098,7 +2098,7 @@ void ToolWindow::noneSelected() {
 
 void ToolWindow::customImageSelected() {
     QString fileName = QFileDialog::getOpenFileName(
-            this, tr("Select Image"), "", tr("Images (*.png *.jpg)"));
+            this, tr("Select Image"), "", tr("Images (*.png *.jpg *.jpeg)"));
     if (!fileName.isEmpty()) {
         std::string command =
                 "scene.mode = imagefile:" + fileName.toStdString();
@@ -2117,8 +2117,9 @@ void ToolWindow::customVideoSelected() {
 }
 
 void ToolWindow::custom360ImageSelected() {
-    QString fileName = QFileDialog::getOpenFileName(
-            this, tr("Select 360 Image"), "", tr("Images (*.png *.jpg)"));
+    QString fileName =
+            QFileDialog::getOpenFileName(this, tr("Select 360 Image"), "",
+                                         tr("Images (*.png *.jpg *.jpeg)"));
     if (!fileName.isEmpty()) {
         std::string command = "scene.mode = image360:" + fileName.toStdString();
         getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
