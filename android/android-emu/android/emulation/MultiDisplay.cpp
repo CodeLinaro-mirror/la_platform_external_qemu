@@ -47,6 +47,7 @@
 #include "host-common/MultiDisplayPipe.h"
 #include "host-common/misc.h"
 #include "host-common/screen-recorder.h"
+#include "host-common/opengles.h"                             // for android_redrawOpenglesWindow
 
 using android::automotive::DisplayManager;
 using android::base::AutoLock;
@@ -703,8 +704,18 @@ int MultiDisplay::getColorTransformMatrix(uint32_t displayId,
     if (display == mMultiDisplay.end()) {
         return -1;
     }
-    std::memcpy(outColorTransformMatrix, display->second.colorTransform.mat,
-                sizeof(float) * 16);
+
+    if (display->second.powerMode == android::DisplayPowerMode::OFF) {
+        // Make the display black when turned off, by using a zero color
+        // transform matrix
+        dprint("%s:%d: Returning zero-matrix color transform while the display is off",
+               __func__, __LINE__);
+        std::memset(outColorTransformMatrix, 0, sizeof(float) * 16);
+        outColorTransformMatrix[15] = 1.0f;
+    } else {
+        std::memcpy(outColorTransformMatrix, display->second.colorTransform.mat,
+                    sizeof(float) * 16);
+    }
     return 0;
 }
 
@@ -721,6 +732,52 @@ int MultiDisplay::setColorTransformMatrix(
     }
     std::memcpy(display->second.colorTransform.mat, colorTransformMatrix,
                 sizeof(float) * 16);
+    return 0;
+}
+
+int MultiDisplay::getDisplayPowerMode(uint32_t displayId,
+                                        uint32_t* powerMode) {
+    if (mGuestMode || !powerMode) {
+        return -1;
+    }
+    AutoLock lock(mLock);
+    auto display = mMultiDisplay.find(displayId);
+    if (display == mMultiDisplay.end()) {
+        return -1;
+    }
+    *powerMode = static_cast<uint32_t>(display->second.powerMode);
+    return 0;
+}
+
+int MultiDisplay::setDisplayPowerMode(uint32_t displayId, uint32_t powerMode) {
+    if (mGuestMode) {
+        return -1;
+    }
+    if (powerMode > static_cast<uint32_t>(android::DisplayPowerMode::MAX_VAL)) {
+        derror("Invalid powerMode: %d", powerMode);
+        return -1;
+    }
+
+    bool repostNeeded = false;
+    {
+        AutoLock lock(mLock);
+        auto display = mMultiDisplay.find(displayId);
+        if (display == mMultiDisplay.end()) {
+            return -1;
+        }
+
+        android::DisplayPowerMode newPowerMode =
+                static_cast<android::DisplayPowerMode>(powerMode);
+        if (display->second.powerMode != newPowerMode) {
+            display->second.powerMode = newPowerMode;
+            repostNeeded = true;
+        }
+    }
+
+    if (repostNeeded) {
+        // Force a repost to update the screen contents
+        android_redrawOpenglesWindow();
+    }
     return 0;
 }
 

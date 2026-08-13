@@ -241,7 +241,7 @@ static void clean_up_android_out(const char* android_out) {
             "userdata-qemu.img",  "userdata-qemu.img.qcow2",
             "userdata.img.qcow2", "cache.img.qcow2",
             "version_num.cache",  "hardware-qemu.ini",
-            "emulator-user.ini"};
+            "emulator-user.ini",  "qemu-version.txt"};
     delete_files(android_out, files_to_delete, ARRAY_SIZE(files_to_delete));
 }
 

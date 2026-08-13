@@ -28,21 +28,19 @@
 #include "aemu/base/Debug.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
-#include "android/loadpng.h"
-#include "ver/virtual_environment_renderer.h"
+#include "TestUtils.h"
 
 using namespace android::base;
+using namespace android::ver;
 using namespace gfxstream::host::gl;  // For LazyLoadedGLESv2Dispatch
 
 namespace {
-
-// Threshold for golden image comparison (Sum of Squared Differences per pixel)
-static constexpr double kCompareThreshold = 512.0;
 
 class SceneRenderingTest
     : public ::testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
     void SetUp() override {
+        setupTestLibraryPaths();
         const auto& [backend, modeName] = GetParam();
         System::get()->envSet("VER_RENDERER_BACKEND", backend);
 
@@ -72,92 +70,6 @@ protected:
         System::get()->envSet("VER_RENDERER_BACKEND", "");
     }
 };
-
-static double calculateSSD(const uint8_t* data1,
-                           const uint8_t* data2,
-                           size_t size) {
-    double sum = 0.0;
-    for (size_t i = 0; i < size; ++i) {
-        double diff = static_cast<double>(data1[i]) - data2[i];
-        sum += diff * diff;
-    }
-    return sum;
-}
-
-static bool compareWithGolden(const uint8_t* actualData,
-                              int width,
-                              int height,
-                              const std::string& goldenPath) {
-    int goldenWidth, goldenHeight, goldenBpp;
-    std::vector<uint8_t> goldenBuffer;
-
-    if (!ver_texture_utils_load_png(goldenPath.c_str(), &goldenWidth,
-                                    &goldenHeight, &goldenBpp, &goldenBuffer)) {
-        fprintf(stderr, "Failed to load golden image: %s", goldenPath.c_str());
-        return false;
-    }
-
-    if (width != goldenWidth || height != goldenHeight) {
-        fprintf(stderr, "Dimensions mismatch: actual(%dx%d) vs golden(%dx%d)",
-                width, height, goldenWidth, goldenHeight);
-        return false;
-    }
-
-    // VER framebuffer is RGBA8 (4 bytes per pixel)
-    // TextureUtils load might return RGB24 or RGBA32.
-    size_t actualSize = width * height * 4;
-
-    if (goldenBpp == 3) {
-        // Convert golden to RGBA for easier comparison
-        std::vector<uint8_t> convertedGolden(actualSize);
-        for (int i = 0; i < width * height; ++i) {
-            convertedGolden[i * 4 + 0] = goldenBuffer[i * 3 + 0];
-            convertedGolden[i * 4 + 1] = goldenBuffer[i * 3 + 1];
-            convertedGolden[i * 4 + 2] = goldenBuffer[i * 3 + 2];
-            convertedGolden[i * 4 + 3] = 255;
-        }
-        return calculateSSD(actualData, convertedGolden.data(), actualSize) <=
-               kCompareThreshold * actualSize;
-    } else {
-        return calculateSSD(actualData, goldenBuffer.data(), actualSize) <=
-               kCompareThreshold * actualSize;
-    }
-}
-
-static void verifyOrCompareWithGolden(const uint8_t* fbData,
-                                      int width,
-                                      int height,
-                                      const std::string& goldenFilename,
-                                      const std::string& testLabel) {
-    std::string goldenPath = PathUtils::join(
-            System::get()->getProgramDirectory(), "testdata", goldenFilename);
-
-    if (!std::filesystem::exists(goldenPath)) {
-        std::string outputPath =
-                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
-                                testLabel + "_output.png");
-        std::filesystem::create_directories(
-                std::filesystem::path(outputPath).parent_path());
-        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
-                (void*)fbData);
-        FAIL() << "Golden image not found at: " << goldenPath
-               << ". Output saved to: " << outputPath;
-    }
-
-    bool match = compareWithGolden(fbData, width, height, goldenPath);
-
-    if (!match) {
-        std::string outputPath =
-                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
-                                testLabel + "_failed.png");
-        std::filesystem::create_directories(
-                std::filesystem::path(outputPath).parent_path());
-        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
-                (void*)fbData);
-        FAIL() << "Golden image comparison failed for: " << testLabel
-               << ". Output saved to: " << outputPath;
-    }
-}
 
 TEST_P(SceneRenderingTest, RenderSceneMode) {
     const auto& [backend, modeName] = GetParam();
@@ -221,6 +133,16 @@ TEST_P(SceneRenderingTest, RenderSceneMode) {
     ver_destroy_scene(scene);
 }
 
+INSTANTIATE_TEST_SUITE_P(SceneModes,
+                         SceneRenderingTest,
+                         ::testing::Combine(::testing::Values("vulkan", "gles"),
+                                            ::testing::Values("mesh3d",
+                                                              "videofile",
+                                                              "imagefile",
+                                                              "color",
+                                                              "image360",
+                                                              "streetview")));
+
 TEST(SceneRenderingTestSimple, InvalidDimensions) {
     VerRenderViewHandle view = ver_create_render_view();
     ASSERT_NE(view, (VerRenderViewHandle)VER_INVALID_HANDLE);
@@ -267,6 +189,7 @@ TEST(SceneRenderingTestSimple, InvalidDimensions) {
 }
 
 TEST(SceneRenderingTestSimple, BackendSelectionEnvVar) {
+    setupTestLibraryPaths();
     std::vector<std::filesystem::path> resourcePaths;
     std::string resourcesDir = PathUtils::join(
             android::base::System::get()->getProgramDirectory(), "resources");
@@ -300,9 +223,23 @@ TEST(SceneRenderingTestSimple, BackendSelectionEnvVar) {
     android::base::System::get()->envSet("VER_RENDERER_BACKEND", "");
 }
 
-TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
+class PosterSideBySideTest : public ::testing::TestWithParam<std::string> {
+protected:
+    void SetUp() override {
+        setupTestLibraryPaths();
+        const std::string& backend = GetParam();
+        System::get()->envSet("VER_RENDERER_BACKEND", backend);
+    }
+    void TearDown() override {
+        ver_cleanup();
+        System::get()->envSet("VER_RENDERER_BACKEND", "");
+    }
+};
+
+TEST_P(PosterSideBySideTest, PosterSideBySide) {
+    const std::string& backend = GetParam();
 #ifndef __APPLE__
-    {
+    if (backend == "gles") {
         // TODO(virtualscene-library): Fix software GLES initialization on
         // linux&windows
         GTEST_SKIP()
@@ -325,9 +262,11 @@ TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
     std::filesystem::path vulkanDir = PathUtils::join(
             System::get()->getProgramDirectory(), "lib64", "vulkan");
 
-    ver_initialize(resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
-                   (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
-
+    bool success = ver_initialize(
+            resourcePaths, (const void*)LazyLoadedEGLDispatch::get(),
+            (const void*)LazyLoadedGLESv2Dispatch::get(), vulkanDir);
+    ASSERT_TRUE(success) << "Failed to initialize VER with backend: "
+                         << backend;
     VerSceneConfig config(VerSceneConfig::Mode::Mesh3D, "poster_test.obj");
     VerSceneHandle scene = ver_create_scene(config);
     ASSERT_NE(scene, (VerSceneHandle)VER_INVALID_HANDLE);
@@ -418,49 +357,15 @@ TEST(SceneRenderingTestSimple, PosterSideBySideTest) {
     ASSERT_NE(fbData, nullptr);
     ASSERT_EQ(fbSize, (uint64_t)width * height * 4);
 
-    std::string goldenPath =
-            PathUtils::join(System::get()->getProgramDirectory(), "testdata",
-                            "scene_poster_side_by_side_golden.png");
-
-    if (!std::filesystem::exists(goldenPath)) {
-        std::string outputPath =
-                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
-                                "scene_poster_side_by_side_output.png");
-        std::filesystem::create_directories(
-                std::filesystem::path(outputPath).parent_path());
-        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
-                (void*)fbData);
-        FAIL() << "Golden image not found at: " << goldenPath
-               << ". Output saved to: " << outputPath;
-    }
-
-    bool match = compareWithGolden(fbData, width, height, goldenPath);
-
-    if (!match) {
-        std::string outputPath =
-                PathUtils::join(System::get()->getTempDir(), "ver_test_outputs",
-                                "scene_poster_side_by_side_failed.png");
-        std::filesystem::create_directories(
-                std::filesystem::path(outputPath).parent_path());
-        savepng(outputPath.c_str(), 4, width, height, SKIN_ROTATION_0,
-                (void*)fbData);
-        FAIL() << "Golden image comparison failed for PosterSideBySideTest. Output saved to: "
-               << outputPath;
-    }
+    verifyOrCompareWithGolden(fbData, width, height,
+                              "scene_poster_side_by_side_golden.png",
+                              "scene_poster_side_by_side");
 
     ver_destroy_render_view(view);
     ver_destroy_scene(scene);
-    ver_cleanup();
 }
-
-INSTANTIATE_TEST_SUITE_P(SceneModes,
-                         SceneRenderingTest,
-                         ::testing::Combine(::testing::Values("vulkan", "gles"),
-                                            ::testing::Values("mesh3d",
-                                                              "videofile",
-                                                              "imagefile",
-                                                              "color",
-                                                              "image360",
-                                                              "streetview")));
+INSTANTIATE_TEST_SUITE_P(PosterSideBySide,
+                         PosterSideBySideTest,
+                         ::testing::Values("vulkan", "gles"));
 
 }  // namespace

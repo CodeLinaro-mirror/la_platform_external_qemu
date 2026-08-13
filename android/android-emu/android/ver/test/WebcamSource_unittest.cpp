@@ -423,5 +423,65 @@ TEST_F(WebcamSourceTest, ConvertBufferToRGB32_BGR32_to_RGB32) {
     EXPECT_EQ(view.buffer[15], 255);
 }
 
+TEST(WebcamInfoTest, NegotiateFormatFallback) {
+    WebcamSource::WebcamInfo info;
+    info.friendly_name = "Test Camera";
+
+    WebcamSource::WebcamPixelFormat format;
+    format.pixel_format = 0x12345678;  // Fake format
+    info.supported_formats.push_back(format);
+    info.preferred_format_index = -1;  // Force fallback
+
+    auto negotiated = info.NegotiateFormat(V4L2_PIX_FMT_RGB32);
+    ASSERT_TRUE(negotiated.has_value());
+    EXPECT_EQ(negotiated->pixel_format, 0x12345678);
+}
+
+TEST(WebcamInfoTest, NegotiateFormatPreferred) {
+    WebcamSource::WebcamInfo info;
+    info.friendly_name = "Test Camera";
+
+    WebcamSource::WebcamPixelFormat format1;
+    format1.pixel_format = 0x12345678;  // Fake
+    WebcamSource::WebcamPixelFormat format2;
+    format2.pixel_format = V4L2_PIX_FMT_YUYV;  // Preferred
+
+    info.supported_formats.push_back(format1);
+    info.supported_formats.push_back(format2);
+    info.preferred_format_index = 1;  // Index of YUYV
+
+    auto negotiated = info.NegotiateFormat(V4L2_PIX_FMT_RGB32);
+    ASSERT_TRUE(negotiated.has_value());
+    EXPECT_EQ(negotiated->pixel_format, V4L2_PIX_FMT_YUYV);
+}
+
+TEST(WebcamInfoTest, NegotiateFormatDirectMatch) {
+    WebcamSource::WebcamInfo info;
+    info.friendly_name = "Test Camera";
+
+    WebcamSource::WebcamPixelFormat format1;
+    format1.pixel_format = 0x12345678;  // Fake
+    WebcamSource::WebcamPixelFormat format2;
+    format2.pixel_format = V4L2_PIX_FMT_RGB32;  // Direct match for requested
+
+    info.supported_formats.push_back(format1);
+    info.supported_formats.push_back(format2);
+    info.preferred_format_index = 0;  // Preferred is Fake
+
+    auto negotiated = info.NegotiateFormat(V4L2_PIX_FMT_RGB32);
+    ASSERT_TRUE(negotiated.has_value());
+    EXPECT_EQ(negotiated->pixel_format,
+              V4L2_PIX_FMT_RGB32);  // Should prefer direct match
+}
+
+TEST(WebcamInfoTest, NegotiateFormatEmpty) {
+    WebcamSource::WebcamInfo info;
+    info.friendly_name = "Test Camera";
+    info.preferred_format_index = -1;
+
+    auto negotiated = info.NegotiateFormat(V4L2_PIX_FMT_RGB32);
+    EXPECT_FALSE(negotiated.has_value());
+}
+
 }  // namespace ver
 }  // namespace android
