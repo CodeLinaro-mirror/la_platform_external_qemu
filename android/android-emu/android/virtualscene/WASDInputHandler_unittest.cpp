@@ -431,6 +431,7 @@ TEST(VerSceneConfigTest, modeSupportsCameraTranslation) {
     EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::VideoFile));
     EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::Color));
     EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::Webcam));
+    EXPECT_FALSE(VerSceneConfig::modeSupportsCameraTranslation(VerSceneConfig::Mode::Video360));
 
     EXPECT_TRUE(VirtualSceneManager::modeSupportsCameraTranslation(VerSceneConfig::Mode::Mesh3D));
     EXPECT_FALSE(VirtualSceneManager::modeSupportsCameraTranslation(VerSceneConfig::Mode::Image360));

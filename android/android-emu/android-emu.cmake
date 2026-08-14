@@ -760,6 +760,7 @@ if(NOT LINUX_AARCH64)
       testdata/ver/scene_videofile_golden.png
       testdata/ver/scene_mesh3d_golden.png
       testdata/ver/scene_image360_golden.png
+      testdata/ver/scene_video360_golden.png
       testdata/ver/scene_streetview_golden.png
       testdata/ver/scene_poster_side_by_side_golden.png
       testdata/ver/streetview.jpg

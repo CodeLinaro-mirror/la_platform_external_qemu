@@ -74,6 +74,7 @@ struct SceneConfig {
         Image360,   ///< 360-degree panoramic image
         StreetView, ///< 360-degree street view panoramic image
         Webcam,     ///< Single webcam feed rendered as a plane
+        Video360,   ///< 360-degree video panoramic image
     };
 
     SceneConfig(Mode mode, std::string_view argument) {
@@ -91,6 +92,7 @@ struct SceneConfig {
     static constexpr const char* kDefaultImageFile = "default.jpg";
     static constexpr const char* kDefaultVideoFile = "default.mp4";
     static constexpr const char* kDefaultImage360File = "default360.jpg";
+    static constexpr const char* kDefaultVideo360File = "default360.mp4";
     static constexpr const char* kDefaultWebcam = "";
 
     // A blank background
@@ -116,6 +118,8 @@ struct SceneConfig {
             return SceneConfig::Mode::StreetView;
         } else if (sceneModeStr == "webcam") {
             return SceneConfig::Mode::Webcam;
+        } else if (sceneModeStr == "video360") {
+            return SceneConfig::Mode::Video360;
         } else {
             dwarning("Unknown scene mode requested: %s", sceneModeStr);
             return SceneConfig::Mode::Unknown;
@@ -140,6 +144,8 @@ struct SceneConfig {
             return "streetview";
         } else if (mode == SceneConfig::Mode::Webcam) {
             return "webcam";
+        } else if (mode == SceneConfig::Mode::Video360) {
+            return "video360";
         } else {
             return "unknown";
         }
@@ -160,6 +166,8 @@ struct SceneConfig {
         } else if (mode == SceneConfig::Mode::Image360 ||
                    mode == SceneConfig::Mode::StreetView) {
             return kDefaultImage360File;
+        } else if (mode == SceneConfig::Mode::Video360) {
+            return kDefaultVideo360File;
         } else if (mode == SceneConfig::Mode::Webcam) {
             return kDefaultWebcam;
         } else {
@@ -174,7 +182,8 @@ struct SceneConfig {
     static bool modeRequiresRenderer(SceneConfig::Mode mode) {
         return (mode == SceneConfig::Mode::Mesh3D) ||
                (mode == SceneConfig::Mode::Image360) ||
-               (mode == SceneConfig::Mode::StreetView);
+               (mode == SceneConfig::Mode::StreetView) ||
+               (mode == SceneConfig::Mode::Video360);
     }
 
     /**
@@ -184,7 +193,8 @@ struct SceneConfig {
         // Currently, only Mesh3D supports view rotations
         return (mode == SceneConfig::Mode::Mesh3D) ||
                (mode == SceneConfig::Mode::Image360) ||
-               (mode == SceneConfig::Mode::StreetView);
+               (mode == SceneConfig::Mode::StreetView) ||
+               (mode == SceneConfig::Mode::Video360);
     }
 
     /**
@@ -204,7 +214,8 @@ struct SceneConfig {
         // These modes should enable scene controls for movement or rotation
         return (mode == SceneConfig::Mode::Mesh3D) ||
                (mode == SceneConfig::Mode::Image360) ||
-               (mode == SceneConfig::Mode::StreetView);
+               (mode == SceneConfig::Mode::StreetView) ||
+               (mode == SceneConfig::Mode::Video360);
     }
 
     /**

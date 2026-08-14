@@ -2048,6 +2048,13 @@ QMenu* ToolWindow::createEnvironmentMenu() {
     envMenu->addAction(tr("Custom 360 Image..."), this,
                        SLOT(custom360ImageSelected()));
 
+    const std::string video360FeatureVar = System::get()->envGet("ANDROID_EMU_ENABLE_VIDEO360");
+    const bool video360Enabled = (video360FeatureVar == "1");
+    if (video360Enabled) {
+        envMenu->addAction(tr("Custom 360 Video"), this,
+                           SLOT(custom360VideoSelected()));
+    }
+
     // Check if the streetview feature is enabled:
     const std::string streetViewFeatureVar = System::get()->envGet("ANDROID_EMU_ENABLE_STREETVIEW");
     const bool streetViewEnabled = (streetViewFeatureVar == "1");
@@ -2134,6 +2141,15 @@ void ToolWindow::custom360ImageSelected() {
                                          tr("Images (*.png *.jpg *.jpeg)"));
     if (!fileName.isEmpty()) {
         std::string command = "scene.mode = image360:" + fileName.toStdString();
+        getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
+    }
+}
+
+void ToolWindow::custom360VideoSelected() {
+    QString fileName = QFileDialog::getOpenFileName(
+            this, tr("Select 360 Video"), "", tr("Videos (*.mp4)"));
+    if (!fileName.isEmpty()) {
+        std::string command = "scene.mode = video360:" + fileName.toStdString();
         getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
     }
 }
