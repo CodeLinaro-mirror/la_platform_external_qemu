@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Guest Only PCI Device
  *
  * Copyright 2022 Google LLC
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
  */
 
 #include "qemu/osdep.h"
@@ -19,17 +10,20 @@
 #include "qapi/error.h"
 #include "hw/pci/pci.h"
 #include "hw/pci/pci_device.h"
-#include "hw/qdev-properties-system.h"
-#include "migration/vmstate.h"
-#include "hw/registerfields.h"
 #include "hw/pci/pci_regs.h"
+#include "hw/core/qdev-properties-system.h"
+#include "hw/core/registerfields.h"
+#include "migration/vmstate.h"
 #include "trace.h"
 
 #define TYPE_GUEST_ONLY_PCI "guest-only-pci"
 OBJECT_DECLARE_SIMPLE_TYPE(GuestOnlyPci, GUEST_ONLY_PCI)
 
 typedef struct GuestOnlyPci {
+    /*< private >*/
     PCIDevice parent;
+    /*< public >*/
+    MemoryRegion mmio;
 
     /* PCI config properties */
     uint16_t vendor_id;
@@ -37,7 +31,31 @@ typedef struct GuestOnlyPci {
     uint16_t subsystem_vendor_id;
     uint16_t subsystem_device_id;
     uint32_t class_revision;
+    uint64_t bar_size;
 } GuestOnlyPci;
+
+static uint64_t guest_only_mmio_read(void *opaque, hwaddr addr, unsigned size)
+{
+   /* GuestOnlyPci *s = opaque; */
+   return 0;
+}
+
+static void guest_only_mmio_write(void *opaque, hwaddr addr, uint64_t val,
+                                  unsigned size)
+{
+    /* GuestOnlyPci *s = opaque; */
+}
+
+/* This MMIO Space won't have a read-write functionality, it just exists */
+static const MemoryRegionOps mmio_ops = {
+    .read = guest_only_mmio_read,
+    .write = guest_only_mmio_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .impl = {
+        .min_access_size = 4,
+        .max_access_size = 4,
+    },
+};
 
 static void guest_only_pci_realize(PCIDevice *p, Error **errp)
 {
@@ -57,6 +75,15 @@ static void guest_only_pci_realize(PCIDevice *p, Error **errp)
     pci_set_word(&p->config[PCI_SUBSYSTEM_VENDOR_ID], s->subsystem_vendor_id);
     pci_set_word(&p->config[PCI_SUBSYSTEM_ID], s->subsystem_device_id);
     pci_set_long(&p->config[PCI_CLASS_REVISION], s->class_revision);
+
+    if (s->bar_size > 0) {
+        memory_region_init_io(/*mr=*/&s->mmio, /*owner=*/OBJECT(p), &mmio_ops,
+                              /*opaque=*/s, "guest-only-bar",
+                              /*size=*/s->bar_size);
+
+        pci_register_bar(p, /*region_num=*/0,
+                         /*attr=*/PCI_BASE_ADDRESS_MEM_TYPE_64, &s->mmio);
+    }
 }
 
 static const VMStateDescription vmstate_guest_only_pci = {
@@ -78,9 +105,10 @@ static const Property guest_only_pci_properties[] = {
                        subsystem_device_id, 0),
     DEFINE_PROP_UINT32("class-revision", GuestOnlyPci, class_revision,
                        0xff000000 /* Unknown class */),
+    DEFINE_PROP_UINT64("bar-size", GuestOnlyPci, bar_size, 0),
 };
 
-static void guest_only_pci_class_init(ObjectClass *klass, void *data)
+static void guest_only_pci_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     PCIDeviceClass *pdc = PCI_DEVICE_CLASS(klass);

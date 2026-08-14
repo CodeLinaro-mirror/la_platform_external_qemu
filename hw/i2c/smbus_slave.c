@@ -216,7 +216,7 @@ static void smbus_device_enter_reset(Object *obj, ResetType type)
     dev->data_len = 0;
 }
 
-static void smbus_device_class_init(ObjectClass *klass, void *data)
+static void smbus_device_class_init(ObjectClass *klass, const void *data)
 {
     I2CSlaveClass *sc = I2C_SLAVE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);

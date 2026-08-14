@@ -3,24 +3,6 @@
  *
  * Copyright (c) 2015 Corey Minyard, MontaVista Software, LLC
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
  * NOTE: Is this correct? Who knows... @wuhaotsh to find out during upstreaming.
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -33,7 +15,7 @@
 #include "chardev/char-fe.h"
 #include "hw/ipmi/ipmi.h"
 #include "hw/ipmi/ipmi_extern.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "qom/object.h"
 
@@ -167,7 +149,7 @@ void ipmi_extern_handle_command(IPMIExtern *ibe,
             ibe->waiting_rsp = false;
             k->handle_msg(s, msg_id, rsp, 3);
         }
-        goto out;
+        return;
     }
 
     addchar(ibe, msg_id);
@@ -182,9 +164,6 @@ void ipmi_extern_handle_command(IPMIExtern *ibe,
 
     /* Start the transmit */
     continue_send(ibe);
-
- out:
-    return;
 }
 
 static void handle_msg(IPMIExtern *ibe)
@@ -379,8 +358,10 @@ static void ipmi_extern_realize(DeviceState *dev, Error **errp)
                              chr_event, NULL, ibe, NULL, true);
 }
 
-int ipmi_extern_post_migrate(IPMIExtern *ibe, int version_id)
+static int ipmi_extern_post_migrate(void *opaque, int version_id)
 {
+    IPMIExtern *ibe = opaque;
+
     /*
      * We don't directly restore waiting_rsp, Instead, we return an
      * error on the interface if a response was being waited for.
@@ -398,6 +379,17 @@ int ipmi_extern_post_migrate(IPMIExtern *ibe, int version_id)
     return 0;
 }
 
+static const VMStateDescription vmstate_ipmi_extern = {
+    .name = TYPE_IPMI_EXTERN,
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .post_load = ipmi_extern_post_migrate,
+    .fields = (const VMStateField[]) {
+        VMSTATE_BOOL(waiting_rsp, IPMIExtern),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
 static void ipmi_extern_init(Object *obj)
 {
     IPMIExtern *ibe = IPMI_EXTERN(obj);
@@ -409,17 +401,16 @@ static void ipmi_extern_finalize(Object *obj)
 {
     IPMIExtern *ibe = IPMI_EXTERN(obj);
 
-    timer_del(ibe->extern_timer);
     timer_free(ibe->extern_timer);
 }
 
-
-static void ipmi_extern_class_init(ObjectClass *oc, void *data)
+static void ipmi_extern_class_init(ObjectClass *oc, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
 
     dc->hotpluggable = false;
     dc->realize = ipmi_extern_realize;
+    dc->vmsd = &vmstate_ipmi_extern;
 }
 
 static const TypeInfo ipmi_extern_type = {

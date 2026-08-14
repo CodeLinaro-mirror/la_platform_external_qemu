@@ -67,7 +67,7 @@ bool qpci_check_buggy_msi(QPCIDevice *dev)
     return false;
 }
 
-static void qpci_device_set(QPCIDevice *dev, QPCIBus *bus, int devfn)
+void qpci_device_set(QPCIDevice *dev, QPCIBus *bus, int devfn)
 {
     g_assert(dev);
 

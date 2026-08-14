@@ -23,8 +23,8 @@
 
 #include "qemu/osdep.h"
 #include "hw/gpio/pca_i2c_gpio.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "qapi/visitor.h"
 #include "qemu/log.h"
@@ -85,6 +85,112 @@ static void pca_i2c_irq_handler(void *opaque, int n, int level)
 }
 
 /* slave to master */
+static uint8_t tcal6416_recv(I2CSlave *i2c)
+{
+    PCAGPIOState *ps = PCA_I2C_GPIO(i2c);
+    uint8_t data;
+
+    switch (ps->command) {
+    case PCA6416_INPUT_PORT_0:
+        data = ps->curr_input;
+        break;
+
+    case PCA6416_INPUT_PORT_1:
+        data = ps->curr_input >> 8;
+        break;
+
+    /*
+     * i2c reads to the output registers reflect the values written
+     * NOT the actual values of the gpios
+     */
+    case PCA6416_OUTPUT_PORT_0:
+        data = ps->new_output;
+        break;
+
+    case PCA6416_OUTPUT_PORT_1:
+        data = ps->new_output >> 8;
+        break;
+
+    case PCA6416_POLARITY_INVERSION_PORT_0:
+        data = ps->polarity_inv;
+        break;
+
+    case PCA6416_POLARITY_INVERSION_PORT_1:
+        data = ps->polarity_inv >> 8;
+        break;
+
+    case PCA6416_CONFIGURATION_PORT_0:
+        data = ps->config;
+        break;
+
+    case PCA6416_CONFIGURATION_PORT_1:
+        data = ps->config >> 8;
+        break;
+
+    case TCAL6416_OUTPUT_STRENGTH_0:
+        data = ps->output_drive_strength;
+        break;
+    case TCAL6416_OUTPUT_STRENGTH_1:
+        data = ps->output_drive_strength >> 8;
+        break;
+    case TCAL6416_OUTPUT_STRENGTH_2:
+        data = ps->output_drive_strength >> 16;
+        break;
+    case TCAL6416_OUTPUT_STRENGTH_3:
+        data = ps->output_drive_strength >> 24;
+        break;
+
+    case TCAL6416_INPUT_LATCH_0:
+        data = ps->input_latch;
+        break;
+    case TCAL6416_INPUT_LATCH_1:
+        data = ps->input_latch >> 8;
+        break;
+
+    case TCAL6416_PU_PD_ENABLE_0:
+        data = ps->pu_pd_enable;
+        break;
+    case TCAL6416_PU_PD_ENABLE_1:
+        data = ps->pu_pd_enable >> 8;
+        break;
+
+    case TCAL6416_PU_PD_SELECT_0:
+        data = ps->pu_pd_select;
+        break;
+    case TCAL6416_PU_PD_SELECT_1:
+        data = ps->pu_pd_select >> 8;
+        break;
+
+    case TCAL6416_INTERRUPT_MASK_0:
+        data = ps->interrupt_mask;
+        break;
+    case TCAL6416_INTERRUPT_MASK_1:
+        data = ps->interrupt_mask >> 8;
+        break;
+
+    case TCAL6416_INTERRUPT_STATUS_0:
+        data = ps->interrupt_status;
+        break;
+    case TCAL6416_INTERRUPT_STATUS_1:
+        data = ps->interrupt_status >> 8;
+        break;
+
+    case TCAL6416_OUTPUT_PORT_CONFIG:
+        data = ps->output_port_config;
+        break;
+
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: reading from unsupported register 0x%02x",
+                      __func__, ps->command);
+        data = 0xFF;
+        break;
+    }
+
+    trace_pca_i2c_recv(DEVICE(ps)->canonical_path, ps->command, data);
+    return data;
+}
+
 static uint8_t pca6416_recv(I2CSlave *i2c)
 {
     PCAGPIOState *ps = PCA_I2C_GPIO(i2c);
@@ -234,6 +340,128 @@ static int pca6416_send(I2CSlave *i2c, uint8_t data)
     return 0;
 }
 
+static int tcal6416_send(I2CSlave *i2c, uint8_t data)
+{
+    PCAGPIOState *ps = PCA_I2C_GPIO(i2c);
+    if (ps->i2c_cmd) {
+        ps->command = data;
+        ps->i2c_cmd = false;
+        return 0;
+    }
+
+    trace_pca_i2c_send(DEVICE(ps)->canonical_path, ps->command, data);
+
+    switch (ps->command) {
+    case PCA6416_INPUT_PORT_0:
+    case PCA6416_INPUT_PORT_1:
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: writing to read only reg: 0x%02x",
+                      __func__, ps->command);
+        break;
+
+    case PCA6416_OUTPUT_PORT_0:
+        ps->new_output &= 0xFF00;
+        ps->new_output |= data;
+        break;
+
+    case PCA6416_OUTPUT_PORT_1:
+        ps->new_output &= 0xFF;
+        ps->new_output |= data << 8;
+        break;
+
+    case PCA6416_POLARITY_INVERSION_PORT_0:
+        ps->polarity_inv &= 0xFF00;
+        ps->polarity_inv |= data;
+        break;
+
+    case PCA6416_POLARITY_INVERSION_PORT_1:
+        ps->polarity_inv &= 0xFF;
+        ps->polarity_inv |= data << 8;
+        break;
+
+    case PCA6416_CONFIGURATION_PORT_0:
+        ps->config &= 0xFF00;
+        ps->config |= data;
+        break;
+
+    case PCA6416_CONFIGURATION_PORT_1:
+        ps->config &= 0xFF;
+        ps->config |= data << 8;
+        break;
+
+    case TCAL6416_OUTPUT_STRENGTH_0:
+        ps->output_drive_strength &= 0xFFFFFF00;
+        ps->output_drive_strength |= data;
+        break;
+    case TCAL6416_OUTPUT_STRENGTH_1:
+        ps->output_drive_strength &= 0xFFFF00FF;
+        ps->output_drive_strength |= data << 8;
+        break;
+    case TCAL6416_OUTPUT_STRENGTH_2:
+        ps->output_drive_strength &= 0xFF00FFFF;
+        ps->output_drive_strength |= data << 16;
+        break;
+    case TCAL6416_OUTPUT_STRENGTH_3:
+        ps->output_drive_strength &= 0x00FFFFFF;
+        ps->output_drive_strength |= data << 24;
+        break;
+
+    case TCAL6416_INPUT_LATCH_0:
+        ps->input_latch &= 0xFF00;
+        ps->input_latch |= data;
+        break;
+    case TCAL6416_INPUT_LATCH_1:
+        ps->input_latch &= 0xFF;
+        ps->input_latch |= data << 8;
+        break;
+
+    case TCAL6416_PU_PD_ENABLE_0:
+        ps->pu_pd_enable &= 0xFF00;
+        ps->pu_pd_enable |= data;
+        break;
+    case TCAL6416_PU_PD_ENABLE_1:
+        ps->pu_pd_enable &= 0xFF;
+        ps->pu_pd_enable |= data << 8;
+        break;
+
+    case TCAL6416_PU_PD_SELECT_0:
+        ps->pu_pd_select &= 0xFF00;
+        ps->pu_pd_select |= data;
+        break;
+    case TCAL6416_PU_PD_SELECT_1:
+        ps->pu_pd_select &= 0xFF;
+        ps->pu_pd_select |= data << 8;
+        break;
+
+    case TCAL6416_INTERRUPT_MASK_0:
+        ps->interrupt_mask &= 0xFF00;
+        ps->interrupt_mask |= data;
+        break;
+    case TCAL6416_INTERRUPT_MASK_1:
+        ps->interrupt_mask &= 0xFF;
+        ps->interrupt_mask |= data << 8;
+        break;
+
+    case TCAL6416_INTERRUPT_STATUS_0:
+    case TCAL6416_INTERRUPT_STATUS_1:
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: writing to read only reg: 0x%02x",
+                      __func__, ps->command);
+        break;
+
+    case TCAL6416_OUTPUT_PORT_CONFIG:
+        ps->output_port_config = data;
+        break;
+
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: writing to unsupported register\n",
+                      __func__);
+        return -1;
+    }
+
+    pca_i2c_update_irqs(ps);
+    return 0;
+}
+
 /* master to slave */
 static int pca9538_send(I2CSlave *i2c, uint8_t data)
 {
@@ -370,13 +598,20 @@ static const VMStateDescription vmstate_pca_i2c_gpio = {
         VMSTATE_I2C_SLAVE(parent, PCAGPIOState),
         VMSTATE_UINT16(polarity_inv, PCAGPIOState),
         VMSTATE_UINT16(config, PCAGPIOState),
+        VMSTATE_UINT32(output_drive_strength, PCAGPIOState),
+        VMSTATE_UINT16(input_latch, PCAGPIOState),
+        VMSTATE_UINT16(pu_pd_enable, PCAGPIOState),
+        VMSTATE_UINT16(pu_pd_select, PCAGPIOState),
+        VMSTATE_UINT16(interrupt_mask, PCAGPIOState),
+        VMSTATE_UINT16(interrupt_status, PCAGPIOState),
+        VMSTATE_UINT8(output_port_config, PCAGPIOState),
         VMSTATE_UINT16(curr_input, PCAGPIOState),
         VMSTATE_UINT16(curr_output, PCAGPIOState),
         VMSTATE_END_OF_LIST()
     }
 };
 
-static void pca6416_gpio_class_init(ObjectClass *klass, void *data)
+static void pca6416_gpio_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     I2CSlaveClass *k = I2C_SLAVE_CLASS(klass);
@@ -393,7 +628,24 @@ static void pca6416_gpio_class_init(ObjectClass *klass, void *data)
     pc->num_pins = PCA6416_NUM_PINS;
 }
 
-static void pca9538_gpio_class_init(ObjectClass *klass, void *data)
+static void tcal6416_gpio_class_init(ObjectClass *klass, const void *data)
+{
+    DeviceClass *dc = DEVICE_CLASS(klass);
+    I2CSlaveClass *k = I2C_SLAVE_CLASS(klass);
+    PCAGPIOClass *pc = PCA_I2C_GPIO_CLASS(klass);
+
+    dc->desc = "TCAL6416 16-bit I/O expander with advanced features";
+    dc->realize = pca_i2c_realize;
+    dc->vmsd = &vmstate_pca_i2c_gpio;
+
+    k->event = pca_i2c_event;
+    k->recv = tcal6416_recv;
+    k->send = tcal6416_send;
+
+    pc->num_pins = PCA6416_NUM_PINS;
+}
+
+static void pca9538_gpio_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     I2CSlaveClass *k = I2C_SLAVE_CLASS(klass);
@@ -410,7 +662,7 @@ static void pca9538_gpio_class_init(ObjectClass *klass, void *data)
     pc->num_pins = PCA9538_NUM_PINS;
 }
 
-static void pca9536_gpio_class_init(ObjectClass *klass, void *data)
+static void pca9536_gpio_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     I2CSlaveClass *k = I2C_SLAVE_CLASS(klass);
@@ -435,6 +687,15 @@ static void pca_i2c_gpio_init(Object *obj)
 
     ps->new_output = PCA_I2C_OUTPUT_DEFAULT;
     ps->config = PCA_I2C_CONFIG_DEFAULT;
+
+    /* TCAL6416 specific registers */
+    ps->output_drive_strength = 0x0; /* Low-current drive */
+    ps->input_latch = 0x0;
+    ps->pu_pd_enable = 0x0; /* Pull-up/pull-down disabled */
+    ps->pu_pd_select = 0x0; /* Pull-down if enabled */
+    ps->interrupt_mask = 0xFFFF; /* All interrupts masked */
+    ps->interrupt_status = 0x0;
+    ps->output_port_config = 0x0; /* P0_0-P0_7 configured as totem-pole output */
 
     object_property_add(obj, "gpio_input", "uint16",
                         pca_i2c_input_get,
@@ -462,6 +723,11 @@ static const TypeInfo pca_gpio_types[] = {
     .name = TYPE_PCA6416_GPIO,
     .parent = TYPE_PCA_I2C_GPIO,
     .class_init = pca6416_gpio_class_init,
+    },
+    {
+    .name = TYPE_TCAL6416_GPIO,
+    .parent = TYPE_PCA_I2C_GPIO,
+    .class_init = tcal6416_gpio_class_init,
     },
     {
     .name = TYPE_PCA9538_GPIO,

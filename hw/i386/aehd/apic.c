@@ -176,7 +176,7 @@ static void aehd_apic_unrealize(DeviceState *dev)
 {
 }
 
-static void aehd_apic_class_init(ObjectClass *klass, void *data)
+static void aehd_apic_class_init(ObjectClass *klass, const void *data)
 {
     APICCommonClass *k = APIC_COMMON_CLASS(klass);
 

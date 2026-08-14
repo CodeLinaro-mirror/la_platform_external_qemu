@@ -15,6 +15,10 @@ EXPORTS
     aml_method
     aml_return
     async_run_on_cpu
+    audio_be_add_capture
+    audio_be_by_name
+    audio_be_del_capture
+    audio_get_default_audio_be
     bdrv_all_find_vmstate_bs
     bdrv_snapshot_list
     blk_commit_all
@@ -73,8 +77,6 @@ EXPORTS
     error_setg_errno_internal
     error_setg_internal
     error_setg_win32_internal
-    error_set_log_info
-    error_warn
     freq_to_str
     get_ptr_rcu_reader
     graphic_console_init
@@ -174,6 +176,7 @@ EXPORTS
     qemu_bh_delete
     qemu_bh_new_full
     qemu_bh_schedule
+    qemu_chr_be_event
     qemu_chr_be_write
     qemu_clock_deadline_ns_all
     qemu_clock_enable
@@ -268,14 +271,11 @@ EXPORTS
     qemu_set_cloexec
     qemu_set_fd_handler
     qemu_set_irq
-    qemu_socket_set_block
     qemu_system_reset_request
     qemu_system_shutdown_request
     qemu_thread_create
     qemu_thread_get_self
     qemu_unregister_reset
-    qemu_wait_io_event
-    qemu_wait_io_event_common
     qemu_win32_map_alloc
     qemu_win32_map_free
     qio_channel_add_watch_source

@@ -13,7 +13,7 @@
 #include "trace.h"
 #include "qemu/thread.h"
 #include "qemu/main-loop.h"
-#include "system/cpu-timers.h"
+#include "exec/icount.h"
 #include "qemu/range.h"
 
 /* #define DEBUG_IOMMU */
@@ -136,6 +136,11 @@ static void dma_blk_cb(void *opaque, int ret)
         cur_len = dbs->sg->sg[dbs->sg_cur_index].len - dbs->sg_cur_byte;
         mem = dma_memory_map(dbs->sg->as, cur_addr, &cur_len, dbs->dir,
                              MEMTXATTRS_UNSPECIFIED);
+        if (mem == NULL) {
+            dma_complete(dbs, -EFAULT);
+            return;
+        }
+
         /*
          * Make reads deterministic in icount mode. Windows sometimes issues
          * disk read requests with overlapping SGs. It leads

@@ -12,12 +12,12 @@
 #include "qemu/osdep.h"
 #include "qemu/error-report.h"
 #include "qemu/log.h"
+#include "hw/core/registerfields.h"
+#include "hw/core/qdev-properties.h"
 #include "qapi/error.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/svc-i3c.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties.h"
-#include "hw/registerfields.h"
+#include "hw/core/irq.h"
 #include "trace.h"
 
 REG32(MCONFIG, 0x00)
@@ -359,7 +359,7 @@ static void svc_i3c_rxfifo_push(SVCI3C *s, const uint8_t *buf, size_t num_bytes)
 
 static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 {
-    SVCI3C *s = SVC_I3C(bus->qbus.parent);
+    SVCI3C *s = SVC_I3C(bus->parent_obj.parent);
     int ret = 0;
     g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
@@ -407,7 +407,7 @@ static int svc_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 
 static int svc_i3c_ibi_recv(I3CBus *bus, uint8_t data)
 {
-    SVCI3C *s = SVC_I3C(bus->qbus.parent);
+    SVCI3C *s = SVC_I3C(bus->parent_obj.parent);
     g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     /*
@@ -429,7 +429,7 @@ static int svc_i3c_ibi_recv(I3CBus *bus, uint8_t data)
 
 static int svc_i3c_ibi_finish(I3CBus *bus)
 {
-    SVCI3C *s = SVC_I3C(bus->qbus.parent);
+    SVCI3C *s = SVC_I3C(bus->parent_obj.parent);
     g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     if (ARRAY_FIELD_EX32(s->regs, MCTRL, REQUEST) == SVC_I3C_REQUEST_AUTO_IBI) {
@@ -490,8 +490,8 @@ static uint32_t svc_i3c_txtrig_threshold(SVCI3C *s)
 static uint32_t svc_i3c_txfifo_pop(SVCI3C *s, uint8_t *buf, uint32_t num_bytes)
 {
     uint32_t trig_threshold = svc_i3c_txtrig_threshold(s);
-    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     uint32_t i;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     for (i = 0; i < num_bytes; i++) {
         if (fifo8_is_empty(&s->tx_fifo)) {
@@ -564,18 +564,23 @@ static int svc_i3c_tx(SVCI3C *s)
         }
     }
 
+    if (xfer_size > 0) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
+        svc_i3c_update_irq(s);
+    }
+
     trace_svc_i3c_send(path, xfer_size);
     return ret;
 }
 
 static int svc_i3c_rx(SVCI3C *s)
 {
-    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
     uint8_t num_bytes = ARRAY_FIELD_EX32(s->regs, MCTRL, RDTERM);
     uint8_t i3c_buf[SVC_I3C_FIFO_SIZE];
     int ret = 0;
     bool xfer_done;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     if (!svc_i3c_is_enabled(s)) {
         return 0;
@@ -624,11 +629,11 @@ static int svc_i3c_rx(SVCI3C *s)
 
 static void svc_i3c_send_start(SVCI3C *s)
 {
-    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     bool is_read = ARRAY_FIELD_EX32(s->regs, MCTRL, DIR);
     uint8_t addr = ARRAY_FIELD_EX32(s->regs, MCTRL, ADDR);
     bool is_i2c = ARRAY_FIELD_EX32(s->regs, MCTRL, TYPE);
     int ret = 0;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     if (!svc_i3c_is_enabled(s)) {
         return;
@@ -656,9 +661,9 @@ static void svc_i3c_send_start(SVCI3C *s)
 
 static void svc_i3c_do_entdaa(SVCI3C *s)
 {
-    g_autofree char *path = object_get_canonical_path(OBJECT(s));
     uint8_t target_data[I3C_ENTDAA_SIZE];
     uint32_t num_read;
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
     /*
      * if the bus isn't in ENTDAA, we send a START w/ broadcast, followed by the
@@ -700,6 +705,7 @@ static void svc_i3c_do_entdaa(SVCI3C *s)
         ARRAY_FIELD_DP32(s->regs, MSTATUS, COMPLETE, 1);
         ARRAY_FIELD_DP32(s->regs, MSTATUS, STATE, SVC_I3C_STATE_IDLE);
         svc_i3c_merrwarn_update(s, R_MERRWARN_NACK_MASK);
+        svc_i3c_end_transfer(s);
         return;
     }
 
@@ -770,12 +776,13 @@ static void svc_i3c_mctrl_w(SVCI3C *s, uint32_t val)
 static void svc_i3c_enter_reset(Object *obj, ResetType type)
 {
     SVCI3C *s = SVC_I3C(obj);
+    g_autofree char *path = object_get_canonical_path(obj);
 
     for (size_t i = 0; i < ARRAY_SIZE(s->regs); i++) {
         s->regs[i] = svc_i3c_resets[i];
     }
 
-    trace_svc_i3c_reset(object_get_canonical_path(obj));
+    trace_svc_i3c_reset(path);
 }
 
 static void svc_i3c_mintclr_w(SVCI3C *s, uint32_t val)
@@ -793,6 +800,13 @@ static void svc_i3c_mintset_w(SVCI3C *s, uint32_t val)
 
 static void svc_i3c_mstatus_w(SVCI3C *s, uint32_t val)
 {
+    /* If they're clearing IBIWON, clear IBIADDR and IBITYPE. */
+    if (FIELD_EX32(val, MSTATUS, IBIWON) &&
+        ARRAY_FIELD_EX32(s->regs, MSTATUS, IBIWON)) {
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, IBIADDR, 0);
+        ARRAY_FIELD_DP32(s->regs, MSTATUS, IBITYPE, 0);
+    }
+
     /* MSTATUS is W1C. */
     s->regs[R_MSTATUS] &= ~val;
     svc_i3c_update_irq(s);
@@ -875,11 +889,8 @@ static void svc_i3c_mwdatab_w(SVCI3C *s, uint32_t val)
     }
 
     svc_i3c_txfifo_push(s, &byte, sizeof(byte));
-    svc_i3c_tx(s);
-
-    /* This is the last byte, complete the transfer. */
     if (end) {
-        svc_i3c_end_transfer(s);
+        svc_i3c_tx(s);
     }
 }
 
@@ -888,10 +899,9 @@ static void svc_i3c_mwdatabe_w(SVCI3C *s, uint32_t val)
     uint8_t byte = FIELD_EX32(val, MWDATABE, DATA);
 
     svc_i3c_txfifo_push(s, &byte, sizeof(byte));
-    svc_i3c_tx(s);
 
-    /* MWDATAxE registers always complete transfers. */
-    svc_i3c_end_transfer(s);
+    /* MWDATAxE registers always start transfers. */
+    svc_i3c_tx(s);
 }
 
 static void svc_i3c_mwdatah_w(SVCI3C *s, uint32_t val)
@@ -904,10 +914,9 @@ static void svc_i3c_mwdatah_w(SVCI3C *s, uint32_t val)
     word |= FIELD_EX32(val, MWDATAH, DATA1);
     svc_i3c_txfifo_push(s, (const uint8_t *)&word, sizeof(word));
 
-    svc_i3c_tx(s);
-    /* This is the last byte, complete the transfer. */
+    /* This is the last byte, start the transfer. */
     if (end) {
-        svc_i3c_end_transfer(s);
+        svc_i3c_tx(s);
     }
 }
 
@@ -920,13 +929,14 @@ static void svc_i3c_mwdatahe_w(SVCI3C *s, uint32_t val)
     word |= FIELD_EX32(val, MWDATAHE, DATA1);
     svc_i3c_txfifo_push(s, (const uint8_t *)&word, sizeof(word));
 
+    /* MWDATAxE registers always start transfers. */
     svc_i3c_tx(s);
-    /* MWDATAxE registers always complete transfers. */
-    svc_i3c_end_transfer(s);
 }
 
 static void svc_i3c_mwmsg_sdr_w(SVCI3C *s, uint32_t val)
 {
+    g_autofree char *path = object_get_canonical_path(OBJECT(s));
+
     /*
      * If there isn't a transfer in progress, this first write is the
      * information about the transfer.
@@ -943,7 +953,6 @@ static void svc_i3c_mwmsg_sdr_w(SVCI3C *s, uint32_t val)
         s->mwmsg_xfer_in_progress = true;
     } else {
         uint16_t word = FIELD_EX32(val, MWMSG_SDR, DATA);
-        g_autofree char *path = object_get_canonical_path(OBJECT(s));
 
         /* Transmit the word. */
         for (int i = 0; i < sizeof(word); i++) {
@@ -1065,7 +1074,7 @@ static const Property svc_i3c_properties[] = {
     DEFINE_PROP_UINT8("device-id", SVCI3C, cfg.id, 0),
 };
 
-static void svc_i3c_class_init(ObjectClass *klass, void *data)
+static void svc_i3c_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);

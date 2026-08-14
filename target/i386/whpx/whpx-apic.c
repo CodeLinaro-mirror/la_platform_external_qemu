@@ -18,7 +18,7 @@
 #include "hw/pci/msi.h"
 #include "system/hw_accel.h"
 #include "system/whpx.h"
-#include "whpx-internal.h"
+#include "system/whpx-internal.h"
 
 struct whpx_lapic_state {
     struct {
@@ -115,12 +115,12 @@ static void whpx_put_apic_base(CPUState *cpu, uint64_t val)
 
 static void whpx_apic_set_tpr(APICCommonState *s, uint8_t val)
 {
-    s->tpr = val;
+    s->tpr = (val & 0x0f) << 4;
 }
 
 static uint8_t whpx_apic_get_tpr(APICCommonState *s)
 {
-    return s->tpr;
+    return s->tpr >> 4;
 }
 
 static void whpx_apic_vapic_base_update(APICCommonState *s)
@@ -143,17 +143,15 @@ static void whpx_apic_put(CPUState *cs, run_on_cpu_data data)
         &kapic,
         sizeof(kapic));
     if (FAILED(hr)) {
-        fprintf(stderr,
-            "WHvSetVirtualProcessorInterruptControllerState failed: %08lx\n",
-             hr);
-
+        error_report(
+            "WHvSetVirtualProcessorInterruptControllerState failed: %08lx",
+            hr);
         abort();
     }
 }
 
-void whpx_apic_get(DeviceState *dev)
+void whpx_apic_get(APICCommonState *s)
 {
-    APICCommonState *s = APIC_COMMON(dev);
     CPUState *cpu = CPU(s->cpu);
     struct whpx_lapic_state kapic;
 
@@ -164,8 +162,8 @@ void whpx_apic_get(DeviceState *dev)
         sizeof(kapic),
         NULL);
     if (FAILED(hr)) {
-        fprintf(stderr,
-            "WHvSetVirtualProcessorInterruptControllerState failed: %08lx\n",
+        error_report(
+            "WHvGetVirtualProcessorInterruptControllerState failed: %08lx",
             hr);
 
         abort();
@@ -192,6 +190,11 @@ static void whpx_send_msi(MSIMessage *msg)
     uint8_t dest_mode = (addr >> MSI_ADDR_DEST_MODE_SHIFT) & 0x1;
     uint8_t trigger_mode = (data >> MSI_DATA_TRIGGER_SHIFT) & 0x1;
     uint8_t delivery = (data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x7;
+
+    if (vector == 0) {
+        warn_report("Ignoring request for interrupt vector 0");
+        return;
+    }
 
     WHV_INTERRUPT_CONTROL interrupt = {
         /* Values correspond to delivery modes */
@@ -252,7 +255,12 @@ static void whpx_apic_realize(DeviceState *dev, Error **errp)
     msi_nonbroken = true;
 }
 
-static void whpx_apic_class_init(ObjectClass *klass, void *data)
+static void whpx_apic_pre_save(APICCommonState *s)
+{
+    whpx_apic_get(s);
+}
+
+static void whpx_apic_class_init(ObjectClass *klass, const void *data)
 {
     APICCommonClass *k = APIC_COMMON_CLASS(klass);
 
@@ -261,6 +269,7 @@ static void whpx_apic_class_init(ObjectClass *klass, void *data)
     k->set_base = whpx_apic_set_base;
     k->set_tpr = whpx_apic_set_tpr;
     k->get_tpr = whpx_apic_get_tpr;
+    k->pre_save = whpx_apic_pre_save;
     k->post_load = whpx_apic_post_load;
     k->vapic_base_update = whpx_apic_vapic_base_update;
     k->external_nmi = whpx_apic_external_nmi;

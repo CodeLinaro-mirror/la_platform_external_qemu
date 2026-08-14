@@ -32,6 +32,15 @@ typedef struct PCAGPIOState {
     uint16_t polarity_inv;
     uint16_t config;
 
+    /* TCAL6416 specific registers */
+    uint32_t output_drive_strength;
+    uint16_t input_latch;
+    uint16_t pu_pd_enable;
+    uint16_t pu_pd_select;
+    uint16_t interrupt_mask;
+    uint16_t interrupt_status;
+    uint8_t output_port_config;
+
     /* the values of the gpio pins are mirrored in these integers */
     uint16_t curr_input;
     uint16_t curr_output;
@@ -62,6 +71,22 @@ OBJECT_DECLARE_TYPE(PCAGPIOState, PCAGPIOClass, PCA_I2C_GPIO)
 #define PCA6416_CONFIGURATION_PORT_0         0x06 /* read/write */
 #define PCA6416_CONFIGURATION_PORT_1         0x07 /* read/write */
 
+#define TCAL6416_OUTPUT_STRENGTH_0           0x40 /* read/write */
+#define TCAL6416_OUTPUT_STRENGTH_1           0x41 /* read/write */
+#define TCAL6416_OUTPUT_STRENGTH_2           0x42 /* read/write */
+#define TCAL6416_OUTPUT_STRENGTH_3           0x43 /* read/write */
+#define TCAL6416_INPUT_LATCH_0               0x44 /* read/write */
+#define TCAL6416_INPUT_LATCH_1               0x45 /* read/write */
+#define TCAL6416_PU_PD_ENABLE_0              0x46 /* read/write */
+#define TCAL6416_PU_PD_ENABLE_1              0x47 /* read/write */
+#define TCAL6416_PU_PD_SELECT_0              0x48 /* read/write */
+#define TCAL6416_PU_PD_SELECT_1              0x49 /* read/write */
+#define TCAL6416_INTERRUPT_MASK_0            0x4A /* read/write */
+#define TCAL6416_INTERRUPT_MASK_1            0x4B /* read/write */
+#define TCAL6416_INTERRUPT_STATUS_0          0x4C /* read */
+#define TCAL6416_INTERRUPT_STATUS_1          0x4D /* read */
+#define TCAL6416_OUTPUT_PORT_CONFIG          0x4F /* read/write */
+
 #define PCA9538_INPUT_PORT                   0x00 /* read */
 #define PCA9538_OUTPUT_PORT                  0x01 /* read/write */
 #define PCA9538_POLARITY_INVERSION_PORT      0x02 /* read/write */
@@ -76,5 +101,6 @@ OBJECT_DECLARE_TYPE(PCAGPIOState, PCAGPIOClass, PCA_I2C_GPIO)
 #define TYPE_PCA6416_GPIO "pca6416"
 #define TYPE_PCA9538_GPIO "pca9538"
 #define TYPE_PCA9536_GPIO "pca9536"
+#define TYPE_TCAL6416_GPIO "tcal6416"
 
 #endif

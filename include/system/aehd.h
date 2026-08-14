@@ -18,7 +18,7 @@
 #include "qemu/accel.h"
 #include "hw/core/cpu.h"
 #include "exec/memattrs.h"
-#include "hw/irq.h"
+#include "hw/core/irq.h"
 
 #ifdef COMPILING_PER_TARGET
 # ifdef CONFIG_AEHD

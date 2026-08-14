@@ -3,16 +3,6 @@
  *
  * Copyright (c) 2023 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
- *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
@@ -43,6 +33,10 @@
  * - 1-byte target address
  * - 1-byte RnW boolean
  * - 1-byte bus in ENTDAA boolean
+ *
+ * CCC is supported request (controller -> target)
+ * - 1 byte opcode
+ * - 1 byte CCC
  */
 
 #ifndef REMOTE_I3C_H_
@@ -67,6 +61,7 @@ typedef enum {
     REMOTE_I3C_HANDLE_CCC_READ = 8,
     REMOTE_I3C_IBI = 9,
     REMOTE_I3C_TARGET_MATCH = 10,
+    REMOTE_I3C_CCC_IS_SUPPORTED = 11,
     /* Sent from remote target to us. */
     REMOTE_I3C_IBI_ACK = 0xc0,
     REMOTE_I3C_IBI_NACK = 0xc1,

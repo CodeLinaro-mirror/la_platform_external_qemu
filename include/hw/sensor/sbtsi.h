@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #ifndef SBTSI_H_
 #define SBTSI_H_
 

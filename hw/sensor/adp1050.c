@@ -222,7 +222,7 @@ static void adp1050_init(Object *obj)
                         NULL, &pmdev->pages[0].read_temperature_1);
 }
 
-static void adp1050_class_init(ObjectClass *klass, void *data)
+static void adp1050_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

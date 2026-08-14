@@ -16,20 +16,20 @@
 
 #include "qemu/osdep.h"
 
-#include "hw/boards.h"
-#include "exec/hwaddr.h"
+#include "hw/core/boards.h"
 #include "chardev/char.h"
+#include "exec/hwaddr.h"
 #include "hw/arm/boot.h"
 #include "hw/arm/bsa.h"
 #include "hw/arm/npcm8xx.h"
 #include "hw/char/serial-mm.h"
 #include "hw/intc/arm_gic.h"
-#include "hw/loader.h"
+#include "hw/core/loader.h"
 #include "hw/misc/unimp.h"
-#include "hw/qdev-clock.h"
-#include "hw/qdev-core.h"
-#include "hw/qdev-properties.h"
-#include "hw/sysbus.h"
+#include "hw/core/qdev-clock.h"
+#include "hw/core/qdev.h"
+#include "hw/core/qdev-properties.h"
+#include "hw/core/sysbus.h"
 #include "hw/usb/npcm-udc.h"
 #include "hw/usb/redirect-host.h"
 #include "qapi/error.h"
@@ -81,10 +81,10 @@
 #define NPCM8XX_MMC_BA          0xf0842000
 
 /* PCS Module */
-#define NPCM8XX_PCS_BA          (0xf0780000)
+#define NPCM8XX_PCS_BA          0xf0780000
 
-/* PSPI Module */
-#define NPCM8XX_PSPI_BA         (0xf0201000)
+/* PSPI Modules */
+#define NPCM8XX_PSPI_BA         0xf0201000
 
 /* Run PLL1 at 1600 MHz */
 #define NPCM8XX_PLLCON1_FIXUP_VAL   0x00402101
@@ -106,8 +106,13 @@ enum NPCM8xxInterrupt {
     NPCM8XX_GMAC3_IRQ,
     NPCM8XX_GMAC4_IRQ,
     NPCM8XX_ESPI_IRQ,
-    NPCM8XX_MMC_IRQ             = 26,
+    NPCM8XX_SIOX0_IRQ,
+    NPCM8XX_SIOX1_IRQ,
+    NPCM8XX_MC_IRQ              = 25,
+    NPCM8XX_MMC_IRQ,
     NPCM8XX_PSPI_IRQ            = 28,
+    NPCM8XX_VDMA_IRQ,
+    NPCM8XX_MCTP_IRQ,
     NPCM8XX_TIMER0_IRQ          = 32,   /* Timer Module 0 */
     NPCM8XX_TIMER1_IRQ,
     NPCM8XX_TIMER2_IRQ,
@@ -138,9 +143,14 @@ enum NPCM8xxInterrupt {
     NPCM8XX_OHCI1_IRQ,
     NPCM8XX_EHCI2_IRQ,
     NPCM8XX_OHCI2_IRQ,
+    NPCM8XX_SPI1_IRQ            = 82,
+    NPCM8XX_RNG_IRQ             = 84,
+    NPCM8XX_SPI0_IRQ            = 85,
+    NPCM8XX_SPI3_IRQ            = 87,
     NPCM8XX_GDMA0_IRQ           = 88,
     NPCM8XX_GDMA1_IRQ,
     NPCM8XX_GDMA2_IRQ,
+    NPCM8XX_OTP_IRQ             = 92,
     NPCM8XX_PWM0_IRQ            = 93,   /* PWM module 0 */
     NPCM8XX_PWM1_IRQ,                   /* PWM module 1 */
     NPCM8XX_MFT0_IRQ            = 96,   /* MFT module 0 */
@@ -153,6 +163,11 @@ enum NPCM8xxInterrupt {
     NPCM8XX_MFT7_IRQ,                   /* MFT module 7 */
     NPCM8XX_PCI_MBOX1_IRQ       = 105,
     NPCM8XX_PCI_MBOX2_IRQ,
+    NPCM8XX_GPIO231_IRQ         = 108,
+    NPCM8XX_GPIO233_IRQ,
+    NPCM8XX_GPIO234_IRQ,
+    NPCM8XX_GPIO93_IRQ,
+    NPCM8XX_GPIO94_IRQ,
     NPCM8XX_GPIO0_IRQ           = 116,
     NPCM8XX_GPIO1_IRQ,
     NPCM8XX_GPIO2_IRQ,
@@ -189,6 +204,12 @@ enum NPCM8xxInterrupt {
     NPCM8XX_SMBUS24_IRQ,
     NPCM8XX_SMBUS25_IRQ,
     NPCM8XX_SMBUS26_IRQ,
+    NPCM8XX_FLM0_IRQ            = 160,
+    NPCM8XX_FLM1_IRQ,
+    NPCM8XX_FLM2_IRQ,
+    NPCM8XX_FLM3_IRQ,
+    NPCM8XX_JMT1_IRQ            = 188,
+    NPCM8XX_JMT2_IRQ,
     NPCM8XX_UART0_IRQ           = 192,
     NPCM8XX_UART1_IRQ,
     NPCM8XX_UART2_IRQ,
@@ -202,6 +223,16 @@ enum NPCM8xxInterrupt {
     NPCM8XX_I3C3_IRQ,
     NPCM8XX_I3C4_IRQ,
     NPCM8XX_I3C5_IRQ,
+    NPCM8XX_A35INTERR_IRQ       = 240,
+    NPCM8XX_A35EXTERR_IRQ,
+    NPCM8XX_PMU0_IRQ,
+    NPCM8XX_PMU1_IRQ,
+    NPCM8XX_PMU2_IRQ,
+    NPCM8XX_PMU3_IRQ,
+    NPCM8XX_CTI0_IRQ,
+    NPCM8XX_CTI1_IRQ,
+    NPCM8XX_CTI2_IRQ,
+    NPCM8XX_CTI3_IRQ,
 };
 
 /* Total number of GIC interrupts, including internal Cortex-A35 interrupts. */
@@ -319,6 +350,12 @@ static const hwaddr npcm8xx_ohci_addr[] = {
     0xf082b000,
 };
 
+/* Register base address for each PCI mailbox module */
+static const hwaddr npcm8xx_pci_mbox_addr[] = {
+    0xf0848000,
+    0xf0868000,
+};
+
 /* Register base address for 0-7 USB device controller registers */
 static const hwaddr npcm8xx_udc_addr[] = {
     0xf0830000,
@@ -331,10 +368,11 @@ static const hwaddr npcm8xx_udc_addr[] = {
     0xf0837000,
 };
 
-/* Register base address for each PCI mailbox module */
-static const hwaddr npcm8xx_pci_mbox_addr[] = {
-    0xf0848000,
-    0xf0868000,
+/* Register base addresses for each GDMA module. */
+static const hwaddr npcm8xx_gdma_addr[] = {
+    0xf0850000,
+    0xf0851000,
+    0xf0852000,
 };
 
 /* Register base addresses for each I3C module. */
@@ -345,13 +383,6 @@ static const hwaddr npcm8xx_i3c_addr[] = {
     0xfff13000,
     0xfff14000,
     0xfff15000,
-};
-
-/* Register base addresses for each GDMA module. */
-static const hwaddr npcm8xx_gdma_addr[] = {
-    0xf0850000,
-    0xf0851000,
-    0xf0852000,
 };
 
 static const struct {
@@ -395,6 +426,11 @@ static const struct {
     },
 };
 
+static const hwaddr npcm8xx_sgpio_addr[] = {
+    0xf0101000,
+    0xf0102000,
+};
+
 static const struct {
     const char *name;
     hwaddr regs_addr;
@@ -433,6 +469,7 @@ static struct arm_boot_info npcm8xx_binfo = {
     .psci_conduit           = QEMU_PSCI_CONDUIT_SMC,
     .board_id               = -1,
     .board_setup_addr       = NPCM8XX_BOARD_SETUP_ADDR,
+    .psci_conduit           = QEMU_PSCI_CONDUIT_SMC,
 };
 
 void npcm8xx_load_kernel(MachineState *machine, NPCM8xxState *soc)
@@ -500,6 +537,11 @@ static void npcm8xx_init(Object *obj)
     }
 
 
+    for (i = 0; i < ARRAY_SIZE(s->sgpio); i++) {
+        object_initialize_child(obj, "sgpio[*]",
+                                &s->sgpio[i], TYPE_NPCM8XX_SGPIO);
+    }
+
     for (i = 0; i < ARRAY_SIZE(s->smbus); i++) {
         object_initialize_child(obj, "smbus[*]", &s->smbus[i],
                                 TYPE_NPCM8XX_SMBUS);
@@ -548,17 +590,18 @@ static void npcm8xx_init(Object *obj)
 
     object_initialize_child(obj, "mmc", &s->mmc, TYPE_NPCM7XX_SDHCI);
     object_initialize_child(obj, "peci", &s->peci, TYPE_NPCM7XX_PECI);
-    object_initialize_child(obj, "pcierc", &s->pcierc, TYPE_NPCM_PCIERC);
     object_initialize_child(obj, "pspi", &s->pspi, TYPE_NPCM_PSPI);
+    object_initialize_child(obj, "pcierc", &s->pcierc, TYPE_NPCM_PCIERC);
 
-    for (i = 0; i < ARRAY_SIZE(s->i3c); i++) {
-        object_initialize_child(obj, "i3c[*]", &s->i3c[i], TYPE_SVC_I3C);
-    }
+    object_initialize_child(obj, "espi", &s->espi, TYPE_NPCM_ESPI);
 
     for (i = 0; i < ARRAY_SIZE(s->gdma); i++) {
         object_initialize_child(obj, "gdma[*]", &s->gdma[i], TYPE_NPCM8XX_GDMA);
     }
-    object_initialize_child(obj, "espi", &s->espi, TYPE_NPCM_ESPI);
+
+    for (i = 0; i < ARRAY_SIZE(s->i3c); i++) {
+        object_initialize_child(obj, "i3c[*]", &s->i3c[i], TYPE_SVC_I3C);
+    }
 }
 
 static void npcm8xx_realize(DeviceState *dev, Error **errp)
@@ -725,6 +768,17 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
         sysbus_mmio_map(SYS_BUS_DEVICE(obj), 0, npcm8xx_gpio[i].regs_addr);
         sysbus_connect_irq(SYS_BUS_DEVICE(obj), 0,
                            npcm8xx_irq(s, NPCM8XX_GPIO0_IRQ + i));
+    }
+
+    /* Serial SIOX modules. Cannot fail. */
+    QEMU_BUILD_BUG_ON(ARRAY_SIZE(npcm8xx_sgpio_addr) != ARRAY_SIZE(s->sgpio));
+    for (i = 0; i < ARRAY_SIZE(s->sgpio); i++) {
+        Object *obj = OBJECT(&s->sgpio[i]);
+
+        sysbus_realize(SYS_BUS_DEVICE(obj), &error_abort);
+        sysbus_mmio_map(SYS_BUS_DEVICE(obj), 0, npcm8xx_sgpio_addr[i]);
+        sysbus_connect_irq(SYS_BUS_DEVICE(obj), 0,
+                           npcm8xx_irq(s, NPCM8XX_SIOX0_IRQ + i));
     }
 
     /* SMBus modules. Cannot fail. */
@@ -898,11 +952,18 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->mmc), 0,
             npcm8xx_irq(s, NPCM8XX_MMC_IRQ));
 
+    /* PSPI */
+    sysbus_realize(SYS_BUS_DEVICE(&s->pspi), &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->pspi), 0, NPCM8XX_PSPI_BA);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->pspi), 0,
+            npcm8xx_irq(s, NPCM8XX_PSPI_IRQ));
+
     /* PECI */
     sysbus_realize(SYS_BUS_DEVICE(&s->peci), &error_abort);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->peci), 0, NPCM8XX_PECI_BA);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->peci), 0,
                         npcm8xx_irq(s, NPCM8XX_PECI_IRQ));
+
     /* PCIe RC */
     sysbus_realize(SYS_BUS_DEVICE(&s->pcierc), &error_abort);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->pcierc), 0, NPCM8XX_PCIERC_BA);
@@ -915,11 +976,13 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->espi), 0,
                        npcm8xx_irq(s, NPCM8XX_ESPI_IRQ));
 
-    /* PSPI */
-    sysbus_realize(SYS_BUS_DEVICE(&s->pspi), &error_abort);
-    sysbus_mmio_map(SYS_BUS_DEVICE(&s->pspi), 0, NPCM8XX_PSPI_BA);
-    sysbus_connect_irq(SYS_BUS_DEVICE(&s->pspi), 0,
-                       npcm8xx_irq(s, NPCM8XX_PSPI_IRQ));
+    /* GDMA */
+    for (i = 0; i < ARRAY_SIZE(s->gdma); i++) {
+        sysbus_realize(SYS_BUS_DEVICE(&s->gdma[i]), &error_abort);
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->gdma[i]), 0, npcm8xx_gdma_addr[i]);
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->gdma[i]), 0,
+                           npcm8xx_irq(s, NPCM8XX_GDMA0_IRQ + i));
+    }
 
     /* I3C */
     for (i = 0; i < ARRAY_SIZE(s->i3c); i++) {
@@ -931,22 +994,12 @@ static void npcm8xx_realize(DeviceState *dev, Error **errp)
                            npcm8xx_irq(s, NPCM8XX_I3C0_IRQ + i));
     }
 
-    /* GDMA */
-    for (i = 0; i < ARRAY_SIZE(s->gdma); i++) {
-        sysbus_realize(SYS_BUS_DEVICE(&s->gdma[i]), &error_abort);
-        sysbus_mmio_map(SYS_BUS_DEVICE(&s->gdma[i]), 0, npcm8xx_gdma_addr[i]);
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->gdma[i]), 0,
-                           npcm8xx_irq(s, NPCM8XX_GDMA0_IRQ + i));
-    }
-
     create_unimplemented_device("npcm8xx.shm",          0xc0001000,   4 * KiB);
     create_unimplemented_device("npcm8xx.gicextra",     0xdfffa000,  24 * KiB);
     create_unimplemented_device("npcm8xx.vdmx",         0xe0800000,   4 * KiB);
     create_unimplemented_device("npcm8xx.gfxi",         0xf000e000,   4 * KiB);
     create_unimplemented_device("npcm8xx.fsw",          0xf000f000,   4 * KiB);
     create_unimplemented_device("npcm8xx.bt",           0xf0030000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.siox[1]",      0xf0101000,   4 * KiB);
-    create_unimplemented_device("npcm8xx.siox[2]",      0xf0102000,   4 * KiB);
     create_unimplemented_device("npcm8xx.tmps",         0xf0188000,   4 * KiB);
     create_unimplemented_device("npcm8xx.viru1",        0xf0204000,   4 * KiB);
     create_unimplemented_device("npcm8xx.viru2",        0xf0205000,   4 * KiB);
@@ -982,7 +1035,7 @@ static const Property npcm8xx_properties[] = {
                      MemoryRegion *),
 };
 
-static void npcm8xx_class_init(ObjectClass *oc, void *data)
+static void npcm8xx_class_init(ObjectClass *oc, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
     NPCM8xxClass *nc = NPCM8XX_CLASS(oc);

@@ -10,7 +10,10 @@
 #define QEMU_AEHD_INT_H
 
 #include "qemu/accel.h"
+#include "accel/accel-ops.h"
+#include "exec/translation-block.h"
 #include "system/aehd.h"
+#include "system/memory.h"
 
 typedef struct AEHDSlot {
     hwaddr start_addr;

@@ -13,8 +13,8 @@
 #include "hw/misc/aspeed_lpc.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "trace.h"
 
@@ -584,8 +584,8 @@ static void aspeed_lpc_write(void *opaque, hwaddr offset, uint64_t data,
 
         if (data & mask) {
             qemu_log_mask(LOG_GUEST_ERROR,
-                 "%s: read-only bits in 0x%02lx ignored\n",
-                      __func__, data);
+                          "%s: read-only bits in 0x%02" PRIx64 " ignored\n",
+                          __func__, data);
             data &= ~mask;
         }
 
@@ -709,7 +709,7 @@ static const Property aspeed_lpc_properties[] = {
     DEFINE_PROP_UINT32("hicr7", AspeedLPCState, hicr7, 0),
 };
 
-static void aspeed_lpc_class_init(ObjectClass *klass, void *data)
+static void aspeed_lpc_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
@@ -750,7 +750,7 @@ static void aspeed_kcs_set_atn(struct IPMIInterface *s, int val, int irq)
     /* Set attention bit is not support for now */
 }
 
-static void aspeed_kcs_channel_class_init(ObjectClass *klass, void *data)
+static void aspeed_kcs_channel_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     IPMIInterfaceClass *iic = IPMI_INTERFACE_CLASS(klass);

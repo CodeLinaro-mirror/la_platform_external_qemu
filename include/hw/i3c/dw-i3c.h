@@ -1,11 +1,8 @@
 /*
- * Designware I3C Controller
+ * DesignWare I3C Controller
  *
  * Copyright (C) 2021 ASPEED Technology Inc.
- * Copyright (C) 2023 Google, LLC
- *
- * This code is licensed under the GPL version 2 or later.  See
- * the COPYING file in the top-level directory.
+ * Copyright (C) 2025 Google, LLC.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -14,9 +11,8 @@
 #define DW_I3C_H
 
 #include "qemu/fifo32.h"
-#include "migration/vmstate.h"
 #include "hw/i3c/i3c.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 
 #define TYPE_DW_I3C "dw.i3c"
 OBJECT_DECLARE_SIMPLE_TYPE(DWI3C, DW_I3C)
@@ -167,11 +163,9 @@ typedef struct DWI3CIBIData {
     bool ibi_nacked;
 } DWI3CIBIData;
 
-typedef struct DWI3C {
-    /* <private> */
-    SysBusDevice parent;
+struct DWI3C {
+    SysBusDevice parent_obj;
 
-    /* <public> */
     MemoryRegion mr;
     qemu_irq irq;
     I3CBus *bus;
@@ -197,7 +191,7 @@ typedef struct DWI3C {
         uint16_t dev_char_table_depth;
     } cfg;
     uint32_t regs[DW_I3C_NR_REGS];
-} DWI3C;
+};
 
 /* Extern for other controllers that use DesignWare I3C. */
 extern const VMStateDescription vmstate_dw_i3c;

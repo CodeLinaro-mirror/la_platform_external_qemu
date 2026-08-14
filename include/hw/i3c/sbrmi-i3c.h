@@ -4,16 +4,6 @@
  *
  * Copyright (c) 2024 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
- *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
@@ -55,6 +45,8 @@ typedef enum {
     SBRMI_REG_SW_INTERRUPT = 0x40,
     SBRMI_REG_THREADNUMBER,
     SBRMI_REG_RAS_STATUS = 0x4c,
+    SBRMI_REG_THREADNUMBER_LOW = 0x4E,
+    SBRMI_REG_THREADNUMBER_HIGH,
 } SbrmiReg;
 
 /* Only list the commands we support now. */
@@ -77,11 +69,23 @@ typedef enum {
     SBRMI_MAILBOX_INVALID_OOB_RAS_CONFIG,
 } SbrmiMailboxError;
 
+/* CPUID function, see PPR Vol 1 for AMD Family 1Ah Model 02h C0 */
+typedef enum {
+    SBRMI_CPUID_FN00000000 = 0x0,
+    SBRMI_CPUID_FN00000001 = 0x1,
+    SBRMI_CPUID_FN0000000B = 0xb,
+    SBRMI_CPUID_FN8000001E = 0x8000001E,
+} SbrmiCpuidFn;
+
 /* BIT definition for SBRMI_REG_CONTROL */
 #define SBRMI_BIT_ALERT_MASK (0)
 #define SBRMI_BIT_ALERT_MASK_LEN (1)
+#define SBRMI_BIT_SW_ALERT_MASK (4)
+#define SBRMI_BIT_SW_ALERT_MASK_LEN (1)
 #define SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE (5)
 #define SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE_LEN (1)
+#define SBRMI_BIT_HW_ALERT_MASK (7)
+#define SBRMI_BIT_HW_ALERT_MASK_LEN (1)
 
 /* BIT definition for SBRMI_REG_STATUS */
 #define SBRMI_BIT_SW_ALERT_STATUS (1)
@@ -260,9 +264,12 @@ struct SbrmiI3cTargetState {
         /* revision 0x21: 2-bytes command code. 0x20: 1-byte command code. */
         uint8_t sbrmi_rev;
     } cfg;
+
+    qemu_irq alert;
 };
 
 I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
                                    uint64_t pid, const char *cpu_vendor,
-                                   uint32_t ucode_rev);
+                                   uint32_t ucode_rev, int nr_cores,
+                                   int nr_thread);
 #endif  /* SBRMI_I3C_H_ */

@@ -8,12 +8,12 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties.h"
-#include "hw/qdev-properties-system.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
+#include "hw/core/qdev-properties-system.h"
 #include "hw/ipmi/aspeed_ibt.h"
 #include "hw/ipmi/ipmi_extern.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "migration/vmstate.h"
 #include "qapi/error.h"
 #include "qemu/bitops.h"
@@ -285,7 +285,7 @@ static const VMStateDescription vmstate_aspeed_ibt = {
     }
 };
 
-static void aspeed_ibt_class_init(ObjectClass *klass, void *data)
+static void aspeed_ibt_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

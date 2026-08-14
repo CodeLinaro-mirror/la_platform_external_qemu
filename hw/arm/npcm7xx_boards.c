@@ -17,13 +17,14 @@
 #include "qemu/osdep.h"
 
 #include "hw/arm/npcm7xx.h"
+#include "hw/arm/machines-qom.h"
 #include "hw/core/cpu.h"
 #include "hw/i2c/i2c_mux_pca954x.h"
 #include "hw/i2c/smbus_eeprom.h"
-#include "hw/loader.h"
+#include "hw/core/loader.h"
 #include "hw/nvram/eeprom_at24c.h"
-#include "hw/qdev-core.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev.h"
+#include "hw/core/qdev-properties.h"
 #include "qapi/error.h"
 #include "qemu/datadir.h"
 #include "qemu/units.h"
@@ -401,8 +402,8 @@ static void quanta_gbs_i2c_init(NPCM7xxState *soc)
 
 
     /* i2c-2: */
-    i2c_slave_create_simple(
-        npcm7xx_i2c_get_bus(soc, 2), "sbtsi-i2c-target", 0x4c);
+    i2c_slave_create_simple(npcm7xx_i2c_get_bus(soc, 2),
+                            "sbtsi-i2c-target", 0x4c);
 
     /* i2c-5: */
     /* mb_fru */
@@ -553,6 +554,10 @@ static void quanta_gbs_init(MachineState *machine)
     npcm7xx_connect_flash(&soc->fiu[0], 0, "mx66u51235f",
                           drive_get(IF_MTD, 0, 0));
 
+    /* Actually mt25ql512a; this one is 3V. */
+    npcm7xx_connect_flash(&soc->fiu[1], 0, "mx25l25635e",
+                          drive_get(IF_MTD, 3, 0));
+
     quanta_gbs_i2c_init(soc);
     sdhci_attach_drive(&soc->mmc.sdhci, 0);
     npcm7xx_load_kernel(machine, soc);
@@ -601,7 +606,7 @@ static void npcm7xx_set_soc_type(NPCM7xxMachineClass *nmc, const char *type)
     mc->default_cpus = mc->min_cpus = mc->max_cpus = sc->num_cpus;
 }
 
-static void npcm7xx_machine_class_init(ObjectClass *oc, void *data)
+static void npcm7xx_machine_class_init(ObjectClass *oc, const void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
     static const char * const valid_cpu_types[] = {
@@ -620,7 +625,7 @@ static void npcm7xx_machine_class_init(ObjectClass *oc, void *data)
  * Schematics:
  * https://github.com/Nuvoton-Israel/nuvoton-info/blob/master/npcm7xx-poleg/evaluation-board/board_deliverables/NPCM750x_EB_ver.A1.1_COMPLETE.pdf
  */
-static void npcm750_evb_machine_class_init(ObjectClass *oc, void *data)
+static void npcm750_evb_machine_class_init(ObjectClass *oc, const void *data)
 {
     NPCM7xxMachineClass *nmc = NPCM7XX_MACHINE_CLASS(oc);
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -633,7 +638,7 @@ static void npcm750_evb_machine_class_init(ObjectClass *oc, void *data)
     mc->default_ram_size = 512 * MiB;
 };
 
-static void gsj_machine_class_init(ObjectClass *oc, void *data)
+static void gsj_machine_class_init(ObjectClass *oc, const void *data)
 {
     NPCM7xxMachineClass *nmc = NPCM7XX_MACHINE_CLASS(oc);
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -646,7 +651,7 @@ static void gsj_machine_class_init(ObjectClass *oc, void *data)
     mc->default_ram_size = 512 * MiB;
 };
 
-static void gsz_machine_class_init(ObjectClass *oc, void *data)
+static void gsz_machine_class_init(ObjectClass *oc, const void *data)
 {
     NPCM7xxMachineClass *nmc = NPCM7XX_MACHINE_CLASS(oc);
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -658,7 +663,7 @@ static void gsz_machine_class_init(ObjectClass *oc, void *data)
     mc->default_ram_size = 1 * GiB;
 }
 
-static void gbs_bmc_machine_class_init(ObjectClass *oc, void *data)
+static void gbs_bmc_machine_class_init(ObjectClass *oc, const void *data)
 {
     NPCM7xxMachineClass *nmc = NPCM7XX_MACHINE_CLASS(oc);
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -671,7 +676,7 @@ static void gbs_bmc_machine_class_init(ObjectClass *oc, void *data)
     mc->default_ram_size = 1 * GiB;
 }
 
-static void kudo_bmc_machine_class_init(ObjectClass *oc, void *data)
+static void kudo_bmc_machine_class_init(ObjectClass *oc, const void *data)
 {
     NPCM7xxMachineClass *nmc = NPCM7XX_MACHINE_CLASS(oc);
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -684,7 +689,7 @@ static void kudo_bmc_machine_class_init(ObjectClass *oc, void *data)
     mc->default_ram_size = 1 * GiB;
 };
 
-static void mori_bmc_machine_class_init(ObjectClass *oc, void *data)
+static void mori_bmc_machine_class_init(ObjectClass *oc, const void *data)
 {
     NPCM7xxMachineClass *nmc = NPCM7XX_MACHINE_CLASS(oc);
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -709,26 +714,32 @@ static const TypeInfo npcm7xx_machine_types[] = {
         .name           = MACHINE_TYPE_NAME("npcm750-evb"),
         .parent         = TYPE_NPCM7XX_MACHINE,
         .class_init     = npcm750_evb_machine_class_init,
+        .interfaces     = arm_machine_interfaces,
     }, {
         .name           = MACHINE_TYPE_NAME("quanta-gsj"),
         .parent         = TYPE_NPCM7XX_MACHINE,
         .class_init     = gsj_machine_class_init,
+        .interfaces     = arm_machine_interfaces,
     }, {
         .name           = MACHINE_TYPE_NAME("quanta-gsz-bmc"),
         .parent         = TYPE_NPCM7XX_MACHINE,
         .class_init     = gsz_machine_class_init,
+        .interfaces     = arm_machine_interfaces,
     }, {
         .name           = MACHINE_TYPE_NAME("quanta-gbs-bmc"),
         .parent         = TYPE_NPCM7XX_MACHINE,
         .class_init     = gbs_bmc_machine_class_init,
+        .interfaces     = arm_machine_interfaces,
     }, {
         .name           = MACHINE_TYPE_NAME("kudo-bmc"),
         .parent         = TYPE_NPCM7XX_MACHINE,
         .class_init     = kudo_bmc_machine_class_init,
+        .interfaces     = arm_machine_interfaces,
     }, {
         .name           = MACHINE_TYPE_NAME("mori-bmc"),
         .parent         = TYPE_NPCM7XX_MACHINE,
         .class_init     = mori_bmc_machine_class_init,
+        .interfaces     = arm_machine_interfaces,
     },
 };
 

@@ -3,15 +3,7 @@
  *
  * Copyright 2020 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #include "qemu/osdep.h"
@@ -1289,7 +1281,7 @@ static const VMStateDescription vmstate_npcm_smbus = {
     },
 };
 
-static void npcm_smbus_class_init(ObjectClass *klass, void *data)
+static void npcm_smbus_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -1299,7 +1291,7 @@ static void npcm_smbus_class_init(ObjectClass *klass, void *data)
     rc->phases.hold = npcm_smbus_hold_reset;
 }
 
-static void npcm7xx_smbus_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_smbus_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     NPCMSMBusClass *c = NPCM_SMBUS_CLASS(klass);
@@ -1310,7 +1302,7 @@ static void npcm7xx_smbus_class_init(ObjectClass *klass, void *data)
     c->rxf_ctl_last = NPCM7XX_SMBRXF_CTL_LAST;
 }
 
-static void npcm8xx_smbus_class_init(ObjectClass *klass, void *data)
+static void npcm8xx_smbus_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     NPCMSMBusClass *c = NPCM_SMBUS_CLASS(klass);
@@ -1321,7 +1313,7 @@ static void npcm8xx_smbus_class_init(ObjectClass *klass, void *data)
     c->rxf_ctl_last = NPCM8XX_SMBRXF_CTL_LAST;
 }
 
-static void npcm_i2c_bus_class_init(ObjectClass *klass, void *data)
+static void npcm_i2c_bus_class_init(ObjectClass *klass, const void *data)
 {
     I2CBusClass *ic = I2C_BUS_CLASS(klass);
 

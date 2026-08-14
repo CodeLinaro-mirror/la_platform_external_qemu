@@ -20,7 +20,7 @@
 #include "hw/i2c/i2c.h"
 #include "qom/object.h"
 #include "qemu/bitops.h"
-#include "hw/register.h"
+#include "hw/core/register.h"
 
 REG8(CR1, 0x00)         /* R/W Control Register 1 */
     FIELD(CR1, ALTMSK, 7, 1)    /* Alert mask */

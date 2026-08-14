@@ -577,7 +577,7 @@ static void pmbus_generic_init(Object *obj)
                         NULL, &pmdev->num_pages);
 }
 
-static void pmbus_generic_class_init(ObjectClass *klass, void *data)
+static void pmbus_generic_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

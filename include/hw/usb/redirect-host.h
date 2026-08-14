@@ -14,7 +14,7 @@
 #include <usbredirproto.h>
 
 #include "chardev/char-fe.h"
-#include "hw/qdev-core.h"
+#include "hw/core/qdev.h"
 #include "qemu/log.h"
 #include "qemu/queue.h"
 #include "qemu/typedefs.h"
@@ -69,11 +69,11 @@ typedef QTAILQ_HEAD(BulkPacketQueue, BulkPacket) BulkPacketQueue;
 
 typedef struct USBRedirectHost {
     DeviceState parent_obj;
-    CharBackend chr;
+    CharFrontend chr;
 
     const uint8_t *read_cache;
     int read_size;
-    gint write_ready_watch;
+    guint write_ready_watch;
 
     struct usbredirparser *parser;
     uint64_t latest_packet_id;

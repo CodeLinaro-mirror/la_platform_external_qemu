@@ -6,6 +6,10 @@ pci_pm_transition(const char *dev, uint32_t bus, uint32_t slot, uint32_t func, u
 pci_update_mappings_del(const char *dev, uint32_t bus, uint32_t slot, uint32_t func, int bar, uint64_t addr, uint64_t size) "%s %02x:%02x.%x %d,0x%"PRIx64"+0x%"PRIx64
 pci_update_mappings_add(const char *dev, uint32_t bus, uint32_t slot, uint32_t func, int bar, uint64_t addr, uint64_t size) "%s %02x:%02x.%x %d,0x%"PRIx64"+0x%"PRIx64
 pci_route_irq(int dev_irq, const char *dev_path, int parent_irq, const char *parent_path) "IRQ %d @%s -> IRQ %d @%s"
+pci_bad_rom_magic(uint16_t bad_rom_magic, uint16_t good_rom_magic) "Bad ROM magic number: %04"PRIX16". Should be: %04"PRIX16
+pci_bad_pcir_offset(uint16_t pcir_offset) "Bad PCIR offset 0x%"PRIx16" or signature"
+pci_rom_and_pci_ids(char *romfile, uint16_t vendor_id, uint16_t device_id, uint16_t rom_vendor_id, uint16_t rom_device_id) "%s: ROM ID %04"PRIx16":%04"PRIx16" | PCI ID %04"PRIx16":%04"PRIx16
+pci_rom_checksum_change(uint8_t old_checksum, uint8_t new_checksum) "ROM checksum changed from %02"PRIx8" to %02"PRIx8
 
 # pci_host.c
 pci_cfg_read(const char *dev, uint32_t bus, uint32_t slot, uint32_t func, unsigned offs, unsigned val) "%s %02x:%02x.%x @0x%x -> 0x%x"
@@ -24,3 +28,11 @@ pcie_cap_slot_write_config(const char *parent, const char *child, const char *pd
 
 # shpc.c
 shpc_slot_command(const char *parent, int pci_slot, const char *child, const char *old_pic, const char *new_pic, const char *old_aic, const char *new_aic, const char *old_state, const char *new_state) "%s[%d] > %s: pic: %s->%s, aic: %s->%s, state: %s->%s"
+
+# remote_pci.c
+remote_pci_read_external_config(const char *id, uint32_t addr, int size, uint32_t val) "%s: addr: 0x%04" PRIx32 ", size: %d, val: 0x%04" PRIx32
+remote_pci_write_external_config(const char *id, uint32_t addr, int size, uint32_t val) "%s: addr: 0x%04" PRIx32 ", size: %d, val: 0x%04" PRIx32
+remote_pci_bar_read(const char *id, uint32_t addr, int size, uint64_t val) "%s: addr: 0x%04" PRIx32 ", size: %u, val: 0x%08" PRIx64
+remote_pci_bar_write(const char *id, uint32_t addr, int size, uint64_t val) "%s: addr: 0x%04" PRIx32 ", size: %u, val: 0x%08" PRIx64
+remote_pci_dma_read(const char *id, uint64_t addr, uint64_t size) "%s: addr: 0x%08" PRIx64 ", size: 0x%08" PRIx64
+remote_pci_dma_write(const char *id, uint64_t addr, uint64_t size) "%s: addr: 0x%08" PRIx64 ", size: 0x%08" PRIx64

@@ -937,7 +937,7 @@ int main(int argc, char **argv)
 
     global_qtest = qtest_initf(
         "-machine npcm845-evb,remote-udc=testcd "
-        "-chardev socket,id=testcd,port=%d,host=localhost,reconnect=1",
+        "-chardev socket,id=testcd,port=%d,host=localhost,reconnect-ms=1000",
         port);
     qtest_irq_intercept_in(global_qtest, "/machine/soc/gic");
 

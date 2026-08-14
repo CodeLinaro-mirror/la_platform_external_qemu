@@ -208,6 +208,7 @@ copy_to_directory(
     name = "platform_new_copy",
     srcs = [":platform_dir"],
     out = "platform",
+    exclude_srcs_patterns = ["**/run"],
     replace_prefixes = {
         "generated/build/bazel/platform": "",
     },

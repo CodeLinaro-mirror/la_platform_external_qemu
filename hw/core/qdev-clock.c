@@ -13,8 +13,8 @@
 
 #include "qemu/osdep.h"
 #include "qemu/error-report.h"
-#include "hw/qdev-clock.h"
-#include "hw/qdev-core.h"
+#include "hw/core/qdev-clock.h"
+#include "hw/core/qdev.h"
 #include "qapi/error.h"
 
 /*
@@ -106,7 +106,7 @@ void qdev_init_clocks(DeviceState *dev, const ClockPortInitArray clocks)
     }
 }
 
-static NamedClockList *qdev_get_clocklist(DeviceState *dev, const char *name)
+NamedClockList *qdev_get_clocklist(DeviceState *dev, const char *name)
 {
     NamedClockList *ncl;
 

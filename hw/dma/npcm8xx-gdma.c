@@ -11,16 +11,16 @@
 
 #include "qemu/osdep.h"
 #include "qom/object.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "qapi/error.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
 #include "hw/dma/npcm8xx-gdma.h"
 #include "system/dma.h"
-#include "hw/stream.h"
+#include "hw/core/stream.h"
 #include "qemu/log.h"
-#include "exec/address-spaces.h"
-#include "hw/registerfields.h"
+#include "system/address-spaces.h"
+#include "hw/core/registerfields.h"
 
 REG32(CTL, 0x00)
     FIELD(CTL, TC,      18, 1)
@@ -186,7 +186,7 @@ static void npcm8xx_gdma_channel_realize(DeviceState *dev, Error **errp)
 static const MemoryRegionOps npcm8xx_gdma_channel_ops = {
     .read = npcm8xx_gdma_channel_read,
     .write = npcm8xx_gdma_channel_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
+    .endianness = DEVICE_LITTLE_ENDIAN,
     .valid = {
         .min_access_size = 4,
         .max_access_size = 4,
@@ -203,7 +203,7 @@ static void npcm8xx_gdma_channel_init(Object *obj)
     sysbus_init_mmio(sbd, &s->iomem);
 }
 
-static void npcm8xx_gdma_channel_class_init(ObjectClass *klass, void *data)
+static void npcm8xx_gdma_channel_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);
@@ -214,16 +214,18 @@ static void npcm8xx_gdma_channel_class_init(ObjectClass *klass, void *data)
 
 static uint64_t npcm8xx_gdma_read(void *opaque, hwaddr offset, unsigned size)
 {
-    qemu_log_mask(LOG_GUEST_ERROR, "%s: Read from unimplimented register at "
-                  "0x%lx", DEVICE(opaque)->canonical_path, offset);
+    qemu_log_mask(LOG_UNIMP, "%s: Read from unimplimented register at "
+                  "0x%" HWADDR_PRIx "\n",
+                  DEVICE(opaque)->canonical_path, offset);
     return 0;
 }
 
 static void npcm8xx_gdma_write(void *opaque, hwaddr offset, uint64_t value,
                                unsigned size)
 {
-    qemu_log_mask(LOG_GUEST_ERROR, "%s: Write to unimplimented register at "
-                  "0x%lx", DEVICE(opaque)->canonical_path, offset);
+    qemu_log_mask(LOG_UNIMP, "%s: Write to unimplimented register at "
+                  "0x%" HWADDR_PRIx "\n",
+                  DEVICE(opaque)->canonical_path, offset);
 }
 
 static void npcm8xx_gdma_realize(DeviceState *dev, Error **errp)
@@ -246,7 +248,7 @@ static void npcm8xx_gdma_realize(DeviceState *dev, Error **errp)
 static const MemoryRegionOps npcm8xx_gdma_ops = {
     .read = npcm8xx_gdma_read,
     .write = npcm8xx_gdma_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
+    .endianness = DEVICE_LITTLE_ENDIAN,
     .valid = {
         .min_access_size = 4,
         .max_access_size = 4,
@@ -270,7 +272,7 @@ static void npcm8xx_gdma_init(Object *obj)
     sysbus_init_irq(sbd, &s->irq);
 }
 
-static void npcm8xx_gdma_class_init(ObjectClass *klass, void *data)
+static void npcm8xx_gdma_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 

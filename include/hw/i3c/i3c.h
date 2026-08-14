@@ -1,17 +1,7 @@
 /*
  * QEMU I3C bus interface.
  *
- * Copyright 2022 Google LLC
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
+ * Copyright 2025 Google LLC
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -19,7 +9,7 @@
 #ifndef QEMU_INCLUDE_HW_I3C_I3C_H_
 #define QEMU_INCLUDE_HW_I3C_I3C_H_
 
-#include "hw/qdev-core.h"
+#include "hw/core/qdev.h"
 #include "qom/object.h"
 #include "hw/i2c/i2c.h"
 
@@ -100,8 +90,10 @@ typedef enum I3CCCC {
 #define I3C_HJ_ADDR 0x02
 #define I3C_ENTDAA_SIZE 8
 
+#define BCR_IBI_PAYLOAD_MASK     (1 << 2)
+
 struct I3CTargetClass {
-    DeviceClass parent;
+    DeviceClass parent_class;
 
     /*
      * Controller to target. Returns 0 for success, non-zero for NAK or other
@@ -139,16 +131,21 @@ struct I3CTargetClass {
      */
     bool (*target_match)(I3CTarget *candidate, uint8_t address, bool is_read,
                          bool broadcast, bool in_entdaa);
+    /* Returns if the CCC is supported by the target. */
+    bool (*ccc_is_supported)(I3CTarget *s, I3CCCC ccc);
 };
 
 struct I3CTarget {
-    DeviceState qdev;
+    DeviceState parent_obj;
 
     uint8_t address;
     uint8_t static_address;
     uint8_t dcr;
     uint8_t bcr;
     uint64_t pid;
+    uint16_t mrl;
+    uint8_t max_ibi_payload;
+    uint16_t mwl;
 
     /* CCC State tracking. */
     I3CCCC curr_ccc;
@@ -170,7 +167,7 @@ typedef QLIST_HEAD(I3CNodeList, I3CNode) I3CNodeList;
 OBJECT_DECLARE_TYPE(I3CBus, I3CBusClass, I3C_BUS)
 
 struct I3CBus {
-    BusState qbus;
+    BusState parent_obj;
 
     /* Legacy I2C. */
     I2CBus *i2c_bus;
@@ -184,7 +181,7 @@ struct I3CBus {
 };
 
 struct I3CBusClass {
-    DeviceClass parent;
+    BusClass parent_class;
 
     /* Handle an incoming IBI request from a target */
     int (*ibi_handle) (I3CBus *bus, uint8_t addr, bool is_recv);

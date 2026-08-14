@@ -16,7 +16,7 @@
 #ifndef NPCM7XX_H
 #define NPCM7XX_H
 
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "hw/adc/npcm7xx_adc.h"
 #include "hw/core/split-irq.h"
 #include "hw/cpu/a9mpcore.h"
@@ -40,6 +40,7 @@
 #include "hw/ssi/npcm_pspi.h"
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
+#include "hw/usb/npcm-udc.h"
 #include "target/arm/cpu.h"
 #include "hw/sd/npcm7xx_sdhci.h"
 
@@ -108,6 +109,7 @@ typedef struct NPCM7xxState {
     NPCM7xxKCSState     kcs;
     EHCISysBusState     ehci;
     OHCISysBusState     ohci;
+    NPCMUDC             udc[8];
     NPCM7xxFIUState     fiu[2];
     NPCM7xxEMCState     emc[2];
     NPCMGMACState       gmac[2];

@@ -3,14 +3,7 @@
  *
  * Copyright 2021 Google LLC
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #include "qemu/osdep.h"
@@ -23,11 +16,12 @@
 #include "hw/pci/pci.h"
 #include "hw/pci/pci_device.h"
 #include "hw/isa/isa.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "hw/ipmi/ipmi_kcs.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties-system.h"
-#include "hw/registerfields.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
+#include "hw/core/qdev-properties-system.h"
+#include "hw/core/registerfields.h"
 #include "hw/pci/pci_regs.h"
 
 /* By default the VID for the device belongs to Winbond, not Nuvoton */
@@ -138,7 +132,7 @@ struct NuvotonPCIIPMIState {
         MemoryRegion iomem;
 
         /* Variables for TX/RXing BMC data */
-        CharBackend chr;
+        CharFrontend chr;
         NuvotonPCIIPMIHostState state;
         uint8_t op;
         hwaddr offset;
@@ -513,7 +507,7 @@ static bool nuvoton_pci_ipmi_mbx_check_mem_op(void *opaque, hwaddr addr,
 static const struct MemoryRegionOps nuvoton_pci_ipmi_mbx_ops = {
     .read = nuvoton_pci_ipmi_mbx_read,
     .write = nuvoton_pci_ipmi_mbx_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
+    .endianness = DEVICE_LITTLE_ENDIAN,
     .valid = {
         .min_access_size = 1,
         .max_access_size = 8,
@@ -802,7 +796,7 @@ static void nuvoton_pci_ipmi_init(Object *obj)
                           NUVOTON_PCI_MBX_MMIO_SIZE);
 }
 
-static void nuvoton_pci_ipmi_class_init(ObjectClass *oc, void *data)
+static void nuvoton_pci_ipmi_class_init(ObjectClass *oc, const void *data)
 {
     PCIDeviceClass *pdc = PCI_DEVICE_CLASS(oc);
     DeviceClass *dc = DEVICE_CLASS(oc);
@@ -837,7 +831,7 @@ static const Property nuvoton_ipmi_kcs_properties[] = {
     DEFINE_PROP_INT32("isa-irq", NuvotonIPMIKCSState, cfg.isairq, 10),
 };
 
-static void nuvoton_ipmi_kcs_class_init(ObjectClass *oc, void *data)
+static void nuvoton_ipmi_kcs_class_init(ObjectClass *oc, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
     IPMIInterfaceClass *iic = IPMI_INTERFACE_CLASS(oc);

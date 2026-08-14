@@ -9,10 +9,10 @@
 #ifndef NPCM7XX_PECI_H
 #define NPCM7XX_PECI_H
 
-#include "exec/memory.h"
-#include "hw/irq.h"
+#include "system/memory.h"
+#include "hw/core/irq.h"
 #include "hw/peci/peci.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 
 typedef struct NPCM7xxPECIState {
     SysBusDevice parent;

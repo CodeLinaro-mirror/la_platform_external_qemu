@@ -131,6 +131,8 @@
 
 #define CONFIG_I2C_ECHO 1
 
+#define CONFIG_I2C_TESTER 1
+
 #define CONFIG_I386 1
 
 #define CONFIG_I440FX 1
@@ -159,13 +161,13 @@
 
 #define CONFIG_IGB_PCI_EXPRESS 1
 
-#define CONFIG_IMX_USBPHY 1
-
 #define CONFIG_IOAPIC 1
 
 #define CONFIG_IOH3420 1
 
 #define CONFIG_IOMMUFD 1
+
+#define CONFIG_IOMMU_TESTDEV 1
 
 #define CONFIG_IPACK 1
 
@@ -287,6 +289,8 @@
 
 #define CONFIG_Q35 1
 
+#define CONFIG_REMOTE_PCI 1
+
 #define CONFIG_ROCKER 1
 
 #define CONFIG_RTL8139_PCI 1
@@ -324,6 +328,8 @@
 #define CONFIG_SPDM_SOCKET 1
 
 #define CONFIG_SYNDBG 1
+
+#define CONFIG_TDX 1
 
 #define CONFIG_TEST_DEVICES 1
 
@@ -389,6 +395,8 @@
 
 #define CONFIG_VFIO_PCI 1
 
+#define CONFIG_VFIO_USER 1
+
 #define CONFIG_VGA 1
 
 #define CONFIG_VGA_CIRRUS 1
@@ -418,6 +426,10 @@
 #define CONFIG_VHOST_USER_SCSI 1
 
 #define CONFIG_VHOST_USER_SND 1
+
+#define CONFIG_VHOST_USER_SPI 1
+
+#define CONFIG_VHOST_USER_TEST 1
 
 #define CONFIG_VHOST_USER_VGA 1
 
@@ -485,9 +497,13 @@
 
 #define CONFIG_VTD 1
 
+#define CONFIG_VTD_ACCEL 1
+
 #define CONFIG_WDT_IB6300ESB 1
 
 #define CONFIG_WDT_IB700 1
+
+#define CONFIG_WINDUMP 1
 
 #define CONFIG_X86_FW_OVMF 1
 

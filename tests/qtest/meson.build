@@ -46,6 +46,7 @@ qtests_cxl = \
 #        for the availability of the default NICs in the tests
 qtests_filter = \
   (get_option('default_devices') and slirp.found() ? ['test-netfilter'] : []) + \
+  (get_option('default_devices') and host_os != 'windows' ? ['test-filter-buffer'] : []) + \
   (get_option('default_devices') and host_os != 'windows' ? ['test-filter-mirror'] : []) + \
   (get_option('default_devices') and host_os != 'windows' ? ['test-filter-redirector'] : [])
 
@@ -94,6 +95,7 @@ qtests_i386 = \
   (config_all_devices.has_key('CONFIG_SB16') ? ['fuzz-sb16-test'] : []) +                   \
   (config_all_devices.has_key('CONFIG_SDHCI_PCI') ? ['fuzz-sdcard-test'] : []) +            \
   (config_all_devices.has_key('CONFIG_ESP_PCI') ? ['am53c974-test'] : []) +                 \
+  (config_all_devices.has_key('CONFIG_AMD_IOMMU') ? ['amd-iommu-test'] : []) +             \
   (config_all_devices.has_key('CONFIG_VTD') ? ['intel-iommu-test'] : []) +                 \
   (host_os != 'windows' and                                                                \
    config_all_devices.has_key('CONFIG_ACPI_ERST') ? ['erst-test'] : []) +                   \
@@ -105,7 +107,6 @@ qtests_i386 = \
   (unpack_edk2_blobs and                                                                    \
    config_all_devices.has_key('CONFIG_HPET') and                                            \
    config_all_devices.has_key('CONFIG_PARALLEL') ? ['bios-tables-test'] : []) +             \
-  (config_all_devices.has_key('CONFIG_NUVOTON_PCI_IPMI_KCS') ? ['nuvoton-host-pcimbx-test'] : []) + \
   qtests_pci +                                                                              \
   qtests_cxl +                                                                              \
   [
@@ -149,15 +150,15 @@ qtests_hppa = \
 
 qtests_loongarch64 = qtests_filter + \
   (config_all_devices.has_key('CONFIG_LOONGARCH_VIRT') ? ['numa-test'] : []) + \
-  ['boot-serial-test']
+  (unpack_edk2_blobs ? ['bios-tables-test'] : []) + \
+  ['boot-serial-test',
+   'cpu-plug-test']
 
 qtests_m68k = ['boot-serial-test'] + \
   qtests_filter
 
 qtests_microblaze = ['boot-serial-test'] + \
   qtests_filter
-
-qtests_microblazeel = qtests_microblaze
 
 qtests_mips = \
   qtests_filter + \
@@ -203,8 +204,8 @@ qtests_sparc64 = \
 qtests_npcm7xx = \
   ['npcm7xx_adc-test',
    'npcm7xx_gpio-test',
-   'npcm7xx_lpc-test',
    'npcm7xx_pci_mbox-test',
+   'npcm7xx_lpc-test',
    'npcm7xx_pwm-test',
    'npcm7xx_rng-test',
    'npcm7xx_sdhci-test',
@@ -213,16 +214,20 @@ qtests_npcm7xx = \
    'npcm7xx_watchdog_timer-test'] + \
    (slirp.found() ? ['npcm7xx_emc-test'] : [])
 qtests_npcm8xx = \
-  ['npcm_gmac-test']
+  ['npcm_gmac-test',
+   'npcm8xx_sgpio-test',]
 # TODO(b/376868143): disable test while flakiness is diagnosed
 
 qtests_aspeed = \
-  ['aspeed_hace-test',
+  ['aspeed_gpio-test',
+   'aspeed_hace-test',
+   'aspeed_scu-test',
    'aspeed_smc-test',
-   'remote-i3c-test',
-   'aspeed_gpio-test']
+   'remote-i3c-test']
 qtests_aspeed64 = \
   ['ast2700-gpio-test',
+   'ast2700-hace-test',
+   'ast2700-sgpio-test',
    'ast2700-smc-test']
 
 qtests_stm32l4x5 = \
@@ -250,6 +255,14 @@ qtests_arm = \
   (config_all_devices.has_key('CONFIG_FSI_APB2OPB_ASPEED') ? ['aspeed_fsi-test'] : []) + \
   (config_all_devices.has_key('CONFIG_STM32L4X5_SOC') and
    config_all_devices.has_key('CONFIG_DM163')? ['dm163-test'] : []) + \
+  (config_all_devices.has_key('CONFIG_FLEXCOMM') ? [
+      'flexcomm-test',
+      'flexcomm-usart-test',
+      'flexcomm-i2c-test',
+      'flexcomm-spi-test',
+    ] : []) + \
+  (config_all_devices.has_key('CONFIG_RT500_CLKCTL') ? ['rt500-clkctl-test'] : []) + \
+  (config_all_devices.has_key('CONFIG_OSTIMER') ? ['ostimer-test'] : []) + \
   ['arm-cpu-features',
    'boot-serial-test']
 
@@ -266,6 +279,10 @@ qtests_aarch64 = \
   (config_all_devices.has_key('CONFIG_ASPEED_SOC') ? qtests_aspeed64 : []) + \
   (config_all_devices.has_key('CONFIG_NPCM7XX') ? qtests_npcm7xx : []) + \
   (config_all_devices.has_key('CONFIG_NPCM8XX') ? qtests_npcm8xx : []) + \
+  (config_all_devices.has_key('CONFIG_IOMMU_TESTDEV') and
+   config_all_devices.has_key('CONFIG_ARM_VIRT') ?
+   ['iommu-smmuv3-test'] : []) + \
+  qtests_cxl +                                                                                  \
   ['arm-cpu-features',
    'numa-test',
    'boot-serial-test',
@@ -284,13 +301,18 @@ qtests_riscv32 = \
   (config_all_devices.has_key('CONFIG_SIFIVE_E_AON') ? ['sifive-e-aon-watchdog-test'] : [])
 
 qtests_riscv64 = ['riscv-csr-test'] + \
-  (unpack_edk2_blobs ? ['bios-tables-test'] : [])
+  (unpack_edk2_blobs ? ['bios-tables-test'] : []) + \
+  (config_all_devices.has_key('CONFIG_IOMMU_TESTDEV') and
+   config_all_devices.has_key('CONFIG_RISCV_IOMMU') ?
+   ['iommu-riscv-test'] : [])
 
 qos_test_ss = ss.source_set()
 qos_test_ss.add(
   'ac97-test.c',
+  'ad5321-test.c',
   'adm1272-test.c',
   'adm1266-test.c',
+  'adt7475-test.c',
   'ds1338-test.c',
   'e1000-test.c',
   'eepro100-test.c',
@@ -313,6 +335,7 @@ qos_test_ss.add(
   'pci-test.c',
   'pcnet-test.c',
   'pi7c9x3g606gp.c',
+  # 'remote-pci-test.c', diasbled TODO(b/247856997)
   'rs5c372-test.c',
   'sdhci-test.c',
   'spapr-phb-test.c',
@@ -355,7 +378,7 @@ endif
 
 tpmemu_files = ['tpm-emu.c', 'tpm-util.c', 'tpm-tests.c']
 
-migration_files = [files(
+test_migration_files = [files(
   'migration/bootfile.c',
   'migration/framework.c',
   'migration/migration-qmp.c',
@@ -378,14 +401,23 @@ if gnutls.found()
   endif
 endif
 
+migration_colo_files = []
+if get_option('replication').allowed()
+  migration_colo_files = [files('migration/colo-tests.c')]
+endif
+
 qtests = {
+  'aspeed_hace-test': files('aspeed-hace-utils.c', 'aspeed_hace-test.c'),
+  'aspeed_smc-test': files('aspeed-smc-utils.c', 'aspeed_smc-test.c'),
+  'ast2700-hace-test': files('aspeed-hace-utils.c', 'ast2700-hace-test.c'),
+  'ast2700-smc-test': files('aspeed-smc-utils.c', 'ast2700-smc-test.c'),
   'bios-tables-test': [io, 'boot-sector.c', 'acpi-utils.c', 'tpm-emu.c'],
   'cdrom-test': files('boot-sector.c'),
   'dbus-vmstate-test': files('migration/migration-qmp.c',
                              'migration/migration-util.c') + dbus_vmstate1,
   'erst-test': files('erst-test.c'),
   'ivshmem-test': [rt, '../../contrib/ivshmem-server/ivshmem-server.c'],
-  'migration-test': migration_files + migration_tls_files,
+  'migration-test': test_migration_files + migration_tls_files + migration_colo_files,
   'pxe-test': files('boot-sector.c'),
   'pnv-xive2-test': files('pnv-xive2-common.c', 'pnv-xive2-flush-sync.c',
                           'pnv-xive2-nvpg_bar.c'),
@@ -397,11 +429,10 @@ qtests = {
   'tpm-tis-i2c-test': [io, tpmemu_files, 'qtest_aspeed.c'],
   'tpm-tis-device-swtpm-test': [io, tpmemu_files, 'tpm-tis-util.c'],
   'tpm-tis-device-test': [io, tpmemu_files, 'tpm-tis-util.c'],
-  'virtio-net-failover': migration_files,
+  'virtio-net-failover': test_migration_files,
   'vmgenid-test': files('boot-sector.c', 'acpi-utils.c'),
   'netdev-socket': files('netdev-socket.c', '../unit/socket-helpers.c'),
-  'aspeed_smc-test': files('aspeed-smc-utils.c', 'aspeed_smc-test.c'),
-  'ast2700-smc-test': files('aspeed-smc-utils.c', 'ast2700-smc-test.c'),
+  'flexcomm-usart-test': [io],
 }
 
 if libusb.found() and usbredir.found()

@@ -13,7 +13,14 @@
 #include "qemu/log.h"
 
 #define TYPE_TDA387XX "tda387xx"
-OBJECT_DECLARE_SIMPLE_TYPE(TDA387xxState, TDA387XX)
+OBJECT_DECLARE_TYPE(TDA387xxState, TDA387xxClass, TDA387XX)
+
+#define TYPE_TDA38740 "tda38740"
+#define TYPE_TDA38725 "tda38725"
+#define TYPE_XDPE1A2G5B "xdpe1a2g5b"
+#define TYPE_XDPE19284C "xdpe19284c"
+#define TYPE_XDPE192C4B "xdpe192c4b"
+#define TYPE_XDPE19283B "xdpe19283b"
 
 
 #define TDA387XX_VENDOR_INFO                0xC1
@@ -25,6 +32,14 @@ OBJECT_DECLARE_SIMPLE_TYPE(TDA387xxState, TDA387XX)
 #define TDA387XX_DEFAULT_DEVICE_ID          0x84
 #define TDA387XX_DEFAULT_DEVICE_REV         0x1
 #define TDA387XX_PB_REVISION                0x22
+#define TDA387XX_DEFAULT_FLAGS \
+    (PB_HAS_VIN | PB_HAS_VOUT | PB_HAS_VOUT_MARGIN | PB_HAS_VOUT_MODE | \
+     PB_HAS_VOUT_RATING | PB_HAS_IIN | PB_HAS_IOUT | PB_HAS_PIN | \
+     PB_HAS_POUT | PB_HAS_TEMPERATURE | PB_HAS_TEMP2)
+
+/* MFR defaults */
+#define TDA387XX_DEFAULT_MFR_ID             "IR"
+#define TDA387XX_DEFAULT_MFR_REVISION       "00"
 
 /* Random defaults */
 #define TDA387XX_DEFAULT_ON_OFF_CONFIG      0x1a
@@ -44,18 +59,45 @@ OBJECT_DECLARE_SIMPLE_TYPE(TDA387xxState, TDA387XX)
 static const uint8_t tda38740_ic_device_id[] = {0x1, 0x84};
 static const uint8_t tda38740_ic_device_rev[] = {0x1, 0x1};
 
+static const uint8_t tda38725_ic_device_id[] = {0x1, 0x92};
+static const uint8_t xdpe1a2g5b_ic_device_id[] = {0x2, 0x1, 0x9e};
+static const uint8_t xdpe19284c_ic_device_id[] = {0x2, 0x2, 0x98};
+static const uint8_t xdpe192c4b_ic_device_id[] = {0x2, 0x1, 0x99};
+static const uint8_t xdpe19283b_ic_device_id[] = {0x2, 0x1, 0x0};
+
 typedef struct TDA387xxState {
     PMBusDevice parent;
     uint16_t vendor;
 } TDA387xxState;
 
+#define TDA387XX_MAX_DEVICE_ID_LEN 4
+
+typedef struct TDA387xxClass {
+    PMBusDeviceClass parent;
+    uint8_t device_id[TDA387XX_MAX_DEVICE_ID_LEN];
+    uint8_t device_id_len;
+    /* PMBus flags for the device. */
+    uint64_t flags;
+} TDA387xxClass;
+
 static uint8_t tda387xx_read_byte(PMBusDevice *pmdev)
 {
     TDA387xxState *s = TDA387XX(pmdev);
+    TDA387xxClass *c = TDA387XX_GET_CLASS(pmdev);
 
     switch (pmdev->code) {
+    case PMBUS_MFR_ID:
+        pmbus_send(pmdev, (uint8_t *)TDA387XX_DEFAULT_MFR_ID,
+                   sizeof(TDA387XX_DEFAULT_MFR_ID));
+        break;
+    case PMBUS_MFR_REVISION:
+        pmbus_send(pmdev, (uint8_t *)TDA387XX_DEFAULT_MFR_REVISION,
+                   sizeof(TDA387XX_DEFAULT_MFR_REVISION));
+        break;
+    /* TDA387xx sends device ID as MFR model. */
+    case PMBUS_MFR_MODEL:
     case PMBUS_IC_DEVICE_ID:
-        pmbus_send(pmdev, tda38740_ic_device_id, sizeof(tda38740_ic_device_id));
+        pmbus_send(pmdev, c->device_id, c->device_id_len);
         break;
 
     case PMBUS_IC_DEVICE_REV:
@@ -171,13 +213,10 @@ static void tda387xx_set(Object *obj, Visitor *v, const char *name,
 static void tda387xx_init(Object *obj)
 {
     PMBusDevice *pmdev = PMBUS_DEVICE(obj);
-    uint64_t flags = PB_HAS_VIN | PB_HAS_VOUT | PB_HAS_VOUT_MARGIN
-                     | PB_HAS_VOUT_MODE | PB_HAS_VOUT_RATING | PB_HAS_IIN
-                     | PB_HAS_IOUT | PB_HAS_PIN | PB_HAS_POUT
-                     | PB_HAS_TEMPERATURE | PB_HAS_MFR_INFO;
+    TDA387xxClass *klass = TDA387XX_GET_CLASS(obj);
 
-    pmbus_page_config(pmdev, 0, flags);
-    pmbus_page_config(pmdev, 1, flags);
+    pmbus_page_config(pmdev, 0, klass->flags);
+    pmbus_page_config(pmdev, 1, klass->flags);
 
     object_property_add(obj, "vin", "uint32", tda387xx_get, tda387xx_set, NULL,
                         &pmdev->pages[0].read_vin);
@@ -202,7 +241,7 @@ static void tda387xx_init(Object *obj)
                         NULL, &pmdev->pages[0].read_temperature_1);
 }
 
-static void tda387xx_class_init(ObjectClass *klass, void *data)
+static void tda387xx_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -216,14 +255,117 @@ static void tda387xx_class_init(ObjectClass *klass, void *data)
     rc->phases.exit = tda387xx_exit_reset;
 }
 
+static void tda38740_class_init(ObjectClass *klass, const void *data)
+{
+    TDA387xxClass *t = TDA387XX_CLASS(klass);
+
+    QEMU_BUILD_BUG_ON(sizeof(tda38740_ic_device_id) >
+                      TDA387XX_MAX_DEVICE_ID_LEN);
+    t->device_id_len = sizeof(tda38740_ic_device_id);
+    memcpy(t->device_id, tda38740_ic_device_id, sizeof(tda38740_ic_device_id));
+    t->flags = TDA387XX_DEFAULT_FLAGS;
+}
+
+static void tda38725_class_init(ObjectClass *klass, const void *data)
+{
+    TDA387xxClass *t = TDA387XX_CLASS(klass);
+
+    QEMU_BUILD_BUG_ON(sizeof(tda38725_ic_device_id) >
+                      TDA387XX_MAX_DEVICE_ID_LEN);
+    t->device_id_len = sizeof(tda38725_ic_device_id);
+    memcpy(t->device_id, tda38725_ic_device_id, sizeof(tda38725_ic_device_id));
+    t->flags = TDA387XX_DEFAULT_FLAGS;
+}
+
+static void xdpe1a2g5b_class_init(ObjectClass *klass, const void *data)
+{
+    TDA387xxClass *t = TDA387XX_CLASS(klass);
+
+    QEMU_BUILD_BUG_ON(sizeof(xdpe1a2g5b_ic_device_id) >
+                      TDA387XX_MAX_DEVICE_ID_LEN);
+    t->device_id_len = sizeof(xdpe1a2g5b_ic_device_id);
+    memcpy(t->device_id, xdpe1a2g5b_ic_device_id,
+           sizeof(xdpe1a2g5b_ic_device_id));
+    t->flags = TDA387XX_DEFAULT_FLAGS | PB_HAS_VIN_RATING | PB_HAS_IIN_RATING |
+               PB_HAS_PIN_RATING | PB_HAS_VOUT_RATING | PB_HAS_IOUT_RATING |
+               PB_HAS_POUT_RATING;
+}
+
+static void xdpe19284c_class_init(ObjectClass *klass, const void *data)
+{
+    TDA387xxClass *t = TDA387XX_CLASS(klass);
+
+    QEMU_BUILD_BUG_ON(sizeof(xdpe19284c_ic_device_id) >
+                      TDA387XX_MAX_DEVICE_ID_LEN);
+    t->device_id_len = sizeof(xdpe19284c_ic_device_id);
+    memcpy(t->device_id, xdpe19284c_ic_device_id,
+           sizeof(xdpe19284c_ic_device_id));
+    t->flags = TDA387XX_DEFAULT_FLAGS;
+}
+
+static void xdpe192c4b_class_init(ObjectClass *klass, const void *data)
+{
+    TDA387xxClass *t = TDA387XX_CLASS(klass);
+
+    QEMU_BUILD_BUG_ON(sizeof(xdpe192c4b_ic_device_id) >
+                      TDA387XX_MAX_DEVICE_ID_LEN);
+    t->device_id_len = sizeof(xdpe192c4b_ic_device_id);
+    memcpy(t->device_id, xdpe192c4b_ic_device_id,
+           sizeof(xdpe192c4b_ic_device_id));
+    t->flags = TDA387XX_DEFAULT_FLAGS;
+}
+
+static void xdpe19283b_class_init(ObjectClass *klass, const void *data)
+{
+    TDA387xxClass *t = TDA387XX_CLASS(klass);
+
+    QEMU_BUILD_BUG_ON(sizeof(xdpe19283b_ic_device_id) >
+                      TDA387XX_MAX_DEVICE_ID_LEN);
+    t->device_id_len = sizeof(xdpe19283b_ic_device_id);
+    memcpy(t->device_id, xdpe19283b_ic_device_id,
+           sizeof(xdpe19283b_ic_device_id));
+    t->flags = TDA387XX_DEFAULT_FLAGS;
+}
+
 static const TypeInfo tda387xx_types[] = {
     {
         .name = TYPE_TDA387XX,
         .parent = TYPE_PMBUS_DEVICE,
         .instance_size = sizeof(TDA387xxState),
         .instance_init = tda387xx_init,
+        .class_size = sizeof(TDA387xxClass),
         .class_init = tda387xx_class_init,
-    }
+    },
+    {
+        .name = TYPE_TDA38740,
+        .parent = TYPE_TDA387XX,
+        .class_init = tda38740_class_init,
+    },
+    {
+        .name = TYPE_TDA38725,
+        .parent = TYPE_TDA387XX,
+        .class_init = tda38725_class_init,
+    },
+    {
+        .name = TYPE_XDPE1A2G5B,
+        .parent = TYPE_TDA387XX,
+        .class_init = xdpe1a2g5b_class_init,
+    },
+    {
+        .name = TYPE_XDPE19284C,
+        .parent = TYPE_TDA387XX,
+        .class_init = xdpe19284c_class_init,
+    },
+    {
+        .name = TYPE_XDPE192C4B,
+        .parent = TYPE_TDA387XX,
+        .class_init = xdpe192c4b_class_init,
+    },
+    {
+        .name = TYPE_XDPE19283B,
+        .parent = TYPE_TDA387XX,
+        .class_init = xdpe19283b_class_init,
+    },
 };
 
 DEFINE_TYPES(tda387xx_types)

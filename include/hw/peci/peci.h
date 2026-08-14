@@ -9,7 +9,7 @@
 #ifndef PECI_H
 #define PECI_H
 
-#include "hw/qdev-core.h"
+#include "hw/core/qdev.h"
 #include "qom/object.h"
 
 #define PECI_CMD_PING               0x0

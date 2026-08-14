@@ -56,8 +56,8 @@ Supported devices
  * Ethernet controller (EMC)
  * Tachometer
  * Peripheral SPI controller (PSPI)
- * BIOS POST code FIFO
  * PCI Mailbox
+ * BIOS POST code FIFO
 
 Missing devices
 ---------------

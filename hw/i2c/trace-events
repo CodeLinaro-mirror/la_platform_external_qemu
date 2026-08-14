@@ -73,12 +73,21 @@ i2c_mctp_drop_invalid_pec(uint8_t pec, uint8_t expected) "pec 0x%"PRIx8" expecte
 i2c_mctp_drop_invalid_eid(uint8_t eid, uint8_t expected) "eid 0x%"PRIx8" expected 0x%"PRIx8""
 i2c_mctp_drop_invalid_pktseq(uint8_t pktseq, uint8_t expected) "pktseq 0x%"PRIx8" expected 0x%"PRIx8""
 
+# pmbus_device.c
+pmbus_read_uint(const char *id, uint8_t code, uint16_t data) "%s: read reg: 0x%02x data: 0x%x"
+pmbus_read_string(const char *id, uint8_t code, const char *data) "%s: read reg: 0x%02x data: %s"
+pmbus_write_uint(const char *id, uint8_t code, uint16_t data) "%s: write to reg: 0x%02x data: 0x%x"
+
 # cmis.c
 
 cmis_device_send(const char *id, uint8_t data) "%s send data: 0x%02" PRIx8
 cmis_device_recv(const char *id, uint8_t data) "%s recv data: 0x%02" PRIx8
 
-# pmbus_device.c
-pmbus_read_uint(const char *id, uint8_t code, uint16_t data) "%s: read reg: 0x%02x data: 0x%x"
-pmbus_read_string(const char *id, uint8_t code, const char *data) "%s: read reg: 0x%02x data: %s"
-pmbus_write_uint(const char *id, uint8_t code, uint16_t data) "%s: write to reg: 0x%02x data: 0x%x"
+# flexcomm_i2c.c
+flexcomm_i2c_reg_read(const char *id, const char *reg_name, uint32_t addr, uint32_t val) " %s: %s[0x%04x] -> 0x%08x"
+flexcomm_i2c_reg_write(const char *id, const char *reg_name, uint32_t addr, uint32_t val) "%s: %s[0x%04x] <- 0x%08x"
+flexcomm_i2c_start(const char *id, uint8_t addr, uint8_t recv) "%s: 0x%02x %d"
+flexcomm_i2c_rx(const char *id, uint8_t data) "%s: <- 0x%02x"
+flexcomm_i2c_tx(const char *id, uint8_t data) "%s: -> 0x%02x"
+flexcomm_i2c_nak(const char *id) "%s: <- nak"
+flexcomm_i2c_irq(const char *id, bool irq, bool perirqs, bool enabled) "%s: %d %d %d"

@@ -79,6 +79,24 @@
           "Requires": "pcre2"
         }
       },
+      "gobject": {
+        "lib_type": "bazel",
+        "bazel_target": "@glib//gobject:gobject_import",
+        "version": "2.77.2",
+        "shim": {
+          "name": "gobject-2.0",
+          "Requires": "glib-2.0"
+        }
+      },
+      "gio": {
+        "lib_type": "bazel",
+        "bazel_target": "@glib//gio:gio_import",
+        "version": "2.77.2",
+        "shim": {
+          "name": "gio-2.0",
+          "Requires": "gobject-2.0, gmodule-export-2.0"
+        }
+      },
       "zlib": {
         "lib_type": "bazel",
         "bazel_target": "@zlib//:zlib",
@@ -90,7 +108,7 @@
         "version": "2.77.2",
         "shim": {
           "name": "glib-2.0",
-          "Requires": "pcre2, gmodule-export-2.0",
+          "Requires": "pcre2, gmodule-export-2.0, gobject-2.0, gio-2.0",
           "link_flags": "-pthread"
         }
       },
@@ -124,8 +142,6 @@
       "-Daudio_drv_list": "default",
       "-Dauth_pam": "disabled",
       "-Dauto_features": "disabled",
-      "-Davx2": "disabled",
-      "-Davx512bw": "disabled",
       "-Db_coverage": "false",
       "-Db_lto": "false",
       "-Db_pie": "false",
@@ -274,6 +290,7 @@
       "-Dvvfat": "disabled",
       "-Dwerror": "false",
       "-Dwhpx": "disabled",
+      "-Dx86_version": "2",
       "-Dxen": "disabled",
       "-Dxen_pci_passthrough": "disabled",
       "-Dxkbcommon": "disabled",

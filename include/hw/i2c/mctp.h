@@ -4,7 +4,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "qom/object.h"
-#include "hw/qdev-core.h"
+#include "hw/core/qdev.h"
 #include "hw/misc/mctp.h"
 
 typedef struct MCTPI2CPacketHeader {

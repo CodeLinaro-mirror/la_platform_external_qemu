@@ -11,7 +11,7 @@
 #define ASPEED_IBT_H
 
 #include "hw/ipmi/ipmi.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 
 #define TYPE_ASPEED_IBT "aspeed.ibt"
 #define ASPEED_IBT(obj) OBJECT_CHECK(AspeedIBTState, (obj), TYPE_ASPEED_IBT)

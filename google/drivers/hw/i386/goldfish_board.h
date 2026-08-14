@@ -17,7 +17,7 @@
 #include "qemu/osdep.h"
 #include "qemu/units.h"
 
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "hw/i386/pc.h"
 
 typedef struct GoldfishMachineState {

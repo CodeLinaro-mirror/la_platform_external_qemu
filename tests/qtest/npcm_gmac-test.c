@@ -257,7 +257,6 @@ static void test_init(gconstpointer test_data)
     CHECK_REG32(NPCM_GMAC_PTP_TAR, 0);
     CHECK_REG32(NPCM_GMAC_PTP_TTSR, 0);
 
-    /* TODO Add registers PCS */
     if (mod->base_addr == 0xf0802000) {
         CHECK_REG_PCS(NPCM_PCS_SR_CTL_ID1, 0x699e);
         CHECK_REG_PCS(NPCM_PCS_SR_CTL_ID2, 0);

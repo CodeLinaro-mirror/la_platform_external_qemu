@@ -13,23 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Simple wrapper around virtual environment creation and fetch-bazel invocation
-if [[ -f ~/go/bin/oauth2l ]]; then
-    OAUTHL=~/go/bin/oauth2l
-else
-    OAUTHL=oauth2l  # Assume it's on the PATH if ~/go/bin/oauth2l doesn't exist
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CUR_DIR="$SCRIPT_DIR"
+WORKSPACE_ROOT=""
+while [[ "$CUR_DIR" != "/" ]]; do
+    if [[ -f "$CUR_DIR/build/bazel/toplevel.bazelrc" ]] || [[ -d "$CUR_DIR/.repo" ]]; then
+        WORKSPACE_ROOT="$CUR_DIR"
+        break
+    fi
+    CUR_DIR="$(dirname "$CUR_DIR")"
+done
+
+if [[ -z "$WORKSPACE_ROOT" ]]; then
+    echo "Could not find workspace root containing MODULE.bazel" >&2
+    exit 1
 fi
 
-# Now you can use the OAUTHL variable, e.g.,
-if [[ -x "$OAUTHL" ]]; then
-    echo "using $OAUTHL."
-else
-    echo ** Make sure you have oauth2l.  See http://go/oauth2l **
-    exit
-fi
-
-
-. $(dirname "$0")/configure.sh
-. .venv/bin/activate
-$OAUTHL reset
-fetch-bazel $@
+cd "$WORKSPACE_ROOT" && bazel run @qemu//google/scripts/fetch_bazel:fetch_bazel -- "$@"

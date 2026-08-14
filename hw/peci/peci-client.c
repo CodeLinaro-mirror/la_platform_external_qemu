@@ -7,8 +7,8 @@
 
 #include "qemu/osdep.h"
 #include "hw/peci/peci.h"
-#include "hw/qdev-core.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
@@ -228,6 +228,9 @@ static void peci_client_reset(Object *obj, ResetType type)
     PECIClientDevice *client = PECI_CLIENT(obj);
     client->core_temp_max = 0;
     client->dimm_temp_max = 0;
+
+    /* Pick up the sensor temperature immediately after reset. */
+    peci_client_update_temps(client);
 }
 
 static const VMStateDescription vmstate_peci_client = {
@@ -268,7 +271,7 @@ static void peci_client_realize(DeviceState *dev, Error **errp)
     }
 }
 
-static void peci_client_class_init(ObjectClass *klass, void *data)
+static void peci_client_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);

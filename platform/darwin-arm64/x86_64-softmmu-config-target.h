@@ -13,7 +13,7 @@
 
 #define CONFIG_TCG 1
 
-#define QEMU_ARCH QEMU_ARCH_I386
+#define TARGET_ARCH X86_64
 
 #define TARGET_BIG_ENDIAN 0
 
@@ -27,7 +27,7 @@
 
 #define TARGET_NAME "x86_64"
 
-#define TARGET_SUPPORTS_MTTCG 1
+#define TARGET_NOT_USING_LEGACY_LDST_PHYS_API 1
 
 #define TARGET_X86_64 1
 

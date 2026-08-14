@@ -17,7 +17,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/peci/peci.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "qemu/module.h"
 #include "qemu/log.h"
@@ -89,7 +89,7 @@ static void peci_rd_pkg_cfg(PECIClientDevice *client, PECICmd *pcmd)
 {
     PECIPkgCfg *resp = (PECIPkgCfg *)pcmd->tx;
     uint8_t index = pcmd->rx[1];
-    uint16_t param = pcmd->rx[3] | pcmd->rx[2];
+    uint16_t param = (pcmd->rx[3] << 8) | pcmd->rx[2];
 
     switch (index) {
     case PECI_MBX_CPU_ID: /* CPU Family ID*/
@@ -192,7 +192,17 @@ int peci_handle_cmd(PECIBus *bus, PECICmd *pcmd)
          * The data is returned as a negative value representing the number of
          * degrees centigrade below the maximum processor junction temperature
          */
-        memcpy(pcmd->tx, &client->core_temp_max, sizeof(client->core_temp_max));
+        if (client->cpu_id >= FAM6_SAPPHIRE_RAPIDS_X) {
+            /*
+             * The value is returned in 10.6 format (10 bits signed decimal,
+             * 6 bits fractional).
+             */
+            int16_t get_temp = client->core_temp_max << 6;
+            memcpy(pcmd->tx, &get_temp, sizeof(get_temp));
+        } else {
+            memcpy(pcmd->tx, &client->core_temp_max,
+                   sizeof(client->core_temp_max));
+        }
         break;
 
     case PECI_CMD_RD_PKG_CFG:

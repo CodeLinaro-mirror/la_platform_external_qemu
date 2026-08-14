@@ -1,0 +1,327 @@
+/*
+ * MIPI HCI I3C controller
+ *
+ * Copyright (C) 2025 Google, LLC
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#include "qemu/osdep.h"
+#include "hw/core/registerfields.h"
+#include "hw/core/qdev-properties.h"
+#include "qapi/error.h"
+#include "migration/vmstate.h"
+#include "hw/i3c/hci-core.h"
+#include "hci-core-internal.h"
+#include "hw/i3c/hci-dma.h"
+#include "hci-dma-internal.h"
+#include "hw/i3c/hci-ext.h"
+#include "hci-ext-internal.h"
+#include "hci-dat-internal.h"
+#include "hci-dct-internal.h"
+#include "hw/i3c/hci-ibi.h"
+#include "trace.h"
+#include "hw/i3c/i3c.h"
+#include "hw/i3c/mipi-hci.h"
+#include "hw/i3c/hci-dat.h"
+#include "hw/i3c/hci-pio.h"
+#include "hci-pio-internal.h"
+#include "hw/core/irq.h"
+#include "qemu/fifo32.h"
+
+static uint8_t mipi_hci_get_next_dynamic_addr(MIPIHCIState *s,
+                                              uint8_t dat_index)
+{
+    return FIELD_EX32(s->dat.regs[dat_index + R_TARGET_DAT], TARGET_DAT,
+                      TARGET_DYNAMIC_ADDRESS);
+}
+
+static uint8_t mipi_hci_get_dev_dynamic_addr(MIPIHCIState *s,
+                                             uint8_t dat_index)
+{
+    return mipi_hci_get_next_dynamic_addr(s, dat_index);
+}
+
+ /* Default IRQ update function. This assumes 1 IRQ line. */
+static void mipi_hci_update_irq(MIPIHCIState *s, MIPIHCIIRQContext ctx)
+{
+    HCICoreState *core = &s->core;
+    HCIDMAState *dma = &s->dma;
+    HCIPIOState *pio = &s->pio;
+    g_assert(s->cfg.num_irqs == 1);
+
+    /* INTR_STATUS is masked before setting the IRQ line. */
+    core->regs[R_INTR_STATUS] &= core->regs[R_INTR_SIGNAL_ENABLE];
+    dma->regs[R_RH_INTR_STATUS] &= dma->regs[R_RH_INTR_SIGNAL_ENABLE];
+    pio->regs[R_PIO_INTR_STATUS] &= pio->regs[R_PIO_INTR_SIGNAL_ENABLE];
+
+    bool level = !!(core->regs[R_INTR_STATUS] &
+                    core->regs[R_INTR_SIGNAL_ENABLE]);
+    level |= !!(dma->regs[R_RH_INTR_STATUS] &
+                dma->regs[R_RH_INTR_SIGNAL_ENABLE]);
+    level |= !!(pio->regs[R_PIO_INTR_STATUS] &
+                pio->regs[R_PIO_INTR_SIGNAL_ENABLE]);
+
+    trace_mipi_hci_update_irq(DEVICE(s)->canonical_path,
+                              core->regs[R_INTR_STATUS],
+                              dma->regs[R_RH_INTR_STATUS],
+                              pio->regs[R_PIO_INTR_STATUS], level);
+    qemu_set_irq(s->irq[0], level);
+}
+
+/* Default halt function. */
+static void mipi_hci_enter_halt(MIPIHCIState *s)
+{
+    trace_mipi_hci_enter_halt(DEVICE(s)->canonical_path);
+    s->core.halted = true;
+}
+
+static const MemoryRegionOps hci_core_ops = {
+    .read = hci_core_read,
+    .write = hci_core_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_pio_ops = {
+    .read = hci_pio_read,
+    .write = hci_pio_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_dma_ops = {
+    .read = hci_dma_read,
+    .write = hci_dma_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_dma_header_ops = {
+    .read = hci_dma_header_read,
+    .write = hci_dma_header_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_ext_caps_ops = {
+    .read = hci_ext_read,
+    .write = hci_ext_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_dat_ops = {
+    .read = hci_dat_read,
+    .write = hci_dat_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static const MemoryRegionOps hci_dct_ops = {
+    .read = hci_dct_read,
+    .write = hci_dct_write,
+    .valid.min_access_size = 1,
+    .valid.max_access_size = 4,
+    .impl.min_access_size = 1,
+    .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static void mipi_hci_instance_init(Object *obj)
+{
+}
+
+static const Property mipi_hci_properties[] = {
+    DEFINE_PROP_UINT32("ring-header-section-offset", MIPIHCIState,
+                       core.cfg.ring_header_section_offset, 0),
+    DEFINE_PROP_ARRAY("ring-offsets", MIPIHCIState,
+                      dma.cfg.num_ring_offsets, dma.cfg.ring_offsets,
+                      qdev_prop_uint32, uint32_t),
+    DEFINE_PROP_UINT32("pio-offset", MIPIHCIState, core.cfg.pio_offset, 0),
+    DEFINE_PROP_ARRAY("ext-capabilities", MIPIHCIState,
+                      ext_cap.num_ext_capabilities, ext_cap.ext_capabilities,
+                      qdev_prop_uint32, uint32_t),
+    DEFINE_PROP_UINT32("ext-caps-section-offset", MIPIHCIState,
+                       core.cfg.ext_caps_section_offset, 0),
+    DEFINE_PROP_UINT32("dat-table-size", MIPIHCIState, core.cfg.dat_table_size,
+                       0),
+    DEFINE_PROP_UINT32("dat-table-offset", MIPIHCIState,
+                       core.cfg.dat_table_offset, 0),
+    DEFINE_PROP_UINT32("dct-table-size", MIPIHCIState, core.cfg.dct_table_size,
+                        0),
+    DEFINE_PROP_UINT32("dct-table-offset", MIPIHCIState,
+                        core.cfg.dct_table_offset, 0),
+    DEFINE_PROP_UINT32("hci-version", MIPIHCIState,
+                       core.cfg.hci_version, 0),
+    DEFINE_PROP_UINT32("hc-capabilities", MIPIHCIState,
+                       core.cfg.hc_capabilities, 0),
+    DEFINE_PROP_UINT32("int-ctrl-cmds-en", MIPIHCIState,
+                        core.cfg.int_ctrl_cmds_en, 0),
+    DEFINE_PROP_UINT32("preamble-size", MIPIHCIState,
+                       dma.cfg.preamble_size, 0),
+    DEFINE_PROP_UINT32("header-size", MIPIHCIState,
+                       dma.cfg.header_size, 0),
+    DEFINE_PROP_UINT32("xfer-struct-size", MIPIHCIState,
+                       dma.cfg.xfer_struct_size, 0),
+    DEFINE_PROP_UINT32("resp-struct-size", MIPIHCIState,
+                       dma.cfg.resp_struct_size, 0),
+    DEFINE_PROP_UINT32("ibi-stat", MIPIHCIState,
+                       dma.cfg.ibi_status_struct_size, 0),
+    DEFINE_PROP_UINT32("num-irqs", MIPIHCIState, cfg.num_irqs, 1),
+    /* TXRX data buffer sizes are 2^(n+1) DWORDs. */
+    DEFINE_PROP_UINT8("tx-data-buffer-size", MIPIHCIState,
+                      pio.cfg.tx_data_buffer_size, 0),
+    DEFINE_PROP_UINT8("rx-data-buffer-size", MIPIHCIState,
+                      pio.cfg.rx_data_buffer_size, 0),
+    /* IBI status size is in DWORDS. */
+    DEFINE_PROP_UINT8("ibi-status-size", MIPIHCIState,
+                      pio.cfg.ibi_status_size, 0),
+    /* Each command entry is 2 DWORDs, and each response is 1 DWORD. */
+    DEFINE_PROP_UINT8("cr-queue-entries", MIPIHCIState,
+                      pio.cfg.cr_queue_entries, 0),
+};
+
+static void mipi_hci_realize(DeviceState *dev, Error **errp)
+{
+    MIPIHCIState *s = MIPI_HCI(dev);
+    HCICoreState *core = &s->core;
+    HCIDMAState *dma = &s->dma;
+    HCIPIOState *pio = &s->pio;
+    HCIExtCapState *ext_caps = &s->ext_cap;
+    HCIDATState *dat = &s->dat;
+    HCIDCTState *dct = &s->dct;
+
+    g_assert(s->cfg.num_irqs > 0);
+
+    s->irq = g_new0(qemu_irq, s->cfg.num_irqs);
+    for (int i = 0; i < s->cfg.num_irqs; i++) {
+        sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq[i]);
+    }
+
+    /* Command queue size is 2 DWORDs per entry. */
+    fifo32_create(&pio->cmd_fifo, (pio->cfg.cr_queue_entries + 1) * 2);
+    fifo32_create(&pio->resp_fifo, pio->cfg.cr_queue_entries + 1);
+    fifo32_create(&pio->tx_data_fifo, 1 << (pio->cfg.tx_data_buffer_size + 1));
+    fifo32_create(&pio->rx_data_fifo, 1 << (pio->cfg.rx_data_buffer_size + 1));
+    fifo32_create(&pio->ibi_fifo, pio->cfg.ibi_status_size);
+
+    memory_region_init(&s->iomem, OBJECT(s), TYPE_MIPI_HCI"-mmio",
+                       MIPI_HCI_MMIO_SIZE);
+    memory_region_init_io(&core->iomem, OBJECT(s), &hci_core_ops, s,
+                          TYPE_MIPI_HCI"-core-mmio",
+                          HCI_CORE_NUM_REGS * sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem, HCI_CORE_MMIO_OFFSET,
+                                &core->iomem);
+    dma->rh_mmio = g_new0(MemoryRegion, dma->cfg.num_ring_offsets);
+    memory_region_init_io(&dma->header_mmio, OBJECT(s), &hci_dma_header_ops, s,
+                           TYPE_MIPI_HCI"-dma-header-mmio",
+                           HCI_DMA_HEADER_NUM_REGS * sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem,
+                                core->cfg.ring_header_section_offset,
+                                &dma->header_mmio);
+    for (int i = 0; i < dma->cfg.num_ring_offsets; ++i) {
+        g_autofree char *mr_name = g_strdup_printf("%s-dma-%d-mmio",
+                                                   TYPE_MIPI_HCI, i);
+        memory_region_init_io(&dma->rh_mmio[i], OBJECT(s), &hci_dma_ops, s,
+                              mr_name, HCI_DMA_NUM_REGS * sizeof(uint32_t));
+        memory_region_add_subregion(&s->iomem, dma->cfg.ring_offsets[i],
+                                    &dma->rh_mmio[i]);
+    }
+    if (core->cfg.pio_offset) {
+        memory_region_init_io(&pio->mmio, OBJECT(s), &hci_pio_ops, s,
+                              TYPE_MIPI_HCI"-pio-mmio",
+                              HCI_PIO_NUM_REGS * sizeof(uint32_t));
+        memory_region_add_subregion(&s->iomem, core->cfg.pio_offset,
+                                    &pio->mmio);
+    }
+    memory_region_init_io(&ext_caps->mmio, OBJECT(s), &hci_ext_caps_ops, s,
+                                 TYPE_MIPI_HCI"-ext-caps-mmio",
+                                 ext_caps->num_ext_capabilities *
+                                 sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem, core->cfg.ext_caps_section_offset,
+                                        &ext_caps->mmio);
+    memory_region_init_io(&dat->mmio, OBJECT(s), &hci_dat_ops, s,
+                          TYPE_MIPI_HCI"-dat-mmio",
+                          core->cfg.dat_table_size * sizeof(uint32_t) *
+                          HCI_DAT_ENTRY_SIZE);
+    memory_region_add_subregion(&s->iomem, core->cfg.dat_table_offset,
+                                &dat->mmio);
+    memory_region_init_io(&dct->mmio, OBJECT(s), &hci_dct_ops, s,
+                          TYPE_MIPI_HCI"-dct-mmio",
+                          core->cfg.dct_table_size * sizeof(uint32_t));
+    memory_region_add_subregion(&s->iomem, core->cfg.dct_table_offset,
+                                &dct->mmio);
+
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+
+    s->bus = i3c_init_bus(DEVICE(s), NULL);
+
+    I3CBusClass *bc = I3C_BUS_GET_CLASS(s->bus);
+    bc->ibi_handle = hci_ibi_handle;
+    bc->ibi_recv = hci_ibi_recv;
+    bc->ibi_finish = hci_ibi_finish;
+}
+
+static void mipi_hci_enter_reset(Object *obj, ResetType type)
+{
+    MIPIHCIState *s = MIPI_HCI(obj);
+
+    hci_core_reset(&s->core);
+    hci_dma_reset(&s->dma);
+    hci_dat_reset(&s->dat, s->core.cfg.dat_table_size);
+    hci_dct_reset(&s->dct, s->core.cfg.dct_table_size);
+    hci_pio_reset(&s->pio);
+}
+
+static void mipi_hci_class_init(ObjectClass *klass, const void *data)
+{
+    DeviceClass *dc = DEVICE_CLASS(klass);
+    ResettableClass *rc = RESETTABLE_CLASS(klass);
+    MIPIHCIClass *mhc = MIPI_HCI_CLASS(klass);
+
+    rc->phases.enter = mipi_hci_enter_reset;
+    dc->realize = mipi_hci_realize;
+    dc->desc = "MIPI HCI I3C Controller";
+    device_class_set_props(dc, mipi_hci_properties);
+
+    mhc->update_irq = mipi_hci_update_irq;
+    mhc->get_next_dynamic_addr = mipi_hci_get_next_dynamic_addr;
+    mhc->get_dev_dynamic_addr = mipi_hci_get_dev_dynamic_addr;
+    mhc->enter_halt = mipi_hci_enter_halt;
+    mhc->dat_dev_index_from_addr = hci_dat_dev_index_from_addr;
+}
+
+static const TypeInfo mipi_hci_info = {
+    .name = TYPE_MIPI_HCI,
+    .parent = TYPE_SYS_BUS_DEVICE,
+    .instance_init = mipi_hci_instance_init,
+    .instance_size = sizeof(MIPIHCIState),
+    .class_init = mipi_hci_class_init,
+    .class_size = sizeof(MIPIHCIClass),
+};
+
+static void mipi_hci_register_types(void)
+{
+    type_register_static(&mipi_hci_info);
+}
+
+type_init(mipi_hci_register_types);

@@ -1122,19 +1122,19 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     return true;
 }
 
-static int virtio_gpu_rutabaga_get_num_capsets(VirtIOGPU *g)
+static bool
+virtio_gpu_rutabaga_get_num_capsets(VirtIOGPU *g, uint32_t *num_capsets, Error **errp)
 {
     int result;
-    uint32_t num_capsets;
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
-    result = rutabaga_get_num_capsets(vr->rutabaga, &num_capsets);
+    result = rutabaga_get_num_capsets(vr->rutabaga, num_capsets);
     if (result) {
-        error_report("Failed to get capsets");
-        return 0;
+        error_setg_errno(errp, -result, "Failed to get num_capsets");
+        return false;
     }
-    vr->num_capsets = num_capsets;
-    return num_capsets;
+    vr->num_capsets = *num_capsets;
+    return true;
 }
 
 static void virtio_gpu_rutabaga_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
@@ -1160,7 +1160,7 @@ static void virtio_gpu_rutabaga_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
 
 static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
 {
-    int num_capsets;
+    uint32_t num_capsets;
     VirtIOGPUBase *bdev = VIRTIO_GPU_BASE(qdev);
     VirtIOGPU *gpudev = VIRTIO_GPU(qdev);
 
@@ -1173,8 +1173,7 @@ static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
         return;
     }
 
-    num_capsets = virtio_gpu_rutabaga_get_num_capsets(gpudev);
-    if (!num_capsets) {
+    if (!virtio_gpu_rutabaga_get_num_capsets(gpudev, &num_capsets, errp)) {
         return;
     }
 
@@ -1402,7 +1401,7 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         }
     }
 
-    vmstate_load_state(f, &vmstate_virtio_gpu_scanouts, g, 1);
+    vmstate_load_state(f, &vmstate_virtio_gpu_scanouts, g, 1, NULL);
     return 0;
 }
 
@@ -1495,7 +1494,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
         }
     }
 
-    vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL);
+    vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL, NULL);
     return 0;
 }
 
@@ -1670,6 +1669,13 @@ static int virtio_gpu_post_load(void* opaque, int version_id) {
       }
   }
 
+  // we need to re-kick the bh handler to pick
+  // up the left over in vq commands, that were
+  // not processed at the moment of snapshot save
+  // so guest will not get stuck, as it "believe"
+  // it already sends commands through vq to host
+  qemu_bh_schedule(g->ctrl_bh);
+
   return ret;
 }
 
@@ -1763,7 +1769,7 @@ static void virtio_gpu_rutabaga_reset(VirtIODevice *vdev)
     virtio_gpu_rutabaga_reset_state(g);
 }
 
-static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, void *data)
+static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);

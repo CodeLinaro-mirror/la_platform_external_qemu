@@ -48,9 +48,6 @@ bool warn_report_once_cond(bool *printed, const char *fmt, ...)
 
 void error_init(const char *argv0);
 
-// TODO(whollins): Remove this when main-emu-next-dev branch of goldfish is turned down.
-void error_set_log_info(bool);
-
 typedef void(*logger)(int severity, const char *file, int line, const char *fmt, va_list ap);
 void set_logger(logger logger);
 
@@ -80,5 +77,11 @@ extern bool message_with_timestamp;
 extern bool message_with_loc;
 extern bool error_with_guestname;
 extern const char *error_guest_name;
+
+/*
+ * Return current datetime in ISO 8601 format.
+ * Caller is responsible to g_free() the returned string.
+ */
+char *real_time_iso8601(void);
 
 #endif

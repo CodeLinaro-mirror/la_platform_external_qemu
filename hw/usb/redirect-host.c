@@ -19,8 +19,8 @@
 
 #include "chardev/char.h"
 #include "chardev/char-fe.h"
-#include "hw/qdev-core.h"
-#include "hw/qdev-properties-system.h"
+#include "hw/core/qdev.h"
+#include "hw/core/qdev-properties-system.h"
 #include "qapi/qapi-types-run-state.h"
 #include "qemu/error-report.h"
 #include "qemu/log-for-trace.h"
@@ -839,7 +839,7 @@ static const Property usbredir_host_properties[] = {
     DEFINE_PROP_CHR("chardev", USBRedirectHost, chr),
 };
 
-static void usbredir_host_class_init(ObjectClass *klass, void *data)
+static void usbredir_host_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     device_class_set_props(dc, usbredir_host_properties);

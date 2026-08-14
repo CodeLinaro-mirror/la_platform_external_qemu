@@ -3,19 +3,12 @@
  *
  * Copyright 2021 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #include "qemu/osdep.h"
 #include "qemu/bitops.h"
+#include "qemu/bswap.h"
 #include "qobject/qdict.h"
 #include "qobject/qnum.h"
 #include "libqtest-single.h"
@@ -225,7 +218,7 @@ int main(int argc, char **argv)
     g_test_message("port=%d", port);
     global_qtest = qtest_initf("-machine npcm750-evb "
         "-chardev socket,id=npcm7xx-pcimbox-chr,host=localhost,"
-        "port=%d,reconnect=10 "
+        "port=%d,reconnect-ms=10000 "
         "-global driver=npcm7xx-pci-mbox,property=chardev,"
         "value=npcm7xx-pcimbox-chr",
         port);

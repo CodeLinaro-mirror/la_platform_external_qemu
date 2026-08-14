@@ -3,16 +3,15 @@
  *
  * Copyright (C) 2023 Google, LLC
  *
- * This code is licensed under the GPL version 2 or later.  See
- * the COPYING file in the top-level directory.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #ifndef NPCM8XX_GDMA_H
 #define NPCM8XX_GDMA_H
 
 #include "qom/object.h"
-#include "hw/sysbus.h"
-#include "hw/irq.h"
+#include "hw/core/sysbus.h"
+#include "hw/core/irq.h"
 #include "ui/console.h"
 #include "system/dma.h"
 

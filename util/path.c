@@ -13,9 +13,11 @@
 static const char *base;
 static GHashTable *hash;
 static QemuMutex lock;
+static GRegex *shared_library_regex;
 
 void init_paths(const char *prefix)
 {
+    GError *gerr = NULL;
     if (prefix[0] == '\0' || !strcmp(prefix, "/")) {
         return;
     }
@@ -30,6 +32,40 @@ void init_paths(const char *prefix)
 
     hash = g_hash_table_new(g_str_hash, g_str_equal);
     qemu_mutex_init(&lock);
+
+    shared_library_regex = g_regex_new("\\.so(\\.[[:digit:]]+)*$",
+                                       G_REGEX_OPTIMIZE,
+                                       0, &gerr);
+    if (gerr != NULL) {
+        fprintf(stderr, "g_regex_new returns error: %s\n", gerr->message);
+        g_error_free(gerr);
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Checks if a filename indicates that it's a shared object file by matching the
+ * file name against /\.so(\.[0-9]+)*$/.
+ */
+static bool is_filename_shared_object(const char *name)
+{
+    return g_regex_match(shared_library_regex, name, 0, NULL);
+}
+
+/*
+ * Checks if a filename indicates that it may contain shared object files, and
+ * so therefore should be wrapped by QEMU_LD_PREFIX.
+ */
+static bool is_filename_libdir(const char *name)
+{
+    return (
+        g_str_has_prefix(name, "/lib")
+        || g_str_has_prefix(name, "/usr/lib")
+        || g_str_has_prefix(name, "/usr/local/lib")
+        || g_str_has_prefix(name, "/lib64")
+        || g_str_has_prefix(name, "/usr/lib64")
+        || g_str_has_prefix(name, "/usr/local/lib64")
+    );
 }
 
 /* Look for path in emulation dir, otherwise return name. */
@@ -48,7 +84,8 @@ const char *path(const char *name)
     /* Have we looked up this file before?  */
     if (g_hash_table_lookup_extended(hash, name, &key, &value)) {
         ret = value ? value : name;
-    } else {
+    } else if (is_filename_shared_object(name) || is_filename_libdir(name)) {
+        /* GOOGLE CHANGE only prepend QEMU_LD_PREFIX for libraries */
         char *save = g_strdup(name);
         char *full = g_build_filename(base, name, NULL);
 
@@ -63,6 +100,9 @@ const char *path(const char *name)
             g_hash_table_insert(hash, save, NULL);
             ret = name;
         }
+    } else {
+        g_hash_table_insert(hash, g_strdup(name), NULL);
+        ret = name;
     }
 
     qemu_mutex_unlock(&lock);

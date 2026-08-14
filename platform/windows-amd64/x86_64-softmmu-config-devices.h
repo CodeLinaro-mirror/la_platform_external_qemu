@@ -127,6 +127,8 @@
 
 #define CONFIG_I2C_ECHO 1
 
+#define CONFIG_I2C_TESTER 1
+
 #define CONFIG_I386 1
 
 #define CONFIG_I440FX 1
@@ -155,11 +157,11 @@
 
 #define CONFIG_IGB_PCI_EXPRESS 1
 
-#define CONFIG_IMX_USBPHY 1
-
 #define CONFIG_IOAPIC 1
 
 #define CONFIG_IOH3420 1
+
+#define CONFIG_IOMMU_TESTDEV 1
 
 #define CONFIG_IPACK 1
 
@@ -276,6 +278,8 @@
 #define CONFIG_PXB 1
 
 #define CONFIG_Q35 1
+
+#define CONFIG_REMOTE_PCI 1
 
 #define CONFIG_ROCKER 1
 
@@ -430,6 +434,8 @@
 #define CONFIG_WDT_IB6300ESB 1
 
 #define CONFIG_WDT_IB700 1
+
+#define CONFIG_WINDUMP 1
 
 #define CONFIG_X86_IOMMU 1
 

@@ -97,7 +97,7 @@ static void process_config_write(QIOChannel *ioc, PCIDevice *dev,
     PciConfDataMsg *conf = (PciConfDataMsg *)&msg->data.pci_conf_data;
     MPQemuMsg ret = { 0 };
 
-    if ((conf->addr + sizeof(conf->val)) > pci_config_size(dev)) {
+    if ((conf->addr + conf->len) > pci_config_size(dev)) {
         error_setg(errp, "Bad address for PCI config write, pid "FMT_pid".",
                    getpid());
         ret.data.u64 = UINT64_MAX;
@@ -121,7 +121,7 @@ static void process_config_read(QIOChannel *ioc, PCIDevice *dev,
     PciConfDataMsg *conf = (PciConfDataMsg *)&msg->data.pci_conf_data;
     MPQemuMsg ret = { 0 };
 
-    if ((conf->addr + sizeof(conf->val)) > pci_config_size(dev)) {
+    if ((conf->addr + conf->len) > pci_config_size(dev)) {
         error_setg(errp, "Bad address for PCI config read, pid "FMT_pid".",
                    getpid());
         ret.data.u64 = UINT64_MAX;

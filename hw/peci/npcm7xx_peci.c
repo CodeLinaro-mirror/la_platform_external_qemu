@@ -170,7 +170,7 @@ static void npcm7xx_peci_reset(Object *obj, ResetType type)
 static const MemoryRegionOps npcm7xx_peci_ops = {
     .read = npcm7xx_peci_read,
     .write = npcm7xx_peci_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
+    .endianness = DEVICE_LITTLE_ENDIAN,
     .valid = {
         .min_access_size = 1,
         .min_access_size = 1,
@@ -192,7 +192,7 @@ static void npcm7xx_peci_realize(DeviceState *dev, Error **errp)
     ps->bus = peci_bus_create(DEVICE(ps));
 }
 
-static void npcm7xx_peci_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_peci_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

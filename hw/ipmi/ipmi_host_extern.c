@@ -3,15 +3,7 @@
  *
  * Copyright 2021 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 /*
@@ -25,8 +17,8 @@
 #include "chardev/char-fe.h"
 #include "hw/ipmi/ipmi.h"
 #include "hw/ipmi/ipmi_extern.h"
-#include "hw/qdev-properties.h"
-#include "hw/qdev-properties-system.h"
+#include "hw/core/qdev-properties.h"
+#include "hw/core/qdev-properties-system.h"
 #include "migration/vmstate.h"
 #include "qom/object.h"
 
@@ -121,7 +113,7 @@ static const Property ipmi_host_extern_properties[] = {
                      TYPE_IPMI_INTERFACE, IPMIInterface *),
 };
 
-static void ipmi_host_extern_class_init(ObjectClass *oc, void *data)
+static void ipmi_host_extern_class_init(ObjectClass *oc, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
     IPMICoreClass *ck = IPMI_CORE_CLASS(oc);

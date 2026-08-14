@@ -130,10 +130,10 @@ static void tda387xx_register_nodes(void)
                                     "id=" TEST_ID ",address=0x72"};
     add_qi2c_address(&opts, &(QI2CAddress){TEST_ADDR});
 
-    qos_node_create_driver("tda387xx", i2c_device_create);
-    qos_node_consumes("tda387xx", "i2c-bus", &opts);
+    qos_node_create_driver("tda38740", i2c_device_create);
+    qos_node_consumes("tda38740", "i2c-bus", &opts);
 
-    qos_add_test("test_tx_rx", "tda387xx", test_tx_rx, NULL);
+    qos_add_test("test_tx_rx", "tda38740", test_tx_rx, NULL);
 }
 
 libqos_init(tda387xx_register_nodes);

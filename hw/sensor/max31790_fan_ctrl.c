@@ -16,8 +16,8 @@
 
 #include "qemu/osdep.h"
 #include "hw/sensor/max31790_fan_ctrl.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "qapi/visitor.h"
 #include "qemu/log.h"
@@ -425,7 +425,7 @@ static void max31790_init(Object *obj)
     }
 }
 
-static void max31790_class_init(ObjectClass *klass, void *data)
+static void max31790_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     I2CSlaveClass *k = I2C_SLAVE_CLASS(klass);

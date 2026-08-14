@@ -16,11 +16,11 @@
 #include "google/drivers/hw/acpi/goldfish_acpi.h"
 #include "google/drivers/hw/acpi/goldfish_defs.h"
 #include "google/drivers/hw/i386/goldfish_board.h"
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "hw/char/parallel-isa.h"
 #include "hw/cxl/cxl_host.h"
 #include "hw/display/ramfb.h"
-#include "hw/hotplug.h"
+#include "hw/core/hotplug.h"
 #include "hw/hyperv/vmbus-bridge.h"
 #include "hw/i386/pc.h"
 #include "hw/southbridge/piix.h"
@@ -99,7 +99,7 @@ static int x86_kvm_type(MachineState *ms, const char *vm_type)
     return 0;
 }
 
-static void goldfish_machine_std_class_init(ObjectClass *oc, void *data) {
+static void goldfish_machine_std_class_init(ObjectClass *oc, const void *data) {
   MachineClass *mc = MACHINE_CLASS(oc);
 
   // Enable the loading of the acpi ini file.

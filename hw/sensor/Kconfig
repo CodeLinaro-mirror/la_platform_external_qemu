@@ -31,6 +31,11 @@ config ADP1050
     bool
     depends on I2C
 
+config ADT7475
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
 config MAX34451
     bool
     depends on I2C
@@ -47,10 +52,6 @@ config ISL_PMBUS_VR
 config MAX31785
     bool
     depends on PMBUS
-
-config AMDSBTSI
-    bool
-    depends on I2C
 
 config MAX6581
     bool
@@ -93,7 +94,31 @@ config LTC4287
     depends on I2C
     default y if I2C_DEVICES
 
+config AMDSBTSI
+    bool
+    depends on I2C
+
 config PI7C9X3G606GP
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
+config AD5321
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
+config LTC2991
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
+config TPS25990
+    bool
+    depends on I2C
+    default y if I2C_DEVICES
+
+config TPS546D24
     bool
     depends on I2C
     default y if I2C_DEVICES

@@ -21,6 +21,7 @@
 #include "hw/cpu/cluster.h"
 #include "hw/dma/npcm8xx-gdma.h"
 #include "hw/gpio/npcm7xx_gpio.h"
+#include "hw/gpio/npcm8xx_sgpio.h"
 #include "hw/i2c/npcm_smbus.h"
 #include "hw/i3c/svc-i3c.h"
 #include "hw/ipmi/npcm7xx_kcs.h"
@@ -41,12 +42,12 @@
 #include "hw/timer/npcm7xx_timer.h"
 #include "hw/ssi/npcm7xx_fiu.h"
 #include "hw/ssi/npcm_espi.h"
-#include "hw/ssi/npcm_pspi.h"
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
 #include "hw/usb/npcm-udc.h"
 #include "hw/usb/redirect-host.h"
 #include "target/arm/cpu.h"
+#include "hw/ssi/npcm_pspi.h"
 
 #define NPCM8XX_MAX_NUM_CPUS    (4)
 
@@ -117,12 +118,13 @@ struct NPCM8xxState {
     NPCMPCSState        pcs;
     NPCM7xxPCIMBoxState pci_mbox[2];
     NPCM7xxSDHCIState   mmc;
+    NPCMPSPIState       pspi;
     NPCM7xxPECIState    peci;
     NPCMPCIERCState     pcierc;
-    SVCI3C              i3c[6];
-    NPCM8xxGDMA         gdma[3];
     NPCMESPIState       espi;
-    NPCMPSPIState       pspi;
+    NPCM8xxGDMA         gdma[3];
+    SVCI3C              i3c[6];
+    NPCM8xxSGPIOState   sgpio[2];
 };
 
 struct NPCM8xxClass {
