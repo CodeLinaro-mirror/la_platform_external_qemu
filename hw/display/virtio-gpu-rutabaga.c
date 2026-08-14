@@ -1669,6 +1669,13 @@ static int virtio_gpu_post_load(void* opaque, int version_id) {
       }
   }
 
+  // we need to re-kick the bh handler to pick
+  // up the left over in vq commands, that were
+  // not processed at the moment of snapshot save
+  // so guest will not get stuck, as it "believe"
+  // it already sends commands through vq to host
+  qemu_bh_schedule(g->ctrl_bh);
+
   return ret;
 }
 
