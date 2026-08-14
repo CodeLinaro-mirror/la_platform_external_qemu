@@ -22,7 +22,7 @@ namespace base {
 // A small Stream implementation used during this test. It uses a
 // client-provided fixed-size buffer to store the data, which can be
 // used either for reading or writing.
-class MemoryStream : public Stream {
+class MemoryStream : public StreamWithErrorLogger {
 public:
     MemoryStream(void* buffer, size_t bufferLen) :
             mBuffer(static_cast<uint8_t*>(buffer)),
