@@ -309,6 +309,7 @@ struct rutabaga;
 
 struct VirtIOGPURutabaga {
     VirtIOGPU parent_obj;
+    struct VMChangeStateEntry* vm_state_entry;
     struct MemoryRegionInfo memory_regions[MAX_SLOTS];
     QTAILQ_HEAD(, virtio_gpu_rutabaga_context) contexts;
     uint64_t capset_mask;
