@@ -269,6 +269,54 @@ rutabaga_cmd_context_destroy(VirtIOGPU *g,
 }
 
 static void
+rutabaga_setup_full_res_transfer(struct virtio_gpu_simple_resource *res,
+                                 struct rutabaga_transfer *transfer,
+                                 struct iovec *transfer_iovec)
+{
+    transfer->x = 0;
+    transfer->y = 0;
+    transfer->z = 0;
+    transfer->w = res->width;
+    transfer->h = res->height;
+    transfer->d = 1;
+
+    transfer_iovec->iov_base = pixman_image_get_data(res->image);
+    transfer_iovec->iov_len = pixman_image_get_height(res->image) * pixman_image_get_stride(res->image);
+}
+
+static void virtio_gpu_rutabaga_update_display(VirtIOGPUBase *vb)
+{
+    VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(vb);
+    VirtIOGPU* gpu = VIRTIO_GPU(vb);
+    struct virtio_gpu_simple_resource *res;
+    struct rutabaga_transfer transfer = { 0 };
+    struct iovec transfer_iovec;
+    struct virtio_gpu_scanout *scanout;
+    int32_t i;
+
+    if (vr->headless) {
+        return;
+    }
+
+    for (i = 0; i < vb->conf.max_outputs; i++) {
+        scanout = &vb->scanout[i];
+        if (!scanout->con || !qemu_console_is_visible(scanout->con) || !scanout->resource_id) {
+            continue;
+        }
+        res = virtio_gpu_find_resource(gpu, scanout->resource_id);
+        if (!res || !res->image) {
+            continue;
+        }
+
+        rutabaga_setup_full_res_transfer(res, &transfer, &transfer_iovec);
+        if (rutabaga_resource_transfer_read(vr->rutabaga, 0, scanout->resource_id,
+                                            &transfer, &transfer_iovec) == 0) {
+            dpy_gfx_update_full(scanout->con);
+        }
+    }
+}
+
+static void
 rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
 {
     int32_t result, i;
@@ -300,19 +348,11 @@ rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
         }
     }
 
-    if (!found) {
+    if (!found || !qemu_console_is_visible(scanout->con)) {
         return;
     }
 
-    transfer.x = 0;
-    transfer.y = 0;
-    transfer.z = 0;
-    transfer.w = res->width;
-    transfer.h = res->height;
-    transfer.d = 1;
-
-    transfer_iovec.iov_base = pixman_image_get_data(res->image);
-    transfer_iovec.iov_len = res->width * res->height * 4;
+    rutabaga_setup_full_res_transfer(res, &transfer, &transfer_iovec);
 
     result = rutabaga_resource_transfer_read(vr->rutabaga, 0,
                                              rf.resource_id, &transfer,
@@ -1777,6 +1817,7 @@ static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
     VirtIOGPUClass *vgc = VIRTIO_GPU_CLASS(klass);
 
     vbc->gl_flushed = virtio_gpu_rutabaga_gl_flushed;
+    vbc->update_display = virtio_gpu_rutabaga_update_display;
     vgc->handle_ctrl = virtio_gpu_rutabaga_handle_ctrl;
     vgc->process_cmd = virtio_gpu_rutabaga_process_cmd;
     vgc->update_cursor_data = virtio_gpu_rutabaga_update_cursor;

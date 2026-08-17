@@ -184,6 +184,7 @@ struct VirtIOGPUBaseClass {
     VirtioDeviceClass parent;
 
     void (*gl_flushed)(VirtIOGPUBase *g);
+    void (*update_display)(VirtIOGPUBase *g);
 };
 
 #define VIRTIO_GPU_BASE_PROPERTIES(_state, _conf)                       \
