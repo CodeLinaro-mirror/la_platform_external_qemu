@@ -90,7 +90,8 @@ public:
                     [this](auto data) { enqueue(HCIPacket::EVENT, data); },
                     [this](auto data) { enqueue(HCIPacket::ACL, data); },
                     [this](auto data) { enqueue(HCIPacket::SCO, data); },
-                    [this](auto data) { enqueue(HCIPacket::ISO, data); }),
+                    [this](auto data) { enqueue(HCIPacket::ISO, data); },
+                    /*enable_recovery_state=*/true),
           mDeviceInfo(deviceInfo) {}
 
     std::unique_ptr<ChipInfo> chip_info() override {
