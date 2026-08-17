@@ -3050,7 +3050,7 @@ extern "C" int main(int argc, char** argv) {
     if (feature_is_enabled(kFeature_Nfc)) {
         D("Nfc feature is enabled");
         args.add2("-chardev", "netsim,id=nfc");
-        args.add2("-device", "virtconsole,chardev=nfc,name=nfc");
+        args.add2("-device", "virtserialport,chardev=nfc,name=nfc");
     }
 
     bool bluetooth_explicitly_disabled =
