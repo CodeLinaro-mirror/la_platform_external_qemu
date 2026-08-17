@@ -67,8 +67,9 @@ struct AvdInfo {
     char* snapshotLockPath;    /* core snapshot.lock path */
     char* multiInstanceLockPath;
 
-    FileData buildProperties[1]; /* build.prop file */
-    FileData bootProperties[1];  /* boot.prop file */
+    FileData buildProperties[1];       /* build.prop file */
+    FileData vendorBuildProperties[1]; /* vendor/build.prop file */
+    FileData bootProperties[1];        /* boot.prop file */
 
     /* image files */
     char* imagePath[AVD_IMAGE_MAX];
