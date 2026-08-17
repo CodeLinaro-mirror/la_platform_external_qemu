@@ -10,6 +10,9 @@
 #include "hw/virtio/virtio-gpu-pixman.h"
 #include "hw/virtio/virtio-iommu.h"
 #include "migration/qemu-file-types.h"
+#include "qemu/main-loop.h"
+#include "qemu/timer.h"
+#include "system/runstate.h"
 #include "ui/console.h"
 
 #include <glib/gmem.h>
@@ -991,6 +994,7 @@ virtio_gpu_rutabaga_aio_cb(void *opaque)
         virtio_gpu_ctrl_response_nodata(g, cmd, VIRTIO_GPU_RESP_OK_NODATA);
         QTAILQ_REMOVE(&g->fenceq, cmd, next);
         g_free(cmd);
+        g->inflight--;
     }
 
     g_free(data);
@@ -1198,11 +1202,15 @@ static void virtio_gpu_rutabaga_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
     virtio_gpu_process_cmdq(g);
 }
 
+static void virtio_gpu_rutabaga_vm_state_change(void* opaque, bool running,
+                                                RunState state);
+
 static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
 {
     uint32_t num_capsets;
     VirtIOGPUBase *bdev = VIRTIO_GPU_BASE(qdev);
     VirtIOGPU *gpudev = VIRTIO_GPU(qdev);
+    VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(qdev);
 
 #if HOST_BIG_ENDIAN
     error_setg(errp, "rutabaga is not supported on bigendian platforms");
@@ -1223,6 +1231,9 @@ static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
 
     bdev->virtio_config.num_capsets = num_capsets;
     virtio_gpu_device_realize(qdev, errp);
+
+    vr->vm_state_entry = qemu_add_vm_change_state_handler(
+        virtio_gpu_rutabaga_vm_state_change, gpudev);
 }
 
 static const Property virtio_gpu_rutabaga_properties[] = {
@@ -1643,6 +1654,53 @@ static int virtio_gpu_rutabaga_load_backing(
   }
 
   return 0;
+}
+
+#define VIRTIO_GPU_RUTABAGA_DRAIN_TIMEOUT_MS 5000
+
+static void virtio_gpu_rutabaga_drain_wakeup(void* opaque) {
+}
+
+static void virtio_gpu_rutabaga_drain_for_save(VirtIOGPU* g) {
+  VirtIOGPUClass* vgc = VIRTIO_GPU_GET_CLASS(g);
+  AioContext* ctx = qemu_get_aio_context();
+  struct virtio_gpu_ctrl_command* cmd;
+  QEMUTimer wakeup;
+  unsigned int n;
+  int64_t deadline = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) +
+                     VIRTIO_GPU_RUTABAGA_DRAIN_TIMEOUT_MS;
+
+  // since vCPU stopped, pop all the commands off vq
+  vgc->handle_ctrl(VIRTIO_DEVICE(g), g->ctrl_vq);
+
+  if (QTAILQ_EMPTY(&g->fenceq) && QTAILQ_EMPTY(&g->cmdq)) {
+      return;
+  }
+
+  aio_timer_init(ctx, &wakeup, QEMU_CLOCK_REALTIME, SCALE_MS,
+          virtio_gpu_rutabaga_drain_wakeup, NULL);
+  timer_mod(&wakeup, deadline);
+
+  while (!QTAILQ_EMPTY(&g->fenceq) || !QTAILQ_EMPTY(&g->cmdq)) {
+      if (qemu_clock_get_ms(QEMU_CLOCK_REALTIME) >= deadline) {
+          warn_report( "virtio-gpu-rutabaga: drain timed out; and the restored guest may ANR.");
+          break;
+      }
+      aio_poll(ctx, true);
+      virtio_gpu_process_cmdq(g);
+  }
+
+  timer_del(&wakeup);
+
+}
+
+static void virtio_gpu_rutabaga_vm_state_change(void* opaque, bool running,
+                                                RunState state) {
+  if (!running &&
+      (state == RUN_STATE_SAVE_VM || state == RUN_STATE_FINISH_MIGRATE ||
+       state == RUN_STATE_SHUTDOWN || state == RUN_STATE_PAUSED)) {
+    virtio_gpu_rutabaga_drain_for_save(VIRTIO_GPU(opaque));
+  }
 }
 
 static int virtio_gpu_pre_load(void* opaque) {
