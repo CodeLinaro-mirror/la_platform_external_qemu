@@ -1285,10 +1285,30 @@ static const VMStateDescription vmstate_virtio_gpu_scanouts = {
             VMSTATE_END_OF_LIST()},
 };
 
+static bool virtio_gpu_rutabaga_has_guest_state(VirtIOGPURutabaga *vgr) {
+    VirtIOGPU *g = &(vgr->parent_obj);
+    if (!QTAILQ_EMPTY(&vgr->contexts)) {
+        return true;
+    }
+    if (!QTAILQ_EMPTY(&g->reslist)) {
+        return true;
+    }
+    for (int slot = 0; slot < MAX_SLOTS; slot++) {
+        if (vgr->memory_regions[slot].used) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
     VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     int slot;
+
+    if (vgr->rutabaga && !virtio_gpu_rutabaga_has_guest_state(vgr)) {
+        return;
+    }
 
     memory_region_transaction_begin();
     for (slot = 0; slot < MAX_SLOTS; slot++) {
@@ -1305,6 +1325,17 @@ static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
         vgr->memory_regions[slot].offset = 0;
     }
     memory_region_transaction_commit();
+
+    struct virtio_gpu_rutabaga_context *ctx, *next_ctx;
+    QTAILQ_FOREACH_SAFE(ctx, &vgr->contexts, next, next_ctx) {
+        struct virtio_gpu_rutabaga_resource *res, *next_res;
+        QTAILQ_FOREACH_SAFE(res, &ctx->reslist, next, next_res) {
+            QTAILQ_REMOVE(&ctx->reslist, res, next);
+            g_free(res);
+        }
+        QTAILQ_REMOVE(&vgr->contexts, ctx, next);
+        g_free(ctx);
+    }
 
     rutabaga_finish(&vgr->rutabaga);
     Error *local_err = NULL;
