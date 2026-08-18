@@ -179,5 +179,41 @@ TEST(AddressSpaceHostMemoryAllocatorContext, UnallocateTwice) {
     EXPECT_NE(req.metadata, 0);
 }
 
+TEST(AddressSpaceHostMemoryAllocatorContext, AllocateUnalignedSizeRequest) {
+    struct address_space_device_control_ops ops =
+        create_address_space_device_control_ops();
+
+    AddressSpaceHwFuncs hw_funcs = create_address_space_device_hw_funcs();
+
+    AddressSpaceHostMemoryAllocatorContext ctx(&ops, &hw_funcs);
+
+    AddressSpaceDevicePingInfo req = {};
+    req.metadata = static_cast<uint64_t>(
+        AddressSpaceHostMemoryAllocatorContext::HostMemoryAllocatorCommand::Allocate);
+    req.phys_addr = GOOD_GPA_1;
+    req.size = 512; // Unaligned size request
+
+    ctx.perform(&req);
+    EXPECT_EQ(req.metadata, 0);
+
+    req = createUnallocateRequest(GOOD_GPA_1);
+    ctx.perform(&req);
+    EXPECT_EQ(req.metadata, 0);
+
+    // Test with an odd, non-power-of-two size (777 bytes)
+    req = {};
+    req.metadata = static_cast<uint64_t>(
+        AddressSpaceHostMemoryAllocatorContext::HostMemoryAllocatorCommand::Allocate);
+    req.phys_addr = GOOD_GPA_2;
+    req.size = 777; // Odd size request
+
+    ctx.perform(&req);
+    EXPECT_EQ(req.metadata, 0);
+
+    req = createUnallocateRequest(GOOD_GPA_2);
+    ctx.perform(&req);
+    EXPECT_EQ(req.metadata, 0);
+}
+
 }  // namespace emulation
 } // namespace android

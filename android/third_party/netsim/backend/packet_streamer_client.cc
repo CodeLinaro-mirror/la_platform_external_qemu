@@ -78,7 +78,11 @@ std::unique_ptr<android::base::ObservableProcess> RunNetsimd(
     NetsimdOptions options) {
   std::string executable = "netsimd";
   if (android::featurecontrol::isEnabled(android::featurecontrol::NetsimX)) {
-    executable = "netsimdx";
+    auto netsimdx =
+        android::base::System::get()->findBundledExecutable("netsimdx");
+    if (!netsimdx.empty()) {
+      executable = "netsimdx";
+    }
   }
   auto exe = android::base::System::get()->findBundledExecutable(executable);
   std::vector<std::string> program_with_args{exe};

@@ -982,7 +982,7 @@ std::unique_ptr<MeshSceneObject> MeshSceneObject::createSphere(
 
         for (int j = 0; j <= segments; ++j) {
             float u_coord = (float)j / segments;
-            float theta = u_coord * 2.0f * M_PI;  // Longitude
+            float theta = (u_coord + 0.25f) * 2.0f * M_PI;  // Longitude
 
             VertexPositionUV v;
             v.pos.x = std::sin(phi) * std::cos(theta);

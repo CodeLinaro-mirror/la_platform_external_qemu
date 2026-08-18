@@ -694,6 +694,9 @@ static void aehd_user_backed_ram_map(hwaddr gpa, void* hva, hwaddr size,
     AEHDMemoryListener* kml;
     int err;
 
+    // Align size to host page size (0x1000 on x86_64)
+    size = ALIGN(size, qemu_real_host_page_size);
+
     if (!aehd_state) {
         qemu_abort("%s: attempted to map RAM before AEHD initialized\n", __func__);
     }
@@ -719,6 +722,9 @@ static void aehd_user_backed_ram_unmap(hwaddr gpa, hwaddr size)
     AEHDSlot *slot;
     AEHDMemoryListener* kml;
     int err;
+
+    // Align size to host page size (0x1000 on x86_64)
+    size = ALIGN(size, qemu_real_host_page_size);
 
     if (!aehd_state) {
         qemu_abort("%s: attempted to map RAM before AEHD initialized\n", __func__);

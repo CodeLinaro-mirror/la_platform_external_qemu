@@ -1814,14 +1814,14 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
 
     int lastVersion = avdInfo_getLastRunQemuVersion(avd);
     if (!opts->grpc_ui && lastVersion != EMULATOR_QEMU_VERSION) {
-        if (lastVersion > 0) {
+        if (lastVersion > 0 && !opts->wipe_data) {
             // File exists, and there is a mismatch
             derror("AVD %s is not compatible with this emulator."
                    "Last run QEMU version: %d, compatible QEMU version: %d",
                    avdInfo_getName(avd), lastVersion, EMULATOR_QEMU_VERSION);
             return false;
         } else {
-            // Invalid version (e.g. missing file, first run), save the last
+            // Invalid version (e.g. missing file, first run) or wipe-data requested, save the last
             // version file for future qemu2 or qemu-next runs
             dinfo("Saving last run QEMU version for the AVD to %d",
                   EMULATOR_QEMU_VERSION);

@@ -63,6 +63,9 @@ public:
         int preferred_format_index = -1;  // -1 if no format is supported
 
         std::weak_ptr<Impl> shared_impl;
+
+        std::optional<WebcamPixelFormat> NegotiateFormat(
+                uint32_t requested_format) const;
     };
 
     static size_t GetWebcamCount();
