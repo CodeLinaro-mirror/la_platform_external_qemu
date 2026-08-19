@@ -169,6 +169,11 @@ int propertyFile_getAdbdCommunicationMode(const FileData* data);
  */
 char* path_getBuildBuildProp( const char* androidOut );
 
+/* Return the path of the vendor properties file (vendor/build.prop)
+ * from an Android platform build, or NULL if it doesn't exist.
+ */
+char* path_getBuildVendorProp( const char* androidOut );
+
 /* Return the path of the boot properties file (boot.prop) from an
  * Android platform build, or NULL if it doesn't exit.
  */

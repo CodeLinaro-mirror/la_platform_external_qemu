@@ -122,6 +122,7 @@ void avdInfo_free(AvdInfo* i) {
         AFREE(i->snapshotLockPath);
 
         fileData_done(i->buildProperties);
+        fileData_done(i->vendorBuildProperties);
         fileData_done(i->bootProperties);
 
         for (nn = 0; nn < i->numSearchPaths; nn++)
@@ -1064,8 +1065,9 @@ AvdInfo* avdInfo_new(const char* name, AvdInfoParams* __unused_params, const cha
         goto FAIL;
     }
 
-    // Find the build.prop and boot.prop files and read them.
+    // Find the build.prop, vendor-build.prop, and boot.prop files and read them.
     _avdInfo_getPropertyFile(i, "build.prop", i->buildProperties);
+    _avdInfo_getPropertyFile(i, "vendor-build.prop", i->vendorBuildProperties);
     _avdInfo_getPropertyFile(i, "boot.prop", i->bootProperties);
 
     _avdInfo_extractBuildProperties(i);
@@ -1170,6 +1172,12 @@ AvdInfo* avdInfo_newForAndroidBuild(const char* androidBuildRoot,
     if (buildPropPath) {
         _avdInfo_readPropertyFile(i, buildPropPath, i->buildProperties);
         free(buildPropPath);
+    }
+
+    char* vendorPropPath = path_getBuildVendorProp(i->androidOut);
+    if (vendorPropPath) {
+        _avdInfo_readPropertyFile(i, vendorPropPath, i->vendorBuildProperties);
+        free(vendorPropPath);
     }
 
     // FInd the boot.prop file and read it.
@@ -1937,6 +1945,10 @@ const FileData* avdInfo_getBuildProperties(const AvdInfo* i) {
     return i->buildProperties;
 }
 
+const FileData* avdInfo_getVendorBuildProperties(const AvdInfo* i) {
+    return i->vendorBuildProperties;
+}
+
 CIniFile* avdInfo_getConfigIni(const AvdInfo* i) {
     return i->configIni;
 }
@@ -2263,6 +2275,20 @@ bool avdInfo_getBuildPropertyBool(const AvdInfo* info, const char* property, boo
 
 char* avdInfo_getBuildPropertyString(const AvdInfo* info, const char* property) {
     return propertyFile_getValue((const char*)info->buildProperties->data, info->buildProperties->size, property);
+}
+
+int avdInfo_getVendorBuildPropertyInt(const AvdInfo* info, const char* property, int defValue) {
+    return propertyFile_getInt(
+            info->vendorBuildProperties, property, defValue, NULL);
+}
+
+bool avdInfo_getVendorBuildPropertyBool(const AvdInfo* info, const char* property, bool defValue) {
+    return propertyFile_getBool(
+            info->vendorBuildProperties, property, defValue, NULL);
+}
+
+char* avdInfo_getVendorBuildPropertyString(const AvdInfo* info, const char* property) {
+    return propertyFile_getValue((const char*)info->vendorBuildProperties->data, info->vendorBuildProperties->size, property);
 }
 
 // function used to mock AvdInfo on Test
