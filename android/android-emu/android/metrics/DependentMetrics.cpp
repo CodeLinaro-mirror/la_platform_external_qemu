@@ -17,10 +17,12 @@
 #include <unistd.h>
 #endif
 
+#include <algorithm>
+#include <array>
+#include <cstdint>     // for int64_t, uin...
 #include <inttypes.h>
 #include <stdlib.h>    // for free
 #include <sys/stat.h>  // for stat, st_mtime
-#include <cstdint>     // for int64_t, uin...
 #include <functional>  // for __base
 #include <iosfwd>      // for string
 #include <memory>      // for shared_ptr
@@ -887,19 +889,14 @@ static bool isRunningInCi() {
     auto sys = System::get();
     if (isTruthy(sys->envGet("CI"))) return true;
     if (isTruthy(sys->envGet("CONTINUOUS_INTEGRATION"))) return true;
-    if (!sys->envGet("GITHUB_ACTIONS").empty() ||
-        !sys->envGet("GITLAB_CI").empty() ||
-        !sys->envGet("JENKINS_URL").empty() ||
-        !sys->envGet("BUILD_ID").empty() ||
-        !sys->envGet("TF_BUILD").empty() ||
-        !sys->envGet("CIRCLECI").empty() ||
-        !sys->envGet("TRAVIS").empty() ||
-        !sys->envGet("BUILDKITE").empty() ||
-        !sys->envGet("TEAMCITY_VERSION").empty() ||
-        !sys->envGet("CODEBUILD_BUILD_ID").empty()) {
-        return true;
-    }
-    return false;
+
+    static constexpr std::array kCiEnvVars = {
+            "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL",      "TF_BUILD",
+            "CIRCLECI",       "TRAVIS",    "BUILDKITE",   "TEAMCITY_VERSION", "CODEBUILD_BUILD_ID",
+    };
+
+    return std::any_of(kCiEnvVars.begin(), kCiEnvVars.end(),
+                       [&](const char* var) { return sys->envTest(var); });
 }
 
 static bool isAndroidCliDefined() {
