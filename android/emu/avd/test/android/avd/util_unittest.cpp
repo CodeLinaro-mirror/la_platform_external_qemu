@@ -309,3 +309,55 @@ TEST(AvdInfoTest, api_level_parsing) {
     avdInfo_getFullApiNameFromAvd(nullptr, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("Unknown API version", fullNameBuf);
 }
+
+TEST(AvdUtil, path_getBuildVendorProp) {
+    TestSystem sys("/home", 64, "/");
+    TestTempDir* tmp = sys.getTempRoot();
+    tmp->makeSubDir("out");
+    std::string outDir = pj(tmp->pathString(), "out");
+
+    // Initially vendor/build.prop does not exist
+    EXPECT_EQ(nullptr, path_getBuildVendorProp(outDir.c_str()));
+
+    // Create vendor/build.prop
+    tmp->makeSubDir(pj("out", "vendor"));
+    std::string vendorBuildProp = pj({outDir, "vendor", "build.prop"});
+    writeToFile(vendorBuildProp, "ro.vendor.uwb.dev=/dev/uwb0\n");
+
+    ScopedCPtr<char> propPath(path_getBuildVendorProp(outDir.c_str()));
+    ASSERT_NE(nullptr, propPath.get());
+    EXPECT_STREQ(vendorBuildProp.c_str(), propPath.get());
+}
+
+TEST(AvdInfoTest, build_and_vendor_properties_merged) {
+    TestSystem sys("/home", 64, "/");
+    TestTempDir* tmp = sys.getTempRoot();
+    tmp->makeSubDir("out");
+    tmp->makeSubDir(pj("out", "system"));
+    tmp->makeSubDir(pj("out", "vendor"));
+    std::string outDir = pj(tmp->pathString(), "out");
+
+    writeToFile(pj({outDir, "system", "build.prop"}),
+                "ro.product.cpu.abi=x86_64\n"
+                "ro.build.version.sdk=34\n");
+    writeToFile(pj({outDir, "vendor", "build.prop"}),
+                "ro.vendor.uwb.dev=/dev/uwb0\n");
+
+    AvdInfo* avd = avdInfo_newForAndroidBuild(tmp->pathString().c_str(), outDir.c_str(), nullptr, nullptr);
+    ASSERT_NE(nullptr, avd);
+
+    ScopedCPtr<char> arch(avdInfo_getTargetCpuArch(avd));
+    EXPECT_STREQ("x86_64", arch.get());
+    EXPECT_EQ(34, avdInfo_getApiLevel(avd));
+
+    ScopedCPtr<char> uwbDev(avdInfo_getVendorBuildPropertyString(avd, "ro.vendor.uwb.dev"));
+    ASSERT_NE(nullptr, uwbDev.get());
+    EXPECT_STREQ("/dev/uwb0", uwbDev.get());
+
+    const FileData* vendorProps = avdInfo_getVendorBuildProperties(avd);
+    ASSERT_NE(nullptr, vendorProps);
+    EXPECT_FALSE(fileData_isEmpty(vendorProps));
+
+    avdInfo_free(avd);
+}
+

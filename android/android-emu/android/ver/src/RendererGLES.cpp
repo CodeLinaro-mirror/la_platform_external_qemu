@@ -1328,6 +1328,12 @@ bool RendererGLES::EglState::initialize(int frameWidth, int frameHeight) {
         return false;
     }
 
+#ifndef __APPLE__
+    if (mEglDispatch->eglUseOsEglApi) {
+        mEglDispatch->eglUseOsEglApi(EGL_TRUE, EGL_FALSE);
+    }
+#endif
+
     mEglDisplay = mEglDispatch->eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (mEglDisplay == EGL_NO_DISPLAY) {
         LOG(ERROR) << "eglGetDisplay failed, error "
@@ -1346,7 +1352,6 @@ bool RendererGLES::EglState::initialize(int frameWidth, int frameHeight) {
                    << mEglDispatch->eglGetError();
         return false;
     }
-
     // Get an EGL config.
     const EGLint attribs[] = {EGL_SURFACE_TYPE,
                               EGL_PBUFFER_BIT,
@@ -1362,10 +1367,10 @@ bool RendererGLES::EglState::initialize(int frameWidth, int frameHeight) {
                               24,
                               EGL_NONE};
     EGLint numConfig = 0;
-    EGLConfig eglConfig;
-    EGLBoolean chooseResult = mEglDispatch->eglChooseConfig(
-            mEglDisplay, attribs, &eglConfig, 1, &numConfig);
-    if (chooseResult == EGL_FALSE || numConfig < 1) {
+    EGLConfig eglConfig = nullptr;
+    if (mEglDispatch->eglChooseConfig(mEglDisplay, attribs, &eglConfig, 1,
+                                      &numConfig) != EGL_TRUE ||
+        numConfig < 1) {
         LOG(ERROR) << "eglChooseConfig failed, error "
                    << mEglDispatch->eglGetError();
         return false;
@@ -1423,11 +1428,18 @@ std::unique_ptr<RendererContext> RendererGLES::EglState::makeEglCurrent() {
 
 void RendererGLES::EglState::destroy() {
     if (mEglDispatch && mEglDisplay != EGL_NO_DISPLAY) {
-        mEglDispatch->eglDestroySurface(mEglDisplay, mEglSurface);
-        mEglDispatch->eglDestroyContext(mEglDisplay, mEglContext);
+        if (mEglSurface != EGL_NO_SURFACE) {
+            mEglDispatch->eglDestroySurface(mEglDisplay, mEglSurface);
+            mEglSurface = EGL_NO_SURFACE;
+        }
+        if (mEglContext != EGL_NO_CONTEXT) {
+            mEglDispatch->eglDestroyContext(mEglDisplay, mEglContext);
+            mEglContext = EGL_NO_CONTEXT;
+        }
         // Don't eglTerminate the display, we don't own the instance.
         mEglDisplay = EGL_NO_DISPLAY;
     }
+    mEglInitialized = false;
 }
 
 }  // namespace ver

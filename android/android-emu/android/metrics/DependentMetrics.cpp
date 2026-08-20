@@ -17,10 +17,12 @@
 #include <unistd.h>
 #endif
 
+#include <algorithm>
+#include <array>
+#include <cstdint>     // for int64_t, uin...
 #include <inttypes.h>
 #include <stdlib.h>    // for free
 #include <sys/stat.h>  // for stat, st_mtime
-#include <cstdint>     // for int64_t, uin...
 #include <functional>  // for __base
 #include <iosfwd>      // for string
 #include <memory>      // for shared_ptr
@@ -871,6 +873,53 @@ static void fillFeatureFlagState(android_studio::AndroidStudioEvent* event) {
     }
 }
 
+static bool isTruthy(const std::string& val) {
+    if (val.empty()) return false;
+    if (val == "1") return true;
+    if (val.size() == 4) {
+        return (val[0] == 't' || val[0] == 'T') &&
+               (val[1] == 'r' || val[1] == 'R') &&
+               (val[2] == 'u' || val[2] == 'U') &&
+               (val[3] == 'e' || val[3] == 'E');
+    }
+    return false;
+}
+
+static bool isRunningInCi() {
+    auto sys = System::get();
+    if (isTruthy(sys->envGet("CI"))) return true;
+    if (isTruthy(sys->envGet("CONTINUOUS_INTEGRATION"))) return true;
+
+    static constexpr std::array kCiEnvVars = {
+            "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL",      "TF_BUILD",
+            "CIRCLECI",       "TRAVIS",    "BUILDKITE",   "TEAMCITY_VERSION", "CODEBUILD_BUILD_ID",
+    };
+
+    return std::any_of(kCiEnvVars.begin(), kCiEnvVars.end(),
+                       [&](const char* var) { return sys->envTest(var); });
+}
+
+static bool isAndroidCliDefined() {
+    return System::get()->envGet("ANDROID_CLI") == "1";
+}
+
+static bool isRunningInContainer() {
+    auto sys = System::get();
+#if defined(__linux__)
+    if (sys->pathExists("/.dockerenv")) return true;
+    if (sys->pathExists("/run/.containerenv")) return true;
+    if (sys->pathExists("/run/systemd/container")) return true;
+    if (!sys->envGet("container").empty()) return true;
+    if (!sys->envGet("KUBERNETES_SERVICE_HOST").empty()) return true;
+#endif
+    // Backward compatibility with the legacy container image
+    if (sys->pathExists("/android/sdk/launch-emulator.sh") &&
+        sys->pathExists("/tmp/pulseverbose.log")) {
+        return true;
+    }
+    return false;
+}
+
 void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
     android_studio::AndroidStudioEvent* event =
             static_cast<android_studio::AndroidStudioEvent*>(opaque);
@@ -934,6 +983,9 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
             cpuFlags & ANDROID_CPU_INFO_VIRT_SUPPORTED);
     event->mutable_emulator_host()->set_running_in_vm(cpuFlags &
                                                       ANDROID_CPU_INFO_VM);
+    event->mutable_emulator_host()->set_running_in_ci(isRunningInCi());
+    event->mutable_emulator_host()->set_android_cli_defined(
+            isAndroidCliDefined());
     event->mutable_emulator_host()->set_cpu_manufacturer(
             (cpuFlags & ANDROID_CPU_INFO_INTEL) ? "INTEL"
             : (cpuFlags & ANDROID_CPU_INFO_AMD) ? "AMD"
@@ -975,10 +1027,8 @@ void android_metrics_fill_common_info(bool openglAlive, void* opaque) {
         android::CommonReportedInfo::setDetails(&forCommonInfoDetails);
     }
 
-    // Check for a set of files that exist in the container environment
-    bool isContainer =
-            System::get()->pathExists("/android/sdk/launch-emulator.sh") &&
-            System::get()->pathExists("/tmp/pulseverbose.log");
+    // Check for container environment
+    bool isContainer = isRunningInContainer();
 
     if (isContainer && getConsoleAgents()
                                ->settings->android_cmdLineOptions()

@@ -338,6 +338,20 @@ char* path_getBuildBuildProp(const char* androidOut) {
     return ASTRDUP(temp);
 }
 
+char* path_getBuildVendorProp(const char* androidOut) {
+    char temp[MAX_PATH], *p = temp, *end = p + sizeof(temp);
+    p = bufprint(temp, end, "%s"PATH_SEP"vendor"PATH_SEP"build.prop", androidOut);
+    if (p >= end) {
+        D("ANDROID_BUILD_OUT is too long: %s\n", androidOut);
+        return NULL;
+    }
+    if (!path_exists(temp)) {
+        D("Cannot find vendor build properties file: %s\n", temp);
+        return NULL;
+    }
+    return ASTRDUP(temp);
+}
+
 
 char* path_getBuildBootProp(const char* androidOut) {
     char temp[MAX_PATH], *p = temp, *end = p + sizeof(temp);
@@ -361,10 +375,10 @@ path_getBuildTargetArch(const char* androidOut) {
         return NULL;
     }
 
-    FileData buildProp[1];
-    fileData_initFromFile(buildProp, buildPropPath);
-    char* ret = propertyFile_getTargetArch(buildProp);
-    fileData_done(buildProp);
+    FileData buildProp;
+    fileData_initFromFile(&buildProp, buildPropPath);
+    char* ret = propertyFile_getTargetArch(&buildProp);
+    fileData_done(&buildProp);
     AFREE(buildPropPath);
     return ret;
 }

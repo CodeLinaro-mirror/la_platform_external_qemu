@@ -40,6 +40,8 @@ cpuid_family: 6
 cpuid_type: 0
 cpuid_extmodel: 3
 cpuid_extfamily: 0
+running_in_ci: true
+android_cli_defined: true
 )";
 
 static const char kEmulatorDetailsTestStr[] = R"(
@@ -129,6 +131,8 @@ TEST(CommonReportedInfo, basic) {
     android_studio::EmulatorHost hostInfoFromCommon;
     EXPECT_TRUE(hostInfoFromCommon.ParseFromString(tmpHostInfo));
     EXPECT_EQ(hostInfo.DebugString(), hostInfoFromCommon.DebugString());
+    EXPECT_TRUE(hostInfoFromCommon.running_in_ci());
+    EXPECT_TRUE(hostInfoFromCommon.android_cli_defined());
 
     std::string tmpDetails;
     CommonReportedInfo::writeDetails(&tmpDetails);

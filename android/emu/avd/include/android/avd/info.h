@@ -306,6 +306,12 @@ const FileData* avdInfo_getBootProperties(const AvdInfo* i);
  */
 const FileData* avdInfo_getBuildProperties(const AvdInfo* i);
 
+/* Return a reference to the vendor/build.prop file for this AVD, if any.
+ * Note that this never returns NULL, but the corresponding content can
+ * be empty.
+ */
+const FileData* avdInfo_getVendorBuildProperties(const AvdInfo* i);
+
 /* Return a reference to the avd/config.ini file for this AVD.
  * Note that this value could be NULL.
  */
@@ -517,5 +523,12 @@ bool avdInfo_getBuildPropertyBool(const AvdInfo* info, const char* property, boo
 int avdInfo_getBuildPropertyInt(const AvdInfo* info, const char* property, int defValue);
 
 char* avdInfo_getBuildPropertyString(const AvdInfo* info, const char* property);
+
+/* Returns the boolean value for the given vendor build property key. */
+bool avdInfo_getVendorBuildPropertyBool(const AvdInfo* info, const char* property, bool defValue);
+
+int avdInfo_getVendorBuildPropertyInt(const AvdInfo* info, const char* property, int defValue);
+
+char* avdInfo_getVendorBuildPropertyString(const AvdInfo* info, const char* property);
 
 ANDROID_END_HEADER
