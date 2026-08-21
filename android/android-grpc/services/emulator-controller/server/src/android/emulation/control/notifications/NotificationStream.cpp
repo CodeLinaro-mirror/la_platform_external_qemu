@@ -18,6 +18,7 @@
 
 #include "aemu/base/EventNotificationSupport.h"
 #include "android/avd/info.h"
+#include "android/console.h"
 #include "android/emulation/control/BootCompletionHandler.h"
 #include "android/emulation/control/utils/TypeConversion.h"
 #include "android/hw-sensors.h"
@@ -170,6 +171,18 @@ NotificationStream::getMicrophoneStateNotificationEvent(bool allow) {
     return event;
 }
 
+std::optional<Notification>
+NotificationStream::getDisplayPowerModeNotificationEvent(
+        uint32_t displayId,
+        DisplayPowerMode powerMode) {
+    Notification event;
+    auto* powerModeNotification = event.mutable_displaypowermode();
+    powerModeNotification->set_display(displayId);
+    powerModeNotification->set_power_mode(
+            static_cast<DisplayPowerModeNotification_PowerMode>(powerMode));
+    return event;
+}
+
 NotificationStreamWriter* NotificationStream::notificationStream() {
     if (!mRegisteredListeners.test_and_set()) {
         registerListeners();
@@ -187,6 +200,16 @@ NotificationStreamWriter* NotificationStream::notificationStream() {
         stream->eventArrived(getXrOptionsNotificationEvent());
     }
     stream->eventArrived(getDisplayNotificationEvent());
+    if (mAgents && mAgents->multi_display &&
+        mAgents->multi_display->getDisplayPowerMode) {
+        for (uint32_t i = 0; i < MultiDisplay::s_maxNumMultiDisplay; i++) {
+            uint32_t mode = 0;
+            if (mAgents->multi_display->getDisplayPowerMode(i, &mode) == 0) {
+                stream->eventArrived(getDisplayPowerModeNotificationEvent(
+                        i, static_cast<DisplayPowerMode>(mode)));
+            }
+        }
+    }
     return stream;
 }
 
@@ -275,6 +298,23 @@ void NotificationStream::registerListeners() {
                 });
             }
         }
+
+        if (mAgents->multi_display &&
+            mAgents->multi_display->getDisplayPowerModeEventListener) {
+            auto powerModePublisher =
+                    static_cast<base::EventNotificationSupport<
+                            DisplayPowerModeChangeEvent>*>(
+                            mAgents->multi_display
+                                    ->getDisplayPowerModeEventListener());
+            if (powerModePublisher) {
+                powerModePublisher->registerOnce(
+                        [this](const DisplayPowerModeChangeEvent& evt) {
+                            mNotificationListeners.fireEvent(
+                                    getDisplayPowerModeNotificationEvent(
+                                            evt.displayId, evt.powerMode));
+                        });
+            }
+        }
     }
 
     if (auto md = MultiDisplay::getInstance()) {
@@ -297,18 +337,6 @@ void NotificationStream::registerListeners() {
     }
 
     xr_service::registerCallback(handleXrOptionsEvent, this);
-
-    if (mAgents->vm && mAgents->vm->getRealAudioEventListener) {
-        auto microphoneStatePublisher =
-                static_cast<base::EventNotificationSupport<bool>*>(
-                        mAgents->vm->getRealAudioEventListener());
-        if (microphoneStatePublisher) {
-            microphoneStatePublisher->registerOnce([&](bool allow) {
-                mNotificationListeners.fireEvent(
-                        getMicrophoneStateNotificationEvent(allow));
-            });
-        }
-    }
 }
 
 void handleXrOptionsEvent(void* user_data,

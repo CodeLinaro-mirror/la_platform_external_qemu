@@ -669,6 +669,7 @@ if(NOT LINUX_AARCH64)
       android/emulation/HostmemIdMapping_unittest.cpp
       android/emulation/HostMemoryService_unittest.cpp
       android/emulation/Hypervisor_unittest.cpp
+      android/emulation/MultiDisplay_unittest.cpp
       android/emulation/ParameterList_unittest.cpp
       android/emulation/serial_line_unittest.cpp
       android/emulation/SetupParameters_unittest.cpp

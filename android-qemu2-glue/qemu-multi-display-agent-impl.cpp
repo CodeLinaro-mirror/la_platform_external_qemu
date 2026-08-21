@@ -16,13 +16,14 @@
 using android::MultiDisplay;
 
 static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
-        .notifyDisplayChanges = []() {
-            auto instance = MultiDisplay::getInstance();
-            if (instance) {
-                return instance->notifyDisplayChanges();
-            }
-            return false;
-        },
+        .notifyDisplayChanges =
+                []() {
+                    auto instance = MultiDisplay::getInstance();
+                    if (instance) {
+                        return instance->notifyDisplayChanges();
+                    }
+                    return false;
+                },
         .setMultiDisplay = [](uint32_t id,
                               int32_t x,
                               int32_t y,
@@ -30,7 +31,7 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
                               uint32_t h,
                               uint32_t dpi,
                               uint32_t flag,
-                              bool add) -> int{
+                              bool add) -> int {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
                 return instance->setMultiDisplay(id, x, y, w, h, dpi, flag, add);
@@ -38,13 +39,13 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             return -1;
         },
         .getMultiDisplay = [](uint32_t id,
-                             int32_t* x,
-                             int32_t* y,
-                             uint32_t* w,
-                             uint32_t* h,
-                             uint32_t* dpi,
-                             uint32_t* flag,
-                             bool* enable) -> bool{
+                              int32_t* x,
+                              int32_t* y,
+                              uint32_t* w,
+                              uint32_t* h,
+                              uint32_t* dpi,
+                              uint32_t* flag,
+                              bool* enable) -> bool {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
                 return instance->getMultiDisplay(id, x, y, w, h, dpi, flag, enable);
@@ -52,14 +53,14 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             return false;
         },
         .getNextMultiDisplay = [](int32_t start_id,
-                                uint32_t* id,
-                                int32_t* x,
-                                int32_t* y,
-                                uint32_t* w,
-                                uint32_t* h,
-                                uint32_t* dpi,
-                                uint32_t* flag,
-                                uint32_t* cb) -> bool {
+                                  uint32_t* id,
+                                  int32_t* x,
+                                  int32_t* y,
+                                  uint32_t* w,
+                                  uint32_t* h,
+                                  uint32_t* dpi,
+                                  uint32_t* flag,
+                                  uint32_t* cb) -> bool {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
                 return instance->getNextMultiDisplay(start_id, id, x, y, w, h, dpi, flag, cb);
@@ -73,17 +74,21 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             }
             return false;
         },
-        .getCombinedDisplaySize = [](uint32_t* width, uint32_t* height) {
-            auto instance = MultiDisplay::getInstance();
-            if (instance) {
-                instance->getCombinedDisplaySize(width, height);
-            } else {
-                *width = -1;
-                *height = -1;
-            }
-        },
-        .multiDisplayParamValidate = [](uint32_t id, uint32_t w, uint32_t h,
-                                        uint32_t dpi, uint32_t flag) -> bool {
+        .getCombinedDisplaySize =
+                [](uint32_t* width, uint32_t* height) {
+                    auto instance = MultiDisplay::getInstance();
+                    if (instance) {
+                        instance->getCombinedDisplaySize(width, height);
+                    } else {
+                        *width = -1;
+                        *height = -1;
+                    }
+                },
+        .multiDisplayParamValidate = [](uint32_t id,
+                                        uint32_t w,
+                                        uint32_t h,
+                                        uint32_t dpi,
+                                        uint32_t flag) -> bool {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
                 return instance->multiDisplayParamValidate(id, w, h, dpi, flag);
@@ -91,7 +96,8 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
                 return false;
             }
         },
-        .translateCoordination = [](uint32_t* x, uint32_t*y, uint32_t* displayId) -> bool {
+        .translateCoordination =
+                [](uint32_t* x, uint32_t* y, uint32_t* displayId) -> bool {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
                 return instance->translateCoordination(x, y, displayId);
@@ -99,12 +105,13 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
                 return false;
             }
         },
-        .setGpuMode = [](bool isGuestMode, uint32_t w, uint32_t h) {
-            auto instance = MultiDisplay::getInstance();
-            if (instance) {
-                instance->setGpuMode(isGuestMode, w, h);
-            }
-        },
+        .setGpuMode =
+                [](bool isGuestMode, uint32_t w, uint32_t h) {
+                    auto instance = MultiDisplay::getInstance();
+                    if (instance) {
+                        instance->setGpuMode(isGuestMode, w, h);
+                    }
+                },
         .createDisplay = [](uint32_t* displayId) -> int {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
@@ -122,11 +129,11 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             }
         },
         .setDisplayPose = [](uint32_t displayId,
-                            int32_t x,
-                            int32_t y,
-                            uint32_t w,
-                            uint32_t h,
-                            uint32_t dpi) -> int {
+                             int32_t x,
+                             int32_t y,
+                             uint32_t w,
+                             uint32_t h,
+                             uint32_t dpi) -> int {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
                 return instance->setDisplayPose(displayId, x, y, w, h, dpi, /* flag */ 0);
@@ -135,10 +142,10 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             }
         },
         .getDisplayPose = [](uint32_t displayId,
-                            int32_t* x,
-                            int32_t* y,
-                            uint32_t* w,
-                            uint32_t* h) -> int {
+                             int32_t* x,
+                             int32_t* y,
+                             uint32_t* w,
+                             uint32_t* h) -> int {
             auto instance = MultiDisplay::getInstance();
             if (instance) {
                 return instance->getDisplayPose(displayId, x, y, w, h);
@@ -180,6 +187,13 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             }
             return instance->setDisplayPowerMode(displayId, mode);
         },
+        .getDisplayPowerModeEventListener = []() -> void* {
+            auto instance = MultiDisplay::getInstance();
+            if (instance) {
+                return instance->getDisplayPowerModeEventListener();
+            }
+            return nullptr;
+        },
         .getDisplayColorBuffer = [](uint32_t displayId,
                                     uint32_t* colorBuffer) -> int {
             auto instance = MultiDisplay::getInstance();
@@ -215,12 +229,13 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
                 return false;
             }
         },
-        .performRotation = [](int rot) {
-            auto instance = MultiDisplay::getInstance();
-            if (instance) {
-                instance->performRotation(rot);
-            }
-        },
+        .performRotation =
+                [](int rot) {
+                    auto instance = MultiDisplay::getInstance();
+                    if (instance) {
+                        instance->performRotation(rot);
+                    }
+                },
         .isPixelFold = []() -> bool {
             auto instance = MultiDisplay::getInstance();
             if (instance) {

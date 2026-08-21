@@ -21,10 +21,10 @@
 #include "host-common/multi_display_agent.h"  // for QAndroidM...
 
 static std::map<uint32_t, android::MultiDisplayInfo> mMultiDisplay;
+static android::DisplayPowerModeNotificationSupport
+        sPowerModeNotificationSupport;
 static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
-        .notifyDisplayChanges = []() {
-            return true;
-        },
+        .notifyDisplayChanges = []() { return true; },
         .setMultiDisplay = [](uint32_t id,
                               int32_t x,
                               int32_t y,
@@ -32,28 +32,24 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
                               uint32_t h,
                               uint32_t dpi,
                               uint32_t flag,
-                              bool add) -> int{
-            return 0;
-        },
+                              bool add) -> int { return 0; },
         .getMultiDisplay = [](uint32_t id,
-                             int32_t* x,
-                             int32_t* y,
-                             uint32_t* w,
-                             uint32_t* h,
-                             uint32_t* dpi,
-                             uint32_t* flag,
-                             bool* enable) -> bool{
-            return true;
-        },
+                              int32_t* x,
+                              int32_t* y,
+                              uint32_t* w,
+                              uint32_t* h,
+                              uint32_t* dpi,
+                              uint32_t* flag,
+                              bool* enable) -> bool { return true; },
         .getNextMultiDisplay = [](int32_t start_id,
-                                uint32_t* id,
-                                int32_t* x,
-                                int32_t* y,
-                                uint32_t* w,
-                                uint32_t* h,
-                                uint32_t* dpi,
-                                uint32_t* flag,
-                                uint32_t* cb) -> bool {
+                                  uint32_t* id,
+                                  int32_t* x,
+                                  int32_t* y,
+                                  uint32_t* w,
+                                  uint32_t* h,
+                                  uint32_t* dpi,
+                                  uint32_t* flag,
+                                  uint32_t* cb) -> bool {
             uint32_t key;
             std::map<uint32_t, android::MultiDisplayInfo>::iterator i;
             if (start_id < 0) {
@@ -95,21 +91,17 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
         .isMultiDisplayEnabled = [](void) -> bool {
             return mMultiDisplay.size() > 1;
         },
-        .getCombinedDisplaySize = [](uint32_t* width, uint32_t* height) {
-        },
+        .getCombinedDisplaySize = [](uint32_t* width, uint32_t* height) {},
         .multiDisplayParamValidate = [](uint32_t id,
                                         uint32_t w,
                                         uint32_t h,
                                         uint32_t dpi,
-                                        uint32_t flag) -> bool {
+                                        uint32_t flag) -> bool { return true; },
+        .translateCoordination =
+                [](uint32_t* x, uint32_t* y, uint32_t* displayId) -> bool {
             return true;
         },
-        .translateCoordination = [](uint32_t* x,
-                                    uint32_t*y,
-                                    uint32_t* displayId) -> bool {
-            return true;
-        },
-        .setGpuMode = [](bool isGuestMode, uint32_t w, uint32_t h) { },
+        .setGpuMode = [](bool isGuestMode, uint32_t w, uint32_t h) {},
         .createDisplay = [](uint32_t* displayId) -> int {
             mMultiDisplay.emplace(*displayId, android::MultiDisplayInfo());
             return 0;
@@ -132,10 +124,10 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             return 0;
         },
         .getDisplayPose = [](uint32_t displayId,
-                            int32_t* x,
-                            int32_t* y,
-                            uint32_t* w,
-                            uint32_t* h) -> int {
+                             int32_t* x,
+                             int32_t* y,
+                             uint32_t* w,
+                             uint32_t* h) -> int {
             *x = mMultiDisplay[displayId].pos_x;
             *y = mMultiDisplay[displayId].pos_y;
             *w = mMultiDisplay[displayId].width;
@@ -177,9 +169,18 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             if (mode > static_cast<uint32_t>(android::DisplayPowerMode::MAX_VAL)) {
                 return -1;
             }
-            mMultiDisplay[displayId].powerMode =
+            android::DisplayPowerMode newMode =
                     static_cast<android::DisplayPowerMode>(mode);
+            if (mMultiDisplay[displayId].powerMode != newMode) {
+                mMultiDisplay[displayId].powerMode = newMode;
+                sPowerModeNotificationSupport.fire(
+                        android::DisplayPowerModeChangeEvent{displayId,
+                                                             newMode});
+            }
             return 0;
+        },
+        .getDisplayPowerModeEventListener = []() -> void* {
+            return &sPowerModeNotificationSupport;
         },
         .getDisplayColorBuffer = [](uint32_t displayId,
                                     uint32_t* colorBuffer) -> int {
@@ -202,7 +203,7 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             return 0;
         },
         .isMultiDisplayWindow = []() { return false; },
-        .performRotation = [](int rot) { },
+        .performRotation = [](int rot) {},
         .isPixelFold = []() { return false; },
 };
 extern "C" const QAndroidMultiDisplayAgent* const
