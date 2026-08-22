@@ -281,7 +281,7 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
 }
 
 static bool ca_init_voice_locked(CoreaudioVoice *core,
-                                 const struct audsettings *sw_as);
+                                 const struct audsettings *mixeng_as);
 static void ca_fini_voice_locked(CoreaudioVoice *core);
 
 /* This handles both device and format changes */
@@ -921,7 +921,7 @@ static size_t ca_get_periods_count(const CoreaudioVoice *core)
 }
 
 static bool ca_init_voice_locked(CoreaudioVoice *core,
-                                 const struct audsettings *sw_as)
+                                 const struct audsettings *mixeng_as)
 {
     ASSERT(core->device_id == kAudioDeviceUnknown);
     ASSERT(!core->ioprocid);
@@ -1003,30 +1003,33 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
 
         struct audio_pcm_info *info = core->is_output ? &core->hw.out.info
                                                       : &core->hw.in.info;
-        if (sw_as) {
-            ASSERT(sw_as->nchannels > 0);
+        if (mixeng_as) {
+            ASSERT(mixeng_as->freq > 0);
+            ASSERT(mixeng_as->nchannels > 0);
 
             /*
              * This is a new voice, try using the sound card
              * values to avoid double conversion.
              */
             struct audsettings as = {
-                .freq = hw_stream_fmt.mSampleRate,
                 /*
                  * This accomodates 5 channel guest streams on
                  * a 16 channel sound card in MacOS.
                  */
-                .nchannels = MIN(sw_as->nchannels,
+                .nchannels = MIN(mixeng_as->nchannels,
                                  hw_stream_fmt.mChannelsPerFrame),
                 .big_endian = false,
             };
 
-            if (!ca_get_sample_format(&hw_stream_fmt, &as.fmt)) {
+            if (ca_get_sample_format(&hw_stream_fmt, &as.fmt)) {
+                as.freq = hw_stream_fmt.mSampleRate;
+            } else {
                 /*
                  * A converter will be created anyway, use
-                 * the format QEMU suggested.
+                 * the mixeng settings.
                  */
-                as.fmt = ca_to_safe_AudioFormat(sw_as->fmt);
+                as.freq = mixeng_as->freq;
+                as.fmt = ca_to_safe_AudioFormat(mixeng_as->fmt);
             }
 
             audio_pcm_init_info(info, &as);
@@ -1129,7 +1132,7 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
 
 static int coreaudio_init_impl(const bool is_output,
                                CoreaudioVoice *core,
-                               struct audsettings *sw_as)
+                               struct audsettings *mixeng_as)
 {
     OSStatus status;
     int err;
@@ -1156,7 +1159,7 @@ static int coreaudio_init_impl(const bool is_output,
         return -1;
     }
 
-    if (!ca_init_voice_locked(core, sw_as)) {
+    if (!ca_init_voice_locked(core, mixeng_as)) {
         ca_unlisten_dev_change_locked(core);
         ca_voice_unlock(core);
         pthread_mutex_destroy(&core->buf_mutex);
@@ -1227,9 +1230,9 @@ static void coreaudio_enable_impl(CoreaudioVoice *core,
     ca_voice_unlock(core);
 }
 
-static int coreaudio_init_out(HWVoiceOut *hw, struct audsettings *as)
+static int coreaudio_init_out(HWVoiceOut *hw, struct audsettings *mixeng_as)
 {
-    return coreaudio_init_impl(true, (CoreaudioVoice *)hw, as);
+    return coreaudio_init_impl(true, (CoreaudioVoice *)hw, mixeng_as);
 }
 
 static void coreaudio_fini_out(HWVoiceOut *hw)
@@ -1242,9 +1245,9 @@ static void coreaudio_enable_out(HWVoiceOut *hw, bool enable)
     coreaudio_enable_impl((CoreaudioVoice *)hw, enable);
 }
 
-static int coreaudio_init_in(HWVoiceIn *hw, struct audsettings *as)
+static int coreaudio_init_in(HWVoiceIn *hw, struct audsettings *mixeng_as)
 {
-    return coreaudio_init_impl(false, (CoreaudioVoice *)hw, as);
+    return coreaudio_init_impl(false, (CoreaudioVoice *)hw, mixeng_as);
 }
 
 static void coreaudio_fini_in(HWVoiceIn *hw)
