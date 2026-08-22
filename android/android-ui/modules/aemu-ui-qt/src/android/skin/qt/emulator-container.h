@@ -20,9 +20,14 @@
 #include <QString>                         // for QString
 #include <QTimer>                          // for QTimer
 
+#include <memory>
+
+#include "aemu/base/EventNotificationSupport.h"
 #include "aemu/base/memory/OnDemand.h"  // for OnDemand
 #include "android/skin/qt/ModalOverlay.h"  // for ModalOverlay, ModalOverlay...
 #include "android/skin/qt/OverlayMessageCenter.h"
+#include "host-common/MultiDisplay.h"
+
 class EmulatorQtWindow;
 class QCloseEvent;
 class QFocusEvent;
@@ -72,6 +77,7 @@ signals:
                              Ui::ModalOverlay::OverlayButtonFunc func);
     void showVirtualSceneInfoDialog();
     void hideVirtualSceneInfoDialog();
+    void displayPowerModeChanged(uint32_t displayId, int mode);
 
 private slots:
     void slot_resizeDone();
@@ -82,6 +88,7 @@ private slots:
     void slot_showVirtualSceneInfoDialog();
     void slot_hideVirtualSceneInfoDialog();
     void slot_messagesResized();
+    void slot_displayPowerModeChanged(uint32_t displayId, int mode);
 
 private:
     void startResizeTimer();
@@ -103,4 +110,8 @@ private:
     QList<QEvent::Type> mEventBuffer;
     QTimer mResizeTimer;
     bool mRotating = false;
+    std::unique_ptr<android::base::RaiiEventListener<
+            android::DisplayPowerModeNotificationSupport,
+            android::DisplayPowerModeChangeEvent>>
+            mDisplayPowerModeEventListener;
 };
