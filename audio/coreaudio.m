@@ -577,29 +577,33 @@ static OSStatus ca_in_device_ioproc(
     return kAudioHardwareNoError;
 }
 
+typedef struct caInputConverterContext {
+    const char *data;
+    uint32_t available_frames;
+    uint32_t num_channels : 10;
+    uint32_t frame_size : 22;
+} CaInputConverterContext;
+
 static OSStatus ca_in_conv_proc_locked(AudioConverterRef converter,
                                        UInt32 *frames_to_consume,
                                        AudioBufferList *data_to_consume,
                                        AudioStreamPacketDescription **spd,
-                                       void *input_data_raw)
+                                       void *input_context_raw)
 {
     if (spd) {
         *spd = NULL;
     }
 
-    AudioBufferList *input_data = input_data_raw;
-    const uint32_t available_frames = input_data->mBuffers[0].mDataByteSize;
-    const uint32_t hacked_channels = input_data->mBuffers[0].mNumberChannels;
-    const uint32_t frame_size = hacked_channels >> 10;
-    const size_t num_frames = MIN(*frames_to_consume, available_frames);
+    CaInputConverterContext *input_context = input_context_raw;
 
-    input_data->mBuffers[0].mData =
-            ((char*)input_data->mBuffers[0].mData) + num_frames * frame_size;
-    input_data->mBuffers[0].mDataByteSize -= num_frames;
+    const size_t num_frames = MIN(*frames_to_consume, input_context->available_frames);
 
-    *data_to_consume = *input_data;
-    data_to_consume->mBuffers[0].mDataByteSize = num_frames * frame_size;
-    data_to_consume->mBuffers[0].mNumberChannels = hacked_channels & 0x3FF;
+    data_to_consume->mNumberBuffers = 1;
+    data_to_consume->mBuffers[0].mData = (char*)input_context->data;
+    data_to_consume->mBuffers[0].mNumberChannels = input_context->num_channels;
+    data_to_consume->mBuffers[0].mDataByteSize = num_frames * input_context->frame_size;
+    input_context->data += data_to_consume->mBuffers[0].mDataByteSize;
+    input_context->available_frames -= num_frames;
     *frames_to_consume = num_frames;
     return kAudioHardwareNoError;
 }
@@ -635,12 +639,6 @@ static OSStatus ca_in_device_wconv_ioproc(
             inInputData->mBuffers[0].mDataByteSize /
             core->hw_frame_size;
 
-    AudioBufferList input_data = *inInputData;
-    input_data.mBuffers[0].mDataByteSize = requested_size_frames;
-    input_data.mBuffers[0].mNumberChannels =
-            (core->hw_frame_size << 10) |
-            inInputData->mBuffers[0].mNumberChannels;
-
     HWVoiceIn *q_voice = &core->hw.in;
     const size_t q_bytes_per_frame = q_voice->info.bytes_per_frame;
     ASSERT(q_bytes_per_frame > 0);
@@ -652,6 +650,14 @@ static OSStatus ca_in_device_wconv_ioproc(
     ASSERT(pos_emul < size_emul);
     char* buf_emul8 = q_voice->buf_emul;
     ASSERT(buf_emul8);
+
+    ASSERT(core->hw_channels == inInputData->mBuffers[0].mNumberChannels);
+    CaInputConverterContext input_context = {
+        .data = inInputData->mBuffers[0].mData,
+        .available_frames = requested_size_frames,
+        .num_channels = core->hw_channels,
+        .frame_size = core->hw_frame_size,
+    };
 
     while (requested_size_frames) {
         UInt32 size_frames =
@@ -668,7 +674,7 @@ static OSStatus ca_in_device_wconv_ioproc(
         OSStatus status =
                 AudioConverterFillComplexBuffer(core->converter,
                                                 &ca_in_conv_proc_locked,
-                                                &input_data,
+                                                &input_context,
                                                 &size_frames,
                                                 &output_data,
                                                 NULL);
