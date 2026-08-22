@@ -839,7 +839,7 @@ static bool ca_is_converter_required(const AudioStreamBasicDescription *hw,
                                      const struct audio_pcm_info* sw)
 {
     AudioFormat hw_af;
-    return (hw->mSampleRate != sw->freq) ||
+    return (fabs(hw->mSampleRate - sw->freq) > (sw->freq * 0.0005)) ||
            !ca_get_sample_format(hw, &hw_af) ||
            (hw_af != sw->af);
 }
