@@ -935,6 +935,9 @@ static int user_backed_flags_to_kvm_flags(int flags) {
 }
 
 static void kvm_user_backed_ram_map(uint64_t gpa, void* hva, uint64_t size, int flags) {
+    if (!hva) {
+        return;
+    }
     KVMSlot *slot;
     KVMMemoryListener* kml;
     int err;

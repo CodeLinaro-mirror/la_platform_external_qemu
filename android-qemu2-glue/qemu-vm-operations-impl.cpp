@@ -985,6 +985,11 @@ static void set_snapshot_callbacks(void* opaque,
 
 static void map_user_backed_ram(uint64_t gpa, void* hva, uint64_t size) {
     android::RecursiveScopedVmLock vmlock;
+    if (!hva) {
+        derror("%s: null host virtual address passed for gpa:0x%llx. Ignoring.",
+               __func__, (unsigned long long)gpa);
+        return;
+    }
     DMEM("%s: gpa:0x%lx hva:0x%lx size:0x%lx", __func__, gpa, (uintptr_t)hva, size);
     auto [it, inserted] = sMemoryMap.insert({gpa, MemoryMapping{(uint64_t)(uintptr_t)hva, size}});
     if (!inserted) {
