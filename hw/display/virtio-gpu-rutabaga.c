@@ -16,6 +16,7 @@
 #include "ui/console.h"
 
 #include <glib/gmem.h>
+#include <glib/gstdio.h>
 #include <rutabaga_gfx/rutabaga_gfx_ffi.h>
 
 #define VIRTIO_GPU_RUTABAGA_VM_VERSION 1
@@ -1359,7 +1360,7 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         error_report("snapshot_directory not configured");
         return -EINVAL;
     }
-    full_path = g_build_filename(vgr->snapshot_directory, id_str, NULL);
+    full_path = g_build_filename(vgr->snapshot_directory, "default_boot", id_str, NULL);
 
     if (rutabaga_restore(vgr->rutabaga, full_path)) {
         error_report("failed to restore rutabaga");
@@ -1487,6 +1488,29 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
     return 0;
 }
 
+static void virtio_gpu_rutabaga_remove_dir_recursive(const char *path)
+{
+    GDir *dir = g_dir_open(path, 0, NULL);
+    const char *name;
+
+    if (!dir) {
+        g_remove(path);
+        return;
+    }
+
+    while ((name = g_dir_read_name(dir)) != NULL) {
+        g_autofree char *child = g_build_filename(path, name, NULL);
+        if (g_file_test(child, G_FILE_TEST_IS_DIR) &&
+            !g_file_test(child, G_FILE_TEST_IS_SYMLINK)) {
+            virtio_gpu_rutabaga_remove_dir_recursive(child);
+        } else {
+            g_remove(child);
+        }
+    }
+    g_dir_close(dir);
+    g_rmdir(path);
+}
+
 static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
                            const VMStateField *field, JSONWriter *vmdesc)
 {
@@ -1496,6 +1520,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
     int i;
     g_autofree char *id_str = NULL;
     g_autofree char *full_path = NULL;
+    g_autofree char *default_boot_path = NULL;
 
     if (!vgr->snapshot_directory) {
         error_report("snapshot_directory not configured");
@@ -1506,7 +1531,10 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
     id_str = g_date_time_format(now, "rutabaga-%Y-%b-%d-%H-%M-%S");
     qemu_put_counted_string(f, id_str);
 
-    full_path = g_build_filename(vgr->snapshot_directory, id_str, NULL);
+    default_boot_path = g_build_filename(vgr->snapshot_directory, "default_boot", NULL);
+    virtio_gpu_rutabaga_remove_dir_recursive(default_boot_path);
+
+    full_path = g_build_filename(vgr->snapshot_directory, "default_boot", id_str, NULL);
 
     if (g_mkdir_with_parents(full_path, 0755) == -1) {
         error_report("Failed to create snapshot directory %s", full_path);
@@ -1515,6 +1543,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
 
     if (rutabaga_snapshot(vgr->rutabaga, full_path)) {
         error_report("Failed to save graphics");
+        virtio_gpu_rutabaga_remove_dir_recursive(default_boot_path);
         return -EINVAL;
     }
 
