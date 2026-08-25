@@ -281,7 +281,7 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
 }
 
 static bool ca_init_voice_locked(CoreaudioVoice *core,
-                                 const struct audsettings *sw_as);
+                                 const struct audsettings *mixeng_as);
 static void ca_fini_voice_locked(CoreaudioVoice *core);
 
 /* This handles both device and format changes */
@@ -577,29 +577,33 @@ static OSStatus ca_in_device_ioproc(
     return kAudioHardwareNoError;
 }
 
+typedef struct caInputConverterContext {
+    const char *data;
+    uint32_t available_frames;
+    uint32_t num_channels : 10;
+    uint32_t frame_size : 22;
+} CaInputConverterContext;
+
 static OSStatus ca_in_conv_proc_locked(AudioConverterRef converter,
                                        UInt32 *frames_to_consume,
                                        AudioBufferList *data_to_consume,
                                        AudioStreamPacketDescription **spd,
-                                       void *input_data_raw)
+                                       void *input_context_raw)
 {
     if (spd) {
         *spd = NULL;
     }
 
-    AudioBufferList *input_data = input_data_raw;
-    const uint32_t available_frames = input_data->mBuffers[0].mDataByteSize;
-    const uint32_t hacked_channels = input_data->mBuffers[0].mNumberChannels;
-    const uint32_t frame_size = hacked_channels >> 10;
-    const size_t num_frames = MIN(*frames_to_consume, available_frames);
+    CaInputConverterContext *input_context = input_context_raw;
 
-    input_data->mBuffers[0].mData =
-            ((char*)input_data->mBuffers[0].mData) + num_frames * frame_size;
-    input_data->mBuffers[0].mDataByteSize -= num_frames;
+    const size_t num_frames = MIN(*frames_to_consume, input_context->available_frames);
 
-    *data_to_consume = *input_data;
-    data_to_consume->mBuffers[0].mDataByteSize = num_frames * frame_size;
-    data_to_consume->mBuffers[0].mNumberChannels = hacked_channels & 0x3FF;
+    data_to_consume->mNumberBuffers = 1;
+    data_to_consume->mBuffers[0].mData = (char*)input_context->data;
+    data_to_consume->mBuffers[0].mNumberChannels = input_context->num_channels;
+    data_to_consume->mBuffers[0].mDataByteSize = num_frames * input_context->frame_size;
+    input_context->data += data_to_consume->mBuffers[0].mDataByteSize;
+    input_context->available_frames -= num_frames;
     *frames_to_consume = num_frames;
     return kAudioHardwareNoError;
 }
@@ -635,12 +639,6 @@ static OSStatus ca_in_device_wconv_ioproc(
             inInputData->mBuffers[0].mDataByteSize /
             core->hw_frame_size;
 
-    AudioBufferList input_data = *inInputData;
-    input_data.mBuffers[0].mDataByteSize = requested_size_frames;
-    input_data.mBuffers[0].mNumberChannels =
-            (core->hw_frame_size << 10) |
-            inInputData->mBuffers[0].mNumberChannels;
-
     HWVoiceIn *q_voice = &core->hw.in;
     const size_t q_bytes_per_frame = q_voice->info.bytes_per_frame;
     ASSERT(q_bytes_per_frame > 0);
@@ -652,6 +650,14 @@ static OSStatus ca_in_device_wconv_ioproc(
     ASSERT(pos_emul < size_emul);
     char* buf_emul8 = q_voice->buf_emul;
     ASSERT(buf_emul8);
+
+    ASSERT(core->hw_channels == inInputData->mBuffers[0].mNumberChannels);
+    CaInputConverterContext input_context = {
+        .data = inInputData->mBuffers[0].mData,
+        .available_frames = requested_size_frames,
+        .num_channels = core->hw_channels,
+        .frame_size = core->hw_frame_size,
+    };
 
     while (requested_size_frames) {
         UInt32 size_frames =
@@ -668,7 +674,7 @@ static OSStatus ca_in_device_wconv_ioproc(
         OSStatus status =
                 AudioConverterFillComplexBuffer(core->converter,
                                                 &ca_in_conv_proc_locked,
-                                                &input_data,
+                                                &input_context,
                                                 &size_frames,
                                                 &output_data,
                                                 NULL);
@@ -839,7 +845,7 @@ static bool ca_is_converter_required(const AudioStreamBasicDescription *hw,
                                      const struct audio_pcm_info* sw)
 {
     AudioFormat hw_af;
-    return (hw->mSampleRate != sw->freq) ||
+    return (fabs(hw->mSampleRate - sw->freq) > (sw->freq * 0.0005)) ||
            !ca_get_sample_format(hw, &hw_af) ||
            (hw_af != sw->af);
 }
@@ -921,7 +927,7 @@ static size_t ca_get_periods_count(const CoreaudioVoice *core)
 }
 
 static bool ca_init_voice_locked(CoreaudioVoice *core,
-                                 const struct audsettings *sw_as)
+                                 const struct audsettings *mixeng_as)
 {
     ASSERT(core->device_id == kAudioDeviceUnknown);
     ASSERT(!core->ioprocid);
@@ -1003,30 +1009,33 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
 
         struct audio_pcm_info *info = core->is_output ? &core->hw.out.info
                                                       : &core->hw.in.info;
-        if (sw_as) {
-            ASSERT(sw_as->nchannels > 0);
+        if (mixeng_as) {
+            ASSERT(mixeng_as->freq > 0);
+            ASSERT(mixeng_as->nchannels > 0);
 
             /*
              * This is a new voice, try using the sound card
              * values to avoid double conversion.
              */
             struct audsettings as = {
-                .freq = hw_stream_fmt.mSampleRate,
                 /*
                  * This accomodates 5 channel guest streams on
                  * a 16 channel sound card in MacOS.
                  */
-                .nchannels = MIN(sw_as->nchannels,
+                .nchannels = MIN(mixeng_as->nchannels,
                                  hw_stream_fmt.mChannelsPerFrame),
                 .big_endian = false,
             };
 
-            if (!ca_get_sample_format(&hw_stream_fmt, &as.fmt)) {
+            if (ca_get_sample_format(&hw_stream_fmt, &as.fmt)) {
+                as.freq = hw_stream_fmt.mSampleRate;
+            } else {
                 /*
                  * A converter will be created anyway, use
-                 * the format QEMU suggested.
+                 * the mixeng settings.
                  */
-                as.fmt = ca_to_safe_AudioFormat(sw_as->fmt);
+                as.freq = mixeng_as->freq;
+                as.fmt = ca_to_safe_AudioFormat(mixeng_as->fmt);
             }
 
             audio_pcm_init_info(info, &as);
@@ -1129,7 +1138,7 @@ no_voice:   ca_logerr2(core->is_output, status, "%s",
 
 static int coreaudio_init_impl(const bool is_output,
                                CoreaudioVoice *core,
-                               struct audsettings *sw_as)
+                               struct audsettings *mixeng_as)
 {
     OSStatus status;
     int err;
@@ -1156,7 +1165,7 @@ static int coreaudio_init_impl(const bool is_output,
         return -1;
     }
 
-    if (!ca_init_voice_locked(core, sw_as)) {
+    if (!ca_init_voice_locked(core, mixeng_as)) {
         ca_unlisten_dev_change_locked(core);
         ca_voice_unlock(core);
         pthread_mutex_destroy(&core->buf_mutex);
@@ -1227,9 +1236,9 @@ static void coreaudio_enable_impl(CoreaudioVoice *core,
     ca_voice_unlock(core);
 }
 
-static int coreaudio_init_out(HWVoiceOut *hw, struct audsettings *as)
+static int coreaudio_init_out(HWVoiceOut *hw, struct audsettings *mixeng_as)
 {
-    return coreaudio_init_impl(true, (CoreaudioVoice *)hw, as);
+    return coreaudio_init_impl(true, (CoreaudioVoice *)hw, mixeng_as);
 }
 
 static void coreaudio_fini_out(HWVoiceOut *hw)
@@ -1242,9 +1251,9 @@ static void coreaudio_enable_out(HWVoiceOut *hw, bool enable)
     coreaudio_enable_impl((CoreaudioVoice *)hw, enable);
 }
 
-static int coreaudio_init_in(HWVoiceIn *hw, struct audsettings *as)
+static int coreaudio_init_in(HWVoiceIn *hw, struct audsettings *mixeng_as)
 {
-    return coreaudio_init_impl(false, (CoreaudioVoice *)hw, as);
+    return coreaudio_init_impl(false, (CoreaudioVoice *)hw, mixeng_as);
 }
 
 static void coreaudio_fini_in(HWVoiceIn *hw)

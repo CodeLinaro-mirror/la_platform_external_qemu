@@ -184,6 +184,7 @@ struct VirtIOGPUBaseClass {
     VirtioDeviceClass parent;
 
     void (*gl_flushed)(VirtIOGPUBase *g);
+    void (*update_display)(VirtIOGPUBase *g);
 };
 
 #define VIRTIO_GPU_BASE_PROPERTIES(_state, _conf)                       \
@@ -309,6 +310,7 @@ struct rutabaga;
 
 struct VirtIOGPURutabaga {
     VirtIOGPU parent_obj;
+    struct VMChangeStateEntry* vm_state_entry;
     struct MemoryRegionInfo memory_regions[MAX_SLOTS];
     QTAILQ_HEAD(, virtio_gpu_rutabaga_context) contexts;
     uint64_t capset_mask;

@@ -77,6 +77,7 @@ EXPORTS
     get_ptr_rcu_reader
     graphic_console_init
     graphic_console_set_hwops
+    graphic_hw_update
     icount_account_warp_timer
     icount_get
     icount_round
@@ -352,6 +353,7 @@ EXPORTS
     tlb_flush
     type_register_static
     type_register_static_array
+    unregister_displaychangelistener
     vga_common_init
     vga_common_reset
     vga_dirty_log_start
