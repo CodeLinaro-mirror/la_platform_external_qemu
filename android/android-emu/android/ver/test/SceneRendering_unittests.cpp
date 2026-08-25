@@ -53,7 +53,12 @@ protected:
         std::filesystem::path vulkanDir = PathUtils::join(
                 System::get()->getProgramDirectory(), "lib64", "vulkan");
 
+        // Enable flags for upcoming features
         System::get()->envSet("ANDROID_EMU_ENABLE_STREETVIEW", "1");
+        System::get()->envSet("ANDROID_EMU_ENABLE_VIDEO360", "1");
+
+        // Set test parameters for streetview mode to avoid dependency on
+        // internet connection
         System::get()->envSet("ANDROID_EMU_STREETVIEW_IMAGE_PATH",
                               "testdata/streetview.jpg");
 
@@ -78,15 +83,6 @@ TEST_P(SceneRenderingTest, RenderSceneMode) {
     // Fail on invalid modes
     ASSERT_NE(mode, VerSceneConfig::Mode::Unknown);
 
-#ifndef __APPLE__
-    if (backend == "gles" && VerSceneConfig::modeRequiresRenderer(mode)) {
-        // TODO(virtualscene-library): Fix software GLES initialization on
-        // linux&windows
-        GTEST_SKIP()
-                << "GLES renderer is currently not supported on this platform for testing.";
-        return;
-    }
-#endif
     VerSceneConfig config(mode, VerSceneConfig::defaultArgumentForMode(mode));
     VerSceneHandle scene = ver_create_scene(config);
     ASSERT_NE(scene, (VerSceneHandle)VER_INVALID_HANDLE)
@@ -141,7 +137,8 @@ INSTANTIATE_TEST_SUITE_P(SceneModes,
                                                               "imagefile",
                                                               "color",
                                                               "image360",
-                                                              "streetview")));
+                                                              "streetview",
+                                                              "video360")));
 
 TEST(SceneRenderingTestSimple, InvalidDimensions) {
     VerRenderViewHandle view = ver_create_render_view();
@@ -238,15 +235,6 @@ protected:
 
 TEST_P(PosterSideBySideTest, PosterSideBySide) {
     const std::string& backend = GetParam();
-#ifndef __APPLE__
-    if (backend == "gles") {
-        // TODO(virtualscene-library): Fix software GLES initialization on
-        // linux&windows
-        GTEST_SKIP()
-                << "GLES renderer is currently not supported on this platform for testing.";
-        return;
-    }
-#endif
     std::string testdataDir =
             PathUtils::join(System::get()->getProgramDirectory(), "testdata");
     std::string objPath = PathUtils::join(testdataDir, "poster_test.obj");

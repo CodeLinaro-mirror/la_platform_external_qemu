@@ -3044,13 +3044,19 @@ extern "C" int main(int argc, char** argv) {
     if (feature_is_enabled(kFeature_Uwb)) {
         D("Uwb feature is enabled");
         args.add2("-chardev", "netsim,id=uwb");
-        args.add2("-device", "virtconsole,chardev=uwb,name=uwb");
+        ScopedCPtr<char> uwb_dev(
+                avdInfo_getVendorBuildPropertyString(avd, "ro.vendor.uwb.dev"));
+        if (uwb_dev && std::string_view(uwb_dev.get()) == "/dev/uwb0") {
+            args.add2("-device", "virtserialport,chardev=uwb,name=uwb");
+        } else {
+            args.add2("-device", "virtconsole,chardev=uwb,name=uwb");
+        }
     }
 
     if (feature_is_enabled(kFeature_Nfc)) {
         D("Nfc feature is enabled");
         args.add2("-chardev", "netsim,id=nfc");
-        args.add2("-device", "virtconsole,chardev=nfc,name=nfc");
+        args.add2("-device", "virtserialport,chardev=nfc,name=nfc");
     }
 
     bool bluetooth_explicitly_disabled =

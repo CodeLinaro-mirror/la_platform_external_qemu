@@ -567,7 +567,8 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
     updateFoldableButtonVisibility();
     updateXrButtonsVisibility();
 
-    if (avdFlavor == AVD_GLASSES) {
+    const bool isGlassesAVD = (avdFlavor == AVD_GLASSES);
+    if (isGlassesAVD) {
         mToolsUi->zoom_button->setHidden(true);
         mToolsUi->prev_layout_button->setHidden(true);
         mToolsUi->next_layout_button->setHidden(true);
@@ -577,13 +578,24 @@ ToolWindow::ToolWindow(EmulatorQtWindow* window,
         if (getConsoleAgents()->settings->hw()->hw_touchpad0) {
             mTouchpadWindow->get();
         }
+    } else {
+        mToolsUi->glasses_button->setVisible(false);
+    }
 
+    bool showEnvironmentMenu = isGlassesAVD;
+    if (!showEnvironmentMenu &&
+        android::base::System::get()->getEnvironmentVariable(
+                "ANDROID_EMU_ENABLE_ENVIRONMENT_MENU") == "1") {
+        dinfo("ANDROID_EMU_ENABLE_ENVIRONMENT_MENU is set, enabling environmentMenu");
+        showEnvironmentMenu = true;
+    }
+
+    if (showEnvironmentMenu) {
         QMenu* envMenu = createEnvironmentMenu();
         mToolsUi->environment_button->setMenu(envMenu);
         mToolsUi->environment_button->setEnabled(true);
     } else {
         mToolsUi->environment_button->setVisible(false);
-        mToolsUi->glasses_button->setVisible(false);
     }
 
     connect(mPostureSelectionDialog, SIGNAL(newPostureRequested(int)), this,
@@ -2036,6 +2048,13 @@ QMenu* ToolWindow::createEnvironmentMenu() {
     envMenu->addAction(tr("Custom 360 Image..."), this,
                        SLOT(custom360ImageSelected()));
 
+    const std::string video360FeatureVar = System::get()->envGet("ANDROID_EMU_ENABLE_VIDEO360");
+    const bool video360Enabled = (video360FeatureVar == "1");
+    if (video360Enabled) {
+        envMenu->addAction(tr("Custom 360 Video"), this,
+                           SLOT(custom360VideoSelected()));
+    }
+
     // Check if the streetview feature is enabled:
     const std::string streetViewFeatureVar = System::get()->envGet("ANDROID_EMU_ENABLE_STREETVIEW");
     const bool streetViewEnabled = (streetViewFeatureVar == "1");
@@ -2122,6 +2141,15 @@ void ToolWindow::custom360ImageSelected() {
                                          tr("Images (*.png *.jpg *.jpeg)"));
     if (!fileName.isEmpty()) {
         std::string command = "scene.mode = image360:" + fileName.toStdString();
+        getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
+    }
+}
+
+void ToolWindow::custom360VideoSelected() {
+    QString fileName = QFileDialog::getOpenFileName(
+            this, tr("Select 360 Video"), "", tr("Videos (*.mp4)"));
+    if (!fileName.isEmpty()) {
+        std::string command = "scene.mode = video360:" + fileName.toStdString();
         getConsoleAgents()->virtual_scene->reloadEnvironment(command.c_str());
     }
 }

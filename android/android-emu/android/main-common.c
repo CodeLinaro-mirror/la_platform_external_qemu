@@ -77,6 +77,33 @@ static const int EMULATOR_QEMU_VERSION = 2;
             dprint(__VA_ARGS__); \
     } while (0)
 
+static bool isTruthy(const char* val) {
+    if (!val) {
+        return false;
+    }
+    return strcmp(val, "1") == 0 || strcasecmp(val, "true") == 0 ||
+           strcasecmp(val, "yes") == 0;
+}
+
+static bool isRunningInCi(void) {
+    if (isTruthy(getenv("CI")) || isTruthy(getenv("CONTINUOUS_INTEGRATION"))) {
+        return true;
+    }
+    if (getenv("GITHUB_ACTIONS") || getenv("GITLAB_CI") || getenv("CIRCLECI") ||
+        getenv("JENKINS_URL") || getenv("JENKINS_HOME") ||
+        isTruthy(getenv("TF_BUILD")) || getenv("BITBUCKET_BUILD_NUMBER") ||
+        getenv("TRAVIS") || getenv("BUILDKITE") || getenv("TEAMCITY_VERSION") ||
+        getenv("APPVEYOR") || getenv("CODEBUILD_BUILD_ID")) {
+        return true;
+    }
+    return false;
+}
+
+static bool isAndroidCliDefined(void) {
+    const char* val = getenv("ANDROID_CLI");
+    return val && strcmp(val, "1") == 0;
+}
+
 // TODO(digit): Remove this!
 // The plan is to move the -wipe-data and -writable-system feature to the
 // top-level 'emulator' launcher program, so that the engines don't have
@@ -1634,6 +1661,13 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
 
     // Update the log configuration based upon user preferences.
     base_configure_logs(log_opts);
+
+    if (isRunningInCi()) {
+        D("running in CI: true");
+    }
+    if (isAndroidCliDefined()) {
+        D("android_cli_defined: true (ANDROID_CLI=1)");
+    }
 
     getConsoleAgents()->settings->inject_cmdLineOptions(opts);
 

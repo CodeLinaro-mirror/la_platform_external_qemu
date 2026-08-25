@@ -155,6 +155,18 @@ bool Scene::initialize() {
     if (sceneMode != SceneConfig::Mode::Color &&
         sceneMode != SceneConfig::Mode::Webcam &&
         sceneMode != SceneConfig::Mode::StreetView) {
+
+        if (sceneMode == SceneConfig::Mode::Video360) {
+            // Check if the feature is enabled:
+            const std::string video360FeatureVar =
+                    System::get()->envGet("ANDROID_EMU_ENABLE_VIDEO360");
+            const bool video360Enabled = (video360FeatureVar == "1");
+            if (!video360Enabled) {
+                derror("Video360: feature is not enabled.");
+                return false;
+            }
+        }
+
         sceneFilename =
                 resolveSceneFilename(mConfig.mArgument, mResourceBasePaths);
         if (sceneFilename.empty()) {
@@ -368,12 +380,23 @@ bool Scene::initialize() {
             }
             mBaseRotation = 90;
         } break;
+        case SceneConfig::Mode::Video360: {
+            mRawImageSource = RawVideofileSource::Create(sceneFilename);
+            if (!mRawImageSource) {
+                derror("%s: Could not load video file for video360: '%s'",
+                       __func__, mConfig.mArgument.c_str());
+                return false;
+            }
+            mBaseRotation = 90;
+        } break;
         default:
             dwarning("%s: Unhandled scene mode %d", __func__, (int)sceneMode);
     }
 
     if (mRawImageSource) {
-        mBaseRotation = mRawImageSource->GetBaseRotation();
+        if (sceneMode != SceneConfig::Mode::Video360) {
+            mBaseRotation = mRawImageSource->GetBaseRotation();
+        }
 
         // Set up an initial black image
         mOverlayObject = std::make_unique<SceneOverlayObject>();
@@ -470,11 +493,50 @@ bool Scene::loadRendererResources() {
             }
             mSceneObjects.push_back(std::move(photoSphereObject));
         } break;
+        case SceneConfig::Mode::Video360: {
+            std::unique_ptr<MeshSceneObject> photoSphereObject =
+                    MeshSceneObject::createSphere(*mRenderer);
+            if (mOverlayObject && mOverlayObject->isValid()) {
+                Texture sceneTexture = mRenderer->createTextureRGBA(
+                        mOverlayObject->mDataRGBA.data(),
+                        mOverlayObject->mWidth,
+                        mOverlayObject->mHeight);
+                if (sceneTexture.isValid()) {
+                    photoSphereObject->setTexture(0, sceneTexture);
+                    mRenderer->releaseTexture(sceneTexture);
+                    mVideo360TextureToken = mRawImageSourceToken;
+                }
+            }
+            mSceneObjects.push_back(std::move(photoSphereObject));
+        } break;
     }
 
     mObjectsVersion++;
 
     return true;
+}
+
+void Scene::updateVideo360Texture() {
+    if (mConfig.mSceneMode != SceneConfig::Mode::Video360) {
+        return;
+    }
+    if (mVideo360TextureToken.has_value() &&
+        mRawImageSourceToken.has_value() &&
+        mVideo360TextureToken->token == mRawImageSourceToken->token) {
+        return;
+    }
+    if (!mRenderer || mSceneObjects.empty() || !mOverlayObject ||
+        !mOverlayObject->isValid()) {
+        return;
+    }
+    Texture sceneTexture = mRenderer->createTextureRGBA(
+            mOverlayObject->mDataRGBA.data(), mOverlayObject->mWidth,
+            mOverlayObject->mHeight);
+    if (sceneTexture.isValid()) {
+        mSceneObjects[0]->setTexture(0, sceneTexture);
+        mRenderer->releaseTexture(sceneTexture);
+        mVideo360TextureToken = mRawImageSourceToken;
+    }
 }
 
 bool Scene::releaseResources() {
@@ -549,8 +611,29 @@ void Scene::update(bool updateTime) {
                         mOverlayObject->mHeight = buffer->height;
                     }
 
-                    std::memcpy(mOverlayObject->mDataRGBA.data(),
-                                buffer->buffer, buffer->buffer_size);
+                    // TODO(virtualscene): flip the image in the shader and do
+                    // not manually flip it on the CPU for video360 mode
+                    if (mConfig.mSceneMode == SceneConfig::Mode::Video360) {
+                        // flip the image horizontally
+                        uint8_t* dstRGBA = mOverlayObject->mDataRGBA.data();
+                        const uint8_t* srcRGBA = buffer->buffer;
+
+                        for (size_t row = 0; row < buffer->height; row++) {
+                            const size_t dstRow = row;
+                            const size_t srcRow = ((buffer->height - 1) - row);
+
+                            for (size_t col = 0; col < buffer->width; col++) {
+                                const size_t dstStart = (dstRow * buffer->width + col) * 4;
+                                const size_t srcStart = (srcRow * buffer->width + col) * 4;
+                                for (int channel = 0; channel < 4; channel++) {
+                                    dstRGBA[dstStart + channel] = srcRGBA[srcStart + channel];
+                                }
+                            }
+                        }
+                    } else {
+                        std::memcpy(mOverlayObject->mDataRGBA.data(),
+                                    buffer->buffer, buffer->buffer_size);
+                    }
                     return absl::OkStatus();
                 });
         if (res.ok()) {
@@ -579,6 +662,8 @@ uint64_t Scene::getVersionHashForView(
 
 std::vector<RenderableObject> Scene::getRenderableObjects(
         const glm::mat4& viewProjection) const {
+    // TODO(virtualscene): optimize video image upload
+    const_cast<Scene*>(this)->updateVideo360Texture();
     std::vector<RenderableObject> renderables;
 
     for (auto& sceneObject : mSceneObjects) {
