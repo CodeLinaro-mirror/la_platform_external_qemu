@@ -1633,6 +1633,9 @@ user_backed_flags_to_whpx(int flags) {
 #endif
 
 static void whpx_user_backed_ram_map(uint64_t gpa, void* hva, uint64_t size, int flags) {
+    if (!hva) {
+        return;
+    }
     struct whpx_state *whpx = &whpx_global;
     HRESULT hr;
 
