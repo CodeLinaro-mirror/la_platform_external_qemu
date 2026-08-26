@@ -103,6 +103,7 @@ EXPORTS
     module_load_qom
     module_object_class_by_name
     monitor_init_hmp
+    notifier_remove
     object_apply_compat_props
     object_apply_global_props
     object_child_foreach
@@ -336,6 +337,7 @@ EXPORTS
     runstate_get
     save_snapshot
     set_logger
+    ShutdownCause_lookup
     socket_address_flatten
     socket_local_address
     strstart
