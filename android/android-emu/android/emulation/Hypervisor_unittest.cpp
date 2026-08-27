@@ -95,6 +95,10 @@ TEST(HypervisorTest, HVF_MapAndUnmap) {
     int unmapTwiceRes = hv_vm_unmap(gpa, hostPageSize);
     EXPECT_EQ(HV_SUCCESS, unmapTwiceRes);
 
+    // 7. Mapping with a null hva pointer fails cleanly
+    int mapNullRes = hv_vm_map(nullptr, gpa, hostPageSize, HV_MEMORY_READ | HV_MEMORY_WRITE);
+    EXPECT_NE(HV_SUCCESS, mapNullRes);
+
     free(hva);
     hv_vm_destroy();
 }
