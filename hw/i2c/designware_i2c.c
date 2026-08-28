@@ -3,16 +3,6 @@
  * DesignWare I2C Module.
  *
  * Copyright 2021 Google LLC
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
  */
 
 #include "qemu/osdep.h"
@@ -66,6 +56,8 @@ enum DesignWareI2CRegister {
     DW_IC_ENABLE_STATUS         = 0x9c,
     DW_IC_FS_SPKLEN             = 0xa0,
     DW_IC_CLR_RESTART_DET       = 0xa8,
+    DW_IC_SMBUS_INTR_MASK       = 0xcc,
+    DW_IC_CLR_SMBUS_INTR        = 0xd4,
     DW_IC_COMP_PARAM_1          = 0xf4,
     DW_IC_COMP_VERSION          = 0xf8,
     DW_IC_COMP_TYPE             = 0xfc,
@@ -689,6 +681,14 @@ static void dw_i2c_write(void *opaque, hwaddr offset, uint64_t value,
     case DW_IC_FS_SPKLEN:
         s->ic_fs_spklen = value & DW_IC_FS_SPKLEN_MASK;
         break;
+    case DW_IC_SMBUS_INTR_MASK:
+        qemu_log_mask(LOG_UNIMP, "%s: unsupported write - IC_SMBUS_INTR_MASK\n",
+                      DEVICE(s)->canonical_path);
+        break;
+    case DW_IC_CLR_SMBUS_INTR:
+        qemu_log_mask(LOG_UNIMP, "%s: unsupported write - IC_CLR_SMBUS_INTR\n",
+                      DEVICE(s)->canonical_path);
+        break;
 
     /* This register is invalid at this point. */
     default:
@@ -813,7 +813,7 @@ static void designware_i2c_build_smb_aml(AcpiDevAmlIf *adev, Aml *scope)
     }
 }
 
-static void designware_i2c_class_init(ObjectClass *klass, void *data)
+static void designware_i2c_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

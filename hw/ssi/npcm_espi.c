@@ -11,8 +11,8 @@
 
 #include "qemu/osdep.h"
 
-#include "hw/irq.h"
-#include "hw/registerfields.h"
+#include "hw/core/irq.h"
+#include "hw/core/registerfields.h"
 #include "qapi/visitor.h"
 #include "qemu/bitops.h"
 #include "qemu/log.h"
@@ -196,7 +196,7 @@ static void npcm_espi_realize(DeviceState *dev, Error **errp)
 
 }
 
-static void npcm_espi_class_init(ObjectClass *klass, void *data)
+static void npcm_espi_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);

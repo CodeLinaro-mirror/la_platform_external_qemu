@@ -4,7 +4,7 @@
 #include "qemu/osdep.h"
 #include "qemu/units.h"
 
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "hw/arm/virt.h"
 
 typedef struct GoldfishMachineState {

@@ -11,7 +11,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/i2c/smbus_slave.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "hw/sensor/max31732.h"
 #include "qapi/visitor.h"
 #include "qom/object.h"
@@ -276,7 +276,7 @@ static void max31732_init(Object *obj)
     }
 }
 
-static void max31732_class_init(ObjectClass *klass, void *data)
+static void max31732_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

@@ -14,16 +14,15 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef ASPEED_I2C_H
 #define ASPEED_I2C_H
 
 #include "hw/i2c/i2c.h"
-#include "hw/sysbus.h"
-#include "hw/registerfields.h"
+#include "hw/core/sysbus.h"
+#include "hw/core/registerfields.h"
 #include "qom/object.h"
 
 #define TYPE_ASPEED_I2C "aspeed.i2c"
@@ -37,8 +36,7 @@ OBJECT_DECLARE_TYPE(AspeedI2CState, AspeedI2CClass, ASPEED_I2C)
 #define ASPEED_I2C_NR_BUSSES 16
 #define ASPEED_I2C_SHARE_POOL_SIZE 0x800
 #define ASPEED_I2C_BUS_POOL_SIZE 0x20
-#define ASPEED_I2C_OLD_NUM_REG 11
-#define ASPEED_I2C_NEW_NUM_REG 28
+#define ASPEED_I2C_NEW_NUM_REG (0xa0 >> 2)
 
 #define A_I2CD_M_STOP_CMD       BIT(5)
 #define A_I2CD_M_RX_CMD         BIT(3)
@@ -236,6 +234,8 @@ REG32(I2CS_DMA_TX_ADDR_HI, 0x68)
     FIELD(I2CS_DMA_TX_ADDR_HI, ADDR_HI, 0, 7)
 REG32(I2CS_DMA_RX_ADDR_HI, 0x6c)
     FIELD(I2CS_DMA_RX_ADDR_HI, ADDR_HI, 0, 7)
+/* Debug register */
+REG32(BYTE_DATA_LOG, 0x84)
 
 struct AspeedI2CState;
 
@@ -253,10 +253,12 @@ struct AspeedI2CBus {
     MemoryRegion mr_pool;
 
     I2CBus *bus;
+    char *name;
     uint8_t id;
     qemu_irq irq;
 
     uint32_t regs[ASPEED_I2C_NEW_NUM_REG];
+    uint32_t pending_intr_sts;
     uint8_t pool[ASPEED_I2C_BUS_POOL_SIZE];
     uint64_t dma_dram_offset;
 };
@@ -270,6 +272,7 @@ struct AspeedI2CState {
     uint32_t intr_status;
     uint32_t ctrl_global;
     uint32_t new_clk_divider;
+    char *bus_label;
     MemoryRegion pool_iomem;
     uint8_t share_pool[ASPEED_I2C_SHARE_POOL_SIZE];
 
@@ -302,6 +305,7 @@ struct AspeedI2CClass {
     bool has_share_pool;
     uint64_t mem_size;
     bool has_dma64;
+    bool has_data_log;
 };
 
 static inline bool aspeed_i2c_is_new_mode(AspeedI2CState *s)

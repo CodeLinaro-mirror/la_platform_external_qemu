@@ -31,9 +31,9 @@
 
 #include <zlib.h> /* for crc32 */
 
-#include "hw/irq.h"
-#include "hw/qdev-clock.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-clock.h"
+#include "hw/core/qdev-properties.h"
 #include "hw/net/npcm7xx_emc.h"
 #include "net/eth.h"
 #include "migration/vmstate.h"
@@ -424,7 +424,12 @@ static bool emc_can_receive(NetClientState *nc)
 static bool emc_receive_filter1(NPCM7xxEMCState *emc, const uint8_t *buf,
                                 size_t len, const char **fail_reason)
 {
-    eth_pkt_types_e pkt_type = get_eth_packet_type(PKT_GET_ETH_HDR(buf));
+    struct eth_header eth_hdr = {};
+    eth_pkt_types_e pkt_type;
+
+    memcpy(&eth_hdr, PKT_GET_ETH_HDR(buf),
+           (sizeof(eth_hdr) > len) ? len : sizeof(eth_hdr));
+    pkt_type = get_eth_packet_type(&eth_hdr);
 
     switch (pkt_type) {
     case ETH_PKT_BCAST:
@@ -849,7 +854,7 @@ static const Property npcm7xx_emc_properties[] = {
     DEFINE_NIC_PROPERTIES(NPCM7xxEMCState, conf),
 };
 
-static void npcm7xx_emc_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_emc_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 

@@ -17,7 +17,7 @@
 #include "google/drivers/hw/acpi/goldfish_defs.h"
 #include "google/drivers/hw/i386/goldfish_board.h"
 #include "hw/acpi/aml-build.h"
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "qemu/typedefs.h"
 
 /**

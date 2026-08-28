@@ -105,6 +105,7 @@
     // "meson_options": A dictionary of Meson feature flags and settings.
     // These are passed to the `meson setup` command.
     "meson_options": {
+      "-Daehd": "disabled",
       "-Daf_xdp": "disabled",
       "-Dalsa": "disabled",
       "-Dandroid": "enabled",
@@ -113,8 +114,6 @@
       "-Daudio_drv_list": "default",
       "-Dauth_pam": "disabled",
       "-Dauto_features": "disabled",
-      "-Davx2": "disabled",
-      "-Davx512bw": "disabled",
       "-Db_coverage": "false",
       "-Db_lto": "false",
       "-Db_pie": "false",
@@ -132,6 +131,7 @@
       "-Dcocoa": "disabled",
       "-Dcolo_proxy": "disabled",
       "-Dcoreaudio": "disabled",
+      "-Dcoroutine_backend": "auto",
       "-Dcoroutine_pool": "true",
       "-Dcrypto_afalg": "disabled",
       "-Dcurl": "disabled",
@@ -163,6 +163,7 @@
       "-Dhv_balloon": "disabled",
       "-Dhvf": "disabled",
       "-Diconv": "disabled",
+      "-Digvm": "disabled",
       "-Dinstall_blobs": "false",
       "-Djack": "disabled",
       "-Dkeyring": "disabled",
@@ -183,20 +184,25 @@
       "-Dlinux_io_uring": "disabled",
       "-Dlzfse": "disabled",
       "-Dlzo": "disabled",
+      "-Dmalloc": "system",
       "-Dmalloc_trim": "disabled",
+      "-Dmcux-soc-svd": "false",
       "-Dmembarrier": "disabled",
       "-Dmodule_upgrades": "false",
       "-Dmodules": "disabled",
       "-Dmpath": "disabled",
+      "-Dmshv": "disabled",
       "-Dmultiprocess": "disabled",
       "-Dnetmap": "disabled",
       "-Dnettle": "disabled",
+      "-Dnitro": "disabled",
       "-Dnuma": "disabled",
       "-Dnvmm": "disabled",
       "-Dopengl": "disabled",
       "-Doss": "disabled",
       "-Dpa": "disabled",
       "-Dparallels": "disabled",
+      "-Dpasst": "disabled",
       "-Dpipewire": "disabled",
       "-Dpixman": "enabled",
       "-Dplugins": "false",
@@ -241,6 +247,7 @@
       "-Duadk": "disabled",
       "-Dubsan": "false",
       "-Dusb_redir": "disabled",
+      "-Dvalgrind": "disabled",
       "-Dvde": "disabled",
       "-Dvdi": "disabled",
       "-Dvduse_blk_export": "disabled",
@@ -264,7 +271,7 @@
       "-Dvvfat": "disabled",
       "-Dwerror": "false",
       "-Dwhpx": "disabled",
-      "-Daehd": "disabled",
+      "-Dx86_version": "0",
       "-Dxen": "disabled",
       "-Dxen_pci_passthrough": "disabled",
       "-Dxkbcommon": "disabled",
@@ -278,7 +285,7 @@
         "content": {
           "common": {
             "GENISOIMAGE": "False",
-            "TARGET_DIRS": "aarch64-softmmu riscv64-softmmu x86_64-softmmu",
+            "TARGET_DIRS": "aarch64-softmmu x86_64-softmmu",
             "CONFIG_DEFAULT_TARGETS": "y"
           }
         }
@@ -469,11 +476,18 @@
         "target": "libqemuutil",
         "shims": {
           "-srcs": [
-            "stubs/monitor-core.c",
-            "stubs/error-printf.c"
+            "stubs/monitor-core.c"
           ],
           "+srcs": [
             "google/drivers/trace/goldfish.c"
+          ]
+        }
+      },
+      {
+        "target": "libqemu-.*-softmmu",
+        "shims": {
+          "-srcs": [
+            "accel/qtest/qtest.c"
           ]
         }
       }
@@ -541,11 +555,8 @@
         }
       },
       "meson_options": {
-        "-Dandroid": "enabled",
         "-Dalsa": "enabled",
         "-Daudio_drv_list": "pa,alsa",
-        "-Davx2": "enabled",
-        "-Davx512bw": "enabled",
         "-Db_pie": "true",
         "-Dcrypto_afalg": "enabled",
         "-Dkvm": "enabled",
@@ -555,7 +566,8 @@
         "-Dvhost_kernel": "enabled",
         "-Dvhost_net": "enabled",
         "-Dvhost_user": "enabled",
-        "-Dvhost_user_blk_server": "enabled"
+        "-Dvhost_user_blk_server": "enabled",
+        "-Dx86_version": "3"
       },
       "shims": [
         {
@@ -564,9 +576,6 @@
             "+linkopts": [
               "-rdynamic",
               "-lrt"
-            ],
-            "+deps": [
-              "@gcc_lib//:libpulse"
             ]
           }
         },
@@ -620,8 +629,7 @@
       },
       "export": [
         "qemu-system-x86_64",
-        "qemu-system-aarch64",
-        "qemu-system-riscv64"
+        "qemu-system-aarch64"
       ],
       "exclude": [
         "vhost-user",
@@ -713,12 +721,6 @@
           }
         },
         {
-          "target": "qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "qemu-system-riscv64"
-          }
-        },
-        {
           "target": "qemu-system-x86_64-unsigned",
           "shims": {
             "name": "qemu-system-x86_64"
@@ -728,12 +730,6 @@
           "target": "libcommon_qemu-system-aarch64-unsigned",
           "shims": {
             "name": "libcommon_qemu-system-aarch64"
-          }
-        },
-        {
-          "target": "libcommon_qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "libcommon_qemu-system-riscv64"
           }
         },
         {
@@ -757,8 +753,7 @@
       "external_deps": {},
       "export": [
         "qemu-system-x86_64-unsigned",
-        "qemu-system-aarch64-unsigned",
-        "qemu-system-riscv64-unsigned"
+        "qemu-system-aarch64-unsigned"
       ],
       "exclude": []
     },
@@ -816,12 +811,6 @@
           }
         },
         {
-          "target": "qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "qemu-system-riscv64"
-          }
-        },
-        {
           "target": "qemu-system-x86_64-unsigned",
           "shims": {
             "name": "qemu-system-x86_64"
@@ -831,12 +820,6 @@
           "target": "libcommon_qemu-system-aarch64-unsigned",
           "shims": {
             "name": "libcommon_qemu-system-aarch64"
-          }
-        },
-        {
-          "target": "libcommon_qemu-system-riscv64-unsigned",
-          "shims": {
-            "name": "libcommon_qemu-system-riscv64"
           }
         },
         {
@@ -860,8 +843,7 @@
       "external_deps": {},
       "export": [
         "qemu-system-x86_64-unsigned",
-        "qemu-system-aarch64-unsigned",
-        "qemu-system-riscv64-unsigned"
+        "qemu-system-aarch64-unsigned"
       ],
       "exclude": []
     },
@@ -901,14 +883,13 @@
         }
       },
       "meson_options": {
-        "-Dvsenv": "false",
+        "-Daehd": "enabled",
         "-Daudio_drv_list": "dsound",
-        "-Davx2": "auto",
-        "-Davx512bw": "auto",
         "-Ddsound": "enabled",
         "-Dvhost_net": "enabled",
+        "-Dvsenv": "false",
         "-Dwhpx": "enabled",
-        "-Daehd": "enabled"
+        "-Dx86_version": "3"
       },
       "generated_files": [
         {
@@ -937,12 +918,6 @@
           }
         },
         {
-          "target": "qemu-system-riscv64",
-          "shims": {
-            "win_def_file": "google/build/qemu-system-riscv64.def"
-          }
-        },
-        {
           "target": "qemu-system-x86_64",
           "shims": {
             "+deps": [
@@ -955,7 +930,9 @@
           "target": "libqemuutil",
           "shims": {
             "+linkopts": [
-              "-defaultlib:advapi32.lib"
+              "-defaultlib:advapi32.lib",
+              "-defaultlib:synchronization.lib",
+              "-defaultlib:user32.lib"
             ]
           }
         },

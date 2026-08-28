@@ -10,7 +10,7 @@
 #ifndef ASPEED_LPC_H
 #define ASPEED_LPC_H
 
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "hw/ipmi/ipmi.h"
 
 #define TYPE_ASPEED_LPC "aspeed.lpc"

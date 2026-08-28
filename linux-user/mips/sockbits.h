@@ -63,13 +63,22 @@
 #define TARGET_SO_DETACH_FILTER        27
 
 #define TARGET_SO_PEERNAME             28
-#define TARGET_SO_TIMESTAMP            29
-#define SCM_TIMESTAMP          SO_TIMESTAMP
 
 #define TARGET_SO_PEERSEC              30
 #define TARGET_SO_SNDBUFFORCE          31
 #define TARGET_SO_RCVBUFFORCE          33
 #define TARGET_SO_PASSSEC              34
+
+#define TARGET_SO_TIMESTAMP_OLD        29
+#define TARGET_SCM_TIMESTAMP_OLD       TARGET_SO_TIMESTAMP_OLD
+
+#define TARGET_SO_TIMESTAMP_NEW        63
+#define TARGET_SCM_TIMESTAMP_NEW       TARGET_SO_TIMESTAMP_NEW
+#define TARGET_SO_TIMESTAMPNS_NEW      64
+#define TARGET_SO_TIMESTAMPING_NEW     65
+
+#define TARGET_SO_RCVTIMEO_NEW         66
+#define TARGET_SO_SNDTIMEO_NEW         67
 
 /** sock_type - Socket types
  *

@@ -3,8 +3,7 @@
  *
  * Copyright (C) 2023 Google, LLC
  *
- * This code is licensed under the GPL version 2 or later.  See
- * the COPYING file in the top-level directory.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #ifndef SVC_I3C_H
@@ -12,8 +11,8 @@
 
 #include "qemu/fifo32.h"
 #include "hw/i3c/i3c.h"
-#include "hw/irq.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
+#include "hw/core/irq.h"
 
 #define TYPE_SVC_I3C "svc.i3c"
 OBJECT_DECLARE_SIMPLE_TYPE(SVCI3C, SVC_I3C)

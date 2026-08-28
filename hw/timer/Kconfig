@@ -65,3 +65,7 @@ config STELLARIS_GPTM
 
 config AVR_TIMER16
     bool
+
+config OSTIMER
+    bool
+    select REGISTER

@@ -3,26 +3,16 @@
  * Nuvoton NPCM7xx PCI Mailbox Module
  *
  * Copyright 2021 Google LLC
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
  */
 #ifndef NPCM7XX_PCI_MBOX_H
 #define NPCM7XX_PCI_MBOX_H
 
 #include "chardev/char-fe.h"
-#include "exec/memory.h"
-#include "hw/clock.h"
-#include "hw/irq.h"
+#include "system/memory.h"
+#include "hw/core/clock.h"
+#include "hw/core/irq.h"
 #include "hw/pci/pci.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "qom/object.h"
 
 #define NPCM7XX_PCI_MBOX_RAM_SIZE 0x4000
@@ -64,7 +54,7 @@ typedef struct NPCM7xxPCIMBoxState {
     qemu_irq irq;
     uint8_t content[NPCM7XX_PCI_MBOX_RAM_SIZE];
     uint32_t regs[NPCM7XX_PCI_MBOX_NR_REGS];
-    CharBackend chr;
+    CharFrontend chr;
 
     /* aux data for receiving host commands. */
     NPCM7xxPCIMBoxHostState state;

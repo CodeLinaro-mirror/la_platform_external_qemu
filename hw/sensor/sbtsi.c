@@ -4,20 +4,10 @@
  * Forked from tmp_sbtsi to isolate the transport layer.
  *
  * Copyright 2024 Google LLC
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
  */
 #include "qemu/osdep.h"
-#include "hw/irq.h"
-#include "hw/qdev-core.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev.h"
 #include "hw/i2c/smbus_slave.h"
 #include "hw/sensor/sbtsi.h"
 #include "migration/vmstate.h"
@@ -274,7 +264,7 @@ static void sbtsi_init(Object *obj)
     qdev_init_gpio_out_named(DEVICE(obj), &s->alarm, SBTSI_ALARM_L, 0);
 }
 
-static void sbtsi_class_init(ObjectClass *klass, void *data)
+static void sbtsi_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     dc->desc = "SB-TSI Sensor";

@@ -48,11 +48,13 @@ static const hwaddr aspeed_soc_ast2600_memmap[] = {
     [ASPEED_DEV_XDMA]      = 0x1E6E7000,
     [ASPEED_DEV_ADC]       = 0x1E6E9000,
     [ASPEED_DEV_DP]        = 0x1E6EB000,
+    [ASPEED_DEV_PCIE_PHY1] = 0x1E6ED200,
     [ASPEED_DEV_SBC]       = 0x1E6F2000,
     [ASPEED_DEV_EMMC_BC]   = 0x1E6f5000,
     [ASPEED_DEV_VIDEO]     = 0x1E700000,
     [ASPEED_DEV_SDHCI]     = 0x1E740000,
     [ASPEED_DEV_EMMC]      = 0x1E750000,
+    [ASPEED_DEV_PCIE0]     = 0x1E770000,
     [ASPEED_DEV_GPIO]      = 0x1E780000,
     [ASPEED_DEV_GPIO_1_8V] = 0x1E780800,
     [ASPEED_DEV_RTC]       = 0x1E781000,
@@ -78,7 +80,8 @@ static const hwaddr aspeed_soc_ast2600_memmap[] = {
     [ASPEED_DEV_VUART]     = 0x1E787000,
     [ASPEED_DEV_FSI1]      = 0x1E79B000,
     [ASPEED_DEV_FSI2]      = 0x1E79B100,
-    [ASPEED_DEV_I3C]       = 0x1E7A0000,
+    [ASPEED_DEV_I3C0]       = 0x1E7A0000,
+    [ASPEED_DEV_PCIE_MMIO1] = 0x60000000,
     [ASPEED_DEV_SDRAM]     = 0x80000000,
 };
 
@@ -127,6 +130,7 @@ static const int aspeed_soc_ast2600_irqmap[] = {
     [ASPEED_DEV_LPC]       = 35,
     [ASPEED_DEV_IBT]       = 143,
     [ASPEED_DEV_I2C]       = 110,   /* 110 -> 125 */
+    [ASPEED_DEV_PCIE0]     = 168,
     [ASPEED_DEV_PECI]      = 38,
     [ASPEED_DEV_ETH1]      = 2,
     [ASPEED_DEV_ETH2]      = 3,
@@ -137,8 +141,11 @@ static const int aspeed_soc_ast2600_irqmap[] = {
     [ASPEED_DEV_DP]        = 62,
     [ASPEED_DEV_FSI1]      = 100,
     [ASPEED_DEV_FSI2]      = 101,
-    [ASPEED_DEV_I3C]       = 102,   /* 102 -> 107 */
+    [ASPEED_DEV_I3C0]      = 102,   /* 102 -> 107 */
 };
+
+#define AST_BMC_DEV_MEM_SIZE    0x100000
+#define AST_BMC_DEV_MEM_ADDR    0xbff00000
 
 static qemu_irq aspeed_soc_ast2600_get_irq(AspeedSoCState *s, int dev)
 {
@@ -163,7 +170,7 @@ static void aspeed_soc_ast2600_init(Object *obj)
 
     for (i = 0; i < sc->num_cpus; i++) {
         object_initialize_child(obj, "cpu[*]", &a->cpu[i],
-                                aspeed_soc_cpu_type(sc));
+                                aspeed_soc_cpu_type(sc->valid_cpu_types));
     }
 
     snprintf(typename, sizeof(typename), "aspeed.scu-%s", socname);
@@ -190,6 +197,10 @@ static void aspeed_soc_ast2600_init(Object *obj)
 
     snprintf(typename, sizeof(typename), "aspeed.i2c-%s", socname);
     object_initialize_child(obj, "i2c", &s->i2c, typename);
+
+    object_initialize_child(obj, "pcie-cfg", &s->pcie[0], TYPE_ASPEED_PCIE_CFG);
+    object_initialize_child(obj, "pcie-phy[*]", &s->pcie_phy[0],
+                            TYPE_ASPEED_PCIE_PHY);
 
     object_initialize_child(obj, "peci", &s->peci, TYPE_ASPEED_PECI);
 
@@ -261,7 +272,7 @@ static void aspeed_soc_ast2600_init(Object *obj)
 
     object_initialize_child(obj, "i3c", &s->i3c, TYPE_ASPEED_I3C);
 
-    object_initialize_child(obj, "sbc", &s->sbc, TYPE_ASPEED_SBC);
+    object_initialize_child(obj, "sbc", &s->sbc, TYPE_ASPEED_AST2600_SBC);
 
     object_initialize_child(obj, "ibt", &s->ibt, TYPE_ASPEED_IBT);
 
@@ -275,6 +286,10 @@ static void aspeed_soc_ast2600_init(Object *obj)
     for (i = 0; i < ASPEED_FSI_NUM; i++) {
         object_initialize_child(obj, "fsi[*]", &s->fsi[i], TYPE_ASPEED_APB2OPB);
     }
+
+    object_initialize_child(obj, "pci-mbox", &s->pci_mbox, TYPE_PCI_MBOX);
+    object_property_set_uint(OBJECT(&s->pci_mbox), "ram-size",
+                             AST_BMC_DEV_MEM_SIZE, &error_fatal);
 }
 
 /*
@@ -287,6 +302,67 @@ static uint64_t aspeed_calc_affinity(int cpu)
     return (0xf << ARM_AFF1_SHIFT) | cpu;
 }
 
+/*
+ * PCIe Root Complex (RC)
+ *
+ * H2X register space (single block 0x00-0xFF):
+ *   0x00-0x7F : shared by RC_L (PCIe0) and RC_H (PCIe1)
+ *   0x80-0xBF : RC_L only
+ *   0xC0-0xFF : RC_H only
+ *
+ * Model scope / limitations:
+ *   - Firmware supports RC_H only; this QEMU model does not support RC_L.
+ *   - RC_H uses PHY1 and the MMIO window [0x60000000, 0x80000000]
+ *     (aka MMIO1).
+ *
+ * Indexing convention (this model):
+ *   - Expose a single logical instance at index 0.
+ *   - pcie[0] -> hardware RC_H (PCIe1)
+ *   - phy[0]  -> hardware PHY1
+ *   - mmio.0 -> guest address range MMIO1: 0x60000000-0x80000000
+ *   - RC_L / PCIe0 is not created and mapped.
+ */
+static bool aspeed_soc_ast2600_pcie_realize(DeviceState *dev, Error **errp)
+{
+    Aspeed2600SoCState *a = ASPEED2600_SOC(dev);
+    AspeedSoCState *s = ASPEED_SOC(dev);
+    AspeedSoCClass *sc = ASPEED_SOC_GET_CLASS(s);
+    MemoryRegion *mmio_mr = NULL;
+    qemu_irq irq;
+
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->pcie_phy[0]), errp)) {
+        return false;
+    }
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->pcie_phy[0]), 0,
+                    sc->memmap[ASPEED_DEV_PCIE_PHY1]);
+
+    object_property_set_int(OBJECT(&s->pcie[0]), "dram-base",
+                            sc->memmap[ASPEED_DEV_SDRAM],
+                            &error_abort);
+    object_property_set_link(OBJECT(&s->pcie[0]), "dram", OBJECT(s->dram_mr),
+                             &error_abort);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->pcie[0]), errp)) {
+        return false;
+    }
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->pcie[0]), 0,
+                    sc->memmap[ASPEED_DEV_PCIE0]);
+
+    irq = qdev_get_gpio_in(DEVICE(&a->a7mpcore),
+                           sc->irqmap[ASPEED_DEV_PCIE0]);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->pcie[0].rc), 0, irq);
+
+    mmio_mr = sysbus_mmio_get_region(SYS_BUS_DEVICE(&s->pcie[0].rc), 1);
+    memory_region_init_alias(&s->pcie_mmio_alias[0], OBJECT(&s->pcie[0].rc),
+                             "aspeed.pcie-mmio", mmio_mr,
+                             sc->memmap[ASPEED_DEV_PCIE_MMIO1],
+                             0x20000000);
+    memory_region_add_subregion(s->memory,
+                                sc->memmap[ASPEED_DEV_PCIE_MMIO1],
+                                &s->pcie_mmio_alias[0]);
+
+    return true;
+}
+
 static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
 {
     int i;
@@ -295,6 +371,7 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     AspeedSoCClass *sc = ASPEED_SOC_GET_CLASS(s);
     qemu_irq irq;
     g_autofree char *sram_name = NULL;
+    int uart;
 
     /* Default boot region (SPI memory or ROMs) */
     memory_region_init(&s->spi_boot_container, OBJECT(s),
@@ -303,16 +380,19 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
                                 &s->spi_boot_container);
 
     /* IO space */
-    aspeed_mmio_map_unimplemented(s, SYS_BUS_DEVICE(&s->iomem), "aspeed.io",
+    aspeed_mmio_map_unimplemented(s->memory, SYS_BUS_DEVICE(&s->iomem),
+                                  "aspeed.io",
                                   sc->memmap[ASPEED_DEV_IOMEM],
                                   ASPEED_SOC_IOMEM_SIZE);
 
     /* Video engine stub */
-    aspeed_mmio_map_unimplemented(s, SYS_BUS_DEVICE(&s->video), "aspeed.video",
+    aspeed_mmio_map_unimplemented(s->memory, SYS_BUS_DEVICE(&s->video),
+                                  "aspeed.video",
                                   sc->memmap[ASPEED_DEV_VIDEO], 0x1000);
 
     /* eMMC Boot Controller stub */
-    aspeed_mmio_map_unimplemented(s, SYS_BUS_DEVICE(&s->emmc_boot_controller),
+    aspeed_mmio_map_unimplemented(s->memory,
+                                  SYS_BUS_DEVICE(&s->emmc_boot_controller),
                                   "aspeed.emmc-boot-controller",
                                   sc->memmap[ASPEED_DEV_EMMC_BC], 0x1000);
 
@@ -347,7 +427,8 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
                             &error_abort);
 
     sysbus_realize(SYS_BUS_DEVICE(&a->a7mpcore), &error_abort);
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&a->a7mpcore), 0, ASPEED_A7MPCORE_ADDR);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&a->a7mpcore), 0,
+                    ASPEED_A7MPCORE_ADDR);
 
     for (i = 0; i < sc->num_cpus; i++) {
         SysBusDevice *sbd = SYS_BUS_DEVICE(&a->a7mpcore);
@@ -373,7 +454,8 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
                                 sc->memmap[ASPEED_DEV_SRAM], &s->sram);
 
     /* DPMCU */
-    aspeed_mmio_map_unimplemented(s, SYS_BUS_DEVICE(&s->dpmcu), "aspeed.dpmcu",
+    aspeed_mmio_map_unimplemented(s->memory, SYS_BUS_DEVICE(&s->dpmcu),
+                                  "aspeed.dpmcu",
                                   sc->memmap[ASPEED_DEV_DPMCU],
                                   ASPEED_SOC_DPMCU_SIZE);
 
@@ -381,15 +463,17 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->scu), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->scu), 0, sc->memmap[ASPEED_DEV_SCU]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->scu), 0,
+                    sc->memmap[ASPEED_DEV_SCU]);
 
     /* RTC */
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->rtc), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->rtc), 0, sc->memmap[ASPEED_DEV_RTC]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->rtc), 0,
+                    sc->memmap[ASPEED_DEV_RTC]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->rtc), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_RTC));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_RTC));
 
     /* Timer */
     object_property_set_link(OBJECT(&s->timerctrl), "scu", OBJECT(&s->scu),
@@ -397,10 +481,10 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timerctrl), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->timerctrl), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->timerctrl), 0,
                     sc->memmap[ASPEED_DEV_TIMER1]);
     for (i = 0; i < ASPEED_TIMER_NR_TIMERS; i++) {
-        irq = aspeed_soc_get_irq(s, ASPEED_DEV_TIMER1 + i);
+        irq = aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_TIMER1 + i);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->timerctrl), i, irq);
     }
 
@@ -408,13 +492,19 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->adc), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->adc), 0, sc->memmap[ASPEED_DEV_ADC]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->adc), 0,
+                    sc->memmap[ASPEED_DEV_ADC]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->adc), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_ADC));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_ADC));
 
     /* UART */
-    if (!aspeed_soc_uart_realize(s, errp)) {
-        return;
+    for (i = 0, uart = sc->uarts_base; i < sc->uarts_num; i++, uart++) {
+        if (!aspeed_soc_uart_realize(s->memory, &s->uart[i],
+                                     sc->memmap[uart], errp)) {
+            return;
+        }
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->uart[i]), 0,
+                           aspeed_soc_ast2600_get_irq(s, uart));
     }
 
     /* I2C */
@@ -423,7 +513,8 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->i2c), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->i2c), 0, sc->memmap[ASPEED_DEV_I2C]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->i2c), 0,
+                    sc->memmap[ASPEED_DEV_I2C]);
     for (i = 0; i < ASPEED_I2C_GET_CLASS(&s->i2c)->num_busses; i++) {
         irq = qdev_get_gpio_in(DEVICE(&a->a7mpcore),
                                sc->irqmap[ASPEED_DEV_I2C] + i);
@@ -435,10 +526,15 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->peci), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->peci), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->peci), 0,
                     sc->memmap[ASPEED_DEV_PECI]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->peci), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_PECI));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_PECI));
+
+    /* PCIe Root Complex (RC) */
+    if (!aspeed_soc_ast2600_pcie_realize(dev, errp)) {
+        return;
+    }
 
     /* FMC, The number of CS is set at the board level */
     object_property_set_link(OBJECT(&s->fmc), "dram", OBJECT(s->dram_mr),
@@ -446,11 +542,12 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->fmc), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->fmc), 0, sc->memmap[ASPEED_DEV_FMC]);
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->fmc), 1,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->fmc), 0,
+                    sc->memmap[ASPEED_DEV_FMC]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->fmc), 1,
                     ASPEED_SMC_GET_CLASS(&s->fmc)->flash_window_base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->fmc), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_FMC));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_FMC));
 
     /* Set up an alias on the FMC CE0 region (boot default) */
     MemoryRegion *fmc0_mmio = &s->fmc.flashes[0].mmio;
@@ -465,10 +562,12 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
         if (!sysbus_realize(SYS_BUS_DEVICE(&s->spi[i]), errp)) {
             return;
         }
-        aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->spi[i]), 0,
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->spi[i]), 0,
                         sc->memmap[ASPEED_DEV_SPI1 + i]);
-        aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->spi[i]), 1,
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->spi[i]), 1,
                         ASPEED_SMC_GET_CLASS(&s->spi[i])->flash_window_base);
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi[i]), 0,
+                           aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_SPI1 + i));
     }
 
     /* EHCI */
@@ -476,17 +575,18 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
         if (!sysbus_realize(SYS_BUS_DEVICE(&s->ehci[i]), errp)) {
             return;
         }
-        aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->ehci[i]), 0,
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->ehci[i]), 0,
                         sc->memmap[ASPEED_DEV_EHCI1 + i]);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->ehci[i]), 0,
-                           aspeed_soc_get_irq(s, ASPEED_DEV_EHCI1 + i));
+                           aspeed_soc_ast2600_get_irq(s,
+                                                      ASPEED_DEV_EHCI1 + i));
     }
 
     /* SDMC - SDRAM Memory Controller */
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->sdmc), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->sdmc), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->sdmc), 0,
                     sc->memmap[ASPEED_DEV_SDMC]);
 
     /* Watch dog */
@@ -499,7 +599,7 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
         if (!sysbus_realize(SYS_BUS_DEVICE(&s->wdt[i]), errp)) {
             return;
         }
-        aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->wdt[i]), 0, wdt_offset);
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->wdt[i]), 0, wdt_offset);
     }
 
     /* RAM */
@@ -514,10 +614,10 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
         if (!sysbus_realize(SYS_BUS_DEVICE(&s->ftgmac100[i]), errp)) {
             return;
         }
-        aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->ftgmac100[i]), 0,
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->ftgmac100[i]), 0,
                         sc->memmap[ASPEED_DEV_ETH1 + i]);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->ftgmac100[i]), 0,
-                           aspeed_soc_get_irq(s, ASPEED_DEV_ETH1 + i));
+                           aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_ETH1 + i));
 
         object_property_set_link(OBJECT(&s->mii[i]), "nic",
                                  OBJECT(&s->ftgmac100[i]), &error_abort);
@@ -525,7 +625,7 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
             return;
         }
 
-        aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->mii[i]), 0,
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->mii[i]), 0,
                         sc->memmap[ASPEED_DEV_MII1 + i]);
     }
 
@@ -533,55 +633,56 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->xdma), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->xdma), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->xdma), 0,
                     sc->memmap[ASPEED_DEV_XDMA]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->xdma), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_XDMA));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_XDMA));
 
     /* GPIO */
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->gpio), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->gpio), 0,
                     sc->memmap[ASPEED_DEV_GPIO]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->gpio), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_GPIO));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_GPIO));
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio_1_8v), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->gpio_1_8v), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->gpio_1_8v), 0,
                     sc->memmap[ASPEED_DEV_GPIO_1_8V]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->gpio_1_8v), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_GPIO_1_8V));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_GPIO_1_8V));
 
     /* SDHCI */
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->sdhci), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->sdhci), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->sdhci), 0,
                     sc->memmap[ASPEED_DEV_SDHCI]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->sdhci), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_SDHCI));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_SDHCI));
 
     /* eMMC */
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->emmc), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->emmc), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->emmc), 0,
                     sc->memmap[ASPEED_DEV_EMMC]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->emmc), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_EMMC));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_EMMC));
 
     /* LPC */
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->lpc), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->lpc), 0, sc->memmap[ASPEED_DEV_LPC]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->lpc), 0,
+                    sc->memmap[ASPEED_DEV_LPC]);
 
     /* Connect the LPC IRQ to the GIC. It is otherwise unused. */
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->lpc), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_LPC));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_LPC));
 
     /*
      * On the AST2600 LPC subdevice IRQs are connected straight to the GIC.
@@ -613,19 +714,20 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->hace), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->hace), 0,
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->hace), 0,
                     sc->memmap[ASPEED_DEV_HACE]);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->hace), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_HACE));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_HACE));
 
     /* I3C */
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->i3c), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->i3c), 0, sc->memmap[ASPEED_DEV_I3C]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->i3c), 0,
+                    sc->memmap[ASPEED_DEV_I3C0]);
     for (i = 0; i < ASPEED_I3C_NR_DEVICES; i++) {
         irq = qdev_get_gpio_in(DEVICE(&a->a7mpcore),
-                               sc->irqmap[ASPEED_DEV_I3C] + i);
+                               sc->irqmap[ASPEED_DEV_I3C0] + i);
         /* The AST2600 I3C controller has one IRQ per bus. */
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->i3c.devices[i]), 0, irq);
     }
@@ -634,17 +736,18 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->sbc), errp)) {
         return;
     }
-    aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->sbc), 0, sc->memmap[ASPEED_DEV_SBC]);
+    aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->sbc), 0,
+                    sc->memmap[ASPEED_DEV_SBC]);
 
     /* FSI */
     for (i = 0; i < ASPEED_FSI_NUM; i++) {
         if (!sysbus_realize(SYS_BUS_DEVICE(&s->fsi[i]), errp)) {
             return;
         }
-        aspeed_mmio_map(s, SYS_BUS_DEVICE(&s->fsi[i]), 0,
+        aspeed_mmio_map(s->memory, SYS_BUS_DEVICE(&s->fsi[i]), 0,
                         sc->memmap[ASPEED_DEV_FSI1 + i]);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->fsi[i]), 0,
-                           aspeed_soc_get_irq(s, ASPEED_DEV_FSI1 + i));
+                           aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_FSI1 + i));
     }
 
     /* iBT */
@@ -655,7 +758,17 @@ static void aspeed_soc_ast2600_realize(DeviceState *dev, Error **errp)
                    sc->memmap[ASPEED_DEV_IBT] - sc->memmap[ASPEED_DEV_LPC],
                    &s->ibt.iomem);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->ibt), 0,
-                       aspeed_soc_get_irq(s, ASPEED_DEV_IBT));
+                       aspeed_soc_ast2600_get_irq(s, ASPEED_DEV_IBT));
+
+    /* Host2Bmc PCI Mbox */
+    Chardev *chardev = qemu_chr_find("pci0");
+    if (chardev) {
+        qdev_prop_set_chr(DEVICE(&s->pci_mbox), "chardev", chardev);
+    } else {
+        warn_report("PCI Mailbox does not have a chardev backend.");
+    }
+    sysbus_realize(SYS_BUS_DEVICE(&s->pci_mbox), &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->pci_mbox), 0, AST_BMC_DEV_MEM_ADDR);
 }
 
 static bool aspeed_soc_ast2600_boot_from_emmc(AspeedSoCState *s)
@@ -665,7 +778,7 @@ static bool aspeed_soc_ast2600_boot_from_emmc(AspeedSoCState *s)
     return !!(hw_strap1 & SCU_AST2600_HW_STRAP_BOOT_SRC_EMMC);
 }
 
-static void aspeed_soc_ast2600_class_init(ObjectClass *oc, void *data)
+static void aspeed_soc_ast2600_class_init(ObjectClass *oc, const void *data)
 {
     static const char * const valid_cpu_types[] = {
         ARM_CPU_TYPE_NAME("cortex-a7"),
@@ -690,7 +803,6 @@ static void aspeed_soc_ast2600_class_init(ObjectClass *oc, void *data)
     sc->irqmap       = aspeed_soc_ast2600_irqmap;
     sc->memmap       = aspeed_soc_ast2600_memmap;
     sc->num_cpus     = 2;
-    sc->get_irq      = aspeed_soc_ast2600_get_irq;
     sc->boot_from_emmc = aspeed_soc_ast2600_boot_from_emmc;
 }
 

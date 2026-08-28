@@ -1,17 +1,7 @@
 /*
  * QEMU I3C bus interface.
  *
- * Copyright 2022 Google LLC
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
+ * Copyright 2025 Google LLC
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -21,8 +11,8 @@
 #include "qapi/error.h"
 #include "trace.h"
 #include "hw/i3c/i3c.h"
-#include "hw/hotplug.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/hotplug.h"
+#include "hw/core/qdev-properties.h"
 
 /*
  * In test mode (enabled by ENTTM CCC) we're supposed to send a random PID
@@ -42,23 +32,11 @@ static void i3c_realize(BusState *bus, Error **errp)
     qbus_set_bus_hotplug_handler(bus);
 }
 
-static void i3c_class_init(ObjectClass *klass, void *data)
+static void i3c_class_init(ObjectClass *klass, const void *data)
 {
     BusClass *k = BUS_CLASS(klass);
     k->realize = i3c_realize;
 }
-
-static const TypeInfo i3c_bus_info = {
-    .name = TYPE_I3C_BUS,
-    .parent = TYPE_BUS,
-    .instance_size = sizeof(I3CBus),
-    .class_size = sizeof(I3CBusClass),
-    .class_init = i3c_class_init,
-    .interfaces = (InterfaceInfo[]) {
-        { TYPE_HOTPLUG_HANDLER },
-        { }
-    }
-};
 
 I3CBus *i3c_init_bus(DeviceState *parent, const char *name)
 {
@@ -116,12 +94,43 @@ static bool i3c_target_match(I3CTarget *candidate, uint8_t address,
     return targ_addr == address || broadcast;
 }
 
+static bool i3c_target_ccc_is_supported(I3CTarget *s, I3CCCC ccc)
+{
+    switch (ccc) {
+    case I3C_CCC_ENTDAA:
+    case I3C_CCC_ENTTM:
+    case I3C_CCC_RSTDAA:
+    case I3C_CCC_SETAASA:
+    case I3C_CCCD_SETDASA:
+    case I3C_CCC_SETMWL:
+    case I3C_CCC_SETMRL:
+    case I3C_CCCD_SETNEWDA:
+    case I3C_CCCD_SETMWL:
+    case I3C_CCCD_SETMRL:
+    case I3C_CCCD_GETMWL:
+    case I3C_CCCD_GETMRL:
+    case I3C_CCCD_GETPID:
+    case I3C_CCCD_GETBCR:
+    case I3C_CCCD_GETDCR:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool i3c_target_match_and_add(I3CBus *bus, I3CTarget *target, uint8_t address,
                               enum I3CEvent event)
 {
     I3CTargetClass *tc = I3C_TARGET_GET_CLASS(target);
     bool matched = tc->target_match(target, address, event == I3C_START_RECV,
                                     bus->broadcast, bus->in_entdaa);
+    /*
+     * If we're in the middle of a CCC, this is a direct CCC and the target
+     * should only ACK if it supports it.
+     */
+    if (matched && bus->in_ccc) {
+        matched = tc->ccc_is_supported(target, bus->ccc);
+    }
 
     if (matched) {
         I3CNode *node = g_new(struct I3CNode, 1);
@@ -135,6 +144,7 @@ bool i3c_scan_bus(I3CBus *bus, uint8_t address, enum I3CEvent event)
 {
     BusChild *child;
     I3CNode *node, *next;
+    bool found = false;
 
     /* Clear out any devices from a previous (re-)START. */
     QLIST_FOREACH_SAFE(node, &bus->current_devs, next, next) {
@@ -142,17 +152,16 @@ bool i3c_scan_bus(I3CBus *bus, uint8_t address, enum I3CEvent event)
         g_free(node);
     }
 
-    QTAILQ_FOREACH(child, &bus->qbus.children, sibling) {
+    QTAILQ_FOREACH(child, &bus->parent_obj.children, sibling) {
         DeviceState *qdev = child->child;
         I3CTarget *target = I3C_TARGET(qdev);
 
         if (i3c_target_match_and_add(bus, target, address, event)) {
-            return true;
+            found = true;
         }
     }
 
-    /* No one on the bus could respond. */
-    return false;
+    return found;
 }
 
 /* Class-level event handling, since we do some CCCs at the class level. */
@@ -235,40 +244,26 @@ int i3c_start_send(I3CBus *bus, uint8_t address)
 void i3c_end_transfer(I3CBus *bus)
 {
     I3CTargetClass *tc;
-    I3CNode *node, *next;
 
     trace_i3c_end_transfer();
 
     /*
-     * If we're in ENTDAA, we need to notify all devices when ENTDAA is done.
-     * This is because everyone initially participates due to the broadcast,
-     * but gradually drops out as they get assigned addresses.
-     * Since the current_devs list only stores who's currently participating,
-     * and not everyone who previously participated, we send the STOP to all
-     * children.
+     * We need to send STOPs to all devices, since it's possible for devices to
+     * ACK and initially participate on the bus, such as with ENTDAA and direct
+     * CCCs, but then no longer participate on the bus, such as ENTDAA after
+     * being assigned an address, or if the CCC is a direct CCC and the target
+     * isn't addressed.
      */
-    if (bus->in_entdaa) {
-        BusChild *child;
-
-        QTAILQ_FOREACH(child, &bus->qbus.children, sibling) {
-            DeviceState *qdev = child->child;
-            I3CTarget *t = I3C_TARGET(qdev);
-            tc = I3C_TARGET_GET_CLASS(t);
-            if (tc->event) {
-                i3c_target_event(t, I3C_STOP);
-            }
-        }
-    } else {
-        QLIST_FOREACH_SAFE(node, &bus->current_devs, next, next) {
-            I3CTarget *t = node->target;
-            tc = I3C_TARGET_GET_CLASS(t);
-            if (tc->event) {
-                i3c_target_event(t, I3C_STOP);
-            }
-            QLIST_REMOVE(node, next);
-            g_free(node);
+    BusChild *child;
+    QTAILQ_FOREACH(child, &bus->parent_obj.children, sibling) {
+        DeviceState *qdev = child->child;
+        I3CTarget *t = I3C_TARGET(qdev);
+        tc = I3C_TARGET_GET_CLASS(t);
+        if (tc->event) {
+            i3c_target_event(t, I3C_STOP);
         }
     }
+
     bus->broadcast = false;
     bus->in_entdaa = false;
     bus->in_ccc = false;
@@ -291,6 +286,10 @@ static int i3c_target_handle_ccc_write(I3CTarget *t, const uint8_t *data,
         t->in_ccc = true;
         *num_sent = 1;
         trace_i3c_target_handle_ccc(t->address, t->curr_ccc);
+
+        if (CCC_IS_DIRECT(t->curr_ccc)) {
+            return 0;
+        }
     }
 
     switch (t->curr_ccc) {
@@ -308,7 +307,9 @@ static int i3c_target_handle_ccc_write(I3CTarget *t, const uint8_t *data,
         }
         break;
     case I3C_CCCD_SETDASA:
-        t->address = t->static_address;
+        /* The address will come in shifted to the left by 1, so undo that. */
+        t->address = *data >> 1;
+        ++*num_sent;
         break;
     case I3C_CCC_SETAASA:
         t->address = t->static_address;
@@ -334,6 +335,32 @@ static int i3c_target_handle_ccc_write(I3CTarget *t, const uint8_t *data,
             ++*num_sent;
         }
         break;
+    case I3C_CCC_SETMWL:
+    case I3C_CCCD_SETMWL:
+        while (*num_sent < num_to_send) {
+            /* MSB first. */
+            t->mwl <<= 8;
+            t->mwl |= data[*num_sent];
+            ++*num_sent;
+        }
+        break;
+    case I3C_CCC_SETMRL:
+    case I3C_CCCD_SETMRL:
+        while (*num_sent < num_to_send) {
+            /*
+             * If a device supports IBI payloads, its payload length can be
+             * optionally set by GETMRL.
+             */
+            if (*num_sent == 2 && (t->bcr & BCR_IBI_PAYLOAD_MASK)) {
+                t->max_ibi_payload = data[*num_sent];
+            } else {
+                /* MSB first. */
+                t->mrl <<= 8;
+                t->mrl |= data[*num_sent];
+            }
+            ++*num_sent;
+        }
+        break;
     /* Ignore other CCCs it's better to handle on a device-by-device basis. */
     default:
         break;
@@ -347,7 +374,7 @@ int i3c_send_byte(I3CBus *bus, uint8_t data)
      * Ignored, the caller can determine how many were sent based on if this was
      * ACKed/NACKed.
      */
-    uint32_t num_sent;
+    uint32_t num_sent = 0;
     return i3c_send(bus, &data, 1, &num_sent);
 }
 
@@ -454,6 +481,40 @@ static int i3c_target_handle_ccc_read(I3CTarget *t, uint8_t *data,
         *data = t->dcr;
         *num_read = 1;
         break;
+    case I3C_CCCD_GETMWL:
+        while (t->ccc_byte_offset < 2) {
+            if (read_count >= num_to_read) {
+                break;
+            }
+            /* MSB first. */
+            data[read_count] = (t->mwl >> ((1 - t->ccc_byte_offset) * 8)) &
+                               0xff;
+            t->ccc_byte_offset++;
+            read_count++;
+        }
+        *num_read = read_count;
+        break;
+    case I3C_CCCD_GETMRL:
+        while (t->ccc_byte_offset < 2) {
+            if (read_count >= num_to_read) {
+                break;
+            }
+            /*
+             * If a device supports IBI payloads, its payload length can be
+             * optionally retrieved by GETMRL.
+             */
+            if (read_count == 2 && (t->bcr & BCR_IBI_PAYLOAD_MASK)) {
+                data[read_count] = t->max_ibi_payload;
+            } else {
+                /* MSB first. */
+                data[read_count] = (t->mrl >> ((1 - t->ccc_byte_offset) * 8)) &
+                                  0xff;
+            }
+            t->ccc_byte_offset++;
+            read_count++;
+        }
+        *num_read = read_count;
+        break;
     default:
         /* Unhandled on the I3CTarget class level. */
         break;
@@ -523,7 +584,7 @@ void i3c_nack(I3CBus *bus)
 
 int i3c_target_send_ibi(I3CTarget *t, uint8_t addr, bool is_recv)
 {
-    I3CBus *bus = I3C_BUS(t->qdev.parent_bus);
+    I3CBus *bus = I3C_BUS(t->parent_obj.parent_bus);
     I3CBusClass *bc = I3C_BUS_GET_CLASS(bus);
     trace_i3c_target_send_ibi(addr, is_recv);
     return bc->ibi_handle(bus, addr, is_recv);
@@ -531,7 +592,7 @@ int i3c_target_send_ibi(I3CTarget *t, uint8_t addr, bool is_recv)
 
 int i3c_target_send_ibi_bytes(I3CTarget *t, uint8_t data)
 {
-    I3CBus *bus = I3C_BUS(t->qdev.parent_bus);
+    I3CBus *bus = I3C_BUS(t->parent_obj.parent_bus);
     I3CBusClass *bc = I3C_BUS_GET_CLASS(bus);
     trace_i3c_target_send_ibi_bytes(data);
     return bc->ibi_recv(bus, data);
@@ -539,7 +600,7 @@ int i3c_target_send_ibi_bytes(I3CTarget *t, uint8_t data)
 
 int i3c_target_ibi_finish(I3CTarget *t, uint8_t data)
 {
-    I3CBus *bus = I3C_BUS(t->qdev.parent_bus);
+    I3CBus *bus = I3C_BUS(t->parent_obj.parent_bus);
     I3CBusClass *bc = I3C_BUS_GET_CLASS(bus);
     trace_i3c_target_ibi_finish();
     return bc->ibi_finish(bus);
@@ -547,7 +608,7 @@ int i3c_target_ibi_finish(I3CTarget *t, uint8_t data)
 
 static bool i3c_addr_is_rsvd(uint8_t addr)
 {
-    const bool is_rsvd[255] = {
+    static const bool is_rsvd[256] = {
         [0x00] = true,
         [0x01] = true,
         [0x02] = true,
@@ -585,7 +646,7 @@ I3CTarget *i3c_target_new(const char *name, uint8_t addr, uint8_t dcr,
 
 bool i3c_target_realize_and_unref(I3CTarget *dev, I3CBus *bus, Error **errp)
 {
-    return qdev_realize_and_unref(&dev->qdev, &bus->qbus, errp);
+    return qdev_realize_and_unref(&dev->parent_obj, &bus->parent_obj, errp);
 }
 
 I3CTarget *i3c_target_create_simple(I3CBus *bus, const char *name, uint8_t addr,
@@ -651,7 +712,7 @@ I2CSlave *legacy_i2c_device_create_simple(I3CBus *bus, const char *name,
     return dev;
 }
 
-static void i3c_target_class_init(ObjectClass *klass, void *data)
+static void i3c_target_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *k = DEVICE_CLASS(klass);
     I3CTargetClass *sc = I3C_TARGET_CLASS(klass);
@@ -659,21 +720,29 @@ static void i3c_target_class_init(ObjectClass *klass, void *data)
     k->bus_type = TYPE_I3C_BUS;
     device_class_set_props(k, i3c_props);
     sc->target_match = i3c_target_match;
+    sc->ccc_is_supported = i3c_target_ccc_is_supported;
 }
 
-static const TypeInfo i3c_target_type_info = {
-    .name = TYPE_I3C_TARGET,
-    .parent = TYPE_DEVICE,
-    .instance_size = sizeof(I3CTarget),
-    .abstract = true,
-    .class_size = sizeof(I3CTargetClass),
-    .class_init = i3c_target_class_init,
+static const TypeInfo i3c_types[] = {
+    {
+        .name = TYPE_I3C_BUS,
+        .parent = TYPE_BUS,
+        .instance_size = sizeof(I3CBus),
+        .class_size = sizeof(I3CBusClass),
+        .class_init = i3c_class_init,
+        .interfaces = (InterfaceInfo[]) {
+            { TYPE_HOTPLUG_HANDLER },
+            { }
+        }
+    },
+    {
+        .name = TYPE_I3C_TARGET,
+        .parent = TYPE_DEVICE,
+        .instance_size = sizeof(I3CTarget),
+        .abstract = true,
+        .class_size = sizeof(I3CTargetClass),
+        .class_init = i3c_target_class_init,
+    },
 };
 
-static void i3c_register_types(void)
-{
-    type_register_static(&i3c_bus_info);
-    type_register_static(&i3c_target_type_info);
-}
-
-type_init(i3c_register_types)
+DEFINE_TYPES(i3c_types)

@@ -8,7 +8,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/sensor/isl_pmbus_vr.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "qapi/visitor.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
@@ -287,7 +287,7 @@ static void isl_pmbus_vr_class_init(ObjectClass *klass, const void *data,
     k->device_num_pages = pages;
 }
 
-static void isl68137_class_init(ObjectClass *klass, void *data)
+static void isl68137_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -296,7 +296,7 @@ static void isl68137_class_init(ObjectClass *klass, void *data)
     isl_pmbus_vr_class_init(klass, data, 2);
 }
 
-static void isl69260_class_init(ObjectClass *klass, void *data)
+static void isl69260_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -305,7 +305,7 @@ static void isl69260_class_init(ObjectClass *klass, void *data)
     isl_pmbus_vr_class_init(klass, data, 2);
 }
 
-static void raa228000_class_init(ObjectClass *klass, void *data)
+static void raa228000_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -314,7 +314,7 @@ static void raa228000_class_init(ObjectClass *klass, void *data)
     isl_pmbus_vr_class_init(klass, data, 1);
 }
 
-static void raa229004_class_init(ObjectClass *klass, void *data)
+static void raa229004_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -323,7 +323,7 @@ static void raa229004_class_init(ObjectClass *klass, void *data)
     isl_pmbus_vr_class_init(klass, data, 2);
 }
 
-static void isl69259_class_init(ObjectClass *klass, void *data)
+static void isl69259_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

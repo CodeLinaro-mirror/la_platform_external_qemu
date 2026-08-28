@@ -130,7 +130,6 @@ static inline int os_mlock(bool on_fault G_GNUC_UNUSED)
 
 static inline void os_setup_limits(void)
 {
-    return;
 }
 
 #define fsync _commit
@@ -169,11 +168,14 @@ static inline void qemu_funlockfile(FILE *f)
 #endif
 }
 
-/* Helper for WSAEventSelect, to report errors */
+/* Helpers for WSAEventSelect() */
 bool qemu_socket_select(int sockfd, WSAEVENT hEventObject,
                         long lNetworkEvents, Error **errp);
+void qemu_socket_select_nofail(int sockfd, WSAEVENT hEventObject,
+                               long lNetworkEvents);
 
 bool qemu_socket_unselect(int sockfd, Error **errp);
+void qemu_socket_unselect_nofail(int sockfd);
 
 /* We wrap all the sockets functions so that we can set errno based on
  * WSAGetLastError(), and use file-descriptors instead of SOCKET.
@@ -270,12 +272,8 @@ win32_close_exception_handler(struct _EXCEPTION_RECORD*, void*,
 void *qemu_win32_map_alloc(size_t size, HANDLE *h, Error **errp);
 void qemu_win32_map_free(void *ptr, HANDLE h, Error **errp);
 
-/* goldfish <<< */
-struct off_t_is_broken_on_windows;
-#define off_t struct off_t_is_broken_on_windows
+#define off_t off_t_is_broken_on_windows
 #define OFF_MAX INT64_MAX
-/* goldfish >>> */
-
 
 #ifdef __cplusplus
 }

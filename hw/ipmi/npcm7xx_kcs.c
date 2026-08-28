@@ -3,16 +3,6 @@
  *
  * Copyright 2021 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
- *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * TODO: Add a do_hw_op function that passes host reset signal to the BPC.
@@ -20,7 +10,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/ipmi/npcm7xx_kcs.h"
-#include "hw/irq.h"
+#include "hw/core/irq.h"
 #include "migration/vmstate.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
@@ -647,7 +637,7 @@ static void npcm7xx_kcs_write(void *opaque, hwaddr addr, uint64_t v,
 static const MemoryRegionOps npcm7xx_kcs_ops = {
     .read = npcm7xx_kcs_read,
     .write = npcm7xx_kcs_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
+    .endianness = DEVICE_LITTLE_ENDIAN,
     .valid = {
         .min_access_size = 1, /* KCS registers are 8-bits. */
         .max_access_size = 1, /* KCS registers are 8-bits. */
@@ -698,7 +688,7 @@ static void npcm7xx_kcs_set_atn(struct IPMIInterface *s, int val, int irq)
 {
 }
 
-static void npcm7xx_kcs_channel_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_kcs_channel_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     IPMIInterfaceClass *iic = IPMI_INTERFACE_CLASS(klass);
@@ -757,7 +747,7 @@ static void npcm7xx_bpc_finalize(Object *obj)
     fifo8_destroy(&b->addr_fifo);
 }
 
-static void npcm7xx_bpc_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_bpc_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
@@ -837,7 +827,7 @@ static void npcm7xx_kcs_init(Object *obj)
     object_initialize_child(obj, "bpc", &s->bpc, TYPE_NPCM7XX_BPC);
 }
 
-static void npcm7xx_kcs_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_kcs_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

@@ -136,7 +136,7 @@ qemu_irq *aehd_i8259_init(ISABus *bus)
     return qemu_allocate_irqs(aehd_pic_set_irq, NULL, ISA_NUM_IRQS);
 }
 
-static void aehd_i8259_class_init(ObjectClass *klass, void *data)
+static void aehd_i8259_class_init(ObjectClass *klass, const void *data)
 {
     AEHDPICClass *kpc = AEHD_PIC_CLASS(klass);
     PICCommonClass *k = PIC_COMMON_CLASS(klass);

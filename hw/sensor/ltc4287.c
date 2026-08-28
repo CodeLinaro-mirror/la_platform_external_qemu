@@ -20,12 +20,15 @@ OBJECT_DECLARE_SIMPLE_TYPE(LTC4287State, LTC4287)
 
 #define LTC4287_DEFAULT_OPERATION               0x80 /* Device Enabled */
 #define LTC4287_DEFAULT_CAPABILITY              0x20 /* 1MHz bus speed */
-#define LTC4287_DEFAULT_VOUT_MODE               0x60 /* DIRECT Mode */
+#define LTC4287_DEFAULT_VOUT_MODE               0x40 /* DIRECT Mode */
 #define LTC4287_DEFAULT_REVISION                0x11 /* Latest */
+
+#define LTC4287_MFR_REBOOT_CONTROL 0xFD
 
 typedef struct LTC4287State {
     PMBusDevice parent;
     uint8_t mfr_revision;
+    uint8_t mfr_reboot_control;
 } LTC4287State;
 
 static uint8_t ltc4287_read_byte(PMBusDevice *pmdev)
@@ -57,6 +60,10 @@ static uint8_t ltc4287_read_byte(PMBusDevice *pmdev)
         pmbus_send8(pmdev, s->mfr_revision);
         break;
 
+    case LTC4287_MFR_REBOOT_CONTROL:
+        pmbus_send8(pmdev, s->mfr_reboot_control);
+        break;
+
     default:
         qemu_log_mask(LOG_UNIMP,
                       "%s: %s: reading from unimplemented register: 0x%02x\n",
@@ -83,6 +90,10 @@ static int ltc4287_write_data(PMBusDevice *pmdev, const uint8_t *buf,
                       DEVICE(s)->canonical_path, __func__, pmdev->code);
         break;
 
+    case LTC4287_MFR_REBOOT_CONTROL:
+        s->mfr_reboot_control = pmbus_receive8(pmdev);
+        break;
+
     default:
         qemu_log_mask(LOG_UNIMP,
                       "%s: %s: writing to unimplemented register: 0x%02x\n",
@@ -102,12 +113,15 @@ static void ltc4287_exit_reset(Object *obj, ResetType type)
     pmdev->pages[0].vout_mode = LTC4287_DEFAULT_VOUT_MODE;
     pmdev->pages[0].revision = LTC4287_DEFAULT_REVISION;
     s->mfr_revision = LTC4287_DEFAULT_REVISION;
+    s->mfr_reboot_control = 0x24;
 
     /* random sensor readings */
     pmdev->pages[0].read_vin = 0x100;
     pmdev->pages[0].read_vout = 0x100;
     pmdev->pages[0].read_iin = 0x10;
     pmdev->pages[0].read_temperature_1 = 30;
+    pmdev->pages[0].read_iout = 0x10;
+    pmdev->pages[0].read_pin = 0x110;
 }
 
 static void ltc4287_get(Object *obj, Visitor *v, const char *name, void *opaque,
@@ -115,13 +129,12 @@ static void ltc4287_get(Object *obj, Visitor *v, const char *name, void *opaque,
 {
     uint32_t value;
 
-    if (strcmp(name, "vout") == 0) {
-        value = *(uint16_t *)opaque;
-    } else {
-        value = *(uint16_t *)opaque;
+    value = *(uint16_t *)opaque;
+
+    if (!(strcmp(name, "temperature") == 0 || strcmp(name, "pin") == 0)) {
+        value *= 1000; /* use milliunits for qmp */
     }
 
-    value *= 1000; /* use milliunits for qmp */
     visit_type_uint32(v, name, &value, errp);
 }
 
@@ -136,8 +149,11 @@ static void ltc4287_set(Object *obj, Visitor *v, const char *name, void *opaque,
         return;
     }
 
-    /* use milliunits for qmp */
-    value /= 1000;
+    if (!(strcmp(name, "temperature") == 0 || strcmp(name, "pin") == 0)) {
+        /* use milliunits for qmp */
+        value /= 1000;
+    }
+
     if (strcmp(name, "vout") == 0) {
         *internal = (uint16_t)value;
     } else {
@@ -160,7 +176,8 @@ static void ltc4287_init(Object *obj)
 {
     PMBusDevice *pmdev = PMBUS_DEVICE(obj);
     uint64_t psu_flags = PB_HAS_VIN | PB_HAS_VOUT | PB_HAS_VOUT_MARGIN |
-                         PB_HAS_VOUT_MODE | PB_HAS_IIN | PB_HAS_TEMPERATURE;
+                         PB_HAS_VOUT_MODE | PB_HAS_IIN | PB_HAS_TEMPERATURE |
+                         PB_HAS_IOUT | PB_HAS_PIN;
 
     pmbus_page_config(pmdev, 0, psu_flags);
     object_property_add(obj, "vin", "uint32", ltc4287_get, ltc4287_set,
@@ -171,9 +188,13 @@ static void ltc4287_init(Object *obj)
                         NULL, &pmdev->pages[0].read_vout);
     object_property_add(obj, "temperature", "uint32", ltc4287_get, ltc4287_set,
                         NULL, &pmdev->pages[0].read_temperature_1);
+    object_property_add(obj, "iout", "uint32", ltc4287_get, ltc4287_set,
+                        NULL, &pmdev->pages[0].read_iout);
+    object_property_add(obj, "pin", "uint32", ltc4287_get, ltc4287_set,
+                        NULL, &pmdev->pages[0].read_pin);
 }
 
-static void ltc4287_class_init(ObjectClass *klass, void *data)
+static void ltc4287_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

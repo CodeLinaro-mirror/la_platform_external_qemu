@@ -16,9 +16,9 @@
 
 #include "qemu/osdep.h"
 #include "hw/adc/npcm7xx_adc.h"
-#include "hw/qdev-clock.h"
-#include "hw/qdev-properties.h"
-#include "hw/registerfields.h"
+#include "hw/core/qdev-clock.h"
+#include "hw/core/qdev-properties.h"
+#include "hw/core/registerfields.h"
 #include "migration/vmstate.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
@@ -272,7 +272,7 @@ static const Property npcm7xx_timer_properties[] = {
     DEFINE_PROP_UINT32("max-data", NPCM7xxADCState, data_max, NPCM7XX_ADC_DEFAULT_MAX),
 };
 
-static void npcm7xx_adc_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_adc_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

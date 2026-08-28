@@ -7,8 +7,8 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/irq.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
 #include "hw/pci-host/npcm_pcierc.h"
 #include "hw/pci/msi.h"
 #include "qapi/error.h"
@@ -30,12 +30,12 @@ static bool npcm_pcierc_valid_window_addr(hwaddr addr, uint32_t size)
 {
     if ((addr + size) > NPCM_PCIE_HOLE_END) {
         qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: window mapping @0x%lx, size: %d is invalid.\n",
-                      __func__, addr, size);
+                      "%s: window mapping @0x%" HWADDR_PRIx ", size: %" PRIu32
+                      " is invalid.\n", __func__, addr, size);
         return false;
     } else if (addr < NPCM_PCIE_HOLE) {
         qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: window mapping @0x%lx, is invalid.\n",
+                      "%s: window mapping @0x%" HWADDR_PRIx ", is invalid.\n",
                       __func__, addr);
         return false;
     } else {
@@ -101,8 +101,8 @@ static void npcm_pcierc_map_enabled(NPCMPCIERCState *s, NPCMPCIEWindow *w)
     } else if (w->type == PCIE2AXI) {
         snprintf(name, sizeof(name), "npcm-pcie2axi-window-%d", w->id);
         memory_region_init_alias(&w->mem, OBJECT(s), name,
-                                 system, src_ba, size);
-        memory_region_add_subregion(&s->pcie_memory, dest_ba, &w->mem);
+                                 system, dest_ba, size);
+        memory_region_add_subregion(&s->pcie_memory, src_ba, &w->mem);
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
                       "%s: unable to map uninitialized PCIe window",
@@ -160,7 +160,7 @@ static NPCMPCIEWindow *npcm_pcierc_get_window(NPCMPCIERCState *s, hwaddr addr)
 
     default:
         qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: invalid window address 0x%lx\n",
+                      "%s: invalid window address 0x%" HWADDR_PRIx "\n",
                       __func__, addr);
         return 0;
     }
@@ -306,8 +306,8 @@ static uint64_t npcm_pcierc_cfg_read(void *opaque, hwaddr addr, unsigned size)
 
     default:
         qemu_log_mask(LOG_UNIMP,
-                      "%s: read from unimplemented register 0x%04lx\n",
-                      __func__, addr);
+                      "%s: read from unimplemented register 0x%04" HWADDR_PRIx
+                      "\n", __func__, addr);
         ret = -1;
         break;
     }
@@ -353,7 +353,8 @@ static void npcm_pcierc_cfg_write(void *opaque, hwaddr addr, uint64_t data,
 
     default:
         qemu_log_mask(LOG_UNIMP,
-                      "%s: write to unimplemented reg 0x%04lx data: 0x%lx\n",
+                      "%s: write to unimplemented reg 0x%04" HWADDR_PRIx
+                      " data: 0x%" PRIx64 "\n",
                       __func__, addr, data);
         break;
     }
@@ -408,17 +409,32 @@ static const PCIIOMMUOps npcm_pcierc_iommu_ops = {
 
 static void npcm_pcierc_reset_pcie_windows(NPCMPCIERCState *s)
 {
-    memset(s->axi2pcie, 0, sizeof(s->axi2pcie));
-    memset(s->pcie2axi, 0, sizeof(s->pcie2axi));
-
     for (int i = 0; i < NPCM_PCIERC_NUM_PA_WINDOWS; i++) {
+        s->pcie2axi[i].sal = 0;
+        s->pcie2axi[i].sah = 0;
+        s->pcie2axi[i].tal = 0;
+        s->pcie2axi[i].tah = 0;
+        s->pcie2axi[i].params = 0;
         s->pcie2axi[i].id = i;
         s->pcie2axi[i].type = PCIE2AXI;
+        s->pcie2axi[i].set_fields = 0;
+
+        npcm_pcierc_unmap_disabled(s, &s->pcie2axi[i]);
+        memset(&s->pcie2axi[i].mem, 0, sizeof(s->pcie2axi[i].mem));
     }
 
     for (int i = 0; i < NPCM_PCIERC_NUM_AP_WINDOWS; i++) {
+        s->axi2pcie[i].sal = 0;
+        s->axi2pcie[i].sah = 0;
+        s->axi2pcie[i].tal = 0;
+        s->axi2pcie[i].tah = 0;
+        s->axi2pcie[i].params = 0;
         s->axi2pcie[i].id = i;
         s->axi2pcie[i].type = AXI2PCIE;
+        s->axi2pcie[i].set_fields = 0;
+
+        npcm_pcierc_unmap_disabled(s, &s->axi2pcie[i]);
+        memset(&s->axi2pcie[i].mem, 0, sizeof(s->axi2pcie[i].mem));
     }
 }
 
@@ -507,7 +523,9 @@ static void npcm_pcierc_realize(DeviceState *dev, Error **errp)
                           &npcm_pcie_cfg_space_ops, s, "npcm-pcie-config",
                           4 * KiB);
 
-    /* realize the root port */
+    /* Setting this early since the root port reads it */
+    phs->bus->flags |= PCI_BUS_EXTENDED_CONFIG_SPACE;
+    /* Initialize the Root Port */
     pci_realize_and_unref(root, phs->bus, &error_fatal);
     /* enable MSI (non-X) in root port config space */
     msi_nonbroken = true;
@@ -521,6 +539,7 @@ static void npcm_pcie_root_port_realize(DeviceState *dev, Error **errp)
 {
     PCIERootPortClass *rpc = PCIE_ROOT_PORT_GET_CLASS(dev);
     Error *local_err = NULL;
+    dev->id = g_strdup(TYPE_NPCM_PCIE_ROOT_PORT);
 
     rpc->parent_realize(dev, &local_err);
     if (local_err) {
@@ -529,7 +548,7 @@ static void npcm_pcie_root_port_realize(DeviceState *dev, Error **errp)
     }
 }
 
-static void npcm_pcierc_class_init(ObjectClass *klass, void *data)
+static void npcm_pcierc_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     PCIHostBridgeClass *hbc = PCI_HOST_BRIDGE_CLASS(klass);
@@ -542,7 +561,7 @@ static void npcm_pcierc_class_init(ObjectClass *klass, void *data)
     dc->fw_name = "pci";
 }
 
-static void npcm_pcie_rp_class_init(ObjectClass *klass, void *data)
+static void npcm_pcie_rp_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     PCIDeviceClass *pk = PCI_DEVICE_CLASS(klass);
@@ -555,9 +574,8 @@ static void npcm_pcie_rp_class_init(ObjectClass *klass, void *data)
                                     npcm_pcie_root_port_realize,
                                     &rpc->parent_realize);
 
-    /* TODO(b/229132071) replace with real values */
-    pk->vendor_id = PCI_VENDOR_ID_QEMU;
-    pk->device_id = 0;
+    pk->vendor_id = NPCM_PCIE_VENDOR_ID;
+    pk->device_id = NPCM_PCIE_DEVICE_ID;
     pk->class_id = PCI_CLASS_BRIDGE_PCI;
 
     rpc->exp_offset = NPCM_PCIE_HEADER_OFFSET; /* Express capabilities offset */

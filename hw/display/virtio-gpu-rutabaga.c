@@ -10,9 +10,13 @@
 #include "hw/virtio/virtio-gpu-pixman.h"
 #include "hw/virtio/virtio-iommu.h"
 #include "migration/qemu-file-types.h"
+#include "qemu/main-loop.h"
+#include "qemu/timer.h"
+#include "system/runstate.h"
 #include "ui/console.h"
 
 #include <glib/gmem.h>
+#include <glib/gstdio.h>
 #include <rutabaga_gfx/rutabaga_gfx_ffi.h>
 
 #define VIRTIO_GPU_RUTABAGA_VM_VERSION 1
@@ -269,6 +273,54 @@ rutabaga_cmd_context_destroy(VirtIOGPU *g,
 }
 
 static void
+rutabaga_setup_full_res_transfer(struct virtio_gpu_simple_resource *res,
+                                 struct rutabaga_transfer *transfer,
+                                 struct iovec *transfer_iovec)
+{
+    transfer->x = 0;
+    transfer->y = 0;
+    transfer->z = 0;
+    transfer->w = res->width;
+    transfer->h = res->height;
+    transfer->d = 1;
+
+    transfer_iovec->iov_base = pixman_image_get_data(res->image);
+    transfer_iovec->iov_len = pixman_image_get_height(res->image) * pixman_image_get_stride(res->image);
+}
+
+static void virtio_gpu_rutabaga_update_display(VirtIOGPUBase *vb)
+{
+    VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(vb);
+    VirtIOGPU* gpu = VIRTIO_GPU(vb);
+    struct virtio_gpu_simple_resource *res;
+    struct rutabaga_transfer transfer = { 0 };
+    struct iovec transfer_iovec;
+    struct virtio_gpu_scanout *scanout;
+    int32_t i;
+
+    if (vr->headless) {
+        return;
+    }
+
+    for (i = 0; i < vb->conf.max_outputs; i++) {
+        scanout = &vb->scanout[i];
+        if (!scanout->con || !qemu_console_is_visible(scanout->con) || !scanout->resource_id) {
+            continue;
+        }
+        res = virtio_gpu_find_resource(gpu, scanout->resource_id);
+        if (!res || !res->image) {
+            continue;
+        }
+
+        rutabaga_setup_full_res_transfer(res, &transfer, &transfer_iovec);
+        if (rutabaga_resource_transfer_read(vr->rutabaga, 0, scanout->resource_id,
+                                            &transfer, &transfer_iovec) == 0) {
+            dpy_gfx_update_full(scanout->con);
+        }
+    }
+}
+
+static void
 rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
 {
     int32_t result, i;
@@ -300,19 +352,11 @@ rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
         }
     }
 
-    if (!found) {
+    if (!found || !qemu_console_is_visible(scanout->con)) {
         return;
     }
 
-    transfer.x = 0;
-    transfer.y = 0;
-    transfer.z = 0;
-    transfer.w = res->width;
-    transfer.h = res->height;
-    transfer.d = 1;
-
-    transfer_iovec.iov_base = pixman_image_get_data(res->image);
-    transfer_iovec.iov_len = res->width * res->height * 4;
+    rutabaga_setup_full_res_transfer(res, &transfer, &transfer_iovec);
 
     result = rutabaga_resource_transfer_read(vr->rutabaga, 0,
                                              rf.resource_id, &transfer,
@@ -951,6 +995,7 @@ virtio_gpu_rutabaga_aio_cb(void *opaque)
         virtio_gpu_ctrl_response_nodata(g, cmd, VIRTIO_GPU_RESP_OK_NODATA);
         QTAILQ_REMOVE(&g->fenceq, cmd, next);
         g_free(cmd);
+        g->inflight--;
     }
 
     g_free(data);
@@ -1122,19 +1167,19 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     return true;
 }
 
-static int virtio_gpu_rutabaga_get_num_capsets(VirtIOGPU *g)
+static bool
+virtio_gpu_rutabaga_get_num_capsets(VirtIOGPU *g, uint32_t *num_capsets, Error **errp)
 {
     int result;
-    uint32_t num_capsets;
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
-    result = rutabaga_get_num_capsets(vr->rutabaga, &num_capsets);
+    result = rutabaga_get_num_capsets(vr->rutabaga, num_capsets);
     if (result) {
-        error_report("Failed to get capsets");
-        return 0;
+        error_setg_errno(errp, -result, "Failed to get num_capsets");
+        return false;
     }
-    vr->num_capsets = num_capsets;
-    return num_capsets;
+    vr->num_capsets = *num_capsets;
+    return true;
 }
 
 static void virtio_gpu_rutabaga_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
@@ -1158,11 +1203,15 @@ static void virtio_gpu_rutabaga_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
     virtio_gpu_process_cmdq(g);
 }
 
+static void virtio_gpu_rutabaga_vm_state_change(void* opaque, bool running,
+                                                RunState state);
+
 static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
 {
-    int num_capsets;
+    uint32_t num_capsets;
     VirtIOGPUBase *bdev = VIRTIO_GPU_BASE(qdev);
     VirtIOGPU *gpudev = VIRTIO_GPU(qdev);
+    VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(qdev);
 
 #if HOST_BIG_ENDIAN
     error_setg(errp, "rutabaga is not supported on bigendian platforms");
@@ -1173,8 +1222,7 @@ static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
         return;
     }
 
-    num_capsets = virtio_gpu_rutabaga_get_num_capsets(gpudev);
-    if (!num_capsets) {
+    if (!virtio_gpu_rutabaga_get_num_capsets(gpudev, &num_capsets, errp)) {
         return;
     }
 
@@ -1184,6 +1232,9 @@ static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
 
     bdev->virtio_config.num_capsets = num_capsets;
     virtio_gpu_device_realize(qdev, errp);
+
+    vr->vm_state_entry = qemu_add_vm_change_state_handler(
+        virtio_gpu_rutabaga_vm_state_change, gpudev);
 }
 
 static const Property virtio_gpu_rutabaga_properties[] = {
@@ -1235,10 +1286,30 @@ static const VMStateDescription vmstate_virtio_gpu_scanouts = {
             VMSTATE_END_OF_LIST()},
 };
 
+static bool virtio_gpu_rutabaga_has_guest_state(VirtIOGPURutabaga *vgr) {
+    VirtIOGPU *g = &(vgr->parent_obj);
+    if (!QTAILQ_EMPTY(&vgr->contexts)) {
+        return true;
+    }
+    if (!QTAILQ_EMPTY(&g->reslist)) {
+        return true;
+    }
+    for (int slot = 0; slot < MAX_SLOTS; slot++) {
+        if (vgr->memory_regions[slot].used) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
     VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     int slot;
+
+    if (vgr->rutabaga && !virtio_gpu_rutabaga_has_guest_state(vgr)) {
+        return;
+    }
 
     memory_region_transaction_begin();
     for (slot = 0; slot < MAX_SLOTS; slot++) {
@@ -1255,6 +1326,17 @@ static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
         vgr->memory_regions[slot].offset = 0;
     }
     memory_region_transaction_commit();
+
+    struct virtio_gpu_rutabaga_context *ctx, *next_ctx;
+    QTAILQ_FOREACH_SAFE(ctx, &vgr->contexts, next, next_ctx) {
+        struct virtio_gpu_rutabaga_resource *res, *next_res;
+        QTAILQ_FOREACH_SAFE(res, &ctx->reslist, next, next_res) {
+            QTAILQ_REMOVE(&ctx->reslist, res, next);
+            g_free(res);
+        }
+        QTAILQ_REMOVE(&vgr->contexts, ctx, next);
+        g_free(ctx);
+    }
 
     rutabaga_finish(&vgr->rutabaga);
     Error *local_err = NULL;
@@ -1278,7 +1360,7 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         error_report("snapshot_directory not configured");
         return -EINVAL;
     }
-    full_path = g_build_filename(vgr->snapshot_directory, id_str, NULL);
+    full_path = g_build_filename(vgr->snapshot_directory, "default_boot", id_str, NULL);
 
     if (rutabaga_restore(vgr->rutabaga, full_path)) {
         error_report("failed to restore rutabaga");
@@ -1402,8 +1484,31 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         }
     }
 
-    vmstate_load_state(f, &vmstate_virtio_gpu_scanouts, g, 1);
+    vmstate_load_state(f, &vmstate_virtio_gpu_scanouts, g, 1, NULL);
     return 0;
+}
+
+static void virtio_gpu_rutabaga_remove_dir_recursive(const char *path)
+{
+    GDir *dir = g_dir_open(path, 0, NULL);
+    const char *name;
+
+    if (!dir) {
+        g_remove(path);
+        return;
+    }
+
+    while ((name = g_dir_read_name(dir)) != NULL) {
+        g_autofree char *child = g_build_filename(path, name, NULL);
+        if (g_file_test(child, G_FILE_TEST_IS_DIR) &&
+            !g_file_test(child, G_FILE_TEST_IS_SYMLINK)) {
+            virtio_gpu_rutabaga_remove_dir_recursive(child);
+        } else {
+            g_remove(child);
+        }
+    }
+    g_dir_close(dir);
+    g_rmdir(path);
 }
 
 static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
@@ -1415,6 +1520,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
     int i;
     g_autofree char *id_str = NULL;
     g_autofree char *full_path = NULL;
+    g_autofree char *default_boot_path = NULL;
 
     if (!vgr->snapshot_directory) {
         error_report("snapshot_directory not configured");
@@ -1425,7 +1531,10 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
     id_str = g_date_time_format(now, "rutabaga-%Y-%b-%d-%H-%M-%S");
     qemu_put_counted_string(f, id_str);
 
-    full_path = g_build_filename(vgr->snapshot_directory, id_str, NULL);
+    default_boot_path = g_build_filename(vgr->snapshot_directory, "default_boot", NULL);
+    virtio_gpu_rutabaga_remove_dir_recursive(default_boot_path);
+
+    full_path = g_build_filename(vgr->snapshot_directory, "default_boot", id_str, NULL);
 
     if (g_mkdir_with_parents(full_path, 0755) == -1) {
         error_report("Failed to create snapshot directory %s", full_path);
@@ -1434,6 +1543,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
 
     if (rutabaga_snapshot(vgr->rutabaga, full_path)) {
         error_report("Failed to save graphics");
+        virtio_gpu_rutabaga_remove_dir_recursive(default_boot_path);
         return -EINVAL;
     }
 
@@ -1495,7 +1605,7 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
         }
     }
 
-    vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL);
+    vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL, NULL);
     return 0;
 }
 
@@ -1606,6 +1716,53 @@ static int virtio_gpu_rutabaga_load_backing(
   return 0;
 }
 
+#define VIRTIO_GPU_RUTABAGA_DRAIN_TIMEOUT_MS 5000
+
+static void virtio_gpu_rutabaga_drain_wakeup(void* opaque) {
+}
+
+static void virtio_gpu_rutabaga_drain_for_save(VirtIOGPU* g) {
+  VirtIOGPUClass* vgc = VIRTIO_GPU_GET_CLASS(g);
+  AioContext* ctx = qemu_get_aio_context();
+  struct virtio_gpu_ctrl_command* cmd;
+  QEMUTimer wakeup;
+  unsigned int n;
+  int64_t deadline = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) +
+                     VIRTIO_GPU_RUTABAGA_DRAIN_TIMEOUT_MS;
+
+  // since vCPU stopped, pop all the commands off vq
+  vgc->handle_ctrl(VIRTIO_DEVICE(g), g->ctrl_vq);
+
+  if (QTAILQ_EMPTY(&g->fenceq) && QTAILQ_EMPTY(&g->cmdq)) {
+      return;
+  }
+
+  aio_timer_init(ctx, &wakeup, QEMU_CLOCK_REALTIME, SCALE_MS,
+          virtio_gpu_rutabaga_drain_wakeup, NULL);
+  timer_mod(&wakeup, deadline);
+
+  while (!QTAILQ_EMPTY(&g->fenceq) || !QTAILQ_EMPTY(&g->cmdq)) {
+      if (qemu_clock_get_ms(QEMU_CLOCK_REALTIME) >= deadline) {
+          warn_report( "virtio-gpu-rutabaga: drain timed out; and the restored guest may ANR.");
+          break;
+      }
+      aio_poll(ctx, true);
+      virtio_gpu_process_cmdq(g);
+  }
+
+  timer_del(&wakeup);
+
+}
+
+static void virtio_gpu_rutabaga_vm_state_change(void* opaque, bool running,
+                                                RunState state) {
+  if (!running &&
+      (state == RUN_STATE_SAVE_VM || state == RUN_STATE_FINISH_MIGRATE ||
+       state == RUN_STATE_SHUTDOWN || state == RUN_STATE_PAUSED)) {
+    virtio_gpu_rutabaga_drain_for_save(VIRTIO_GPU(opaque));
+  }
+}
+
 static int virtio_gpu_pre_load(void* opaque) {
   VirtIOGPURutabaga* vgr = opaque;
   VirtIOGPU* g = &(vgr->parent_obj);
@@ -1669,6 +1826,13 @@ static int virtio_gpu_post_load(void* opaque, int version_id) {
                   res_ctx->resource_id);
       }
   }
+
+  // we need to re-kick the bh handler to pick
+  // up the left over in vq commands, that were
+  // not processed at the moment of snapshot save
+  // so guest will not get stuck, as it "believe"
+  // it already sends commands through vq to host
+  qemu_bh_schedule(g->ctrl_bh);
 
   return ret;
 }
@@ -1763,7 +1927,7 @@ static void virtio_gpu_rutabaga_reset(VirtIODevice *vdev)
     virtio_gpu_rutabaga_reset_state(g);
 }
 
-static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, void *data)
+static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
@@ -1771,6 +1935,7 @@ static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, void *data)
     VirtIOGPUClass *vgc = VIRTIO_GPU_CLASS(klass);
 
     vbc->gl_flushed = virtio_gpu_rutabaga_gl_flushed;
+    vbc->update_display = virtio_gpu_rutabaga_update_display;
     vgc->handle_ctrl = virtio_gpu_rutabaga_handle_ctrl;
     vgc->process_cmd = virtio_gpu_rutabaga_process_cmd;
     vgc->update_cursor_data = virtio_gpu_rutabaga_update_cursor;

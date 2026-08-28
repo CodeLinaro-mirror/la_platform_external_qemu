@@ -15,6 +15,7 @@
 
 #include "google/drivers/hw/arm/goldfish_arm_board.h"
 
+#include "hw/arm/machines-qom.h"
 #include "hw/arm/fdt.h"
 #include "hw/arm/virt.h"
 #include "hw/pci/pci.h"
@@ -177,7 +178,7 @@ static void goldfish_set_vendor_device_in_guest(Object *obj, const char *value,
   ams->vendor_device_in_guest = g_strdup(value);
 }
 
-static void goldfish_machine_std_class_init(ObjectClass *oc, void *data) {
+static void goldfish_machine_std_class_init(ObjectClass *oc, const void *data) {
   MachineClass *mc = MACHINE_CLASS(oc);
   object_class_property_add_str(oc, "system", NULL,
                                 goldfish_set_system_device_in_guest);
@@ -192,10 +193,7 @@ static const TypeInfo goldfish_machine_type_std = {
     .class_init = goldfish_machine_std_class_init,
     .instance_size = sizeof(GoldfishMachineState),
     .instance_init = goldfish_instance_init,
-    .interfaces = (InterfaceInfo[]) {
-         { TYPE_HOTPLUG_HANDLER },
-         { }
-    },
+    .interfaces = arm_aarch64_machine_interfaces,
 };
 
 static void goldfish_machine_init_std(void) {

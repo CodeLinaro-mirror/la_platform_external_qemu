@@ -30,9 +30,6 @@
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "net/slirp.h"
-#include <stdbool.h>
-
-#include "trace.h"
 
 #if defined(CONFIG_SMBD_COMMAND)
 #include <pwd.h>
@@ -87,9 +84,8 @@ struct slirp_config_str {
 };
 
 struct GuestFwd {
-    CharBackend hd;
-    struct in_addr server; /* IPv4 Server address */
-    struct in6_addr server_v6; /* IPv6 Server address */
+    CharFrontend hd;
+    struct in_addr server;
     int port;
     Slirp *slirp;
 };
@@ -120,13 +116,6 @@ static void slirp_smb_cleanup(SlirpState *s);
 #else
 static inline void slirp_smb_cleanup(SlirpState *s) { }
 #endif
-
-/* Should only be used here */
-enum GFwdProtocols {
-    GFWD_TCP = 1,
-    GFWD_UDP = 2,
-    GFWD_INVALID = 3,
-};
 
 static ssize_t net_slirp_send_packet(const void *pkt, size_t pkt_len,
                                      void *opaque)
@@ -273,11 +262,13 @@ static void net_slirp_register_poll_sock(slirp_os_socket fd, void *opaque)
 {
 #ifdef WIN32
     AioContext *ctxt = qemu_get_aio_context();
+    g_autofree char *msg = NULL;
 
     if (WSAEventSelect(fd, event_notifier_get_handle(&ctxt->notifier),
                        FD_READ | FD_ACCEPT | FD_CLOSE |
                        FD_CONNECT | FD_WRITE | FD_OOB) != 0) {
-        error_setg_win32(&error_warn, WSAGetLastError(), "failed to WSAEventSelect()");
+        msg = g_win32_error_message(WSAGetLastError());
+        warn_report("failed to WSAEventSelect(): %s", msg);
     }
 #endif
 }
@@ -285,8 +276,11 @@ static void net_slirp_register_poll_sock(slirp_os_socket fd, void *opaque)
 static void net_slirp_unregister_poll_sock(slirp_os_socket fd, void *opaque)
 {
 #ifdef WIN32
+    g_autofree char *msg = NULL;
+
     if (WSAEventSelect(fd, NULL, 0) != 0) {
-        error_setg_win32(&error_warn, WSAGetLastError(), "failed to WSAEventSelect()");
+        msg = g_win32_error_message(WSAGetLastError());
+        warn_report("failed to WSAEventSelect(): %s", msg);
     }
 #endif
 }
@@ -767,136 +761,20 @@ static SlirpState *slirp_lookup(Monitor *mon, const char *id)
     }
 }
 
-static const char *parse_protocol(const char *str, bool *is_udp,
-                                  Error **errp)
-{
-    char buf[10];
-    const char *p = str;
-
-    if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
-        error_setg(errp, "missing protocol name separator");
-        return NULL;
-    }
-
-    if (!strcmp(buf, "tcp") || buf[0] == '\0') {
-        *is_udp = false;
-    } else if (!strcmp(buf, "udp")) {
-        *is_udp = true;
-    } else {
-        error_setg(errp, "bad protocol name '%s'", buf);
-        return NULL;
-    }
-
-    return p;
-}
-
-static int parse_hostfwd_sockaddr(const char *str, int family, int socktype,
-                                  struct sockaddr_storage *saddr,
-                                  bool *v6_only, Error **errp)
-{
-    struct addrinfo hints, *res = NULL, *e;
-    InetSocketAddress *addr = g_new(InetSocketAddress, 1);
-    int gai_rc;
-    int rc = -1;
-    Error *err = NULL;
-
-    const char *optstr = inet_parse_host_port(addr, str, errp);
-    if (optstr == NULL) {
-        goto fail_return;
-    }
-
-    if (inet_parse_ipv46(addr, optstr, errp) < 0) {
-        goto fail_return;
-    }
-
-    if (v6_only) {
-        bool v4 = addr->has_ipv4 && addr->ipv4;
-        bool v6 = addr->has_ipv6 && addr->ipv6;
-        *v6_only = v6 && !v4;
-    }
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_flags = AI_PASSIVE; /* ignored if host is not ""(->NULL) */
-    hints.ai_flags |= AI_NUMERICHOST | AI_NUMERICSERV;
-    hints.ai_socktype = socktype;
-    hints.ai_family = inet_ai_family_from_address(addr, &err);
-    if (err) {
-        error_propagate(errp, err);
-        goto fail_return;
-    }
-    if (family != PF_UNSPEC) {
-        /* Guest must use same family as host (for now). */
-        if (hints.ai_family != PF_UNSPEC && hints.ai_family != family) {
-            error_setg(errp,
-                       "unexpected address family for %s: expecting %s",
-                       str, family == PF_INET ? "ipv4" : "ipv6");
-            goto fail_return;
-        }
-        hints.ai_family = family;
-    }
-
-    /* For backward compatibility, treat an empty host spec as IPv4. */
-    if (*addr->host == '\0' && hints.ai_family == PF_UNSPEC) {
-        hints.ai_family = PF_INET;
-    }
-
-    /*
-     * Calling getaddrinfo for guest addresses is dubious, but addresses are
-     * restricted to numeric only. Convert "" to NULL for getaddrinfo's
-     * benefit.
-     */
-    gai_rc = getaddrinfo(*addr->host ? addr->host : NULL,
-                         *addr->port ? addr->port : NULL, &hints, &res);
-    if (gai_rc != 0) {
-        error_setg(errp, "address resolution failed for '%s': %s",
-                   str, gai_strerror(gai_rc));
-        goto fail_return;
-    }
-    if (res->ai_next != NULL) {
-        /*
-         * The caller only wants one address, and except for "any" for both
-         * ipv4 and ipv6 (which we've already precluded above), we shouldn't
-         * get more than one. To assist debugging print all we find.
-         */
-        GString *s = g_string_new(NULL);
-        for (e = res; e != NULL; e = e->ai_next) {
-            char host[NI_MAXHOST];
-            char serv[NI_MAXSERV];
-            int ret = getnameinfo((struct sockaddr *)e->ai_addr, e->ai_addrlen,
-                                  host, sizeof(host),
-                                  serv, sizeof(serv),
-                                  NI_NUMERICHOST | NI_NUMERICSERV);
-            if (ret == 0) {
-                g_string_append_printf(s, "\n  %s:%s", host, serv);
-            } else {
-                g_string_append_printf(s, "\n  unknown, got: %s",
-                                       gai_strerror(ret));
-            }
-        }
-        error_setg(errp, "multiple addresses resolved for '%s':%s",
-                   str, s->str);
-        g_string_free(s, TRUE);
-        goto fail_return;
-    }
-
-    memcpy(saddr, res->ai_addr, res->ai_addrlen);
-    rc = 0;
-
- fail_return:
-    qapi_free_InetSocketAddress(addr);
-    if (res) {
-        freeaddrinfo(res);
-    }
-    return rc;
-}
-
 void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
 {
-    struct sockaddr_storage host_addr;
+    /* TODO: support removing unix fwd */
+    struct sockaddr_in host_addr = {
+        .sin_family = AF_INET,
+        .sin_addr = {
+            .s_addr = INADDR_ANY,
+        },
+    };
+    int host_port;
+    char buf[256];
     const char *src_str, *p;
     SlirpState *s;
-    bool is_udp;
-    Error *error = NULL;
+    int is_udp = 0;
     int err;
     const char *arg1 = qdict_get_str(qdict, "arg1");
     const char *arg2 = qdict_get_try_str(qdict, "arg2");
@@ -912,136 +790,199 @@ void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
         return;
     }
 
-    g_assert(src_str != NULL);
     p = src_str;
-
-    p = parse_protocol(p, &is_udp, &error);
-    if (p == NULL) {
+    if (!p || get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
         goto fail_syntax;
     }
 
-    if (parse_hostfwd_sockaddr(p, PF_UNSPEC, is_udp ? SOCK_DGRAM : SOCK_STREAM,
-        &host_addr, /*v6_only=*/NULL, &error) < 0) {
+    if (!strcmp(buf, "tcp") || buf[0] == '\0') {
+        is_udp = 0;
+    } else if (!strcmp(buf, "udp")) {
+        is_udp = 1;
+    } else {
         goto fail_syntax;
     }
+
+    if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+        goto fail_syntax;
+    }
+    if (buf[0] != '\0' && !inet_aton(buf, &host_addr.sin_addr)) {
+        goto fail_syntax;
+    }
+
+    if (qemu_strtoi(p, NULL, 10, &host_port)) {
+        goto fail_syntax;
+    }
+    host_addr.sin_port = htons(host_port);
 
 #if SLIRP_CHECK_VERSION(4, 5, 0)
-    {
-        int flags = is_udp ? SLIRP_HOSTFWD_UDP : 0;
-        err = slirp_remove_hostxfwd(s->slirp, (struct sockaddr *) &host_addr,
-                                    sizeof(host_addr), flags);
-    }
+    err = slirp_remove_hostxfwd(s->slirp, (struct sockaddr *) &host_addr,
+            sizeof(host_addr), is_udp ? SLIRP_HOSTFWD_UDP : 0);
 #else
-    if (host_addr.ss_family != AF_INET) {
-        monitor_printf(mon,
-                       "Could not remove host forwarding rule '%s':"
-                       " only IPv4 supported",
-                       src_str);
-        return;
-    } else {
-        struct sockaddr_in *host_in_addr = (struct sockaddr_in *) &host_addr;
-        err = slirp_remove_hostfwd(s->slirp, is_udp,
-                                   host_in_addr->sin_addr,
-                                   ntohs(host_in_addr->sin_port));
-    }
+    err = slirp_remove_hostfwd(s->slirp, is_udp, host_addr.sin_addr, host_port);
 #endif
 
-    monitor_printf(mon, "host forwarding rule for %s %s\n", src_str,
-                   err ? "not found" : "removed");
+    if (err) {
+        monitor_printf(mon, "host forwarding rule for %s not found", src_str);
+    }
     return;
 
  fail_syntax:
-    monitor_printf(mon, "Invalid format: %s\n", error_get_pretty(error));
-    error_free(error);
+    monitor_printf(mon, "invalid format\n");
 }
 
 static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
 {
-    struct sockaddr_storage host_addr, guest_addr;
+    union {
+        struct sockaddr_in in;
+#if !defined(WIN32) && SLIRP_CHECK_VERSION(4, 7, 0)
+        struct sockaddr_un un;
+#endif
+    } host_addr = {0};
+
+    struct sockaddr_in guest_addr = {
+        .sin_family = AF_INET,
+        .sin_addr = {
+            .s_addr = 0,
+        },
+    };
+    int err;
+    int host_port, guest_port;
     const char *p;
     char buf[256];
-    bool is_udp;
-    Error *error = NULL;
-    int port;
-    bool v6_only;
+    int is_udp = 0;
+#if !defined(WIN32) && SLIRP_CHECK_VERSION(4, 7, 0)
+    int is_unix = 0;
+#endif
+    const char *end;
+    const char *fail_reason = "Unknown reason";
+    socklen_t host_addr_size;
 
-    g_assert(redir_str != NULL);
     p = redir_str;
-
-    p = parse_protocol(p, &is_udp, &error);
-    if (p == NULL) {
+    if (!p || get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+        fail_reason = "No : separators";
         goto fail_syntax;
     }
-
-    if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
-        error_setg(&error, "missing host-guest separator");
-        goto fail_syntax;
+    if (!strcmp(buf, "tcp") || buf[0] == '\0') {
+        is_udp = 0;
+    } else if (!strcmp(buf, "udp")) {
+        is_udp = 1;
     }
-
-    if (parse_hostfwd_sockaddr(buf, PF_UNSPEC,
-        is_udp ? SOCK_DGRAM : SOCK_STREAM,
-        &host_addr, &v6_only, &error) < 0) {
-        error_prepend(&error, "For host address: ");
-        goto fail_syntax;
-    }
-
-    if (parse_hostfwd_sockaddr(p, host_addr.ss_family,
-        is_udp ? SOCK_DGRAM : SOCK_STREAM,
-        &guest_addr, /*v6_only=*/NULL, &error) < 0) {
-        error_prepend(&error, "For guest address: ");
-        goto fail_syntax;
-    }
-
-    port = sockaddr_getport((struct sockaddr *) &guest_addr);
-    if (port == 0) {
-        error_setg(&error, "For guest address: invalid port '0'");
-        goto fail_syntax;
-    }
-#if SLIRP_CHECK_VERSION(4, 5, 0)
-    {
-        int flags = is_udp ? SLIRP_HOSTFWD_UDP : 0;
-        if (v6_only) {
-            flags |= SLIRP_HOSTFWD_V6ONLY;
-        }
-        if (slirp_add_hostxfwd(s->slirp,
-                               (struct sockaddr *) &host_addr,
-                               sizeof(host_addr),
-                               (struct sockaddr *) &guest_addr,
-                               sizeof(guest_addr),
-                               flags) < 0) {
-            error_setg(errp, "Could not set up host forwarding rule '%s': %s",
-                       redir_str, strerror(errno));
-            return -1;
-        }
-    }
-#else
-    if (host_addr.ss_family != AF_INET || guest_addr.ss_family != AF_INET) {
-        error_setg(errp,
-                   "Could not set up host forwarding rule '%s':"
-                   " only IPv4 supported",
-                   redir_str);
-        return -1;
-    } else {
-        struct sockaddr_in *host_in_addr = (struct sockaddr_in *) &host_addr;
-        struct sockaddr_in *guest_in_addr = (struct sockaddr_in *) &guest_addr;
-        if (slirp_add_hostfwd(s->slirp, is_udp,
-                              host_in_addr->sin_addr,
-                              ntohs(host_in_addr->sin_port),
-                              guest_in_addr->sin_addr,
-                              ntohs(guest_in_addr->sin_port)) < 0) {
-            error_setg(errp, "Could not set up host forwarding rule '%s'",
-                       redir_str);
-            return -1;
-        }
+#if !defined(WIN32) && SLIRP_CHECK_VERSION(4, 7, 0)
+    else if (!strcmp(buf, "unix")) {
+        is_unix = 1;
     }
 #endif
+    else {
+        fail_reason = "Bad protocol name";
+        goto fail_syntax;
+    }
 
+#if !defined(WIN32) && SLIRP_CHECK_VERSION(4, 7, 0)
+    if (is_unix) {
+        if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
+            fail_reason = "Missing - separator";
+            goto fail_syntax;
+        }
+        if (buf[0] == '\0') {
+            fail_reason = "Missing unix socket path";
+            goto fail_syntax;
+        }
+        if (buf[0] != '/') {
+            fail_reason = "unix socket path must be absolute";
+            goto fail_syntax;
+        }
+
+        size_t path_len = strlen(buf);
+        if (path_len > sizeof(host_addr.un.sun_path) - 1) {
+            fail_reason = "Unix socket path is too long";
+            goto fail_syntax;
+        }
+
+        struct stat st;
+        if (stat(buf, &st) == 0) {
+            if (!S_ISSOCK(st.st_mode)) {
+                fail_reason = "file exists and it's not unix socket";
+                goto fail_syntax;
+            }
+
+            if (unlink(buf) < 0) {
+                error_setg_errno(errp, errno, "Failed to unlink '%s'", buf);
+                goto fail_syntax;
+            }
+        }
+        host_addr.un.sun_family = AF_UNIX;
+        memcpy(host_addr.un.sun_path, buf, path_len);
+        host_addr_size = sizeof(host_addr.un);
+    } else
+#endif
+    {
+        host_addr.in.sin_family = AF_INET;
+        host_addr.in.sin_addr.s_addr = INADDR_ANY;
+
+        if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+            fail_reason = "Missing : separator";
+            goto fail_syntax;
+        }
+
+        if (buf[0] != '\0' && !inet_aton(buf, &host_addr.in.sin_addr)) {
+            fail_reason = "Bad host address";
+            goto fail_syntax;
+        }
+
+        if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
+            fail_reason = "Bad host port separator";
+            goto fail_syntax;
+        }
+
+        err = qemu_strtoi(buf, &end, 0, &host_port);
+        if (err || host_port < 0 || host_port > 65535) {
+            fail_reason = "Bad host port";
+            goto fail_syntax;
+        }
+
+        host_addr.in.sin_port = htons(host_port);
+        host_addr_size = sizeof(host_addr.in);
+    }
+
+    if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+        fail_reason = "Missing guest address";
+        goto fail_syntax;
+    }
+    if (buf[0] != '\0' && !inet_aton(buf, &guest_addr.sin_addr)) {
+        fail_reason = "Bad guest address";
+        goto fail_syntax;
+    }
+
+    err = qemu_strtoi(p, &end, 0, &guest_port);
+    if (err || guest_port < 1 || guest_port > 65535) {
+        fail_reason = "Bad guest port";
+        goto fail_syntax;
+    }
+    guest_addr.sin_port = htons(guest_port);
+
+#if SLIRP_CHECK_VERSION(4, 5, 0)
+    err = slirp_add_hostxfwd(s->slirp,
+            (struct sockaddr *) &host_addr, host_addr_size,
+            (struct sockaddr *) &guest_addr, sizeof(guest_addr),
+            is_udp ? SLIRP_HOSTFWD_UDP : 0);
+#else
+    (void) host_addr_size;
+    err = slirp_add_hostfwd(s->slirp, is_udp,
+            host_addr.in.sin_addr, host_port,
+            guest_addr.sin_addr, guest_port);
+#endif
+
+    if (err < 0) {
+        error_setg(errp, "Could not set up host forwarding rule '%s'",
+                   redir_str);
+        return -1;
+    }
     return 0;
 
  fail_syntax:
     error_setg(errp, "Invalid host forwarding rule '%s' (%s)", redir_str,
-               error_get_pretty(error));
-    error_free(error);
+               fail_reason);
     return -1;
 }
 
@@ -1111,8 +1052,9 @@ static int slirp_smb(SlirpState* s, const char *exported_dir,
     }
 
     if (access(exported_dir, R_OK | X_OK)) {
-        error_setg(errp, "Error accessing shared directory '%s': %s",
-                   exported_dir, strerror(errno));
+        error_setg_errno(errp, errno,
+                         "Error accessing shared directory '%s'",
+                         exported_dir);
         return -1;
     }
 
@@ -1125,8 +1067,10 @@ static int slirp_smb(SlirpState* s, const char *exported_dir,
 
     f = fopen(smb_conf, "w");
     if (!f) {
+        int eno = errno;
+
         slirp_smb_cleanup(s);
-        error_setg(errp,
+        error_setg_errno(errp, eno,
                    "Could not create samba server configuration file '%s'",
                     smb_conf);
         g_free(smb_conf);
@@ -1197,198 +1141,44 @@ static void guestfwd_read(void *opaque, const uint8_t *buf, int size)
     slirp_socket_recv(fwd->slirp, fwd->server, fwd->port, buf, size);
 }
 
-/*
- * Write function will be called by slirp side.
- */
- static ssize_t guestfwd_write(const void *buf, size_t len, void *chr)
- {
-     return qemu_chr_fe_write_all(chr, buf, len);
- }
-
-/* Only allow v6 addresses contain '[]' */
-static inline bool guestfwd_is_v6_only(const char *p)
+static ssize_t guestfwd_write(const void *buf, size_t len, void *chr)
 {
-    return p[0] == '[' ? true : false;
-}
-
-static int guestfwd_parse_v6_addr(char *buf, const char *end, const char *p,
-                                  int *port, int *target_port,
-                                  struct in6_addr *server_v6,
-                                  struct in6_addr *target_v6,
-                                  Error **errp) {
-    /* For debug print */
-    char addrstr[INET6_ADDRSTRLEN];
-
-    /*
-     * Example v6 usage:
-     * guestfwd=tcp:[fec0::105]:6657-tcp:[::1]:6655,
-     * namely guestfwd=protocol:[server_addr]:server_port-protocol:
-     * [target_addr]:target_port
-     */
-
-    p++;
-
-    /*
-     * Parse server address.
-     * get_str_sep() parses the part before delimiter in to buf.
-     */
-    if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
-        error_setg(errp, "Invalid IPv6 server address format: %s", buf);
-        return -1;
-    }
-
-    if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, server_v6)) {
-        error_setg(errp, "Invalid IPv6 server address: %s", buf);
-        return -1;
-    }
-
-    /* Skip the `:` */
-    p++;
-
-    /* Parse the server port */
-    if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
-        error_setg(errp, "Invalid IPv6 server port format: %s", buf);
-        return -1;
-    }
-
-    if (qemu_strtoi(buf, &end, 10, port)) {
-        error_setg(errp, "Invalid IPv6 server port number: %s", buf);
-        return -1;
-    }
-
-    if (*end != '\0' || *port < 1 || *port > 65535) {
-        error_setg(errp, "Invalid IPv6 server port number: %s", buf);
-        return -1;
-    }
-
-    inet_ntop(AF_INET6, server_v6, addrstr, INET6_ADDRSTRLEN);
-    trace_slirp_guestfwd_parse(addrstr, *port);
-
-    /*
-     * Skip the "tcp:[", leaving the tcp here to make it consistent with
-     * the IPv4 syntax.
-     * In IPv4, this prefix is used to let chardev create proper backend.
-     */
-
-    p = p + 5;
-
-    /* Parse the target address */
-    if (get_str_sep(buf, sizeof(buf), &p, ']') < 0) {
-        error_setg(errp, "Invalid IPv6 target address format: %s", buf);
-        return -1;
-    }
-
-    if (buf[0] != '\0' && !inet_pton(AF_INET6, buf, target_v6)) {
-        error_setg(errp, "Invalid IPv6 target address: %s", buf);
-        return -1;
-    }
-
-    /* Skip the `:` */
-    p++;
-
-    /* Parse the target port, until the end of line */
-    if (get_str_sep(buf, sizeof(buf), &p, '\0') < 0) {
-        error_setg(errp, "Invalid IPv6 target port format: %s", buf);
-        return -1;
-    }
-
-    if (qemu_strtoi(buf, &end, 10, target_port)) {
-        error_setg(errp, "Invalid IPv6 target port number: %s", buf);
-        return -1;
-    }
-
-    if (*end != '\0' || *target_port < 1 || *target_port > 65535) {
-        error_setg(errp, "Invalid IPv6 target port number: %s", buf);
-        return -1;
-    }
-
-    inet_ntop(AF_INET6, target_v6, addrstr, INET6_ADDRSTRLEN);
-    trace_slirp_guestfwd_parse(addrstr, *target_port);
-
-    return 0;
-}
-
-static int guestfwd_parse_v4_addr(char *buf, const char *end, const char *p,
-                                  int *port, struct in_addr *server) {
-    if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
-        return -1;
-    }
-    if (buf[0] != '\0' && !inet_aton(buf, server)) {
-        return -1;
-    }
-    if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
-        return -1;
-    }
-    if (qemu_strtoi(buf, &end, 10, port)) {
-        return -1;
-    }
-    if (*end != '\0' || *port < 1 || *port > 65535) {
-        return -1;
-    }
-    return 0;
+    return qemu_chr_fe_write_all(chr, buf, len);
 }
 
 static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
 {
+    /* TODO: IPv6 */
     struct in_addr server = { .s_addr = 0 };
-    struct in6_addr server_v6 = IN6ADDR_ANY_INIT;
-    struct in6_addr target_v6 = IN6ADDR_ANY_INIT;
-    struct GuestFwd *fwd = NULL;
+    struct GuestFwd *fwd;
     const char *p;
     char buf[128];
-    char *end = NULL;
-    /* server port */
+    char *end;
     int port;
-    /* destination/target port */
-    int target_port;
-    enum GFwdProtocols protocol = GFWD_INVALID;
-    bool v6_only = false;
 
     p = config_str;
-
     if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
-        protocol = GFWD_INVALID;
+        goto fail_syntax;
     }
-    if (strcmp(buf, "tcp") == 0) {
-        protocol = GFWD_TCP;
-    } else if (strcmp(buf, "udp") == 0) {
-        protocol = GFWD_UDP;
-    } else if (buf[0] != '\0') {
+    if (strcmp(buf, "tcp") && buf[0] != '\0') {
+        goto fail_syntax;
+    }
+    if (get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
+        goto fail_syntax;
+    }
+    if (buf[0] != '\0' && !inet_aton(buf, &server)) {
+        goto fail_syntax;
+    }
+    if (get_str_sep(buf, sizeof(buf), &p, '-') < 0) {
+        goto fail_syntax;
+    }
+    port = strtol(buf, &end, 10);
+    if (*end != '\0' || port < 1 || port > 65535) {
         goto fail_syntax;
     }
 
-    /*
-     * Parse address, only supports v6 to v6 or v4 to v4.
-     * v6: the guestfwd should parse both target and destination
-     * port/address.
-     * v4: Only parse the target port and address, the destination info will
-     * be used in char-socket to create socket.
-     */
-
-    v6_only = guestfwd_is_v6_only(p);
-
-    if (protocol == GFWD_UDP && v6_only == false) {
-        error_setg(errp, "Invalid protocol, UDP is only supported in"
-        " IPv6 '%s'", config_str);
-        return -1;
-    }
-
-    if (v6_only == true) {
-        if (guestfwd_parse_v6_addr(buf, end, p, &port, &target_port, &server_v6,
-                                   &target_v6, errp) != 0) {
-            goto fail_syntax;
-        }
-    } else {
-        if (guestfwd_parse_v4_addr(buf, end, p, &port, &server) != 0) {
-            goto fail_syntax;
-        }
-    }
     snprintf(buf, sizeof(buf), "guestfwd.tcp.%d", port);
 
-    /*
-     * Typical usage of guestfwd: send a netcat command to host, and fetch
-     * the result.
-     */
     if (g_str_has_prefix(p, "cmd:")) {
         if (slirp_add_exec(s->slirp, &p[4], &server, port) < 0) {
             error_setg(errp, "Conflicting/invalid host:port in guest "
@@ -1396,62 +1186,48 @@ static int slirp_guestfwd(SlirpState *s, const char *config_str, Error **errp)
             return -1;
         }
     } else {
-        if (!v6_only) {
-            Error *err = NULL;
-            /*
-             * FIXME: sure we want to support implicit
-             * muxed monitors here?
-             */
-            Chardev *chr = qemu_chr_new_mux_mon(buf, p, NULL);
+        Error *err = NULL;
+        /*
+         * FIXME: sure we want to support implicit
+         * muxed monitors here?
+         */
+        Chardev *chr = qemu_chr_new_mux_mon(buf, p, NULL);
 
-            if (!chr) {
-                error_setg(errp, "Could not open guest forwarding device '%s'",
-                           buf);
-                return -1;
-            }
-
-            /*
-             * v4 guestfwd: the connection will be established before the boot
-             * up. See char-socket.c for detail.
-             */
-            fwd = g_new(struct GuestFwd, 1);
-            qemu_chr_fe_init(&fwd->hd, chr, &err);
-            if (err) {
-                error_propagate(errp, err);
-                object_unparent(OBJECT(chr));
-                g_free(fwd);
-                return -1;
-            }
-            if (slirp_add_guestfwd(s->slirp, guestfwd_write, &fwd->hd,
-                                   &server, port) < 0) {
-                goto fail_parsing;
-            }
-            fwd->server = server;
-            fwd->port = port;
-            fwd->slirp = s->slirp;
-            qemu_chr_fe_set_handlers(&fwd->hd, guestfwd_can_read, guestfwd_read,
-                                     NULL, NULL, fwd, NULL, true);
-            s->fwd = g_slist_append(s->fwd, fwd);
-        } else {
-            if (slirp_add_guestxfwd(s->slirp, &server_v6, port, &target_v6,
-                                    target_port, protocol) < 0) {
-                goto fail_parsing;
-            }
+        if (!chr) {
+            error_setg(errp, "Could not open guest forwarding device '%s'",
+                       buf);
+            return -1;
         }
+
+        fwd = g_new(struct GuestFwd, 1);
+        qemu_chr_fe_init(&fwd->hd, chr, &err);
+        if (err) {
+            error_propagate(errp, err);
+            object_unparent(OBJECT(chr));
+            g_free(fwd);
+            return -1;
+        }
+
+        if (slirp_add_guestfwd(s->slirp, guestfwd_write, &fwd->hd,
+                               &server, port) < 0) {
+            error_setg(errp, "Conflicting/invalid host:port in guest "
+                       "forwarding rule '%s'", config_str);
+            qemu_chr_fe_deinit(&fwd->hd, true);
+            g_free(fwd);
+            return -1;
+        }
+        fwd->server = server;
+        fwd->port = port;
+        fwd->slirp = s->slirp;
+
+        qemu_chr_fe_set_handlers(&fwd->hd, guestfwd_can_read, guestfwd_read,
+                                 NULL, NULL, fwd, NULL, true);
+        s->fwd = g_slist_append(s->fwd, fwd);
     }
     return 0;
 
  fail_syntax:
     error_setg(errp, "Invalid guest forwarding rule '%s'", config_str);
-    return -1;
-
- fail_parsing:
-    error_setg(errp, "Conflicting/invalid host:port in guest "
-              "forwarding rule '%s'", config_str);
-    if (fwd) {
-        qemu_chr_fe_deinit(&fwd->hd, true);
-        g_free(fwd);
-    }
     return -1;
 }
 

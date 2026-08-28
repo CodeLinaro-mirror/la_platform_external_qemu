@@ -86,21 +86,6 @@ static int max20730_write_data(PMBusDevice *pmdev, const uint8_t *buf,
 {
     MAX20730State *s = MAX20730(pmdev);
 
-    if (len == 0) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: writing empty data\n", __func__);
-        return -1;
-    }
-
-    pmdev->code = buf[0]; /* PMBus command code */
-
-    if (len == 1) {
-        return 0;
-    }
-
-    /* Exclude command code from buffer */
-    buf++;
-    len--;
-
     switch (pmdev->code) {
     case MAX20730_MFR_VOUT_MIN:
         s->mfr_vout_min = pmbus_receive16(pmdev);
@@ -255,7 +240,7 @@ static void max20730_init(Object *obj)
                         NULL, &s->r_fb2);
 }
 
-static void max20730_class_init(ObjectClass *klass, void *data)
+static void max20730_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

@@ -8,6 +8,7 @@
 
 #include "qemu/osdep.h"
 #include <math.h>
+#include <stdint.h>
 #include "hw/i2c/pmbus_device.h"
 #include "migration/vmstate.h"
 #include "qemu/module.h"
@@ -37,6 +38,37 @@ uint16_t pmbus_data2linear_mode(uint16_t value, int exp)
     return value >> exp;
 }
 
+uint16_t pmbus_data2linear11(uint16_t value, int exp)
+{
+    return (uint16_t)((exp & 0x1F) << 11 |
+        (pmbus_data2linear_mode(value, exp) & 0x7FF));
+}
+
+uint16_t pmbus_milliunits2linear_mode(uint32_t value, int exp)
+{
+    uint32_t ret;
+
+    /* L = D * 2^(-e) */
+    if (exp < 0) {
+        ret = DIV_ROUND_CLOSEST((value << (-exp)), 1000);
+    } else {
+        ret = DIV_ROUND_CLOSEST((value >> exp), 1000);
+    }
+
+    /* clamp value to maximum if it exceeds representable value*/
+    if (ret > UINT16_MAX) {
+        return UINT16_MAX;
+    }
+
+    return ret;
+}
+
+uint16_t pmbus_milliunits2linear11(uint32_t value, int exp)
+{
+    return (uint16_t)((exp & 0x1F) << 11 |
+        (pmbus_milliunits2linear_mode(value, exp) & 0x7FF));
+}
+
 uint16_t pmbus_linear_mode2data(uint16_t value, int exp)
 {
     /* D = L * 2^e */
@@ -44,6 +76,17 @@ uint16_t pmbus_linear_mode2data(uint16_t value, int exp)
         return value >> (-exp);
     }
     return value << exp;
+}
+
+uint32_t pmbus_linear_mode2milliunits(uint16_t value, int exp)
+{
+    /* D = L * 2^e */
+    uint32_t v = (uint32_t)value;
+
+    if (exp < 0) {
+        return (v * 1000) >> (-exp);
+    }
+    return (v << exp) * 1000;
 }
 
 void pmbus_send(PMBusDevice *pmdev, const uint8_t *data, uint16_t len)
@@ -223,18 +266,21 @@ static void pmbus_quick_cmd(SMBusDevice *smd, uint8_t read)
     }
 }
 
-static uint8_t pmbus_pages_num(PMBusDevice *pmdev)
+static void pmbus_pages_alloc(PMBusDevice *pmdev)
 {
     const PMBusDeviceClass *k = PMBUS_DEVICE_GET_CLASS(pmdev);
 
-    /* some PMBus devices don't use the PAGE command, so they get 1 page */
-    return k->device_num_pages ? : 1;
-}
-
-static void pmbus_pages_alloc(PMBusDevice *pmdev)
-{
-    pmdev->num_pages = pmbus_pages_num(pmdev);
-    pmdev->pages = g_new0(PMBusPage, pmdev->num_pages);
+    /*
+     * Some PMBus devices don't use the PAGE command, so they get 1 page
+     * PMBus devices that don't specify a phase count also get 1 phase.
+     */
+    pmdev->num_pages = k->device_num_pages ? : 1;
+    pmdev->num_phases = k->device_num_phases ? : 1;
+    pmdev->phases = g_new0(PMBusPage *, pmdev->num_phases);
+    for (int i = 0; i < pmdev->num_phases; i++) {
+        pmdev->phases[i] = g_new0(PMBusPage, pmdev->num_pages);
+    }
+    pmdev->pages = pmdev->phases[0];
 }
 
 void pmbus_check_limits(PMBusDevice *pmdev)
@@ -359,7 +405,7 @@ static uint8_t pmbus_receive_byte(SMBusDevice *smd)
         break;
 
     case PMBUS_PHASE:                     /* R/W byte */
-        pmbus_send8(pmdev, pmdev->pages[index].phase);
+        pmbus_send8(pmdev, pmdev->phase);
         break;
 
     case PMBUS_WRITE_PROTECT:             /* R/W byte */
@@ -1190,19 +1236,20 @@ passthough:
  */
 static void pmbus_clear_faults(PMBusDevice *pmdev)
 {
-    for (uint8_t i = 0; i < pmdev->num_pages; i++) {
-        pmdev->pages[i].status_word = 0;
-        pmdev->pages[i].status_vout = 0;
-        pmdev->pages[i].status_iout = 0;
-        pmdev->pages[i].status_input = 0;
-        pmdev->pages[i].status_temperature = 0;
-        pmdev->pages[i].status_cml = 0;
-        pmdev->pages[i].status_other = 0;
-        pmdev->pages[i].status_mfr_specific = 0;
-        pmdev->pages[i].status_fans_1_2 = 0;
-        pmdev->pages[i].status_fans_3_4 = 0;
+    for (int i = 0; i < pmdev->num_phases; i++) {
+        for (uint8_t j = 0; j < pmdev->num_pages; j++) {
+            pmdev->phases[i][j].status_word = 0;
+            pmdev->phases[i][j].status_vout = 0;
+            pmdev->phases[i][j].status_iout = 0;
+            pmdev->phases[i][j].status_input = 0;
+            pmdev->phases[i][j].status_temperature = 0;
+            pmdev->phases[i][j].status_cml = 0;
+            pmdev->phases[i][j].status_other = 0;
+            pmdev->phases[i][j].status_mfr_specific = 0;
+            pmdev->phases[i][j].status_fans_1_2 = 0;
+            pmdev->phases[i][j].status_fans_3_4 = 0;
+        }
     }
-
 }
 
 /*
@@ -1248,6 +1295,16 @@ static int pmbus_write_data(SMBusDevice *smd, uint8_t *buf, uint8_t len)
     pmdev->in_buf_len = len;
     pmdev->in_buf = buf;
 
+    /* clear the output buffer when the register being read changes */
+    if (pmdev->out_buf_len != 0 && pmdev->code != buf[0]) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: previous read was not completed, %d bytes dropped\n",
+                      __func__, pmdev->out_buf_len);
+
+        pmdev->out_buf_len = 0;
+        memset(pmdev->out_buf, 0, sizeof(pmdev->out_buf));
+    }
+
     pmdev->code = buf[0]; /* PMBus command code */
 
     if (pmdev->code == PMBUS_CLEAR_FAULTS) {
@@ -1282,6 +1339,36 @@ static int pmbus_write_data(SMBusDevice *smd, uint8_t *buf, uint8_t len)
         return 0;
     }
 
+    if (pmdev->code == PMBUS_PHASE) {
+        pmdev->phase = pmbus_receive8(pmdev);
+
+        if (pmdev->phase > pmdev->num_phases - 1 &&
+                pmdev->phase != PB_ALL_PHASES) {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "%s: phase %u is out of range\n",
+                          __func__, pmdev->phase);
+
+            pmdev->phase = 0; /* undefined behaviour - reset to phase 0 */
+            pmbus_cml_error(pmdev);
+            return PMBUS_ERR_BYTE;
+        }
+        pmdev->pages =
+            pmdev->phases[pmdev->phase == PB_ALL_PHASES ? 0 : pmdev->phase];
+        return 0;
+    }
+
+    /* loop through all configured phases when 0xFF is received */
+    if (pmdev->phase == PB_ALL_PHASES) {
+        for (int i = 0; i < pmdev->num_phases; i++) {
+            pmdev->phase = i;
+            pmdev->pages = pmdev->phases[i];
+            pmbus_write_data(smd, buf, len);
+        }
+        pmdev->phase = PB_ALL_PHASES;
+        pmdev->pages = pmdev->phases[0];
+        return 0;
+    }
+
     index = pmdev->page;
 
     switch (pmdev->code) {
@@ -1296,10 +1383,6 @@ static int pmbus_write_data(SMBusDevice *smd, uint8_t *buf, uint8_t len)
 
     case PMBUS_CLEAR_FAULTS:              /* Send Byte */
         pmbus_clear_faults(pmdev);
-        break;
-
-    case PMBUS_PHASE:                     /* R/W byte */
-        pmdev->pages[index].phase = pmbus_receive8(pmdev);
         break;
 
     case PMBUS_PAGE_PLUS_WRITE:           /* Block Write-only */
@@ -1869,7 +1952,9 @@ int pmbus_page_config(PMBusDevice *pmdev, uint8_t index, uint64_t flags)
     /* The 0xFF page is special for commands applying to all pages */
     if (index == PB_ALL_PAGES) {
         for (int i = 0; i < pmdev->num_pages; i++) {
-            pmdev->pages[i].page_flags = flags;
+            for (int j = 0; j < pmdev->num_phases; j++) {
+                pmdev->phases[j][i].page_flags = flags;
+            }
         }
         return 0;
     }
@@ -1881,7 +1966,9 @@ int pmbus_page_config(PMBusDevice *pmdev, uint8_t index, uint64_t flags)
         return -1;
     }
 
-    pmdev->pages[index].page_flags = flags;
+    for (int j = 0; j < pmdev->num_phases; j++) {
+        pmdev->phases[j][index].page_flags = flags;
+    }
 
     return 0;
 }
@@ -1904,10 +1991,15 @@ const VMStateDescription vmstate_pmbus_device = {
 static void pmbus_device_finalize(Object *obj)
 {
     PMBusDevice *pmdev = PMBUS_DEVICE(obj);
-    g_free(pmdev->pages);
+    if (pmdev->phases) {
+        for (int i = 0; i < pmdev->num_phases; i++) {
+            g_free(pmdev->phases[i]);
+        }
+        g_free(pmdev->phases);
+    }
 }
 
-static void pmbus_device_class_init(ObjectClass *klass, void *data)
+static void pmbus_device_class_init(ObjectClass *klass, const void *data)
 {
     SMBusDeviceClass *k = SMBUS_DEVICE_CLASS(klass);
 

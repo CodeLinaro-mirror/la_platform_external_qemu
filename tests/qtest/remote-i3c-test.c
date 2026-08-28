@@ -3,21 +3,13 @@
  *
  * Copyright 2022 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #include "qemu/osdep.h"
 #include "libqtest-single.h"
 #include "socket_util.h"
-#include "hw/registerfields.h"
+#include "hw/core/registerfields.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/remote-i3c.h"
 #include <sys/time.h>

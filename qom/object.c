@@ -11,7 +11,7 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/qdev-core.h"
+#include "hw/core/qdev.h"
 #include "qapi/error.h"
 #include "qom/object.h"
 #include "qom/object_interfaces.h"
@@ -54,10 +54,10 @@ struct TypeImpl
     size_t instance_size;
     size_t instance_align;
 
-    void (*class_init)(ObjectClass *klass, void *data);
-    void (*class_base_init)(ObjectClass *klass, void *data);
+    void (*class_init)(ObjectClass *klass, const void *data);
+    void (*class_base_init)(ObjectClass *klass, const void *data);
 
-    void *class_data;
+    const void *class_data;
 
     void (*instance_init)(Object *obj);
     void (*instance_post_init)(Object *obj);
@@ -431,12 +431,12 @@ static void object_init_with_type(Object *obj, TypeImpl *ti)
 
 static void object_post_init_with_type(Object *obj, TypeImpl *ti)
 {
-    if (ti->instance_post_init) {
-        ti->instance_post_init(obj);
-    }
-
     if (type_has_parent(ti)) {
         object_post_init_with_type(obj, type_get_parent(ti));
+    }
+
+    if (ti->instance_post_init) {
+        ti->instance_post_init(obj);
     }
 }
 
@@ -485,7 +485,7 @@ bool object_apply_global_props(Object *obj, const GPtrArray *props,
  * Slot 0: accelerator's global property defaults
  * Slot 1: machine's global property defaults
  * Slot 2: global properties from legacy command line option
- * Each is a GPtrArray of of GlobalProperty.
+ * Each is a GPtrArray of GlobalProperty.
  * Applied in order, later entries override earlier ones.
  */
 static GPtrArray *object_compat_props[3];
@@ -682,7 +682,6 @@ static void object_property_del_child(Object *obj, Object *child)
     GHashTableIter iter;
     gpointer key, value;
 
-    g_assert(obj->properties);
     g_hash_table_iter_init(&iter, obj->properties);
     while (g_hash_table_iter_next(&iter, &key, &value)) {
         prop = value;
@@ -1149,7 +1148,6 @@ static int do_object_child_foreach(Object *obj,
     ObjectProperty *prop;
     int ret = 0;
 
-    g_assert(obj->properties);
     g_hash_table_iter_init(&iter, obj->properties);
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *)&prop)) {
         if (object_property_is_child(prop)) {
@@ -1200,7 +1198,7 @@ GSList *object_class_get_list(const char *implements_type,
     return list;
 }
 
-static gint object_class_cmp(gconstpointer a, gconstpointer b)
+static gint object_class_cmp(gconstpointer a, gconstpointer b, gpointer d)
 {
     return strcasecmp(object_class_get_name((ObjectClass *)a),
                       object_class_get_name((ObjectClass *)b));
@@ -1209,8 +1207,9 @@ static gint object_class_cmp(gconstpointer a, gconstpointer b)
 GSList *object_class_get_list_sorted(const char *implements_type,
                                      bool include_abstract)
 {
-    return g_slist_sort(object_class_get_list(implements_type, include_abstract),
-                        object_class_cmp);
+    return g_slist_sort_with_data(
+        object_class_get_list(implements_type, include_abstract),
+        object_class_cmp, NULL);
 }
 
 Object *object_ref(void *objptr)
@@ -1306,7 +1305,6 @@ object_property_try_add(Object *obj, const char *name, const char *type,
     prop->release = release;
     prop->opaque = opaque;
 
-    g_assert(obj->properties);
     g_hash_table_insert(obj->properties, prop->name, prop);
     return prop;
 }
@@ -1360,7 +1358,6 @@ ObjectProperty *object_property_find(Object *obj, const char *name)
         return prop;
     }
 
-    g_assert(obj->properties);
     return g_hash_table_lookup(obj->properties, name);
 }
 
@@ -1432,7 +1429,6 @@ ObjectProperty *object_class_property_find_err(ObjectClass *klass,
 
 void object_property_del(Object *obj, const char *name)
 {
-    g_assert(obj->properties);
     ObjectProperty *prop = g_hash_table_lookup(obj->properties, name);
 
     if (prop->release) {
@@ -1759,6 +1755,7 @@ const char *object_property_get_type(Object *obj, const char *name, Error **errp
 }
 
 static const char *const root_containers[] = {
+    "audiodevs",
     "chardevs",
     "objects",
     "backend"
@@ -2114,7 +2111,6 @@ const char *object_get_canonical_path_component(const Object *obj)
         return NULL;
     }
 
-    g_assert(obj->parent->properties);
     g_hash_table_iter_init(&iter, obj->parent->properties);
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *)&prop)) {
         if (!object_property_is_child(prop)) {
@@ -2204,10 +2200,8 @@ static Object *object_resolve_partial_path(Object *parent,
     GHashTableIter iter;
     ObjectProperty *prop;
 
-    g_assert(parent);
     obj = object_resolve_abs_path(parent, parts, type_name);
 
-    g_assert(parent->properties);
     g_hash_table_iter_init(&iter, parent->properties);
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *)&prop)) {
         Object *found;
@@ -2924,7 +2918,7 @@ void object_class_property_set_description(ObjectClass *klass,
     op->description = g_strdup(description);
 }
 
-static void object_class_init(ObjectClass *klass, void *data)
+static void object_class_init(ObjectClass *klass, const void *data)
 {
     object_class_property_add_str(klass, "type", object_get_type,
                                   NULL);

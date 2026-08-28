@@ -14,7 +14,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/sensor/max31760.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "qapi/visitor.h"
 #include "qemu/log.h"
@@ -147,7 +147,7 @@ static void max31760_exit_reset(Object *obj, ResetType type)
 
 }
 
-static void max31760_class_init(ObjectClass *klass, void *data)
+static void max31760_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

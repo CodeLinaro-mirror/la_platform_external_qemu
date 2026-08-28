@@ -4,7 +4,13 @@ import re
 
 
 def poison_config_switches(files):
-    config_switches_to_poison = ["CONFIG_TCG", "CONFIG_USER_ONLY", "CONFIG_SOFTMMU"]
+    config_switches_to_poison = [
+        "CONFIG_TCG",
+        "CONFIG_USER_ONLY",
+        "CONFIG_SOFTMMU",
+        "TARGET_NOT_USING_LEGACY_LDST_PHYS_API",
+        "TARGET_NOT_USING_LEGACY_NATIVE_ENDIAN_API",
+    ]
 
     poisoned_switches = set()
 

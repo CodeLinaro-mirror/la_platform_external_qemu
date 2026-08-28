@@ -12,7 +12,7 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/irq.h"
+#include "hw/core/irq.h"
 #include "hw/net/ftgmac100.h"
 #include "system/dma.h"
 #include "qapi/error.h"
@@ -21,7 +21,7 @@
 #include "net/checksum.h"
 #include "net/eth.h"
 #include "hw/net/mii.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "migration/vmstate.h"
 
 #include <zlib.h> /* for crc32 */
@@ -498,7 +498,7 @@ static int ftgmac100_write_bd(FTGMAC100Desc *bd, dma_addr_t addr)
 }
 
 static int ftgmac100_insert_vlan(FTGMAC100State *s, int frame_size,
-                                  uint8_t vlan_tci)
+                                 uint16_t vlan_tci)
 {
     uint8_t *vlan_hdr = s->frame + (ETH_ALEN * 2);
     uint8_t *payload = vlan_hdr + sizeof(struct vlan_header);
@@ -624,7 +624,10 @@ static void ftgmac100_do_tx(FTGMAC100State *s, uint64_t tx_ring,
         bd.des0 &= ~FTGMAC100_TXDES0_TXDMA_OWN;
 
         /* Write back the modified descriptor.  */
-        ftgmac100_write_bd(&bd, addr);
+        if (ftgmac100_write_bd(&bd, addr)) {
+            s->isr |= FTGMAC100_INT_AHB_ERR;
+            break;
+        }
         /* Advance to the next descriptor.  */
         if (bd.des0 & s->txdes0_edotr) {
             addr = tx_ring;
@@ -989,12 +992,16 @@ static void ftgmac100_high_write(void *opaque, hwaddr addr,
 static int ftgmac100_filter(FTGMAC100State *s, const uint8_t *buf, size_t len)
 {
     unsigned mcast_idx;
+    struct eth_header eth_hdr = {};
 
     if (s->maccr & FTGMAC100_MACCR_RX_ALL) {
         return 1;
     }
 
-    switch (get_eth_packet_type(PKT_GET_ETH_HDR(buf))) {
+    memcpy(&eth_hdr, PKT_GET_ETH_HDR(buf),
+           (sizeof(eth_hdr) > len) ? len : sizeof(eth_hdr));
+
+    switch (get_eth_packet_type(&eth_hdr)) {
     case ETH_PKT_BCAST:
         if (!(s->maccr & FTGMAC100_MACCR_RX_BROADPKT)) {
             return 0;
@@ -1028,6 +1035,7 @@ static ssize_t ftgmac100_receive(NetClientState *nc, const uint8_t *buf,
 {
     FTGMAC100State *s = FTGMAC100(qemu_get_nic_opaque(nc));
     FTGMAC100Desc bd;
+    struct eth_header eth_hdr = {};
     uint32_t flags = 0;
     uint64_t addr;
     uint32_t crc;
@@ -1036,7 +1044,11 @@ static ssize_t ftgmac100_receive(NetClientState *nc, const uint8_t *buf,
     uint32_t buf_len;
     size_t size = len;
     uint32_t first = FTGMAC100_RXDES0_FRS;
-    uint16_t proto = be16_to_cpu(PKT_GET_ETH_HDR(buf)->h_proto);
+    uint16_t proto;
+
+    memcpy(&eth_hdr, PKT_GET_ETH_HDR(buf),
+           (sizeof(eth_hdr) > len) ? len : sizeof(eth_hdr));
+    proto = be16_to_cpu(eth_hdr.h_proto);
     int max_frame_size = ftgmac100_max_frame_size(s, proto);
 
     if ((s->maccr & (FTGMAC100_MACCR_RXDMA_EN | FTGMAC100_MACCR_RXMAC_EN))
@@ -1061,7 +1073,7 @@ static ssize_t ftgmac100_receive(NetClientState *nc, const uint8_t *buf,
         flags |= FTGMAC100_RXDES0_FTL;
     }
 
-    switch (get_eth_packet_type(PKT_GET_ETH_HDR(buf))) {
+    switch (get_eth_packet_type(&eth_hdr)) {
     case ETH_PKT_BCAST:
         flags |= FTGMAC100_RXDES0_BROADCAST;
         break;
@@ -1134,7 +1146,10 @@ static ssize_t ftgmac100_receive(NetClientState *nc, const uint8_t *buf,
             bd.des0 |= flags | FTGMAC100_RXDES0_LRS;
             s->isr |= FTGMAC100_INT_RPKT_BUF;
         }
-        ftgmac100_write_bd(&bd, addr);
+        if (ftgmac100_write_bd(&bd, addr)) {
+            s->isr |= FTGMAC100_INT_AHB_ERR;
+            break;
+        }
         if (bd.des0 & s->rxdes0_edorr) {
             addr = s->rx_ring;
         } else {
@@ -1260,7 +1275,7 @@ static const Property ftgmac100_properties[] = {
     DEFINE_PROP_BOOL("dma64", FTGMAC100State, dma64, false),
 };
 
-static void ftgmac100_class_init(ObjectClass *klass, void *data)
+static void ftgmac100_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
@@ -1419,7 +1434,7 @@ static const Property aspeed_mii_properties[] = {
                      FTGMAC100State *),
 };
 
-static void aspeed_mii_class_init(ObjectClass *klass, void *data)
+static void aspeed_mii_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 

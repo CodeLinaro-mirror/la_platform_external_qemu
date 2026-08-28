@@ -66,7 +66,7 @@ static void u50su8p167_init(Object *obj)
     pmbus_page_config(pmdev, 0, psu_flags);
 }
 
-static void u50su8p167_class_init(ObjectClass *klass, void *data)
+static void u50su8p167_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

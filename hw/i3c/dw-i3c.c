@@ -1,11 +1,8 @@
 /*
- * Designware I3C Controller
+ * DesignWare I3C Controller
  *
  * Copyright (C) 2021 ASPEED Technology Inc.
- * Copyright (C) 2023 Google, LLC
- *
- * This code is licensed under the GPL version 2 or later.  See
- * the COPYING file in the top-level directory.
+ * Copyright (C) 2025 Google, LLC
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -13,15 +10,19 @@
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "qemu/error-report.h"
+#include "hw/i3c/i3c.h"
 #include "hw/i3c/dw-i3c.h"
-#include "hw/registerfields.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/registerfields.h"
+#include "hw/core/qdev-properties.h"
 #include "qapi/error.h"
 #include "migration/vmstate.h"
 #include "trace.h"
-#include "hw/i3c/i3c.h"
-#include "hw/irq.h"
+#include "hw/core/irq.h"
 
+/*
+ * Disable event command values. sent along with a DISEC CCC to disable certain
+ * events on targets.
+ */
 #define DISEC_HJ 0x08
 #define DISEC_CR 0x02
 #define DISEC_INT 0x01
@@ -40,9 +41,9 @@ REG32(DEVICE_ADDR,                  0x04)
     FIELD(DEVICE_ADDR, STATIC_ADDR,         0, 7)
     FIELD(DEVICE_ADDR, STATIC_ADDR_VALID,   15, 1)
     FIELD(DEVICE_ADDR, DYNAMIC_ADDR,        16, 7)
-    FIELD(DEVICE_ADDR, DYNAMIC_ADDR_VALID,  15, 1)
+    FIELD(DEVICE_ADDR, DYNAMIC_ADDR_VALID,  31, 1)
 REG32(HW_CAPABILITY,                0x08)
-    FIELD(HW_CAPABILITY, DEVICE_ROLE_CONFIG,  0, 2)
+    FIELD(HW_CAPABILITY, DEVICE_ROLE_CONFIG,  0, 3)
     FIELD(HW_CAPABILITY, HDR_DDR, 3, 1)
     FIELD(HW_CAPABILITY, HDR_TS,  4, 1)
 REG32(COMMAND_QUEUE_PORT,           0x0c)
@@ -75,7 +76,7 @@ REG32(COMMAND_QUEUE_PORT,           0x0c)
 REG32(RESPONSE_QUEUE_PORT,          0x10)
     FIELD(RESPONSE_QUEUE_PORT, DL, 0, 16)
     FIELD(RESPONSE_QUEUE_PORT, CCCT, 16, 8)
-    FIELD(RESPONSE_QUEUE_PORT, TID, 24, 4)
+    FIELD(RESPONSE_QUEUE_PORT, TID, 24, 3)
     FIELD(RESPONSE_QUEUE_PORT, ERR_STATUS, 28, 4)
 REG32(RX_TX_DATA_PORT,              0x14)
 REG32(IBI_QUEUE_STATUS,             0x18)
@@ -88,11 +89,11 @@ REG32(IBI_QUEUE_DATA,               0x18)
 REG32(QUEUE_THLD_CTRL,              0x1c)
     FIELD(QUEUE_THLD_CTRL, CMD_BUF_EMPTY_THLD,  0, 8);
     FIELD(QUEUE_THLD_CTRL, RESP_BUF_THLD, 8, 8);
-    FIELD(QUEUE_THLD_CTRL, IBI_DATA_THLD, 16, 8);
+    FIELD(QUEUE_THLD_CTRL, IBI_DATA_THLD, 16, 5);
     FIELD(QUEUE_THLD_CTRL, IBI_STATUS_THLD,     24, 8);
 REG32(DATA_BUFFER_THLD_CTRL,        0x20)
     FIELD(DATA_BUFFER_THLD_CTRL, TX_BUF_THLD,   0, 3)
-    FIELD(DATA_BUFFER_THLD_CTRL, RX_BUF_THLD,   10, 3)
+    FIELD(DATA_BUFFER_THLD_CTRL, RX_BUF_THLD,   8, 3)
     FIELD(DATA_BUFFER_THLD_CTRL, TX_START_THLD, 16, 3)
     FIELD(DATA_BUFFER_THLD_CTRL, RX_START_THLD, 24, 3)
 REG32(IBI_QUEUE_CTRL,               0x24)
@@ -188,7 +189,7 @@ REG32(PRESENT_STATE,                0x54)
     FIELD(PRESENT_STATE, CMD_TID,               24, 4)
 REG32(CCC_DEVICE_STATUS,            0x58)
     FIELD(CCC_DEVICE_STATUS, PENDING_INTR,      0, 4)
-    FIELD(CCC_DEVICE_STATUS, PROTOCOL_ERR,      4, 2)
+    FIELD(CCC_DEVICE_STATUS, PROTOCOL_ERR,      5, 1)
     FIELD(CCC_DEVICE_STATUS, ACTIVITY_MODE,     6, 2)
     FIELD(CCC_DEVICE_STATUS, UNDER_ERR,         8, 1)
     FIELD(CCC_DEVICE_STATUS, SLV_BUSY,          9, 1)
@@ -225,18 +226,8 @@ REG32(SLV_INTR_REQ,                 0x8c)
     FIELD(SLV_INTR_REQ, MIR,          3, 1)
     FIELD(SLV_INTR_REQ, TS,           4, 1)
     FIELD(SLV_INTR_REQ, IBI_STS,      8, 2)
-    FIELD(SLV_INTR_REQ, MDB,          8, 8)
-    FIELD(SLV_INTR_REQ, SIR_DATA_LEN, 16, 8)
 REG32(SLV_TSX_SYMBL_TIMING,         0x90)
     FIELD(SLV_TSX_SYMBL_TIMING, SLV_TSX_SYMBL_CNT, 0, 6)
-REG32(SLV_SIR_DATA,                 0x94)
-    FIELD(SLV_SIR_DATA, SIR_DATA_BYTE0, 0, 8)
-    FIELD(SLV_SIR_DATA, SIR_DATA_BYTE1, 8, 8)
-    FIELD(SLV_SIR_DATA, SIR_DATA_BYTE2, 16, 8)
-    FIELD(SLV_SIR_DATA, SIR_DATA_BYTE3, 24, 8)
-REG32(SLV_IBI_RESP,                 0x98)
-    FIELD(SLV_IBI_RESP, IBI_STS,           0, 2)
-    FIELD(SLV_IBI_RESP, SIR_RESP_DATA_LEN, 8, 16)
 REG32(DEVICE_CTRL_EXTENDED,         0xb0)
     FIELD(DEVICE_CTRL_EXTENDED, MODE, 0, 2)
     FIELD(DEVICE_CTRL_EXTENDED, REQMST_ACK_CTRL, 3, 1)
@@ -258,14 +249,7 @@ REG32(BUS_IDLE_TIMING,              0xd8)
 REG32(I3C_VER_ID,                   0xe0)
 REG32(I3C_VER_TYPE,                 0xe4)
 REG32(EXTENDED_CAPABILITY,          0xe8)
-    FIELD(EXTENDED_CAPABILITY, APP_IF_MODE,       0, 2)
-    FIELD(EXTENDED_CAPABILITY, APP_IF_DATA_WIDTH, 2, 2)
-    FIELD(EXTENDED_CAPABILITY, OPERATION_MODE,    4, 2)
-    FIELD(EXTENDED_CAPABILITY, CLK_PERIOD,        8, 6)
 REG32(SLAVE_CONFIG,                 0xec)
-    FIELD(SLAVE_CONFIG, DMA_EN,     0, 1)
-    FIELD(SLAVE_CONFIG, HJ_CAP,     0, 1)
-    FIELD(SLAVE_CONFIG, CLK_PERIOD, 2, 14)
 /* Device characteristic table fields */
 REG32(DEVICE_CHARACTERISTIC_TABLE_LOC1, 0x200)
 REG32(DEVICE_CHARACTERISTIC_TABLE_LOC_SECONDARY, 0x200)
@@ -292,16 +276,14 @@ REG32(DEVICE_ADDR_TABLE_LOC1, 0x280)
     FIELD(DEVICE_ADDR_TABLE_LOC1, DEV_NACK_RETRY_CNT, 29, 2)
     FIELD(DEVICE_ADDR_TABLE_LOC1, LEGACY_I2C_DEVICE, 31, 1)
 
-static void dw_i3c_cmd_queue_execute(DWI3C * s);
-
 static const uint32_t dw_i3c_resets[DW_I3C_NR_REGS] = {
     /* Target mode is not supported, don't advertise it for now. */
     [R_HW_CAPABILITY]               = 0x000e00b9,
     [R_QUEUE_THLD_CTRL]             = 0x01000101,
     [R_DATA_BUFFER_THLD_CTRL]       = 0x01010100,
     [R_SLV_EVENT_CTRL]              = 0x0000000b,
-    [R_QUEUE_STATUS_LEVEL]          = 0x00000002,
-    [R_DATA_BUFFER_STATUS_LEVEL]    = 0x00000010,
+    [R_QUEUE_STATUS_LEVEL]          = 0x00000010,
+    [R_DATA_BUFFER_STATUS_LEVEL]    = 0x00000040,
     [R_PRESENT_STATE]               = 0x00000003,
     [R_I3C_VER_ID]                  = 0x3130302a,
     [R_I3C_VER_TYPE]                = 0x6c633033,
@@ -362,6 +344,8 @@ static const uint32_t dw_i3c_ro[DW_I3C_NR_REGS] = {
     [R_SLAVE_CONFIG]                = 0xffffffff,
 };
 
+static void dw_i3c_cmd_queue_execute(DWI3C *s);
+
 static inline bool dw_i3c_has_hdr_ts(DWI3C *s)
 {
     return ARRAY_FIELD_EX32(s->regs, HW_CAPABILITY, HDR_TS);
@@ -399,6 +383,11 @@ static inline uint8_t dw_i3c_ibi_slice_size(DWI3C *s)
     return ibi_slice_size;
 }
 
+static inline uint8_t dw_i3c_fifo_threshold_from_reg(uint8_t regval)
+{
+    return regval = regval ? (2 << regval) : 1;
+}
+
 static void dw_i3c_update_irq(DWI3C *s)
 {
     bool level = !!(s->regs[R_INTR_SIGNAL_EN] & s->regs[R_INTR_STATUS]);
@@ -417,6 +406,7 @@ static void dw_i3c_end_transfer(DWI3C *s, bool is_i2c)
 static int dw_i3c_send_start(DWI3C *s, uint8_t addr, bool is_recv, bool is_i2c)
 {
     int ret;
+
     if (is_i2c) {
         ret = legacy_i2c_start_transfer(s->bus, addr, is_recv);
     } else {
@@ -487,11 +477,12 @@ static int dw_i3c_recv_data(DWI3C *s, bool is_i2c, uint8_t *data,
                             uint16_t num_to_read, uint32_t *num_read)
 {
     int ret;
+
     if (is_i2c) {
         for (uint16_t i = 0; i < num_to_read; i++) {
             data[i] = legacy_i2c_recv(s->bus);
         }
-        /* I2C devices cannot NACK a read, nor end transfers early. */
+        /* I2C devices can neither NACK a read, nor end transfers early. */
         *num_read = num_to_read;
         trace_dw_i3c_recv_data(s->cfg.id, *num_read);
         return 0;
@@ -500,7 +491,8 @@ static int dw_i3c_recv_data(DWI3C *s, bool is_i2c, uint8_t *data,
     ret = i3c_recv(s->bus, data, num_to_read, num_read);
     if (ret) {
         g_autofree char *path = object_get_canonical_path(OBJECT(s));
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: NACKed receiving byte\n", path);
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: NACKed receiving byte\n",
+                      path);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_HALT);
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_STATUS,
@@ -508,12 +500,13 @@ static int dw_i3c_recv_data(DWI3C *s, bool is_i2c, uint8_t *data,
         ARRAY_FIELD_DP32(s->regs, INTR_STATUS, TRANSFER_ERR, 1);
         ARRAY_FIELD_DP32(s->regs, DEVICE_CTRL, I3C_RESUME, 1);
     }
+
     trace_dw_i3c_recv_data(s->cfg.id, *num_read);
 
     return ret;
 }
 
-static inline void dw_i3c_ctrl_w(DWI3C *s, uint32_t val)
+static void dw_i3c_ctrl_w(DWI3C *s, uint32_t val)
 {
     /*
      * If the user is setting I3C_RESUME, the controller was halted.
@@ -683,7 +676,7 @@ static int dw_i3c_handle_targ_irq(DWI3C *s, uint8_t addr)
 
 static int dw_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 {
-    DWI3C *s = DW_I3C(bus->qbus.parent);
+    DWI3C *s = DW_I3C(bus->parent_obj.parent);
 
     trace_dw_i3c_ibi_handle(s->cfg.id, addr, is_recv);
     s->ibi_data.ibi_queue_status = FIELD_DP32(s->ibi_data.ibi_queue_status,
@@ -709,7 +702,7 @@ static int dw_i3c_ibi_handle(I3CBus *bus, uint8_t addr, bool is_recv)
 
 static int dw_i3c_ibi_recv(I3CBus *bus, uint8_t data)
 {
-    DWI3C *s = DW_I3C(bus->qbus.parent);
+    DWI3C *s = DW_I3C(bus->parent_obj.parent);
     if (fifo8_is_full(&s->ibi_data.ibi_intermediate_queue)) {
         return -1;
     }
@@ -730,9 +723,9 @@ static void dw_i3c_ibi_queue_push(DWI3C *s)
     uint8_t ibi_status_count = num_slices;
     union {
         uint8_t b[sizeof(uint32_t)];
-        uint32_t w;
-    } word = {
-        .w = 0
+        uint32_t val32;
+    } ibi_data = {
+        .val32 = 0
     };
 
     /* The report was suppressed, do nothing. */
@@ -778,16 +771,16 @@ static void dw_i3c_ibi_queue_push(DWI3C *s)
                 break;
             }
 
-            word.b[j & 3] = fifo8_pop(&s->ibi_data.ibi_intermediate_queue);
+            ibi_data.b[j & 3] = fifo8_pop(&s->ibi_data.ibi_intermediate_queue);
             /* We have 32-bits, push it to the IBI FIFO. */
             if ((j & 0x03) == 0x03) {
-                fifo32_push(&s->ibi_queue, word.w);
-                word.w = 0;
+                fifo32_push(&s->ibi_queue, ibi_data.val32);
+                ibi_data.val32 = 0;
             }
         }
         /* If the data isn't 32-bit aligned, push the leftover bytes. */
         if (ibi_slice_size & 0x03) {
-            fifo32_push(&s->ibi_queue, word.w);
+            fifo32_push(&s->ibi_queue, ibi_data.val32);
         }
 
         /* Clear out the data length for the next iteration. */
@@ -816,7 +809,7 @@ static void dw_i3c_ibi_queue_push(DWI3C *s)
 
 static int dw_i3c_ibi_finish(I3CBus *bus)
 {
-    DWI3C *s = DW_I3C(bus->qbus.parent);
+    DWI3C *s = DW_I3C(bus->parent_obj.parent);
     bool nack_and_disable_hj = ARRAY_FIELD_EX32(s->regs, DEVICE_CTRL,
                                                 HOT_JOIN_ACK_NACK_CTRL);
     if (nack_and_disable_hj || s->ibi_data.send_direct_disec) {
@@ -955,6 +948,10 @@ static void dw_i3c_reset(DeviceState *dev)
                      s->cfg.dev_char_table_pointer);
     ARRAY_FIELD_DP32(s->regs, DEV_CHAR_TABLE_POINTER, DEV_CHAR_TABLE_DEPTH,
                      s->cfg.dev_char_table_depth);
+    ARRAY_FIELD_DP32(s->regs, QUEUE_STATUS_LEVEL, CMD_QUEUE_EMPTY_LOC,
+                     s->cfg.cmd_resp_queue_capacity_bytes);
+    ARRAY_FIELD_DP32(s->regs, DATA_BUFFER_STATUS_LEVEL, TX_BUF_EMPTY_LOC,
+                     s->cfg.tx_rx_queue_capacity_bytes);
 
     dw_i3c_cmd_queue_reset(s);
     dw_i3c_resp_queue_reset(s);
@@ -997,10 +994,11 @@ static uint32_t dw_i3c_pop_rx(DWI3C *s)
     uint32_t val = fifo32_pop(&s->rx_queue);
     ARRAY_FIELD_DP32(s->regs, DATA_BUFFER_STATUS_LEVEL, RX_BUF_BLR,
                      fifo32_num_used(&s->rx_queue));
+
     /* Threshold is 2^RX_BUF_THLD. */
     uint8_t threshold = ARRAY_FIELD_EX32(s->regs, DATA_BUFFER_THLD_CTRL,
                                          RX_BUF_THLD);
-    threshold = threshold ? 2 << threshold : 1;
+    threshold = dw_i3c_fifo_threshold_from_reg(threshold);
     if (fifo32_num_used(&s->rx_queue) < threshold) {
         ARRAY_FIELD_DP32(s->regs, INTR_STATUS, RX_THLD, 0);
         dw_i3c_update_irq(s);
@@ -1041,6 +1039,7 @@ static uint32_t dw_i3c_resp_queue_port_r(DWI3C *s)
     uint32_t val = fifo32_pop(&s->resp_queue);
     ARRAY_FIELD_DP32(s->regs, QUEUE_STATUS_LEVEL, RESP_BUF_BLR,
                      fifo32_num_used(&s->resp_queue));
+
     /* Threshold is the register value + 1. */
     uint8_t threshold = ARRAY_FIELD_EX32(s->regs, QUEUE_THLD_CTRL,
                                          RESP_BUF_THLD) + 1;
@@ -1128,7 +1127,8 @@ static void dw_i3c_push_tx(DWI3C *s, uint32_t val)
     /* Threshold is 2^TX_BUF_THLD. */
     uint8_t empty_threshold = ARRAY_FIELD_EX32(s->regs, DATA_BUFFER_THLD_CTRL,
                                                TX_BUF_THLD);
-    empty_threshold = empty_threshold ? 2 << empty_threshold : 1;
+    empty_threshold =
+        dw_i3c_fifo_threshold_from_reg(empty_threshold);
     if (fifo32_num_free(&s->tx_queue) < empty_threshold) {
         ARRAY_FIELD_DP32(s->regs, INTR_STATUS, TX_THLD, 0);
         dw_i3c_update_irq(s);
@@ -1152,7 +1152,8 @@ static uint32_t dw_i3c_pop_tx(DWI3C *s)
     /* Threshold is 2^TX_BUF_THLD. */
     uint8_t empty_threshold = ARRAY_FIELD_EX32(s->regs, DATA_BUFFER_THLD_CTRL,
                                                TX_BUF_THLD);
-    empty_threshold = empty_threshold ? 2 << empty_threshold : 1;
+    empty_threshold =
+        dw_i3c_fifo_threshold_from_reg(empty_threshold);
     if (fifo32_num_free(&s->tx_queue) >= empty_threshold) {
         ARRAY_FIELD_DP32(s->regs, INTR_STATUS, TX_THLD, 1);
         dw_i3c_update_irq(s);
@@ -1176,7 +1177,7 @@ static void dw_i3c_push_rx(DWI3C *s, uint32_t val)
     /* Threshold is 2^RX_BUF_THLD. */
     uint8_t threshold = ARRAY_FIELD_EX32(s->regs, DATA_BUFFER_THLD_CTRL,
                                          RX_BUF_THLD);
-    threshold = threshold ? 2 << threshold : 1;
+    threshold = dw_i3c_fifo_threshold_from_reg(threshold);
     if (fifo32_num_used(&s->rx_queue) >= threshold) {
         ARRAY_FIELD_DP32(s->regs, INTR_STATUS, RX_THLD, 1);
         dw_i3c_update_irq(s);
@@ -1217,7 +1218,7 @@ static void dw_i3c_short_transfer(DWI3C *s, DWI3CTransferCmd cmd,
          * ignored.
          */
         if (cmd.dbp) {
-            data[len] += arg.byte0;
+            data[len] = arg.byte0;
             len++;
         }
     }
@@ -1232,10 +1233,16 @@ static void dw_i3c_short_transfer(DWI3C *s, DWI3CTransferCmd cmd,
         len++;
     }
 
-    if (dw_i3c_send(s, data, len, &bytes_sent, is_i2c)) {
-        err = DW_I3C_RESP_QUEUE_ERR_I2C_NACK;
+    if (len > 0) {
+        if (dw_i3c_send(s, data, len, &bytes_sent, is_i2c)) {
+            err = DW_I3C_RESP_QUEUE_ERR_I2C_NACK;
+        } else {
+            /* Only go to an idle state on a successful transfer. */
+            ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
+                             DW_I3C_TRANSFER_STATE_IDLE);
+        }
     } else {
-        /* Only go to an idle state on a successful transfer. */
+        /* No payload bytes for this short transfer. */
         ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                          DW_I3C_TRANSFER_STATE_IDLE);
     }
@@ -1260,13 +1267,13 @@ static uint16_t dw_i3c_tx(DWI3C *s, uint16_t num, bool is_i2c)
     uint16_t bytes_sent = 0;
     union {
         uint8_t b[sizeof(uint32_t)];
-        uint32_t w;
-    } word;
+        uint32_t val;
+    } val32;
 
     while (bytes_sent < num) {
-        word.w = dw_i3c_pop_tx(s);
-        for (uint8_t i = 0; i < sizeof(word.w); i++) {
-            if (dw_i3c_send_byte(s, word.b[i], is_i2c)) {
+        val32.val = dw_i3c_pop_tx(s);
+        for (uint8_t i = 0; i < sizeof(val32.val); i++) {
+            if (dw_i3c_send_byte(s, val32.b[i], is_i2c)) {
                 return bytes_sent;
             }
             bytes_sent++;
@@ -1288,7 +1295,7 @@ static uint16_t dw_i3c_rx(DWI3C *s, uint16_t num, bool is_i2c)
      * Allocate a temporary buffer to read data from the target.
      * Zero it and word-align it as well in case we're reading unaligned data.
      */
-    g_autofree uint8_t *data = g_new0(uint8_t, num + (4 - (num & 0x03)));
+    g_autofree uint8_t *data = g_new0(uint8_t, ROUND_UP(num, 4));
     uint32_t *data32 = (uint32_t *)data;
     /*
      * 32-bits since the I3C API wants a 32-bit number, even though the
@@ -1381,6 +1388,7 @@ static void dw_i3c_transfer(DWI3C *s, DWI3CTransferCmd cmd,
 
     ARRAY_FIELD_DP32(s->regs, PRESENT_STATE, CM_TFR_ST_STATUS,
                      DW_I3C_TRANSFER_STATE_IDLE);
+
 transfer_done:
     if (cmd.toc) {
         dw_i3c_end_transfer(s, is_i2c);
@@ -1396,6 +1404,7 @@ transfer_done:
         dw_i3c_resp_queue_push(s, err, cmd.tid, /*ccc_type=*/0,
                                           data_len);
     }
+
     dw_i3c_update_irq(s);
 }
 
@@ -1757,7 +1766,6 @@ static void dw_i3c_write(void *opaque, hwaddr offset, uint64_t value,
     }
 }
 
-/* Non-static for other controllers that use DesignWare I3C. */
 const VMStateDescription vmstate_dw_i3c = {
     .name = TYPE_DW_I3C,
     .version_id = 1,
@@ -1774,16 +1782,39 @@ static const MemoryRegionOps dw_i3c_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+static void dw_i3c_reset_enter(Object *obj, ResetType type)
+{
+    DWI3C *s = DW_I3C(obj);
+
+    memcpy(s->regs, dw_i3c_resets, sizeof(s->regs));
+    /*
+     * The user config for these may differ from our resets array, set them
+     * manually.
+     */
+    ARRAY_FIELD_DP32(s->regs, DEVICE_ADDR_TABLE_POINTER, ADDR,
+                     s->cfg.dev_addr_table_pointer);
+    ARRAY_FIELD_DP32(s->regs, DEVICE_ADDR_TABLE_POINTER, DEPTH,
+                     s->cfg.dev_addr_table_depth);
+    ARRAY_FIELD_DP32(s->regs, DEV_CHAR_TABLE_POINTER,
+                     P_DEV_CHAR_TABLE_START_ADDR,
+                     s->cfg.dev_char_table_pointer);
+    ARRAY_FIELD_DP32(s->regs, DEV_CHAR_TABLE_POINTER, DEV_CHAR_TABLE_DEPTH,
+                     s->cfg.dev_char_table_depth);
+    ARRAY_FIELD_DP32(s->regs, QUEUE_STATUS_LEVEL, CMD_QUEUE_EMPTY_LOC,
+                     s->cfg.cmd_resp_queue_capacity_bytes);
+    ARRAY_FIELD_DP32(s->regs, DATA_BUFFER_STATUS_LEVEL, TX_BUF_EMPTY_LOC,
+                     s->cfg.tx_rx_queue_capacity_bytes);
+}
+
 static void dw_i3c_realize(DeviceState *dev, Error **errp)
 {
     DWI3C *s = DW_I3C(dev);
-    g_autofree char *name = g_strdup_printf(TYPE_DW_I3C ".%d",
-                                            s->cfg.id);
+    g_autofree char *name = g_strdup_printf(TYPE_DW_I3C ".%d", s->cfg.id);
 
     sysbus_init_irq(SYS_BUS_DEVICE(dev), &s->irq);
 
-    memory_region_init_io(&s->mr, OBJECT(s), &dw_i3c_ops,
-                          s, name, DW_I3C_NR_REGS << 2);
+    memory_region_init_io(&s->mr, OBJECT(s), &dw_i3c_ops, s, name,
+                          DW_I3C_NR_REGS << 2);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mr);
 
     fifo32_create(&s->cmd_queue, s->cfg.cmd_resp_queue_capacity_bytes);
@@ -1822,27 +1853,27 @@ static const Property dw_i3c_properties[] = {
                        cfg.dev_char_table_depth, 0x20),
 };
 
-static void dw_i3c_class_init(ObjectClass *klass, void *data)
+static void dw_i3c_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
+    ResettableClass *rc = RESETTABLE_CLASS(klass);
+
+    rc->phases.enter = dw_i3c_reset_enter;
 
     dc->desc = "DesignWare I3C Controller";
     dc->realize = dw_i3c_realize;
-    device_class_set_legacy_reset(dc, dw_i3c_reset);
     dc->vmsd = &vmstate_dw_i3c;
     device_class_set_props(dc, dw_i3c_properties);
 }
 
-static const TypeInfo dw_i3c_info = {
-    .name = TYPE_DW_I3C,
-    .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(DWI3C),
-    .class_init = dw_i3c_class_init,
+static const TypeInfo dw_i3c_types[] = {
+    {
+        .name = TYPE_DW_I3C,
+        .parent = TYPE_SYS_BUS_DEVICE,
+        .instance_size = sizeof(DWI3C),
+        .class_init = dw_i3c_class_init,
+    },
 };
 
-static void dw_i3c_register_types(void)
-{
-    type_register_static(&dw_i3c_info);
-}
+DEFINE_TYPES(dw_i3c_types)
 
-type_init(dw_i3c_register_types);

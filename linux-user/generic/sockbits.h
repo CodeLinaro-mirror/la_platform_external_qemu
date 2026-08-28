@@ -49,8 +49,6 @@
 #define TARGET_SO_DETACH_FILTER        27
 
 #define TARGET_SO_PEERNAME             28
-#define TARGET_SO_TIMESTAMP            29
-#define TARGET_SCM_TIMESTAMP           TARGET_SO_TIMESTAMP
 
 #define TARGET_SO_ACCEPTCONN           30
 
@@ -58,4 +56,16 @@
 
 #define TARGET_SO_PROTOCOL             38
 #define TARGET_SO_DOMAIN               39
+
+#define TARGET_SO_TIMESTAMP_OLD        29
+#define TARGET_SCM_TIMESTAMP_OLD       TARGET_SO_TIMESTAMP_OLD
+
+#define TARGET_SO_TIMESTAMP_NEW        63
+#define TARGET_SCM_TIMESTAMP_NEW       TARGET_SO_TIMESTAMP_NEW
+#define TARGET_SO_TIMESTAMPNS_NEW      64
+#define TARGET_SO_TIMESTAMPING_NEW     65
+
+#define TARGET_SO_RCVTIMEO_NEW         66
+#define TARGET_SO_SNDTIMEO_NEW         67
+
 #endif

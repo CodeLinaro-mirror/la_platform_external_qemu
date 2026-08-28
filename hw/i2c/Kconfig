@@ -62,10 +62,10 @@ config MCTP_I2C
     bool
     select I2C
 
-config CMIS
-    bool
-    select I2C
-
 config SBTSI_I2C
     bool
     select SMBUS
+
+config CMIS
+    bool
+    select I2C

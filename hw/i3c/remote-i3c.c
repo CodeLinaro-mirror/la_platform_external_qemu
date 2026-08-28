@@ -3,16 +3,6 @@
  *
  * Copyright (c) 2023 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
- *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
@@ -24,7 +14,7 @@
 #include "trace.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/remote-i3c.h"
-#include "hw/qdev-properties-system.h"
+#include "hw/core/qdev-properties-system.h"
 
 typedef enum {
     IBI_RX_STATE_DONE = 0,
@@ -43,7 +33,7 @@ typedef struct {
 
 typedef struct {
     I3CTarget parent_obj;
-    CharBackend chr;
+    CharFrontend chr;
     /* For ease of debugging. */
 
     struct {
@@ -67,7 +57,6 @@ typedef struct {
 static void remote_i3c_rx_ibi(RemoteI3C *i3c, const uint8_t *buf, int size)
 {
     g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
-
     uint32_t p_buf = 0;
     while (p_buf < size) {
         switch (i3c->ibi_rx_state) {
@@ -211,6 +200,7 @@ static bool remote_i3c_tx_fifo_push(RemoteI3C *i3c, const uint8_t *data,
 {
     uint32_t num_to_push = num_to_send;
     bool ack = true;
+    g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
 
     /*
      * For performance reasons, we buffer data being sent from the controller to
@@ -219,7 +209,6 @@ static bool remote_i3c_tx_fifo_push(RemoteI3C *i3c, const uint8_t *data,
      * STOP or START.
      */
     if (fifo8_num_free(&i3c->tx_fifo) < num_to_send) {
-        g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
         qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: TX FIFO buffer full.\n",
                       path, i3c->cfg.name);
         num_to_push = fifo8_num_free(&i3c->tx_fifo);
@@ -278,6 +267,7 @@ static int remote_i3c_handle_ccc_write(I3CTarget *t, const uint8_t *data,
 
 static bool remote_i3c_read_target_match(RemoteI3C *i3c)
 {
+    g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
     uint8_t byte;
 
     /*
@@ -294,7 +284,6 @@ static bool remote_i3c_read_target_match(RemoteI3C *i3c)
         remote_i3c_rx_ibi(i3c, &byte, sizeof(byte));
         return false;
     } else if (byte != 0 && byte != 1) {
-        g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
         qemu_log_mask(LOG_GUEST_ERROR, "%s Received unknown byte 0x%.2x during "
                       "address match\n", path, byte);
     }
@@ -302,8 +291,9 @@ static bool remote_i3c_read_target_match(RemoteI3C *i3c)
     return byte == 1;
 }
 
-static bool remote_i3c_target_match(I3CTarget *t, uint8_t address, bool is_recv,
-                                    bool broadcast, bool in_entdaa)
+static bool remote_i3c_target_match(I3CTarget *t, uint8_t address,
+                                    bool is_recv, bool broadcast,
+                                    bool in_entdaa)
 {
     RemoteI3C *i3c = REMOTE_I3C(t);
     uint8_t request[4];
@@ -336,11 +326,30 @@ static bool remote_i3c_target_match(I3CTarget *t, uint8_t address, bool is_recv,
     return remote_i3c_read_target_match(i3c);
 }
 
+static bool remote_i3c_ccc_is_supported(I3CTarget *t, I3CCCC ccc)
+{
+    RemoteI3C *i3c = REMOTE_I3C(t);
+    uint8_t request[2];
+
+    /*
+     * Request format is 2 bytes:
+     * - byte 0 is the request type
+     * - byte 1 is the CCC
+     */
+    request[0] = REMOTE_I3C_CCC_IS_SUPPORTED;
+    request[1] = ccc;
+    qemu_chr_fe_write_all(&i3c->chr, request, sizeof(request));
+
+    uint8_t response;
+    qemu_chr_fe_read_all(&i3c->chr, &response, sizeof(response));
+    return response;
+}
+
 static int remote_i3c_event(I3CTarget *t, enum I3CEvent event)
 {
     RemoteI3C *i3c = REMOTE_I3C(t);
+    g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
     uint8_t type;
-
     trace_remote_i3c_event(i3c->cfg.name, event);
     switch (event) {
     case I3C_START_RECV:
@@ -356,12 +365,9 @@ static int remote_i3c_event(I3CTarget *t, enum I3CEvent event)
         type = REMOTE_I3C_NACK;
         break;
     default:
-        {
-            g_autofree char *path = object_get_canonical_path(OBJECT(i3c));
-            qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Unknown I3C event %d\n",
-                          path, i3c->cfg.name, event);
-            return -1;
-        }
+        qemu_log_mask(LOG_GUEST_ERROR, "%s-%s: Unknown I3C event %d\n",
+                      path, i3c->cfg.name, event);
+        return -1;
     }
 
     /*
@@ -501,7 +507,7 @@ static const Property remote_i3c_props[] = {
     DEFINE_PROP_STRING("device-name", RemoteI3C, cfg.name),
 };
 
-static void remote_i3c_class_init(ObjectClass *klass, void *data)
+static void remote_i3c_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     I3CTargetClass *k = I3C_TARGET_CLASS(klass);
@@ -512,6 +518,7 @@ static void remote_i3c_class_init(ObjectClass *klass, void *data)
     k->handle_ccc_read = &remote_i3c_handle_ccc_read;
     k->handle_ccc_write = &remote_i3c_handle_ccc_write;
     k->target_match = &remote_i3c_target_match;
+    k->ccc_is_supported = &remote_i3c_ccc_is_supported;
     device_class_set_props(dc, remote_i3c_props);
     dc->realize = remote_i3c_realize;
 }

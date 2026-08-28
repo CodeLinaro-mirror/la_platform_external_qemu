@@ -228,6 +228,7 @@ enum pmbus_registers {
 /* PAGES */
 #define PB_MAX_PAGES            0x1F
 #define PB_ALL_PAGES            0xFF
+#define PB_ALL_PHASES           0xFF
 
 #define PMBUS_ERR_BYTE          0xFF
 
@@ -266,6 +267,7 @@ OBJECT_DECLARE_TYPE(PMBusDevice, PMBusDeviceClass,
 struct PMBusDeviceClass {
     SMBusDeviceClass parent_class;
     uint8_t device_num_pages;
+    uint8_t device_num_phases;
 
     /**
      * Implement quick_cmd, receive byte, and write_data to support non-standard
@@ -417,14 +419,17 @@ struct PMBusDevice {
     SMBusDevice smb;
 
     uint8_t num_pages;
+    uint8_t num_phases;
     uint8_t code;
     uint8_t page;
+    uint8_t phase;
 
     /*
      * PMBus registers are stored in a PMBusPage structure allocated by
      * calling pmbus_pages_alloc()
      */
     PMBusPage *pages;
+    PMBusPage **phases;
     uint8_t capability;
 
 
@@ -449,10 +454,17 @@ typedef struct PMBusCoefficients {
 /**
  * VOUT_Mode bit fields
  */
+#if HOST_BIG_ENDIAN
 typedef struct PMBusVoutMode {
     uint8_t  mode:3;
     int8_t   exp:5;
 } PMBusVoutMode;
+# else
+typedef struct PMBusVoutMode {
+    int8_t   exp:5;
+    uint8_t  mode:3;
+} PMBusVoutMode;
+#endif
 
 /**
  * Convert sensor values to direct mode format
@@ -477,9 +489,64 @@ uint32_t pmbus_direct_mode2data(PMBusCoefficients c, uint16_t value);
  *
  * L = D * 2^(-e)
  *
+ * Exponent is retrieved from VOUT_MODE register
+ *
+ *   7   6   5   4   3   2   1   0
+ * +---+---+---+---+---+---+---+---+
+ * | 0 | 0 | 0 |       N           |
+ * +---+---+---+---+---+---+---+---+
+ *   |_______|   |_______________|
+ *     Mode          Exponent (N)
+ *    = 000b
+ *
  * @return uint16
  */
 uint16_t pmbus_data2linear_mode(uint16_t value, int exp);
+
+/**
+ * Convert sensor values to linear11 format
+ *
+ *   L = e << 11 | D * 2^(-e)
+ *
+ *  |        Data Byte High             |        Data Byte Low          |
+ *  +---+---+---+---+---+   +---+---+---+---+---+---+---+---+---+---+---+
+ *  | 7 | 6 | 5 | 4 | 3 |   | 2 | 1 | 0 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+ *  +---+---+---+---+---+   +---+---+---+---+---+---+---+---+---+---+---+
+ *  | MSB               |   | MSB                                       |
+ *  |_________ _________|   |_____________________ _____________________|
+ *            N                                   Y
+ *         Exponent                            Mantissa
+ *
+ * @return uint16
+ */
+uint16_t pmbus_data2linear11(uint16_t value, int exp);
+
+/**
+ * Convert sensor values in milliunits to linear11 format
+ *
+ *   L = e << 11 | D * 2^(-e)
+ *
+ *  |        Data Byte High             |        Data Byte Low          |
+ *  +---+---+---+---+---+   +---+---+---+---+---+---+---+---+---+---+---+
+ *  | 7 | 6 | 5 | 4 | 3 |   | 2 | 1 | 0 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+ *  +---+---+---+---+---+   +---+---+---+---+---+---+---+---+---+---+---+
+ *  | MSB               |   | MSB                                       |
+ *  |_________ _________|   |_____________________ _____________________|
+ *            N                                   Y
+ *         Exponent                            Mantissa
+ *
+ * @return uint16
+ */
+uint16_t pmbus_milliunits2linear11(uint32_t value, int exp);
+
+/**
+ * Convert milliunit sensor value to linear mode format
+ *
+ * L = D * 2^(-e)
+ *
+ * @return uint16
+ */
+uint16_t pmbus_milliunits2linear_mode(uint32_t value, int exp);
 
 /**
  * Convert linear mode formatted data into sensor reading
@@ -489,6 +556,15 @@ uint16_t pmbus_data2linear_mode(uint16_t value, int exp);
  * @return uint16
  */
 uint16_t pmbus_linear_mode2data(uint16_t value, int exp);
+
+/**
+ * Convert linear mode formatted data into sensor reading in milliunits
+ *
+ * D = L * 2^e
+ *
+ * @return uint32 value in milliunits
+ */
+uint32_t pmbus_linear_mode2milliunits(uint16_t value, int exp);
 
 /**
  * @brief Send a block of data over PMBus

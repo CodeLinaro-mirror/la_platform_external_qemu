@@ -12,10 +12,10 @@
 #ifndef NPCM_ESPI_H
 #define NPCM_ESPI_H
 
-#include "hw/sysbus.h"
-#include "exec/memory.h"
+#include "hw/core/sysbus.h"
+#include "system/memory.h"
 #include "qom/object.h"
-#include "hw/irq.h"
+#include "hw/core/irq.h"
 
 #define NPCM_ESPI_NR_REGS 0x180
 

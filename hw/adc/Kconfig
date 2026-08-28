@@ -1,2 +1,7 @@
 config STM32F2XX_ADC
     bool
+
+config TLA202X
+    bool
+    depends on I2C
+    default y if I2C_DEVICES

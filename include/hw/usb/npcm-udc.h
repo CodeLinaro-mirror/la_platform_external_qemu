@@ -10,7 +10,7 @@
 #ifndef NPCM_UDC_H
 #define NPCM_UDC_H
 
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "hw/usb/redirect-host.h"
 #include "qemu/typedefs.h"
 #include "qom/object.h"
@@ -44,6 +44,7 @@ typedef struct QueueHead {
 #define QH_EP_INFO_INTERRUPT_ON_SETUP_MASK 0x8000
 
 typedef struct NPCMUDCRegisters {
+    uint32_t sbscfg;
     uint32_t command;
     uint32_t status;
     uint32_t interrupt_enable;

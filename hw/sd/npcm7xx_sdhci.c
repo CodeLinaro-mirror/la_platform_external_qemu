@@ -81,7 +81,8 @@ static bool npcm7xx_sdhci_check_mem_op(void *opaque, hwaddr addr,
         /* R/W Dword */
         return size == 4;
     default:
-        return false;
+        /* Undefined registers read as zero */
+        return !is_write;
     }
 }
 
@@ -149,7 +150,7 @@ static const VMStateDescription vmstate_npcm7xx_sdhci = {
     },
 };
 
-static void npcm7xx_sdhci_class_init(ObjectClass *classp, void *data)
+static void npcm7xx_sdhci_class_init(ObjectClass *classp, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(classp);
 

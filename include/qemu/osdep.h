@@ -8,7 +8,7 @@
  * To avoid getting into possible circular include dependencies, this
  * file should not include any other QEMU headers, with the exceptions
  * of config-host.h, config-target.h, qemu/compiler.h,
- * system/os-posix.h, system/os-win32.h, glib-compat.h and
+ * system/os-posix.h, system/os-win32.h, system/os-wasm.h, glib-compat.h and
  * qemu/typedefs.h, all of which are doing a similar job to this file
  * and are under similar constraints.
  *
@@ -133,6 +133,20 @@ QEMU_EXTERN_C int daemon(int, int);
 #include <setjmp.h>
 #include <signal.h>
 
+/*
+ * Avoid conflict with linux/arch/powerpc/include/uapi/asm/elf.h, included
+ * from <asm/sigcontext.h>, but we might as well do this unconditionally.
+ */
+#undef ELF_CLASS
+#undef ELF_DATA
+#undef ELF_ARCH
+
+/*
+ * Avoid conflict with Solaris FSCALE definition from <sys/param.h> header,
+ * but we might as well do this unconditionally.
+ */
+#undef FSCALE
+
 #ifdef CONFIG_IOVEC
 #include <sys/uio.h>
 #endif
@@ -164,11 +178,15 @@ QEMU_EXTERN_C int daemon(int, int);
 #include "system/os-win32.h"
 #endif
 
-#ifdef CONFIG_POSIX
+#if defined(CONFIG_POSIX) && !defined(EMSCRIPTEN)
 #include "system/os-posix.h"
 #endif
 
-typedef int64_t off64_t;  /* goldfish */
+#if defined(EMSCRIPTEN)
+#include "system/os-wasm.h"
+#endif
+
+typedef int64_t off64_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -497,6 +515,24 @@ void QEMU_ERROR("code path is reachable")
 #endif
 
 /*
+ * Divide positive or negative dividend by positive divisor and round
+ * to closest integer. Result is undefined for negative divisors and
+ * for negative dividends if the divisor variable type is unsigned.
+ */
+#ifndef DIV_ROUND_CLOSEST
+#define DIV_ROUND_CLOSEST(x, divisor)(          \
+{                                               \
+    typeof(x) __x = x;                          \
+    typeof(divisor) __d = divisor;              \
+    (((typeof(x))-1) > 0 ||                     \
+     ((typeof(divisor))-1) > 0 || (__x) > 0) ?  \
+        (((__x) + ((__d) / 2)) / (__d)) :       \
+        (((__x) - ((__d) / 2)) / (__d));        \
+}                                               \
+)
+#endif
+
+/*
  * &(x)[0] is always a pointer - if it's same type as x then the argument is a
  * pointer, not an array.
  */
@@ -550,8 +586,8 @@ int madvise(char *, size_t, int);
 #endif
 
 #if defined(__linux__) && \
-    (defined(__x86_64__) || defined(__arm__) || defined(__aarch64__) \
-     || defined(__powerpc64__))
+    (defined(__x86_64__) || defined(__aarch64__) \
+     || defined(__powerpc64__) || defined(__riscv))
    /* Use 2 MiB alignment so transparent hugepages can be used by KVM.
       Valgrind does not support alignments larger than 1 MiB,
       therefore we need special code which handles running on Valgrind. */
@@ -617,6 +653,7 @@ int qemu_lock_fd(int fd, int64_t start, int64_t len, bool exclusive);
 int qemu_unlock_fd(int fd, int64_t start, int64_t len);
 int qemu_lock_fd_test(int fd, int64_t start, int64_t len, bool exclusive);
 bool qemu_has_ofd_lock(void);
+int qemu_fcntl_addfl(int fd, int flag);
 #endif
 
 bool qemu_has_direct_io(void);
@@ -677,6 +714,16 @@ ssize_t qemu_write_full(int fd, const void *buf, size_t count)
     G_GNUC_WARN_UNUSED_RESULT;
 
 void qemu_set_cloexec(int fd);
+bool qemu_set_blocking(int fd, bool block, Error **errp);
+
+/*
+ * Clear FD_CLOEXEC for a descriptor.
+ *
+ * The caller must guarantee that no other fork+exec's occur before the
+ * exec that is intended to inherit this descriptor, eg by suspending CPUs
+ * and blocking monitor commands.
+ */
+void qemu_clear_cloexec(int fd);
 
 /* Return a dynamically allocated directory path that is appropriate for storing
  * local state.

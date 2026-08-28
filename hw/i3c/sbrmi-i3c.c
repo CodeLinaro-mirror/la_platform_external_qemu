@@ -4,16 +4,6 @@
  *
  * Copyright (c) 2024 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
- *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
@@ -22,14 +12,16 @@
 #include "qemu/log.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/sbrmi-i3c.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
 #include "trace.h"
 
 I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
                                    uint64_t pid, const char *cpu_vendor,
-                                   uint32_t ucode_rev)
+                                   uint32_t ucode_rev, int nr_cores,
+                                   int nr_thread)
 {
     I3CTarget *target = i3c_target_new(TYPE_SBRMI_I3C_TARGET, addr,
                              /*dcr=*/0, /*bcr=*/0, pid);
@@ -42,9 +34,9 @@ I3CTarget *create_sbrmi_i3c_target(const char *name, uint8_t addr,
                                &error_abort);
     object_property_set_uint(OBJECT(target), "apic_id", 0,
                                &error_abort);
-    object_property_set_uint(OBJECT(target), "nr_cores", 128,
+    object_property_set_uint(OBJECT(target), "nr_cores", nr_cores,
                                &error_abort);
-    object_property_set_uint(OBJECT(target), "nr_thread", 1,
+    object_property_set_uint(OBJECT(target), "nr_thread", nr_thread,
                                &error_abort);
     object_property_set_uint(OBJECT(target), "ecx_fn1", 0xffffffff,
                                &error_abort);
@@ -258,6 +250,8 @@ static void sbrmi_i3c_target_cpuid_read_handler(SbrmiI3cTargetState *s)
             (s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_FUNCTION_3] << 24);
     uint8_t is_ecx_edx = extract8(
         s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_WRITE_DATA_9], 0, 1);
+    uint8_t ext = extract8(
+        s->cpu_reg_write_data[SBRMI_READ_CPUID_WD_WRITE_DATA_9], 4, 4);
 
     /* prepare for data out */
     memset(s->cpu_reg_read_data, 0, sizeof(s->cpu_reg_read_data));
@@ -266,7 +260,7 @@ static void sbrmi_i3c_target_cpuid_read_handler(SbrmiI3cTargetState *s)
 
     /* See PPR Vol 1 for AMD Family 1Ah Model 02h C0, 2.1.18 */
     switch (cpuid_fn) {
-    case 0:
+    case SBRMI_CPUID_FN00000000:
         if (is_ecx_edx) {
             /* ECX = vendor3 */
             s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_0] =
@@ -299,7 +293,23 @@ static void sbrmi_i3c_target_cpuid_read_handler(SbrmiI3cTargetState *s)
                     extract32(s->cpu.vendor1, 24, 8);
         }
         break;
-    case 1:
+    case SBRMI_CPUID_FN0000000B:
+        if (ext != 1) {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                      "Unsupported EXT 0x%.8x for CPUID_FN0000000B\n", ext);
+            break;
+        }
+        if (is_ecx_edx) {
+            /* Not implemented */
+        } else {
+            /* EBX[15:0]: LogProcAtThisLevel */
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_0] =
+                    extract32(s->cpu.nr_cores * s->cpu.nr_thread, 0, 8);
+            s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_1] =
+                    extract32(s->cpu.nr_cores * s->cpu.nr_thread, 8, 8);
+        }
+        break;
+    case SBRMI_CPUID_FN00000001:
         if (is_ecx_edx) {
             /* ECX = ecx_fn1 */
             s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EAX_ECX_0] =
@@ -334,18 +344,30 @@ static void sbrmi_i3c_target_cpuid_read_handler(SbrmiI3cTargetState *s)
              * in PPR Vol 1 for AMD Family 1Ah Model 02h C0)
              */
             s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_1] = 8;
-            /* EBX[23:16] = (nr_cores * nr_thread) */
+            /* EBX[23:16] = (nr_cores) */
             s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_2] =
-                    (s->cpu.nr_cores * s->cpu.nr_thread) & 0xff;
+                    s->cpu.nr_cores & 0xff;
             /* EBX[31:24] = apic_id */
             s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_3] =
                     s->cpu.apic_id & 0xff;
         }
         break;
+    case SBRMI_CPUID_FN8000001E:
+        if (is_ecx_edx) {
+            /* Not implemented */
+        } else {
+            /* EAX = Extended APIC ID not implemented */
+            /* EBX = Core Identifiers */
+            if (s->cpu.nr_thread >= 1) {
+                s->cpu_reg_read_data[SBRMI_READ_CPUID_RD_EBX_EDX_1] =
+                        (s->cpu.nr_thread - 1) & 0xff;
+            }
+        }
+        break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR,
                       "Unsupported CPUID function 0x%.8x\n", cpuid_fn);
-        return;
+        break;
     }
 
     s->cpu_reg_read_data_ptr = 0;
@@ -400,6 +422,40 @@ static void sbrmi_i3c_target_cpu_reg_reset(SbrmiI3cTargetState *s)
     memset(s->cpu_reg_read_data, 0, sizeof(s->cpu_reg_read_data));
 }
 
+static void sbrmi_i3c_update_alert(SbrmiI3cTargetState *s)
+{
+    if (extract8(s->sbrmi_control, SBRMI_BIT_ALERT_MASK,
+                 SBRMI_BIT_ALERT_MASK_LEN)) {
+        /* alert is disabled */
+        return;
+    }
+
+    /* sw alert signaling */
+    if (!extract8(s->sbrmi_control, SBRMI_BIT_SW_ALERT_MASK,
+                  SBRMI_BIT_SW_ALERT_MASK_LEN) &&
+         extract8(s->sbrmi_status, SBRMI_BIT_SW_ALERT_STATUS,
+                  SBRMI_BIT_SW_ALERT_STATUS_LEN)) {
+        qemu_irq_raise(s->alert);
+        return;
+    }
+
+    /* hw alert signaling */
+    if (!extract8(s->sbrmi_control, SBRMI_BIT_HW_ALERT_MASK,
+                  SBRMI_BIT_HW_ALERT_MASK_LEN) &&
+         extract8(s->sbrmi_status, SBRMI_BIT_HW_ALERT_STATUS,
+                  SBRMI_BIT_HW_ALERT_STATUS_LEN)) {
+        qemu_irq_raise(s->alert);
+        return;
+    }
+
+    /* mce alert signaling, not supported */
+
+    /* clear alert */
+    qemu_irq_lower(s->alert);
+
+    return;
+}
+
 static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
                                uint32_t num_to_read)
 {
@@ -423,11 +479,14 @@ static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
         *data = s->cfg.sbrmi_rev;
         break;
     case SBRMI_REG_RAS_STATUS:
-        /* TODO(b/347796186): support RAS */
+        /* Currently no APML RAS function supporting required. */
         *data = 0;
         break;
     case SBRMI_REG_STATUS:
         *data = s->sbrmi_status;
+        break;
+    case SBRMI_REG_CONTROL:
+        *data = s->sbrmi_control;
         break;
     case SBRMI_REG_OUTBNDMSG_INST0:
         *data = s->mailbox_command;
@@ -448,7 +507,13 @@ static uint32_t sbrmi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
         *data = s->mailbox_error;
         break;
     case SBRMI_REG_THREADNUMBER:
-        *data = s->cpu.nr_thread;
+        *data = 0;
+        break;
+    case SBRMI_REG_THREADNUMBER_LOW:
+        *data = extract32(s->cpu.nr_cores * s->cpu.nr_thread, 0, 8);
+        break;
+    case SBRMI_REG_THREADNUMBER_HIGH:
+        *data = extract32(s->cpu.nr_cores * s->cpu.nr_thread, 8, 8);
         break;
     case SBRMI_READ_CPU_REG_CMD:
     {
@@ -530,6 +595,9 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
                                         SBRMI_BIT_HW_ALERT_STATUS_LEN, 0);
         }
         break;
+    case SBRMI_REG_CONTROL:
+        s->sbrmi_control = *data;
+        break;
     case SBRMI_REG_INBNDMSG_INST0:
         /* sbrmi mailbox command start */
         s->mailbox_command = *data;
@@ -605,6 +673,9 @@ static int sbrmi_i3c_target_tx(I3CTarget *i3c, const uint8_t *data,
     }
 
     *num_sent = num_to_send;
+
+    sbrmi_i3c_update_alert(s);
+
     return 0;
 }
 
@@ -708,6 +779,7 @@ static void sbrmi_i3c_target_reset(I3CTarget *i3c)
                                  SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE,
                                  SBRMI_BIT_MB_CMPL_SW_ALERT_ENABLE_LEN, 1);
     sbrmi_i3c_target_mailbox_reset(s);
+    qemu_irq_lower(s->alert);
 }
 
 static void sbrmi_i3c_target_realize(DeviceState *dev, Error **errp)
@@ -784,6 +856,9 @@ static void sbrmi_i3c_target_init(Object *obj)
     object_property_add_uint32_ptr(obj, "ucode_rev",
                                     &s->cpu.ucode_rev,
                                     OBJ_PROP_FLAG_READWRITE);
+
+    /* alert */
+    qdev_init_gpio_out_named(DEVICE(obj), &s->alert, "alert_l", 0);
 }
 
 static const Property sbrmi_i3c_props[] = {
@@ -792,7 +867,7 @@ static const Property sbrmi_i3c_props[] = {
                       SBRMI_REV_21),
 };
 
-static void sbrmi_i3c_target_class_init(ObjectClass *klass, void *data)
+static void sbrmi_i3c_target_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     I3CTargetClass *k = I3C_TARGET_CLASS(klass);

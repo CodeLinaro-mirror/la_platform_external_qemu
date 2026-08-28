@@ -2,30 +2,21 @@
  * ASPEED I3C Controller
  *
  * Copyright (C) 2021 ASPEED Technology Inc.
- * Copyright (C) 2022 Google, LLC
+ * Copyright (C) 2025 Google, LLC.
  *
  * This code is licensed under the GPL version 2 or later.  See
  * the COPYING file in the top-level directory.
- *
- * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "qemu/error-report.h"
 #include "hw/i3c/aspeed_i3c.h"
-#include "hw/i3c/dw-i3c.h"
-#include "hw/registerfields.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/registerfields.h"
+#include "hw/core/qdev-properties.h"
 #include "qapi/error.h"
 #include "migration/vmstate.h"
 #include "trace.h"
-#include "hw/i3c/i3c.h"
-#include "hw/irq.h"
-
-#define DISEC_HJ 0x08
-#define DISEC_CR 0x02
-#define DISEC_INT 0x01
 
 /* I3C Controller Registers */
 REG32(I3C1_REG0, 0x10)
@@ -84,17 +75,17 @@ REG32(I3C6_REG1, 0x64)
     FIELD(I3C6_REG1, INST_ID,       16, 4)
 
 static const uint32_t ast2600_i3c_controller_ro[ASPEED_I3C_NR_REGS] = {
-    [R_I3C1_REG0]                   = 0xfc000000,
+    [R_I3C1_REG0]                   = 0xcc000000,
     [R_I3C1_REG1]                   = 0xfff00000,
-    [R_I3C2_REG0]                   = 0xfc000000,
+    [R_I3C2_REG0]                   = 0xcc000000,
     [R_I3C2_REG1]                   = 0xfff00000,
-    [R_I3C3_REG0]                   = 0xfc000000,
+    [R_I3C3_REG0]                   = 0xcc000000,
     [R_I3C3_REG1]                   = 0xfff00000,
-    [R_I3C4_REG0]                   = 0xfc000000,
+    [R_I3C4_REG0]                   = 0xcc000000,
     [R_I3C4_REG1]                   = 0xfff00000,
-    [R_I3C5_REG0]                   = 0xfc000000,
+    [R_I3C5_REG0]                   = 0xcc000000,
     [R_I3C5_REG1]                   = 0xfff00000,
-    [R_I3C6_REG0]                   = 0xfc000000,
+    [R_I3C6_REG0]                   = 0xcc000000,
     [R_I3C6_REG1]                   = 0xfff00000,
 };
 
@@ -188,11 +179,11 @@ static void aspeed_i3c_instance_init(Object *obj)
     }
 }
 
-static void aspeed_i3c_realize(DeviceState *ds, Error **errp)
+static void aspeed_i3c_realize(DeviceState *dev, Error **errp)
 {
     int i;
-    AspeedI3CState *s = ASPEED_I3C(ds);
-    SysBusDevice *sbd = SYS_BUS_DEVICE(ds);
+    AspeedI3CState *s = ASPEED_I3C(dev);
+    SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
 
     memory_region_init(&s->iomem_container, OBJECT(s),
             TYPE_ASPEED_I3C ".container", 0x8000);
@@ -205,13 +196,13 @@ static void aspeed_i3c_realize(DeviceState *ds, Error **errp)
     memory_region_add_subregion(&s->iomem_container, 0x0, &s->iomem);
 
     for (i = 0; i < ASPEED_I3C_NR_DEVICES; ++i) {
-        Object *dev = OBJECT(&s->devices[i]);
+        Object *i3c_dev = OBJECT(&s->devices[i]);
 
-        if (!object_property_set_uint(dev, "device-id", i, errp)) {
+        if (!object_property_set_uint(i3c_dev, "device-id", i, errp)) {
             return;
         }
 
-        if (!sysbus_realize(SYS_BUS_DEVICE(dev), errp)) {
+        if (!sysbus_realize(SYS_BUS_DEVICE(i3c_dev), errp)) {
             return;
         }
 
@@ -236,7 +227,7 @@ static const VMStateDescription vmstate_aspeed_i3c = {
     .name = TYPE_ASPEED_I3C,
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (VMStateField[]) {
+    .fields = (const VMStateField[]) {
         VMSTATE_UINT32_ARRAY(regs, AspeedI3CState, ASPEED_I3C_NR_REGS),
         VMSTATE_STRUCT_ARRAY(devices, AspeedI3CState, ASPEED_I3C_NR_DEVICES, 1,
                              vmstate_dw_i3c, DWI3C),
@@ -244,7 +235,7 @@ static const VMStateDescription vmstate_aspeed_i3c = {
     }
 };
 
-static void aspeed_i3c_class_init(ObjectClass *klass, void *data)
+static void aspeed_i3c_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
@@ -254,17 +245,14 @@ static void aspeed_i3c_class_init(ObjectClass *klass, void *data)
     dc->vmsd = &vmstate_aspeed_i3c;
 }
 
-static const TypeInfo aspeed_i3c_info = {
-    .name = TYPE_ASPEED_I3C,
-    .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_init = aspeed_i3c_instance_init,
-    .instance_size = sizeof(AspeedI3CState),
-    .class_init = aspeed_i3c_class_init,
+static const TypeInfo aspeed_i3c_types[] = {
+    {
+        .name = TYPE_ASPEED_I3C,
+        .parent = TYPE_SYS_BUS_DEVICE,
+        .instance_init = aspeed_i3c_instance_init,
+        .instance_size = sizeof(AspeedI3CState),
+        .class_init = aspeed_i3c_class_init,
+    },
 };
 
-static void aspeed_i3c_register_types(void)
-{
-    type_register_static(&aspeed_i3c_info);
-}
-
-type_init(aspeed_i3c_register_types);
+DEFINE_TYPES(aspeed_i3c_types)

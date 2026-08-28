@@ -4,26 +4,29 @@
  *
  * Copyright (c) 2024 Google LLC
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
- *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #include "qemu/osdep.h"
 #include "qemu/log.h"
+#include "qapi/error.h"
 #include "hw/i3c/i3c.h"
 #include "hw/i3c/sbtsi-i3c.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "hw/sensor/sbtsi.h"
 #include "trace.h"
+
+I3CTarget *create_sbtsi_i3c_target(const char *device_name, uint8_t addr,
+                                   uint64_t pid)
+{
+    I3CTarget *target = i3c_target_new(TYPE_SBTSI_I3C_TARGET, addr,
+                                       /*dcr=*/0, /*bcr=*/0, pid);
+    object_property_set_str(OBJECT(target), "device-name", device_name,
+                               &error_abort);
+    target->address = 0;
+
+    return target;
+}
 
 static uint32_t sbtsi_i3c_target_rx(I3CTarget *i3c, uint8_t *data,
                                uint32_t num_to_read)
@@ -158,7 +161,7 @@ static const Property sbtsi_i3c_props[] = {
     DEFINE_PROP_STRING("device-name", SbtsiI3cTargetState, name),
 };
 
-static void sbtsi_i3c_target_class_init(ObjectClass *klass, void *data)
+static void sbtsi_i3c_target_class_init(ObjectClass *klass, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);

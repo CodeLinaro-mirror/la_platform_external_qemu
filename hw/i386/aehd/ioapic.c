@@ -13,7 +13,7 @@
 #include "qemu/osdep.h"
 #include "monitor/monitor.h"
 #include "hw/i386/pc.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "hw/intc/ioapic_internal.h"
 #include "system/aehd.h"
 #include "system/aehd-interface.h"
@@ -136,7 +136,7 @@ static const Property aehd_ioapic_properties[] = {
     DEFINE_PROP_UINT32("gsi_base", AEHDIOAPICState, aehd_gsi_base, 0),
 };
 
-static void aehd_ioapic_class_init(ObjectClass *klass, void *data)
+static void aehd_ioapic_class_init(ObjectClass *klass, const void *data)
 {
     IOAPICCommonClass *k = IOAPIC_COMMON_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

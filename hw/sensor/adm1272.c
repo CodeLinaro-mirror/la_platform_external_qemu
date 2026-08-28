@@ -9,7 +9,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/i2c/pmbus_device.h"
-#include "hw/irq.h"
+#include "hw/core/irq.h"
 #include "migration/vmstate.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
@@ -361,23 +361,7 @@ static int adm1272_write_data(PMBusDevice *pmdev, const uint8_t *buf,
 {
     ADM1272State *s = ADM1272(pmdev);
 
-    if (len == 0) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: writing empty data\n", __func__);
-        return -1;
-    }
-
-    pmdev->code = buf[0]; /* PMBus command code */
-
-    if (len == 1) {
-        return 0;
-    }
-
-    /* Exclude command code from buffer */
-    buf++;
-    len--;
-
     switch (pmdev->code) {
-
     case ADM1272_RESTART_TIME:
         s->restart_time = pmbus_receive8(pmdev);
         break;
@@ -536,7 +520,7 @@ static void adm1272_init(Object *obj)
 
 }
 
-static void adm1272_class_init(ObjectClass *klass, void *data)
+static void adm1272_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);

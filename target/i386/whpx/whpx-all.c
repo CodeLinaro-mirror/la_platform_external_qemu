@@ -10,18 +10,18 @@
 
 #include "qemu/osdep.h"
 #include "cpu.h"
-#include "exec/address-spaces.h"
-#include "exec/exec-all.h"
-#include "exec/ioport.h"
+#include "system/address-spaces.h"
+#include "system/ioport.h"
 #include "exec/ram_addr.h"
 #ifndef _MSC_VER
 #include "strings.h"
 #endif
 #include <sdkddkver.h>
 
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "hw/i386/apic_internal.h"
 #include "hw/intc/ioapic.h"
+#include "emulate/x86_flags.h"
 #include "migration/blocker.h"
 #include "qapi/error.h"
 #include "qapi/qapi-types-common.h"
@@ -40,8 +40,9 @@
 #include <winhvemulation.h>
 #include <winhvplatform.h>
 
-#include "whpx-accel-ops.h"
-#include "whpx-internal.h"
+#include "accel/accel-ops.h"
+#include "system/whpx-accel-ops.h"
+#include "system/whpx-internal.h"
 
 #define WHPX_CPUID_SIGNATURE 0x40000000
 
@@ -165,13 +166,14 @@ struct AccelCPUState {
     uint64_t tpr;
     uint64_t apic_base;
     bool interruption_pending;
-    bool dirty;
 
     /* Must be the last field as it may have a tail */
     WHV_RUN_VP_EXIT_CONTEXT exit_ctx;
 };
 
-static bool whpx_allowed;
+bool whpx_allowed;
+bool whpx_irqchip_in_kernel;
+static bool whpx_in_loadvm = false;
 static bool whp_dispatch_initialized = false;
 static HMODULE hWinHvPlatform, hWinHvEmulation;
 static uint32_t max_vcpu_index;
@@ -186,6 +188,10 @@ static bool whpx_has_xsave(void) {
 
 static bool whpx_has_xsave_supervisor(void) {
     return whpx_xsave_cap.XsaveSupervisorSupport;
+}
+
+bool whpx_arch_supports_guest_debug(void) {
+    return true;
 }
 
 /*
@@ -266,6 +272,18 @@ static void whpx_set_xcrs_and_xss(CPUState* cpu) {
                                                       &reg_val);
     if (FAILED(hr)) {
         error_report("WHPX: Failed to set register IA32_XSS, hr=%08lx", hr);
+    }
+}
+
+void whpx_vcpu_kick_out_of_hlt(CPUState *cpu) {
+    WHV_REGISTER_NAME name = WHvRegisterInternalActivityState;
+    WHV_REGISTER_VALUE reg;
+    HRESULT hr = whp_dispatch.WHvGetVirtualProcessorRegisters(
+        whpx_global.partition, cpu->cpu_index, &name, 1, &reg);
+    if (SUCCEEDED(hr) && (reg.InternalActivity.StartupSuspend || reg.InternalActivity.HaltSuspend || reg.InternalActivity.IdleSuspend)) {
+        reg.InternalActivity.AsUINT64 = 0;
+        whp_dispatch.WHvSetVirtualProcessorRegisters(
+            whpx_global.partition, cpu->cpu_index, &name, 1, &reg);
     }
 }
 
@@ -600,7 +618,6 @@ static void whpx_get_registers(CPUState* cpu) {
 
     assert(whpx_register_names[idx] == WHvX64RegisterSysenterCs);
     env->sysenter_cs = vcxt.values[idx++].Reg64;
-    ;
     assert(whpx_register_names[idx] == WHvX64RegisterSysenterEip);
     env->sysenter_eip = vcxt.values[idx++].Reg64;
     assert(whpx_register_names[idx] == WHvX64RegisterSysenterEsp);
@@ -631,7 +648,8 @@ static HRESULT CALLBACK whpx_emu_ioport_callback(void* ctx, WHV_EMULATOR_IO_ACCE
 }
 
 static HRESULT CALLBACK whpx_emu_mmio_callback(void* ctx, WHV_EMULATOR_MEMORY_ACCESS_INFO* ma) {
-    cpu_physical_memory_rw(ma->GpaAddress, ma->Data, ma->AccessSize, ma->Direction);
+    MemTxAttrs attrs = {0};
+    address_space_rw(&address_space_memory, ma->GpaAddress, attrs, ma->Data, ma->AccessSize, ma->Direction);
     return S_OK;
 }
 
@@ -674,7 +692,7 @@ static HRESULT CALLBACK whpx_emu_setreg_callback(void* ctx, const WHV_REGISTER_N
      * The emulator just successfully wrote the register state. We clear the
      * dirty state so we avoid the double write on resume of the VP.
      */
-    cpu->accel->dirty = false;
+    cpu->vcpu_dirty = false;
 
     return hr;
 }
@@ -955,7 +973,7 @@ static void whpx_vcpu_process_async_events(CPUState* cpu) {
 
     if ((cpu->interrupt_request & CPU_INTERRUPT_INIT) && !(env->hflags & HF_SMM_MASK)) {
         do_cpu_init(x86_cpu);
-        cpu->accel->dirty = true;
+        cpu->vcpu_dirty = true;
         vcpu->interruptable = true;
     }
 
@@ -964,13 +982,13 @@ static void whpx_vcpu_process_async_events(CPUState* cpu) {
         apic_poll_irq(x86_cpu->apic_state);
     }
 
-    if (((cpu->interrupt_request & CPU_INTERRUPT_HARD) && (env->eflags & IF_MASK)) ||
-        (cpu->interrupt_request & CPU_INTERRUPT_NMI)) {
+    if (((cpu_test_interrupt(cpu, CPU_INTERRUPT_HARD)) && (env->eflags & IF_MASK)) ||
+        cpu_test_interrupt(cpu, CPU_INTERRUPT_NMI)) {
         cpu->halted = false;
     }
 
     if (cpu->interrupt_request & CPU_INTERRUPT_SIPI) {
-        if (!cpu->accel->dirty) {
+        if (!cpu->vcpu_dirty) {
             whpx_get_registers(cpu);
         }
         do_cpu_sipi(x86_cpu);
@@ -978,7 +996,7 @@ static void whpx_vcpu_process_async_events(CPUState* cpu) {
 
     if (cpu->interrupt_request & CPU_INTERRUPT_TPR) {
         cpu->interrupt_request &= ~CPU_INTERRUPT_TPR;
-        if (!cpu->accel->dirty) {
+        if (!cpu->vcpu_dirty) {
             whpx_get_registers(cpu);
         }
         apic_handle_tpr_access_report(x86_cpu->apic_state, env->eip, env->tpr_access_type);
@@ -994,7 +1012,8 @@ static int whpx_vcpu_run(CPUState* cpu) {
     int ret;
 
     whpx_vcpu_process_async_events(cpu);
-    if (cpu->halted) {
+    whpx_in_loadvm = false;
+    if (cpu->halted && !whpx_irqchip_in_kernel()) {
         cpu->exception_index = EXCP_HLT;
         qatomic_set(&cpu->exit_request, false);
         return 0;
@@ -1004,9 +1023,9 @@ static int whpx_vcpu_run(CPUState* cpu) {
     cpu_exec_start(cpu);
 
     do {
-        if (cpu->accel->dirty) {
+        if (cpu->vcpu_dirty) {
             whpx_set_registers(cpu);
-            cpu->accel->dirty = false;
+            cpu->vcpu_dirty = false;
         }
 
         whpx_vcpu_pre_run(cpu);
@@ -1182,21 +1201,26 @@ static int whpx_vcpu_run(CPUState* cpu) {
 
 static void do_whpx_cpu_synchronize_state(CPUState* cpu, run_on_cpu_data arg) {
     whpx_get_registers(cpu);
-    cpu->accel->dirty = true;
+    cpu->vcpu_dirty = true;
 }
 
 static void do_whpx_cpu_synchronize_post_reset(CPUState* cpu, run_on_cpu_data arg) {
     whpx_set_registers(cpu);
-    cpu->accel->dirty = false;
+    cpu->vcpu_dirty = false;
 }
 
 static void do_whpx_cpu_synchronize_post_init(CPUState* cpu, run_on_cpu_data arg) {
     whpx_set_registers(cpu);
-    cpu->accel->dirty = false;
+    if (whpx_in_loadvm) {
+        cpu->halted = false;
+        whpx_vcpu_kick_out_of_hlt(cpu);
+    }
+    cpu->vcpu_dirty = false;
 }
 
 static void do_whpx_cpu_synchronize_pre_loadvm(CPUState* cpu, run_on_cpu_data arg) {
-    cpu->accel->dirty = true;
+    whpx_in_loadvm = true;
+    cpu->vcpu_dirty = true;
 }
 
 /*
@@ -1204,7 +1228,7 @@ static void do_whpx_cpu_synchronize_pre_loadvm(CPUState* cpu, run_on_cpu_data ar
  */
 
 void whpx_cpu_synchronize_state(CPUState* cpu) {
-    if (!cpu->accel->dirty) {
+    if (!cpu->vcpu_dirty) {
         run_on_cpu(cpu, do_whpx_cpu_synchronize_state, RUN_ON_CPU_NULL);
     }
 }
@@ -1292,7 +1316,7 @@ int whpx_init_vcpu(CPUState* cpu) {
     }
 
     vcpu->interruptable = true;
-    vcpu->dirty = true;
+    cpu->vcpu_dirty = true;
     cpu->accel = vcpu;
     max_vcpu_index = MAX(max_vcpu_index, cpu->cpu_index);
     qemu_add_vm_change_state_handler(whpx_cpu_update_state, env);
@@ -1410,7 +1434,7 @@ static void whpx_process_section(MemoryRegionSection* section, int add) {
 
     host_va = (uintptr_t)memory_region_get_ram_ptr(mr) + section->offset_within_region + delta;
 
-    whpx_update_mapping(start_pa, size, (void*)(uintptr_t)host_va, add, memory_region_is_rom(mr),
+    whpx_update_mapping(start_pa, size, (void*)(uintptr_t)host_va, add, memory_region_is_romd(mr),
                         mr->name);
 }
 
@@ -1616,7 +1640,7 @@ static void whpx_set_kernel_irqchip(Object* obj, Visitor* v, const char* name, v
     }
 }
 
-static int whpx_accel_init(MachineState* ms) {
+static int whpx_accel_init(AccelState* as, MachineState* ms) {
     struct whpx_state* whpx;
     int ret;
     HRESULT hr;
@@ -1707,7 +1731,7 @@ static int whpx_accel_init(MachineState* ms) {
     if (whpx->kernel_irqchip_allowed && features.LocalApicEmulation &&
         whp_dispatch.WHvSetVirtualProcessorInterruptControllerState2) {
         WHV_X64_LOCAL_APIC_EMULATION_MODE mode = WHvX64LocalApicEmulationModeXApic;
-        printf("WHPX: setting APIC emulation mode in the hypervisor\n");
+        warn_report("WHPX: setting APIC emulation mode in the hypervisor");
         hr = whp_dispatch.WHvSetPartitionProperty(whpx->partition,
                                                   WHvPartitionPropertyCodeLocalApicEmulationMode,
                                                   &mode, sizeof(mode));
@@ -1719,16 +1743,16 @@ static int whpx_accel_init(MachineState* ms) {
                 goto error;
             }
         } else {
-            whpx->apic_in_platform = true;
+            whpx_irqchip_in_kernel = true;
         }
     }
 
     memset(&prop, 0, sizeof(WHV_PARTITION_PROPERTY));
     prop.ExtendedVmExits.X64MsrExit = 1;
     prop.ExtendedVmExits.X64CpuidExit = 1;
-    if (whpx_apic_in_platform()) {
+    /*if (whpx_apic_in_platform()) {
         prop.ExtendedVmExits.X64ApicInitSipiExitTrap = 1;
-    }
+    }*/
 
     hr = whp_dispatch.WHvSetPartitionProperty(whpx->partition,
                                               WHvPartitionPropertyCodeExtendedVmExits, &prop,
@@ -1798,19 +1822,11 @@ error:
     return ret;
 }
 
-int whpx_enabled(void) {
-    return whpx_allowed;
-}
-
-bool whpx_apic_in_platform(void) {
-    return whpx_global.apic_in_platform;
-}
-
 void whpx_cpu_synchronize_pre_resume(bool step_pending) {
     whpx_global.step_pending = step_pending;
 }
 
-static void whpx_accel_class_init(ObjectClass* oc, void* data) {
+static void whpx_accel_class_init(ObjectClass* oc, const void* data) {
     AccelClass* ac = ACCEL_CLASS(oc);
     ac->name = "WHPX";
     ac->init_machine = whpx_accel_init;
@@ -1861,6 +1877,17 @@ bool init_whp_dispatch() {
     }
     hLib = hWinHvPlatform;
     LIST_WINHVPLATFORM_FUNCTIONS(WHP_LOAD_FIELD)
+
+    WHV_CAPABILITY_FEATURES features = {0};
+    UINT32 written_size = 0;
+    HRESULT hr = whp_dispatch.WHvGetCapability(WHvCapabilityCodeFeatures, &features,
+                                               sizeof(features), &written_size);
+    if (SUCCEEDED(hr) && features.LocalApicEmulation) {
+        warn_report("WHPX: Loading supplemental APIs (APIC emulation supported)");
+        LIST_WINHVPLATFORM_FUNCTIONS_SUPPLEMENTAL(WHP_LOAD_FIELD)
+    } else {
+        warn_report("WHPX: Supplemental APIs NOT loaded (APIC emulation NOT supported)");
+    }
 
     lib_name = "WinHvEmulation.dll";
     HMODULE hWinHvEmulation = LoadLibrary(lib_name);

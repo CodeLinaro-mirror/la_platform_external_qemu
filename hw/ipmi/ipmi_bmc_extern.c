@@ -35,8 +35,8 @@
 #include "chardev/char-fe.h"
 #include "hw/ipmi/ipmi.h"
 #include "hw/ipmi/ipmi_extern.h"
-#include "hw/qdev-properties.h"
-#include "hw/qdev-properties-system.h"
+#include "hw/core/qdev-properties.h"
+#include "hw/core/qdev-properties-system.h"
 #include "migration/vmstate.h"
 #include "qom/object.h"
 
@@ -127,6 +127,16 @@ static void ipmi_bmc_extern_handle_command(IPMICore *b,
     ipmi_extern_handle_command(&ibe->conn, cmd, cmd_len, max_cmd_len, msg_id);
 }
 
+static const VMStateDescription vmstate_ipmi_bmc_extern = {
+    .name = TYPE_IPMI_BMC_EXTERN,
+    .version_id = 2,
+    .minimum_version_id = 2,
+    .fields = (const VMStateField[]) {
+        VMSTATE_BOOL(send_reset, IPMIBmcExtern),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
 static void ipmi_bmc_extern_realize(DeviceState *dev, Error **errp)
 {
     IPMIBmcExtern *ibe = IPMI_BMC_EXTERN(dev);
@@ -158,7 +168,7 @@ static const Property ipmi_bmc_extern_properties[] = {
     DEFINE_PROP_CHR("chardev", IPMIBmcExtern, conn.chr),
 };
 
-static void ipmi_bmc_extern_class_init(ObjectClass *oc, void *data)
+static void ipmi_bmc_extern_class_init(ObjectClass *oc, const void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
     IPMIBmcClass *bk = IPMI_BMC_CLASS(oc);
@@ -169,6 +179,7 @@ static void ipmi_bmc_extern_class_init(ObjectClass *oc, void *data)
     ck->handle_hw_op = ipmi_bmc_handle_hw_op;
     dc->hotpluggable = false;
     dc->realize = ipmi_bmc_extern_realize;
+    dc->vmsd = &vmstate_ipmi_bmc_extern;
     device_class_set_props(dc, ipmi_bmc_extern_properties);
 }
 

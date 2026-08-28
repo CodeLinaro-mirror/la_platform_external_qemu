@@ -3,29 +3,20 @@
  * Nuvoton NPCM7xx PCI Mailbox Module
  *
  * Copyright 2024 Google LLC
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
  */
 
 #include "qemu/osdep.h"
 #include "chardev/char-fe.h"
-#include "hw/irq.h"
-#include "hw/qdev-clock.h"
-#include "hw/qdev-properties-system.h"
+#include "hw/core/irq.h"
+#include "hw/core/qdev-clock.h"
+#include "hw/core/qdev-properties-system.h"
 #include "hw/misc/npcm7xx_pci_mbox.h"
-#include "hw/registerfields.h"
+#include "hw/core/registerfields.h"
 #include "migration/vmstate.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
 #include "qemu/bitops.h"
+#include "qemu/bswap.h"
 #include "qemu/error-report.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
@@ -71,7 +62,12 @@ static void npcm7xx_pci_mbox_send_response(NPCM7xxPCIMBoxState *s, uint8_t code)
 {
     qemu_chr_fe_write(&s->chr, &code, 1);
     if (code == NPCM7XX_PCI_MBOX_OK && s->op == NPCM7XX_PCI_MBOX_OP_READ) {
-        qemu_chr_fe_write(&s->chr, (uint8_t *)(&s->data), s->size);
+        /* Since we cast &s->data to a uint8_t *, we silently assume little
+         * endianness. For big endian machines swap the bytes, so the chardev
+         * data matches the original string.
+         */
+        le64_to_cpus(&s->data);
+        qemu_chr_fe_write_all(&s->chr, (uint8_t *)(&s->data), s->size);
     }
 }
 
@@ -304,7 +300,7 @@ static const Property npcm7xx_pci_mbox_properties[] = {
     DEFINE_PROP_CHR("chardev", NPCM7xxPCIMBoxState, chr),
 };
 
-static void npcm7xx_pci_mbox_class_init(ObjectClass *klass, void *data)
+static void npcm7xx_pci_mbox_class_init(ObjectClass *klass, const void *data)
 {
     ResettableClass *rc = RESETTABLE_CLASS(klass);
     DeviceClass *dc = DEVICE_CLASS(klass);
