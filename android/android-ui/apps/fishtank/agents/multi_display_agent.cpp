@@ -142,7 +142,8 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     auto client = getGlobalControlClient();
                     if (!client) {
                         derror("FishtankAgents (MultiDisplay): getMultiDisplay failed: global control client is null");
-                        if (enable) *enable = false;
+                        if (enable)
+                            *enable = false;
                         return false;
                     }
                     auto context = client->client()->newContext();
@@ -151,25 +152,34 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     auto status = client->service()->getDisplayConfigurations(context.get(), request, &response);
                     if (!status.ok()) {
                         derror("FishtankAgents (MultiDisplay): getDisplayConfigurations failed: %s", status.error_message().c_str());
-                        if (enable) *enable = false;
+                        if (enable)
+                            *enable = false;
                         return false;
                     }
                     for (const auto& display : response.displays()) {
                         if (display.display() == id) {
-                            if (x) *x = 0;
-                            if (y) *y = 0;
-                            if (w) *w = display.width();
-                            if (h) *h = display.height();
-                            if (dpi) *dpi = display.dpi();
-                            if (flag) *flag = display.flags();
-                            if (enable) *enable = true;
+                            if (x)
+                                *x = 0;
+                            if (y)
+                                *y = 0;
+                            if (w)
+                                *w = display.width();
+                            if (h)
+                                *h = display.height();
+                            if (dpi)
+                                *dpi = display.dpi();
+                            if (flag)
+                                *flag = display.flags();
+                            if (enable)
+                                *enable = true;
                             dinfo("FishtankAgents (MultiDisplay): getMultiDisplay found active display: w=%u, h=%u, dpi=%u, flag=%u",
                                   display.width(), display.height(), display.dpi(), display.flags());
                             return true;
                         }
                     }
                     dinfo("FishtankAgents (MultiDisplay): getMultiDisplay display id=%u not found (disabled)", id);
-                    if (enable) *enable = false;
+                    if (enable)
+                        *enable = false;
                     return false;
                 },
         .getNextMultiDisplay =
@@ -207,14 +217,22 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     }
 
                     if (next_disp) {
-                        if (id) *id = next_disp->display();
-                        if (x) *x = 0;
-                        if (y) *y = 0;
-                        if (w) *w = next_disp->width();
-                        if (h) *h = next_disp->height();
-                        if (dpi) *dpi = next_disp->dpi();
-                        if (flag) *flag = next_disp->flags();
-                        if (cb) *cb = 0; // Color buffer not supported via gRPC yet
+                        if (id)
+                            *id = next_disp->display();
+                        if (x)
+                            *x = 0;
+                        if (y)
+                            *y = 0;
+                        if (w)
+                            *w = next_disp->width();
+                        if (h)
+                            *h = next_disp->height();
+                        if (dpi)
+                            *dpi = next_disp->dpi();
+                        if (flag)
+                            *flag = next_disp->flags();
+                        if (cb)
+                            *cb = 0;  // Color buffer not supported via gRPC yet
                         return true;
                     }
                     return false;
@@ -240,8 +258,10 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     auto client = getGlobalControlClient();
                     if (!client) {
                         derror("FishtankAgents (MultiDisplay): getCombinedDisplaySize failed: global control client is null");
-                        if (width) *width = 0;
-                        if (height) *height = 0;
+                        if (width)
+                            *width = 0;
+                        if (height)
+                            *height = 0;
                         return;
                     }
                     auto context = client->client()->newContext();
@@ -250,8 +270,10 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     auto status = client->service()->getDisplayConfigurations(context.get(), request, &response);
                     if (!status.ok()) {
                         derror("FishtankAgents (MultiDisplay): getDisplayConfigurations failed: %s", status.error_message().c_str());
-                        if (width) *width = 0;
-                        if (height) *height = 0;
+                        if (width)
+                            *width = 0;
+                        if (height)
+                            *height = 0;
                         return;
                     }
                     uint32_t total_w = 0;
@@ -260,8 +282,10 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                         total_w += display.width();
                         total_h = std::max(total_h, display.height());
                     }
-                    if (width) *width = total_w;
-                    if (height) *height = total_h;
+                    if (width)
+                        *width = total_w;
+                    if (height)
+                        *height = total_h;
                     dinfo("FishtankAgents (MultiDisplay): getCombinedDisplaySize calculated: w=%u, h=%u", total_w, total_h);
                 },
         .multiDisplayParamValidate =
@@ -280,9 +304,10 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     }
                     return false;
                 },
-        .setGpuMode = [](bool isGuestMode,
-                         uint32_t w,
-                         uint32_t h) { NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.setGpuMode"); },
+        .setGpuMode =
+                [](bool isGuestMode, uint32_t w, uint32_t h) {
+                    NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.setGpuMode");
+                },
         .createDisplay =
                 [](uint32_t* displayId) {
                     // We don't support direct display creation without pose.
@@ -331,16 +356,19 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.getDisplayColorTransform");
                     return -1;
                 },
-        .getDisplayPowerMode =
-                [](uint32_t displayId, uint32_t* mode) -> int {
-                    NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.getDisplayPowerMode");
-                    return -1;
-                },
-        .setDisplayPowerMode =
-                [](uint32_t displayId, uint32_t mode) -> int {
-                    NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.setDisplayPowerMode");
-                    return -1;
-                },
+        .getDisplayPowerMode = [](uint32_t displayId, uint32_t* mode) -> int {
+            NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.getDisplayPowerMode");
+            return -1;
+        },
+        .setDisplayPowerMode = [](uint32_t displayId, uint32_t mode) -> int {
+            NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.setDisplayPowerMode");
+            return -1;
+        },
+        .getDisplayPowerModeEventListener = []() -> void* {
+            NOT_IMPLEMENTED(
+                    "QAndroidMultiDisplayAgent.getDisplayPowerModeEventListener");
+            return nullptr;
+        },
         .getDisplayColorBuffer =
                 [](uint32_t displayId, uint32_t* colorBuffer) {
                     NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.getDisplayColorBuffer");
@@ -363,7 +391,11 @@ const QAndroidMultiDisplayAgent sFishtankQAndroidMultiDisplayAgent = {
                     }
                     return false;
                 },
-        .performRotation = [](int rot) { NOT_IMPLEMENTED("QAndroidMultiDisplayAgent.performRotation"); },
+        .performRotation =
+                [](int rot) {
+                    NOT_IMPLEMENTED(
+                            "QAndroidMultiDisplayAgent.performRotation");
+                },
         .isPixelFold =
                 []() {
                     if (auto md = android::MultiDisplay::getInstance()) {

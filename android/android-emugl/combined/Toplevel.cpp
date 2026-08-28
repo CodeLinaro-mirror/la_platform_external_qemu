@@ -233,6 +233,9 @@ static int32_t sDisplayW = 0;
 static int32_t sDisplayH = 0;
 static int32_t sDisplayDpi = 0;
 
+static android::DisplayPowerModeNotificationSupport
+        sPowerModeNotificationSupport;
+
 static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
         .notifyDisplayChanges = []() { return true; },
         .setMultiDisplay = [](uint32_t id,
@@ -401,9 +404,18 @@ static const QAndroidMultiDisplayAgent sMultiDisplayAgent = {
             if (mode > static_cast<uint32_t>(android::DisplayPowerMode::MAX_VAL)) {
                 return -1;
             }
-            mMultiDisplay[displayId].powerMode =
+            android::DisplayPowerMode newMode =
                     static_cast<android::DisplayPowerMode>(mode);
+            if (mMultiDisplay[displayId].powerMode != newMode) {
+                mMultiDisplay[displayId].powerMode = newMode;
+                sPowerModeNotificationSupport.fire(
+                        android::DisplayPowerModeChangeEvent{displayId,
+                                                             newMode});
+            }
             return 0;
+        },
+        .getDisplayPowerModeEventListener = []() -> void* {
+            return &sPowerModeNotificationSupport;
         },
         .getDisplayColorBuffer = [](uint32_t displayId,
                                     uint32_t* colorBuffer) -> int {
