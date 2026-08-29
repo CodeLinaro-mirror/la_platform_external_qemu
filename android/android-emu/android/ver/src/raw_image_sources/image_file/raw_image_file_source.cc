@@ -9,6 +9,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 #include "raw_image_file_source.h"
+#include "JpegUtils.h"
 
 #include <png.h>
 #include <csetjmp>
@@ -442,108 +443,32 @@ std::optional<ImageData> loadPNGImage(const std::string& filename) {
     return img;
 }
 
-struct JpegErrorManager {
-    struct jpeg_error_mgr pub;  // "public" fields
-    jmp_buf setjmp_buffer;      // for return to caller
-};
-
-static void jpeg_error_exit(j_common_ptr cinfoPtr) {
-    JpegErrorManager* myerr =
-            reinterpret_cast<JpegErrorManager*>(cinfoPtr->err);
-    longjmp(myerr->setjmp_buffer, 1);
-}
-
 std::optional<ImageData> loadJPEGImage(const std::string& filename) {
-    struct jpeg_decompress_struct cinfo;
-    JpegErrorManager jerr;
-
-    // All cpp classes must be declared before the setjmp to ensure thier
-    // deconstructors are called.
     ImageData img;
-    ScopedStdioFile fp(android_fopen(filename.c_str(), "rb"));
-    if (!fp) {
-        derror("Failed to open file %s", filename.c_str());
+    JpegImageInfo info;
+    JpegDecompressOptions options;
+    options.color_space = JCS_RGBA_8888;
+    options.align_row_stride = true;
+    options.save_app1_marker = true;
+
+    if (!JpegUtils::DecompressFromFile(filename, img.data, &info, options)) {
         return std::nullopt;
     }
 
-    cinfo.err = jpeg_std_error(&jerr.pub);
-    jerr.pub.error_exit = jpeg_error_exit;
-
-    std::unique_ptr<jpeg_decompress_struct, decltype(&jpeg_destroy_decompress)>
-            cinfo_guard(&cinfo, &jpeg_destroy_decompress);
-
-    if (setjmp(jerr.setjmp_buffer)) {
-        char buffer[JMSG_LENGTH_MAX];
-        (*cinfo.err->format_message)(
-                reinterpret_cast<jpeg_common_struct*>(&cinfo), buffer);
-        derror("JPEG library error for %s: %s", filename.c_str(), buffer);
-        return std::nullopt;
-    }
-
-    jpeg_create_decompress(&cinfo);
-
-    // Increase libjpeg memory limit to 256 MB to prevent failures when
-    // loading large images.
-    cinfo.mem->max_memory_to_use = 256 * 1024 * 1024;
-
-    jpeg_stdio_src(&cinfo, fp.get());
-    // Request to save APP1 marker (contains EXIF)
-    jpeg_save_markers(&cinfo, JPEG_APP0 + 1, 0xFFFF);
-    (void)jpeg_read_header(&cinfo, TRUE);
-
-    // Parse EXIF orientation early
-    ExifOrientation orientation = ExifOrientation::Normal;
-    jpeg_saved_marker_ptr marker = cinfo.marker_list;
-    while (marker != nullptr) {
-        if (marker->marker == JPEG_APP0 + 1) {
-            auto res = getOrientation(marker->data, marker->data_length);
-            if (res.has_value()) {
-                orientation = res.value();
-                break;
-            }
-        }
-        marker = marker->next;
-    }
-
-    cinfo.out_color_space = JCS_RGBA_8888;  // Force RGBA format.
-    (void)jpeg_start_decompress(&cinfo);
-
-    img.width = cinfo.output_width;
-    img.height = cinfo.output_height;
-    img.num_components = cinfo.output_components;
-
-    if (img.num_components <= 0) {
-        derror("Invalid JPEG num_components: %d", img.num_components);
-        return std::nullopt;
-    }
-
-    auto packed_line_size = safeMultiply(img.width, img.num_components);
-    if (!packed_line_size ||
-        *packed_line_size >
-                static_cast<size_t>(std::numeric_limits<int>::max()) - 3) {
-        derror("JPEG line_size overflows int");
-        return std::nullopt;
-    }
-    size_t stride = alignRowBytes(*packed_line_size);
-    img.line_size = static_cast<int>(stride);
-
-    auto size = safeMultiply(stride, img.height);
-    if (!size) {
-        derror("Overflow in JPEG data allocation size (stride * height)");
-        return std::nullopt;
-    }
-
-    img.data.resize(*size);
-
-    while (cinfo.output_scanline < cinfo.output_height) {
-        // buffer is a pointer to the start of the current row in our vector
-        unsigned char* buffer =
-                &img.data[cinfo.output_scanline * img.line_size];
-        (void)jpeg_read_scanlines(&cinfo, &buffer, 1);
-    }
-
-    (void)jpeg_finish_decompress(&cinfo);
+    img.width = info.width;
+    img.height = info.height;
+    img.num_components = info.num_components;
+    img.line_size = static_cast<int>(info.line_size);
     img.data_ptr = img.data.data();
+
+    ExifOrientation orientation = ExifOrientation::Normal;
+    for (const auto& app1_data : info.app1_markers) {
+        auto res = getOrientation(app1_data.data(), app1_data.size());
+        if (res.has_value()) {
+            orientation = res.value();
+            break;
+        }
+    }
 
     transformImage(img, orientation);
 
