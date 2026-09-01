@@ -305,7 +305,7 @@ public:
         if (_xioctl(fd_.get(), VIDIOC_S_FMT, &fmt) < 0) {
             derror("Camera '%s' does not support pixel format %s with dimensions %dx%d",
                    webcam_info_->friendly_name.c_str(),
-                   FourccToString(pixel_format), res.width, res.height);
+                   FourccToString(format->pixel_format), res.width, res.height);
             StopLocked();
             return -1;
         }
