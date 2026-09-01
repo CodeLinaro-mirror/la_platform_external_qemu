@@ -240,6 +240,9 @@ int __hvf_set_memory(hvf_slot *slot);
 int __hvf_set_memory_with_flags_locked(hvf_slot *slot, hv_memory_flags_t flags);
 
 int hvf_map_safe(void* hva, uint64_t gpa, uint64_t size, uint64_t flags) {
+    if (!hva) {
+        return -EINVAL;
+    }
     // Align size to host page size (0x1000 on x86_64, 0x4000 on Apple Silicon ARM64)
     size = ALIGN(size, qemu_real_host_page_size);
     pthread_rwlock_wrlock(&mem_lock);

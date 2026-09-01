@@ -690,6 +690,9 @@ static int user_backed_flags_to_aehd_flags(int flags)
 static void aehd_user_backed_ram_map(hwaddr gpa, void* hva, hwaddr size,
                                     int flags)
 {
+    if (!hva) {
+        return;
+    }
     AEHDSlot *slot;
     AEHDMemoryListener* kml;
     int err;
