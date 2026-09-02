@@ -70,7 +70,7 @@ private:
     std::unique_ptr<emulation::apacket> mCachedPacket = nullptr;
     std::unique_ptr<emulation::apacket> mloadedCachedPacket = nullptr;
     std::unordered_set<uint32_t> mPendingGuestReplyCommandIds;
-    int mBreakpointRequestId = 0;
+    uint32_t mBreakpointRequestId = 0;
     int mBreakpointEventId = 0;
     int64_t mLastSendMs = 0;
 };
