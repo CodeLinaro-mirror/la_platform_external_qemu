@@ -83,6 +83,9 @@ static QemudPipeMessage* _load_pipe_message(Stream* f, QemudPipeMessage** last) 
         *last = *next = wrk;
         wrk->size = size;
         wrk->offset = stream_get_be32(f);
+        if (wrk->offset > wrk->size) {
+            APANIC("Malformed snapshot (offset > size)");
+        }
         wrk->message = static_cast<uint8_t*>(malloc(wrk->size));
         if (wrk->message == NULL) {
             APANIC("Unable to allocate buffer for pipe's pending message.");

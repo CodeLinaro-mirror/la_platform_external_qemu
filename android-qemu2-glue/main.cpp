@@ -3040,16 +3040,21 @@ extern "C" int main(int argc, char** argv) {
         }
     }
 
-    // TODO(b/333591823): Handle system images without Uwb support
-    if (feature_is_enabled(kFeature_Uwb)) {
-        D("Uwb feature is enabled");
-        args.add2("-chardev", "netsim,id=uwb");
+    bool uwb_explicitly_disabled =
+            !feature_is_enabled(kFeature_Uwb) &&
+            fc::isOverridden(fc::Uwb);
+    if (!uwb_explicitly_disabled) {
         ScopedCPtr<char> uwb_dev(
                 avdInfo_getVendorBuildPropertyString(avd, "ro.vendor.uwb.dev"));
-        if (uwb_dev && std::string_view(uwb_dev.get()) == "/dev/uwb0") {
-            args.add2("-device", "virtserialport,chardev=uwb,name=uwb");
-        } else {
-            args.add2("-device", "virtconsole,chardev=uwb,name=uwb");
+        if (feature_is_enabled(kFeature_Uwb) || uwb_dev) {
+            dprint("Uwb requested by %s",
+                   feature_is_enabled(kFeature_Uwb) ? "user" : "guest");
+            args.add2("-chardev", "netsim,id=uwb");
+            if (uwb_dev && std::string_view(uwb_dev.get()) == "/dev/uwb0") {
+                args.add2("-device", "virtserialport,chardev=uwb,name=uwb");
+            } else {
+                args.add2("-device", "virtconsole,chardev=uwb,name=uwb");
+            }
         }
     }
 

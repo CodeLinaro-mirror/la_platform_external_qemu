@@ -18,6 +18,7 @@
 
 #include "aemu/base/EventNotificationSupport.h"
 #include "android/avd/info.h"
+#include "android/console.h"
 #include "android/emulation/control/BootCompletionHandler.h"
 #include "android/emulation/control/utils/TypeConversion.h"
 #include "android/hw-sensors.h"
@@ -52,6 +53,10 @@ NotificationStream::NotificationStream(VirtualSceneCamera* camera,
     : mCamera(camera), mAgents(agents) {}
 
 std::optional<Notification> NotificationStream::getDisplayNotificationEvent() {
+    if (!mAgents || !mAgents->multi_display ||
+        !mAgents->multi_display->getMultiDisplay) {
+        return std::nullopt;
+    }
     Notification event;
 
     auto eventDetails =
@@ -109,6 +114,9 @@ std::optional<Notification> NotificationStream::getBootedNotificationEvent() {
 }
 
 std::optional<Notification> NotificationStream::getCameraNotificationEvent() {
+    if (!mCamera) {
+        return std::nullopt;
+    }
     Notification event;
     auto eventDetails = event.mutable_cameranotification();
 
@@ -137,7 +145,6 @@ std::optional<Notification> NotificationStream::getPostureNotificationEvent() {
                      "value: %d",
                      currentPosture);
         return std::nullopt;
-        return std::nullopt;
     }
     event.mutable_posture()->set_value(
             static_cast< ::android::emulation::control::Posture_PostureValue>(
@@ -164,6 +171,18 @@ NotificationStream::getMicrophoneStateNotificationEvent(bool allow) {
     return event;
 }
 
+std::optional<Notification>
+NotificationStream::getDisplayPowerModeNotificationEvent(
+        uint32_t displayId,
+        DisplayPowerMode powerMode) {
+    Notification event;
+    auto* powerModeNotification = event.mutable_displaypowermode();
+    powerModeNotification->set_display(displayId);
+    powerModeNotification->set_power_mode(
+            static_cast<DisplayPowerModeNotification_PowerMode>(powerMode));
+    return event;
+}
+
 NotificationStreamWriter* NotificationStream::notificationStream() {
     if (!mRegisteredListeners.test_and_set()) {
         registerListeners();
@@ -173,12 +192,24 @@ NotificationStreamWriter* NotificationStream::notificationStream() {
     stream->eventArrived(getCameraNotificationEvent());
     stream->eventArrived(getPostureNotificationEvent());
     stream->eventArrived(getBootedNotificationEvent());
-    stream->eventArrived(getMicrophoneStateNotificationEvent(
-            mAgents->vm->isRealAudioAllowed()));
+    if (mAgents && mAgents->vm && mAgents->vm->isRealAudioAllowed) {
+        stream->eventArrived(getMicrophoneStateNotificationEvent(
+                mAgents->vm->isRealAudioAllowed()));
+    }
     if (android_is_xr_mode()) {
         stream->eventArrived(getXrOptionsNotificationEvent());
     }
     stream->eventArrived(getDisplayNotificationEvent());
+    if (mAgents && mAgents->multi_display &&
+        mAgents->multi_display->getDisplayPowerMode) {
+        for (uint32_t i = 0; i < MultiDisplay::s_maxNumMultiDisplay; i++) {
+            uint32_t mode = 0;
+            if (mAgents->multi_display->getDisplayPowerMode(i, &mode) == 0) {
+                stream->eventArrived(getDisplayPowerModeNotificationEvent(
+                        i, static_cast<DisplayPowerMode>(mode)));
+            }
+        }
+    }
     return stream;
 }
 
@@ -232,48 +263,80 @@ static void led_forwarder(void* opaque,
 
 void NotificationStream::registerListeners() {
     // Register event listeners.
-    mCamera->registerOnce([&](auto state) {
-        mNotificationListeners.fireEvent(getCameraNotificationEvent());
-    });
+    if (mCamera) {
+        mCamera->registerOnce([&](auto state) {
+            mNotificationListeners.fireEvent(getCameraNotificationEvent());
+        });
+    }
 
     // TODO(jansene): This assumes we close down the event handler system after
     // qemu stops!
-    const static AndroidHwControlFuncs sCallbacks = {
-            .light_brightness = brightness_forwarder};
-    mAgents->hw_control->setCallbacks(&mNotificationListeners, &sCallbacks);
+    if (mAgents) {
+        if (mAgents->hw_control && mAgents->hw_control->setCallbacks) {
+            static const AndroidHwControlFuncs sCallbacks = {
+                    .light_brightness = brightness_forwarder};
+            mAgents->hw_control->setCallbacks(&mNotificationListeners,
+                                              &sCallbacks);
+        }
 
-    // Register Led Indicator event listeners.
-    const static AndroidHwXrLedFuncs sLedCallbacks = {
-        .led_forwarder = led_forwarder
-    };
-    mAgents->hw_xr_led->setCallbacks(&mNotificationListeners, &sLedCallbacks);
+        // Register Led Indicator event listeners.
+        if (mAgents->hw_xr_led && mAgents->hw_xr_led->setCallbacks) {
+            static const AndroidHwXrLedFuncs sLedCallbacks = {
+                    .led_forwarder = led_forwarder};
+            mAgents->hw_xr_led->setCallbacks(&mNotificationListeners,
+                                             &sLedCallbacks);
+        }
 
-    MultiDisplay::getInstance()->registerOnce(
-            [&](const android::DisplayChangeEvent state) {
-                DD("Displaychange event: %d", state.change);
-                mNotificationListeners.fireEvent(getDisplayNotificationEvent());
-            });
-    auto foldableListener =
-            static_cast<base::EventNotificationSupport<FoldablePostures>*>(
-                    android_get_posture_listener());
-    foldableListener->registerOnce([&](auto state) {
-        mNotificationListeners.fireEvent(getPostureNotificationEvent());
-    });
-    BootCompletionHandler::get()->registerOnce([&](auto completed) {
-        mNotificationListeners.fireEvent(getBootedNotificationEvent());
-    });
+        if (mAgents->vm && mAgents->vm->getRealAudioEventListener) {
+            auto microphoneStatePublisher =
+                    static_cast<base::EventNotificationSupport<bool>*>(
+                            mAgents->vm->getRealAudioEventListener());
+            if (microphoneStatePublisher) {
+                microphoneStatePublisher->registerOnce([&](bool allow) {
+                    mNotificationListeners.fireEvent(
+                            getMicrophoneStateNotificationEvent(allow));
+                });
+            }
+        }
 
-    xr_service::registerCallback(handleXrOptionsEvent, this);
+        if (mAgents->multi_display &&
+            mAgents->multi_display->getDisplayPowerModeEventListener) {
+            auto powerModePublisher =
+                    static_cast<base::EventNotificationSupport<
+                            DisplayPowerModeChangeEvent>*>(
+                            mAgents->multi_display
+                                    ->getDisplayPowerModeEventListener());
+            if (powerModePublisher) {
+                powerModePublisher->registerOnce(
+                        [this](const DisplayPowerModeChangeEvent& evt) {
+                            mNotificationListeners.fireEvent(
+                                    getDisplayPowerModeNotificationEvent(
+                                            evt.displayId, evt.powerMode));
+                        });
+            }
+        }
+    }
 
-    auto microphoneStatePublisher =
-            static_cast<base::EventNotificationSupport<bool>*>(
-                    mAgents->vm->getRealAudioEventListener());
-    if (microphoneStatePublisher) {
-        microphoneStatePublisher->registerOnce([&](bool allow) {
-            mNotificationListeners.fireEvent(
-                    getMicrophoneStateNotificationEvent(allow));
+    if (auto md = MultiDisplay::getInstance()) {
+        md->registerOnce([&](const android::DisplayChangeEvent state) {
+            DD("Displaychange event: %d", state.change);
+            mNotificationListeners.fireEvent(getDisplayNotificationEvent());
         });
     }
+    if (auto foldableListener =
+                static_cast<base::EventNotificationSupport<FoldablePostures>*>(
+                        android_get_posture_listener())) {
+        foldableListener->registerOnce([&](auto state) {
+            mNotificationListeners.fireEvent(getPostureNotificationEvent());
+        });
+    }
+    if (auto bootHandler = BootCompletionHandler::get()) {
+        bootHandler->registerOnce([&](auto completed) {
+            mNotificationListeners.fireEvent(getBootedNotificationEvent());
+        });
+    }
+
+    xr_service::registerCallback(handleXrOptionsEvent, this);
 }
 
 void handleXrOptionsEvent(void* user_data,
@@ -294,7 +357,9 @@ void handleXrOptionsEvent(void* user_data,
 
 NotificationStream::~NotificationStream() {
     // Unset the XR lights callback for this instance to prevent Use-After-Free
-    android_hw_xrlights_unset(&mNotificationListeners);
+    if (mAgents && mAgents->hw_xr_led) {
+        android_hw_xrlights_unset(&mNotificationListeners);
+    }
 }
 
 }  // namespace control

@@ -19,6 +19,7 @@
 #include "android/emulation/control/camera/VirtualSceneCamera.h"
 #include "android/emulation/control/utils/EventSupport.h"
 #include "emulator_controller.pb.h"
+#include "host-common/MultiDisplay.h"
 #include "xr_emulator_conn.pb.h"
 
 namespace android {
@@ -85,6 +86,9 @@ private:
     std::optional<Notification> getBootedNotificationEvent();
     std::optional<Notification> getXrOptionsNotificationEvent();
     std::optional<Notification> getMicrophoneStateNotificationEvent(bool allow);
+    std::optional<Notification> getDisplayPowerModeNotificationEvent(
+            uint32_t displayId,
+            DisplayPowerMode powerMode);
     NotificationEventChangeSupport mNotificationListeners; // publisher holding a list of subscribers/listeners
     VirtualSceneCamera* mCamera;
     const AndroidConsoleAgents* mAgents;

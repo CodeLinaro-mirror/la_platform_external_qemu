@@ -759,6 +759,7 @@ int MultiDisplay::setDisplayPowerMode(uint32_t displayId, uint32_t powerMode) {
     }
 
     bool repostNeeded = false;
+    android::DisplayPowerMode newPowerMode;
     {
         AutoLock lock(mLock);
         auto display = mMultiDisplay.find(displayId);
@@ -766,8 +767,7 @@ int MultiDisplay::setDisplayPowerMode(uint32_t displayId, uint32_t powerMode) {
             return -1;
         }
 
-        android::DisplayPowerMode newPowerMode =
-                static_cast<android::DisplayPowerMode>(powerMode);
+        newPowerMode = static_cast<android::DisplayPowerMode>(powerMode);
         if (display->second.powerMode != newPowerMode) {
             display->second.powerMode = newPowerMode;
             repostNeeded = true;
@@ -777,6 +777,8 @@ int MultiDisplay::setDisplayPowerMode(uint32_t displayId, uint32_t powerMode) {
     if (repostNeeded) {
         // Force a repost to update the screen contents
         android_redrawOpenglesWindow();
+        mPowerModeNotificationSupport.fire(
+                DisplayPowerModeChangeEvent{displayId, newPowerMode});
     }
     return 0;
 }
