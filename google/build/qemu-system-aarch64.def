@@ -103,6 +103,7 @@ EXPORTS
     module_load_qom
     module_object_class_by_name
     monitor_init_hmp
+    notifier_remove
     object_apply_compat_props
     object_apply_global_props
     object_child_foreach
@@ -168,6 +169,7 @@ EXPORTS
     qdev_find_recursive
     qdev_realize
     qemu_add_polling_cb
+    qemu_add_vm_change_state_handler
     qemu_add_wait_object
     qemu_bh_cancel
     qemu_bh_delete
@@ -202,6 +204,7 @@ EXPORTS
     qemu_del_net_client
     qemu_del_nic
     qemu_del_polling_cb
+    qemu_del_vm_change_state_handler
     qemu_del_wait_object
     qemu_display_register
     qemu_displaysurface_set_share_handle
@@ -336,6 +339,7 @@ EXPORTS
     runstate_get
     save_snapshot
     set_logger
+    ShutdownCause_lookup
     socket_address_flatten
     socket_local_address
     strstart
