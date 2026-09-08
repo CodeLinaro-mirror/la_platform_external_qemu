@@ -122,6 +122,8 @@ EmulatorContainer::EmulatorContainer(EmulatorQtWindow* window)
             SLOT(slot_showVirtualSceneInfoDialog()));
     connect(this, SIGNAL(hideVirtualSceneInfoDialog()), this,
             SLOT(slot_hideVirtualSceneInfoDialog()));
+    connect(this, SIGNAL(displayPowerModeChanged(uint32_t, int)), this,
+            SLOT(slot_displayPowerModeChanged(uint32_t, int)));
 
     // Detect AI Glasses and add GlassesStatusOverlay
     if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_GLASSES) {
@@ -131,6 +133,35 @@ EmulatorContainer::EmulatorContainer(EmulatorQtWindow* window)
         QString displayDevice = getBootProp("ro.boot.display_device");
         if (displayDevice == "none") {
             mGlassesStatusOverlay->setStatusNoDisplay();
+        } else {
+            auto multiDisplayAgent = getConsoleAgents()->multi_display;
+            if (multiDisplayAgent &&
+                multiDisplayAgent->getDisplayPowerModeEventListener) {
+                auto notifier = static_cast<
+                        android::DisplayPowerModeNotificationSupport*>(
+                        multiDisplayAgent->getDisplayPowerModeEventListener());
+                if (notifier) {
+                    mDisplayPowerModeEventListener = std::make_unique<
+                            android::base::RaiiEventListener<
+                                    android::
+                                            DisplayPowerModeNotificationSupport,
+                                    android::DisplayPowerModeChangeEvent>>(
+                            notifier,
+                            [this](const android::DisplayPowerModeChangeEvent
+                                           evt) {
+                                emit this->displayPowerModeChanged(
+                                        evt.displayId,
+                                        static_cast<int>(evt.powerMode));
+                            });
+                }
+            }
+
+            if (multiDisplayAgent && multiDisplayAgent->getDisplayPowerMode) {
+                uint32_t mode = 0;
+                if (multiDisplayAgent->getDisplayPowerMode(0, &mode) == 0) {
+                    slot_displayPowerModeChanged(0, mode);
+                }
+            }
         }
     }
 }
@@ -654,6 +685,19 @@ void EmulatorContainer::adjustGlassesStatusOverlayGeometry() {
 
     auto scaleFactor = SizeTweaker::scaleFactor(this).x();
     mGlassesStatusOverlay->move(mapToGlobal(QPoint(10 * scaleFactor, 10 * scaleFactor)));
+}
+
+void EmulatorContainer::slot_displayPowerModeChanged(uint32_t displayId,
+                                                     int mode) {
+    if (displayId != 0 || !mGlassesStatusOverlay) {
+        return;
+    }
+    if (mode == static_cast<int>(android::DisplayPowerMode::OFF)) {
+        mGlassesStatusOverlay->setStatusDisplayOff();
+    } else {
+        mGlassesStatusOverlay->setStatusDisplayOn();
+    }
+    adjustGlassesStatusOverlayGeometry();
 }
 
 QString EmulatorContainer::getBootProp(const char* prop) {

@@ -27,6 +27,8 @@ public:
     virtual ~GlassesStatusOverlay() = default;
 
     void setStatusNoDisplay();
+    void setStatusDisplayOff();
+    void setStatusDisplayOn();
     void showOverlay();
     void hideOverlay();
 

@@ -53,7 +53,16 @@ int qemud_serial_load(Stream* f, QemudSerial* s) {
     s->version = static_cast<QemudVersion>(stream_get_be32(f));
 #endif
     qemud_sink_load(f, s->header);
+    if (s->header->size != HEADER_SIZE || s->header->used < 0 ||
+            s->header->used > s->header->size) {
+        return -EIO;
+    }
+
     qemud_sink_load(f, s->payload);
+    if (s->payload->size < 0 || s->payload->size > MAX_SERIAL_PAYLOAD ||
+            s->payload->used < 0 || s->payload->used > s->payload->size) {
+        return -EIO;
+    }
 
     /* s->header and s->payload are only ever connected to s->data0 */
     s->header->buff = s->payload->buff = s->data0;

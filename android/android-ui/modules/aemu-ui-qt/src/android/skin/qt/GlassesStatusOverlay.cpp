@@ -40,6 +40,7 @@ GlassesStatusOverlay::GlassesStatusOverlay(QWidget* parent)
 
     setAttribute(Qt::WA_ShowWithoutActivating);
     setAttribute(Qt::WA_TranslucentBackground, true);
+    setAttribute(Qt::WA_TransparentForMouseEvents, true);
     setFocusPolicy(Qt::NoFocus);
 
     // Create a top-level vertical layout to hold the UI
@@ -81,6 +82,18 @@ void GlassesStatusOverlay::setStatusNoDisplay() {
     adjustSize();
 }
 
+void GlassesStatusOverlay::setStatusDisplayOff() {
+    mShouldDisplay = true;
+    mTextLabel->setText(tr("Display Off"));
+    adjustSize();
+    showOverlay();
+}
+
+void GlassesStatusOverlay::setStatusDisplayOn() {
+    mShouldDisplay = false;
+    hideOverlay();
+}
+
 void GlassesStatusOverlay::showOverlay() {
     if (!mShouldDisplay) return;
     if (!mIsShown) {
@@ -92,9 +105,8 @@ void GlassesStatusOverlay::showOverlay() {
 }
 
 void GlassesStatusOverlay::hideOverlay() {
-    if (!mShouldDisplay) return;
-    // We cannot use Show / Hide as this doesn't work for when the emulator in minimized.
-    // See emulator-container.cpp for more details on this issue.
+    // We cannot use Show / Hide as this doesn't work for when the emulator is
+    // minimized. See emulator-container.cpp for more details on this issue.
     setWindowOpacity(0.0);
     LOG(DEBUG) << "Hide glasses overlay";
 }

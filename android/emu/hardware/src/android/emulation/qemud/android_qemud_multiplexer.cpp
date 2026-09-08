@@ -44,16 +44,10 @@ void qemud_multiplexer_serial_recv(void* opaque,
       __FUNCTION__, msglen, channel);
 }
 
-/* handle a new connection attempt. This returns 0 on
- * success, -1 if the service name is unknown, or -2
- * if the service's maximum number of clients has been
- * reached.
- */
-int qemud_multiplexer_connect(QemudMultiplexer* m,
-                              const char* service_name,
-                              int channel_id) {
-    android::base::AutoLock _lock(m->lock);
 
+static int qemud_multiplexer_connect_locked(QemudMultiplexer* m,
+                                            const char* service_name,
+                                            int channel_id) {
     /* find the corresponding registered service by name */
     QemudService* sv = qemud_service_find(m->services, service_name);
     if (sv == NULL) {
@@ -74,6 +68,18 @@ int qemud_multiplexer_connect(QemudMultiplexer* m,
     }
 
     return 0;
+}
+
+/* handle a new connection attempt. This returns 0 on
+ * success, -1 if the service name is unknown, or -2
+ * if the service's maximum number of clients has been
+ * reached.
+ */
+int qemud_multiplexer_connect(QemudMultiplexer* m,
+                              const char* service_name,
+                              int channel_id) {
+    const android::base::AutoLock lock(m->lock);
+    return qemud_multiplexer_connect_locked(m, service_name, channel_id);
 }
 
 /* disconnect a given client from its channel id */
@@ -135,7 +141,7 @@ void qemud_multiplexer_control_recv(void* opaque,
                                     int msglen,
                                     QemudClient* client) {
     QemudMultiplexer* mult = (QemudMultiplexer*) opaque;
-    android::base::AutoLock(mult->lock);
+    const android::base::AutoLock lock(mult->lock);
     uint8_t* msgend = msg + msglen;
     char tmp[64], * p = tmp, * end = p + sizeof(tmp);
 
@@ -160,7 +166,7 @@ void qemud_multiplexer_control_recv(void* opaque,
             return;
         }
 
-        ret = qemud_multiplexer_connect(mult, service_name, channel);
+        ret = qemud_multiplexer_connect_locked(mult, service_name, channel);
         /* the answer can be one of:
          *    ok:connect:<id>
          *    ko:connect:<id>:<reason-for-failure>
@@ -243,7 +249,7 @@ void qemud_multiplexer_control_recv(void* opaque,
             service_name = const_cast<char*>("hw-control");
         }
 
-        qemud_multiplexer_connect(mult, service_name, channel);
+        qemud_multiplexer_connect_locked(mult, service_name, channel);
         return;
     }
 
@@ -347,8 +353,8 @@ static int qemud_load_services(Stream* f, QemudService* current_services) {
 int qemud_multiplexer_load(QemudMultiplexer* m,
                            Stream* stream,
                            int version) {
+    const android::base::AutoLock lock(m->lock);
     int ret = 0;
-    android::base::AutoLock(m->lock);
 
     ret = qemud_serial_load(stream, m->serial);
     if (!ret) {
@@ -361,7 +367,7 @@ int qemud_multiplexer_load(QemudMultiplexer* m,
 }
 
 void qemud_multiplexer_save(QemudMultiplexer* m, Stream* stream) {
-    android::base::AutoLock(m->lock);
+    const android::base::AutoLock lock(m->lock);
 
     /* save serial state if any */
     qemud_serial_save(stream, m->serial);

@@ -303,9 +303,15 @@ public:
         fmt.fmt.pix.field = V4L2_FIELD_ANY;
 
         if (_xioctl(fd_.get(), VIDIOC_S_FMT, &fmt) < 0) {
-            derror("Camera '%s' does not support pixel format %s with dimensions %dx%d",
-                   webcam_info_->friendly_name.c_str(),
-                   FourccToString(pixel_format), res.width, res.height);
+            if (errno == EBUSY) {
+                derror("Camera '%s' is in use by another application: %s",
+                       webcam_info_->friendly_name.c_str(), strerror(errno));
+            } else {
+                derror("Camera '%s' does not support pixel format %s with dimensions %dx%d: %s",
+                       webcam_info_->friendly_name.c_str(),
+                       FourccToString(format->pixel_format).c_str(), res.width,
+                       res.height, strerror(errno));
+            }
             StopLocked();
             return -1;
         }
