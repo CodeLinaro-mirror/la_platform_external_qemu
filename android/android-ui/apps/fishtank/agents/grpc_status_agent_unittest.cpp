@@ -59,7 +59,18 @@ TEST_F(GrpcHelpControllerTest, GrpcHelpController_FetchesEmulatorStatusFromBacke
 
     EXPECT_EQ(info.emulatorVersion, "37.1.2-16173978");
     EXPECT_EQ(info.androidVersion, "15.0");
-    EXPECT_FALSE(info.feedbackReport.empty());
+    EXPECT_THAT(
+            info.feedbackReport,
+            testing::StartsWith(
+                    "Please Read:\nhttps://developer.android.com/studio/report-bugs.html#emulator-bugs\n\n"));
+    EXPECT_THAT(
+            info.feedbackReport,
+            testing::HasSubstr(
+                    "Emulator Version (Emulator--> Extended Controls--> Emulator Version): 37.1.2-16173978\n"));
+    EXPECT_THAT(info.feedbackReport,
+                testing::HasSubstr("Hypervisor Version: KVM\n"));
+    EXPECT_THAT(info.feedbackReport,
+                testing::HasSubstr("AVD Details: details\n"));
 }
 
 TEST_F(GrpcHelpControllerTest, GrpcHelpController_HandlesMissingGuestConfigGracefully) {
@@ -76,4 +87,58 @@ TEST_F(GrpcHelpControllerTest, GrpcHelpController_HandlesMissingGuestConfigGrace
 
     EXPECT_EQ(info.emulatorVersion, "37.1.2.0 (37.1.2-15513348)");
     EXPECT_TRUE(info.androidVersion.empty());
+    EXPECT_THAT(
+            info.feedbackReport,
+            testing::StartsWith(
+                    "Please Read:\nhttps://developer.android.com/studio/report-bugs.html#emulator-bugs\n\n"));
+    EXPECT_THAT(
+            info.feedbackReport,
+            testing::HasSubstr(
+                    "Emulator Version (Emulator--> Extended Controls--> Emulator Version): 37.1.2.0 (37.1.2-15513348)\n"));
+    EXPECT_THAT(info.feedbackReport,
+                testing::HasSubstr("Hypervisor Version: None\n"));
+}
+
+TEST_F(GrpcHelpControllerTest,
+       GrpcHelpController_FormatsFeedbackReportWithAllBackendFields) {
+    EXPECT_CALL(*mMockStub, getStatus(_, _, _))
+            .WillOnce(Invoke([](grpc::ClientContext* context,
+                                const google::protobuf::Empty& request,
+                                android::emulation::control::EmulatorStatus*
+                                        response) {
+                response->set_version("37.2.4-16031473");
+                auto& guestConfig = *response->mutable_guestconfig();
+                guestConfig["androidVersion"] = "17 (C) - API CANARY";
+                guestConfig["hypervisorVersion"] = "KVM 12.0.0";
+                guestConfig["hostOsName"] = "Debian GNU/Linux rodete";
+                guestConfig["cpuModel"] = "Intel CPU";
+                guestConfig["totalMem"] = "192021";
+                guestConfig["gpu"] = "host";
+                guestConfig["buildFingerprint"] =
+                        "google/generic_system_google/generic:CANARY/...";
+                guestConfig["avdDetails"] = "Name: canary\nCPU/ABI: x86_64\n";
+                return grpc::Status::OK;
+            }));
+
+    GrpcHelpController controller(mControlClient);
+    HelpSystemInfo info = controller.getSystemInfo();
+
+    EXPECT_THAT(
+            info.feedbackReport,
+            testing::HasSubstr(
+                    "Emulator Version (Emulator--> Extended Controls--> Emulator Version): 37.2.4-16031473\nHypervisor Version: KVM 12.0.0\n"));
+    EXPECT_THAT(info.feedbackReport,
+                testing::HasSubstr(
+                        "Host Operating System: Debian GNU/Linux rodete\n"));
+    EXPECT_THAT(info.feedbackReport,
+                testing::HasSubstr("CPU Manufacturer: Intel CPU\n"));
+    EXPECT_THAT(info.feedbackReport, testing::HasSubstr("RAM: 192021 MB\n"));
+    EXPECT_THAT(info.feedbackReport, testing::HasSubstr("GPU: host\n"));
+    EXPECT_THAT(
+            info.feedbackReport,
+            testing::HasSubstr(
+                    "Build Fingerprint: google/generic_system_google/generic:CANARY/...\n"));
+    EXPECT_THAT(
+            info.feedbackReport,
+            testing::HasSubstr("AVD Details: Name: canary\nCPU/ABI: x86_64\n"));
 }
