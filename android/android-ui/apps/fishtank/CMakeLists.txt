@@ -383,7 +383,9 @@ android_add_test(
       agents/record_screen_agent.cpp
       agents/user_event_agent_unittest.cpp
       agents/user_event_agent.cpp
-      agents/test_client_setup.cpp)
+      agents/test_client_setup.cpp
+      agents/grpc_status_agent_unittest.cpp
+      ${ANDROID_QEMU2_TOP_DIR}/android/android-ui/modules/aemu-ext-pages/help/src/android/skin/qt/extended-pages/grpc-help-controller.cpp)
 
 target_link_libraries(
   fishtank_unittests
@@ -400,4 +402,5 @@ target_link_libraries(
           android-emu-test-launcher)
 
 target_include_directories(fishtank_unittests
-                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+                                   ${ANDROID_QEMU2_TOP_DIR}/android/android-ui/modules/aemu-ext-pages/help/src)
