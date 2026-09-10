@@ -42,6 +42,7 @@ protected:
     void SetUp() override {
         setupTestLibraryPaths();
         const auto& [backend, modeName] = GetParam();
+        SKIP_IF_GLES_UNAVAILABLE(backend);
         System::get()->envSet("VER_RENDERER_BACKEND", backend);
 
         std::vector<std::filesystem::path> resourcePaths;
@@ -225,6 +226,7 @@ protected:
     void SetUp() override {
         setupTestLibraryPaths();
         const std::string& backend = GetParam();
+        SKIP_IF_GLES_UNAVAILABLE(backend);
         System::get()->envSet("VER_RENDERER_BACKEND", backend);
     }
     void TearDown() override {
