@@ -22,6 +22,9 @@
 #include <string>
 #include <vector>
 
+#include "OpenGLESDispatch/EGLDispatch.h"
+#include "OpenGLESDispatch/GLESv2Dispatch.h"
+#include "OpenGLESDispatch/OpenGLDispatchLoader.h"
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/system/System.h"
 #include "android/loadpng.h"
@@ -47,6 +50,87 @@ inline void setupTestLibraryPaths() {
     std::string vulkanDir = PathUtils::join(lib64dir, "vulkan");
     System::get()->addLibrarySearchDir(vulkanDir);
 }
+
+inline GLint queryGlesMaxTextureSize() {
+    using namespace gfxstream::host::gl;
+    const EGLDispatch* egl = LazyLoadedEGLDispatch::get();
+    const GLESv2Dispatch* gles2 = LazyLoadedGLESv2Dispatch::get();
+    if (!egl || !gles2) {
+        return 0;
+    }
+
+#ifndef __APPLE__
+    if (egl->eglUseOsEglApi) {
+        egl->eglUseOsEglApi(EGL_TRUE, EGL_FALSE);
+    }
+#endif
+
+    EGLDisplay display = egl->eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (display == EGL_NO_DISPLAY) {
+        return 0;
+    }
+
+    EGLint eglMaj = 0;
+    EGLint eglMin = 0;
+    if (egl->eglInitialize(display, &eglMaj, &eglMin) == EGL_FALSE) {
+        return 0;
+    }
+
+    const EGLint attribs[] = {EGL_SURFACE_TYPE,
+                              EGL_PBUFFER_BIT,
+                              EGL_RENDERABLE_TYPE,
+                              EGL_OPENGL_ES2_BIT,
+                              EGL_BLUE_SIZE,
+                              8,
+                              EGL_GREEN_SIZE,
+                              8,
+                              EGL_RED_SIZE,
+                              8,
+                              EGL_DEPTH_SIZE,
+                              24,
+                              EGL_NONE};
+    EGLint numConfig = 0;
+    EGLConfig eglConfig = nullptr;
+    if (egl->eglChooseConfig(display, attribs, &eglConfig, 1, &numConfig) !=
+                EGL_TRUE ||
+        numConfig < 1) {
+        return 0;
+    }
+
+    const EGLint contextAttribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+    EGLContext context = egl->eglCreateContext(display, eglConfig,
+                                               EGL_NO_CONTEXT, contextAttribs);
+    if (context == EGL_NO_CONTEXT) {
+        return 0;
+    }
+
+    const EGLint pbufferAttribs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
+    EGLSurface surface =
+            egl->eglCreatePbufferSurface(display, eglConfig, pbufferAttribs);
+    if (surface == EGL_NO_SURFACE) {
+        egl->eglDestroyContext(display, context);
+        return 0;
+    }
+
+    GLint maxTextureSize = 0;
+    if (egl->eglMakeCurrent(display, surface, surface, context) == EGL_TRUE) {
+        gles2->glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+        egl->eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE,
+                            EGL_NO_CONTEXT);
+    }
+
+    egl->eglDestroySurface(display, surface);
+    egl->eglDestroyContext(display, context);
+    return maxTextureSize;
+}
+
+#define SKIP_IF_GLES_UNAVAILABLE(backend)                                  \
+    do {                                                                   \
+        if ((backend) == "gles" && queryGlesMaxTextureSize() <= 0) {       \
+            GTEST_SKIP() << "Skipping test: GL_MAX_TEXTURE_SIZE is 0 for " \
+                            "GLES backend";                                \
+        }                                                                  \
+    } while (0)
 
 // Threshold for golden image comparison (Sum of Squared Differences per pixel)
 static constexpr double kCompareThreshold = 512.0;
