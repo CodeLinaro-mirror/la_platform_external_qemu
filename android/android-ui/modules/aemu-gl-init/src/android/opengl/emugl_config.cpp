@@ -1125,28 +1125,13 @@ bool emuglConfig_init(EmuglConfig* config,
             switchToSoftwareGles = true;
         }
 #ifdef __APPLE__
-        if (!switchToSoftwareGles) {
-            const int hostGpuMemoryLimitMB = 5 * 1024;  // 5GB
-            int freeRamMB = 0;
-            System::isUnderMemoryPressure(&freeRamMB);
-
-            // TODO(b/479126903): New macOS system update (Tahoe) leaks memory
-            // when host OpenGL driver is used, which is deprecated on macOS for
-            // some time. Check memory usage and decide to use software
-            // rendering for GL emulation if there is possibly a leak that may
-            // have cause system restarts.
-            if (freeRamMB < hostGpuMemoryLimitMB) {
-                dwarning(
-                        "Software GL rendering will be used due to system memory "
-                        "pressure, performance will be affected!"
-                        " (Available Memory: %d MB, Required: %d MB)",
-                        freeRamMB, hostGpuMemoryLimitMB);
-                switchToSoftwareGles = true;
-            } else {
-                dprint("System has sufficient memory available (%d MB) for "
-                       "hardware GL rendering",
-                       freeRamMB);
-            }
+        // On macOS, native host OpenGL is deprecated and only supports
+        // GLES 3.0. Use software rendering (swangle) when 'auto' is requested
+        // for API levels 37+ so GLES 3.1 and compute shaders are supported.
+        if (needsGLES31) {
+            dinfo("API level %d requires GLES 3.1, forcing software rendering for GLES.",
+                  api_level);
+            switchToSoftwareGles = true;
         }
 #endif
 
