@@ -30,6 +30,7 @@ bool androidEmuglConfigInit(EmuglConfig* config,
                             const char* gpuOption,
                             const char* hwGpuModePtr,
                             bool noWindow,
-                            enum WinsysPreferredGlesBackend uiPreferredBackend);
+                            enum WinsysPreferredGlesBackend uiPreferredBackend,
+                            int apiLevel);
 
 ANDROID_END_HEADER
