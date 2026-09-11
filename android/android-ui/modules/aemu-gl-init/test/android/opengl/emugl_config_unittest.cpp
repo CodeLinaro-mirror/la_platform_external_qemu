@@ -426,6 +426,44 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
     }
 }
 
+TEST(EmuglConfig, initWithEmuglConfigInitApiLevel) {
+    TestSystem testSys("foo", System::kProgramBitness, "/");
+    TestTempDir* myDir = testSys.getTempRoot();
+    myDir->makeSubDir(System::get()->getLauncherDirectory().c_str());
+    makeLibSubDir(myDir, "");
+
+    makeSwAngleSubDirAndFiles(myDir);
+    makeSwiftshaderSubDirAndFiles(myDir);
+
+    const bool onDenyList = isHostGpuBlacklisted();
+
+    {
+        // API level < 37 should use AUTO_GLES_RESULT ("host" on macOS)
+        feature_reset();
+        EmuglConfig config;
+        bool initRes = androidEmuglConfigInit(
+                &config, nullptr, "auto", false,
+                WINSYS_GLESBACKEND_PREFERENCE_AUTO, 36);
+        EXPECT_TRUE(initRes);
+        if (!onDenyList) {
+            EXPECT_STREQ(AUTO_GLES_RESULT, config.gles_backend);
+        }
+    }
+
+    {
+        // API level >= 37 should use AUTO_GLES_RESULT_37_PLUS ("swangle" on macOS)
+        feature_reset();
+        EmuglConfig config;
+        bool initRes = androidEmuglConfigInit(
+                &config, nullptr, "auto", false,
+                WINSYS_GLESBACKEND_PREFERENCE_AUTO, 37);
+        EXPECT_TRUE(initRes);
+        if (!onDenyList) {
+            EXPECT_STREQ(AUTO_GLES_RESULT_37_PLUS, config.gles_backend);
+        }
+    }
+}
+
 TEST(EmuglConfig, initNoWindowWithAuto) {
     TestSystem testSys("foo", System::kProgramBitness, "/");
     TestTempDir* myDir = testSys.getTempRoot();
