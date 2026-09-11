@@ -987,7 +987,8 @@ bool emuglConfig_get_vulkan_hardware_gpu_support_info(
 
 bool emuglConfig_init(EmuglConfig* config,
                       const char* gpu_mode_requested,
-                      bool no_window) {
+                      bool no_window,
+                      int api_level) {
     D("%s: gpu_mode_requested: %s, no_window: %d\n", __FUNCTION__,
       gpu_mode_requested, no_window);
 
@@ -1110,6 +1111,8 @@ bool emuglConfig_init(EmuglConfig* config,
         }
     }
 
+    const bool needsGLES31 = (api_level >= 37);
+
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
     if (gles_mode_selected == "auto") {
@@ -1208,6 +1211,19 @@ bool emuglConfig_init(EmuglConfig* config,
             setCurrentRenderer(gpu_mode_out, gpu_mode_out);
             return false;
         }
+    } else {
+        // Forced host GPU mode for GLES, warn if incompatibilities are expected
+#ifdef __APPLE__
+        if (needsGLES31) {
+            // Ref: b/560079433
+            dwarning(
+                    "API level '%d' requires GLES 3.1, please consider using "
+                    "'software' rendering mode or GuestAngle for better "
+                    "compatibility and stability. Hardware rendering for "
+                    "OpenGL is deprecated on macOS.",
+                    api_level);
+        }
+#endif
     }
 
     // GPU mode should not change after this point

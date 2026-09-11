@@ -109,7 +109,7 @@ protected:
             mAutomationController.get());
 
         EmuglConfig config;
-        EXPECT_TRUE(emuglConfig_init(&config, "auto", false));
+        EXPECT_TRUE(emuglConfig_init(&config, "auto", false, 0));
     }
 
     void TearDown() override {

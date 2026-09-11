@@ -690,7 +690,8 @@ private:
         emuglConfig_init(
                 &config,
                 mUseHostGpu ? "host" : "lavapipe", /* gpu option */
-                mUseWindow);
+                mUseWindow,
+                0);
 
         emugl::vkDispatch(false /* not for test only */);
 

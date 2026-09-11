@@ -37,6 +37,7 @@ namespace base {
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swiftshader" // Windows redirects swangle to swiftshader
 #  define AUTO_GLES_RESULT "host"
+#  define AUTO_GLES_RESULT_37_PLUS "host"
 #elif defined(__APPLE__)
 #  define LIB_NAME(x)  "lib" x ".dylib"
 #if defined(__arm64__)
@@ -48,7 +49,8 @@ namespace base {
 #endif
 #  define SWIFTSHADER_RESULT "swangle" // Mac redirects swiftshader to swangle
 #  define SWANGLE_RESULT "swangle"
-#  define AUTO_GLES_RESULT "host" //TODO: depends on memory usage, avoid possible flakes
+#  define AUTO_GLES_RESULT "host"
+#  define AUTO_GLES_RESULT_37_PLUS "swangle"
 #else
 #  define LIB_NAME(x)  "lib" x ".so"
 #  define LAVAPIPE_RESULT "lavapipe"
@@ -56,6 +58,7 @@ namespace base {
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swangle"
 #  define AUTO_GLES_RESULT "host"
+#  define AUTO_GLES_RESULT_37_PLUS "host"
 #endif
 
 static std::string makeLibSubPath(const char* name) {
@@ -250,7 +253,7 @@ TEST(EmuglConfig, init) {
     {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
-                    &config, "host", false));
+                    &config, "host", false, 0));
         EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
         EXPECT_STREQ("host", config.gles_backend);
     }
@@ -260,7 +263,7 @@ TEST(EmuglConfig, init) {
     {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
-                    &config, "host", true));
+                    &config, "host", true, 0));
         EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
         EXPECT_STREQ("host", config.gles_backend);
     }
@@ -293,7 +296,7 @@ TEST(EmuglConfig, initFromUISetting) {
     for (int i = 1; i < WINSYS_GLESBACKEND_PREFERENCE_NUM; i++) {
         EmuglConfig config;
         EXPECT_TRUE(emuglConfig_init(
-                    &config, UiOptionToGpuOption[i], false));
+                    &config, UiOptionToGpuOption[i], false, 0));
 
         emuglConfig_setupEnv(&config);
 
@@ -373,7 +376,7 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
         // with valid values
         EmuglConfig config;
         EXPECT_TRUE(androidEmuglConfigInit(&config, "host", "host", false,
-                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO));
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO, 0));
         EXPECT_STREQ("host", config.gles_backend);
         EXPECT_STREQ(HOST_VULKAN_RESULT, config.vulkan_backend);
     }
@@ -385,7 +388,7 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
         // with '-gpu software' value
         EmuglConfig config;
         EXPECT_TRUE(androidEmuglConfigInit(&config, "software", "auto", false,
-                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO));
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO, 0));
         EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
     }
 
@@ -396,7 +399,7 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
         // with null options
         EmuglConfig config;
         bool initRes = androidEmuglConfigInit(&config, nullptr, nullptr, false,
-                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO);
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO, 0);
         const bool onDenyList = isHostGpuBlacklisted();
         if (onDenyList) {
             EXPECT_TRUE(initRes);
@@ -414,7 +417,7 @@ TEST(EmuglConfig, initWithEmuglConfigInit) {
         // invalid values should fallback to 'auto' and work fine
         EmuglConfig config;
         bool initRes = androidEmuglConfigInit(&config, "invalid", "unknown", false,
-                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO);
+                                           WINSYS_GLESBACKEND_PREFERENCE_AUTO, 0);
         const bool onDenyList = isHostGpuBlacklisted();
         if (onDenyList) {
             EXPECT_TRUE(initRes);
@@ -437,7 +440,7 @@ TEST(EmuglConfig, initNoWindowWithAuto) {
 
     EmuglConfig config;
     EXPECT_TRUE(emuglConfig_init(
-                &config, "auto", true));
+                &config, "auto", true, 0));
     EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
     EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
 }
@@ -453,7 +456,7 @@ TEST(EmuglConfig, initNoWindowWithLavapipe) {
 
     EmuglConfig config;
     EXPECT_TRUE(emuglConfig_init(
-                &config, "lavapipe", true));
+                &config, "lavapipe", true, 0));
     EXPECT_STREQ(LAVAPIPE_RESULT, config.vulkan_backend);
     EXPECT_STREQ(SWANGLE_RESULT, config.gles_backend);
 }
