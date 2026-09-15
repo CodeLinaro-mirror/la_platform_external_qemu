@@ -41,6 +41,9 @@
     // "dependencies": A dictionary of libraries required for the build. These
     // are used to generate pkg-config (.pc) files, which Meson uses to find
     // libraries and their headers.
+    // NOTE: This section is not used normally during hermetic Bazel builds
+    // (which provide prebuilt packages via amc_pkg_config rules), and is only
+    // used when running `amc setup` non-hermetically.
     "dependencies": {
       // Example: This shim renames the package to "rutabaga_gfx_ffi" and
       // specifies a different Bazel target for the library archive.
@@ -100,6 +103,31 @@
         "lib_type": "bazel",
         "bazel_target": "@pcre2//:pcre2",
         "version": "10.42"
+      },
+      "slirp": {
+        "lib_type": "bazel",
+        "bazel_target": "@libslirp//:libslirp",
+        "version": "4.8.0",
+        "shim": {
+          "name": "slirp",
+          "Requires": "glib-2.0"
+        }
+      },
+      "keycodemapdb": {
+        "lib_type": "bazel",
+        "bazel_target": "@keycodemapdb//:keymap-gen",
+        "version": "0.0.1",
+        "shim": {
+          "name": "keycodemapdb",
+          "data_targets": [
+            "@keycodemapdb//:data/keymaps.csv",
+            "@keycodemapdb//:tools/keymap-gen"
+          ],
+          "extra_vars": {
+            "keymaps_csv": "${prefix}/keymaps.csv",
+            "keymap_gen": "${prefix}/keymap-gen"
+          }
+        }
       }
     },
     // "meson_options": A dictionary of Meson feature flags and settings.
