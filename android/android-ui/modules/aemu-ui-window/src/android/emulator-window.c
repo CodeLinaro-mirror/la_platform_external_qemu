@@ -474,8 +474,10 @@ EmulatorWindow* emulator_window_get(void) {
 static void emulator_window_framebuffer_free(void* opaque) {
     QFrameBuffer* fb = opaque;
 
-    qframebuffer_done(fb);
-    free(fb);
+    if (fb) {
+        qframebuffer_done(fb);
+        free(fb);
+    }
 }
 
 static void* emulator_window_framebuffer_create(int width,

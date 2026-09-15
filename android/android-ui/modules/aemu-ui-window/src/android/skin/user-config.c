@@ -84,14 +84,14 @@ const char* get_skin_path() {
 bool emulator_parseUiCommandLineOptions(AndroidOptions* opts,
                                         AvdInfo* avd,
                                         AndroidHwConfig* hw) {
-    s_deviceLcdWidth = hw->hw_lcd_width;
-    s_deviceLcdHeight = hw->hw_lcd_height;
     if (skin_charmap_setup(opts->charmap)) {
         return false;
     }
 
     parse_skin_files(opts->skindir, opts->skin, opts, hw, &s_skinConfig,
                      &s_skinPath);
+    s_deviceLcdWidth = hw->hw_lcd_width;
+    s_deviceLcdHeight = hw->hw_lcd_height;
 
     if (!opts->charmap) {
         /* Try to find a valid charmap name */
@@ -294,6 +294,7 @@ void parse_skin_files(const char* skinDirPath,
     AConfig* root;
     const char* path = NULL;
     AConfig* n;
+    bool is_zero_lcd = false;
 
     root = aconfig_node("", "");
 
@@ -346,6 +347,20 @@ void parse_skin_files(const char* skinDirPath,
                 bpp = atoi(y + 1);
             }
 
+            if (hwConfig->hw_displayless) {
+                width = 0;
+                height = 0;
+                is_zero_lcd = true;
+                if (hwConfig->environment_width <= 0 ||
+                    hwConfig->environment_height <= 0) {
+                    derror("0x0 display requires valid environment dimensions");
+                    exit(1);
+                }
+            }
+
+            int dispWidth = is_zero_lcd ? hwConfig->environment_width : width;
+            int dispHeight = is_zero_lcd ? hwConfig->environment_height : height;
+
             // change initialOrientation to match magic skin
             // b/307180733
 
@@ -353,18 +368,19 @@ void parse_skin_files(const char* skinDirPath,
                 free(hwConfig->hw_initialOrientation);
             }
 
-            if (width > height) {
+            if (dispWidth > dispHeight) {
                 hwConfig->hw_initialOrientation = strdup("landscape");
             } else {
                 hwConfig->hw_initialOrientation = strdup("portrait");
             }
+
             snprintf(tmp, sizeof tmp,
-                     "display {\n  width %d\n  height %d\n bpp %d}\n", width,
-                     height, bpp);
+                     "display {\n  width %d\n  height %d\n bpp %d}\n",
+                     dispWidth, dispHeight, bpp);
             aconfig_load(root, strdup(tmp));
             path = ":";
-            D("found magic skin width=%d height=%d bpp=%d\n", width, height,
-              bpp);
+            D("found magic skin width=%d height=%d bpp=%d\n", dispWidth,
+              dispHeight, bpp);
             goto FOUND_SKIN;
         }
     }
@@ -415,7 +431,7 @@ FOUND_SKIN:
         }
     }
 
-    if (n != NULL) {
+    if (n != NULL && !is_zero_lcd) {
         int width = aconfig_int(n, "width", hwConfig->hw_lcd_width);
         int height = aconfig_int(n, "height", hwConfig->hw_lcd_height);
         int depth = aconfig_int(n, "bpp", hwConfig->hw_lcd_depth);

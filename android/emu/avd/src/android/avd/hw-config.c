@@ -111,6 +111,12 @@ int androidHwConfig_read(AndroidHwConfig* config, CIniFile* ini) {
 
 #include "android/avd/hw-config-defs.h"
 
+    if (config->hw_displayless) {
+        config->hw_lcd_width = 0;
+        config->hw_lcd_height = 0;
+        config->hw_lcd_depth = 32;
+    }
+
     // Special case for the SD-Card, the AVD Manager can incorrectly create
     // a new AVD with 'sdcard.size=<size>' and 'hw.sdCard=no'. It's not sure
     // whether this occurs when updating an AVD settings or not, but it has

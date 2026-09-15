@@ -1815,9 +1815,15 @@ void avdInfo_getSkinInfo(const AvdInfo* i, char** pSkinName, char** pSkinDir) {
              * (parse_skin_files() in main-common-ui.c parses this name
              *  to determine the screen size.)
              */
-            int width = iniFile_getInteger(i->configIni, "hw.lcd.width", 0);
-            int height = iniFile_getInteger(i->configIni, "hw.lcd.height", 0);
-            if (width > 0 && height > 0) {
+            bool displayless =
+                    iniFile_getBoolean(i->configIni, "hw.displayless", "false");
+            int width = displayless ? 0
+                                    : iniFile_getInteger(i->configIni,
+                                                         "hw.lcd.width", 0);
+            int height = displayless ? 0
+                                     : iniFile_getInteger(i->configIni,
+                                                          "hw.lcd.height", 0);
+            if ((width > 0 && height > 0) || displayless) {
                 char skinNameBuf[64];
                 snprintf(skinNameBuf, sizeof skinNameBuf, "%dx%d", width,
                          height);
