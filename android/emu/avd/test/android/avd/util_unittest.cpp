@@ -10,8 +10,10 @@
 // GNU General Public License for more details.
 
 #include "android/avd/util.h"
-#include "android/base/testing/TestSystem.h"
+#include "android/avd/info.h"
+#include "android/avd/avd-info.h"
 #include "android/utils/file_data.h"
+#include "android/utils/system.h"
 #include "aemu/base/ArraySize.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/memory/ScopedPtr.h"
@@ -359,5 +361,27 @@ TEST(AvdInfoTest, build_and_vendor_properties_merged) {
     EXPECT_FALSE(fileData_isEmpty(vendorProps));
 
     avdInfo_free(avd);
+}
+
+TEST(AvdInfoTest, qemu_version_file_with_unicode_path) {
+    TestSystem sys("/home", 64, "/");
+    TestTempDir* tmp = sys.getTempRoot();
+    ASSERT_TRUE(tmp->makeSubDir("avd_t\xC3\xABst_\xC3\xBCnicode"));
+    std::string unicodeAvdDir = pj(tmp->pathString(), "avd_t\xC3\xABst_\xC3\xBCnicode");
+
+    AvdInfo* info = avdInfo_new_for_testing(AVD_OTHER);
+    ASSERT_NE(nullptr, info);
+    info->contentPath = ASTRDUP(unicodeAvdDir.c_str());
+
+    // Initially, no version file exists
+    EXPECT_EQ(0, avdInfo_getLastRunQemuVersion(info));
+
+    // Write version 2 into qemu-version.txt
+    avdInfo_setLastRunQemuVersion(info, 2);
+
+    // Verify it can be read back
+    EXPECT_EQ(2, avdInfo_getLastRunQemuVersion(info));
+
+    avdInfo_free(info);
 }
 
