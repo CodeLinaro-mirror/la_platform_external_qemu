@@ -327,7 +327,7 @@ bool configureRenderer(enum WinsysPreferredGlesBackend uiPreferredBackend,
     if (!androidEmuglConfigInit(
                 &config, opts->gpu, hw->hw_gpu_mode,
                 getConsoleAgents()->settings->host_emulator_is_headless(),
-                uiPreferredBackend)) {
+                uiPreferredBackend, api_level)) {
         derror("%s", config.status);
 
         crashhandler_append_message_format("androidEmuglConfigInit failed.\n");
