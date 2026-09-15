@@ -14,18 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import json
 import logging
 import re
 import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 import oauth2client.client
-from ab.android_build_client import AndroidBuildClient
+from ab.android_build_client import AndroidBuildClient, obtain_token
 from ab.fetch_artifact import unzip_artifact
 from ab.log import configure_logging
 from tqdm import tqdm
+
+
+PRESUBMIT_BUILD_TASKS = {
+    "emulator_linux_x64:git_emu-main-next": "lin_bid",
+    "emulator_windows_x64:git_emu-main-next": "win_bid",
+    "emulator_mac_aarch64:git_emu-main-next": "mac_bid",
+}
 
 
 class CustomFormatter(
@@ -34,7 +43,75 @@ class CustomFormatter(
     pass
 
 
+def parse_cl_and_revision(cl_arg: str) -> tuple[str, str]:
+    """Extracts numeric change ID and revision (defaulting to 'current') from a CL string or URL."""
+    match = re.search(r"(?:[+/]|^)(\d+)(?:/(\d+))?/?$", cl_arg.strip())
+    if match:
+        change_id = match.group(1)
+        revision = match.group(2) or "current"
+        return change_id, revision
+    return cl_arg.strip(), "current"
 
+
+def fetch_presubmit_bids(cl: str, revision: str, token: str) -> dict[str, str]:
+    """Fetches presubmit build IDs (P...) for the given CL from Gerrit's Treetop plugin."""
+    logging.info("Querying Gerrit Treetop for presubmit builds on CL %s (revision %s)...", cl, revision)
+    raw = None
+    for req_attempt in range(2):
+        url = (
+            f"https://googleplex-android-review.googlesource.com/a/changes/{cl}"
+            f"/revisions/{revision}/treetop~presubmittasks?access_token={token}"
+        )
+        req = urllib.request.Request(url)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read().decode("utf-8")
+            break
+        except urllib.error.HTTPError as e:
+            if req_attempt == 0 and e.code in (400, 401, 403):
+                logging.warning("HTTP %d from Gerrit Treetop; refreshing oauth2l token...", e.code)
+                token = obtain_token("gerritcodereview", reset=True)
+                continue
+            raise RuntimeError(
+                f"Failed to query Gerrit Treetop presubmit tasks for CL {cl}: {e}"
+            ) from e
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to query Gerrit Treetop presubmit tasks for CL {cl}: {e}"
+            ) from e
+
+    if raw.startswith(")]}'"):
+        raw = raw[4:]
+    data = json.loads(raw)
+    tasks = data[0] if data and isinstance(data[0], list) else []
+
+    candidates = {}
+    for task in tasks:
+        # check_name is at index 11 in PresubmitTask JSPB
+        check_name = task[11] if len(task) > 11 and isinstance(task[11], str) else None
+        if check_name in PRESUBMIT_BUILD_TASKS:
+            attempt = task[2] if len(task) > 2 and isinstance(task[2], int) else 0
+            status = task[3] if len(task) > 3 and isinstance(task[3], int) else 0
+            # Extract P<digits> build ID from task resources (index 10) or serialized task
+            resources_str = json.dumps(task[10] if len(task) > 10 else task)
+            is_obsolete = (status == 5) or ("Obsolete" in resources_str)
+            match = re.search(r"/builds/(?:build-details/)?(P\d+)", resources_str)
+            if not match:
+                match = re.search(r"\b(P\d+)\b", resources_str)
+            if match:
+                bid = match.group(1)
+                bid_num = int(bid[1:])
+                sort_key = (not is_obsolete, attempt, bid_num)
+                arg_name = PRESUBMIT_BUILD_TASKS[check_name]
+                if arg_name not in candidates or sort_key > candidates[arg_name][0]:
+                    candidates[arg_name] = (sort_key, bid, check_name, attempt)
+
+    found_bids = {}
+    for arg_name, (_, bid, check_name, attempt) in candidates.items():
+        found_bids[arg_name] = bid
+        logging.info("Found build ID %s for %s (attempt %d)", bid, check_name, attempt)
+
+    return found_bids
 
 
 def run(cmd, dry_run: bool, cwd: Path = None):
@@ -272,13 +349,15 @@ def main():
 
 
 
-        Note: Token generation is only supported on glinux. For mac you will manually have to create a token on your glinux machine by running:
+        Note: Token generation is only supported on glinux. For mac you will manually have to create tokens on your glinux machine by running:
 
         ~/go/bin/oauth2l fetch --sso $USER@google.com androidbuild.internal
+        ~/go/bin/oauth2l fetch --sso $USER@google.com gerritcodereview
         """,
         epilog="""Examples:
 
-        fetch-bazel  --cl 306320 --mac-bid P74111280  --win-bid P74150599 --lin-bid P73982148
+        fetch-bazel --cl 41488125
+        fetch-bazel --cl 306320 --mac-bid P74111280 --win-bid P74150599 --lin-bid P73982148
         """,
     )
     parser.add_argument(
@@ -302,25 +381,33 @@ def main():
     parser.add_argument(
         "--token",
         type=str,
-        help="Apiary OAuth2 token. If not set we will try to obtain one",
+        help="Apiary OAuth2 token for Android Build. If not set we will try to obtain one",
+    )
+    parser.add_argument(
+        "--gerrit-token",
+        type=str,
+        help="OAuth2 token for Gerrit. If not set we will try to obtain one",
     )
     parser.add_argument(
         "--win-bid",
         type=str,
-        required=True,
-        help="Windows build from which we will fetch bazel-windows-x86_64-{win-bid}.zip ",
+        required=False,
+        default=None,
+        help="Windows build from which we will fetch bazel-windows-x86_64-{win-bid}.zip (auto-detected from Gerrit if omitted)",
     )
     parser.add_argument(
         "--lin-bid",
         type=str,
-        required=True,
-        help="Linux build from which we will fetch bazel-linux-x86_64-{lin-bid}.zip ",
+        required=False,
+        default=None,
+        help="Linux build from which we will fetch bazel-linux-x86_64-{lin-bid}.zip (auto-detected from Gerrit if omitted)",
     )
     parser.add_argument(
         "--mac-bid",
         type=str,
-        required=True,
-        help="Darwin build from which we will fetch bazel-darwin-arm64-{mac-bid}.zip ",
+        required=False,
+        default=None,
+        help="Darwin build from which we will fetch bazel-darwin-arm64-{mac-bid}.zip (auto-detected from Gerrit if omitted)",
     )
     parser.add_argument(
         "--no-repo", action="store_true", help="Do not use any repo commands"
@@ -356,6 +443,35 @@ def main():
 
     lvl = logging.DEBUG if args.verbose else logging.INFO
     configure_logging(lvl)
+
+    cl, revision = parse_cl_and_revision(args.cl)
+    args.cl = cl
+
+    # Auto-detect missing build IDs from Gerrit Treetop presubmit tasks
+    if not (args.win_bid and args.lin_bid and args.mac_bid):
+        gerrit_token = args.gerrit_token or obtain_token("gerritcodereview")
+        found_bids = fetch_presubmit_bids(args.cl, revision, gerrit_token)
+        if not args.lin_bid:
+            args.lin_bid = found_bids.get("lin_bid")
+        if not args.win_bid:
+            args.win_bid = found_bids.get("win_bid")
+        if not args.mac_bid:
+            args.mac_bid = found_bids.get("mac_bid")
+
+        missing = [
+            task
+            for task, attr in PRESUBMIT_BUILD_TASKS.items()
+            if not getattr(args, attr)
+        ]
+        if missing:
+            raise ValueError(
+                f"Could not automatically find presubmit build IDs for {', '.join(missing)} "
+                f"on CL {args.cl} (revision {revision}). Please specify missing --*-bid flags explicitly."
+            )
+
+    # Ensure we have a valid Android Build OAuth token up front
+    ab_client = AndroidBuildClient(args.token)
+    args.token = ab_client.token
 
     # Make sure we have a destination that works
     destination_dir = Path(args.dest)
