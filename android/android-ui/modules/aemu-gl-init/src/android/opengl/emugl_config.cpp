@@ -1111,7 +1111,8 @@ bool emuglConfig_init(EmuglConfig* config,
         }
     }
 
-    const bool needsGLES31 = (api_level >= 37);
+    // Android CDD requires GLES 3.1 for API 35 and higher
+    const bool needsGLES31 = (api_level >= 35);
 
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
@@ -1130,7 +1131,7 @@ bool emuglConfig_init(EmuglConfig* config,
 #ifdef __APPLE__
         // On macOS, native host OpenGL is deprecated and only supports
         // GLES 3.0. Use software rendering (swangle) when 'auto' is requested
-        // for API levels 37+ so GLES 3.1 and compute shaders are supported.
+        // for API levels 35+ so GLES 3.1 and compute shaders are supported.
         if (needsGLES31) {
             dinfo("API level %d requires GLES 3.1, forcing software rendering for GLES.",
                   api_level);
