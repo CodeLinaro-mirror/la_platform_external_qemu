@@ -129,6 +129,31 @@
         "lib_type": "bazel",
         "bazel_target": "@pcre2//:pcre2",
         "version": "10.42"
+      },
+      "slirp": {
+        "lib_type": "bazel",
+        "bazel_target": "@libslirp//:libslirp",
+        "version": "4.8.0",
+        "shim": {
+          "name": "slirp",
+          "Requires": "glib-2.0"
+        }
+      },
+      "keycodemapdb": {
+        "lib_type": "bazel",
+        "bazel_target": "@keycodemapdb//:keymap-gen",
+        "version": "0.0.1",
+        "shim": {
+          "name": "keycodemapdb",
+          "data_targets": [
+            "@keycodemapdb//:data/keymaps.csv",
+            "@keycodemapdb//:tools/keymap-gen"
+          ],
+          "extra_vars": {
+            "keymaps_csv": "${prefix}/keymaps.csv",
+            "keymap_gen": "${prefix}/keymap-gen"
+          }
+        }
       }
     },
     // "meson_options": A dictionary of Meson feature flags and settings.
