@@ -153,7 +153,7 @@ std::ostream& operator<<(std::ostream& os, const ListenError& value) {
     return os;
 }
 
-class ListenPipeStream : public android::base::Stream {
+class ListenPipeStream : public android::base::StreamWithErrorLogger {
 public:
     ListenPipeStream(android::AsyncMessagePipeHandle pipe,
                      uint32_t asyncId,

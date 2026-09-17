@@ -3874,7 +3874,7 @@ static int do_screenrecord_start(ControlClient client, char* args) {
                 if (info.timeLimit == 0 || info.timeLimit > kMaxTimeLimit) {
                     control_write(
                             client,
-                            "Time limit %ds outside acceptable range [1,%d]\n",
+                            "KO: Time limit %ds outside acceptable range [1,%d]\r\n",
                             info.timeLimit, kMaxTimeLimit);
                     return -1;
                 }
@@ -3884,7 +3884,7 @@ static int do_screenrecord_start(ControlClient client, char* args) {
                 info.fps = atoi(optarg);
                 if (info.fps == 0 || info.fps > kMaxFPS) {
                     control_write(client,
-                                  "FPS %ds outside acceptable range [1,%d]\n",
+                                  "KO: FPS %ds outside acceptable range [1,%d]\r\n",
                                   info.fps, kMaxFPS);
                     return -1;
                 }
@@ -4076,8 +4076,8 @@ static const CommandDefRec screenrecord_commands[] = {
          "    bits or megabits, e.g. '4000000' is equivalent to '4M'. Default "
          "4Mbps.\r\n"
          "  --time-limit TIME\r\n"
-         "    Set the maximum recording time, in seconds. Default/maximum is "
-         "180.\r\n"
+         "    Set the maximum recording time, in seconds. Default is 180, "
+         "maximum is 14400 (4 hours).\r\n"
          "  --fps FPS\r\n"
          "    Set the frames per second for the video recording. Default is 24"
          " fps, maximum is 60 fps.\r\n"

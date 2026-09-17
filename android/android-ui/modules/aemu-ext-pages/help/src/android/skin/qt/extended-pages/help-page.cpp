@@ -10,6 +10,8 @@
 // GNU General Public License for more details.
 
 #include "android/skin/qt/extended-pages/help-page.h"
+#include "android/skin/qt/extended-pages/grpc-help-controller.h"
+#include "android/skin/qt/extended-pages/legacy-help-controller.h"
 
 #include <QtCore/qglobal.h>  // for Q_OS_MAC
 #include <qiodevice.h>       // for QIODevice::ReadOnly
@@ -67,20 +69,30 @@ HelpPage::HelpPage(QWidget* parent)
               android_studio::EmulatorUiEvent::EXTENDED_HELP_TAB)) {
     mUi->setupUi(this);
     disableForEmbeddedEmulator();
-    // Get the version of this code
-    android::update_check::VersionExtractor vEx;
 
-    android::base::Version curVersion = vEx.getCurrentVersion();
-    auto verStr = curVersion.isValid() ? QString(curVersion.toString().c_str())
-                                       : "Unknown";
+    initializeController();
+    HelpSystemInfo sysInfo = mController->getSystemInfo();
+    mFeedbackReport = sysInfo.feedbackReport;
 
+    auto verStr = !sysInfo.emulatorVersion.empty()
+            ? QString::fromStdString(sysInfo.emulatorVersion)
+            : "Unknown";
     mUi->help_versionBox->setPlainText(verStr);
 
-    char versionString[128];
-    avdInfo_getFullApiNameFromAvd(getConsoleAgents()->settings->avdInfo(), versionString, 128);
-    mUi->help_androidVersionBox->setPlainText(versionString);
+    auto androidVerStr = !sysInfo.androidVersion.empty()
+            ? QString::fromStdString(sysInfo.androidVersion)
+            : "Unknown";
+    mUi->help_androidVersionBox->setPlainText(androidVerStr);
+    int port = 0;
+    if (getConsoleAgents() && getConsoleAgents()->settings &&
+        getConsoleAgents()->settings->android_serial_number_port) {
+        port = getConsoleAgents()->settings->android_serial_number_port();
+    }
+    if (port <= 0) {
+        port = android_serial_number_port;
+    }
     mUi->help_adbSerialNumberBox->setPlainText(
-            "emulator-" + QString::number(android_serial_number_port));
+            "emulator-" + QString::number(port));
 
     // launch the latest version loader in a separate thread
     auto latestVersionThread = new QThread();
@@ -192,10 +204,26 @@ void HelpPage::on_help_sendFeedback_clicked() {
     mHelpTracker->increment("FEEDBACK");
     std::string encodedArgs = Uri::FormatEncodeArguments(
             SEND_FEEDBACK_URL,
-            mBugreportInfo.dump() + FEATURE_REQUEST_TEMPLATE);
+            mFeedbackReport + FEATURE_REQUEST_TEMPLATE);
     QUrl url(QString::fromStdString(encodedArgs));
     if (url.isValid())
         QDesktopServices::openUrl(url);
+}
+
+void HelpPage::initializeController() {
+    if (mController) {
+        return;
+    }
+    if (getConsoleAgents()->settings->android_cmdLineOptions()->grpc_ui) {
+        mController = std::make_unique<GrpcHelpController>();
+    } else {
+        mController = std::make_unique<LegacyHelpController>();
+    }
+}
+
+void HelpPage::setControllerForTest(
+        std::unique_ptr<HelpController> controller) {
+    mController = std::move(controller);
 }
 
 void HelpPage::disableForEmbeddedEmulator() {

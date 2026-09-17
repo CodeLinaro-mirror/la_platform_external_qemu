@@ -24,6 +24,7 @@
 #include "android/utils/debug.h"
 #include "android/utils/dirscanner.h"
 #include "android/utils/file_data.h"
+#include "android/utils/file_io.h"
 #include "android/utils/filelock.h"
 #include "android/utils/path.h"
 #include "android/utils/property_file.h"
@@ -2309,7 +2310,7 @@ int avdInfo_getLastRunQemuVersion(const AvdInfo* info) {
 
     int out_value = 0;
 
-    FILE* f = fopen(qemuVersionPath, "r");
+    FILE* f = android_fopen(qemuVersionPath, "r");
     if (f) {
         // Try to parse an integer
         if (fscanf(f, "%d", &out_value) != 1) {
@@ -2333,7 +2334,7 @@ void avdInfo_setLastRunQemuVersion(AvdInfo* info, int version) {
         return;
     }
 
-    FILE* f = fopen(qemuVersionPath, "w");
+    FILE* f = android_fopen(qemuVersionPath, "w");
     if (!f) {
         derror("%s: Could not write file: %s", __func__, qemuVersionPath);
         return;

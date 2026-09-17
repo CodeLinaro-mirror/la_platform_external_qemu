@@ -25,7 +25,7 @@ namespace qemu {
 // A simple wrapper around QEMUFile* that implements the android::base::Stream
 // interface. Note that the instance doesn't own the QEMUFile*, i.e. the
 // destructor will never close it.
-class QemuFileStream : public android::base::Stream {
+class QemuFileStream : public android::base::StreamWithErrorLogger {
 public:
     explicit QemuFileStream(QEMUFile* file);
     virtual ~QemuFileStream();

@@ -17,7 +17,7 @@
 #include <QWidget>                           // for QWidget
 #include <memory>                            // for unique_ptr
 
-#include "android/avd/BugreportInfo.h"       // for BugreportInfo
+#include "android/skin/qt/extended-pages/help-controller.h"
 #include "android/skin/qt/qt-ui-commands.h"  // for QtUICommand
 #include "ui_help-page.h"                    // for HelpPage
 
@@ -43,18 +43,23 @@ public:
     explicit HelpPage(QWidget *parent = 0);
     void initialize(const ShortcutKeyStore<QtUICommand>* key_store);
 
+    // For testing purposes
+    void setControllerForTest(std::unique_ptr<HelpController> controller);
+
 private slots:
     void on_help_docs_clicked();
     void on_help_sendFeedback_clicked();
 
 private:
+    void initializeController();
     void initializeLicenseText();
     void initializeKeyboardShortcutList(const ShortcutKeyStore<QtUICommand>* key_store);
     void disableForEmbeddedEmulator();
 
     std::unique_ptr<Ui::HelpPage> mUi;
     std::shared_ptr<UiEventTracker> mHelpTracker;
-    android::avd::BugreportInfo mBugreportInfo;
+    std::unique_ptr<HelpController> mController;
+    std::string mFeedbackReport;
 };
 
 class LatestVersionLoadTask : public QObject {

@@ -132,7 +132,8 @@ bool androidEmuglConfigInit(
         const char* gpuOption,
         const char* hwGpuModePtr,
         bool noWindow,
-        enum WinsysPreferredGlesBackend uiPreferredBackend) {
+        enum WinsysPreferredGlesBackend uiPreferredBackend,
+        int apiLevel) {
     // Check gpu selection control flags, if any of them is set, other options
     // will be overwritten.
     const std::vector<fc::Feature> gpuControlFeatures = {
@@ -217,5 +218,5 @@ bool androidEmuglConfigInit(
         }
     }
 
-    return emuglConfig_init(config, gpuChoice.c_str(), noWindow);
+    return emuglConfig_init(config, gpuChoice.c_str(), noWindow, apiLevel);
 }

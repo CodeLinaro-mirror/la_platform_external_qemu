@@ -99,6 +99,7 @@ protected:
     void SetUp() override {
         setupTestLibraryPaths();
         const auto& [backend, modelInfo] = GetParam();
+        SKIP_IF_GLES_UNAVAILABLE(backend);
         System::get()->envSet("VER_RENDERER_BACKEND", backend);
 
         std::vector<std::filesystem::path> resourcePaths;

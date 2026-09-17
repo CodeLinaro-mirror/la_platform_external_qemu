@@ -475,7 +475,8 @@ GoldfishOpenglTestEnv::GoldfishOpenglTestEnv() {
 
     emuglConfig_init(
             &config, useHostGpu ? "host" : "lavapipe",/* gpu mode, option */
-            true /* no window */);
+            true /* no window */,
+            0);
 
     emuglConfig_setupEnv(&config);
 

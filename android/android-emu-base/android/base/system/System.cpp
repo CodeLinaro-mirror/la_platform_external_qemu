@@ -2468,7 +2468,7 @@ void HostSystem::atexit_HostSystem() {
 #ifdef _WIN32
 // Return |path| as a Unicode string, while discarding trailing separators.
 Win32UnicodeString win32Path(std::string_view path) {
-    Win32UnicodeString wpath(path.data());
+    Win32UnicodeString wpath(path.data(), path.size());
     // Get rid of trailing directory separators, Windows doesn't like them.
     size_t size = wpath.size();
     while (size > 0U &&

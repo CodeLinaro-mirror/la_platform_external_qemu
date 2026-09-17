@@ -109,7 +109,10 @@ public:
                 dfatal("Snapshot file version is not compatible!");
             }
             android::snapshot::GfxstreamStreamAdapter gfxstreamStream(stream);
-            renderer->load(&gfxstreamStream, Snapshotter::get().loader().textureLoader());
+            if (!renderer->load(&gfxstreamStream, Snapshotter::get().loader().textureLoader())) {
+                // Should not try to continue loading the snapshot
+                dfatal("Failed to load snapshot state for graphics!");
+            }
         }
 
         void postLoad(android::base::Stream* stream) override {

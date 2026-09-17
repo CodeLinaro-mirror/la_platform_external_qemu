@@ -33,6 +33,15 @@ class GfxstreamStreamAdapter : public gfxstream::Stream {
         return mStream->write(buffer, size);
     }
 
+    // Error handling interface.
+    bool hasErrors() const override { return mStream->hasErrors(); }
+    const std::optional<std::string>& getErrors() const override {
+        return mStream->getErrors();
+    }
+    void addErrorV(const char* fmt, va_list args) const override {
+        mStream->addErrorV(fmt, args);
+    }
+
   private:
     android::base::Stream* const mStream = nullptr;
 };

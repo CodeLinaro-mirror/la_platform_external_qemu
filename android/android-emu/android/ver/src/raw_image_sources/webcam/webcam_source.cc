@@ -89,11 +89,15 @@ int WebcamSource::GetPreferredFormatIndex(
      * matter, and any format can be placed anywhere in this array, as long as
      * conversion for it exists.
      */
-    static constexpr std::array<uint32_t, 14> _preferred_formats = {
+    static constexpr std::array<uint32_t, 16> _preferred_formats = {
             /* Native format for the emulated camera: no conversion at all. */
             V4L2_PIX_FMT_YUV420, V4L2_PIX_FMT_YVU420,
             /* Continue with YCbCr: less math than with RGB */
-            V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_NV21, V4L2_PIX_FMT_YUYV,
+            V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_NV21,
+            /* Compressed formats: high performance, full resolution & framerate */
+            V4L2_PIX_FMT_MJPEG, V4L2_PIX_FMT_JPEG,
+            /* Packed YUV */
+            V4L2_PIX_FMT_YUYV,
             V4L2_PIX_FMT_UYVY, V4L2_PIX_FMT_YUY2, V4L2_PIX_FMT_YUNV,
             V4L2_PIX_FMT_V422,
             /* End with RGB. */

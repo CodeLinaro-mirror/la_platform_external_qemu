@@ -71,14 +71,18 @@ JdwpProxy::JdwpProxy(android::base::Stream* stream) {
     mClientState = Uninitialized;
     mShouldClose = stream->getBe32();
     mCurrentHostId = -1;
-    mShouldSendCachePacket = stream->getByte();
-    if (mShouldSendCachePacket) {
-        mloadedCachedPacket.reset(new emulation::apacket);
-        stream->read(&(mloadedCachedPacket->mesg),
-                     sizeof(mloadedCachedPacket->mesg));
-        mloadedCachedPacket->data.resize(mloadedCachedPacket->mesg.data_length);
-        stream->read(mloadedCachedPacket->data.data(),
-                     mloadedCachedPacket->mesg.data_length);
+
+    if (stream->getByte()) {
+        auto cachedPacket = std::make_unique<emulation::apacket>();
+        stream->read(&cachedPacket->mesg, sizeof(cachedPacket->mesg));
+
+        const size_t data_length = cachedPacket->mesg.data_length;
+        if (data_length >= (kJdwpHeaderSize + 10)) {
+            cachedPacket->data.resize(data_length);
+            stream->read(cachedPacket->data.data(), data_length);
+            mloadedCachedPacket = std::move(cachedPacket);
+            mShouldSendCachePacket = true;
+        }
     }
     D("Loading JdwpProxy host id %d guest id %d\n", mHostId, mGuestId);
 }
@@ -263,7 +267,7 @@ void JdwpProxy::onGuestSendData(const android::emulation::amessage* mesg,
                         // Collect the event ID.
                         if (jdwpCmd.id == mBreakpointRequestId) {
                             memcpy(&mBreakpointEventId, data + kJdwpHeaderSize,
-                                   4);
+                                   sizeof(mBreakpointEventId));
                         }
                         DD("recv reply id %d, remaining %d\n", jdwpCmd.id,
                            (int)mPendingGuestReplyCommandIds.size());
@@ -284,8 +288,12 @@ void JdwpProxy::onGuestSendData(const android::emulation::amessage* mesg,
                             // events) 02 (event kind: break point) xxxxxxxx
                             // (request id) ... We need to override the request
                             // id to match those known to JDI
-                            memcpy(packet1.data.data() + kJdwpHeaderSize + 6,
-                                   &mBreakpointEventId, 4);
+                            if (packet1.data.size() >= (kJdwpHeaderSize + 10)) {
+                                memcpy(packet1.data.data() + kJdwpHeaderSize + 10 -
+                                       sizeof(mBreakpointEventId),
+                                       &mBreakpointEventId,
+                                       sizeof(mBreakpointEventId));
+                            }
                             mShouldSendCachePacket = false;
                             mDebuggerActivated = false;
                             mloadedCachedPacket.reset();

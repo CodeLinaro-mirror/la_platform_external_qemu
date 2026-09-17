@@ -23,6 +23,7 @@
 #include <windows.h>
 #endif
 
+#include "android/android.h"
 #include "android/cmdline-definitions.h"
 #include "android/console.h"
 #include "android/crashreport/crash-initializer.h"
@@ -239,6 +240,7 @@ static void setupEnvFromDiscovery(const std::string& discovery_file) {
 
         int serialPort = discoveryFile.getInt("port.serial", -1);
         if (serialPort > 0) {
+            android_serial_number_port = serialPort;
             getConsoleAgents()->settings->set_android_serial_number_port(serialPort);
 
             // TODO(joshuaduong): If the discovery file ever starts exposing the dynamic
@@ -566,6 +568,7 @@ int main(int argc, char* argv[]) {
         str_reset(&opts->fishtank, discovery_file.c_str());
     }
 
+    getConsoleAgents()->settings->inject_cmdLineOptions(opts);
     getConsoleAgents()->settings->inject_AvdInfo(avd);
 
     const UiEmuAgent uiEmuAgent = createUiEmuAgent();

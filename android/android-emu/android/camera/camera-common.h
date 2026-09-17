@@ -104,6 +104,12 @@ ANDROID_BEGIN_HEADER
 #ifndef V4L2_PIX_FMT_ARGB32
 #define V4L2_PIX_FMT_ARGB32 v4l2_fourcc('B', 'A', '2', '4')
 #endif /* V4L2_PIX_FMT_ARGB32 */
+#ifndef V4L2_PIX_FMT_MJPEG
+#define V4L2_PIX_FMT_MJPEG   v4l2_fourcc('M', 'J', 'P', 'G')
+#endif /* V4L2_PIX_FMT_MJPEG */
+#ifndef V4L2_PIX_FMT_JPEG
+#define V4L2_PIX_FMT_JPEG    v4l2_fourcc('J', 'P', 'E', 'G')
+#endif /* V4L2_PIX_FMT_JPEG */
 
 /* Describes framebuffer, used by the client of camera capturing API.
  * This descriptor is used in camera_device_read_frame call.

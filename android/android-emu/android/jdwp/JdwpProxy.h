@@ -71,7 +71,7 @@ private:
     std::unique_ptr<emulation::apacket> mloadedCachedPacket = nullptr;
     std::unordered_set<uint32_t> mPendingGuestReplyCommandIds;
     uint32_t mBreakpointRequestId = 0;
-    int mBreakpointEventId = 0;
+    uint32_t mBreakpointEventId = 0;
     int64_t mLastSendMs = 0;
 };
 }  // namespace jdwp

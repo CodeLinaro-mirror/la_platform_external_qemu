@@ -66,7 +66,11 @@ XrEnvironmentModeDialog::XrEnvironmentModeDialog(QWidget* parent)
         ui->slider_xr_dimming_value->hide();
         this->adjustSize();
     } else {
-        ui->slider_xr_dimming_value->setRange(0, kSliderScale);
+        int min_val = static_cast<int>(
+                std::floor(mDimmingLevels.front() * kSliderScale));
+        int max_val = static_cast<int>(
+                std::ceil(mDimmingLevels.back() * kSliderScale));
+        ui->slider_xr_dimming_value->setRange(min_val, max_val);
         connect(this, &XrEnvironmentModeDialog::_externalXROptionsChanged, this,
                 &XrEnvironmentModeDialog::onExternalXROptionsChanged);
         // Enable the slider once we have received the initial value from the
