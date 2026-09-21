@@ -3031,7 +3031,6 @@ py_binary(
    name = 'keymap-gen',
 )
 py_binary(
-   data = ['platform/darwin-arm64/aarch64-softmmu-config-devices.h', 'platform/darwin-arm64/aarch64-softmmu-config-target.h', 'platform/darwin-arm64/x86_64-softmmu-config-devices.h', 'platform/darwin-arm64/x86_64-softmmu-config-target.h'],
    name = 'make-config-poison',
    srcs = ['scripts/make-config-poison.py'],
 )
@@ -3040,7 +3039,6 @@ py_binary(
    srcs = ['scripts/modules/module_block.py'],
 )
 py_binary(
-   data = ['qapi/accelerator.json', 'qapi/acpi-hest.json', 'qapi/acpi.json', 'qapi/audio.json', 'qapi/authz.json', 'qapi/block-core.json', 'qapi/block-export.json', 'qapi/block.json', 'qapi/char.json', 'qapi/common.json', 'qapi/compat.json', 'qapi/control.json', 'qapi/crypto.json', 'qapi/cryptodev.json', 'qapi/cxl.json', 'qapi/dump.json', 'qapi/ebpf.json', 'qapi/error.json', 'qapi/introspect.json', 'qapi/job.json', 'qapi/machine-common.json', 'qapi/machine-s390x.json', 'qapi/machine.json', 'qapi/migration.json', 'qapi/misc-arm.json', 'qapi/misc-i386.json', 'qapi/misc.json', 'qapi/net.json', 'qapi/pci.json', 'qapi/pragma.json', 'qapi/qdev.json', 'qapi/qom.json', 'qapi/replay.json', 'qapi/rocker.json', 'qapi/run-state.json', 'qapi/sockets.json', 'qapi/stats.json', 'qapi/tpm.json', 'qapi/trace.json', 'qapi/transaction.json', 'qapi/uefi.json', 'qapi/ui.json', 'qapi/vfio.json', 'qapi/virtio.json', 'qapi/yank.json'],
    name = 'qapi-gen',
    srcs = ['scripts/qapi-gen.py', 'scripts/qapi/__init__.py', 'scripts/qapi/backend.py', 'scripts/qapi/commands.py', 'scripts/qapi/common.py', 'scripts/qapi/error.py', 'scripts/qapi/events.py', 'scripts/qapi/expr.py', 'scripts/qapi/features.py', 'scripts/qapi/gen.py', 'scripts/qapi/introspect.py', 'scripts/qapi/main.py', 'scripts/qapi/parser.py', 'scripts/qapi/schema.py', 'scripts/qapi/source.py', 'scripts/qapi/types.py', 'scripts/qapi/visit.py'],
 )
