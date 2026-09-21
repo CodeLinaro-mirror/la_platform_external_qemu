@@ -39,6 +39,7 @@ void disableAppNap_macImpl(void) {
         [
             [NSProcessInfo processInfo]
                 beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
+                        | NSActivityLatencyCritical
                 reason:@"Not sleepy and don't want to nap"
         ]
         retain];
