@@ -24,13 +24,13 @@ This document is intended for developers and testers working with the Android em
 
 2. Run the tool:
 
-          fetch-bazel.sh --cl <change-cl> --win-bid <windows-presubmit> --lin-bid <linux-presubmit> --mac-bid <mac-presubmit>
+          fetch-bazel.sh --cl <change-cl>
 
-     This will create a git commit and send it out for review to gerrit.
+     This will automatically query Gerrit/TreeHugger for the presubmit build IDs (`emulator_linux_x64:git_emu-main-next`, `emulator_windows_x64:git_emu-main-next`, `emulator_mac_aarch64:git_emu-main-next`), download and merge the generated Bazel files, create a git commit, and send it out for review to Gerrit. You can also explicitly override any build ID using `--win-bid`, `--lin-bid`, or `--mac-bid`.
 
 3. Dry run (optional):
 
-          fetch-bazel.sh --cl <change-cl> --win-bid <windows-presubmit> --lin-bid <linux-presubmit> --mac-bid <mac-presubmit> --dry-run
+          fetch-bazel.sh --cl <change-cl> --dry-run
 
      This will execute all the steps, apart from any git (or repo) operations.
 
