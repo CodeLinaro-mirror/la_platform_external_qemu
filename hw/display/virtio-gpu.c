@@ -16,6 +16,7 @@
 #include "qemu/iov.h"
 #include "ui/console.h"
 #include "trace.h"
+#include "sysemu/sysemu.h"
 #include "hw/virtio/virtio.h"
 #ifdef CONFIG_ANDROID
 #include "hw/virtio/virtio-goldfish-pipe.h"
@@ -1355,8 +1356,13 @@ static void virtio_gpu_device_realize(DeviceState *qdev, Error **errp)
     virtio_init(VIRTIO_DEVICE(g), "virtio-gpu", VIRTIO_ID_GPU,
                 g->config_size);
 
-    g->req_state[0].width = g->conf.xres;
-    g->req_state[0].height = g->conf.yres;
+    if (graphic_width == 0 && graphic_height == 0) {
+        g->req_state[0].width = 0;
+        g->req_state[0].height = 0;
+    } else {
+        g->req_state[0].width = g->conf.xres;
+        g->req_state[0].height = g->conf.yres;
+    }
 
     if (virtio_gpu_virgl_enabled(g->conf)) {
         /* use larger control queue in 3d mode */
@@ -1379,7 +1385,11 @@ static void virtio_gpu_device_realize(DeviceState *qdev, Error **errp)
     QTAILQ_INIT(&g->cmdq);
     QTAILQ_INIT(&g->fenceq);
 
-    g->enabled_output_bitmask = 1;
+    if (graphic_width == 0 && graphic_height == 0) {
+        g->enabled_output_bitmask = 0;
+    } else {
+        g->enabled_output_bitmask = 1;
+    }
     g->qdev = qdev;
 
     for (i = 0; i < g->conf.max_outputs; i++) {

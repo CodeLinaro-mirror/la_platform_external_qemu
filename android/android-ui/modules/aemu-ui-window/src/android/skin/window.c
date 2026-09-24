@@ -2022,6 +2022,9 @@ static void skin_window_resize(SkinWindow* window, int resize_container) {
     getConsoleAgents()->surface->skin_surface_create_window(window->surface, window_x, window_y, window_w,
                                window_h);
 
+    skin_window_set_device_pixel_ratio(window);
+    dpr = window->dpr;
+
     // Calculate the framebuffer and window sizes and locations
     ADisplay* disp = window->layout.displays;
     SkinRect drect = disp->rect;
@@ -2800,10 +2803,18 @@ void skin_window_process_event(SkinWindow* window, SkinEvent* ev) {
             skin_window_show_opengles(window, true);
             break;
 
-        case kEventWindowChanged:
+        case kEventWindowChanged: {
             // The window changed (such as a resize or rotation)
-            skin_window_show_opengles(window, false);
+            double old_dpr = window->dpr;
+            skin_window_set_device_pixel_ratio(window);
+            if (window->dpr != old_dpr) {
+                skin_window_resize(window, 1);
+                skin_window_show_opengles(window, true);
+            } else {
+                skin_window_show_opengles(window, false);
+            }
             break;
+        }
 
         default:;
     }
