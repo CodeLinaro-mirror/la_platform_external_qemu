@@ -2005,6 +2005,11 @@ static QString formatEnvironmentName(const QString& fileName) {
             }
         }
     }
+
+    // Show last '360' word in parentheses to indicate it's a 360 image.
+    if (!words.isEmpty() && words.last() == "360") {
+        words.last() = "(360)";
+    }
     return words.join(' ');
 }
 
@@ -2020,20 +2025,22 @@ QMenu* ToolWindow::createEnvironmentMenu() {
 
     if (!list.isEmpty()) {
         for (const QFileInfo& fileInfo : list) {
-            // Reserve files ending in 360 for 360 image mode
-            if (fileInfo.fileName().endsWith("360.jpg")) {
-                continue;
-            }
+            // Use files ending in "360" for 360 image mode.
+            const bool is360 = fileInfo.fileName().endsWith("360.jpg");
             QString displayName =
                     formatEnvironmentName(fileInfo.completeBaseName());
             QString filePath = fileInfo.absoluteFilePath();
             QAction* action = envMenu->addAction(displayName);
-            connect(action, &QAction::triggered, this, [this, filePath]() {
-                std::string command =
-                        "scene.mode = imagefile:" + filePath.toStdString();
-                getConsoleAgents()->virtual_scene->reloadEnvironment(
-                        command.c_str());
-            });
+            connect(action, &QAction::triggered, this,
+                    [this, is360, filePath]() {
+                        std::string sceneModeString =
+                                is360 ? "image360" : "imagefile";
+                        std::string command =
+                                "scene.mode = " + sceneModeString + ":" +
+                                filePath.toStdString();
+                        getConsoleAgents()->virtual_scene->reloadEnvironment(
+                                command.c_str());
+                    });
         }
     } else {
         envMenu->addAction(tr("Default Environment"), this,

@@ -80,40 +80,51 @@ struct VsockUnixSocketTransport : public IVsockNewTransport {
         char buf[16384];
 
         if (events & LOOP_IO_READ) {
-            const int n = socket_recv(fd, buf, sizeof(buf));
+            while (true) {
+                const int n = socket_recv(fd, buf, sizeof(buf));
 
-            if (n > 0) {
-                virtio_vsock_host_to_guest_send(mKey, buf, n);
-            } else if (n == 0) {
-                loopIo_dontWantRead(mIO);
-                loopIo_dontWantWrite(mIO);
-//                virtio_vsock_host_to_guest_close(mKey);  // loopIo_free(mIO) will be called from this thread
-                std::lock_guard<std::mutex> guard(mGuestToHostMutex);
-                mClosed = true;
-                return;
+                if (n > 0) {
+                    constexpr size_t kLargeBuffer = size_t(64) << 20;
+                    const size_t bufSize =
+                            virtio_vsock_host_to_guest_send(mKey, buf, n);
+                    if (bufSize >= kLargeBuffer || bufSize == 0) {
+                        break;
+                    }
+                } else if (n == 0) {
+                    loopIo_dontWantRead(mIO);
+                    loopIo_dontWantWrite(mIO);
+                    // virtio_vsock_host_to_guest_close(mKey);
+                    // loopIo_free(mIO) will be called from this thread
+                    std::lock_guard<std::mutex> guard(mGuestToHostMutex);
+                    mClosed = true;
+                    return;
+                } else {
+                    break;
+                }
             }
         }
 
         if (events & LOOP_IO_WRITE) {
-            size_t size;
-            {
-                std::lock_guard<std::mutex> guard(mGuestToHostMutex);
-                const auto chunk = mGuestToHostBuf.peek();
-                size = std::min(sizeof(buf), chunk.second);
-                memcpy(buf, chunk.first, size);
-            }
-
-            if (size > 0) {
-                const int sent = socket_send(fd, buf, size);
-                if (sent > 0) {
+            while (true) {
+                size_t size;
+                {
                     std::lock_guard<std::mutex> guard(mGuestToHostMutex);
-                    mGuestToHostBuf.consume(sent);
+                    const auto chunk = mGuestToHostBuf.peek();
+                    size = std::min(sizeof(buf), chunk.second);
+                    if (size > 0) {
+                        memcpy(buf, chunk.first, size);
+                    } else {
+                        loopIo_dontWantWrite(mIO);
+                        break;
+                    }
                 }
-            } else {
+
+                const int sent = socket_send(fd, buf, size);
+                if (sent <= 0) {
+                    break;
+                }
                 std::lock_guard<std::mutex> guard(mGuestToHostMutex);
-                if (mGuestToHostBuf.peek().second == 0) {
-                    loopIo_dontWantWrite(mIO);
-                }
+                mGuestToHostBuf.consume(sent);
             }
         }
     }
@@ -217,6 +228,14 @@ struct NewTransportConnector : public IVsockNewTransport {
 std::shared_ptr<IVsockNewTransport> vsock_create_transport_connector(uint64_t key) {
     return std::make_shared<NewTransportConnector>(key);
 }
+
+#ifndef _WIN32
+std::shared_ptr<IVsockNewTransport> vsock_create_unix_transport_from_fd(
+        uint64_t key,
+        int fd) {
+    return std::make_shared<VsockUnixSocketTransport>(key, fd);
+}
+#endif
 
 std::shared_ptr<IVsockNewTransport> vsock_load_transport(android::base::Stream *stream) {
     return nullptr;
