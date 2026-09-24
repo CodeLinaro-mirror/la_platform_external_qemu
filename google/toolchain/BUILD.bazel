@@ -151,6 +151,27 @@ amc_pkg_config(
     version = "1.0.25",
 )
 
+amc_pkg_config(
+    name = "slirp_pc",
+    package_name = "slirp",
+    library = "@libslirp",
+    version = "4.8.0",
+)
+
+amc_pkg_config(
+    name = "keycodemapdb_pc",
+    package_name = "keycodemapdb",
+    data = [
+        "@keycodemapdb//:data/keymaps.csv",
+        "@keycodemapdb//:tools/keymap-gen",
+    ],
+    extra_vars = {
+        "keymaps_csv": "${prefix}/keymaps.csv",
+        "keymap_gen": "${prefix}/keymap-gen",
+    },
+    version = "0.0.1",
+)
+
 amc_toolchain(
     name = "toolchain",
     compat_lib = select({
@@ -173,11 +194,13 @@ amc_generator(
     packages = [
         ":glib_pc",
         ":gmodule_pc",
+        ":keycodemapdb_pc",
         ":libfdt_pc",
         ":pcre2_pc",
         ":pixman_pc",
         ":pixman_simd_pc",
         ":rutabaga_gfx_ffi_pc",
+        ":slirp_pc",
         ":zlib_pc",
     ] + select({
         "@platforms//os:linux": [

@@ -49,8 +49,9 @@ struct AudioCoreaudio {
 
 typedef enum coreaudioVoiceRunningState {
     CA_VOICE_STOPPED = 0,
-    CA_VOICE_STOPPING = 1,
-    CA_VOICE_RUNNING = 2,
+    CA_VOICE_RUNNING = 1,
+    CA_VOICE_STARTING = 2,
+    CA_VOICE_STOPPING = 3,
 } CoreaudioVoiceRunningState;
 
 typedef struct coreaudioVoice {
@@ -236,6 +237,14 @@ COREAUDIO_WRAPPER_FUNC(write, size_t, (HWVoiceOut *hw, void *buf, size_t size),
                        (hw, buf, size))
 #undef COREAUDIO_WRAPPER_FUNC
 
+static void ca_busywait_while_state_changing_locked(CoreaudioVoice *core) {
+    while (core->running_state > CA_VOICE_RUNNING) {
+        ca_voice_unlock(core);
+        usleep(1000);
+        ca_voice_lock(core);
+    }
+}
+
 static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
                                                  const bool enable)
 {
@@ -245,12 +254,7 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
     }
     ASSERT(core->ioprocid);
 
-    while (core->running_state == CA_VOICE_STOPPING) {
-        ca_voice_unlock(core);
-        usleep(1000);
-        ca_voice_lock(core);
-    }
-
+    ca_busywait_while_state_changing_locked(core);
     if (core->running_state ==
             (enable ? CA_VOICE_RUNNING : CA_VOICE_STOPPED)) {
         return true;
@@ -259,10 +263,12 @@ static bool ca_update_voice_running_state_locked(CoreaudioVoice *core,
     OSStatus status;
 
     if (enable) {
+        core->running_state  = CA_VOICE_STARTING;
+        ca_voice_unlock(core);
         status = AudioDeviceStart(core->device_id, core->ioprocid);
-        if (status == kAudioHardwareNoError) {
-            core->running_state = CA_VOICE_RUNNING;
-        }
+        ca_voice_lock(core);
+        core->running_state = (status == kAudioHardwareNoError)
+                ? CA_VOICE_RUNNING : CA_VOICE_STOPPED;
     } else {
         core->running_state = CA_VOICE_STOPPING;
         ca_voice_unlock(core);
@@ -296,6 +302,7 @@ static OSStatus ca_handle_voice_change(
     ca_voice_lock(core);
     bool is_running = false;
     if (core->device_id) {
+        ca_busywait_while_state_changing_locked(core);
         is_running = (core->running_state == CA_VOICE_RUNNING);
         ca_fini_voice_locked(core);
     }
