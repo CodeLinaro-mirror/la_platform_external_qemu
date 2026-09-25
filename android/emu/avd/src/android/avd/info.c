@@ -1021,6 +1021,13 @@ static void _avdInfo_forceGlassesConfig(AvdInfo* i) {
             write = true;
             iniFile_setInteger(i->configIni, "hw.camera.back.orientation", 0);
         }
+        // Handle legacy audio glasses
+        if (!iniFile_hasKey(i->configIni, "hw.displayless") &&
+            !iniFile_hasKey(i->configIni, "hw.lcd.width") &&
+            !iniFile_hasKey(i->configIni, "hw.lcd.height")) {
+            write = true;
+            iniFile_setBoolean(i->configIni, "hw.displayless", 1);
+        }
         if (write) {
             char* iniPath = _avdInfo_getContentFilePath(i, CORE_CONFIG_INI);
             if (iniPath) {
