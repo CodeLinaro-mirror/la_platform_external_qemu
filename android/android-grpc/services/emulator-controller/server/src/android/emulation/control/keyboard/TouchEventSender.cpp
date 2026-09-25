@@ -1,5 +1,7 @@
 #include "android/emulation/control/keyboard/TouchEventSender.h"
 
+#include "android/console.h"
+
 #include <functional>  // for __base
 #include <vector>      // for vector
 

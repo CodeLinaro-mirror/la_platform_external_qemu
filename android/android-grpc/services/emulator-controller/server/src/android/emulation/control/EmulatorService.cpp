@@ -138,13 +138,13 @@ class EmulatorControllerImpl final
 public:
     EmulatorControllerImpl(const AndroidConsoleAgents* agents)
         : mAgents(agents),
-          mKeyEventSender(agents),
-          mAndroidEventSender(agents),
-          mMouseEventSender(agents),
-          mPenEventSender(agents),
-          mTouchEventSender(agents),
-          mTouchpadEventSender(agents),
-          mWheelEventSender(agents),
+          mKeyEventSender(std::make_shared<keyboard::KeyEventSender>(agents)),
+          mAndroidEventSender(std::make_shared<AndroidEventSender>(agents)),
+          mMouseEventSender(std::make_shared<MouseEventSender>(agents)),
+          mPenEventSender(std::make_shared<PenEventSender>(agents)),
+          mTouchEventSender(std::make_shared<TouchEventSender>(agents)),
+          mTouchpadEventSender(std::make_shared<TouchpadEventSender>(agents)),
+          mWheelEventSender(std::make_shared<WheelEventSender>(agents)),
           mCamera(agents->sensors),
           mClipboard(Clipboard::getClipboard(agents->clipboard)),
           mLooper(android::base::ThreadLooper::get()),
@@ -488,21 +488,21 @@ public:
     Status sendKey(ServerContext* context,
                    const KeyboardEvent* request,
                    ::google::protobuf::Empty* reply) override {
-        mKeyEventSender.send(*request);
+        mKeyEventSender->send(*request);
         return Status::OK;
     }
 
     Status sendMouse(ServerContext* context,
                      const MouseEvent* request,
                      ::google::protobuf::Empty* reply) override {
-        mMouseEventSender.send(*request);
+        mMouseEventSender->send(*request);
         return Status::OK;
     }
 
     Status sendTouch(ServerContext* context,
                      const TouchEvent* request,
                      ::google::protobuf::Empty* reply) override {
-        mTouchEventSender.send(*request);
+        mTouchEventSender->send(*request);
         return Status::OK;
     }
 
@@ -510,7 +510,7 @@ public:
             ::grpc::CallbackServerContext* /*context*/,
             ::google::protobuf::Empty* /*response*/) override {
         return new SimpleServerLambdaReader<WheelEvent>([this](auto request) {
-            mWheelEventSender.send(*request);
+            mWheelEventSender->send(*request);
             return Status::OK;
         });
     }
@@ -524,21 +524,21 @@ public:
                             VERBOSE_INFO(keys, "InputEvent: %s",
                                          request->ShortDebugString());
                             if (request->has_key_event()) {
-                                mKeyEventSender.send(request->key_event());
+                                mKeyEventSender->send(request->key_event());
                             } else if (request->has_mouse_event()) {
-                                mMouseEventSender.send(request->mouse_event());
+                                mMouseEventSender->send(request->mouse_event());
                             } else if (request->has_touch_event()) {
-                                mTouchEventSender.send(request->touch_event());
+                                mTouchEventSender->send(request->touch_event());
                             } else if (request->has_touchpad_event()) {
-                                mTouchpadEventSender.send(
+                                mTouchpadEventSender->send(
                                         request->touchpad_event());
                             } else if (request->has_android_event()) {
-                                mAndroidEventSender.send(
+                                mAndroidEventSender->send(
                                         request->android_event());
                             } else if (request->has_pen_event()) {
-                                mPenEventSender.send(request->pen_event());
+                                mPenEventSender->send(request->pen_event());
                             } else if (request->has_wheel_event()) {
-                                mWheelEventSender.send(request->wheel_event());
+                                mWheelEventSender->send(request->wheel_event());
                             } else if (request->has_xr_command()) {
                                 const XrCommand command = request->xr_command();
                                 switch (command.action()) {
@@ -1666,13 +1666,13 @@ public:
 
 private:
     const AndroidConsoleAgents* mAgents;
-    keyboard::KeyEventSender mKeyEventSender;
-    MouseEventSender mMouseEventSender;
-    PenEventSender mPenEventSender;
-    TouchEventSender mTouchEventSender;
-    TouchpadEventSender mTouchpadEventSender;
-    AndroidEventSender mAndroidEventSender;
-    WheelEventSender mWheelEventSender;
+    std::shared_ptr<keyboard::KeyEventSender> mKeyEventSender;
+    std::shared_ptr<MouseEventSender> mMouseEventSender;
+    std::shared_ptr<PenEventSender> mPenEventSender;
+    std::shared_ptr<TouchEventSender> mTouchEventSender;
+    std::shared_ptr<TouchpadEventSender> mTouchpadEventSender;
+    std::shared_ptr<AndroidEventSender> mAndroidEventSender;
+    std::shared_ptr<WheelEventSender> mWheelEventSender;
     SharedMemoryLibrary mSharedMemoryLibrary;
     EventWaiter mNotificationWaiter;
     NotificationStream mNotificationStream;
