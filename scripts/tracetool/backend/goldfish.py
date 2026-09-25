@@ -45,47 +45,47 @@ def generate_c(event, group):
 
     cond = "trace_event_get_state(%s)" % ("TRACE_" + event.name.upper())
     out('    if (%(cond)s) {',
-        '        GoldfishTraceData data;',
+        '        GoldfishTraceData _trace_data;',
         cond=cond)
 
-    out('        data.type = GOLDFISH_TRACE_EVENT_START;',
-        '        data.name = "%(name)s";',
-        '        goldfish_trace_callback(&data);',
+    out('        _trace_data.type = GOLDFISH_TRACE_EVENT_START;',
+        '        _trace_data.name = "%(name)s";',
+        '        goldfish_trace_callback(&_trace_data);',
         name=event.name)
 
     for type_, name in event.args:
-        out('        data.name = "%s";' % name)
+        out('        _trace_data.name = "%s";' % name)
         # Pointers
         if '*' in type_:
             if 'char*' in type_ or 'char *' in type_:
                 # Check for string array (char**)
                 if 'char**' in type_ or 'char **' in type_:
-                     out('        data.type = GOLDFISH_TRACE_ARG_STRING_ARRAY;',
-                         '        data.value.sa = (const char* const*)%s;' % name)
+                     out('        _trace_data.type = GOLDFISH_TRACE_ARG_STRING_ARRAY;',
+                         '        _trace_data.value.sa = (const char* const*)%s;' % name)
                 else:
-                     out('        data.type = GOLDFISH_TRACE_ARG_STRING;',
-                         '        data.value.s = %s ? %s : "NULL";' % (name, name))
+                     out('        _trace_data.type = GOLDFISH_TRACE_ARG_STRING;',
+                         '        _trace_data.value.s = %s ? %s : "NULL";' % (name, name))
             else:
-                out('        data.type = GOLDFISH_TRACE_ARG_POINTER;',
-                    '        data.value.p = %s;' % name)
+                out('        _trace_data.type = GOLDFISH_TRACE_ARG_POINTER;',
+                    '        _trace_data.value.p = %s;' % name)
         # Booleans
         elif 'bool' in type_:
-            out('        data.type = GOLDFISH_TRACE_ARG_BOOL;',
-                '        data.value.b = %s;' % name)
+            out('        _trace_data.type = GOLDFISH_TRACE_ARG_BOOL;',
+                '        _trace_data.value.b = %s;' % name)
         # Unsigned Integers
         elif 'uint' in type_ or 'unsigned' in type_ or 'size_t' in type_:
-            out('        data.type = GOLDFISH_TRACE_ARG_UINT64;',
-                '        data.value.u = (uint64_t)%s;' % name)
+            out('        _trace_data.type = GOLDFISH_TRACE_ARG_UINT64;',
+                '        _trace_data.value.u = (uint64_t)%s;' % name)
         # Signed Integers and others
         else:
-            out('        data.type = GOLDFISH_TRACE_ARG_INT64;',
-                '        data.value.i = (int64_t)%s;' % name)
+            out('        _trace_data.type = GOLDFISH_TRACE_ARG_INT64;',
+                '        _trace_data.value.i = (int64_t)%s;' % name)
 
-        out('        goldfish_trace_callback(&data);')
+        out('        goldfish_trace_callback(&_trace_data);')
 
-    out('        data.type = GOLDFISH_TRACE_EVENT_END;',
-        '        data.name = "%(name)s";',
-        '        goldfish_trace_callback(&data);',
+    out('        _trace_data.type = GOLDFISH_TRACE_EVENT_END;',
+        '        _trace_data.name = "%(name)s";',
+        '        goldfish_trace_callback(&_trace_data);',
         name=event.name)
 
     out('    }')
