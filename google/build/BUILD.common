@@ -249,7 +249,10 @@ cc_library(
 
 cc_library(
     name = "qemu-headers-exported",
-    defines = ["QEMU_HEADERS_EXPORT"],
+    defines = ["QEMU_HEADERS_EXPORT"] + select({
+        ":goldfish_enabled": ["CONFIG_TRACE_GOLDFISH"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [":qemu-headers"],
 )
