@@ -651,6 +651,7 @@ if(NOT LINUX_AARCH64)
       android/base/testing/ProtobufMatchers.cpp
       android/bootconfig_unittest.cpp
       android/camera/CameraFormatConverters_unittest.cpp
+      android/car_unittest.cpp
       android/console_unittest.cpp
       android/emulation/AdbDebugPipe_unittest.cpp
       android/emulation/AdbGuestPipe_unittest.cpp
