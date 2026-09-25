@@ -278,9 +278,13 @@ public:
         }
 
         auto values = request->value();
-        mAgents->sensors->setPhysicalParameterTarget(
-                (int)request->target(), values.data().data(),
-                values.data().size(), interpolation);
+        int target = (int)request->target();
+        android::base::ThreadLooper::runOnMainLooperAndWaitForCompletion(
+                [this, target, &values, interpolation]() {
+                    mAgents->sensors->setPhysicalParameterTarget(
+                            target, values.data().data(), values.data().size(),
+                            interpolation);
+                });
         return Status::OK;
     }
 
@@ -1497,13 +1501,7 @@ public:
             return Status::OK;
         }
 
-        auto modem = mAgents->telephony->getModem();
-        if (!modem) {
-            reply->set_response(PhoneResponse::ActionFailed);
-            return Status::OK;
-        }
-
-        // create a list of SMS PDUs, then send them
+        // create a list of SMS PDUs, then send them on the main looper
         SmsPDU* pdus = smspdu_create_deliver_utf8(
                 (cbytes_t)smsMessage->text().c_str(), smsMessage->text().size(),
                 &sender, NULL);
@@ -1513,9 +1511,17 @@ public:
             return Status::OK;
         }
 
-        for (int nn = 0; pdus[nn] != NULL; nn++) {
-            amodem_receive_sms_vx(modem, pdus[nn]);
-        }
+        android::base::ThreadLooper::runOnMainLooperAndWaitForCompletion(
+                [this, pdus, reply]() {
+                    auto modem = mAgents->telephony->getModem();
+                    if (!modem) {
+                        reply->set_response(PhoneResponse::ActionFailed);
+                        return;
+                    }
+                    for (int nn = 0; pdus[nn] != NULL; nn++) {
+                        amodem_receive_sms_vx(modem, pdus[nn]);
+                    }
+                });
         smspdu_free_list(pdus);
 
         return Status::OK;
@@ -1526,14 +1532,18 @@ public:
                           PhoneResponse* reply) override {
         (void)context;
         PhoneNumber number = *numberPtr;
-        auto modem = mAgents->telephony->getModem();
-        if (!modem) {
-            reply->set_response(PhoneResponse::ActionFailed);
-            return Status::OK;
-        }
-        if (amodem_update_phone_number(modem, number.number().c_str())) {
-            reply->set_response(PhoneResponse::BadNumber);
-        }
+        android::base::ThreadLooper::runOnMainLooperAndWaitForCompletion(
+                [this, &number, reply]() {
+                    auto modem = mAgents->telephony->getModem();
+                    if (!modem) {
+                        reply->set_response(PhoneResponse::ActionFailed);
+                        return;
+                    }
+                    if (amodem_update_phone_number(modem,
+                                                   number.number().c_str())) {
+                        reply->set_response(PhoneResponse::BadNumber);
+                    }
+                });
         return Status::OK;
     }
 
