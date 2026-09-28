@@ -2874,11 +2874,71 @@ void qmp_x_exit_preconfig(Error **errp)
     }
 }
 
-int try_savevm(void)
+/* Delete the -savevm snapshot so that the next launch cold boots. */
+static int try_deletevm(void)
+{
+    Error *err = NULL;
+
+    if (!delete_snapshot(savevm, false, NULL, &err)) {
+        error_reportf_err(err, "Failed to delete stale snapshot '%s': ",
+                          savevm);
+        return -1;
+    }
+
+    return 0;
+}
+
+/*
+ * Allowlist of the exits that save the -savevm snapshot.  The next launch
+ * resumes from that snapshot instead of booting, so save it only when the
+ * host asked QEMU to quit and the guest was running, asleep in S3, or paused
+ * by the host.  Every other exit skips the save: a needless skip costs one
+ * cold boot, a bad save breaks every later launch.
+ *
+ * Both checks are needed.  A guest power-off, panic, or reset under
+ * -no-reboot ends the main loop while the run state still reads "running",
+ * and the host can quit after the guest has already stopped in a bad state.
+ */
+static bool exit_snapshot_allowed(ShutdownCause exit_cause, RunState state)
+{
+    switch (exit_cause) {
+    case SHUTDOWN_CAUSE_HOST_SIGNAL:    /* Ctrl+C, Ctrl+Break, SIGTERM */
+    case SHUTDOWN_CAUSE_HOST_UI:        /* window close, gRPC, adb emu kill */
+    case SHUTDOWN_CAUSE_HOST_QMP_QUIT:  /* QMP or HMP quit */
+        break;
+    default:
+        return false;
+    }
+
+    switch (state) {
+    case RUN_STATE_RUNNING:
+    case RUN_STATE_SUSPENDED:
+    case RUN_STATE_PAUSED:
+        return true;
+    default:
+        return false;
+    }
+}
+
+int try_savevm(ShutdownCause exit_cause)
 {
     if (!savevm) {
         fprintf(stderr, "No -savevm provided, skipping snapshot save.\n");
         return 0;
+    }
+
+    /*
+     * vm_stop() on a vCPU thread, e.g. for a guest panic, only queues the
+     * stop, and main_loop_should_exit() returns on a shutdown request before
+     * it applies a queued stop.  Check the state the VM was about to enter.
+     */
+    RunState state;
+    if (!qemu_vmstop_requested(&state)) {
+        state = runstate_get();
+    }
+
+    if (!exit_snapshot_allowed(exit_cause, state)) {
+        return try_deletevm();
     }
 
     gint64 start_time = g_get_monotonic_time();
