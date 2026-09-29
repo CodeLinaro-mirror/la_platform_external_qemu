@@ -15,6 +15,8 @@
  */
 
 #include "TextureUtils.h"
+#include "JpegUtils.h"
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -209,135 +211,38 @@ std::optional<TextureUtils::Result> TextureUtils::loadPNG(
     return result;
 }
 
-struct ErrorManager {
-    struct jpeg_error_mgr pub;  // Public fields.
-    jmp_buf setjmp_buffer;
-};
-
 std::optional<TextureUtils::Result> TextureUtils::loadJPEG(
         const char* filename,
         Orientation orientation) {
-    ScopedStdioFile fp(android_fopen(filename, "rb"));
-    if (!fp) {
-        E("%s: Failed to open file %s", __FUNCTION__, filename);
+    if (!filename) {
         return {};
     }
 
-    jpeg_decompress_struct cinfo;
-    ErrorManager jerr;
     std::vector<uint8_t> data;
+    JpegImageInfo info;
+    JpegDecompressOptions options;
+    options.color_space = JCS_RGB;
+    options.align_row_stride = true;
+    options.orientation = (orientation == Orientation::BottomUp)
+                                  ? JpegOrientation::BottomUp
+                                  : JpegOrientation::TopDown;
 
-    // RAII wrapper for cinfo.
-    std::unique_ptr<jpeg_decompress_struct, decltype(&jpeg_destroy_decompress)>
-            cinfo_guard(&cinfo, &jpeg_destroy_decompress);
-
-    // Set up normal error routines, then override error_exit to avoid exit()
-    // on failure.
-    cinfo.err = jpeg_std_error(&jerr.pub);
-    jerr.pub.error_exit = [](j_common_ptr cinfoPtr) {
-        ErrorManager* err = reinterpret_cast<ErrorManager*>(cinfoPtr->err);
-        longjmp(err->setjmp_buffer, 1);
-    };
-
-    if (setjmp(jerr.setjmp_buffer)) {
-        E("%s: JPEG library error", __FUNCTION__);
-        // Prints the message.
-        (cinfo.err->output_message)(
-                reinterpret_cast<jpeg_common_struct*>(&cinfo));
+    if (!JpegUtils::DecompressFromFile(filename, data, &info, options)) {
         return {};
     }
 
-    jpeg_create_decompress(&cinfo);
-
-    // Increase libjpeg memory limit to 256 MB to prevent failures when
-    // loading large images.
-    cinfo.mem->max_memory_to_use = 256 * 1024 * 1024;
-
-    jpeg_stdio_src(&cinfo, fp.get());
-
-    // We can safely ignore the return value since we're using a stdio source
-    // and passing require_image as true.
-    (void)jpeg_read_header(&cinfo, /* require_image */ TRUE);
-    cinfo.out_color_space = JCS_RGB;  // Force RGB format.
-    (void)jpeg_start_decompress(&cinfo);
-
-    const uint32_t width = cinfo.output_width;
-    const uint32_t height = cinfo.output_height;
-    D("%s: Loaded JPEG %s, %dx%d", __FUNCTION__, filename, width, height);
-
-    if (cinfo.output_components != 3) {
-        E("%s: Unsupported output_components %d, should be 3.", __FUNCTION__,
-          cinfo.output_components);
+    if (info.num_components != 3) {
+        E("%s: Unsupported num_components %d, should be 3.", __FUNCTION__,
+          info.num_components);
         return {};
     }
-
-    const size_t rowBytes = width * cinfo.output_components;
-    const size_t stride = alignRowBytes(rowBytes);
-    data.resize(stride * height);
-
-    while (cinfo.output_scanline < height) {
-        // libjpeg can read multiple scanlines at a time, but on high-quality
-        // decompression it is typically one at a time.  Only read one at a time
-        // for simplicity.
-        uint8_t* rowPtrs[1];
-        if (orientation == Orientation::BottomUp) {
-            rowPtrs[0] =
-                    data.data() + (height - cinfo.output_scanline - 1) * stride;
-        } else {
-            rowPtrs[0] = data.data() + cinfo.output_scanline * stride;
-        }
-        (void)jpeg_read_scanlines(&cinfo, rowPtrs, 1);
-    }
-
-    jpeg_finish_decompress(&cinfo);
 
     Result result;
     result.mBuffer = std::move(data);
-    result.mWidth = width;
-    result.mHeight = height;
+    result.mWidth = info.width;
+    result.mHeight = info.height;
     result.mFormat = Format::RGB24;
     return result;
-}
-
-static void initSource(j_decompress_ptr cinfo) {}
-
-static boolean fillInputBuffer(j_decompress_ptr cinfo) {
-    static const JOCTET kEOI[2] = {0xFF, JPEG_EOI};
-    cinfo->src->next_input_byte = kEOI;
-    cinfo->src->bytes_in_buffer = 2;
-    return TRUE;
-}
-
-static void skipInputData(j_decompress_ptr cinfo, long numBytes) {
-    if (numBytes > 0) {
-        if (static_cast<size_t>(numBytes) > cinfo->src->bytes_in_buffer) {
-            cinfo->src->next_input_byte += cinfo->src->bytes_in_buffer;
-            cinfo->src->bytes_in_buffer = 0;
-        } else {
-            cinfo->src->next_input_byte += static_cast<size_t>(numBytes);
-            cinfo->src->bytes_in_buffer -= static_cast<size_t>(numBytes);
-        }
-    }
-}
-
-static void termSource(j_decompress_ptr cinfo) {}
-
-static void jpeg_mem_src_custom(j_decompress_ptr cinfo,
-                                const uint8_t* buffer,
-                                size_t size) {
-    if (cinfo->src == nullptr) {
-        cinfo->src =
-                static_cast<struct jpeg_source_mgr*>((*cinfo->mem->alloc_small)(
-                        reinterpret_cast<j_common_ptr>(cinfo), JPOOL_PERMANENT,
-                        sizeof(struct jpeg_source_mgr)));
-    }
-    cinfo->src->init_source = initSource;
-    cinfo->src->fill_input_buffer = fillInputBuffer;
-    cinfo->src->skip_input_data = skipInputData;
-    cinfo->src->resync_to_restart = jpeg_resync_to_restart;
-    cinfo->src->term_source = termSource;
-    cinfo->src->bytes_in_buffer = size;
-    cinfo->src->next_input_byte = reinterpret_cast<const JOCTET*>(buffer);
 }
 
 std::optional<TextureUtils::Result> TextureUtils::loadJPEGFromMemory(
@@ -348,65 +253,29 @@ std::optional<TextureUtils::Result> TextureUtils::loadJPEGFromMemory(
         return {};
     }
 
-    jpeg_decompress_struct cinfo;
-    ErrorManager jerr;
     std::vector<uint8_t> data;
+    JpegImageInfo info;
+    JpegDecompressOptions options;
+    options.color_space = JCS_RGB;
+    options.align_row_stride = true;
+    options.orientation = (orientation == Orientation::BottomUp)
+                                  ? JpegOrientation::BottomUp
+                                  : JpegOrientation::TopDown;
 
-    std::unique_ptr<jpeg_decompress_struct, decltype(&jpeg_destroy_decompress)>
-            cinfo_guard(&cinfo, &jpeg_destroy_decompress);
-
-    cinfo.err = jpeg_std_error(&jerr.pub);
-    jerr.pub.error_exit = [](j_common_ptr cinfoPtr) {
-        ErrorManager* err = reinterpret_cast<ErrorManager*>(cinfoPtr->err);
-        longjmp(err->setjmp_buffer, 1);
-    };
-
-    if (setjmp(jerr.setjmp_buffer)) {
-        E("%s: JPEG library error", __FUNCTION__);
-        (cinfo.err->output_message)(
-                reinterpret_cast<jpeg_common_struct*>(&cinfo));
+    if (!JpegUtils::DecompressFromMemory(buffer, size, data, &info, options)) {
         return {};
     }
 
-    jpeg_create_decompress(&cinfo);
-    cinfo.mem->max_memory_to_use = 256 * 1024 * 1024;
-
-    jpeg_mem_src_custom(&cinfo, buffer, size);
-
-    (void)jpeg_read_header(&cinfo, TRUE);
-    cinfo.out_color_space = JCS_RGB;
-    (void)jpeg_start_decompress(&cinfo);
-
-    const uint32_t width = cinfo.output_width;
-    const uint32_t height = cinfo.output_height;
-
-    if (cinfo.output_components != 3) {
-        E("%s: Unsupported output_components %d, should be 3.", __FUNCTION__,
-          cinfo.output_components);
+    if (info.num_components != 3) {
+        E("%s: Unsupported num_components %d, should be 3.", __FUNCTION__,
+          info.num_components);
         return {};
     }
-
-    const size_t rowBytes = width * cinfo.output_components;
-    const size_t stride = alignRowBytes(rowBytes);
-    data.resize(stride * height);
-
-    while (cinfo.output_scanline < height) {
-        uint8_t* rowPtrs[1];
-        if (orientation == Orientation::BottomUp) {
-            rowPtrs[0] =
-                    data.data() + (height - cinfo.output_scanline - 1) * stride;
-        } else {
-            rowPtrs[0] = data.data() + cinfo.output_scanline * stride;
-        }
-        (void)jpeg_read_scanlines(&cinfo, rowPtrs, 1);
-    }
-
-    jpeg_finish_decompress(&cinfo);
 
     Result result;
     result.mBuffer = std::move(data);
-    result.mWidth = width;
-    result.mHeight = height;
+    result.mWidth = info.width;
+    result.mHeight = info.height;
     result.mFormat = Format::RGB24;
     return result;
 }

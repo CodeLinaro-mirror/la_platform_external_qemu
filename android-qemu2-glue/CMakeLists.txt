@@ -144,6 +144,7 @@ target_link_libraries(
 android_add_test(
   TARGET libqemu2-glue_unittests
   SRC base/files/KernelCmdLineLoader_unittest.cpp
+      emulation/virtio_vsock_transport_unittest.cpp
       tests/VirtioGpuTimelines_unittest.cpp
       utils/register_crash_info_unittest.cpp
       netsim/NfcPacketProtocol_unittest.cpp)

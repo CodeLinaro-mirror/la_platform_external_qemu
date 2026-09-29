@@ -50,17 +50,44 @@ using emulator::VhalEventLoaderThread;
 
 static constexpr int64_t VHAL_REPLAY_INTERVAL = 1000;
 
+// The combo box is indexed by row, so its rows and the values they map to have
+// to stay in the same order. Keep both in one table and build the widget from
+// it rather than duplicating the list in car-sensor-data.ui.
+static const struct {
+    VehicleGear gear;
+    const char* label;
+} sGearOptions[] = {
+        {VehicleGear::GEAR_NEUTRAL, QT_TR_NOOP("N (Neutral)")},
+        {VehicleGear::GEAR_REVERSE, QT_TR_NOOP("R (Reverse)")},
+        {VehicleGear::GEAR_PARK, QT_TR_NOOP("P (Park)")},
+        {VehicleGear::GEAR_DRIVE, QT_TR_NOOP("D (Drive)")},
+        {VehicleGear::GEAR_1, QT_TR_NOOP("1 (First)")},
+        {VehicleGear::GEAR_2, QT_TR_NOOP("2 (Second)")},
+        {VehicleGear::GEAR_3, QT_TR_NOOP("3 (Third)")},
+        {VehicleGear::GEAR_4, QT_TR_NOOP("4 (Fourth)")},
+        {VehicleGear::GEAR_5, QT_TR_NOOP("5 (Fifth)")},
+        {VehicleGear::GEAR_6, QT_TR_NOOP("6 (Sixth)")},
+        {VehicleGear::GEAR_7, QT_TR_NOOP("7 (Seventh)")},
+        {VehicleGear::GEAR_8, QT_TR_NOOP("8 (Eighth)")},
+        {VehicleGear::GEAR_9, QT_TR_NOOP("9 (Ninth)")}};
+
 CarSensorData::CarSensorData(QWidget* parent)
     : QWidget(parent), mUi(new Ui::CarSensorData) {
     mUi->setupUi(this);
 
+    // setupUi() has already connected currentIndexChanged, and filling the box
+    // would otherwise send a gear change for every row added.
+    const bool blocked = mUi->comboBox_gear->blockSignals(true);
+    for (const auto& option : sGearOptions) {
+        mUi->comboBox_gear->addItem(tr(option.label));
+    }
+    mUi->comboBox_gear->setCurrentIndex(
+            getIndexFromVehicleGear(static_cast<int>(VehicleGear::GEAR_PARK)));
+    mUi->comboBox_gear->blockSignals(blocked);
+
     mUi->button_loadrecord->setVisible(false);
     mUi->button_playrecord->setVisible(false);
 }
-
-static const enum VehicleGear sComboBoxGearValues[] = {
-        VehicleGear::GEAR_NEUTRAL, VehicleGear::GEAR_REVERSE,
-        VehicleGear::GEAR_PARK,    VehicleGear::GEAR_DRIVE};
 
 static const enum VehicleIgnitionState sComboBoxIgnitionStates[] = {
         VehicleIgnitionState::UNDEFINED, VehicleIgnitionState::LOCK,
@@ -196,13 +223,18 @@ void CarSensorData::on_comboBox_ignition_currentIndexChanged(int index) {
 }
 
 void CarSensorData::on_comboBox_gear_currentIndexChanged(int index) {
+    if (index < 0 ||
+        index >= static_cast<int>(sizeof(sGearOptions) / sizeof(sGearOptions[0]))) {
+        return;
+    }
+
     // Set speed to 0 when setting gear to P
-    if (sComboBoxGearValues[index] == VehicleGear::GEAR_PARK) {
+    if (sGearOptions[index].gear == VehicleGear::GEAR_PARK) {
         on_car_speedSlider_valueChanged(0);
         updateCarSpeedSlider(0);
     }
 
-    sendGearChangeMsg(static_cast<int32_t>(sComboBoxGearValues[index]),
+    sendGearChangeMsg(static_cast<int32_t>(sGearOptions[index].gear),
                       mUi->comboBox_gear->currentText().toStdString());
 }
 
@@ -251,7 +283,7 @@ void CarSensorData::processMsg(emulator::EmulatorMessage emulatorMsg) {
             case static_cast<int32_t>(VehicleProperty::GEAR_SELECTION): {
                 int gear_vhal = getIndexFromVehicleGear(val.int32_values(0));
                 int gear_state = mUi->comboBox_gear->currentIndex();
-                if (gear_state != gear_vhal) {
+                if (gear_vhal >= 0 && gear_state != gear_vhal) {
                     bool lastState = mUi->comboBox_gear->blockSignals(true);
                     mUi->comboBox_gear->setCurrentIndex(gear_vhal);
                     mUi->comboBox_gear->blockSignals(lastState);
@@ -320,13 +352,15 @@ void CarSensorData::processMsg(emulator::EmulatorMessage emulatorMsg) {
 }
 
 int CarSensorData::getIndexFromVehicleGear(int gear) {
-    int len = sizeof(sComboBoxGearValues) / sizeof(sComboBoxGearValues[0]);
+    int len = sizeof(sGearOptions) / sizeof(sGearOptions[0]);
     for (int index = 0; index < len; index++) {
-        if (static_cast<int>(sComboBoxGearValues[index]) == gear) {
+        if (static_cast<int>(sGearOptions[index].gear) == gear) {
             return index;
         }
     }
-    return len - 1;
+    // Not a gear the combo box offers, e.g. GEAR_UNKNOWN. Report it rather
+    // than falling back to the last row, which would silently select 9th gear.
+    return -1;
 }
 
 void CarSensorData::vhalEventThreadStarted() {

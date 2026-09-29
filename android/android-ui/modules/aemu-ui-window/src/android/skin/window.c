@@ -1190,35 +1190,33 @@ static void generate_touch_event(FingerState* finger,
     unsigned posX = *x;
     unsigned posY = *y;
     const bool not_pixel_fold = !android_foldable_is_pixel_fold();
-    if (finger->display) {
-        if (android_foldable_is_folded() && not_pixel_fold) {
-            int fx, fy, fw, fh;
-            android_foldable_get_folded_area(&fx, &fy, &fw, &fh);
-            switch (finger->display->rotation) {
-                case SKIN_ROTATION_0:
-                    posX = *x + fx;
-                    posY = *y + fy;
-                    break;
-                case SKIN_ROTATION_180:
-                    posX = *x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
-                    posY = *y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
-                    break;
-                case SKIN_ROTATION_90:
-                    posX = *x + fx;
-                    posY = *y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
-                    break;
-                case SKIN_ROTATION_270:
-                    posX = *x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
-                    posY = *y + fy;
-                    break;
-            }
-        } else {
-            const QAndroidMultiDisplayAgent* const multiDisplayAgent =
-                    emulator_window_get()->uiEmuAgent->multiDisplay;
-            if (!multiDisplayAgent->isMultiDisplayWindow()) {
-                multiDisplayAgent->translateCoordination(&posX, &posY,
-                                                         &display_id);
-            }
+    if (finger->display && android_foldable_is_folded() && not_pixel_fold) {
+        int fx, fy, fw, fh;
+        android_foldable_get_folded_area(&fx, &fy, &fw, &fh);
+        switch (finger->display->rotation) {
+            case SKIN_ROTATION_0:
+                posX = *x + fx;
+                posY = *y + fy;
+                break;
+            case SKIN_ROTATION_180:
+                posX = *x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
+                posY = *y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
+                break;
+            case SKIN_ROTATION_90:
+                posX = *x + fx;
+                posY = *y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
+                break;
+            case SKIN_ROTATION_270:
+                posX = *x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
+                posY = *y + fy;
+                break;
+        }
+    } else {
+        const QAndroidMultiDisplayAgent* const multiDisplayAgent =
+                emulator_window_get()->uiEmuAgent->multiDisplay;
+        if (!multiDisplayAgent->isMultiDisplayWindow()) {
+            multiDisplayAgent->translateCoordination(&posX, &posY,
+                                                     &display_id);
         }
     }
     *x = posX;
@@ -1236,35 +1234,33 @@ static void add_finger_event(SkinWindow* window,
     unsigned posY = y;
 
     const bool not_pixel_fold = !android_foldable_is_pixel_fold();
-    if (finger->display) {
-        if (android_foldable_is_folded() && not_pixel_fold) {
-            int fx, fy, fw, fh;
-            android_foldable_get_folded_area(&fx, &fy, &fw, &fh);
-            switch (finger->display->rotation) {
-                case SKIN_ROTATION_0:
-                    posX = x + fx;
-                    posY = y + fy;
-                    break;
-                case SKIN_ROTATION_180:
-                    posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
-                    posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
-                    break;
-                case SKIN_ROTATION_90:
-                    posX = x + fx;
-                    posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
-                    break;
-                case SKIN_ROTATION_270:
-                    posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
-                    posY = y + fy;
-                    break;
-            }
-        } else {
-            const QAndroidMultiDisplayAgent* const multiDisplayAgent =
-                    emulator_window_get()->uiEmuAgent->multiDisplay;
-            if (!multiDisplayAgent->isMultiDisplayWindow()) {
-                multiDisplayAgent->translateCoordination(&posX, &posY,
-                                                         &displayId);
-            }
+    if (finger->display && android_foldable_is_folded() && not_pixel_fold) {
+        int fx, fy, fw, fh;
+        android_foldable_get_folded_area(&fx, &fy, &fw, &fh);
+        switch (finger->display->rotation) {
+            case SKIN_ROTATION_0:
+                posX = x + fx;
+                posY = y + fy;
+                break;
+            case SKIN_ROTATION_180:
+                posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
+                posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
+                break;
+            case SKIN_ROTATION_90:
+                posX = x + fx;
+                posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
+                break;
+            case SKIN_ROTATION_270:
+                posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
+                posY = y + fy;
+                break;
+        }
+    } else {
+        const QAndroidMultiDisplayAgent* const multiDisplayAgent =
+                emulator_window_get()->uiEmuAgent->multiDisplay;
+        if (!multiDisplayAgent->isMultiDisplayWindow()) {
+            multiDisplayAgent->translateCoordination(&posX, &posY,
+                                                     &displayId);
         }
     }
     window->win_funcs->mouse_event(posX, posY, state, displayId, /* absoluteCoordinates */ true);
@@ -1281,33 +1277,31 @@ static void add_pen_event(SkinWindow* window,
     uint32_t id = 0;
 
     const bool not_pixel_fold = !android_foldable_is_pixel_fold();
-    if (pen->display) {
-        if (android_foldable_is_folded() && not_pixel_fold) {
-            int fx, fy, fw, fh;
-            android_foldable_get_folded_area(&fx, &fy, &fw, &fh);
-            switch (pen->display->rotation) {
-                case SKIN_ROTATION_0:
-                    posX = x + fx;
-                    posY = y + fy;
-                    break;
-                case SKIN_ROTATION_180:
-                    posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
-                    posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
-                    break;
-                case SKIN_ROTATION_90:
-                    posX = x + fx;
-                    posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
-                    break;
-                case SKIN_ROTATION_270:
-                    posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
-                    posY = y + fy;
-                    break;
-            }
-        } else {
-            const QAndroidMultiDisplayAgent* const multiDisplayAgent =
-                    emulator_window_get()->uiEmuAgent->multiDisplay;
-            multiDisplayAgent->translateCoordination(&posX, &posY, &id);
+    if (pen->display && android_foldable_is_folded() && not_pixel_fold) {
+        int fx, fy, fw, fh;
+        android_foldable_get_folded_area(&fx, &fy, &fw, &fh);
+        switch (pen->display->rotation) {
+            case SKIN_ROTATION_0:
+                posX = x + fx;
+                posY = y + fy;
+                break;
+            case SKIN_ROTATION_180:
+                posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
+                posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
+                break;
+            case SKIN_ROTATION_90:
+                posX = x + fx;
+                posY = y + fy + fh - getConsoleAgents()->settings->hw()->hw_lcd_height;
+                break;
+            case SKIN_ROTATION_270:
+                posX = x + fx + fw - getConsoleAgents()->settings->hw()->hw_lcd_width;
+                posY = y + fy;
+                break;
         }
+    } else {
+        const QAndroidMultiDisplayAgent* const multiDisplayAgent =
+                emulator_window_get()->uiEmuAgent->multiDisplay;
+        multiDisplayAgent->translateCoordination(&posX, &posY, &id);
     }
 
     window->win_funcs->pen_event(posX, posY, ev, state, id);
@@ -2483,9 +2477,7 @@ void skin_window_process_touch_event(SkinWindow* window, SkinEvent* ev) {
             my = ev->u.multi_touch_point.y;
             skin_window_map_to_scale(window, &mx, &my);
             skin_window_move_mouse(window, touchFinger, mx, my);
-            if (window->drag_x_start == 0 && window->drag_y_start == 0) {
-                skin_window_find_finger(window, touchFinger, mx, my, displayId);
-            } else {
+            if (window->drag_x_start != 0 || window->drag_y_start != 0) {
                 if (touchFinger->at_corner) {
                     skin_winsys_paint_overlay_for_resize(mx, my);
                     break;
@@ -2498,6 +2490,8 @@ void skin_window_process_touch_event(SkinWindow* window, SkinEvent* ev) {
                            window->drag_y_start;
                 skin_winsys_set_window_pos(posX, posY);
                 break;
+            } else if (!touchFinger->tracking) {
+                skin_window_find_finger(window, touchFinger, mx, my, displayId);
             }
             mx = ev->u.multi_touch_point.x;
             my = ev->u.multi_touch_point.y;
@@ -2720,10 +2714,7 @@ void skin_window_process_event(SkinWindow* window, SkinEvent* ev) {
             skin_window_map_to_scale(window, &mx, &my);
             skin_window_move_mouse(window, finger, mx, my);
 
-            if (window->drag_x_start == 0 && window->drag_y_start == 0) {
-                // Button is not pressed. Check the position and set the cursor.
-                skin_window_find_finger(window, finger, mx, my, displayId);
-            } else {
+            if (window->drag_x_start != 0 || window->drag_y_start != 0) {
                 if (finger->at_corner) {
                     // Resize: just update the overlay until the mouse button is
                     // released
@@ -2737,6 +2728,9 @@ void skin_window_process_event(SkinWindow* window, SkinEvent* ev) {
                            window->drag_y_start;
                 skin_winsys_set_window_pos(posX, posY);
                 break;
+            } else if (!finger->tracking) {
+                // Button is not pressed. Check the position and set the cursor.
+                skin_window_find_finger(window, finger, mx, my, displayId);
             }
             if (window->ball.tracking) {
                 skin_window_trackball_move(window, ev->u.mouse.xrel,

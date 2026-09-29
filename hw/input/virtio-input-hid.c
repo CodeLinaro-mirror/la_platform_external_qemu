@@ -46,6 +46,14 @@ static const unsigned short keymap_button[INPUT_BUTTON__MAX] = {
     [INPUT_BUTTON_TOOL_PEN]          = BTN_TOOL_PEN,
 };
 
+static const unsigned short mouse_keymap_button[INPUT_BUTTON__MAX] = {
+    [INPUT_BUTTON_LEFT]              = BTN_LEFT,
+    [INPUT_BUTTON_RIGHT]             = BTN_RIGHT,
+    [INPUT_BUTTON_MIDDLE]            = BTN_MIDDLE,
+    [INPUT_BUTTON_SIDE]              = BTN_SIDE,
+    [INPUT_BUTTON_EXTRA]             = BTN_EXTRA,
+};
+
 static const unsigned short axismap_rel[INPUT_AXIS__MAX] = {
     [INPUT_AXIS_X]                   = REL_X,
     [INPUT_AXIS_Y]                   = REL_Y,
@@ -466,8 +474,8 @@ static void virtio_mouse_init(Object *obj)
     virtio_input_init_config(vinput, vhid->wheel_axis
                             ? virtio_mouse_config_v2
                             : virtio_mouse_config_v1);
-    virtio_input_key_config(vinput, keymap_button,
-                            ARRAY_SIZE(keymap_button));
+    virtio_input_key_config(vinput, mouse_keymap_button,
+                            ARRAY_SIZE(mouse_keymap_button));
 }
 
 static const TypeInfo virtio_mouse_info = {

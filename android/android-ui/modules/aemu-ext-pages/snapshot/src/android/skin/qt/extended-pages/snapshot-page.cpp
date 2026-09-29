@@ -324,6 +324,9 @@ SnapshotPage::SnapshotPage(QWidget* parent, bool standAlone)
         mUi->tabWidget->removeTab(1);  // Do not show the Settings tab
     }
     qRegisterMetaType<Ui::Settings::SaveSnapshotOnExit>();
+    qRegisterMetaType<std::vector<android::emulation::control::SnapshotInfo>>();
+    qRegisterMetaType<std::vector<android::emulation::control::SnapshotInfo>>(
+            "std::vector<SnapshotInfo>");
     sInstance = this;
 
     enableConnections();
