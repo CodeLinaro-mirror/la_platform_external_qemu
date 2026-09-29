@@ -392,8 +392,8 @@ TEST(AvdInfoTest, displayless_ignores_lcd_dimensions) {
     info->contentPath = ASTRDUP("/dummy/path");
     info->configIni = iniFile_newEmpty("config.ini");
     iniFile_setBoolean(info->configIni, "hw.displayless", true);
-    iniFile_setInteger(info->configIni, "hw.lcd.width", 640);
-    iniFile_setInteger(info->configIni, "hw.lcd.height", 480);
+    iniFile_setInteger(info->configIni, "hw.lcd.width", 500);
+    iniFile_setInteger(info->configIni, "hw.lcd.height", 340);
 
     char* skinName = nullptr;
     char* skinDir = nullptr;
@@ -402,13 +402,17 @@ TEST(AvdInfoTest, displayless_ignores_lcd_dimensions) {
     EXPECT_STREQ("0x0", skinName);
     EXPECT_EQ(nullptr, skinDir);
 
+    AndroidHwConfig defaultHw = {0};
+    androidHwConfig_init(&defaultHw, 0);
+
     AndroidHwConfig hw = {0};
     EXPECT_EQ(0, avdInfo_initHwConfig(info, &hw, true));
     EXPECT_TRUE(hw.hw_displayless);
-    EXPECT_EQ(0, hw.hw_lcd_width);
-    EXPECT_EQ(0, hw.hw_lcd_height);
-    EXPECT_EQ(32, hw.hw_lcd_depth);
+    EXPECT_EQ(defaultHw.hw_lcd_width, hw.hw_lcd_width);
+    EXPECT_EQ(defaultHw.hw_lcd_height, hw.hw_lcd_height);
+    EXPECT_EQ(defaultHw.hw_lcd_depth, hw.hw_lcd_depth);
 
+    androidHwConfig_done(&defaultHw);
     androidHwConfig_done(&hw);
     AFREE(skinName);
     AFREE(skinDir);
