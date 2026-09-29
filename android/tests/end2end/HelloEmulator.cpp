@@ -133,7 +133,6 @@ protected:
         }
 
         std::vector<std::string> launchOpts = {
-            "-no-accel",
             "-no-snapshot",
             "-no-window",
             "-verbose",

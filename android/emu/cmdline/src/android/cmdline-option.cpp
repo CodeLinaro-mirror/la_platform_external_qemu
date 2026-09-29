@@ -34,6 +34,8 @@ enum {
     OPTION_IS_FLAG = 0,
     OPTION_IS_PARAM,
     OPTION_IS_LIST,
+    OPTION_IS_OBSOLETE_FLAG,
+    OPTION_IS_OBSOLETE_PARAM,
 };
 
 typedef struct {
@@ -53,6 +55,8 @@ static const OptionInfo  option_keys[] = {
 #define  OPT_LIST(_name,_template,_descr)   OPTION(_name,OPTION_IS_LIST,0)
 #define  CFG_FLAG(_name,_descr)             OPTION(_name,OPTION_IS_FLAG,1)
 #define  CFG_PARAM(_name,_template,_descr)  OPTION(_name,OPTION_IS_PARAM,1)
+#define  OPT_FLAG_OBSOLETE(_name)           OPTION(_name,OPTION_IS_OBSOLETE_FLAG,0)
+#define  OPT_PARAM_OBSOLETE(_name,_template) OPTION(_name,OPTION_IS_OBSOLETE_PARAM,0)
 #include "android/cmdline-options.h"
     { NULL, 0, 0, 0 }
 };
@@ -145,6 +149,18 @@ android_parse_options( int  *pargc, char**  *pargv, AndroidOptions*  opt )
             for ( ; oo->name; oo++ ) {
                 if ( !strcmp( oo->name, arg2 ) ) {
                     void*  field = (char*)opt + oo->var_offset;
+
+                    if (oo->var_type == OPTION_IS_OBSOLETE_FLAG ||
+                        oo->var_type == OPTION_IS_OBSOLETE_PARAM) {
+                        /* accepted for backward compatibility, but ignored */
+                        dwarning("option -%s obsolete, ignored", arg);
+                        if (oo->var_type == OPTION_IS_OBSOLETE_PARAM &&
+                            nargs > 0) {
+                            nargs--;
+                            aread++;
+                        }
+                        break;
+                    }
 
                     if (oo->var_type != OPTION_IS_FLAG) {
                         /* parameter/list option */
