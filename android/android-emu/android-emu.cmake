@@ -679,6 +679,7 @@ if(NOT LINUX_AARCH64)
       android/jdwp/Jdwp_unittest.cpp
       android/jdwp/JdwpProxy_unittest.cpp
       android/kernel/kernel_utils_unittest.cpp
+      android/multitouch-screen_unittest.cpp
       android/network/control_unittest.cpp
       android/network/GenericNetlinkMessage_unittest.cpp
       android/network/Ieee80211Frame_unittest.cpp

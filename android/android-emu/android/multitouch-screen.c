@@ -15,19 +15,22 @@
  */
 #include "android/multitouch-screen.h"
 
-#include "android/skin/linux_keycodes.h"
-#include "android/skin/generic-event-buffer.h"
-#include "android/skin/linux_keycodes.h"
-#include "android/console.h"  /* for android_hw */
+#include <assert.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "android-qemu2-glue/emulation/virtio-input-multi-touch.h"
+#include "android/console.h" /* for android_hw */
 #include "android/hw-events.h"
 #include "android/skin/charmap.h"
 #include "android/skin/event.h"
-#include "android/utils/debug.h"
-#include "android/utils/misc.h"
-#include "android-qemu2-glue/emulation/virtio-input-multi-touch.h"
 #include "android/skin/generic-event-buffer.h"
-#include <assert.h>
-#include <stdint.h>
+#include "android/skin/linux_keycodes.h"
+#include "android/utils/debug.h"
+#include "android/utils/lock.h"
+#include "android/utils/looper.h"
+#include "android/utils/misc.h"
 
 #define  E(...)    derror(__VA_ARGS__)
 #define  W(...)    dwarning(__VA_ARGS__)
@@ -110,8 +113,29 @@ typedef struct MTSState {
     int             displayId;
     /* Is this on the touchpad */
     bool            touchpad;
-    /* Current framebuffer pointer. */
+    /* Current framebuffer pointer (owned/accessed on the QEMU main looper). */
     uint8_t*        current_fb;
+    /* Lock protecting OpenGLES staging framebuffer state (gles_staging_fb,
+     * gles_staging_fb_size, gles_w, gles_h, gles_ydir, gles_fb_updated).
+     *
+     * Lock ordering:
+     *   - On RenderThread: FrameBuffer::m_lock -> fb_lock (leaf lock).
+     *   - On QEMU iothread: BQL (VmLock) -> fb_lock (leaf lock).
+     * Never acquire BQL, FrameBuffer::m_lock, or call into Looper/SDKCtl I/O
+     * while holding fb_lock. */
+    CLock*          fb_lock;
+    /* Timer used to marshal OpenGLES framebuffer updates to the main looper. */
+    LoopTimer*      fb_timer;
+    /* Staging buffer written by OpenGLES render thread under fb_lock. */
+    uint8_t*        gles_staging_fb;
+    size_t          gles_staging_fb_size;
+    int             gles_w;
+    int             gles_h;
+    int             gles_ydir;
+    int             gles_fb_updated;
+    /* Persistent OpenGLES framebuffer owned by the main looper thread. */
+    uint8_t*        gles_fb;
+    size_t          gles_fb_size;
 } MTSState;
 
 /* Default multi-touch screen descriptor */
@@ -507,9 +531,10 @@ _on_fb_sent(void* opaque, SDKCtlDirectPacket* packet, AsyncIOState status)
             !mts_state->fb_transfer_in_progress) {
             mts_state->fb_transfer_in_progress = 1;
             /* Send accumulated updates. */
-            if (mts_port_send_frame(mts_state->mtsp, &mts_state->fb_header,
-                                    mts_state->current_fb, _on_fb_sent, mts_state,
-                                    mts_state->ydir)) {
+            if (mts_state->mtsp == NULL ||
+                mts_port_send_frame(mts_state->mtsp, &mts_state->fb_header,
+                                    mts_state->current_fb, _on_fb_sent,
+                                    mts_state, mts_state->ydir)) {
                 mts_state->fb_transfer_in_progress = 0;
             }
         }
@@ -564,7 +589,8 @@ _mt_fb_common_update(MTSState* mts_state, int x, int y, int w, int h)
      * completed. */
     if (!mts_state->fb_transfer_in_progress) {
         mts_state->fb_transfer_in_progress = 1;
-        if (mts_port_send_frame(mts_state->mtsp, &mts_state->fb_header,
+        if (mts_state->mtsp == NULL ||
+            mts_port_send_frame(mts_state->mtsp, &mts_state->fb_header,
                                 mts_state->current_fb, _on_fb_sent, mts_state,
                                 mts_state->ydir)) {
             mts_state->fb_transfer_in_progress = 0;
@@ -599,6 +625,52 @@ _mt_fb_update(void* opaque, int x, int y, int w, int h)
     _mt_fb_common_update(mts_state, x, y, w, h);
 }
 
+static void _on_gles_fb_timer(void* opaque, LoopTimer* unused) {
+    MTSState* const mts_state = (MTSState*)opaque;
+    int w = 0;
+    int h = 0;
+    int ydir = 0;
+    uint8_t* tmp_fb = NULL;
+    size_t tmp_size = 0;
+
+    /* Lock order: BQL (held by main looper) -> fb_lock (leaf lock). */
+    android_lock_acquire(mts_state->fb_lock);
+    if (!mts_state->gles_fb_updated || mts_state->gles_staging_fb == NULL) {
+        android_lock_release(mts_state->fb_lock);
+        return;
+    }
+
+    /* Swap the staging buffer into gles_fb so the main looper owns a stable
+     * framebuffer copy without holding fb_lock during JPEG compression. */
+    tmp_fb = mts_state->gles_fb;
+    tmp_size = mts_state->gles_fb_size;
+    mts_state->gles_fb = mts_state->gles_staging_fb;
+    mts_state->gles_fb_size = mts_state->gles_staging_fb_size;
+    mts_state->gles_staging_fb = tmp_fb;
+    mts_state->gles_staging_fb_size = tmp_size;
+
+    w = mts_state->gles_w;
+    h = mts_state->gles_h;
+    ydir = mts_state->gles_ydir;
+    mts_state->gles_fb_updated = 0;
+    android_lock_release(mts_state->fb_lock);
+
+    /* GLES format is always RGBA8888 */
+    mts_state->fb_header.bpp = 4;
+    mts_state->fb_header.bpl = 4 * w;
+    mts_state->fb_header.disp_width = w;
+    mts_state->fb_header.disp_height = h;
+    mts_state->current_fb = mts_state->gles_fb;
+    mts_state->ydir = ydir;
+
+    /* GLES emulator always updates the entire framebuffer, so any region
+     * accumulated from a previous (possibly differently sized) frame is
+     * superseded. */
+    mts_state->fb_header.x = mts_state->fb_header.y = 0;
+    mts_state->fb_header.w = mts_state->fb_header.h = 0;
+    _mt_fb_common_update(mts_state, 0, 0, w, h);
+}
+
 void
 multitouch_opengles_fb_update(void* context,
                               uint32_t displayId,
@@ -607,24 +679,48 @@ multitouch_opengles_fb_update(void* context,
                               unsigned char* pixels)
 {
     MTSState* const mts_state = &_MTSState;
+    size_t frame_size = 0;
+    int schedule_timer = 0;
 
-    /* Make sure MT port is initialized. */
-    if (!_is_mt_initialized) {
+    /* Make sure MT port is initialized and parameters are valid. */
+    if (!__atomic_load_n(&_is_mt_initialized, __ATOMIC_ACQUIRE) ||
+        pixels == NULL || w <= 0 || h <= 0) {
         return;
     }
+    /* fb_header.bpl is an int computed as 4 * w on the main looper. */
+    if (w > INT_MAX / 4 || (size_t)h > (SIZE_MAX / 4) / (size_t)w) {
+        return;
+    }
+    frame_size = (size_t)w * (size_t)h * 4;
 
     T("Multi-touch: openGLES framebuffer update: 0:0 -> %dx%d", w, h);
 
-    /* GLES format is always RGBA8888 */
-    mts_state->fb_header.bpp = 4;
-    mts_state->fb_header.bpl = 4 * w;
-    mts_state->fb_header.disp_width = w;
-    mts_state->fb_header.disp_height = h;
-    mts_state->current_fb = pixels;
-    mts_state->ydir = ydir;
+    /* This callback is invoked on a gfxstream RenderThread (holding
+     * FrameBuffer::m_lock, not BQL). Copy the transient readback buffer into
+     * gles_staging_fb under fb_lock (leaf lock) and schedule _on_gles_fb_timer
+     * on the QEMU main looper. */
+    android_lock_acquire(mts_state->fb_lock);
+    if (mts_state->gles_staging_fb_size < frame_size) {
+        uint8_t* new_buf =
+                (uint8_t*)realloc(mts_state->gles_staging_fb, frame_size);
+        if (new_buf == NULL) {
+            android_lock_release(mts_state->fb_lock);
+            return;
+        }
+        mts_state->gles_staging_fb = new_buf;
+        mts_state->gles_staging_fb_size = frame_size;
+    }
+    memcpy(mts_state->gles_staging_fb, pixels, frame_size);
+    mts_state->gles_w = w;
+    mts_state->gles_h = h;
+    mts_state->gles_ydir = ydir;
+    schedule_timer = !mts_state->gles_fb_updated;
+    mts_state->gles_fb_updated = 1;
+    android_lock_release(mts_state->fb_lock);
 
-    /* GLES emulator alwas update the entire framebuffer. */
-    _mt_fb_common_update(mts_state, 0, 0, w, h);
+    if (schedule_timer && mts_state->fb_timer != NULL) {
+        loopTimer_startRelative(mts_state->fb_timer, 0);
+    }
 }
 
 void
@@ -633,7 +729,7 @@ multitouch_refresh_screen(void)
     MTSState* const mts_state = &_MTSState;
 
     /* Make sure MT port is initialized. */
-    if (!_is_mt_initialized) {
+    if (!__atomic_load_n(&_is_mt_initialized, __ATOMIC_ACQUIRE)) {
         return;
     }
 
@@ -657,7 +753,8 @@ multitouch_fb_updated(void)
     if (mts_state->fb_header.w && mts_state->fb_header.h) {
         mts_state->fb_transfer_in_progress = 1;
         /* Send accumulated updates. */
-        if (mts_port_send_frame(mts_state->mtsp, &mts_state->fb_header,
+        if (mts_state->mtsp == NULL ||
+            mts_port_send_frame(mts_state->mtsp, &mts_state->fb_header,
                                 mts_state->current_fb, _on_fb_sent, mts_state,
                                 mts_state->ydir)) {
             mts_state->fb_transfer_in_progress = 0;
@@ -668,8 +765,9 @@ multitouch_fb_updated(void)
 void multitouch_init(AndroidMTSPort* mtsp,
                      const QAndroidUserEventAgent* user_event_agent,
                      const QAndroidDisplayAgent* display_agent) {
-    if (!_is_mt_initialized) {
+    if (!__atomic_load_n(&_is_mt_initialized, __ATOMIC_ACQUIRE)) {
         MTSState* const mts_state = &_MTSState;
+        Looper* main_looper = android_getMainLooper();
         int index;
 
         /* Stash away interface objects. */
@@ -689,6 +787,14 @@ void multitouch_init(AndroidMTSPort* mtsp,
         mts_state->mtsp = mtsp;
         mts_state->fb_header.header_size = sizeof(MTFrameHeader);
         mts_state->fb_transfer_in_progress = 0;
+        mts_state->fb_lock = android_lock_new();
+        if (main_looper == NULL) {
+            main_looper = looper_getForThread();
+        }
+        if (main_looper != NULL) {
+            mts_state->fb_timer =
+                    loopTimer_new(main_looper, _on_gles_fb_timer, mts_state);
+        }
 
         mts_state->display_agent = *display_agent;
 
@@ -711,7 +817,7 @@ void multitouch_init(AndroidMTSPort* mtsp,
 
         mts_state->display_agent.registerUpdateListener(&_mt_fb_update, mts_state);
 
-        _is_mt_initialized = 1;
+        __atomic_store_n(&_is_mt_initialized, 1, __ATOMIC_RELEASE);
     }
 }
 
