@@ -64,7 +64,7 @@ std::string resolveSceneFilename(const std::string& sceneFilename,
         return inputPath.string();
     }
 
-    // Try search directories, e.g AVD folder, resources/ folder..etc
+    // Try search directories, e.g. AVD folder, resources/ folder..etc
     for (const fs::path& basePath : basePaths) {
         fs::path searchPath = fs::path(basePath) / inputPath;
         if (fs::exists(searchPath)) {
