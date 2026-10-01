@@ -1302,7 +1302,7 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         std::string selectedICDStr =
                 android::base::getEnvironmentVariable(EnvVarSelectICD);
         if (selectedICDStr.empty()) {
-            selectedICDStr = "moltenvk";
+            selectedICDStr = "kosmickrisp";
         } else {
             dinfo("%s: Setting ICD from envvar %s, to '%s'", __func__,
                   EnvVarSelectICD, selectedICDStr.c_str());

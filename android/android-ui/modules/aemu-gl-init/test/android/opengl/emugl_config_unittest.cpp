@@ -349,7 +349,7 @@ TEST(EmuglConfig, initFromUISetting) {
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
         } else if (strcmp(config.vulkan_backend, "host") == 0) {
 #if defined(__APPLE__) && defined(__arm64__)
-            EXPECT_STREQ("moltenvk",
+            EXPECT_STREQ("kosmickrisp",
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
 #else
             EXPECT_STREQ("",
