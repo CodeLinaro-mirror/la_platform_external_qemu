@@ -22,4 +22,5 @@ bool isVulkanSafeToUseNative();
 
 #ifdef __APPLE__
 bool hasMetal();
+bool hasMetal4();
 #endif

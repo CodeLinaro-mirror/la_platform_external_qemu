@@ -12,6 +12,7 @@
 #include "host-common/opengl/emugl_config.h"
 #include "host-common/feature_control.h"
 #include "android/opengl/EmuglBackendList.h"
+#include "android/opengl/NativeGpuInfo.h"
 #include "android/opengl/gpuinfo.h"
 #include "aemu/base/Optional.h"
 #include "android/cmdline-definitions.h"
@@ -349,7 +350,8 @@ TEST(EmuglConfig, initFromUISetting) {
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
         } else if (strcmp(config.vulkan_backend, "host") == 0) {
 #if defined(__APPLE__) && defined(__arm64__)
-            EXPECT_STREQ("kosmickrisp",
+            const char* expectedIcd = hasMetal4() ? "kosmickrisp" : "moltenvk";
+            EXPECT_STREQ(expectedIcd,
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
 #else
             EXPECT_STREQ("",

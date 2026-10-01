@@ -29,6 +29,7 @@
 #include "android/console.h"
 #include "android/cpu_accelerator.h"
 #include "android/opengl/EmuglBackendList.h"
+#include "android/opengl/NativeGpuInfo.h"
 #include "android/opengl/gpuinfo.h"
 #include "android/skin/backend-defs.h"
 #include "host-common/FeatureControl.h"
@@ -1302,7 +1303,15 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         std::string selectedICDStr =
                 android::base::getEnvironmentVariable(EnvVarSelectICD);
         if (selectedICDStr.empty()) {
-            selectedICDStr = "kosmickrisp";
+            if (hasMetal4()) {
+                selectedICDStr = "kosmickrisp";
+            } else {
+                // If the user forces host gpu on a Metal 4 unsupported
+                // machine, fallback to MoltenVK.
+                dwarning(
+                        "Metal4 is not supported. Falling back to using MoltenVK.");
+                selectedICDStr = "moltenvk";
+            }
         } else {
             dinfo("%s: Setting ICD from envvar %s, to '%s'", __func__,
                   EnvVarSelectICD, selectedICDStr.c_str());
