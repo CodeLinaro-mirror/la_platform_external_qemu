@@ -1050,9 +1050,9 @@ bool emuglConfig_init(EmuglConfig* config,
         bool switchToSoftwareVulkan = false;
         if (!is_xr_mode) {
 #if defined(__APPLE__)
-            // Force MoltenVK with 'auto' modes on XR, but otherwise use
-            // software due to known issues
-            switchToSoftwareVulkan = true;
+            // Switch to software vulkan with 'auto' modes on non-Metal 4 capable
+            // devices. XR AVDs will keep using host gpu regardless.
+            switchToSoftwareVulkan = !hasMetal4();
 #else
             switchToSoftwareVulkan = no_window;
 #endif
@@ -1113,7 +1113,8 @@ bool emuglConfig_init(EmuglConfig* config,
     }
 
     // Android CDD requires GLES 3.1 for API 35 and higher
-    const bool needsGLES31 = (api_level >= 35);
+    const bool needsNativeGLES31 =
+            (api_level >= 35) && !fc::isEnabled(fc::GuestAngle);
 
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
@@ -1133,7 +1134,7 @@ bool emuglConfig_init(EmuglConfig* config,
         // On macOS, native host OpenGL is deprecated and only supports
         // GLES 3.0. Use software rendering (swangle) when 'auto' is requested
         // for API levels 35+ so GLES 3.1 and compute shaders are supported.
-        if (needsGLES31) {
+        if (needsNativeGLES31) {
             dinfo("API level %d requires GLES 3.1, forcing software rendering for GLES.",
                   api_level);
             switchToSoftwareGles = true;
@@ -1201,7 +1202,7 @@ bool emuglConfig_init(EmuglConfig* config,
     } else {
         // Forced host GPU mode for GLES, warn if incompatibilities are expected
 #ifdef __APPLE__
-        if (needsGLES31) {
+        if (needsNativeGLES31) {
             // Ref: b/560079433
             dwarning(
                     "API level '%d' requires GLES 3.1, please consider using "
