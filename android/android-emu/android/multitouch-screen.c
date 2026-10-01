@@ -23,6 +23,7 @@
 #include "android-qemu2-glue/emulation/virtio-input-multi-touch.h"
 #include "android/console.h" /* for android_hw */
 #include "android/hw-events.h"
+#include "android/multitouch-fb-rect.h"
 #include "android/skin/charmap.h"
 #include "android/skin/event.h"
 #include "android/skin/generic-event-buffer.h"
@@ -549,40 +550,16 @@ _on_fb_sent(void* opaque, SDKCtlDirectPacket* packet, AsyncIOState status)
 static void
 _mt_fb_common_update(MTSState* mts_state, int x, int y, int w, int h)
 {
-    if (mts_state->fb_header.w == 0 && mts_state->fb_header.h == 0) {
-        /* First update after previous one has been transmitted to the device. */
-        mts_state->fb_header.x = x;
-        mts_state->fb_header.y = y;
-        mts_state->fb_header.w = w;
-        mts_state->fb_header.h = h;
-    } else {
-        /*
-         * Accumulate framebuffer changes in the header.
-         */
-
-        /* "right" and "bottom" coordinates of the current update. */
-        int right = mts_state->fb_header.x + mts_state->fb_header.w;
-        int bottom = mts_state->fb_header.y + mts_state->fb_header.h;
-
-        /* "right" and "bottom" coordinates of the new update. */
-        const int new_right = x + w;
-        const int new_bottom = y + h;
-
-        /* Accumulate changed rectangle coordinates in the header. */
-        if (mts_state->fb_header.x > x) {
-            mts_state->fb_header.x = x;
-        }
-        if (mts_state->fb_header.y > y) {
-            mts_state->fb_header.y = y;
-        }
-        if (right < new_right) {
-            right = new_right;
-        }
-        if (bottom < new_bottom) {
-            bottom = new_bottom;
-        }
-        mts_state->fb_header.w = right - mts_state->fb_header.x;
-        mts_state->fb_header.h = bottom - mts_state->fb_header.y;
+    /* Accumulate framebuffer changes in the header, clamped to the current
+     * display bounds. Changes accumulate while a previous transfer is in
+     * flight; if the display geometry changed in between, an unclamped union
+     * would make the JPEG compressor read past the end of current_fb. */
+    mt_fb_merge_dirty_rect(&mts_state->fb_header.x, &mts_state->fb_header.y,
+                           &mts_state->fb_header.w, &mts_state->fb_header.h,
+                           x, y, w, h, mts_state->fb_header.disp_width,
+                           mts_state->fb_header.disp_height);
+    if (mts_state->fb_header.w == 0 || mts_state->fb_header.h == 0) {
+        return;
     }
 
     /* We will send updates to the device only after previous transmission is
