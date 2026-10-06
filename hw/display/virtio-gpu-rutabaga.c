@@ -998,6 +998,16 @@ virtio_gpu_rutabaga_aio_cb(void *opaque)
             continue;
         }
 
+        /*
+         * Context specific timelines are per (ctx_id, ring_idx). Fence ids
+         * are allocated from a single guest-wide counter, so a completion
+         * from one context must not retire the pending fences of another.
+         */
+        if (signaled_ctx_specific &&
+           (cmd->cmd_hdr.ctx_id != fence_data.ctx_id)) {
+            continue;
+        }
+
         if (cmd->cmd_hdr.fence_id > fence_data.fence_id) {
             continue;
         }
