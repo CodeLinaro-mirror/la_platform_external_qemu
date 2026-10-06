@@ -114,7 +114,7 @@ int ConvertBufferToRGB32(RawImageBufferViewFourCC& buffer,
         uint8_t* v_staging = u_staging + u_size;
 
         uint32_t src_format = buffer.pixel_format;
-        // These formats are aliases of eachother
+        // These formats are aliases of each other
         if (buffer.pixel_format == V4L2_PIX_FMT_YUY2 ||
             buffer.pixel_format == V4L2_PIX_FMT_YUNV ||
             buffer.pixel_format == V4L2_PIX_FMT_V422) {

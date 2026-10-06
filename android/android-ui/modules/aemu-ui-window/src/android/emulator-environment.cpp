@@ -79,8 +79,12 @@ static bool emulatorSetupEnvironment() {
 
     int envWidth, envHeight;
     androidHwConfig_getScreenDimensions(hwCfg, &envWidth, &envHeight);
-    int hwLcdWidth, hwLcdHeight;
-    androidHwConfig_getLcdDimensions(hwCfg, &hwLcdWidth, &hwLcdHeight);
+    // Keep LCD dimensions at 0x0 for displayless devices so the compositor
+    // skips drawing the guest display over the environment backdrop.
+    int hwLcdWidth = 0, hwLcdHeight = 0;
+    if (!hwCfg->hw_displayless) {
+        androidHwConfig_getLcdDimensions(hwCfg, &hwLcdWidth, &hwLcdHeight);
+    }
 
     // Send layout parameters to the compositor when display position and size
     // should be adjusted, note that this should be done even when there are

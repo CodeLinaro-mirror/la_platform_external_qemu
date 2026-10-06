@@ -68,7 +68,7 @@ public:
 private:
     std::shared_ptr<EmulatorGrpcClient> mClient;
     std::unique_ptr<AvdService::StubInterface> mService;
-    std::atomic_bool mLoaded;
+    std::atomic_bool mLoaded{false};
     AvdInfo mCachedInfo;
 };
 
