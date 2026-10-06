@@ -15,9 +15,14 @@
 #include "backend/packet_streamer_client.h"
 
 #include <chrono>
+#include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 #ifdef _WIN32
 #include <Windows.h>
 #else
@@ -40,13 +45,21 @@ using android::control::interceptor::MetricsInterceptorFactory;
 namespace netsim::packet {
 namespace {
 
-const std::chrono::duration kConnectionDeadline = std::chrono::seconds(1);
+constexpr int kMaxConnectRetries = 3;
+std::chrono::milliseconds g_connection_deadline{1000};
+// Exponential backoff of {1, 2, 4}s across kMaxConnectRetries preserves exact
+// cold/warm start behavior while keeping the shared worst-case failure wait to
+// 4 * 1s + (1 + 2 + 4)s = 11s (below a single 15s HangDetector interval).
+std::chrono::milliseconds g_initial_backoff{1000};
+constexpr std::chrono::seconds kFollowerWaitTimeout{15};
+
+std::mutex channel_mutex;
+std::condition_variable channel_cv;
 std::string custom_packet_stream_endpoint = "";
 std::shared_ptr<grpc::Channel> packet_stream_channel;
-std::mutex channel_mutex;
+bool connect_in_progress = false;
 
-std::shared_ptr<grpc::Channel> CreateGrpcChannel() {
-  auto endpoint = custom_packet_stream_endpoint;
+std::shared_ptr<grpc::Channel> CreateGrpcChannel(std::string endpoint) {
   if (endpoint.empty()) {
     auto port = netsim::osutils::GetServerAddress();
     if (!port.has_value()) return nullptr;
@@ -67,11 +80,14 @@ std::shared_ptr<grpc::Channel> CreateGrpcChannel() {
 }
 
 bool GrpcChannelReady(const std::shared_ptr<grpc::Channel> &channel) {
-  if (channel) {
-    auto deadline = std::chrono::system_clock::now() + kConnectionDeadline;
-    return channel->WaitForConnected(deadline);
+  if (!channel) return false;
+  std::chrono::milliseconds deadline_ms;
+  {
+    std::lock_guard<std::mutex> lock(channel_mutex);
+    deadline_ms = g_connection_deadline;
   }
-  return false;
+  auto deadline = std::chrono::system_clock::now() + deadline_ms;
+  return channel->WaitForConnected(deadline);
 }
 
 std::unique_ptr<android::base::ObservableProcess> RunNetsimd(
@@ -112,32 +128,82 @@ std::unique_ptr<android::base::ObservableProcess> RunNetsimd(
 }  // namespace
 
 void SetPacketStreamEndpoint(const std::string &endpoint) {
-  if (endpoint != "default") custom_packet_stream_endpoint = endpoint;
+  std::lock_guard<std::mutex> lock(channel_mutex);
+  custom_packet_stream_endpoint = (endpoint == "default") ? "" : endpoint;
+  packet_stream_channel.reset();
+}
+
+void SetConnectionBudgetForTesting(std::chrono::milliseconds deadline,
+                                   std::chrono::milliseconds initial_backoff) {
+  std::lock_guard<std::mutex> lock(channel_mutex);
+  g_connection_deadline = deadline;
+  g_initial_backoff = initial_backoff;
 }
 
 std::shared_ptr<grpc::Channel> GetChannel(NetsimdOptions options) {
-  std::lock_guard<std::mutex> lock(channel_mutex);
-
-  // bool is_netsimd_started = false;
-  std::unique_ptr<android::base::ObservableProcess> netsimProc;
-  for (int second : {1, 2, 4, 8}) {
-    if (!packet_stream_channel) packet_stream_channel = CreateGrpcChannel();
-    if (GrpcChannelReady(packet_stream_channel)) return packet_stream_channel;
-
-    packet_stream_channel.reset();
-
-    if ((!netsimProc || !netsimProc->isAlive()) &&
-        custom_packet_stream_endpoint.empty()) {
-      BtsLogInfo("Starting netsim since %s",
-                 netsimProc ? "the process died" : "it is not yet launched");
-      netsimProc = RunNetsimd(options);
+  std::unique_lock<std::mutex> lock(channel_mutex);
+  if (packet_stream_channel &&
+      packet_stream_channel->GetState(false) == GRPC_CHANNEL_READY) {
+    return packet_stream_channel;
+  }
+  if (connect_in_progress) {
+    if (!channel_cv.wait_for(lock, kFollowerWaitTimeout,
+                             [] { return !connect_in_progress; })) {
+      BtsLogError(
+          "Timed out waiting for in-progress netsim channel connection.");
+      return nullptr;
     }
-    BtsLogInfo("Retry connecting to netsim in %d second.", second);
-    std::this_thread::sleep_for(std::chrono::seconds(second));
+    return packet_stream_channel;
+  }
+  connect_in_progress = true;
+  std::shared_ptr<grpc::Channel> existing_channel =
+      std::move(packet_stream_channel);
+  const std::string endpoint_override = custom_packet_stream_endpoint;
+  auto backoff = g_initial_backoff;
+  lock.unlock();
+
+  std::shared_ptr<grpc::Channel> channel;
+  {
+    // Publishes |channel| and wakes the followers when this block exits, even
+    // if the attempt unwinds early. The block must end before `return channel`
+    // so the guard never observes the moved-from value an implicit move on
+    // return leaves behind when the compiler does not apply NRVO.
+    struct ConnectScopeGuard {
+      std::shared_ptr<grpc::Channel>& result;
+      ~ConnectScopeGuard() {
+        {
+          std::lock_guard<std::mutex> g(channel_mutex);
+          packet_stream_channel = result;
+          connect_in_progress = false;
+        }
+        channel_cv.notify_all();
+      }
+    } connect_guard{channel};
+
+    std::unique_ptr<android::base::ObservableProcess> netsimProc;
+    for (int i = 0; i <= kMaxConnectRetries; ++i) {
+      channel = existing_channel ? std::move(existing_channel)
+                                 : CreateGrpcChannel(endpoint_override);
+      if (GrpcChannelReady(channel)) break;
+      channel.reset();
+      // If this was the final attempt, break before we sleep or restart netsim.
+      if (i == kMaxConnectRetries) break;
+
+      if ((!netsimProc || !netsimProc->isAlive()) &&
+          endpoint_override.empty()) {
+        BtsLogInfo("Starting netsim since %s",
+                   netsimProc ? "the process died" : "it is not yet launched");
+        netsimProc = RunNetsimd(options);
+      }
+      BtsLogInfo("Retry connecting to netsim in %lld ms.",
+                 static_cast<long long>(backoff.count()));
+      std::this_thread::sleep_for(backoff);
+      backoff *= 2;
+    }
   }
 
-  BtsLogError("Unable to get a packet stream channel.");
-  return nullptr;
+  if (!channel) BtsLogError("Unable to get a packet stream channel.");
+  return channel;
 }
 
 std::shared_ptr<grpc::Channel> CreateChannel(NetsimdOptions options) {
