@@ -147,7 +147,7 @@ public:
 private:
     AudioStream* mStream;
     AudioCaptureEngine::AudioMode mAudioMode;
-    bool mRunning;
+    bool mRunning = false;
 };
 
 }  // namespace control

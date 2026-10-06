@@ -112,37 +112,41 @@ void LegacyTelephonyController::sendSmsAsync(const std::string& senderStr,
         return;
     }
 
-    AModem modem = mAgent->getModem();
-    if (!modem) {
-        invokeCallback(cb, TelephonyResponseStatus::ERROR);
-        return;
-    }
+    auto* agent = mAgent;
+    android::base::ThreadLooper::runOnMainLooper(
+            [agent, senderStr, message, cb]() {
+                AModem modem = agent->getModem();
+                if (!modem) {
+                    invokeCallback(cb, TelephonyResponseStatus::ERROR);
+                    return;
+                }
 
-    SmsAddressRec sender;
-    int retVal = sms_address_from_str(&sender, senderStr.c_str(),
-                                      senderStr.length());
-    if (retVal < 0 || sender.len <= 0) {
-        invokeCallback(cb, TelephonyResponseStatus::ERROR);
-        return;
-    }
+                SmsAddressRec sender;
+                int retVal = sms_address_from_str(&sender, senderStr.c_str(),
+                                                  senderStr.length());
+                if (retVal < 0 || sender.len <= 0) {
+                    invokeCallback(cb, TelephonyResponseStatus::ERROR);
+                    return;
+                }
 
-    const unsigned char* utf8Message =
-            reinterpret_cast<const unsigned char*>(message.data());
-    int nUtf8Chars = message.size();
+                const unsigned char* utf8Message =
+                        reinterpret_cast<const unsigned char*>(message.data());
+                int nUtf8Chars = message.size();
 
-    SmsPDU* pdus = smspdu_create_deliver_utf8(utf8Message, nUtf8Chars, &sender,
-                                              nullptr);
-    if (!pdus) {
-        invokeCallback(cb, TelephonyResponseStatus::ERROR);
-        return;
-    }
+                SmsPDU* pdus = smspdu_create_deliver_utf8(
+                        utf8Message, nUtf8Chars, &sender, nullptr);
+                if (!pdus) {
+                    invokeCallback(cb, TelephonyResponseStatus::ERROR);
+                    return;
+                }
 
-    for (int idx = 0; pdus[idx] != nullptr; idx++) {
-        amodem_receive_sms_vx(modem, pdus[idx]);
-    }
+                for (int idx = 0; pdus[idx] != nullptr; idx++) {
+                    amodem_receive_sms_vx(modem, pdus[idx]);
+                }
 
-    smspdu_free_list(pdus);
-    invokeCallback(cb, TelephonyResponseStatus::OK);
+                smspdu_free_list(pdus);
+                invokeCallback(cb, TelephonyResponseStatus::OK);
+            });
 }
 
 void LegacyTelephonyController::setCallStateCallback(

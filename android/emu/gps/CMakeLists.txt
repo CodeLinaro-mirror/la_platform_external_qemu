@@ -14,6 +14,7 @@ android_add_test(
   TARGET android-emu-gps_unittests
   SOURCE_DIR test
   SRC android/gps/GpxParser_unittest.cpp android/gps/KmlParser_unittest.cpp
+      android/gps_unittest.cpp
   DEPS android-emu-base android-emu-base-headers android-emu-gps android-emu-hardware gmock gmock_main
   LibXml2::LibXml2)
 target_include_directories(android-emu-gps_unittests PRIVATE src test)

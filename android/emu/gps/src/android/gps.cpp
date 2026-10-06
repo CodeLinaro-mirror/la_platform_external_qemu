@@ -10,16 +10,18 @@
 ** GNU General Public License for more details.
 */
 #include "android/gps.h"
+#include "aemu/base/ThreadAnnotations.h"
+#include "aemu/base/synchronization/Lock.h"
 #include "android/emulation/serial_line.h"
 #include "android/gps/PassiveGpsUpdater.h"
 #include "android/utils/debug.h"
 #include "android/utils/stralloc.h"
+#include "host-common/VmLock.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <memory>
-#include <mutex>
 
 using android::emulation::PassiveGpsUpdater;
 
@@ -28,22 +30,30 @@ CSerialLine* android_gps_serial_line;
 static bool s_enable_passive_location_update = true;
 static bool s_enable_gps_signal = true;
 static bool s_enable_gnssgrpcv1 = false;
-static std::mutex s_set_location_mutex;
-static android_gps_location_callback_t s_location_callback = nullptr;
+
+// Lock hierarchy:
+//   VmLock (BQL) -> s_set_location_mutex -> g_qemud_client_global_lock
+// Any function that acquires both VmLock and s_set_location_mutex (including
+// functions that call android_gps_send_nmea() -> qemud_service_broadcast()
+// while holding s_set_location_mutex) MUST acquire VmLock first to prevent
+// ABBA deadlocks with callers invoked from the QEMU main loop under BQL.
+static android::base::StaticLock s_set_location_mutex;
+static android_gps_location_callback_t s_location_callback
+        GUARDED_BY(s_set_location_mutex) = nullptr;
 
 void android_gps_register_location_callback(android_gps_location_callback_t callback) {
-    const std::lock_guard<std::mutex> lock(s_set_location_mutex);
+    const android::base::AutoLock lock(s_set_location_mutex);
     s_location_callback = callback;
 }
 std::unique_ptr<PassiveGpsUpdater> s_updater;
 
 // Last state of the gps, initial coordinates point to Googleplex.
-double s_latitude = 39.237256;
-double s_longitude = -123.150032;
-double s_metersElevation = 0;
-double s_speedKnots = 0;
-double s_headingDegrees = 0;
-int s_nSatellites = 4;
+double s_latitude GUARDED_BY(s_set_location_mutex) = 39.237256;
+double s_longitude GUARDED_BY(s_set_location_mutex) = -123.150032;
+double s_metersElevation GUARDED_BY(s_set_location_mutex) = 0;
+double s_speedKnots GUARDED_BY(s_set_location_mutex) = 0;
+double s_headingDegrees GUARDED_BY(s_set_location_mutex) = 0;
+int s_nSatellites GUARDED_BY(s_set_location_mutex) = 4;
 
 #define D(...) VERBOSE_PRINT(gps, __VA_ARGS__)
 
@@ -57,6 +67,9 @@ void android_gps_send_nmea(const char* sentence) {
 
     D("sending '%s'", sentence);
 
+    // Lock ordering: VmLock (BQL) must be held before writing to the GPS
+    // QEMUD serial line.
+    android::RecursiveScopedVmLockIfInstance vmlock;
     if (android_gps_serial_line == NULL) {
         D("missing GPS channel, ignored");
         return;
@@ -77,6 +90,9 @@ void android_gps_send_gnss(const char* sentence) {
     if (sentence == NULL)
         return;
 
+    // Lock ordering: VmLock (BQL) must be held before writing to the GPS
+    // QEMUD serial line.
+    android::RecursiveScopedVmLockIfInstance vmlock;
     if (android_gps_serial_line == NULL) {
         D("missing GPS channel, ignored");
         return;
@@ -104,7 +120,8 @@ static void send_location_to_device_gnssrpcv1(double latitude,
                                               double metersElevation,
                                               double speedKnots,
                                               double headingDegrees,
-                                              const struct timeval* time) {
+                                              const struct timeval* time)
+        REQUIRES(s_set_location_mutex) {
     constexpr double kAccuracyMeters = 1;
     constexpr double kAccuracySpeed = .5;
     constexpr double kAccuracyHeading = 2;
@@ -141,12 +158,13 @@ s_set_location_mutex.
 @param time The current time.
 */
 static void send_location_to_device_internal(double latitude,
-                                        double longitude,
-                                        double metersElevation,
-                                        double speedKnots,
-                                        double headingDegrees,
-                                        int nSatellites,
-                                        const struct timeval* time) {
+                                             double longitude,
+                                             double metersElevation,
+                                             double speedKnots,
+                                             double headingDegrees,
+                                             int nSatellites,
+                                             const struct timeval* time)
+        REQUIRES(s_set_location_mutex) {
     STRALLOC_DEFINE(msgStr);
     STRALLOC_DEFINE(elevationStr);
     char* elevStrPtr;
@@ -300,6 +318,7 @@ int android_gps_get_location(double* outLatitude,
     //
     // - Someone managed to fake the gps coordinates from inside the device
     // - Android itself has not yet sampled this value. (Usually 1hz)
+    const android::base::AutoLock lock(s_set_location_mutex);
     if (outLatitude)
         *outLatitude = s_latitude;
     if (outLongitude)
@@ -339,7 +358,10 @@ void android_gps_send_location(double latitude,
                                const struct timeval* time) {
     android_gps_location_callback_t location_callback = nullptr;
     {
-        const std::lock_guard<std::mutex> lock(s_set_location_mutex);
+        // Lock ordering: Always acquire VmLock (BQL) BEFORE
+        // s_set_location_mutex.
+        android::RecursiveScopedVmLockIfInstance vmlock;
+        const android::base::AutoLock lock(s_set_location_mutex);
 
         s_latitude = latitude;
         s_longitude = longitude;
@@ -366,7 +388,9 @@ void android_gps_send_location(double latitude,
 }
 
 void android_gps_refresh() {
-    const std::lock_guard<std::mutex> lock(s_set_location_mutex);
+    // Lock ordering: Always acquire VmLock (BQL) BEFORE s_set_location_mutex.
+    android::RecursiveScopedVmLockIfInstance vmlock;
+    const android::base::AutoLock lock(s_set_location_mutex);
     timeval timeVal = {};
     gettimeofday(&timeVal, nullptr);
 
