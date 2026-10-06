@@ -35,6 +35,7 @@
 #include "qemu/error-report.h"
 #include "qemu/queue.h"
 #include "qom/object.h"
+#include "trace.h"
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -308,7 +309,9 @@ static int os_host_main_loop_wait(int64_t timeout)
     ret = qemu_poll_ns((GPollFD *)gpollfds->data, gpollfds->len, timeout);
 
     replay_mutex_lock();
+    trace_main_loop_bql_lock_begin(ret);
     bql_lock();
+    trace_main_loop_bql_lock_end(ret);
 
     glib_pollfds_poll();
 
@@ -525,7 +528,9 @@ static int os_host_main_loop_wait(int64_t timeout)
 
     replay_mutex_lock();
 
+    trace_main_loop_bql_lock_begin(g_poll_ret);
     bql_lock();
+    trace_main_loop_bql_lock_end(g_poll_ret);
     if (g_poll_ret > 0) {
         for (i = 0; i < w->num; i++) {
             w->revents[i] = poll_fds[n_poll_fds + i].revents;
@@ -600,7 +605,9 @@ void main_loop_wait(int nonblocking)
          */
         icount_start_warp_timer();
     }
+    trace_main_loop_timers_begin();
     qemu_clock_run_all_timers();
+    trace_main_loop_timers_end();
 }
 
 /* Functions to operate on the main QEMU AioContext.  */
