@@ -64,6 +64,7 @@ public:
             ::grpc::ServerContext* context,
             const ::android::emulation::control::incubating::CarEvent* request,
             ::google::protobuf::Empty* response) override {
+        android::RecursiveScopedVmLock vmlock;
         mCarDataAgent->sendCarData(request->data().data(),
                                    request->data().size());
         return grpc::Status::OK;
@@ -73,6 +74,7 @@ public:
             ::grpc::CallbackServerContext* /*context*/,
             ::google::protobuf::Empty* /*response*/) override {
         return new SimpleServerLambdaReader<CarEvent>([this](auto request) {
+            android::RecursiveScopedVmLock vmlock;
             mCarDataAgent->sendCarData(request->data().data(),
                                        request->data().size());
             return grpc::Status::OK;

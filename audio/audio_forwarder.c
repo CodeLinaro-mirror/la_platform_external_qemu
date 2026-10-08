@@ -80,6 +80,8 @@ void audio_forwarder_register_card(audio_forwarder_set_voice_cb set,
     }
 }
 
+// Lock ordering: callers must hold BQL (VmLock) before acquiring
+// g_deactivation_mutex.
 int audio_forwarder_enable(const struct audsettings *as,
                           struct audio_capture_ops *ops,
                           audio_forwarder_read_available available_fn,
@@ -89,6 +91,8 @@ int audio_forwarder_enable(const struct audsettings *as,
         qemu_mutex_init(&g_deactivation_mutex);
     }
 
+    qemu_mutex_lock(&g_deactivation_mutex);
+
     // Initialize the forward driver..
     AudioState *s = &glob_audio_state;
     disable_fixed_input_conf();
@@ -97,13 +101,16 @@ int audio_forwarder_enable(const struct audsettings *as,
     g_prev_drv = s->drv;
     g_prev_drv_opaque = s->drv_opaque;
     g_prev_sw = (*g_get_voice_cb)();
-    g_prev_hw = g_prev_sw->hw;
-    g_prev_info = g_prev_hw->info;
-
-    g_prev_hw->info = g_empty_info;
+    g_prev_hw = g_prev_sw ? g_prev_sw->hw : NULL;
+    if (g_prev_hw) {
+        g_prev_info = g_prev_hw->info;
+        g_prev_hw->info = g_empty_info;
+    }
     g_prev_is_real_audio_allowed = qemu_is_real_audio_allowed();
     g_active_avail = available_fn;
-    AUD_set_active_in(g_prev_sw, 0);
+    if (g_prev_sw) {
+        AUD_set_active_in(g_prev_sw, 0);
+    }
 
     // Activate our forward driver.
     audio_driver *driver = audio_driver_lookup("fwd");
@@ -111,6 +118,7 @@ int audio_forwarder_enable(const struct audsettings *as,
         audio_driver_init(s, driver))
     {
         // This shouldn't happen..
+        qemu_mutex_unlock(&g_deactivation_mutex);
         return -1;
     }
 
@@ -125,15 +133,23 @@ int audio_forwarder_enable(const struct audsettings *as,
 
     // gRPC means we will allow audio for now..
     qemu_allow_real_audio(true);
-    AUD_set_active_in(g_active_sw, 1);
+    if (g_active_sw) {
+        AUD_set_active_in(g_active_sw, 1);
+    }
+    qemu_mutex_unlock(&g_deactivation_mutex);
     return 0;
 }
 
 void audio_forwarder_disable()
 {
+    if (!g_deactivation_mutex.initialized) {
+        return;
+    }
     qemu_mutex_lock(&g_deactivation_mutex);
     enabled_fixed_input_conf();
-    g_prev_hw->info = g_prev_info;
+    if (g_prev_hw) {
+        g_prev_hw->info = g_prev_info;
+    }
 
     // Disable us if we were active.
 
@@ -154,8 +170,11 @@ void audio_forwarder_disable()
     s->drv = g_prev_drv;
     s->drv_opaque = g_prev_drv_opaque;
     (*g_set_voice_cb)(g_prev_sw);
-    AUD_set_active_in(g_prev_sw, 1);
-
+    if (g_prev_sw) {
+        AUD_set_active_in(g_prev_sw, 1);
+    }
+    g_prev_hw = NULL;
+    g_prev_sw = NULL;
 
     // TODO(jansene): Is this what we really want?
     // (We could also refactor this by disabling the sw voice, which would do the same)

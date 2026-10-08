@@ -1,5 +1,7 @@
 #include "android/emulation/control/keyboard/PenEventSender.h"
 
+#include "android/console.h"
+
 #include <functional>
 #include <vector>
 

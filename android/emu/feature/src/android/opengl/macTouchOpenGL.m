@@ -15,7 +15,12 @@
 #include "android/opengl/macTouchOpenGL.h"
 
 #include <Cocoa/Cocoa.h>
+#include <Metal/Metal.h>
 #include <OpenGL/OpenGL.h>
+
+#ifndef MTLGPUFamilyMetal4
+#define MTLGPUFamilyMetal4 ((MTLGPUFamily)5002)
+#endif
 
 static NSOpenGLPixelFormatAttribute testAttrs[] =
 {
@@ -38,5 +43,24 @@ void macTouchOpenGL() {
 
 int hasMetalNative() {
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-    return device != nil;
+    if (!device) {
+        return 0;
+    }
+    [device release];
+    return 1;
+}
+
+int hasMetal4Native() {
+    NSOperatingSystemVersion minVersion = {26, 0, 0};
+    if (![[NSProcessInfo processInfo]
+                isOperatingSystemAtLeastVersion:minVersion]) {
+        return 0;
+    }
+    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+    if (!device) {
+        return 0;
+    }
+    BOOL supportsMetal4 = [device supportsFamily:MTLGPUFamilyMetal4];
+    [device release];
+    return supportsMetal4 ? 1 : 0;
 }

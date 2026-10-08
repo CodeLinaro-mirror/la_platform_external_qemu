@@ -18,6 +18,7 @@ extern "C" {
 
 #include "aemu/base/memory/LazyInstance.h"
 #include "android/utils/debug.h"
+#include "host-common/VmLock.h"
 
 extern "C" {
 #include "qemu/osdep.h"
@@ -28,6 +29,15 @@ extern "C" {
 
 #include <atomic>
 #include <unordered_map>
+
+// Lock ordering:
+//   1. VmLock (BQL) via android::RecursiveScopedVmLock
+//   2. g_deactivation_mutex in audio/audio_forwarder.c
+//   3. RingStreambuf internal mutex (via capturer->onSample / available)
+// All mutations of sGlobals->mCapturerMap and QEMU audio core state
+// (AUD_add_capture, AUD_del_capture, audio_forwarder_enable,
+// audio_forwarder_disable) must hold VmLock to serialize against the
+// QEMU main loop (iothread) audio_timer callbacks.
 
 struct AudioState {
     int bytes = 0;
@@ -101,6 +111,7 @@ int QemuAudioCaptureEngine::start(android::emulation::AudioCapturer* capturer)
     ops.capture = my_capture;
     ops.destroy = my_destroy;
 
+    android::RecursiveScopedVmLock vmlock;
     AudioState* state = &sGlobals->mCapturerMap[capturer];
 
     state->bits = bits;
@@ -123,6 +134,7 @@ int QemuAudioCaptureEngine::start(android::emulation::AudioCapturer* capturer)
 // the caller is responsible to free capturer
 int QemuAudioCaptureEngine::stop(android::emulation::AudioCapturer* capturer)
 {
+    android::RecursiveScopedVmLock vmlock;
     auto stateIt = sGlobals->mCapturerMap.find(capturer);
     if (stateIt == sGlobals->mCapturerMap.end())
         return -1;
@@ -153,6 +165,11 @@ static int my_microphone_avail(void* opaque) {
 
 int QemuAudioInputEngine::start(android::emulation::AudioCapturer* capturer)
 {
+    // Hold VmLock across the mRunning transition and audio_forwarder_enable()
+    // so they are atomic with respect to stop(). Otherwise a start() racing
+    // with a stop() could enable the forwarder before the previous session is
+    // disabled, overwriting the saved g_prev_* state in audio_forwarder.c.
+    android::RecursiveScopedVmLock vmlock;
     bool expected = false;
     if (!mRunning.compare_exchange_strong(expected, true)) {
         derror("Already running a capture engine\n");
@@ -164,11 +181,13 @@ int QemuAudioInputEngine::start(android::emulation::AudioCapturer* capturer)
     int nchannels = capturer->getChannels();
 
     if (bits != 8 && bits != 16) {
+        mRunning = false;
         derror("Invalid bits value audio capture\n");
         return -1;
     }
 
     if (nchannels != 1 && nchannels != 2) {
+        mRunning = false;
         derror("Invalid channels value audio capture\n");
         return -1;
     }
@@ -187,15 +206,25 @@ int QemuAudioInputEngine::start(android::emulation::AudioCapturer* capturer)
     ops.capture = my_microphone;
     ops.destroy = my_destroy;
 
-    return audio_forwarder_enable(&as, &ops, my_microphone_avail, capturer);
+    int res = audio_forwarder_enable(&as, &ops, my_microphone_avail, capturer);
+    if (res != 0) {
+        mRunning = false;
+    }
+    return res;
 }
 
 
 int QemuAudioInputEngine::stop(android::emulation::AudioCapturer* capturer)
 {
-   audio_forwarder_disable();
-   mRunning = false;
-   return 0;
+    // See start(): the mRunning transition and audio_forwarder_disable() must
+    // happen under the same VmLock critical section.
+    android::RecursiveScopedVmLock vmlock;
+    bool expected = true;
+    if (!mRunning.compare_exchange_strong(expected, false)) {
+        return -1;
+    }
+    audio_forwarder_disable();
+    return 0;
 }
 
 
