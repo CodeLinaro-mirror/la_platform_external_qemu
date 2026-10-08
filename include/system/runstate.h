@@ -156,5 +156,8 @@ void qemu_system_guest_crashloaded(GuestPanicInformation *info);
 void qemu_system_guest_pvshutdown(void);
 bool qemu_system_dump_in_progress(void);
 
+/* Save or delete the -savevm snapshot on exit; implemented in vl.c. */
+int try_savevm(ShutdownCause exit_cause);
+
 #endif
 

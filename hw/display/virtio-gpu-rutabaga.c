@@ -364,11 +364,14 @@ rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
 
     rutabaga_setup_full_res_transfer(res, &transfer, &transfer_iovec);
 
+    trace_virtio_gpu_cmd_res_flush_read_start(rf.resource_id);
     result = rutabaga_resource_transfer_read(vr->rutabaga, 0,
                                              rf.resource_id, &transfer,
                                              &transfer_iovec);
+    trace_virtio_gpu_cmd_res_flush_read_end(rf.resource_id, result);
     CHECK(!result, cmd);
     dpy_gfx_update_full(scanout->con);
+    trace_virtio_gpu_cmd_res_flush_done(rf.resource_id);
 }
 
 static void
@@ -992,6 +995,16 @@ virtio_gpu_rutabaga_aio_cb(void *opaque)
 
         if (signaled_ctx_specific &&
            (cmd->cmd_hdr.ring_idx != fence_data.ring_idx)) {
+            continue;
+        }
+
+        /*
+         * Context specific timelines are per (ctx_id, ring_idx). Fence ids
+         * are allocated from a single guest-wide counter, so a completion
+         * from one context must not retire the pending fences of another.
+         */
+        if (signaled_ctx_specific &&
+           (cmd->cmd_hdr.ctx_id != fence_data.ctx_id)) {
             continue;
         }
 

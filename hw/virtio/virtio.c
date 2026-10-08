@@ -2503,8 +2503,11 @@ static void virtio_queue_notify_vq(VirtQueue *vq)
             return;
         }
 
-        trace_virtio_queue_notify(vdev, vq - vdev->vq, vq);
+        const int vq_index = vq - vdev->vq;
+        trace_virtio_queue_notify(vdev, vq_index, vq);
+        trace_virtio_queue_handle_output_begin(vdev, vdev->name, vq_index, vq, true);
         vq->handle_output(vdev, vq);
+        trace_virtio_queue_handle_output_end(vdev, vdev->name, vq_index, vq, true);
 
         if (unlikely(vdev->start_on_kick)) {
             virtio_set_started(vdev, true);
@@ -2524,7 +2527,9 @@ void virtio_queue_notify(VirtIODevice *vdev, int n)
     if (vq->host_notifier_enabled) {
         event_notifier_set(&vq->host_notifier);
     } else if (vq->handle_output) {
+        trace_virtio_queue_handle_output_begin(vdev, vdev->name, n, vq, false);
         vq->handle_output(vdev, vq);
+        trace_virtio_queue_handle_output_end(vdev, vdev->name, n, vq, false);
 
         if (unlikely(vdev->start_on_kick)) {
             virtio_set_started(vdev, true);
