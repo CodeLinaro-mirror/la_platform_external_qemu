@@ -199,11 +199,26 @@ public:
     // We always select index 0 of the T<X,...>
     using W = Select_t<0, T>;
 
+    void CloseWriter() {
+        const std::lock_guard<std::mutex> lock(mWritelock);
+        mClosed = true;
+        if (!mWriting) {
+            std::queue<W>().swap(mWriteQueue);
+        }
+    }
+
     void OnWriteDone(bool ok) override {
         {
             const std::lock_guard<std::mutex> lock(mWritelock);
-            mWriteQueue.pop();
+            if (!mWriteQueue.empty()) {
+                mWriteQueue.pop();
+            }
             mWriting = false;
+            if (!ok || mClosed) {
+                mClosed = true;
+                std::queue<W>().swap(mWriteQueue);
+                return;
+            }
         }
         NextWrite();
     }
@@ -212,6 +227,9 @@ public:
     virtual void Write(const W& msg) {
         {
             const std::lock_guard<std::mutex> lock(mWritelock);
+            if (mClosed) {
+                return;
+            }
             mWriteQueue.push(msg);
         }
         NextWrite();
@@ -221,7 +239,7 @@ private:
     void NextWrite() {
         {
             const std::lock_guard<std::mutex> lock(mWritelock);
-            if (!mWriteQueue.empty() && !mWriting) {
+            if (!mClosed && !mWriteQueue.empty() && !mWriting) {
                 mWriting = true;
                 T::StartWrite(&mWriteQueue.front());
             }
@@ -231,6 +249,7 @@ private:
     std::queue<W> mWriteQueue;
     std::mutex mWritelock;
     bool mWriting{false};
+    bool mClosed{false};
 };
 
 template <typename W>
@@ -249,6 +268,7 @@ public:
     }
 
     virtual void OnDone(const grpc::Status& status) override {
+        this->CloseWriter();
         mOnDone(status);
         delete this;
     }

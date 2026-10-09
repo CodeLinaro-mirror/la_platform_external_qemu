@@ -100,7 +100,10 @@ public:
     std::string peer() { return mContext.peer(); }
 
     // True if we should attempt to reconnect when the packet streamer fails.
-    bool reconnect() { return mReconnect; }
+    bool reconnect() {
+        std::lock_guard<std::mutex> l(mAwaitMutex);
+        return mReconnect;
+    }
 
     // Called when you are ready to start the stream, this will obtain a self
     // reference. It will start the protocol with the remote service.
@@ -167,5 +170,11 @@ private:
 std::unique_ptr<PacketProtocol> getPacketProtocol(
         std::string deviceType,
         std::shared_ptr<DeviceInfo> deviceInfo);
+
+// Safely updates `device->transport` under `gActiveDevicesLock` if `device` is
+// still an active registered chardev.
+bool set_netsim_device_transport(
+        PacketStreamChardev* device,
+        const std::shared_ptr<PacketStreamerTransport>& transport);
 }  // namespace qemu2
 }  // namespace android
