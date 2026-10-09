@@ -15,3 +15,14 @@ android_add_library(
        protobuf::libprotobuf
        util-lib)
 target_include_directories(packet-streamer-client-lib PUBLIC ..)
+
+android_add_test(
+  TARGET packet-streamer-client_unittest
+  SRC packet_streamer_client_unittest.cpp
+  DEPS android-emu-base
+       android-emu-base-headers
+       gmock_main
+       grpc++
+       packet-streamer-client-lib
+       packet-streamer-proto-lib
+       protobuf::libprotobuf)

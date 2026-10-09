@@ -59,6 +59,9 @@ PacketStreamerTransport::PacketStreamerTransport(
       mSerializer(std::move(serializer)),
       mChannelFactory(factory),
       mQemuDeviceWriter([this](uint8_t* bytes, size_t size) {
+          if (!mQemudevice) {
+              return;
+          }
           DD("Writing %d bytest to qemu", size);
           qemu_chr_be_write(&mQemudevice->parent, bytes, size);
       }) {}
@@ -66,32 +69,85 @@ PacketStreamerTransport::PacketStreamerTransport(
 PacketStreamerTransport::~PacketStreamerTransport() {}
 
 void PacketStreamerTransport::Read(const PacketResponse* received) {
-    mSerializer->forwardToQemu(received, mQemuDeviceWriter);
+    std::vector<std::vector<uint8_t>> toQemu;
+    {
+        std::lock_guard<std::mutex> guard(mWriterMutex);
+        if (!mSerializer) {
+            return;
+        }
+        mSerializer->forwardToQemu(
+                received, [&toQemu](uint8_t* bytes, size_t size) {
+                    if (bytes && size > 0) {
+                        toQemu.emplace_back(bytes, bytes + size);
+                    }
+                });
+    }
+    for (auto& packet : toQemu) {
+        mQemuDeviceWriter(packet.data(), packet.size());
+    }
 }
 
 void PacketStreamerTransport::OnDone(const grpc::Status& s) {
-    mSerializer->connectionStateChange(
-            PacketProtocol::ConnectionStateChange::REMOTE_DISCONNECTED,
-            mQemuDeviceWriter);
-    mDone = true;
-    mAwaitCondition.notify_one();
+    CloseWriter();
+    std::vector<std::vector<uint8_t>> toQemu;
+    {
+        std::lock_guard<std::mutex> guard(mWriterMutex);
+        if (mSerializer) {
+            mSerializer->connectionStateChange(
+                    PacketProtocol::ConnectionStateChange::REMOTE_DISCONNECTED,
+                    [&toQemu](uint8_t* bytes, size_t size) {
+                        if (bytes && size > 0) {
+                            toQemu.emplace_back(bytes, bytes + size);
+                        }
+                    });
+        }
+    }
+    for (auto& packet : toQemu) {
+        mQemuDeviceWriter(packet.data(), packet.size());
+    }
 
-    if (mReconnect) {
+    if (reconnect()) {
         auto channel = mChannelFactory();
 
+        // Take ownership of the serializer only if nobody cancelled this
+        // transport while the channel factory was blocking, so a cancelled
+        // device never receives a replacement stream.
+        std::unique_ptr<PacketProtocol> serializer;
+        if (channel) {
+            std::lock_guard<std::mutex> l(mAwaitMutex);
+            if (mReconnect) {
+                std::lock_guard<std::mutex> guard(mWriterMutex);
+                serializer = std::move(mSerializer);
+            }
+        }
+
         if (!channel) {
-            auto info = mSerializer->chip_info();
-            dwarning("Unable to reconnect to packet streamer for device: %s",
-                     info->name().c_str());
-        } else {
-            // replace the transport..
+            std::lock_guard<std::mutex> guard(mWriterMutex);
+            if (mSerializer) {
+                auto info = mSerializer->chip_info();
+                dwarning("Unable to reconnect to packet streamer for device: %s",
+                         info->name().c_str());
+            }
+        } else if (serializer) {
+            // replace the transport.. Publish and start it without holding
+            // mAwaitMutex/mWriterMutex: set_netsim_device_transport() takes
+            // gActiveDevicesLock, which close_netsim() holds while calling
+            // cancel() on us.
             DD("Replacing transport");
             auto transport = PacketStreamerTransport::create(
-                    mQemudevice, std::move(mSerializer), channel,
+                    mQemudevice, std::move(serializer), channel,
                     mChannelFactory);
-            mQemudevice->transport = transport;
-            transport->start();
+            if (!mQemudevice ||
+                set_netsim_device_transport(mQemudevice, transport)) {
+                transport->start();
+            }
         }
+    }
+
+    {
+        std::lock_guard<std::mutex> l(mAwaitMutex);
+        mDone = true;
+        mAwaitCondition.notify_all();
     }
 
     // No longer active..
@@ -100,7 +156,15 @@ void PacketStreamerTransport::OnDone(const grpc::Status& s) {
 }
 
 void PacketStreamerTransport::cancel() {
-    mReconnect = false;
+    {
+        std::lock_guard<std::mutex> l(mAwaitMutex);
+        mReconnect = false;
+    }
+    {
+        std::lock_guard<std::mutex> guard(mWriterMutex);
+        mSerializer.reset();
+    }
+    CloseWriter();
 
     // This will result in the scheduling of an OnDone callback.
     // At that point we will notify the packet protocol of a state change.
@@ -109,15 +173,37 @@ void PacketStreamerTransport::cancel() {
 
 uint64_t PacketStreamerTransport::fromQemu(const uint8_t* buffer,
                                            uint64_t bufferSize) {
-    auto packets = mSerializer->forwardToPacketStreamer(buffer, bufferSize);
+    std::vector<PacketRequest> packets;
+    {
+        std::lock_guard<std::mutex> guard(mWriterMutex);
+        if (!mSerializer) {
+            return 0;
+        }
+        packets = mSerializer->forwardToPacketStreamer(buffer, bufferSize);
+    }
     writePackets(packets);
     return bufferSize;
 }
 
 void PacketStreamerTransport::qemuConnected() {
-    auto packets = mSerializer->connectionStateChange(
-            PacketProtocol::ConnectionStateChange::QEMU_CONNECTED,
-            mQemuDeviceWriter);
+    std::vector<PacketRequest> packets;
+    std::vector<std::vector<uint8_t>> toQemu;
+    {
+        std::lock_guard<std::mutex> guard(mWriterMutex);
+        if (!mSerializer) {
+            return;
+        }
+        packets = mSerializer->connectionStateChange(
+                PacketProtocol::ConnectionStateChange::QEMU_CONNECTED,
+                [&toQemu](uint8_t* bytes, size_t size) {
+                    if (bytes && size > 0) {
+                        toQemu.emplace_back(bytes, bytes + size);
+                    }
+                });
+    }
+    for (auto& packet : toQemu) {
+        mQemuDeviceWriter(packet.data(), packet.size());
+    }
     writePackets(packets);
 }
 
@@ -139,9 +225,23 @@ void PacketStreamerTransport::start() {
 
     // Notify that we are connected, and send out the handshake packets
     // (if any)
-    auto packets = mSerializer->connectionStateChange(
-            PacketProtocol::ConnectionStateChange::REMOTE_CONNECTED,
-            mQemuDeviceWriter);
+    std::vector<PacketRequest> packets;
+    std::vector<std::vector<uint8_t>> toQemu;
+    {
+        std::lock_guard<std::mutex> guard(mWriterMutex);
+        if (mSerializer) {
+            packets = mSerializer->connectionStateChange(
+                    PacketProtocol::ConnectionStateChange::REMOTE_CONNECTED,
+                    [&toQemu](uint8_t* bytes, size_t size) {
+                        if (bytes && size > 0) {
+                            toQemu.emplace_back(bytes, bytes + size);
+                        }
+                    });
+        }
+    }
+    for (auto& packet : toQemu) {
+        mQemuDeviceWriter(packet.data(), packet.size());
+    }
     writePackets(packets);
     DD("Stream scheduled.");
 }
