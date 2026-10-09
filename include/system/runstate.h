@@ -159,5 +159,12 @@ bool qemu_system_dump_in_progress(void);
 /* Save or delete the -savevm snapshot on exit; implemented in vl.c. */
 int try_savevm(ShutdownCause exit_cause);
 
+/*
+ * Notifiers run on the main loop thread with the BQL held, after the main
+ * loop has exited and try_savevm() has returned, and before qemu_cleanup().
+ * The data argument points to the ShutdownCause.
+ */
+void qemu_register_main_loop_exit_notifier(Notifier *notifier);
+
 #endif
 

@@ -268,6 +268,7 @@ EXPORTS
     qemu_put_be64
     qemu_put_buffer
     qemu_put_byte
+    qemu_register_main_loop_exit_notifier
     qemu_register_reset
     qemu_register_shutdown_notifier
     qemu_send_packet_async
