@@ -126,7 +126,11 @@ EmulatorContainer::EmulatorContainer(EmulatorQtWindow* window)
             SLOT(slot_displayPowerModeChanged(uint32_t, int)));
 
     // Detect AI Glasses and add GlassesStatusOverlay
-    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) == AVD_GLASSES) {
+    if (avdInfo_getAvdFlavor(getConsoleAgents()->settings->avdInfo()) ==
+                AVD_GLASSES &&
+        !getConsoleAgents()
+                 ->settings->android_cmdLineOptions()
+                 ->qt_hide_window) {
         mGlassesStatusOverlay = new GlassesStatusOverlay(this);
 
         // For displayless AI Glasses, show the "no display" status overlay
