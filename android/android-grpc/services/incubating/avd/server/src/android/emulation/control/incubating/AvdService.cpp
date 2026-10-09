@@ -108,6 +108,7 @@ public:
         }
 
         avdInfo.set_api_level(mQemuAvd->apiLevel);
+        avdInfo.set_api_level_minor(mQemuAvd->apiLevelMinor);
         avdInfo.set_incremental_version(mQemuAvd->incrementalVersion);
         avdInfo.set_is_marshmallow_or_higher(mQemuAvd->isMarshmallowOrHigher);
         avdInfo.set_is_google_apis(mQemuAvd->isGoogleApis);
