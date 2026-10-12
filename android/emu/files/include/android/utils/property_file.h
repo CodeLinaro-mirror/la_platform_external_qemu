@@ -43,7 +43,7 @@ char* propertyFile_getAnyValue(const char* propertyFile,
 // Maximum length of a property name (including terminating zero).
 // Any property name that is equal or greater than this value will be
 // considered undefined / ignored.
-#define MAX_PROPERTY_NAME_LEN  32
+#define MAX_PROPERTY_NAME_LEN  48
 
 // Maximum length of a property value (including terminating zero).
 // Any value stored in a file that has a length equal or greater than this

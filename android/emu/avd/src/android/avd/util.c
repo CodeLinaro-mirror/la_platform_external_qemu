@@ -211,6 +211,65 @@ bool propertyFile_getBool(const FileData* data, const char* key, bool _default,
     return val;
 }
 
+static bool _propertyFile_parseSdkFull(const FileData* data,
+                                       int* major,
+                                       int* minor,
+                                       SearchResult* searchResult) {
+    const char* kSdkFullProps[] = {
+            "ro.build.version.sdk_full",
+            "ro.system.build.version.sdk_full",
+    };
+    char* prop = propertyFile_getAnyValue((const char*)data->data, data->size,
+                                          kSdkFullProps,
+                                          ARRAY_SIZE(kSdkFullProps));
+    if (!prop) {
+        if (searchResult) {
+            *searchResult = RESULT_NOT_FOUND;
+        }
+        return false;
+    }
+
+    char* end = NULL;
+    long long majorVal = strtoll(prop, &end, 10);
+    if (majorVal < INT_MIN || majorVal > INT_MAX || end == prop ||
+        (*end != '\0' && *end != '.')) {
+        D("Invalid sdk_full property: '%s'", prop);
+        AFREE(prop);
+        if (searchResult) {
+            *searchResult = RESULT_INVALID;
+        }
+        return false;
+    }
+
+    long long minorVal = 0;
+    if (*end == '.') {
+        const char* minorStart = end + 1;
+        char* minorEnd = NULL;
+        minorVal = strtoll(minorStart, &minorEnd, 10);
+        if (minorVal < 0 || minorVal > INT_MAX || minorEnd == minorStart ||
+            *minorEnd != '\0') {
+            D("Invalid sdk_full minor property: '%s'", prop);
+            AFREE(prop);
+            if (searchResult) {
+                *searchResult = RESULT_INVALID;
+            }
+            return false;
+        }
+    }
+
+    AFREE(prop);
+    if (major) {
+        *major = (int)majorVal;
+    }
+    if (minor) {
+        *minor = (int)minorVal;
+    }
+    if (searchResult) {
+        *searchResult = RESULT_FOUND;
+    }
+    return true;
+}
+
 int
 propertyFile_getApiLevel(const FileData* data) {
     const int kMinLevel = 3;
@@ -218,6 +277,12 @@ propertyFile_getApiLevel(const FileData* data) {
     SearchResult searchResult;
     int level = propertyFile_getInt(data, "ro.build.version.sdk", kMinLevel,
                                     &searchResult);
+    if (searchResult == RESULT_NOT_FOUND) {
+        int major = kMinLevel;
+        if (_propertyFile_parseSdkFull(data, &major, NULL, &searchResult)) {
+            level = major;
+        }
+    }
     if (searchResult == RESULT_NOT_FOUND) {
         level = kMaxLevel;
         D("Could not find SDK version in build.prop, default is: %d", level);
@@ -227,6 +292,16 @@ propertyFile_getApiLevel(const FileData* data) {
         D("Found target API sdkVersion: %d\n", level);
     }
     return level;
+}
+
+int
+propertyFile_getApiLevelMinor(const FileData* data) {
+    int minor = 0;
+    if (_propertyFile_parseSdkFull(data, NULL, &minor, NULL)) {
+        D("Found target API sdkVersion minor: %d\n", minor);
+        return minor;
+    }
+    return 0;
 }
 
 #define IN_PRODUCT_NAME(data, names) \

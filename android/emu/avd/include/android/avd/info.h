@@ -168,6 +168,7 @@ const char*  avdInfo_getId( const AvdInfo*  i );
  */
 static const int kUnknownApiLevel = 1000;
 int    avdInfo_getApiLevel( const AvdInfo*  i );
+int    avdInfo_getApiLevelMinor( const AvdInfo*  i );
 const char* avdInfo_getApiLevelStr( const AvdInfo*  i );
 
 
