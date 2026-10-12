@@ -3187,7 +3187,7 @@ bool save_snapshot(const char *name, bool overwrite, const char *vmstate,
     int ret = -1, ret2;
     QEMUFile *f;
     RunState saved_state = runstate_get();
-    uint64_t vm_state_size;
+    uint64_t vm_state_size = 0;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
 
     GLOBAL_STATE_CODE();
