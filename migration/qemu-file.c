@@ -349,6 +349,7 @@ static ssize_t coroutine_mixed_fn qemu_fill_buffer(QEMUFile *f)
 
     if (len > 0) {
         f->buf_size += len;
+        qatomic_add(&mig_stats.qemu_file_read, len);
     } else {
         qemu_file_set_error_obj(f, -EIO, local_error);
     }
@@ -593,6 +594,7 @@ size_t qemu_get_buffer_at(QEMUFile *f, const uint8_t *buf, size_t buflen,
         return 0;
     }
 
+    qatomic_add(&mig_stats.qemu_file_read, buflen);
     return ret;
 }
 
