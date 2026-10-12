@@ -22,7 +22,6 @@
 # limitations under the License.
 
 load("@aemu//tools/toolchain:amc.bzl", "amc_generator", "amc_pkg_config", "amc_toolchain")
-load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 load("@bazel_lib//lib:diff_test.bzl", "diff_test")
 load("@bazel_lib//lib:directory_path.bzl", "make_directory_path")
@@ -44,13 +43,14 @@ amc_toolchain(
     name = "toolchain",
     cargo = "@rules_rust//rust/toolchain:current_cargo_files",
     compat_lib = select({
-        "@platforms//os:linux": "//google/compat/linux:compat",
+        "@goldfish_build//platforms:is_linux_x64": "//google/compat/linux:compat",
         "@platforms//os:windows": "//google/compat/windows:compat",
         "//conditions:default": None,
     }),
     rustc = "@rules_rust//rust/toolchain:current_rustc_files",
     target_platform = select({
-        "@platforms//os:linux": "linux-x86_64",
+        "@goldfish_build//platforms:is_linux_aarch64": "linux-aarch64",
+        "@goldfish_build//platforms:is_linux_x64": "linux-x86_64",
         "@platforms//os:macos": "darwin-aarch64",
         "@platforms//os:windows": "windows-msvc-x86_64",
     }),
@@ -221,7 +221,7 @@ amc_generator(
         ":slirp_pc",
         ":zlib_pc",
     ] + select({
-        "@platforms//os:linux": [
+        "@goldfish_build//platforms:is_linux_x64": [
             ":alsa_pc",
             ":libpulse_pc",
         ],
@@ -232,7 +232,8 @@ amc_generator(
         "//conditions:default": [],
     }),
     target_platform = select({
-        "@platforms//os:linux": "linux-x64",
+        "@goldfish_build//platforms:is_linux_aarch64": "linux-aarch64",
+        "@goldfish_build//platforms:is_linux_x64": "linux-x64",
         "@platforms//os:macos": "mac-aarch64",
         "@platforms//os:windows": "windows-x64",
     }),
@@ -269,7 +270,8 @@ pkg_zip(
     name = "zip",
     srcs = [":zip_files"],
     package_file_name = select({
-        "@platforms//os:linux": "bazel-linux-x86_64-{build_id}.zip",
+        "@goldfish_build//platforms:is_linux_aarch64": "bazel-linux-aarch64-{build_id}.zip",
+        "@goldfish_build//platforms:is_linux_x64": "bazel-linux-x86_64-{build_id}.zip",
         "@platforms//os:macos": "bazel-darwin-arm64-{build_id}.zip",
         "@platforms//os:windows": "bazel-windows-x86_64-{build_id}.zip",
     }),

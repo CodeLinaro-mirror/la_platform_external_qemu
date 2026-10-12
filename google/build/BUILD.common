@@ -41,7 +41,8 @@ filegroup(
     srcs = select({
         "@platforms//os:windows": ["platform/BUILD.windows-x86_64"] + glob(["platform/windows-amd64/**/*"]),
         "@platforms//os:macos": ["platform/BUILD.darwin-arm64"] + glob(["platform/darwin-arm64/**/*"]),
-        "@platforms//os:linux": ["platform/BUILD.linux-x86_64"] + glob(["platform/linux-x86_64/**/*"]),
+        "@goldfish_build//platforms:is_linux_aarch64": ["platform/BUILD.linux-aarch64"] + glob(["platform/linux-aarch64/**/*"]),
+        "@goldfish_build//platforms:is_linux_x64": ["platform/BUILD.linux-x86_64"] + glob(["platform/linux-x86_64/**/*"]),
     }),
     visibility = [":__subpackages__"],
 )
@@ -51,6 +52,20 @@ cc_library(
     hdrs = ["google/system/aemu_func_defs.h"],
     includes = ["."],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "qemu-linux-asm-arm64-headers",
+    hdrs = glob(["linux-headers/asm-arm64/**/*.h"]),
+    include_prefix = "asm",
+    strip_include_prefix = "linux-headers/asm-arm64",
+)
+
+cc_library(
+    name = "qemu-linux-asm-x86-headers",
+    hdrs = glob(["linux-headers/asm-x86/**/*.h"]),
+    include_prefix = "asm",
+    strip_include_prefix = "linux-headers/asm-x86",
 )
 
 # Make all the headers available, including the generated ones.
@@ -215,7 +230,14 @@ cc_library(
             "platform/darwin-arm64/x86_64-softmmu-config-devices.h",
             "platform/darwin-arm64/x86_64-softmmu-config-target.h",
         ],
-        "@platforms//os:linux": [
+        "@goldfish_build//platforms:is_linux_aarch64": [
+            "platform/linux-aarch64/aarch64-softmmu-config-devices.h",
+            "platform/linux-aarch64/aarch64-softmmu-config-target.h",
+            "platform/linux-aarch64/config-host.h",
+            "platform/linux-aarch64/x86_64-softmmu-config-devices.h",
+            "platform/linux-aarch64/x86_64-softmmu-config-target.h",
+        ],
+        "@goldfish_build//platforms:is_linux_x64": [
             "platform/linux-x86_64/aarch64-softmmu-config-devices.h",
             "platform/linux-x86_64/aarch64-softmmu-config-target.h",
             "platform/linux-x86_64/config-host.h",
@@ -234,7 +256,8 @@ cc_library(
     ] + select({
         "@platforms//os:windows": ["platform/windows-amd64"],
         "@platforms//os:macos": ["platform/darwin-arm64"],
-        "@platforms//os:linux": ["platform/linux-x86_64"],
+        "@goldfish_build//platforms:is_linux_aarch64": ["platform/linux-aarch64"],
+        "@goldfish_build//platforms:is_linux_x64": ["platform/linux-x86_64"],
         "//conditions:default": [],
     }),
     deps = [
@@ -243,6 +266,8 @@ cc_library(
         "@libslirp//:headers",
     ] + select({
         "@platforms//os:windows": ["@aemu//windows:compat-hdrs"],
+        "@goldfish_build//platforms:is_linux_aarch64": [":qemu-linux-asm-arm64-headers"],
+        "@goldfish_build//platforms:is_linux_x64": [":qemu-linux-asm-x86-headers"],
         "//conditions:default": [],
     }),
 )

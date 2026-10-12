@@ -666,23 +666,6 @@
     },
     "linux-aarch64": {
       "dependencies": {
-        "libpulse": {
-          "lib_type": "bazel",
-          "bazel_target": "@gcc_lib//:libpulse",
-          "version": "3.0",
-          "shim": {
-            "Libs": "-lpulse"
-          }
-        },
-        "alsa": {
-          "lib_type": "bazel",
-          "bazel_target": "@gcc_lib//:libasound",
-          "version": "1.0.25",
-          "shim": {
-            "name": "alsa",
-            "Libs": "-lasound"
-          }
-        },
         "gmodule": {
           "lib_type": "bazel",
           "bazel_target": "@glib//gmodule:gmodule_import",
@@ -693,7 +676,74 @@
             "Requires": "pcre2"
           }
         }
-      }
+      },
+      "meson_options": {
+        "-Db_pie": "true",
+        "-Dcrypto_afalg": "enabled",
+        "-Dkvm": "enabled",
+        "-Dmalloc_trim": "enabled",
+        "-Dvhost_crypto": "enabled",
+        "-Dvhost_kernel": "enabled",
+        "-Dvhost_net": "enabled",
+        "-Dvhost_user": "enabled",
+        "-Dvhost_user_blk_server": "enabled"
+      },
+      "shims": [
+        {
+          "target": "qemu-system-.*",
+          "shims": {
+            "+linkopts": [
+              "-rdynamic",
+              "-lrt"
+            ]
+          }
+        },
+        {
+          "target": "libqemuutil",
+          "shims": {
+            "+linkopts": [
+              "-pthread"
+            ]
+          }
+        },
+        {
+          "target": "qemu-img",
+          "shims": {
+            "+linkopts": [
+              "-lrt"
+            ]
+          }
+        },
+        {
+          "target": ".*",
+          "shims": {
+            "restrict_to": "cc_library|cc_binary|cc_interface_binary",
+            "-hdrs": [
+              "subprojects/libvhost-user/.*"
+            ],
+            "+copts": [
+              "-fwrapv",
+              "-Wno-implicit-function-declaration"
+            ]
+          }
+        }
+      ],
+      "external_deps": {
+        "libvhost-user": [
+          "//subprojects/libvhost-user:vhost-user"
+        ],
+        "libvhost-user-glib": [
+          "//subprojects/libvhost-user:vhost-user-glib"
+        ]
+      },
+      "export": [
+        "qemu-system-x86_64",
+        "qemu-system-aarch64"
+      ],
+      "exclude": [
+        "vhost-user",
+        "vhost-user-glib"
+      ]
     },
     "mac-aarch64": {
       "dependencies": {
