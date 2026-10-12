@@ -3500,6 +3500,11 @@ static bool prepare_mmio_access(MemoryRegion *mr)
     return release_lock;
 }
 
+static inline bool memory_region_has_ram_ptr(const MemoryRegion *mr)
+{
+    return mr->ram_block && mr->ram_block->host != NULL;
+}
+
 /* Called within RCU critical section.  */
 static MemTxResult flatview_write_continue(FlatView *fv, hwaddr addr,
                                            MemTxAttrs attrs,
@@ -3558,12 +3563,14 @@ static MemTxResult flatview_write_continue(FlatView *fv, hwaddr addr,
             }
         } else {
             /* RAM case */
-            if (goldfish_as_oob_access &&
-                !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
-                goldfish_address_space_is_oob(addr1,l)) {
+            if ((goldfish_as_oob_access && mr->name &&
+                 !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
+                 goldfish_address_space_is_oob(addr1,l)) ||
+                !memory_region_has_ram_ptr(mr)) {
                 DPRINTF("A write to %s is out-of-bound and is"
                         " ignored. Offset = 0x%llx, size = %llx\n",
-                        GOLDFISH_ADDRESS_SPACE_AREA_NAME, addr1, l);
+                        mr->name ? mr->name : "unknown",
+                        (unsigned long long)addr1, (unsigned long long)l);
             } else {
                 ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
                 memcpy(ptr, buf, l);
@@ -3664,12 +3671,14 @@ MemTxResult flatview_read_continue(FlatView *fv, hwaddr addr,
             }
         } else {
             /* RAM case */
-            if (goldfish_as_oob_access &&
-                !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
-                goldfish_address_space_is_oob(addr1,l)) {
+            if ((goldfish_as_oob_access && mr->name &&
+                 !strcmp(mr->name, GOLDFISH_ADDRESS_SPACE_AREA_NAME) &&
+                 goldfish_address_space_is_oob(addr1,l)) ||
+                !memory_region_has_ram_ptr(mr)) {
                 DPRINTF("A read to %s is out-of-bound and 0xFF"
                         " is returned. Offset = 0x%llx, size = %llx\n",
-                        GOLDFISH_ADDRESS_SPACE_AREA_NAME, addr1, l);
+                        mr->name ? mr->name : "unknown",
+                        (unsigned long long)addr1, (unsigned long long)l);
                 memset(buf, 0xFF, l);
             } else {
                 ptr = qemu_ram_ptr_length(mr->ram_block, addr1, &l, false);
@@ -3782,7 +3791,7 @@ static inline void cpu_physical_memory_write_rom_internal(AddressSpace *as,
         if (!(memory_region_is_ram(mr) ||
               memory_region_is_romd(mr))) {
             l = memory_access_size(mr, l, addr1);
-        } else {
+        } else if (memory_region_has_ram_ptr(mr)) {
             /* ROM/RAM case */
             ptr = qemu_map_ram_ptr(mr->ram_block, addr1);
             switch (type) {
@@ -4026,6 +4035,12 @@ void *address_space_map(AddressSpace *as,
         return bounce.buffer;
     }
 
+
+    if (!memory_region_has_ram_ptr(mr)) {
+        rcu_read_unlock();
+        *plen = 0;
+        return NULL;
+    }
 
     memory_region_ref(mr);
     *plen = flatview_extend_translation(fv, addr, len, mr, xlat,
