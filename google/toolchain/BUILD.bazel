@@ -40,11 +40,28 @@ alias(
     visibility = ["//visibility:public"],
 )
 
+amc_toolchain(
+    name = "toolchain",
+    cargo = "@rules_rust//rust/toolchain:current_cargo_files",
+    compat_lib = select({
+        "@platforms//os:linux": "//google/compat/linux:compat",
+        "@platforms//os:windows": "//google/compat/windows:compat",
+        "//conditions:default": None,
+    }),
+    rustc = "@rules_rust//rust/toolchain:current_rustc_files",
+    target_platform = select({
+        "@platforms//os:linux": "linux-x86_64",
+        "@platforms//os:macos": "darwin-aarch64",
+        "@platforms//os:windows": "windows-msvc-x86_64",
+    }),
+)
+
 # Prebuilt Packages for QEMU dependencies
 amc_pkg_config(
     name = "zlib_pc",
     package_name = "zlib",
     library = "@zlib",
+    toolchain = ":toolchain",
     version = "1.2.10",
 )
 
@@ -52,6 +69,7 @@ amc_pkg_config(
     name = "pcre2_pc",
     package_name = "pcre2",
     library = "@pcre2",
+    toolchain = ":toolchain",
     version = "10.42",
 )
 
@@ -60,6 +78,7 @@ amc_pkg_config(
     name = "gnulib_pc",
     package_name = "gnulib",
     library = "@glib//glib:gnulib",
+    toolchain = ":toolchain",
     version = "2.77.2",
 )
 
@@ -67,6 +86,7 @@ amc_pkg_config(
     name = "dirent_pc",
     package_name = "dirent",
     library = "@glib//glib/dirent",
+    toolchain = ":toolchain",
     version = "2.77.2",
 )
 
@@ -80,6 +100,7 @@ amc_pkg_config(
         "@platforms//os:windows": "",
     }),
     requires = ["pcre2"],
+    toolchain = ":toolchain",
     version = "2.77.2",
 )
 
@@ -103,6 +124,7 @@ amc_pkg_config(
         ],
         "//conditions:default": [],
     }),
+    toolchain = ":toolchain",
     version = "2.77.2",
 )
 
@@ -110,6 +132,7 @@ amc_pkg_config(
     name = "pixman_simd_pc",
     package_name = "pixman_simd",
     library = "@pixman//:pixman_simd",
+    toolchain = ":toolchain",
     version = "0.42.3",
 )
 
@@ -118,6 +141,7 @@ amc_pkg_config(
     package_name = "pixman-1",
     library = "@pixman//:pixman-1",
     requires = ["pixman_simd"],
+    toolchain = ":toolchain",
     version = "0.42.3",
 )
 
@@ -125,6 +149,7 @@ amc_pkg_config(
     name = "libfdt_pc",
     package_name = "libfdt",
     library = "@dtc//:libfdt",
+    toolchain = ":toolchain",
     version = "1.6.0",
 )
 
@@ -133,6 +158,7 @@ amc_pkg_config(
     package_name = "rutabaga_gfx_ffi",
     archive_library = "@rutabaga_gfx//:rutabaga_ffi",
     library = "@rutabaga_gfx//:rutabaga_c_ffi",
+    toolchain = ":toolchain",
     version = "0.1.2",
 )
 
@@ -141,6 +167,7 @@ amc_pkg_config(
     name = "libpulse_pc",
     package_name = "libpulse",
     library = "@gcc_lib//:libpulse",
+    toolchain = ":toolchain",
     version = "3.0",
 )
 
@@ -148,6 +175,7 @@ amc_pkg_config(
     name = "alsa_pc",
     package_name = "alsa",
     library = "@gcc_lib//:libasound",
+    toolchain = ":toolchain",
     version = "1.0.25",
 )
 
@@ -155,6 +183,7 @@ amc_pkg_config(
     name = "slirp_pc",
     package_name = "slirp",
     library = "@libslirp",
+    toolchain = ":toolchain",
     version = "4.8.0",
 )
 
@@ -169,27 +198,16 @@ amc_pkg_config(
         "keymaps_csv": "${prefix}/keymaps.csv",
         "keymap_gen": "${prefix}/keymap-gen",
     },
+    toolchain = ":toolchain",
     version = "0.0.1",
-)
-
-amc_toolchain(
-    name = "toolchain",
-    compat_lib = select({
-        "@platforms//os:linux": "//google/compat/linux:compat",
-        "@platforms//os:windows": "//google/compat/windows:compat",
-        "//conditions:default": None,
-    }),
-    rustc = "@rules_rust//rust/toolchain:current_rustc_files",
-    target_platform = select({
-        "@platforms//os:linux": "linux-x86_64",
-        "@platforms//os:macos": "darwin-aarch64",
-        "@platforms//os:windows": "windows-msvc-x86_64",
-    }),
 )
 
 amc_generator(
     name = "generated",
-    srcs = ["@qemu//:qemu_sources"],
+    srcs = [
+        "@qemu//:qemu_sources",
+        "@qemu//subprojects/libvhost-user:sources",
+    ],
     config = "qemu-build-config.jsonc",
     packages = [
         ":glib_pc",

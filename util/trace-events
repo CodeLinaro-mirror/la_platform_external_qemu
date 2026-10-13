@@ -12,6 +12,14 @@ poll_remove(void *ctx, void *node, int fd) "ctx %p node %p fd %d"
 aio_co_schedule(void *ctx, void *co) "ctx %p co %p"
 aio_co_schedule_bh_cb(void *ctx, void *co) "ctx %p co %p"
 reentrant_aio(void *ctx, const char *name) "ctx %p name %s"
+aio_bh_call_begin(void *ctx, void *bh, const char *name) "ctx %p bh %p name %s"
+aio_bh_call_end(void *ctx, void *bh, const char *name) "ctx %p bh %p name %s"
+
+# main-loop.c
+main_loop_bql_lock_begin(int poll_ret) "poll_ret %d"
+main_loop_bql_lock_end(int poll_ret) "poll_ret %d"
+main_loop_timers_begin(void) ""
+main_loop_timers_end(void) ""
 
 # thread-pool.c
 thread_pool_submit_aio(void *pool, void *req, void *opaque) "pool %p req %p opaque %p"

@@ -3102,6 +3102,104 @@ static bool mapped_ram_read_header(QEMUFile *file, MappedRamHeader *header,
  * granularity of these critical sections.
  */
 
+#if defined(CONFIG_DARWIN) || defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
+#ifdef __linux__
+#include <sys/sysinfo.h>
+#endif
+#ifdef _WIN32
+#include <psapi.h>
+
+static BOOL CALLBACK sum_pagefile_cb(LPVOID ctx,
+                                     PENUM_PAGE_FILE_INFORMATION info,
+                                     LPCWSTR filename)
+{
+    uint64_t *used_pages = ctx;
+    *used_pages += info->TotalInUse;
+    return TRUE;
+}
+
+static uint64_t win32_process_nonresident_mb(void)
+{
+    PROCESS_MEMORY_COUNTERS_EX pmc = { .cb = sizeof(pmc) };
+
+    if (GetProcessMemoryInfo(GetCurrentProcess(),
+                             (PROCESS_MEMORY_COUNTERS *)&pmc,
+                             sizeof(pmc))) {
+        if (pmc.PrivateUsage > pmc.WorkingSetSize) {
+            return (pmc.PrivateUsage - pmc.WorkingSetSize) >> 20;
+        }
+    }
+    return 0;
+}
+#endif
+
+static uint64_t host_swap_used_mb(void)
+{
+#if defined(CONFIG_DARWIN) || defined(__APPLE__)
+    struct xsw_usage xsw;
+    size_t len = sizeof(xsw);
+
+    if (sysctlbyname("vm.swapusage", &xsw, &len, NULL, 0) == 0) {
+        return xsw.xsu_used >> 20;
+    }
+#elif defined(__linux__)
+    struct sysinfo si;
+
+    if (sysinfo(&si) == 0) {
+        return ((uint64_t)(si.totalswap - si.freeswap) *
+                (si.mem_unit ? si.mem_unit : 1)) >> 20;
+    }
+#elif defined(_WIN32)
+    uint64_t used_pages = 0;
+    uint64_t pagefile_mb = 0;
+    uint64_t proc_nonresident_mb = win32_process_nonresident_mb();
+
+    if (EnumPageFilesW(sum_pagefile_cb, &used_pages)) {
+        pagefile_mb = (used_pages * qemu_real_host_page_size()) >> 20;
+    }
+    fprintf(stderr,
+            "ram-save: win32 pagefile used %" PRIu64
+            " MB, process non-resident %" PRIu64 " MB\n",
+            pagefile_mb, proc_nonresident_mb);
+    return MAX(pagefile_mb, proc_nonresident_mb);
+#endif
+    return 0;
+}
+
+static void ram_report_memory_pressure(void)
+{
+    RAMBlock *block;
+    uint64_t total_ram = 0, swap_used, min_swap;
+    int n = 0;
+
+    WITH_RCU_READ_LOCK_GUARD() {
+        RAMBLOCK_FOREACH_MIGRATABLE(block) {
+            if (block->host && block->used_length) {
+                n++;
+                total_ram += block->used_length;
+            }
+        }
+    }
+
+    min_swap = (total_ram >> 20) / 4;
+    swap_used = host_swap_used_mb();
+    if (n == 0 || swap_used < min_swap) {
+        fprintf(stderr,
+                "ram-save: no memory pressure (host swap used %" PRIu64
+                " MB < %" PRIu64 " MB threshold, %d blocks, %" PRIu64
+                " MB total)\n",
+                swap_used, min_swap, n, total_ram >> 20);
+    } else {
+        fprintf(stderr,
+                "ram-save: memory pressure detected (host swap used %" PRIu64
+                " MB >= %" PRIu64 " MB threshold, %d blocks, %" PRIu64
+                " MB total)\n",
+                swap_used, min_swap, n, total_ram >> 20);
+    }
+}
+
 /**
  * ram_save_setup: Setup RAM for migration
  *
@@ -3169,6 +3267,8 @@ static int ram_save_setup(QEMUFile *f, void *opaque, Error **errp)
     if (migrate_multifd()) {
         multifd_ram_save_setup();
     }
+
+    ram_report_memory_pressure();
 
     /*
      * This operation is unfortunate..

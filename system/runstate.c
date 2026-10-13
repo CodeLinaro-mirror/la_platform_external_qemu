@@ -878,7 +878,7 @@ void qemu_system_debug_request(void)
     qemu_notify_event();
 }
 
-static bool main_loop_should_exit(int *status)
+static bool main_loop_should_exit(int *status, ShutdownCause *exit_cause)
 {
     RunState r;
     ShutdownCause request;
@@ -902,6 +902,7 @@ static bool main_loop_should_exit(int *status)
                 panic_action == PANIC_ACTION_EXIT_FAILURE) {
                 *status = EXIT_FAILURE;
             }
+            *exit_cause = request;
             return true;
         }
     }
@@ -940,12 +941,13 @@ static bool main_loop_should_exit(int *status)
 int qemu_main_loop(void)
 {
     int status = EXIT_SUCCESS;
+    ShutdownCause exit_cause = SHUTDOWN_CAUSE_NONE;
 
-    while (!main_loop_should_exit(&status)) {
+    while (!main_loop_should_exit(&status, &exit_cause)) {
         main_loop_wait(false);
     }
 
-    try_savevm();
+    try_savevm(exit_cause);
 
     return status;
 }

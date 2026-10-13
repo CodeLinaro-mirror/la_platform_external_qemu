@@ -170,7 +170,14 @@ void aio_bh_call(QEMUBH *bh)
         reentrancy_guard->engaged_in_io = true;
     }
 
-    bh->cb(bh->opaque);
+    {
+        AioContext *ctx = bh->ctx;
+        const char *name = bh->name;
+
+        trace_aio_bh_call_begin(ctx, bh, name);
+        bh->cb(bh->opaque);
+        trace_aio_bh_call_end(ctx, bh, name);
+    }
 
     if (reentrancy_guard) {
         reentrancy_guard->engaged_in_io = last_engaged_in_io;
