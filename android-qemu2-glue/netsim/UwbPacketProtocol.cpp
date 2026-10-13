@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "PacketStreamTransport.h"
+#include "absl/base/internal/endian.h"
 #include "aemu/base/logging/Log.h"
 #include "android-qemu2-glue/netsim/PacketProtocol.h"
 #include "android/avd/info.h"
@@ -133,13 +134,21 @@ private:
 
                 if (mBytesWanted == 0) {
                     switch (state_) {
-                        case UCI_HEADER:
-                            mBytesWanted = mPacket.at(UCI_PAYLOAD_LENGTH_FIELD);
+                        case UCI_HEADER: {
+                            uint8_t message_type = (mPacket[0] & UCI_MESSAGE_TYPE_MASK) >>
+                                                   UCI_MESSAGE_TYPE_SHIFT;
+                            if (message_type == UCI_MESSAGE_TYPE_DATA) {
+                                mBytesWanted = absl::little_endian::Load16(&mPacket[2]);
+                            } else {
+                                mBytesWanted = mPacket[UCI_PAYLOAD_LENGTH_FIELD];
+                            }
                             state_ = UCI_PAYLOAD;
                             if (mBytesWanted > 0) {
                                 break;
                             }
                             // Fall through if entire packet is just a header
+                            [[fallthrough]];
+                        }
                         case UCI_PAYLOAD:
                             PacketRequest request;
                             request.set_allocated_packet(new std::string(mPacket.begin(), mPacket.end()));
@@ -158,8 +167,11 @@ private:
             }
 
         private:
-            const size_t UCI_HEADER_SIZE = 4;
-            const size_t UCI_PAYLOAD_LENGTH_FIELD = 3;
+            static constexpr size_t UCI_HEADER_SIZE = 4;
+            static constexpr size_t UCI_PAYLOAD_LENGTH_FIELD = 3;
+            static constexpr uint8_t UCI_MESSAGE_TYPE_MASK = 0xE0;
+            static constexpr uint8_t UCI_MESSAGE_TYPE_SHIFT = 5;
+            static constexpr uint8_t UCI_MESSAGE_TYPE_DATA = 0;
             enum State { UCI_HEADER, UCI_PAYLOAD };
 
             State state_{UCI_HEADER};
