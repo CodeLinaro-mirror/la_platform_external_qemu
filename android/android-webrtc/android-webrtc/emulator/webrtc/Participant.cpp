@@ -185,8 +185,12 @@ EventForwarder::EventForwarder(
         scoped_refptr<::webrtc::DataChannelInterface> channel,
         DataChannelLabel label)
     : mAgents(agents),
-      mKeyEventSender(agents),
-      mTouchEventSender(agents),
+      mKeyEventSender(std::make_shared<
+                      android::emulation::control::keyboard::KeyEventSender>(
+              agents)),
+      mTouchEventSender(
+              std::make_shared<android::emulation::control::TouchEventSender>(
+                      agents)),
       mChannel(channel),
       mLabel(label) {
     channel->RegisterObserver(this);
@@ -203,7 +207,7 @@ void EventForwarder::OnMessage(const ::webrtc::DataBuffer& buffer) {
         case DataChannelLabel::keyboard: {
             android::emulation::control::KeyboardEvent keyEvent;
             keyEvent.ParseFromArray(buffer.data.data(), buffer.size());
-            mKeyEventSender.send(keyEvent);
+            mKeyEventSender->send(keyEvent);
             break;
         }
         case DataChannelLabel::mouse: {
@@ -221,7 +225,7 @@ void EventForwarder::OnMessage(const ::webrtc::DataBuffer& buffer) {
         case DataChannelLabel::touch: {
             android::emulation::control::TouchEvent touchEvent;
             touchEvent.ParseFromArray(buffer.data.data(), buffer.size());
-            mTouchEventSender.send(touchEvent);
+            mTouchEventSender->send(touchEvent);
             break;
         }
         case DataChannelLabel::adb: {

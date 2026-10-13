@@ -20,5 +20,6 @@ ANDROID_BEGIN_HEADER
 
 void macTouchOpenGL();
 int hasMetalNative();
+int hasMetal4Native();
 
 ANDROID_END_HEADER

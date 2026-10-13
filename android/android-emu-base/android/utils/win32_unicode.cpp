@@ -11,6 +11,9 @@
 
 #include "android/utils/win32_unicode.h"
 
+#include <string.h>
+#include <wchar.h>
+
 #include "aemu/base/system/Win32UnicodeString.h"
 
 using android::base::Win32UnicodeString;
@@ -34,8 +37,11 @@ int win32_utf16_to_utf8_buf(const wchar_t* str, char* buffer, int size) {
 }
 
 wchar_t* win32_utf8_to_utf16_str(const char* str) {
+    if (!str) {
+        return nullptr;
+    }
     Win32UnicodeString wide(str);
-    return wide.release();
+    return wcsdup(wide.c_str());
 }
 
 }  // extern "C"
