@@ -265,6 +265,21 @@ path_get_size( const char*  path, uint64_t  *psize )
 #endif
 }
 
+#ifdef _WIN32
+int64_t win32_get_allocated_file_size(const char* filename) {
+    if (!filename) {
+        return -1;
+    }
+    const Win32UnicodeString wide_filename(filename);
+    DWORD high = 0;
+    const DWORD low = GetCompressedFileSizeW(wide_filename.c_str(), &high);
+    if (low != INVALID_FILE_SIZE || GetLastError() == NO_ERROR) {
+        return (static_cast<int64_t>(high) << 32) + low;
+    }
+    return -1;
+}
+#endif
+
 /** OTHER FILE UTILITIES
  **
  **  path_empty_file() creates an empty file at a given path location.
