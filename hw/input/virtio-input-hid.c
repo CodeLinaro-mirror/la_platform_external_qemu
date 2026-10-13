@@ -6,6 +6,8 @@
 #include "qemu/osdep.h"
 #include "qemu/iov.h"
 
+#include "android/console.h"
+#include "host-common/hw-config.h"
 #include "hw/input/android_keycodes.h"
 #include "hw/input/linux_keycodes.h"
 #include "hw/qdev.h"
@@ -302,14 +304,15 @@ static void virtio_keyboard_init(Object *obj)
     virtio_input_init_config(vinput, virtio_keyboard_config);
 
     // Mandatory android keys. Reference hw/input/goldfish_events.c
-    static const guint16 mandatory_android_keys[] = {
+    const guint16 mandatory_android_keys[] = {
         LINUX_KEY_HOME, LINUX_KEY_BACK, LINUX_KEY_SEND, LINUX_KEY_END,
         LINUX_KEY_SOFT1, LINUX_KEY_VOLUMEUP, LINUX_KEY_VOLUMEDOWN,
         LINUX_KEY_SOFT2, LINUX_KEY_POWER, LINUX_KEY_SEARCH, LINUX_KEY_SLEEP,
         ANDROID_KEY_APPSWITCH, ANDROID_KEY_STEM_PRIMARY, ANDROID_KEY_STEM_1,
         ANDROID_KEY_STEM_2, ANDROID_KEY_STEM_3, ANDROID_KEY_ASSIST,
         ANDROID_KEY_ALL_APPS, ANDROID_KEY_MOVE_HOME, ANDROID_KEY_MOVE_END,
-        LINUX_KEY_CENTER, LINUX_KEY_SCALE, LINUX_KEY_FORWARD, LINUX_KEY_REFRESH,
+        getConsoleAgents()->settings->hw()->hw_dPad ? LINUX_KEY_CENTER : 0,
+        LINUX_KEY_SCALE, LINUX_KEY_FORWARD, LINUX_KEY_REFRESH,
         LINUX_KEY_FULL_SCREEN, LINUX_KEY_SYSRQ,
         LINUX_KEY_BRIGHTNESSDOWN, LINUX_KEY_BRIGHTNESSUP, LINUX_KEY_PREVIOUSSONG,
         LINUX_KEY_PLAYPAUSE, LINUX_KEY_NEXTSONG, LINUX_KEY_MICMUTE,
