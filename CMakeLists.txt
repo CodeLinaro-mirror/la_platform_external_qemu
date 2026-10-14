@@ -928,7 +928,8 @@ target_compile_definitions(qemu2-common PRIVATE "-DPOISON_CONFIG_ANDROID")
 target_compile_options(qemu2-common PRIVATE "-Wno-string-plus-int"
                                             "-Wno-return-type")
 target_link_libraries(qemu2-common PUBLIC android-qemu-deps emulator-libusb
-                                          libqemu2-util)
+                                          libqemu2-util
+                                   PRIVATE android-emu-agents android-emu-base)
 
 if(NOT OPTION_AEMU_LIBS_ONLY)
 
