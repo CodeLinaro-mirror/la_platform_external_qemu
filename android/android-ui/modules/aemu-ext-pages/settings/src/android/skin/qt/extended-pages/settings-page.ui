@@ -1518,35 +1518,6 @@
       </property>
      </item>
     </widget>
-    <widget class="RaisedMaterialButton" name="perfstatsButton">
-     <property name="geometry">
-      <rect>
-       <x>324</x>
-       <y>486</y>
-       <width>280</width>
-       <height>36</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <family>Roboto</family>
-       <weight>75</weight>
-       <bold>true</bold>
-      </font>
-     </property>
-     <property name="text">
-      <string>Performance Stats</string>
-     </property>
-     <property name="flat">
-      <bool>true</bool>
-     </property>
-     <property name="ColorGroup" stdset="0">
-      <string>Button</string>
-     </property>
-     <property name="report_metrics" stdset="0">
-      <bool>false</bool>
-     </property>
-    </widget>
    </widget>
   </widget>
  </widget>

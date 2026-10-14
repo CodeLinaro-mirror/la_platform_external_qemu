@@ -21,13 +21,11 @@
 #include "aemu/base/CpuUsage.h"                           // for CpuUsage
 #include "aemu/base/Log.h"                                // for base
 #include "aemu/base/async/ThreadLooper.h"                 // for ThreadL...
-#include "aemu/base/memory/MemoryTracker.h"               // for MemoryT...
 #include "android/adb-server.h"                           // for android...
 #include "android/android.h"                              // for android...
 #include "android/automation/AutomationController.h"      // for Automat...
 #include "android/avd/info.h"                             // for avdInfo...
 #include "android/avd/util.h"                             // for AVD_AND...
-#include "android/base/system/System.h"                   // for System
 #include "android/boot-properties.h"                      // for boot_pr...
 #include "android/car-cluster.h"                          // for android...
 #include "android/car-physics.h"                          // for android...
@@ -561,12 +559,6 @@ bool android_emulation_setup(const AndroidConsoleAgents* agents, bool isQemu2) {
             (int)android::base::CpuUsage::UsageArea::MainLoop,
             android::base::ThreadLooper::get());
 
-    auto memTracker = android::base::MemoryTracker::get();
-    if (memTracker &&
-        !android::base::System::get()->envGet("SHOW_PERF_STATS").empty()) {
-        memTracker->start();
-    }
-
     return true;
 }
 
@@ -576,7 +568,4 @@ void android_emulation_teardown() {
     auto adbConn = android::emulation::AdbConnection::connection(std::chrono::milliseconds(0));
     if (adbConn)
         adbConn->close();
-    auto memTracker = android::base::MemoryTracker::get();
-    if (memTracker)
-        memTracker->stop();
 }
