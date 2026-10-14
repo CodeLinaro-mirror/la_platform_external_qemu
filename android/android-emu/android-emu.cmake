@@ -174,7 +174,6 @@ set(android_emu_dependent_src
     android/camera/camera-virtualscene.cpp
     android/console.cpp
     android/emulation/FakeRotatingCameraSensor.cpp
-    android/emulation/HostMemoryService.cpp
     android/emulation/QemuMiscPipe.cpp
     android/emulation/resizable_display_config.cpp
     android/hw-sensors.cpp
@@ -669,7 +668,6 @@ if(NOT LINUX_AARCH64)
       android/emulation/hostdevices/HostAddressSpace_unittest.cpp
       android/emulation/hostdevices/HostGoldfishPipe_unittest.cpp
       android/emulation/HostmemIdMapping_unittest.cpp
-      android/emulation/HostMemoryService_unittest.cpp
       android/emulation/Hypervisor_unittest.cpp
       android/emulation/MultiDisplay_unittest.cpp
       android/emulation/ParameterList_unittest.cpp
