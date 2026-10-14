@@ -26,6 +26,7 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
+#include "aemu/base/async/ThreadLooper.h"
 #include "android/car-cluster.h"
 #include "android/console.h"
 #include "android/skin/qt/car-cluster-window.h"
@@ -34,6 +35,7 @@ extern "C" {
 #include "android/skin/winsys.h"
 
 using android::base::AutoLock;
+using android::base::Lock;
 using android::base::System;
 using android::base::WorkerProcessingResult;
 
@@ -48,7 +50,8 @@ static constexpr int MSG_START = 1;
 static constexpr int MSG_STOP = 2;
 static constexpr int MSG_RESTART = 3;
 
-static CarClusterConnector* instance;
+static Lock sInstanceLock;
+static CarClusterConnector* instance = nullptr;
 
 CarClusterConnector::CarClusterConnector(CarClusterWindow* carClusterWindow)
     : mCarClusterWindow(carClusterWindow),
@@ -79,7 +82,6 @@ CarClusterConnector::CarClusterConnector(CarClusterWindow* carClusterWindow)
               }
           }
       }) {
-    instance = this;
     avcodec_register_all();
 
     mCodec = avcodec_find_decoder(AV_CODEC_ID_H264);
@@ -94,15 +96,28 @@ CarClusterConnector::CarClusterConnector(CarClusterWindow* carClusterWindow)
     mRgbData = new uint8_t[4 * FRAME_WIDTH * FRAME_HEIGHT];
 
     mWorkerThread.start();
+    {
+        AutoLock lock(sInstanceLock);
+        instance = this;
+    }
     set_car_cluster_call_back(processFrame);
 }
 
 CarClusterConnector::~CarClusterConnector() {
+    {
+        AutoLock lock(sInstanceLock);
+        if (instance == this) {
+            instance = nullptr;
+        }
+    }
     // Send message to worker thread to stop processing
     mWorkerThread.enqueue({});
     mWorkerThread.join();
     stopSendingStartRequest();
-    sendCarClusterMsg(PIPE_STOP);
+    android::base::ThreadLooper::runOnMainLooper([]() {
+        uint8_t msg[1] = {PIPE_STOP};
+        android_send_car_cluster_data(msg, 1);
+    });
 
     av_free(mFrame);
     avcodec_close(mCodecCtx);
@@ -114,8 +129,11 @@ CarClusterConnector::~CarClusterConnector() {
 }
 
 void CarClusterConnector::processFrame(const uint8_t* frame, int frameSize) {
-    instance->mWorkerThread.enqueue(
-            {frameSize, std::vector<uint8_t>(frame, frame + frameSize)});
+    AutoLock lock(sInstanceLock);
+    if (instance) {
+        instance->mWorkerThread.enqueue(
+                {frameSize, std::vector<uint8_t>(frame, frame + frameSize)});
+    }
 }
 
 WorkerProcessingResult CarClusterConnector::workerProcessFrame(
