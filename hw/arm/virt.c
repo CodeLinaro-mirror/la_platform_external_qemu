@@ -158,6 +158,13 @@ static void arm_virt_compat_default_set(MachineClass *mc)
 //      after we don't support MacOS 12 or lower, as we don't want
 //      to diverge from the upstream QEMU.
 #define LEGACY_RAMLIMIT_GB 31
+#elif defined(_WIN32) && (defined(__aarch64__) || defined(_M_ARM64))
+// Note: WHPX on Windows ARM (Qualcomm X1 Elite and X2 Elite) supports 39 bits
+// of GPA, which results in 36 bits of GPA reported by ID_AA64MMFR0_EL1.PARANGE
+// as PARANGE can only choose between 36 bits and 40 bits. So need to change the
+// physical address space allocation so that virtio-gpu device can get its big
+// 64bit BAR resource allocated.
+#define LEGACY_RAMLIMIT_GB 30
 #else
 #define LEGACY_RAMLIMIT_GB 255
 #endif
@@ -238,6 +245,9 @@ static const MemMapEntry base_memmap[] = {
 //      after we don't support MacOS 12 or lower, as we don't want
 //      to diverge from the upstream QEMU.
 #define DEFAULT_HIGH_PCIE_MMIO_SIZE_GB 31
+#elif defined(_WIN32) && (defined(__aarch64__) || defined(_M_ARM64))
+//Note: See comments made to LEGACY_RAMLIMIT_GB
+#define DEFAULT_HIGH_PCIE_MMIO_SIZE_GB 32
 #else
 #define DEFAULT_HIGH_PCIE_MMIO_SIZE_GB 512
 #endif
