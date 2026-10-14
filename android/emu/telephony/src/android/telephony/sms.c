@@ -1629,6 +1629,7 @@ sms_receiver_add_submit_pdu( SmsReceiver  rec, SmsPDU       submit_pdu )
     if (cur >= frag->max) {
         D("%s: SMS fragment index is too large (%d >= %d)\n", __FUNCTION__, cur, frag->max);
         if (*pnode != frag) sms_fragment_free(frag);
+        return -1;
     }
     if (*pnode != frag)
         *pnode = frag;   /* first fragment for this (dest,ref): now safe to link */
@@ -1677,10 +1678,14 @@ sms_receiver_get_text_message( SmsReceiver  rec, int  index, bytes_t  utf8, int 
         int  partial;
         if (utf8 && utf8len > 0) {
             partial  = smspdu_get_text_message( frag->pdus[nn], utf8, utf8len );
+            if (partial < 0)
+                return -1;
             utf8    += partial;
             utf8len -= partial;
         } else {
             partial  = smspdu_get_text_message( frag->pdus[nn], NULL, 0 );
+            if (partial < 0)
+                return -1;
         }
         total += partial;
     }
@@ -1707,7 +1712,6 @@ sms_receiver_create_deliver( SmsReceiver  rec, int  index, const SmsAddressRec* 
     SmsFragment*     pnode = sms_receiver_find_index_p( rec, index );
     SmsFragment      frag  = *pnode;
     SmsTimeStampRec  now[1];
-    int              nn, total;
     bytes_t          utf8;
     int              utf8len;
 
@@ -1733,9 +1737,9 @@ sms_receiver_create_deliver( SmsReceiver  rec, int  index, const SmsAddressRec* 
         goto Exit;
     }
 
-    total = 0;
-    for ( nn = 0; nn < frag->count; nn++ ) {
-        total += smspdu_get_text_message( frag->pdus[nn], utf8 + total, utf8len - total );
+    if (sms_receiver_get_text_message( rec, index, utf8, utf8len ) < 0) {
+        free(utf8);
+        goto Exit;
     }
 
     sms_timestamp_now( now );
