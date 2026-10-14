@@ -212,6 +212,24 @@ set(_gRPC_RE2_INCLUDE_DIR "${ANDROID_QEMU2_TOP_DIR}/android/third_party/re2")
 add_subdirectory(${ANDROID_QEMU2_TOP_DIR}/../cares cares)
 add_subdirectory(${ANDROID_QEMU2_TOP_DIR}/../grpc/emulator grpc)
 
+# grpc 1.82's DCHECK_EQ(StatusFlag, Failure{}) requires a newer abseil-cpp
+# than the one in external/abseil-cpp when NDEBUG is not defined.
+foreach(
+  GRPC_TARGET
+  gpr
+  grpc
+  grpc_unsecure
+  grpc++
+  grpc++_alts
+  grpc++_error_details
+  grpc++_reflection
+  grpc++_unsecure
+  grpc_authorization_provider)
+  if(TARGET ${GRPC_TARGET})
+    target_compile_definitions(${GRPC_TARGET} PRIVATE NDEBUG=1)
+  endif()
+endforeach()
+
 if(LINUX_X86_64)
   # Our linux headers are from 2013, and do not define newer socket options.
   # (b/156635589)

@@ -53,7 +53,6 @@
 #include "android/main-common.h"
 #include "android/main-kernel-parameters.h"
 #include "android/metrics/MetricsReporter.h"
-#include "android/metrics/PeriodicReporter.h"
 #include "android/multi-instance.h"
 #include "android/network/wifi.h"
 #include "android/opengl/gpuinfo.h"
@@ -1837,8 +1836,6 @@ extern "C" int main(int argc, char** argv) {
         android::metrics::MetricsReporter::start(
                 sessionId, EMULATOR_VERSION_STRING,
                 EMULATOR_FULL_VERSION_STRING, QEMU_VERSION, looper);
-        android::metrics::PeriodicReporter::start(
-                &android::metrics::MetricsReporter::get(), looper);
     }
 
     // VulkanNativeSwapchain depends on GuestAngle, auto-enable if requested

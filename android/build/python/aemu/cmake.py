@@ -48,10 +48,14 @@ def get_tasks(args) -> List[BuildTask]:
         list[BuildTask]: List of tasks that need to be executed.
     """
     run_tests = not Toolchain(args.aosp, args.target).is_crosscompile()
-    fishtank_unstripped = args.fishtank_unstripped or (
-        args.feature
-        and any(
-            f.lower().replace("-", "_") == "no_fishtank_strip" for f in args.feature
+    fishtank_unstripped = (
+        args.config == "debug"
+        or args.fishtank_unstripped
+        or (
+            args.feature
+            and any(
+                f.lower().replace("-", "_") == "no_fishtank_strip" for f in args.feature
+            )
         )
     )
     features = args.feature
@@ -94,6 +98,7 @@ def get_tasks(args) -> List[BuildTask]:
             args.aosp,
             args.out,
             args.target,
+            configuration=args.config,
             fishtank_unstripped=fishtank_unstripped,
         ),
     ]

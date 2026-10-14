@@ -82,7 +82,7 @@ set(OPTION_SDK_TOOLS_BUILD_NUMBER ""
 set(OPTION_ASAN "" CACHE STRING "The list of build sanitizers to user")
 set(OPTION_COVERAGE_IN_DEBUG FALSE
     CACHE BOOL "Code coverage in debug builds.")
-set(OPTION_ASAN_IN_DEBUG TRUE
+set(OPTION_ASAN_IN_DEBUG FALSE
     CACHE BOOL "Asan for debug builds.")
 set(OPTION_TIME_INFO FALSE
     CACHE BOOL "Collect compile time statistics.")
@@ -184,6 +184,7 @@ endif()
 
 # Make sure targets have complete control of include order.
 set(CMAKE_INCLUDE_CURRENT_DIR OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Build protobuf as a shared library.
 set(protobuf_BUILD_SHARED_LIBS TRUE)
