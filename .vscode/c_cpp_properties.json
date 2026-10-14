@@ -93,7 +93,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "clang-x64",
             "configurationProvider": "vector-of-bool.cmake-tools",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/objs/compile_commands.json"
         },
         {
             "name": "Win32",
@@ -122,7 +122,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "clang-x64",
             "configurationProvider": "vector-of-bool.cmake-tools",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/objs/compile_commands.json"
         },
         {
             "name": "Linux",
@@ -152,7 +152,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "clang-x64",
             "configurationProvider": "vector-of-bool.cmake-tools",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/objs/compile_commands.json"
         }
     ],
     "version": 4

@@ -31,14 +31,21 @@ class CompileTask(BuildTask):
 
     NINJA_FILTER = re.compile(r"^\[\d+/\d+\]")
 
-    def __init__(self, aosp: Path, destination: Path, target: str, fishtank_unstripped: bool = False):
+    def __init__(
+        self,
+        aosp: Path,
+        destination: Path,
+        target: str,
+        configuration: str = "release",
+        fishtank_unstripped: bool = False,
+    ):
         super().__init__()
         self.toolchain = Toolchain(aosp, target)
         self.target = self.toolchain.distribution()
 
-        # Stripping is meaning less in windows world
+        # Stripping is meaningless in windows world and unwanted in debug builds
         target = "install"
-        if platform.system() != "Windows":
+        if platform.system() != "Windows" and configuration != "debug":
             target += "/strip"
 
         cmake_dir = (
