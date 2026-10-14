@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -27,6 +28,7 @@
 #include "aemu/base/Log.h"
 #include "aemu/base/files/FileShareOpen.h"
 #include "aemu/base/files/FileShareOpenImpl.h"
+#include "aemu/base/memory/ScopedPtr.h"
 #include "gtest/gtest.h"
 
 #ifndef _WIN32
@@ -188,6 +190,38 @@ TEST_F(ProcessTest, can_read_process_name) {
             << "Expected sleep_emu in the process name: " << name
             << ", are your running the test in the directory where sleep_emu "
                "is?";
+}
+
+TEST_F(ProcessTest, can_launch_and_read_unicode_process_name) {
+    namespace fs = std::filesystem;
+    fs::path src = fs::u8path(sleep_exe());
+    if (!fs::exists(src)) {
+        GTEST_SKIP() << "sleep_emu not found at " << sleep_exe();
+    }
+    const std::string unicodeStem = "sleep_t\xC3\xA1st_\xE4\xB8\xAD\xE6\x96\x87";
+    fs::path dst = src.parent_path() / fs::u8path(unicodeStem + EXE);
+    std::error_code ec;
+    fs::copy_file(src, dst, fs::copy_options::overwrite_existing, ec);
+    ASSERT_FALSE(ec) << "Failed to copy sleep_emu: " << ec.message();
+
+    std::unique_ptr<ObservableProcess> proc;
+    auto cleanup = makeCustomScopedPtr(&dst, [&proc](fs::path* dstPath) {
+        if (proc) {
+            proc->terminate();
+            proc->wait_for(500ms);
+        }
+        std::error_code removeEc;
+        fs::remove(*dstPath, removeEc);
+    });
+
+    proc = Command::create({dst.u8string(), "--sleep", "1s"}).execute();
+    ASSERT_NE(proc, nullptr);
+    std::this_thread::sleep_for(10ms);
+    auto discovered = Process::fromPid(proc->pid());
+    ASSERT_NE(discovered, nullptr);
+    std::string name = discovered->exe();
+    EXPECT_NE(name.find(unicodeStem), std::string::npos)
+            << "Expected " << unicodeStem << " in exe(): " << name;
 }
 
 TEST_F(ProcessTest, exit_code_waits_until_process_completes) {

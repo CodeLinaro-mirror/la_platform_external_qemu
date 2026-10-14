@@ -20,6 +20,7 @@
 #include "aemu/base/files/ScopedFileHandle.h"
 #include "aemu/base/logging/Log.h"
 #include "aemu/base/streams/RingStreambuf.h"
+#include "aemu/base/system/Win32UnicodeString.h"
 #include "android/utils/exec.h"
 
 #include <Tlhelp32.h>
@@ -51,14 +52,8 @@ std::vector<char*> toCharArray(const std::vector<std::string>& params) {
 
 // Converts a std::string (utf-8) -> utf-16
 static std::wstring toWide(std::string str) {
-    // Utf8 -> Utf16, so width will always be smaller.
-    wchar_t rspBuffer[str.size() + 1];
-    size_t size = 0;
-    if (mbstowcs_s(&size, rspBuffer, sizeof(rspBuffer), str.c_str(),
-                   str.size()) != 0) {
-        return L"";
-    }
-    return std::wstring(rspBuffer, size - 1);
+    Win32UnicodeString wide(str.data(), str.size());
+    return std::wstring(wide.c_str(), wide.size());
 }
 
 // static
@@ -442,7 +437,7 @@ public:
         }
 
         if (mProcess != 0 && mProcess != INVALID_HANDLE_VALUE) {
-            CloseHandle(mProcInfo.hProcess);
+            CloseHandle(mProcess);
         }
     }
 
@@ -483,18 +478,20 @@ public:
     }
 
     std::string exe() const override {
-        std::string name(MAX_PATH, '\000');
-        if (mProcess != INVALID_HANDLE_VALUE) {
-            int size = GetModuleFileNameExA(mProcess, NULL, name.data(),
-                                            name.size());
-            name.reserve(size + 1);
-            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-                size = GetModuleFileNameExA(mProcess, NULL, name.data(),
-                                            size + 1);
-                name.resize(size + 1, '\000');
+        if (mProcess != nullptr && mProcess != INVALID_HANDLE_VALUE) {
+            std::wstring wname(MAX_PATH, L'\0');
+            DWORD size = GetModuleFileNameExW(mProcess, NULL, wname.data(),
+                                              static_cast<DWORD>(wname.size()));
+            while (size >= wname.size() - 1 && wname.size() < 32768) {
+                wname.resize(wname.size() * 2, L'\0');
+                size = GetModuleFileNameExW(mProcess, NULL, wname.data(),
+                                            static_cast<DWORD>(wname.size()));
+            }
+            if (size > 0) {
+                return Win32UnicodeString::convertToUtf8(wname.c_str(), size);
             }
         }
-        return name;
+        return "";
     }
 
     inline bool isAlive() const override {
@@ -685,7 +682,7 @@ protected:
     }
 
 private:
-    HANDLE mProcess;
+    HANDLE mProcess = INVALID_HANDLE_VALUE;
     PROCESS_INFORMATION mProcInfo = {0};
     std::vector<std::unique_ptr<WindwsPipe>> mPipes;
 };
