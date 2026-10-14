@@ -938,6 +938,14 @@ static bool main_loop_should_exit(int *status, ShutdownCause *exit_cause)
     return false;
 }
 
+static NotifierList main_loop_exit_notifiers =
+    NOTIFIER_LIST_INITIALIZER(main_loop_exit_notifiers);
+
+void qemu_register_main_loop_exit_notifier(Notifier *notifier)
+{
+    notifier_list_add(&main_loop_exit_notifiers, notifier);
+}
+
 int qemu_main_loop(void)
 {
     int status = EXIT_SUCCESS;
@@ -948,6 +956,7 @@ int qemu_main_loop(void)
     }
 
     try_savevm(exit_cause);
+    notifier_list_notify(&main_loop_exit_notifiers, &exit_cause);
 
     return status;
 }

@@ -5,6 +5,7 @@
 LIBRARY qemu-system-x86_64.exe
 EXPORTS
     add_deletable_object
+    add_snapshot_progress_handler
     address_space_map
     address_space_unmap
     aio_bh_call
@@ -52,6 +53,7 @@ EXPORTS
     cpus_count
     current_accel_name
     cursor_alloc
+    del_snapshot_progress_handler
     delete_snapshot
     device_class_set_props_n
     dpy_cursor_define
@@ -268,6 +270,7 @@ EXPORTS
     qemu_put_be64
     qemu_put_buffer
     qemu_put_byte
+    qemu_register_main_loop_exit_notifier
     qemu_register_reset
     qemu_register_shutdown_notifier
     qemu_send_packet_async

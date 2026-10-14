@@ -144,17 +144,16 @@ static void arm_init_goldfish(MachineState *machine) {
                        "google,goldfish-battery\0"
                        "generic,goldfish-battery",
                        2, 0, 0);
-
-#if defined(__linux__) && defined(__aarch64__)
-  /* Default GIC type is host: use the same version as the host */
-  machine->gic_version = 0;
-#endif
 }
 
 static void goldfish_instance_init(Object *obj)
 {
   VirtMachineState *vms = VIRT_MACHINE(obj);
   vms->irqmap = a15irqmap;
+#if defined(__linux__) && defined(__aarch64__)
+  /* Default GIC type is host: use the same version as the host */
+  vms->gic_version = VIRT_GIC_VERSION_MAX;
+#endif
 }
 
 static void goldfish_machine_options(MachineClass *mc) {
