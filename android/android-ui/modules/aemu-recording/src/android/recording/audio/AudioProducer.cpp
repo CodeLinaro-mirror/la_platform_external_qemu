@@ -18,6 +18,7 @@
 #include <limits.h>                                       // for CHAR_BIT
 #include <stddef.h>                                       // for size_t
 #include <stdint.h>                                       // for uint64_t
+#include <atomic>                                         // for atomic
 #include <functional>                                     // for function
 #include <memory>                                         // for unique_ptr
 #include <new>                                            // for operator new
@@ -64,22 +65,19 @@ public:
 
     // Stop the audio capturer
     bool stop() {
+        if (!mRunning.exchange(false)) {
+            return false;
+        }
         auto engine = AudioCaptureEngine::get();
         if (!engine) {
             return false;
         }
 
-        mRunning = engine->stop(this) == 0;
-        return mRunning;
+        return engine->stop(this) == 0;
     }
 
     virtual ~AudioCapturerImpl() {
-        // Doesn't hurt to stop the audio capture engine even if we stopped it
-        // already
-        auto engine = AudioCaptureEngine::get();
-        if (engine) {
-            engine->stop(this);
-        }
+        stop();
     }
 
     // Called from the qemu io thread with the audio data
@@ -91,7 +89,7 @@ public:
 
 private:
     Callback mCallback;
-    bool mRunning = false;
+    std::atomic<bool> mRunning{false};
 };  // class AudioCapturerImpl
 
 // Implementation of Producer class for audio data
@@ -122,6 +120,14 @@ public:
             f.format.audioFormat = mFormat.audioFormat;
             mFreeQueue.send(std::move(f));
         }
+
+        mAudioCapturer.reset(new AudioCapturerImpl(
+                [this](const void* buf, int size) -> int {
+                    return onSample(buf, size);
+                },
+                mSampleRate, getAudioFormatSize(mFormat.audioFormat) * CHAR_BIT,
+                mChannels));
+        mCapturerStarted = mAudioCapturer->start();
     }
 
     virtual ~AudioProducer() { stop(); }
@@ -129,21 +135,14 @@ public:
     intptr_t main() final {
         assert(mCallback);
 
-        // Start the audio capturer to start receiving audio frames.
-        mAudioCapturer.reset(new AudioCapturerImpl(
-                [this](const void* buf, int size) -> int {
-                    return onSample(buf, size);
-                },
-                mSampleRate, getAudioFormatSize(mFormat.audioFormat) * CHAR_BIT,
-                mChannels));
-        if (!mAudioCapturer->start()) {
+        if (!mCapturerStarted) {
             LOG(ERROR) << "Unable to start audio capturer";
             return -1;
         }
 
         int i = 0;
         uint64_t last_pts = android::base::System::get()->getHighResTimeUs();
-        while (true) {
+        while (!mDataQueue.isStopped()) {
             // Consumer
             auto start = android::base::System::get()->getHighResTimeUs();
             // use getUnixTimeUs() to stay same with the following:
@@ -183,13 +182,11 @@ public:
     }
 
     virtual void stop() override {
-        if (!mAudioCapturer) {
-            return;
-        }
-
-        mAudioCapturer->stop();
         mDataQueue.stop();
         mFreeQueue.stop();
+        if (mAudioCapturer) {
+            mAudioCapturer->stop();
+        }
     }
 
 private:
@@ -241,6 +238,7 @@ private:
     std::unique_ptr<Frame> mSilentFrames;
 
     std::unique_ptr<AudioCapturerImpl> mAudioCapturer;
+    bool mCapturerStarted = false;
     // mDataQueue contains filled audio frames and mFreeQueue has available
     // audio frames that the producer can use. The workflow is as follows:
     // Producer:
