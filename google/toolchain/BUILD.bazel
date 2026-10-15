@@ -52,7 +52,8 @@ amc_toolchain(
         "@goldfish_build//platforms:is_linux_aarch64": "linux-aarch64",
         "@goldfish_build//platforms:is_linux_x64": "linux-x86_64",
         "@platforms//os:macos": "darwin-aarch64",
-        "@platforms//os:windows": "windows-msvc-x86_64",
+        "@goldfish_build//platforms:is_windows_aarch64": "windows-msvc-aarch64",
+        "@goldfish_build//platforms:is_windows_x64": "windows-msvc-x86_64",
     }),
 )
 
@@ -235,7 +236,8 @@ amc_generator(
         "@goldfish_build//platforms:is_linux_aarch64": "linux-aarch64",
         "@goldfish_build//platforms:is_linux_x64": "linux-x64",
         "@platforms//os:macos": "mac-aarch64",
-        "@platforms//os:windows": "windows-x64",
+        "@goldfish_build//platforms:is_windows_aarch64": "windows-aarch64",
+        "@goldfish_build//platforms:is_windows_x64": "windows-x64",
     }),
     toolchain = ":toolchain",
 )
@@ -273,7 +275,8 @@ pkg_zip(
         "@goldfish_build//platforms:is_linux_aarch64": "bazel-linux-aarch64-{build_id}.zip",
         "@goldfish_build//platforms:is_linux_x64": "bazel-linux-x86_64-{build_id}.zip",
         "@platforms//os:macos": "bazel-darwin-arm64-{build_id}.zip",
-        "@platforms//os:windows": "bazel-windows-x86_64-{build_id}.zip",
+        "@goldfish_build//platforms:is_windows_aarch64": "bazel-windows-aarch64-{build_id}.zip",
+        "@goldfish_build//platforms:is_windows_x64": "bazel-windows-x86_64-{build_id}.zip",
     }),
     package_variables = ":build_id",
 )

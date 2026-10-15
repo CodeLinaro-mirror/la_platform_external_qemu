@@ -39,7 +39,8 @@ filegroup(
 filegroup(
     name = "platform_files",
     srcs = select({
-        "@platforms//os:windows": ["platform/BUILD.windows-x86_64"] + glob(["platform/windows-amd64/**/*"]),
+        "@goldfish_build//platforms:is_windows_aarch64": ["platform/BUILD.windows-aarch64"] + glob(["platform/windows-aarch64/**/*"]),
+        "@goldfish_build//platforms:is_windows_x64": ["platform/BUILD.windows-x86_64"] + glob(["platform/windows-amd64/**/*"]),
         "@platforms//os:macos": ["platform/BUILD.darwin-arm64"] + glob(["platform/darwin-arm64/**/*"]),
         "@goldfish_build//platforms:is_linux_aarch64": ["platform/BUILD.linux-aarch64"] + glob(["platform/linux-aarch64/**/*"]),
         "@goldfish_build//platforms:is_linux_x64": ["platform/BUILD.linux-x86_64"] + glob(["platform/linux-x86_64/**/*"]),
@@ -216,7 +217,14 @@ cc_library(
         "ui/input-keymap-xorgxquartz-to-qcode.c.inc",
         "ui/input-keymap-xorgxwin-to-qcode.c.inc",
     ] + select({
-        "@platforms//os:windows": [
+        "@goldfish_build//platforms:is_windows_aarch64": [
+            "platform/windows-aarch64/aarch64-softmmu-config-devices.h",
+            "platform/windows-aarch64/aarch64-softmmu-config-target.h",
+            "platform/windows-aarch64/config-host.h",
+            "platform/windows-aarch64/x86_64-softmmu-config-devices.h",
+            "platform/windows-aarch64/x86_64-softmmu-config-target.h",
+        ],
+        "@goldfish_build//platforms:is_windows_x64": [
             "platform/windows-amd64/aarch64-softmmu-config-devices.h",
             "platform/windows-amd64/aarch64-softmmu-config-target.h",
             "platform/windows-amd64/config-host.h",
@@ -254,7 +262,8 @@ cc_library(
         "include",
         "linux-headers",
     ] + select({
-        "@platforms//os:windows": ["platform/windows-amd64"],
+        "@goldfish_build//platforms:is_windows_aarch64": ["platform/windows-aarch64"],
+        "@goldfish_build//platforms:is_windows_x64": ["platform/windows-amd64"],
         "@platforms//os:macos": ["platform/darwin-arm64"],
         "@goldfish_build//platforms:is_linux_aarch64": ["platform/linux-aarch64"],
         "@goldfish_build//platforms:is_linux_x64": ["platform/linux-x86_64"],
