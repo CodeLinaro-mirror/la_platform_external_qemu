@@ -69,18 +69,28 @@ class NetsimWifiTransport;
 
 // Default RX queue used by the virtio wifi driver.
 static int kDefaultQueueIdx = 0;
-static std::unique_ptr<NetsimWifiTransport> sTransport = nullptr;
-static std::unique_ptr<PacketStreamer::Stub> sTransportStub = nullptr;
+static std::mutex sTransportMutex;
+static std::shared_ptr<NetsimWifiTransport> sTransport = nullptr;
 
 class NetsimWifiTransport
-    : public SimpleClientBidiStream<PacketResponse, PacketRequest> {
+    : public SimpleClientBidiStream<PacketResponse, PacketRequest>,
+      public std::enable_shared_from_this<NetsimWifiTransport> {
 public:
     NetsimWifiTransport(WifiService::OnReceiveCallback onRecv,
                         WifiService::CanReceiveCallback canReceive)
-        : mOnRecv(onRecv), mCanReceive(canReceive), mStopped(false) {
-        mThread = std::thread(&NetsimWifiTransport::readThread, this);
+        : mOnRecv(onRecv), mCanReceive(canReceive), mStopped(false) {}
+
+    ~NetsimWifiTransport() {
+        {
+            std::lock_guard<std::mutex> guard(mMutex);
+            mStopped = true;
+        }
+        mConVar.notify_one();
+        if (mThread.joinable()) {
+            mThread.join();
+        }
     }
-    ~NetsimWifiTransport() {}
+
     void Read(const PacketResponse* read) override {
         DD("Forwarding %s -> %s ", mContext.peer().c_str(),
            read->ShortDebugString().c_str());
@@ -88,13 +98,13 @@ public:
             std::lock_guard<std::mutex> guard(mMutex);
             mQueue.push(ToUniqueVec(&read->packet()));
             mConVar.notify_one();
-            } else {
-                dwarning("Unexpected packet %s",
-                         read->DebugString().c_str());
-            }
+        } else {
+            DD("Unexpected packet %s", read->ShortDebugString().c_str());
+        }
     }
 
     void OnDone(const grpc::Status& s) override {
+        CloseWriter();
         dwarning("Netsim Wifi %s is gone due to %s", mContext.peer().c_str(),
                  s.error_message().c_str());
         {
@@ -102,23 +112,53 @@ public:
             mStopped = true;
         }
         mConVar.notify_one();
-        mThread.join();
+        if (mThread.joinable()) {
+            mThread.join();
+        }
+        {
+            std::lock_guard<std::mutex> lock(mAwaitMutex);
+            mStatus = s;
+            mDone = true;
+            mAwaitCondition.notify_all();
+        }
+        mMe.reset();
     }
 
     // Blocks and waits until this connection has completed.
     grpc::Status await() {
         std::unique_lock<std::mutex> lock(mAwaitMutex);
-        mAwaitCondition.wait(lock, [this] { return mDone; });
+        if (!mAwaitCondition.wait_for(lock, std::chrono::seconds(5),
+                                      [this] { return mDone; })) {
+            return grpc::Status(
+                    grpc::StatusCode::DEADLINE_EXCEEDED,
+                    "Timed out waiting for NetsimWifiTransport OnDone");
+        }
         return std::move(mStatus);
     }
 
-    void cancel() { mContext.TryCancel(); }
+    bool isDone() {
+        std::lock_guard<std::mutex> lock(mAwaitMutex);
+        return mDone;
+    }
 
-    void startCall(PacketStreamer::Stub* stub) {
-        stub->async()->StreamPackets(&mContext, this);
+    void cancel() {
+        CloseWriter();
+        {
+            std::lock_guard<std::mutex> guard(mMutex);
+            mStopped = true;
+        }
+        mConVar.notify_one();
+        mContext.TryCancel();
+    }
+
+    void startCall(std::unique_ptr<PacketStreamer::Stub> stub) {
+        mMe = shared_from_this();
+        mStub = std::move(stub);
+        mStub->async()->StreamPackets(&mContext, this);
         StartCall();
         StartRead();
-    };
+        mThread = std::thread(&NetsimWifiTransport::readThread, this);
+    }
 
 protected:
     grpc::ClientContext mContext;
@@ -156,6 +196,8 @@ private:
         }
     }
 
+    std::shared_ptr<NetsimWifiTransport> mMe;
+    std::unique_ptr<PacketStreamer::Stub> mStub;
     std::queue<std::unique_ptr<std::vector<uint8_t>>> mQueue;
     std::mutex mMutex;
     std::thread mThread;
@@ -179,24 +221,31 @@ NetsimWifiForwarder::~NetsimWifiForwarder() {
 }
 
 bool NetsimWifiForwarder::init() {
+    stop();
     auto channel = netsim::packet::CreateChannel(get_netsim_options());
     if (!channel) {
         dwarning("Unable to establish gRPC connection with netsim.");
         return false;
     }
-    sTransportStub = PacketStreamer::NewStub(channel);
-
-    sTransport = std::make_unique<NetsimWifiTransport>(mOnRecv, mCanReceive);
-    sTransport->startCall(sTransportStub.get());
+    auto stub = PacketStreamer::NewStub(channel);
+    auto transport =
+            std::make_shared<NetsimWifiTransport>(mOnRecv, mCanReceive);
+    transport->startCall(std::move(stub));
 
     PacketRequest initial_request;
     auto initial_info = initial_request.mutable_initial_info();
     auto device_info = get_netsim_device_info();
-    initial_info->set_name(device_info->name());
+    if (device_info) {
+        initial_info->set_name(device_info->name());
+        initial_info->mutable_device_info()->CopyFrom(*device_info);
+    }
     initial_info->mutable_chip()->set_kind(
             netsim::common::ChipKind::WIFI);
-    initial_info->mutable_device_info()->CopyFrom(*device_info);
-    sTransport->Write(initial_request);
+    transport->Write(initial_request);
+    {
+        std::lock_guard<std::mutex> guard(sTransportMutex);
+        sTransport = std::move(transport);
+    }
     auto* hostapd = android::emulation::HostapdController::getInstance();
     if (hostapd)
         hostapd->terminate();
@@ -205,7 +254,12 @@ bool NetsimWifiForwarder::init() {
 }
 
 int NetsimWifiForwarder::send(const android::base::IOVector& iov) {
-    if (!sTransport) {
+    std::shared_ptr<NetsimWifiTransport> transport;
+    {
+        std::lock_guard<std::mutex> guard(sTransportMutex);
+        transport = sTransport;
+    }
+    if (!transport || transport->isDone()) {
         return 0;
     }
     // Filter out spurious garbage data from the guest.
@@ -215,7 +269,7 @@ int NetsimWifiForwarder::send(const android::base::IOVector& iov) {
     }
     PacketRequest toSend;
     toSend.set_packet(std::string(msg.data(), msg.data() + msg.dataLen()));
-    sTransport->Write(toSend);
+    transport->Write(toSend);
     return msg.dataLen();
 }
 
@@ -228,8 +282,14 @@ int NetsimWifiForwarder::libslirp_send(const android::base::IOVector& iov) {
 }
 
 void NetsimWifiForwarder::stop() {
-    if (sTransport != nullptr)
-        sTransport->cancel();
+    std::shared_ptr<NetsimWifiTransport> transport;
+    {
+        std::lock_guard<std::mutex> guard(sTransportMutex);
+        transport = std::move(sTransport);
+    }
+    if (transport != nullptr) {
+        transport->cancel();
+    }
 }
 
 int NetsimWifiForwarder::recv(android::base::IOVector& iov) {

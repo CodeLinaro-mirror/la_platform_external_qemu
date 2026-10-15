@@ -140,4 +140,54 @@ TEST(Sms, Utf8FromStr) {
     }
 }
 
+TEST(Sms, ReceiverUndecodableFragment) {
+    const char* hex1 = "0041000A8156103254760004060500032A0201";
+    const char* hex2 = "0041000A8156103254760000090500032A02028242";
+
+    SmsPDU pdu1 = smspdu_create_from_hex(hex1, strlen(hex1));
+    SmsPDU pdu2 = smspdu_create_from_hex(hex2, strlen(hex2));
+    ASSERT_NE(pdu1, nullptr);
+    ASSERT_NE(pdu2, nullptr);
+
+    SmsReceiver rec = sms_receiver_create();
+    ASSERT_NE(rec, nullptr);
+
+    EXPECT_EQ(sms_receiver_add_submit_pdu(rec, pdu1), 0);
+    int index = sms_receiver_add_submit_pdu(rec, pdu2);
+    EXPECT_GT(index, 0);
+
+    EXPECT_EQ(sms_receiver_get_text_message(rec, index, nullptr, 0), -1);
+
+    SmsAddressRec from;
+    ASSERT_EQ(sms_address_from_str(&from, "6501234567", 10), 0);
+    SmsPDU* deliver = sms_receiver_create_deliver(rec, index, &from);
+    EXPECT_EQ(deliver, nullptr);
+
+    sms_receiver_destroy(rec);
+}
+
+TEST(Sms, ReceiverOutOfBoundsFragmentIndex) {
+    SmsReceiver rec = sms_receiver_create();
+    ASSERT_NE(rec, nullptr);
+
+    const char* hex_oob1 = "0041000A8156103254760000060500032B0203";
+    SmsPDU pdu_oob1 = smspdu_create_from_hex(hex_oob1, strlen(hex_oob1));
+    ASSERT_NE(pdu_oob1, nullptr);
+    EXPECT_EQ(sms_receiver_add_submit_pdu(rec, pdu_oob1), -1);
+    smspdu_free(pdu_oob1);
+
+    const char* hex_valid = "0041000A8156103254760000060500032C0201";
+    SmsPDU pdu_valid = smspdu_create_from_hex(hex_valid, strlen(hex_valid));
+    ASSERT_NE(pdu_valid, nullptr);
+    EXPECT_EQ(sms_receiver_add_submit_pdu(rec, pdu_valid), 0);
+
+    const char* hex_oob2 = "0041000A8156103254760000060500032C0203";
+    SmsPDU pdu_oob2 = smspdu_create_from_hex(hex_oob2, strlen(hex_oob2));
+    ASSERT_NE(pdu_oob2, nullptr);
+    EXPECT_EQ(sms_receiver_add_submit_pdu(rec, pdu_oob2), -1);
+    smspdu_free(pdu_oob2);
+
+    sms_receiver_destroy(rec);
+}
+
 }  // namespace sms

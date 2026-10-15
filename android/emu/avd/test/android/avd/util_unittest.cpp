@@ -162,7 +162,26 @@ TEST(AvdUtil, propertyFile_getApiLevel) {
   EXPECT_EQ(19,propertyFile_getApiLevel(&fd));
 
   EXPECT_EQ(0,fileData_initFromMemory(&fd, testFileBogus, strlen(testFileBogus)));
-  EXPECT_EQ(3,propertyFile_getApiLevel(&fd));
+  EXPECT_EQ(3, propertyFile_getApiLevel(&fd));
+
+  // With minor versions.
+  const char* testFile36_0 = "ro.build.version.sdk_full=36.0\n";
+  const char* testFile37_2 = "ro.build.version.sdk_full=37.2\n";
+  const char* testFileSystem37_2 = "ro.system.build.version.sdk_full=37.2\n";
+
+  EXPECT_EQ(0,fileData_initFromMemory(&fd, testFile36_0, strlen(testFile36_0)));
+  EXPECT_EQ(36,propertyFile_getApiLevel(&fd));
+  EXPECT_EQ(0,propertyFile_getApiLevelMinor(&fd));
+
+  EXPECT_EQ(0,
+            fileData_initFromMemory(&fd, testFile37_2, strlen(testFile37_2)));
+  EXPECT_EQ(37, propertyFile_getApiLevel(&fd));
+  EXPECT_EQ(2, propertyFile_getApiLevelMinor(&fd));
+
+  EXPECT_EQ(0, fileData_initFromMemory(&fd, testFileSystem37_2,
+                                       strlen(testFileSystem37_2)));
+  EXPECT_EQ(37, propertyFile_getApiLevel(&fd));
+  EXPECT_EQ(2, propertyFile_getApiLevelMinor(&fd));
 }
 
 TEST(AvdUtil, propertyFile_findProductName) {
@@ -243,6 +262,7 @@ TEST(AvdInfoTest, api_level_parsing) {
     AvdInfo* info_36_1 = avdInfo_new("avd_36_1", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_36_1);
     EXPECT_EQ(36, avdInfo_getApiLevel(info_36_1));
+    EXPECT_EQ(1, avdInfo_getApiLevelMinor(info_36_1));
     EXPECT_STREQ("36.1", avdInfo_getApiLevelStr(info_36_1));
     avdInfo_getFullApiNameFromAvd(info_36_1, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("16 (B) - API 36.1", fullNameBuf);
@@ -253,6 +273,7 @@ TEST(AvdInfoTest, api_level_parsing) {
     AvdInfo* info_37_0 = avdInfo_new("avd_37_0", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_37_0);
     EXPECT_EQ(37, avdInfo_getApiLevel(info_37_0));
+    EXPECT_EQ(0, avdInfo_getApiLevelMinor(info_37_0));
     EXPECT_STREQ("37.0", avdInfo_getApiLevelStr(info_37_0));
     avdInfo_getFullApiNameFromAvd(info_37_0, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("17 (C) - API 37.0", fullNameBuf);
@@ -263,6 +284,7 @@ TEST(AvdInfoTest, api_level_parsing) {
     AvdInfo* info_37_1 = avdInfo_new("avd_37_1", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_37_1);
     EXPECT_EQ(37, avdInfo_getApiLevel(info_37_1));
+    EXPECT_EQ(1, avdInfo_getApiLevelMinor(info_37_1));
     EXPECT_STREQ("37.1", avdInfo_getApiLevelStr(info_37_1));
     avdInfo_getFullApiNameFromAvd(info_37_1, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("17 (C) - API 37.1", fullNameBuf);
@@ -273,6 +295,7 @@ TEST(AvdInfoTest, api_level_parsing) {
     AvdInfo* info_37_2_beta1 = avdInfo_new("avd_37_2_beta1", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_37_2_beta1);
     EXPECT_EQ(37, avdInfo_getApiLevel(info_37_2_beta1));
+    EXPECT_EQ(2, avdInfo_getApiLevelMinor(info_37_2_beta1));
     EXPECT_STREQ("37.2-beta1", avdInfo_getApiLevelStr(info_37_2_beta1));
     avdInfo_getFullApiNameFromAvd(info_37_2_beta1, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("17 (C) - API 37.2-beta1", fullNameBuf);
@@ -283,6 +306,7 @@ TEST(AvdInfoTest, api_level_parsing) {
     AvdInfo* info_baklava = avdInfo_new("avd_baklava", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_baklava);
     EXPECT_EQ(36, avdInfo_getApiLevel(info_baklava));
+    EXPECT_EQ(0, avdInfo_getApiLevelMinor(info_baklava));
     EXPECT_STREQ("Baklava", avdInfo_getApiLevelStr(info_baklava));
     avdInfo_getFullApiNameFromAvd(info_baklava, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("16 (B) - API Baklava", fullNameBuf);
@@ -293,6 +317,7 @@ TEST(AvdInfoTest, api_level_parsing) {
     AvdInfo* info_cinnamon = avdInfo_new("avd_cinnamon", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_cinnamon);
     EXPECT_EQ(37, avdInfo_getApiLevel(info_cinnamon));
+    EXPECT_EQ(0, avdInfo_getApiLevelMinor(info_cinnamon));
     EXPECT_STREQ("CinnamonBun", avdInfo_getApiLevelStr(info_cinnamon));
     avdInfo_getFullApiNameFromAvd(info_cinnamon, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("17 (C) - API CinnamonBun", fullNameBuf);
@@ -303,6 +328,7 @@ TEST(AvdInfoTest, api_level_parsing) {
     AvdInfo* info_35 = avdInfo_new("avd_35", NULL, "dummy_sysdir");
     ASSERT_NE(nullptr, info_35);
     EXPECT_EQ(35, avdInfo_getApiLevel(info_35));
+    EXPECT_EQ(0, avdInfo_getApiLevelMinor(info_35));
     EXPECT_STREQ("35", avdInfo_getApiLevelStr(info_35));
     avdInfo_getFullApiNameFromAvd(info_35, fullNameBuf, sizeof(fullNameBuf));
     EXPECT_STREQ("15.0 (V) - API 35", fullNameBuf);

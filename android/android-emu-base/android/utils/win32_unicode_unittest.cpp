@@ -11,6 +11,7 @@
 
 #include "android/utils/win32_unicode.h"
 
+#include <errno.h>
 #include <gtest/gtest.h>
 #include <stdlib.h>
 #include <string.h>
@@ -97,7 +98,9 @@ TEST(Win32Unicode, Win32Stat) {
             android::base::pj(subDir, "file_\xE4\xB8\xAD\xE6\x96\x87.txt");
     struct _stati64 st = {};
     EXPECT_EQ(-1, win32_stat(filePath.c_str(), &st));
+    errno = 0;
     EXPECT_EQ(-1, win32_stat(nullptr, &st));
+    EXPECT_EQ(EINVAL, errno);
 
     const char kPayload[] = "win32_stat test payload";
     FILE* fp = android_fopen(filePath.c_str(), "wb");

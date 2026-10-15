@@ -14,6 +14,7 @@
 #include "aemu/base/files/PathUtils.h"
 #include "android/base/testing/TestSystem.h"
 #include "android/base/testing/TestTempDir.h"
+#include "android/utils/file_io.h"
 
 #include "gtest/gtest.h"
 
@@ -166,6 +167,42 @@ TEST(Path, PathExists) {
         EXPECT_TRUE(path_exists(subDir.c_str()));
     }
 }
+
+#ifdef _WIN32
+TEST(Path, Win32GetAllocatedFileSize) {
+    TestTempDir tempDir("Win32GetAllocatedFileSizeTest");
+    const char* kWeirdPaths[] = {
+        "regular",
+        "have spaces in it",
+        "âêîôû",
+        "äöüß",
+        "ひらがな",
+        "汉字",
+        "漢字",
+        "हिन्दी",
+    };
+    const char kPayload[] = "test payload for win32_get_allocated_file_size";
+    for (const char* path : kWeirdPaths) {
+        auto subDir = tempDir.makeSubPath(path);
+        ASSERT_EQ(0, path_mkdir_if_needed(subDir.c_str(), 0755));
+
+        auto filePath = pj(subDir, "image_\xE4\xB8\xAD\xE6\x96\x87.img");
+        EXPECT_EQ(-1, win32_get_allocated_file_size(filePath.c_str()));
+
+        ASSERT_EQ(0, path_empty_file(filePath.c_str()));
+        EXPECT_EQ(0, win32_get_allocated_file_size(filePath.c_str()));
+
+        FILE* fp = android_fopen(filePath.c_str(), "wb");
+        ASSERT_NE(nullptr, fp);
+        ASSERT_EQ(sizeof(kPayload), fwrite(kPayload, 1, sizeof(kPayload), fp));
+        fclose(fp);
+
+        EXPECT_GE(win32_get_allocated_file_size(filePath.c_str()),
+                  static_cast<int64_t>(sizeof(kPayload)));
+    }
+    EXPECT_EQ(-1, win32_get_allocated_file_size(nullptr));
+}
+#endif
 
 }  // namespace path
 }  // namespace android

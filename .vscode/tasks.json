@@ -6,7 +6,7 @@
     {
       "label": "Build (Incremental)",
       "type": "shell",
-      "command": "source android/envsetup.sh; ninja -C objs",
+      "command": "../../prebuilts/ninja/$(uname -s | tr A-Z a-z)-x86/ninja -C objs",
       "problemMatcher": [
         "$gcc"
       ],

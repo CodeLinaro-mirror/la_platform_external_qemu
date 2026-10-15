@@ -559,6 +559,44 @@ NOT_A_NUMBER:
     goto EXIT;
 }
 
+static int _avdInfo_getApiLevelMinor(AvdInfo* i) {
+    const char* p;
+    const char* target = i->target;
+    if (target == NULL) {
+        return 0;
+    }
+
+    if (!strncmp(target, "android-", 8)) {
+        p = target + 8;
+    } else {
+        /* skip two columns */
+        p = strchr(target, ':');
+        if (p != NULL) {
+            p = strchr(p + 1, ':');
+            if (p != NULL)
+                p += 1;
+        }
+    }
+    if (p == NULL || !isdigit(*p)) {
+        return 0;
+    }
+
+    char* end;
+    (void)strtol(p, &end, 10);
+    if (!_avdInfo_isDecimalVersion(end)) {
+        return 0;
+    }
+
+    char* minorEnd;
+    long minorVal = strtol(end + 1, &minorEnd, 10);
+    if (minorEnd == end + 1 || minorVal < 0 || minorVal != (int)minorVal) {
+        return 0;
+    }
+
+    D("Found AVD target API level minor: %d", (int)minorVal);
+    return (int)minorVal;
+}
+
 bool avdInfo_isGoogleApis(const AvdInfo* i) {
     return i->isGoogleApis;
 }
@@ -577,6 +615,10 @@ AvdFlavor avdInfo_getAvdFlavor(const AvdInfo* i) {
 
 int avdInfo_getApiLevel(const AvdInfo* i) {
     return i->apiLevel;
+}
+
+int avdInfo_getApiLevelMinor(const AvdInfo* i) {
+    return i->apiLevelMinor;
 }
 
 const char* avdInfo_getApiLevelStr(const AvdInfo* i) {
@@ -968,6 +1010,9 @@ static void _avdInfo_extractBuildProperties(AvdInfo* i) {
             D("Cannot find target API level, defaulting to %d", i->apiLevel);
         }
     }
+    if (!i->apiLevelMinor) {
+        i->apiLevelMinor = propertyFile_getApiLevelMinor(i->buildProperties);
+    }
 
     i->flavor = propertyFile_getAvdFlavor(i->buildProperties);
 
@@ -1068,6 +1113,7 @@ AvdInfo* avdInfo_new(const char* name, AvdInfoParams* __unused_params, const cha
         goto FAIL;
 
     i->apiLevel = _avdInfo_getApiLevel(i, &i->isMarshmallowOrHigher);
+    i->apiLevelMinor = _avdInfo_getApiLevelMinor(i);
 
     /* look for image search paths. handle post 1.1/pre cupcake
      * obsolete SDKs.

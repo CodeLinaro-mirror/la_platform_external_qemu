@@ -102,6 +102,11 @@ extern APosixStatus   path_mkdir_if_needed_no_cow( const char*  path, int  mode 
  * success, -1 on failure (error code in errno) */
 extern APosixStatus   path_get_size( const char*  path, uint64_t  *psize );
 
+#ifdef _WIN32
+/* return the allocated size of a given file, or -1 on failure */
+extern int64_t win32_get_allocated_file_size(const char* filename);
+#endif
+
 /*  path_parent() can be used to return the n-level parent of a given directory
  *  this understands . and .. when encountered in the input path.
  *

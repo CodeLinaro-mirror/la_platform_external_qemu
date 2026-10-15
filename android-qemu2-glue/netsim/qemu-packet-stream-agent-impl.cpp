@@ -92,7 +92,12 @@ static int netsim_chr_write(Chardev* chr, const uint8_t* buf, int len) {
     PacketStreamChardev* netsim = NETSIM_CHARDEV(chr);
     uint64_t consumed = 0;
 
-    if (auto transport = netsim->transport.lock()) {
+    std::shared_ptr<PacketStreamerTransport> transport;
+    {
+        const std::lock_guard<std::mutex> lock(gActiveDevicesLock);
+        transport = netsim->transport.lock();
+    }
+    if (transport) {
         DD("Obtained lock, transporting.");
         consumed = transport->fromQemu(buf, len);
     }
@@ -100,6 +105,21 @@ static int netsim_chr_write(Chardev* chr, const uint8_t* buf, int len) {
     DD("Consumed: %d", consumed);
     return consumed;
 }
+
+namespace android {
+namespace qemu2 {
+bool set_netsim_device_transport(
+        PacketStreamChardev* netsim,
+        const std::shared_ptr<PacketStreamerTransport>& transport) {
+    const std::lock_guard<std::mutex> lock(gActiveDevicesLock);
+    if (!netsim || gActiveDevices.find(netsim) == gActiveDevices.end()) {
+        return false;
+    }
+    netsim->transport = transport;
+    return true;
+}
+}  // namespace qemu2
+}  // namespace android
 
 static void netsim_chr_connect(PacketStreamChardev* netsim) {
     // TODO(jansene): The controller_properties_file could be defined as
@@ -123,8 +143,10 @@ static void netsim_chr_connect(PacketStreamChardev* netsim) {
 
     auto transport = PacketStreamerTransport::create(
             netsim, std::move(protocol), channel, std::move(channelFactory));
+    if (!android::qemu2::set_netsim_device_transport(netsim, transport)) {
+        return;
+    }
     transport->start();
-    netsim->transport = transport;
     dinfo("Activated packet streamer for %s emulation", netsim->parent.label);
 }
 
@@ -145,20 +167,29 @@ static void netsim_chr_open(Chardev* chr,
 
 static void netsim_chr_cleanup(Object* o) {
     PacketStreamChardev* netsim = NETSIM_CHARDEV(o);
-    if (auto transport = netsim->transport.lock()) {
+    std::shared_ptr<PacketStreamerTransport> transport;
+    {
+        const std::lock_guard<std::mutex> lock(gActiveDevicesLock);
+        gActiveDevices.erase(netsim);
+        transport = netsim->transport.lock();
+        netsim->transport.reset();
+    }
+    if (transport) {
         transport->cancel();
     }
 
     // Constructed using placement new, so we will manually destruct it.
     netsim->transport.~weak_ptr();
-
-    const std::lock_guard<std::mutex> lock(gActiveDevicesLock);
-    gActiveDevices.erase(netsim);
 }
 
 static int netsim_chr_machine_done_hook(Chardev* chr) {
     PacketStreamChardev* netsim = NETSIM_CHARDEV(chr);
-    if (auto transport = netsim->transport.lock()) {
+    std::shared_ptr<PacketStreamerTransport> transport;
+    {
+        const std::lock_guard<std::mutex> lock(gActiveDevicesLock);
+        transport = netsim->transport.lock();
+    }
+    if (transport) {
         transport->qemuConnected();
     }
     return 0;

@@ -147,7 +147,8 @@ android_add_test(
       emulation/virtio_vsock_transport_unittest.cpp
       tests/VirtioGpuTimelines_unittest.cpp
       utils/register_crash_info_unittest.cpp
-      netsim/NfcPacketProtocol_unittest.cpp)
+      netsim/NfcPacketProtocol_unittest.cpp
+      netsim/NetsimWifiForwarder_unittest.cpp)
 
 target_link_libraries(
   libqemu2-glue_unittests

@@ -577,27 +577,7 @@ static int64_t raw_getlength(BlockDriverState *bs)
 
 static int64_t raw_get_allocated_file_size(BlockDriverState *bs)
 {
-    typedef DWORD (WINAPI * get_compressed_t)(const char *filename,
-                                              DWORD * high);
-    get_compressed_t get_compressed;
-    struct _stati64 st;
-    const char *filename = bs->filename;
-    /* WinNT support GetCompressedFileSize to determine allocate size */
-    get_compressed =
-        (get_compressed_t) GetProcAddress(GetModuleHandle("kernel32"),
-                                            "GetCompressedFileSizeA");
-    if (get_compressed) {
-        DWORD high, low;
-        low = get_compressed(filename, &high);
-        if (low != 0xFFFFFFFFlu || GetLastError() == NO_ERROR) {
-            return (((int64_t) high) << 32) + low;
-        }
-    }
-
-    if (_stati64(filename, &st) < 0) {
-        return -1;
-    }
-    return st.st_size;
+    return win32_get_allocated_file_size(bs->filename);
 }
 
 static int raw_co_create(BlockdevCreateOptions *options, Error **errp)

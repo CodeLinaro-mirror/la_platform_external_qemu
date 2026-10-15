@@ -18,8 +18,6 @@ import platform
 import os
 import zipfile
 import aemu.prebuilts.angle as angle
-import aemu.prebuilts.lavapipe as lavapipe
-import aemu.prebuilts.moltenvk as moltenvk
 import aemu.prebuilts.qt as qt
 import aemu.prebuilts.vulkan_loader as vulkan_loader
 import aemu.prebuilts.deps.common as deps_common
@@ -36,19 +34,6 @@ _prebuilt_funcs = {
     # Add more prebuilts here
 }
 
-if HOST_OS == "linux":
-    _prebuilt_funcs.update({
-        'lavapipe': lavapipe.buildPrebuilt,
-    })
-
-if HOST_OS == "darwin":
-    _prebuilt_funcs.update(
-        {
-            "moltenvk": moltenvk.buildPrebuilt,
-            "lavapipe": lavapipe.buildPrebuilt,
-        }
-    )
-
 def buildPrebuilts(args, is_emulator_build):
     build_if_sha1_changed = False
     global _prebuilt_funcs
@@ -61,7 +46,6 @@ def buildPrebuilts(args, is_emulator_build):
         # Continue to add support for more platforms/prebuilts in emulator build.
         if HOST_OS == "darwin":
             _prebuilt_funcs = {
-                "moltenvk": moltenvk.buildPrebuilt,
                 "vulkan_loader": vulkan_loader.buildPrebuilt,
             }
         elif HOST_OS == "linux":

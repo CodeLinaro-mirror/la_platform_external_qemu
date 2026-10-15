@@ -50,6 +50,7 @@ struct AvdInfo {
 
     /* for both */
     int apiLevel;
+    int apiLevelMinor;
     int incrementalVersion;
 
     /* For preview releases where we don't know the exact API level this flag

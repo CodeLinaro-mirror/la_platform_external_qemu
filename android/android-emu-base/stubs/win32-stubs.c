@@ -1,4 +1,5 @@
 
+#include <errno.h>
 #include <stdlib.h>
 #include <wchar.h>
 #include <direct.h>
@@ -68,6 +69,8 @@ int win32_stat(const char* filepath, struct stat* st) {
     if (wide_path != NULL) {
         result = _wstati64(wide_path, st);
         free(wide_path);
+    } else {
+        errno = EINVAL;
     }
     return result;
 }

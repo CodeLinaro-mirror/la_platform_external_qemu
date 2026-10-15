@@ -122,6 +122,11 @@ char* propertyFile_getTargetArch(const FileData* data);
  */
 int propertyFile_getApiLevel(const FileData* data);
 
+/* Retrieve the target minor API level from the build.prop contents.
+ * Returns 0 if it cannot be determined or if there is an invalid value.
+ */
+int propertyFile_getApiLevelMinor(const FileData* data);
+
 typedef enum {
     AVD_PHONE = 0,
     AVD_TV = 1,
