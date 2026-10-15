@@ -1769,6 +1769,10 @@ int has_converter(uint32_t from, uint32_t to) {
            get_pixel_format_descriptor(to) != NULL;
 }
 
+static inline size_t align_size(size_t value, size_t alignment) {
+    return (value + alignment - 1) & (~(alignment - 1));
+}
+
 bool calculate_framebuffer_size(uint32_t pixel_format,
                                 int width,
                                 int height,
@@ -1786,16 +1790,48 @@ bool calculate_framebuffer_size(uint32_t pixel_format,
         return false;
     }
 
+    const size_t w = (size_t)width;
+    const size_t h = (size_t)height;
+
     if (desc->format_sel == PIX_FMT_YUV && desc->desc.yuv_desc->alignment) {
         // For aligned YUV, the size must include padding for aligned rows.
-        const int alignment = desc->desc.yuv_desc->alignment;
-        const int y_stride = align(width, alignment);
-        const int u_or_v_stride = align(y_stride / 2, alignment);
-
-        *frame_size =
-                y_stride * height + 2 * u_or_v_stride * ((height + 1) / 2);
+        const size_t alignment = (size_t)desc->desc.yuv_desc->alignment;
+        const size_t y_stride = align_size(w, alignment);
+        const size_t u_or_v_stride = align_size(y_stride / 2, alignment);
+        size_t y_bytes = 0;
+        size_t uv_bytes = 0;
+        if (__builtin_mul_overflow(y_stride, h, &y_bytes) ||
+            __builtin_mul_overflow(2 * u_or_v_stride, (h + 1) / 2, &uv_bytes) ||
+            __builtin_add_overflow(y_bytes, uv_bytes, frame_size)) {
+            E("%s: framebuffer size overflow for %d x %d", __FUNCTION__, width,
+              height);
+            return false;
+        }
+    } else if (desc->format_sel == PIX_FMT_YUV && desc->bits_per_pixel == 12) {
+        // Semi-planar 4:2:0 (NV12/NV21): a w x h Y plane followed by an
+        // interleaved UV plane with ceil(h / 2) rows. Both the slow-path
+        // writers and libyuv emit 2 * ceil(w / 2) bytes per UV row.
+        const size_t aligned_w = align_size(w, 2);
+        size_t y_bytes = 0;
+        size_t uv_bytes = 0;
+        if (__builtin_mul_overflow(aligned_w, h, &y_bytes) ||
+            __builtin_mul_overflow(aligned_w, (h + 1) / 2, &uv_bytes) ||
+            __builtin_add_overflow(y_bytes, uv_bytes, frame_size)) {
+            E("%s: framebuffer size overflow for %d x %d", __FUNCTION__, width,
+              height);
+            return false;
+        }
     } else {
-        *frame_size = align(width, 2) * height * desc->bits_per_pixel / 8;
+        const size_t aligned_w = align_size(w, 2);
+        const size_t bpp = (size_t)desc->bits_per_pixel;
+        size_t total_bits = 0;
+        if (__builtin_mul_overflow(aligned_w, h, &total_bits) ||
+            __builtin_mul_overflow(total_bits, bpp, &total_bits)) {
+            E("%s: framebuffer size overflow for %d x %d", __FUNCTION__, width,
+              height);
+            return false;
+        }
+        *frame_size = total_bits / 8;
     }
 
     return true;
@@ -1923,10 +1959,10 @@ typedef struct YUVInfo {
 
 YUVInfo get_yuv_info(int width, int height) {
     YUVInfo result;
-    result.y_stride = align(width, 16);
-    result.u_or_v_stride = align(result.y_stride / 2, 16);
-    result.y_size = result.y_stride * height;
-    result.u_or_v_size = result.u_or_v_stride * ((height + 1) / 2);
+    result.y_stride = align_size((size_t)width, 16);
+    result.u_or_v_stride = align_size(result.y_stride / 2, 16);
+    result.y_size = result.y_stride * (size_t)height;
+    result.u_or_v_size = result.u_or_v_stride * (((size_t)height + 1) / 2);
     return result;
 }
 
@@ -1972,34 +2008,53 @@ int convert_to_i420(const void* src_frame,
     uint8_t* u_staging = y_staging + dst_info.y_size;
     uint8_t* v_staging = u_staging + dst_info.u_or_v_size;
 
-    if (pixel_format == V4L2_PIX_FMT_YUV420 && rotation == 0) {
-        memcpy(y_staging, src_frame, staging_size);
-    } else if (pixel_format == V4L2_PIX_FMT_YVU420 && rotation == 0) {
-        // YVU420 is 16-byte aligned, but there is no way to specify alignment
-        // with ConvertToI420; manually convert it to YUV420 (swapping U and V)
-        // with libyuv's I420Copy.
-        const uint8_t* src_y = src_frame;
-        const uint8_t* src_v = src_y + src_info.y_size;
-        const uint8_t* src_u = src_v + src_info.u_or_v_size;
-
-        int result = I420Copy(src_y,                   // src_y
-                              src_info.y_stride,       // src_stride_y
-                              src_u,                   // src_u
-                              src_info.u_or_v_stride,  // src_stride_u
-                              src_v,                   // src_v
-                              src_info.u_or_v_stride,  // src_stride_v
-                              y_staging,               // dst_y
-                              src_info.y_stride,       // dst_stride_y
-                              u_staging,               // dst_u
-                              src_info.u_or_v_stride,  // dst_stride_u
-                              v_staging,               // dst_v
-                              src_info.u_or_v_stride,  // dst_stride_v
-                              src_width,               // width
-                              src_height);             // height
-        if (result != 0) {
-            W("%s: I420Copy failed with format %.4s, error %d", __FUNCTION__,
-                (const char*)(&pixel_format), result);
+    if ((pixel_format == V4L2_PIX_FMT_YUV420 ||
+         pixel_format == V4L2_PIX_FMT_YVU420) &&
+        rotation == 0) {
+        const size_t src_required_size =
+                src_info.y_size + 2 * src_info.u_or_v_size;
+        if (src_required_size > framebuffer_size) {
+            W("%s: Source buffer too small (%zu < %zu)", __FUNCTION__,
+              framebuffer_size, src_required_size);
             return -1;
+        }
+
+        if (pixel_format == V4L2_PIX_FMT_YUV420 && src_width == dst_width &&
+            src_height == dst_height) {
+            memcpy(y_staging, src_frame, staging_size);
+        } else {
+            // YUV420 and YVU420 are 16-byte aligned, which ConvertToI420 does
+            // not support; copy/crop (and swap U/V for YVU420) into dst_info's
+            // staging planes using libyuv's I420Copy.
+            const uint8_t* src_y = src_frame;
+            const uint8_t* src_plane1 = src_y + src_info.y_size;
+            const uint8_t* src_plane2 = src_plane1 + src_info.u_or_v_size;
+            const uint8_t* src_u = (pixel_format == V4L2_PIX_FMT_YVU420)
+                                           ? src_plane2
+                                           : src_plane1;
+            const uint8_t* src_v = (pixel_format == V4L2_PIX_FMT_YVU420)
+                                           ? src_plane1
+                                           : src_plane2;
+
+            int result = I420Copy(src_y,                   // src_y
+                                  src_info.y_stride,       // src_stride_y
+                                  src_u,                   // src_u
+                                  src_info.u_or_v_stride,  // src_stride_u
+                                  src_v,                   // src_v
+                                  src_info.u_or_v_stride,  // src_stride_v
+                                  y_staging,               // dst_y
+                                  dst_info.y_stride,       // dst_stride_y
+                                  u_staging,               // dst_u
+                                  dst_info.u_or_v_stride,  // dst_stride_u
+                                  v_staging,               // dst_v
+                                  dst_info.u_or_v_stride,  // dst_stride_v
+                                  dst_width,               // width
+                                  dst_height);             // height
+            if (result != 0) {
+                W("%s: I420Copy failed with format %.4s, error %d",
+                  __FUNCTION__, (const char*)(&pixel_format), result);
+                return -1;
+            }
         }
     } else {
         const uint32_t src_format = pixel_format_to_libyuv(pixel_format);
@@ -2050,32 +2105,50 @@ int convert_frame_fast(const void* src_frame,
     const uint32_t exp_comp_i = EXP_COMP_I_FROM_FLOAT(exp_comp_float);
     int n;
     for (n = 0; n < result_frame->framebuffers_count; ++n) {
-        YUVInfo src_info = get_yuv_info(src_width, src_height);
         int result_width = result_frame->framebuffers[n].width;
         int result_height = result_frame->framebuffers[n].height;
+        if (result_width <= 0 || result_height <= 0 ||
+            src_width <= 0 || src_height <= 0) {
+            E("%s: Invalid dimensions src=%dx%d dst=%dx%d", __FUNCTION__,
+              src_width, src_height, result_width, result_height);
+            return -1;
+        }
+
+        YUVInfo src_info = get_yuv_info(src_width, src_height);
         int rotated_width = 0;
         int rotated_height = 0;
         if (rotation == 1 || rotation == 3) {
             // Require rotation and cropping.
             // We want to crop as little as possible.
-            if (src_height * result_height > src_width * result_width) {
+            if ((int64_t)src_height * result_height >
+                (int64_t)src_width * result_width) {
                 rotated_height = src_width;
-                rotated_width = rotated_height * result_width / result_height;
+                rotated_width = (int)((int64_t)rotated_height * result_width /
+                                      result_height);
             } else {
                 rotated_width = src_height;
-                rotated_height = rotated_width * result_height / result_width;
+                rotated_height = (int)((int64_t)rotated_width * result_height /
+                                       result_width);
             }
         } else {
-            if (src_width * result_height > src_height * result_width) {
+            if ((int64_t)src_width * result_height >
+                (int64_t)src_height * result_width) {
                 // Source aspect ratio is larger than result aspect ratio,
                 // thus crop the width.
                 rotated_height = src_height;
-                rotated_width = rotated_height * result_width / result_height;
+                rotated_width = (int)((int64_t)rotated_height * result_width /
+                                      result_height);
             } else {
                 // Otherwise, crop the height.
                 rotated_width = src_width;
-                rotated_height = rotated_width * result_height / result_width;
+                rotated_height = (int)((int64_t)rotated_width * result_height /
+                                       result_width);
             }
+        }
+        if (rotated_width <= 0 || rotated_height <= 0) {
+            E("%s: Invalid rotated dimensions %dx%d", __FUNCTION__,
+              rotated_width, rotated_height);
+            return -1;
         }
         YUVInfo rotated_info = get_yuv_info(rotated_width, rotated_height);
         size_t rotated_size =
@@ -2156,12 +2229,13 @@ int convert_frame_fast(const void* src_frame,
         // Convert to the target framebuffer formats.
         void* dest = result_frame->framebuffers[n].framebuffer;
         if (!dest) {
-            E("%s: framebuffers[n].framebuffer is NULL", __FUNCTION__, n);
+            E("%s: framebuffers[%d].framebuffer is NULL", __FUNCTION__, n);
             return -1;
         }
 
         if (result_frame->framebuffers[n].framebuffer_size) {
-            const framebuffer_size = result_frame->framebuffers[n].framebuffer_size;
+            const size_t dst_framebuffer_size =
+                    result_frame->framebuffers[n].framebuffer_size;
             size_t size_required = 0;
 
             if (!calculate_framebuffer_size(result_frame->framebuffers[n].pixel_format,
@@ -2171,9 +2245,9 @@ int convert_frame_fast(const void* src_frame,
                 return -1;
             }
 
-            if (size_required > framebuffer_size) {
+            if (size_required > dst_framebuffer_size) {
                 E("%s: framebuffer[%d] framebuffer is too small (%zu bytes), %zu bytes are required",
-                __FUNCTION__, n, framebuffer_size, size_required);
+                __FUNCTION__, n, dst_framebuffer_size, size_required);
                 return -1;
             }
         }
