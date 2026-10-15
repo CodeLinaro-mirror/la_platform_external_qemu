@@ -73,11 +73,6 @@ public:
         mEnabled = enable;
     }
 
-    void setMeasurementInterval(CpuUsage::IntervalUs interval) {
-        AutoLock lock(mLock);
-        mMeasurementIntervalUs = interval;
-    }
-
     void forEachMeasurement(int start, int end, CpuUsage::CpuTimeReader func) {
         AutoLock lock(mLock);
         for (int i = start; i < end; ++i) {
@@ -85,16 +80,6 @@ public:
                 return;
             func(mMeasurements[i].lastMeasurement);
         }
-    }
-
-    float getSingleAreaUsage(int usageArea) {
-        if (usageArea < 0 || usageArea >= CpuUsage::UsageArea::Max)
-            return 0.0f;
-
-        AutoLock lock(mLock);
-        if (!mMeasurements[usageArea].looper)
-            return 0.0f;
-        return mMeasurements[usageArea].lastMeasurement.usage();
     }
 
 private:
@@ -151,10 +136,6 @@ void CpuUsage::setEnabled(bool enable) {
     mImpl->setEnabled(enable);
 }
 
-void CpuUsage::setMeasurementInterval(CpuUsage::IntervalUs interval) {
-    mImpl->setMeasurementInterval(interval);
-}
-
 void CpuUsage::forEachUsage(UsageArea area, CpuTimeReader readerFunc) {
     int start;
 
@@ -171,23 +152,6 @@ void CpuUsage::forEachUsage(UsageArea area, CpuTimeReader readerFunc) {
         dwarning("%s: warning: invalid usage area %d detected.", __func__,
                  area);
     }
-}
-
-float CpuUsage::getSingleAreaUsage(int area) {
-    return mImpl->getSingleAreaUsage(area);
-}
-
-float CpuUsage::getTotalMainLoopAndVcpuUsage() {
-    float total = 0.0f;
-    forEachUsage(UsageArea::MainLoop, [&total](const CpuTime& cpuTime) {
-        total += cpuTime.usage();
-    });
-
-    forEachUsage(UsageArea::Vcpu, [&total](const CpuTime& cpuTime) {
-        total += cpuTime.usage();
-    });
-
-    return total;
 }
 
 std::string CpuUsage::printUsage() {
