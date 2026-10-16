@@ -15,6 +15,7 @@
 #include "android/recording/video/VideoProducer.h"
 
 #include <assert.h>                                       // for assert
+#include <atomic>                                         // for atomic
 #include <cstdint>                                        // for uint8_t
 #include <functional>                                     // for __base, fun...
 #include <memory>                                         // for unique_ptr
@@ -200,7 +201,6 @@ bool getScreenshotSimple() {
 
     intptr_t main() final {
         assert(mCallback);
-        mIsStopped = false;
         if (!mIsGuestMode) {
             // Force a repost
             android_redrawOpenglesWindow();
@@ -236,7 +236,9 @@ bool getScreenshotSimple() {
     }
 
     virtual void stop() override {
-        mIsStopped = true;
+        if (mIsStopped.exchange(true)) {
+            return;
+        }
         mDataQueue.stop();
         mFreeQueue.stop();
         waitForPoke();
@@ -344,7 +346,7 @@ private:
     MessageChannel<Frame, kMaxFrames> mDataQueue;
     MessageChannel<Frame, kMaxFrames> mFreeQueue;
     MessageChannel<int, 1> mSignal;
-    bool mIsStopped = false;
+    std::atomic<bool> mIsStopped{false};
 
     // In guest mode, the frames are already triple-buffered in the readback
     // worker, so we don't need to use the messaage channel.

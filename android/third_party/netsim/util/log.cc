@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <ctime>
 #include <fstream>
+#include <mutex>
 
 namespace netsim {
 
@@ -65,7 +66,15 @@ void BtsLogDefault(int priority, const char *file, int lineNumber,
   fflush(stderr);
 }
 
-static BtsLogFn logFunction = BtsLogDefault;
+static std::mutex &getLogMutex() {
+  static std::mutex *logMutex = new std::mutex();
+  return *logMutex;
+}
+
+static BtsLogFn &getLogFunction() {
+  static BtsLogFn *logFunction = new BtsLogFn(BtsLogDefault);
+  return *logFunction;
+}
 
 void __BtsLog(int priority, const char *file, int line, const char *fmt, ...) {
   char buffer[255];
@@ -75,8 +84,18 @@ void __BtsLog(int priority, const char *file, int line, const char *fmt, ...) {
   vsnprintf(buffer, sizeof(buffer), fmt, arglist);
   va_end(arglist);
 
-  logFunction(priority, file, line, buffer);
+  BtsLogFn logFn;
+  {
+    std::lock_guard<std::mutex> lock(getLogMutex());
+    logFn = getLogFunction();
+  }
+  if (logFn) {
+    logFn(priority, file, line, buffer);
+  }
 }
 
-void setBtsLogSink(BtsLogFn logFn) { logFunction = logFn; }
+void setBtsLogSink(BtsLogFn logFn) {
+  std::lock_guard<std::mutex> lock(getLogMutex());
+  getLogFunction() = std::move(logFn);
+}
 }  // namespace netsim
