@@ -158,4 +158,21 @@ QemuSnapshotProgressEntry *add_snapshot_progress_handler(
  */
 void del_snapshot_progress_handler(QemuSnapshotProgressEntry *e);
 
+/**
+ * qemu_snapshot_in_flight_name: Name of the internal snapshot being saved or
+ * loaded by save_snapshot() or load_snapshot() on the calling thread.
+ *
+ * Lets device save/load hooks that keep state outside the VM state stream
+ * (e.g. virtio-gpu-rutabaga's renderer snapshot directory) key that state by
+ * snapshot name, so that distinct snapshots do not overwrite each other.
+ *
+ * Must be called with the BQL held.  The returned string is owned by the
+ * caller of save_snapshot()/load_snapshot() and is only valid until that
+ * operation finishes.
+ *
+ * Returns: the snapshot name, or NULL when no internal snapshot operation is
+ * in flight (e.g. during live migration).
+ */
+const char *qemu_snapshot_in_flight_name(void);
+
 #endif

@@ -10,6 +10,7 @@
 #include "hw/virtio/virtio-gpu-pixman.h"
 #include "hw/virtio/virtio-iommu.h"
 #include "migration/qemu-file-types.h"
+#include "migration/snapshot.h"
 #include "qemu/main-loop.h"
 #include "qemu/timer.h"
 #include "system/runstate.h"
@@ -19,7 +20,12 @@
 #include <glib/gstdio.h>
 #include <rutabaga_gfx/rutabaga_gfx_ffi.h>
 
-#define VIRTIO_GPU_RUTABAGA_VM_VERSION 1
+/*
+ * 1 -> 2: the renderer state directory is keyed by snapshot name
+ *         (see virtio_gpu_rutabaga_renderer_dir()); the per-save
+ *         "rutabaga-<timestamp>" id string is no longer part of the stream.
+ */
+#define VIRTIO_GPU_RUTABAGA_VM_VERSION 2
 
 #define CHECK(condition, cmd)                                                 \
     do {                                                                      \
@@ -1366,6 +1372,39 @@ static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
     }
 }
 
+/*
+ * The renderer (gfxstream) state of a snapshot does not go through the VM
+ * state stream; rutabaga writes it to its own directory.  Keep that directory
+ * per snapshot, next to the other per-snapshot metadata the launcher keeps:
+ *
+ *   <snapshot_directory>/<snapshot name>/renderer/
+ *
+ * where <snapshot name> is the internal snapshot being saved or loaded.  The
+ * launcher owns <snapshot_directory>/<snapshot name>/ itself; this device only
+ * ever creates or removes the renderer/ subdirectory.
+ *
+ * Returns NULL (with an error reported) when snapshot_directory is not set or
+ * no internal snapshot operation is in flight, which happens for migration.
+ */
+static char *virtio_gpu_rutabaga_renderer_dir(VirtIOGPURutabaga *vgr,
+                                              const char *func)
+{
+    const char *snapshot_name;
+
+    if (!vgr->snapshot_directory) {
+        error_report("%s: snapshot_directory not configured", func);
+        return NULL;
+    }
+    snapshot_name = qemu_snapshot_in_flight_name();
+    if (!snapshot_name || !*snapshot_name) {
+        error_report("%s: no internal snapshot in flight; renderer state can "
+                     "only be saved to or loaded from a named snapshot", func);
+        return NULL;
+    }
+    return g_build_filename(vgr->snapshot_directory, snapshot_name,
+                            "renderer", NULL);
+}
+
 static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
                            const VMStateField *field) {
     VirtIOGPURutabaga *vgr = opaque;
@@ -1373,18 +1412,15 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
     struct virtio_gpu_simple_resource *res;
     uint32_t resource_id, pformat;
     int i;
-    char id_str[256];
-    g_autofree char *full_path = NULL;
+    g_autofree char *renderer_dir = NULL;
 
-    qemu_get_counted_string(f, id_str);
-    if (!vgr->snapshot_directory) {
-        error_report("snapshot_directory not configured");
+    renderer_dir = virtio_gpu_rutabaga_renderer_dir(vgr, __func__);
+    if (!renderer_dir) {
         return -EINVAL;
     }
-    full_path = g_build_filename(vgr->snapshot_directory, "default_boot", id_str, NULL);
 
-    if (rutabaga_restore(vgr->rutabaga, full_path)) {
-        error_report("failed to restore rutabaga");
+    if (rutabaga_restore(vgr->rutabaga, renderer_dir)) {
+        error_report("failed to restore rutabaga from %s", renderer_dir);
         return -EINVAL;
     }
 
@@ -1539,38 +1575,34 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
     VirtIOGPU *g = &(vgr->parent_obj);
     struct virtio_gpu_simple_resource *res = NULL;
     int i;
-    g_autofree char *id_str = NULL;
-    g_autofree char *full_path = NULL;
-    g_autofree char *default_boot_path = NULL;
+    g_autofree char *renderer_dir = NULL;
 
-    if (!vgr->snapshot_directory) {
-        error_report("snapshot_directory not configured");
+    renderer_dir = virtio_gpu_rutabaga_renderer_dir(vgr, __func__);
+    if (!renderer_dir) {
         return -EINVAL;
     }
 
-    g_autoptr(GDateTime) now = g_date_time_new_now_local();
-    id_str = g_date_time_format(now, "rutabaga-%Y-%b-%d-%H-%M-%S");
-    qemu_put_counted_string(f, id_str);
-
-    default_boot_path = g_build_filename(vgr->snapshot_directory, "default_boot", NULL);
-    virtio_gpu_rutabaga_remove_dir_recursive(default_boot_path);
-
-    full_path = g_build_filename(vgr->snapshot_directory, "default_boot", id_str, NULL);
-
-    if (g_mkdir_with_parents(full_path, 0755) == -1) {
-        error_report("Failed to create snapshot directory %s", full_path);
-        return -EINVAL;
-    }
-
-    if (rutabaga_snapshot(vgr->rutabaga, full_path)) {
-        error_report("Failed to save graphics");
-        virtio_gpu_rutabaga_remove_dir_recursive(default_boot_path);
-        return -EINVAL;
-    }
-
+    /*
+     * Refuse before touching the disk: with pending commands the save fails,
+     * and the previous renderer state of this snapshot must survive that.
+     */
     if (!QTAILQ_EMPTY(&g->cmdq)) {
         error_report("virtio-gpu cmdq not empty; cannot migrate");
         return -EBUSY;
+    }
+
+    /* Only the renderer state of *this* snapshot is replaced. */
+    virtio_gpu_rutabaga_remove_dir_recursive(renderer_dir);
+
+    if (g_mkdir_with_parents(renderer_dir, 0755) == -1) {
+        error_report("Failed to create snapshot directory %s", renderer_dir);
+        return -EINVAL;
+    }
+
+    if (rutabaga_snapshot(vgr->rutabaga, renderer_dir)) {
+        error_report("Failed to save graphics to %s", renderer_dir);
+        virtio_gpu_rutabaga_remove_dir_recursive(renderer_dir);
+        return -EINVAL;
     }
 
     struct virtio_gpu_rutabaga_context *ctx;
