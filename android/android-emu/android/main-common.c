@@ -1412,17 +1412,17 @@ bool handleCpuAcceleration(AndroidOptions* opts,
                            char** accel_status) {
     assert(accel_status != NULL);
 
-    /* Handle CPU acceleration options. Software CPU emulation (TCG) is not
-     * supported anymore, only allow it if explicitly requested through the
-     * environment. */
-    if (opts->accel && !strcmp(opts->accel, "off")) {
-        const char* env_tcg = getenv("ANDROID_I_WANT_MY_TCG");
-        if (!env_tcg || strcmp(env_tcg, "yes") != 0) {
-            derror("Software CPU emulation (-accel off) is not supported. "
-                   "A hardware CPU accelerator is required (or set "
-                   "ANDROID_I_WANT_MY_TCG=yes to force TCG software "
-                   "emulation).");
-            exit(1);
+    /* Handle CPU acceleration options. */
+    if (opts->no_accel) {
+        if (opts->accel) {
+            if (strcmp(opts->accel, "off") != 0) {
+                derror("You cannot use -no-accel and '-accel %s' at the same "
+                       "time",
+                       opts->accel);
+                exit(1);
+            }
+        } else {
+            str_reset(&opts->accel, "off");
         }
     }
 
@@ -1508,9 +1508,8 @@ bool handleCpuAcceleration(AndroidOptions* opts,
                 if (!getConsoleAgents()->settings->android_qemu_mode()) {
                     *accel_mode = ACCEL_OFF;
                 }
-                // '-accel off' was used explicitly (with
-                // ANDROID_I_WANT_MY_TCG=yes). Warn about the issue but do
-                // not exit.
+                // '-no-accel' of '-accel off' was used explicitly. Warn about
+                // the issue but do not exit.
                 dwarning(
                         "%s emulation may not work without hardware "
                         "acceleration!",
@@ -1688,6 +1687,8 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
         return false;
     }
 
+    opts->ranchu = is_qemu2;
+
     while ((*p_argc)-- > 1) {
         const char* opt = (++*p_argv)[0];
 
@@ -1768,7 +1769,8 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
                 D("autoconfig: -snapstorage %s", opts->snapstorage);
             } else {
                 if (inAndroidBuild) {
-                    derror("Could not find a snapshot storage file!\n");
+                    derror("You must use the -snapstorage <file> option to "
+                           "specify a snapshot storage file!\n");
                 } else {
                     if (is_qemu2) {
                         android_snapshot_list_ok = true;
@@ -1928,6 +1930,21 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
         android_network_set_latency("none");
     }
 
+    if (opts->code_profile) {
+        char* profilePath = avdInfo_getCodeProfilePath(avd, opts->code_profile);
+        if (profilePath == NULL) {
+            derror("bad -code-profile parameter");
+            return false;
+        }
+        int ret = path_mkdir_if_needed(profilePath, 0755);
+        if (ret < 0) {
+            derror("could not create directory '%s'\n", profilePath);
+            *exit_status = 2;
+            return false;
+        }
+        str_reset_nocopy(&opts->code_profile, profilePath);
+    }
+
     if (opts->unix_pipe) {
     }
 
@@ -1978,7 +1995,12 @@ bool emulator_parseCommonCommandLineOptions(int* p_argc,
             str_reset_null(&opts->snapshot);
         }
 
-        str_reset_null(&opts->snapstorage);
+        if (opts->snapstorage) {
+            dwarning(
+                    "ignoring -snapstorage option due to the use of "
+                    "-no-snapstorage");
+            str_reset_null(&opts->snapstorage);
+        }
 
         // Android Studio used to pass 'no-snapstorage' when it actually meant
         // 'no-snapshot-load' - so treat it that way.

@@ -63,13 +63,8 @@ int win32_stat(const char* filepath, struct stat* st) {
     // are getting. The incoming struct is a "struct _stati64" and this is the
     // matching call for that struct. Unfortunately the macro doesn't take care
     // of that.
-    int result = -1;
     wchar_t* wide_path = win32_utf8_to_utf16_str(filepath);
-    if (wide_path != NULL) {
-        result = _wstati64(wide_path, st);
-        free(wide_path);
-    }
-    return result;
+    return _wstati64(wide_path, st);
 }
 
 int win32_lstat(const char* filepath, struct stat* st) {

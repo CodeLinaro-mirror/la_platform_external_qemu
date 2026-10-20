@@ -326,6 +326,29 @@
    <property name="styleSheet">
     <string notr="true">padding: 3px 3px 3px 3px;</string>
    </property>
+   <property name="currentIndex">
+    <number>2</number>
+   </property>
+   <item>
+    <property name="text">
+     <string>N (Neutral)</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>R (Reverse)</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>P (Park)</string>
+    </property>
+   </item>
+   <item>
+    <property name="text">
+     <string>D (Drive)</string>
+    </property>
+   </item>
   </widget>
   <widget class="QGroupBox" name="groupBox_7">
    <property name="geometry">

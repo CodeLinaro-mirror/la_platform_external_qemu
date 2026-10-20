@@ -14,8 +14,6 @@
 // limitations under the License.
 #include "android/emulation/control/keyboard/MouseEventSender.h"
 
-#include "android/console.h"
-
 #include "android/emulation/control/user_event_agent.h"
 #include "android/hw-sensors.h"
 #include "host-common/FeatureControl.h"

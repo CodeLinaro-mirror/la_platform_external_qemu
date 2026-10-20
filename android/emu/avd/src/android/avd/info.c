@@ -11,7 +11,6 @@
 */
 #include "android/avd/info.h"
 
-#include "android/utils/ini.h"
 #include "host-common/constants.h"
 #include "host-common/hw-config-helper.h"
 #include "android/console.h"
@@ -1022,15 +1021,6 @@ static void _avdInfo_forceGlassesConfig(AvdInfo* i) {
             write = true;
             iniFile_setInteger(i->configIni, "hw.camera.back.orientation", 0);
         }
-        // Handle legacy audio glasses
-        if (!iniFile_hasKey(i->configIni, "hw.displayless") &&
-            iniFile_hasKey(i->configIni, "environment.width") &&
-            iniFile_hasKey(i->configIni, "environment.height") &&
-            !iniFile_hasKey(i->configIni, "hw.lcd.width") &&
-            !iniFile_hasKey(i->configIni, "hw.lcd.height")) {
-            write = true;
-            iniFile_setBoolean(i->configIni, "hw.displayless", 1);
-        }
         if (write) {
             char* iniPath = _avdInfo_getContentFilePath(i, CORE_CONFIG_INI);
             if (iniPath) {
@@ -1825,15 +1815,9 @@ void avdInfo_getSkinInfo(const AvdInfo* i, char** pSkinName, char** pSkinDir) {
              * (parse_skin_files() in main-common-ui.c parses this name
              *  to determine the screen size.)
              */
-            bool displayless =
-                    iniFile_getBoolean(i->configIni, "hw.displayless", "false");
-            int width = displayless ? 0
-                                    : iniFile_getInteger(i->configIni,
-                                                         "hw.lcd.width", 0);
-            int height = displayless ? 0
-                                     : iniFile_getInteger(i->configIni,
-                                                          "hw.lcd.height", 0);
-            if ((width > 0 && height > 0) || displayless) {
+            int width = iniFile_getInteger(i->configIni, "hw.lcd.width", 0);
+            int height = iniFile_getInteger(i->configIni, "hw.lcd.height", 0);
+            if (width > 0 && height > 0) {
                 char skinNameBuf[64];
                 snprintf(skinNameBuf, sizeof skinNameBuf, "%dx%d", width,
                          height);
@@ -2251,8 +2235,6 @@ bool avdInfo_skinHasOverlay(const char* skinName) {
                  strlen("pixel_9")) || /* include pixel 9, pro etc */
         !strncmp(skinName, "pixel_10",
                  strlen("pixel_10")) || /* include pixel 10, pro etc */
-        !strncmp(skinName, "pixel_11",
-                 strlen("pixel_11")) || /* include pixel 11, pro etc */
         !strncmp(skinName, "pixel_6",
                  strlen("pixel_6")) || /* include pixel 6a, 6, pro etc */
         !strncmp(skinName, "pixel_fold", strlen("pixel_fold")) ||

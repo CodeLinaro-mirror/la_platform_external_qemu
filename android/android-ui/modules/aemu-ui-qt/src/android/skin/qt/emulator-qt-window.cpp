@@ -2177,12 +2177,6 @@ void EmulatorQtWindow::slot_getDevicePixelRatio(double* out_dpr,
     QSemaphoreReleaser semReleaser(semaphore);
     auto screen = window()->windowHandle() ? window()->windowHandle()->screen()
                                            : nullptr;
-    if (!screen) {
-        screen = this->screen();
-    }
-    if (!screen) {
-        screen = QApplication::primaryScreen();
-    }
     *out_dpr = screen ? screen->devicePixelRatio() : 1.0;
 }
 
@@ -2196,12 +2190,6 @@ void EmulatorQtWindow::slot_getScreenDimensions(QRect* out_rect,
     auto newScreen = window()->windowHandle()
                              ? window()->windowHandle()->screen()
                              : nullptr;
-    if (!newScreen) {
-        newScreen = this->screen();
-    }
-    if (!newScreen) {
-        newScreen = QApplication::primaryScreen();
-    }
     if (!newScreen) {
         D("Can't get screen geometry. Window is off screen.");
         return;

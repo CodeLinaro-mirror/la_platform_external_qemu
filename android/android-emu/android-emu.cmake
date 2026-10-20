@@ -207,7 +207,6 @@ set(virtual_environment_renderer_src
     android/ver/src/SceneObject.cpp
     android/ver/src/StreetViewUtils.cpp
     android/ver/src/TextureUtils.cpp
-    android/ver/src/JpegUtils.cpp
     android/ver/src/raw_image_sources/fourcc_utils.cc
     android/ver/src/raw_image_sources/raw_image_source.cc
     android/ver/src/raw_image_sources/image_file/raw_image_file_source.cc
@@ -651,7 +650,6 @@ if(NOT LINUX_AARCH64)
       android/base/testing/ProtobufMatchers.cpp
       android/bootconfig_unittest.cpp
       android/camera/CameraFormatConverters_unittest.cpp
-      android/car_unittest.cpp
       android/console_unittest.cpp
       android/emulation/AdbDebugPipe_unittest.cpp
       android/emulation/AdbGuestPipe_unittest.cpp
@@ -680,8 +678,6 @@ if(NOT LINUX_AARCH64)
       android/jdwp/Jdwp_unittest.cpp
       android/jdwp/JdwpProxy_unittest.cpp
       android/kernel/kernel_utils_unittest.cpp
-      android/multitouch-fb-rect_unittest.cpp
-      android/multitouch-screen_unittest.cpp
       android/network/control_unittest.cpp
       android/network/GenericNetlinkMessage_unittest.cpp
       android/network/Ieee80211Frame_unittest.cpp
@@ -792,8 +788,7 @@ if(NOT LINUX_AARCH64)
 
   # Declare virtual_environment_renderer_unittests
   android_add_test(TARGET virtual_environment_renderer_unittests
-                   SRC android/ver/test/JpegUtils_unittest.cpp
-                       android/ver/test/TextureUtils_unittest.cpp
+                   SRC android/ver/test/TextureUtils_unittest.cpp
                        android/ver/test/RawImageFileSource_unittest.cpp
                        android/ver/test/SceneRendering_unittests.cpp
                        android/ver/test/SceneRenderingGltf_unittests.cpp

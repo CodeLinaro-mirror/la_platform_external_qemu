@@ -62,29 +62,20 @@ XrEnvironmentModeDialog::XrEnvironmentModeDialog(QWidget* parent)
         std::sort(mDimmingLevels.begin(), mDimmingLevels.end());
     }
 
-    // Currently dimming and passthrough are mutually exclusive to xr glasses
-    // and xr headset respectively. See b/562914265
     if (mDimmingLevels.empty()) {
         ui->slider_xr_dimming_value->hide();
         this->adjustSize();
     } else {
-        ui->btn_xr_environment_passthrough_on->hide();
-        ui->btn_xr_environment_passthrough_off->hide();
-        this->adjustSize();
-        int min_val = static_cast<int>(
-                std::floor(mDimmingLevels.front() * kSliderScale));
-        int max_val = static_cast<int>(
-                std::ceil(mDimmingLevels.back() * kSliderScale));
-        ui->slider_xr_dimming_value->setRange(min_val, max_val);
+        ui->slider_xr_dimming_value->setRange(0, kSliderScale);
+        connect(this, &XrEnvironmentModeDialog::_externalXROptionsChanged, this,
+                &XrEnvironmentModeDialog::onExternalXROptionsChanged);
         // Enable the slider once we have received the initial value from the
         // guest, and will be able to respond to changes
-        ui->slider_xr_dimming_value->setEnabled(hasReceivedInitialValue);
+        ui->slider_xr_dimming_value->setEnabled(hasReceivedInitialValue &&
+                                                passthroughOn);
+        xrServiceCallbackHandle = xr_service::registerCallback(
+                XrEnvironmentModeDialogHandleXrOptionsEvent, this);
     }
-
-    connect(this, &XrEnvironmentModeDialog::_externalXROptionsChanged, this,
-            &XrEnvironmentModeDialog::onExternalXROptionsChanged);
-    xrServiceCallbackHandle = xr_service::registerCallback(
-            XrEnvironmentModeDialogHandleXrOptionsEvent, this);
 }
 
 void XrEnvironmentModeDialogHandleXrOptionsEvent(
@@ -163,17 +154,21 @@ void XrEnvironmentModeDialog::on_btn_xr_environment_passthrough_off_clicked() {
 
 void XrEnvironmentModeDialog::onExternalXROptionsChanged(
         xr_emulator_proto::XrOptions options) {
-    if (options.has_passthrough_coefficient()) {
+    bool hasPassthrough = options.has_passthrough_coefficient();
+    bool passthroughOn = true;
+    if (hasPassthrough) {
         float coeff = options.passthrough_coefficient();
-        bool passthroughOn = (coeff > 0.0f);
+        passthroughOn = (coeff > 0.0f);
         if (passthroughOn) {
             ui->btn_xr_environment_passthrough_on->setChecked(true);
         } else {
             ui->btn_xr_environment_passthrough_off->setChecked(true);
         }
+    } else {
+        passthroughOn = ui->btn_xr_environment_passthrough_on->isChecked();
     }
 
-    ui->slider_xr_dimming_value->setEnabled(true);
+    ui->slider_xr_dimming_value->setEnabled(passthroughOn);
 
     if (options.has_dimming_value()) {
         float val = options.dimming_value();

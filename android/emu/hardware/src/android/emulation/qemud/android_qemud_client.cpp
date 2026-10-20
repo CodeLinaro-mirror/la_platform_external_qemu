@@ -14,11 +14,10 @@
 #include "aemu/base/containers/StaticMap.h"
 #include "aemu/base/memory/LazyInstance.h"
 
+#include "host-common/android_pipe_host.h"
 #include "android/emulation/qemud/android_qemud_common.h"
 #include "android/emulation/qemud/android_qemud_multiplexer.h"
 #include "android/utils/bufprint.h"
-#include "host-common/VmLock.h"
-#include "host-common/android_pipe_host.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -74,7 +73,6 @@ static QemudPipeMessage* _qemud_pipe_alloc_msg(int msglen) {
 }
 
 static void _qemud_pipe_append_msg(QemudClient* client, QemudPipeMessage* buf) {
-    // Lock ordering: VmLock (BQL) -> g_qemud_client_global_lock (leaf lock).
     qemud_client_global_lock_acquire();
 
     if (client->ProtocolSelector.Pipe.last_msg) {
@@ -140,12 +138,6 @@ void _qemud_pipe_send(QemudClient* client, const uint8_t* msg, int msglen) {
 }
 
 void qemud_client_send(QemudClient* client, const uint8_t* msg, int msglen) {
-    // Lock ordering: VmLock (BQL) must be held before accessing QemudClient
-    // or acquiring g_qemud_client_global_lock in _qemud_pipe_append_msg().
-    android::RecursiveScopedVmLock vmlock;
-    if (!client || !sAllocatedClients->get(client) || client->closing) {
-        return;
-    }
     if (qemud_is_pipe_client(client)) {
         _qemud_pipe_send(client, msg, msglen);
     } else {
@@ -304,9 +296,7 @@ void _qemud_client_free(QemudClient* c) {
 
     if (c != NULL) {
         if (qemud_is_pipe_client(c)) {
-            /* Free outstanding messages under g_qemud_client_global_lock.
-             * Lock ordering: VmLock (BQL) -> g_qemud_client_global_lock (leaf lock). */
-            qemud_client_global_lock_acquire();
+            /* Free outstanding messages. */
             QemudPipeMessage** msg_list = &c->ProtocolSelector.Pipe.messages;
             while (*msg_list != NULL) {
                 QemudPipeMessage* to_free = *msg_list;
@@ -314,7 +304,6 @@ void _qemud_client_free(QemudClient* c) {
                 free(to_free);
             }
             c->ProtocolSelector.Pipe.last_msg = NULL;
-            qemud_client_global_lock_release();
         }
         if (c->param != NULL) {
             free(c->param);

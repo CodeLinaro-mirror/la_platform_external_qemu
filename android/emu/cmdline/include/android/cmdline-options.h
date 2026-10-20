@@ -17,16 +17,6 @@
 #ifndef CFG_FLAG
 #define CFG_FLAG   OPT_FLAG
 #endif
-#ifndef OPT_FLAG_HIDDEN
-#define OPT_FLAG_HIDDEN  OPT_FLAG
-#endif
-#ifndef OPT_FLAG_OBSOLETE
-#define OPT_FLAG_OBSOLETE(_name)  OPT_FLAG(_name, "obsolete, ignored")
-#endif
-#ifndef OPT_PARAM_OBSOLETE
-#define OPT_PARAM_OBSOLETE(_name, _template) \
-    OPT_PARAM(_name, _template, "obsolete, ignored")
-#endif
 
 /* required to ensure that the CONFIG_XXX macros are properly defined */
 #include "android/config/config.h"
@@ -64,16 +54,6 @@
  *    CFG_PARAM( name, "<param>", "description" )
  *        used to define a configuration-specific parameter option.
  *
- *    OPT_FLAG_HIDDEN( name, "description" )
- *        same as OPT_FLAG, but the option is not listed by 'emulator -help'.
- *
- *    OPT_FLAG_OBSOLETE( name )
- *    OPT_PARAM_OBSOLETE( name, "<param>" )
- *        used to define an obsolete option. The option (and its parameter,
- *        if any) is still accepted for backward compatibility, but a warning
- *        is printed and its value is ignored. It is not listed by
- *        'emulator -help'.
- *
  * NOTE: Keep in mind that option names are converted by translating
  *       dashes into underscore.
  *
@@ -92,7 +72,7 @@ CFG_PARAM( datadir, "<dir>",  "write user data into <dir>" )
 CFG_PARAM( kernel,  "<file>", "use specific emulated kernel" )
 CFG_PARAM( ramdisk, "<file>", "ramdisk image (default <system>/ramdisk.img" )
 CFG_PARAM( image,   "<file>", "obsolete, use -system <file> instead" )
-CFG_PARAM( initdata, "<file>", "initial user data image (default <system>/userdata.img)" )
+CFG_PARAM( initdata, "<file>", "same as '-init-data <file>'" )
 CFG_PARAM( data,     "<file>", "data image (default <datadir>/userdata-qemu.img" )
 CFG_PARAM( encryption_key,     "<file>", "read initial encryption key image from <file>" )
 CFG_PARAM( logcat_output, "<file>", "output file of logcat(default none)" )
@@ -105,9 +85,8 @@ OPT_PARAM( sdcard, "<file>", "SD card image (default <datadir>/sdcard.img")
 CFG_PARAM( quit_after_boot, "<timeout>", "quit emulator after guest boots completely, or after timeout in seconds" )
 CFG_PARAM( qemu_top_dir, "<dir>", "Use the emulator in the specified dir (relative or absolute path)" )
 CFG_PARAM( monitor_adb, "<verbose_level>", "monitor the adb messages between guest and host, default not" )
-OPT_PARAM_OBSOLETE( snapstorage, "<file>" )
-// Kept for older Android Studio versions, same as -no-snapshot-load.
-OPT_FLAG_HIDDEN ( no_snapstorage, "do not mount a snapshot storage file (this disables all snapshot functionality)" )
+OPT_PARAM( snapstorage,    "<file>", "file that contains all state snapshots (default <datadir>/snapshots.img)")
+OPT_FLAG ( no_snapstorage, "do not mount a snapshot storage file (this disables all snapshot functionality)" )
 OPT_PARAM( snapshot,       "<name>", "name of snapshot within storage file for auto-start and auto-save (default 'default-boot')" )
 OPT_FLAG ( no_snapshot,    "perform a full boot and do not auto-save, but qemu vmload and vmsave operate on snapstorage" )
 OPT_FLAG ( no_snapshot_save, "do not auto-save to snapshot on exit: abandon changed state" )
@@ -129,18 +108,19 @@ CFG_PARAM( id, "<name>", "assign an id to this virtual device (separate from the
 
 OPT_PARAM( cores, "<number>", "Set number of CPU cores to emulator" )
 OPT_PARAM( accel, "<mode>", "Configure emulation acceleration" )
-OPT_FLAG_OBSOLETE( no_accel )
-OPT_FLAG_OBSOLETE( ranchu )
-OPT_PARAM_OBSOLETE( engine, "<engine>" )
+OPT_FLAG ( no_accel, "Same as '-accel off'" )
+OPT_FLAG ( ranchu, "Use new emulator backend instead of the classic one" )
+OPT_PARAM( engine, "<engine>", "Select engine. auto|classic|qemu2" )
 
 OPT_PARAM( netspeed, "<speed>", "maximum network download/upload speeds" )
 OPT_PARAM( netdelay, "<delay>", "network latency emulation" )
 OPT_FLAG ( netfast, "disable network shaping" )
 
+OPT_PARAM( code_profile, "<name>", "enable code profiling" )
 OPT_FLAG ( show_kernel, "display kernel messages" )
 OPT_FLAG ( shell, "enable root shell on current terminal" )
-OPT_FLAG_OBSOLETE( no_jni )
-OPT_FLAG_OBSOLETE( nojni )
+OPT_FLAG ( no_jni, "deprecated, see dalvik_vm_checkjni" )
+OPT_FLAG ( nojni, "deprecated, see dalvik_vm_checkjni" )
 OPT_FLAG ( dalvik_vm_checkjni, "Enable dalvik.vm.checkjni" )
 OPT_PARAM( logcat, "<tags>", "enable logcat output with given tags" )
 OPT_FLAG( log_nofilter, "Disable the duplicate log filter (DEPRECATED)")
@@ -155,6 +135,7 @@ OPT_FLAG ( no_audio, "disable audio support" )
 OPT_FLAG ( noaudio,  "same as -no-audio" )
 OPT_PARAM( audio,    "<backend>", "use specific audio backend" )
 
+OPT_PARAM( radio, "<device>", "redirect radio modem interface to character device" )
 OPT_PARAM( port, "<port>", "TCP port that will be used for the console" )
 OPT_PARAM( ports, "<consoleport>,<adbport>", "TCP ports used for the console and adb bridge" )
 OPT_PARAM( modem_simulator_port, "<port>", "TCP port that will be used for android modem simulator" )
@@ -178,6 +159,7 @@ OPT_PARAM( net_tap, "<interface>", "use this TAP interface for networking" )
 OPT_PARAM( net_socket, "option", "use Socket interface for network, one of fd=, listen=, or connect=" )
 OPT_PARAM( net_tap_script_up, "<script>", "script to run when the TAP interface goes up" )
 OPT_PARAM( net_tap_script_down, "<script>", "script to run when the TAP interface goes down" )
+OPT_PARAM( cpu_delay, "<cpudelay>", "throttle CPU emulation" )
 OPT_FLAG ( no_boot_anim, "disable animation for faster boot" )
 
 OPT_FLAG( no_window, "disable graphical window display" )
@@ -194,6 +176,7 @@ OPT_FLAG( read_only, "allow running multiple instances of emulators on the same"
 OPT_PARAM( is_restart, "<restart-pid>", "specifies that this emulator was a restart, and to wait out <restart-pid> before proceeding")
 
 OPT_PARAM( report_console, "<socket>", "report console port to remote socket" )
+OPT_PARAM( gps, "<device>", "redirect NMEA GPS to character device" )
 OPT_PARAM( shell_serial, "<device>", "specific character device for root shell" )
 OPT_PARAM( tcpdump, "<file>", "capture network packets to file" )
 
@@ -206,7 +189,10 @@ OPT_LIST(  prop, "<name>=<value>", "set system property on boot")
 
 OPT_PARAM( shared_net_id, "<number>", "join the shared network, using IP address 10.1.2.<number>")
 
-OPT_PARAM_OBSOLETE( nand_limits, "<nlimits>" )
+#ifndef _WIN32
+ // the -nand-limits options can only work on non-windows systems
+OPT_PARAM( nand_limits, "<nlimits>", "enforce NAND/Flash read/write thresholds" )
+#endif
 
 OPT_PARAM( gpu, "<mode>", "set hardware GPU mode" )
 OPT_PARAM( vulkan_validation, "<mode>", "Vulkan validation mode (off|print|fail|crash)" )
@@ -407,9 +393,6 @@ OPT_PARAM(
 
 #undef CFG_FLAG
 #undef CFG_PARAM
-#undef OPT_FLAG_HIDDEN
-#undef OPT_FLAG_OBSOLETE
-#undef OPT_PARAM_OBSOLETE
 #undef OPT_FLAG
 #undef OPT_PARAM
 #undef OPT_LIST

@@ -119,11 +119,5 @@ bool isVulkanSafeToUseNative() {
 }
 
 bool hasMetal() {
-    static bool res = hasMetalNative();
-    return res;
-}
-
-bool hasMetal4() {
-    static bool res = hasMetal4Native();
-    return res;
+    return hasMetalNative();
 }

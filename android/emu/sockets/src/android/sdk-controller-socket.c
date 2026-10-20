@@ -1309,11 +1309,6 @@ _on_sdkctl_packet_received(SDKCtlSocket* sdkctl, SDKCtlPacket* packet)
 
     assert(packet->header.signature == _sdkctl_packet_sig);
     if (packet->header.type == SDKCTL_PACKET_MESSAGE) {
-        if (packet->header.size < (int)sizeof(SDKCtlMessageHeader)) {
-            E("SDKCtl %s: Invalid message packet size %d", sdkctl->service_name,
-              packet->header.size);
-            return;
-        }
         SDKCtlMessage* const msg = (SDKCtlMessage*)packet;
         /* Lets see if this is an internal protocol message. */
         switch (msg->msg_type) {
@@ -1468,29 +1463,8 @@ _on_io_dispatcher_packet_header(SDKCtlIODispatcher* dispatcher,
       dispatcher->sdkctl->service_name, dispatcher->packet_header.type,
       dispatcher->packet_header.size);
 
-    int min_packet_size = 0;
-    switch (dispatcher->packet_header.type) {
-        case SDKCTL_PACKET_MESSAGE:
-            min_packet_size = (int)sizeof(SDKCtlMessageHeader);
-            break;
-        case SDKCTL_PACKET_QUERY:
-            min_packet_size = (int)sizeof(SDKCtlQueryHeader);
-            break;
-        case SDKCTL_PACKET_QUERY_RESPONSE:
-            min_packet_size = (int)sizeof(SDKCtlQueryReplyHeader);
-            break;
-        default:
-            E("SDKCtl %s: Unknown packet type %d, size %d",
-              sdkctl->service_name, dispatcher->packet_header.type,
-              dispatcher->packet_header.size);
-            errno = EINVAL;
-            _on_io_dispatcher_io_failure(dispatcher, asio);
-            return ASIO_ACTION_DONE;
-    }
-
     /* Make sure we have a valid packet header. */
-    if (dispatcher->packet_header.signature != _sdkctl_packet_sig ||
-        dispatcher->packet_header.size < min_packet_size) {
+    if (dispatcher->packet_header.signature != _sdkctl_packet_sig) {
         E("SDKCtl %s: Invalid packet signature %x for packet type %d, size %d",
           sdkctl->service_name, dispatcher->packet_header.signature,
           dispatcher->packet_header.type, dispatcher->packet_header.size);
@@ -1557,10 +1531,6 @@ _on_io_dispatcher_packet(SDKCtlIODispatcher* dispatcher, AsyncSocketIO* asio)
     return ASIO_ACTION_DONE;
 }
 
-static AsyncIOAction _on_io_dispatcher_query_reply(
-        SDKCtlIODispatcher* dispatcher,
-        AsyncSocketIO* asio);
-
 /* A query reply header has been received by I/O dispatcher. */
 static AsyncIOAction
 _on_io_dispatcher_query_reply_header(SDKCtlIODispatcher* dispatcher,
@@ -1571,14 +1541,6 @@ _on_io_dispatcher_query_reply_header(SDKCtlIODispatcher* dispatcher,
 
     T("SDKCtl %s: Query reply header is received for query ID %d",
       dispatcher->sdkctl->service_name, dispatcher->query_reply_header.query_id);
-
-    if (dispatcher->packet_header.size < (int)sizeof(SDKCtlQueryReplyHeader)) {
-        E("SDKCtl %s: Invalid query reply packet size %d", sdkctl->service_name,
-          dispatcher->packet_header.size);
-        errno = EINVAL;
-        _on_io_dispatcher_io_failure(dispatcher, asio);
-        return ASIO_ACTION_DONE;
-    }
 
     /* Pull the query out of the list of active queries. It's the dispatcher that
      * owns this query now. */
@@ -1592,10 +1554,6 @@ _on_io_dispatcher_query_reply_header(SDKCtlIODispatcher* dispatcher,
     if (query == NULL) {
         D("%s: Query #%d is not found by dispatcher",
           dispatcher->sdkctl->service_name, dispatcher->query_reply_header.query_id);
-
-        if (query_data_size == 0) {
-            return _on_io_dispatcher_query_reply(dispatcher, asio);
-        }
 
         /* Query is not found. Just read the remainder of reply up in the air,
          * and then discard when it's over. */
@@ -1623,10 +1581,6 @@ _on_io_dispatcher_query_reply_header(SDKCtlIODispatcher* dispatcher,
         }
         /* Save the actual query response size. */
         *query->response_size = query_data_size;
-
-        if (query_data_size == 0) {
-            return _on_io_dispatcher_query_reply(dispatcher, asio);
-        }
 
         /* Start reading query response. */
         async_socket_read_rel(sdkctl->as, *query->response_buffer,
@@ -2144,16 +2098,6 @@ _on_handshake_io(void* query_opaque,
     SDKCtlSocket* const sdkctl = (SDKCtlSocket*)query_opaque;
 
     if (status == ASIO_STATE_SUCCEEDED) {
-        if (query->response_buffer == NULL || *query->response_buffer == NULL ||
-            query->response_size == NULL ||
-            *query->response_size < sizeof(int)) {
-            E("SDKCtl %s: Invalid handshake response size",
-              sdkctl->service_name);
-            sdkctl->port_status = SDKCTL_HANDSHAKE_UNKNOWN_RESPONSE;
-            sdkctl->on_port_connection(sdkctl->opaque, sdkctl,
-                                       SDKCTL_HANDSHAKE_UNKNOWN_RESPONSE);
-            return ASIO_ACTION_DONE;
-        }
         const int* res = (const int*)(*query->response_buffer);
         SdkCtlPortStatus handshake_status;
         switch (*res) {

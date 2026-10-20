@@ -13,12 +13,7 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
-#include "TestUtils.h"
-#include "aemu/base/files/PathUtils.h"
-#include "aemu/base/files/ScopedStdioFile.h"
-#include "android/base/system/System.h"
 #include "android/camera/camera-common.h"
-#include "android/utils/file_io.h"
 #include "raw_image_sources/fourcc_utils.h"
 #include "raw_image_sources/webcam/webcam_source_virtual.h"
 
@@ -426,107 +421,6 @@ TEST_F(WebcamSourceTest, ConvertBufferToRGB32_BGR32_to_RGB32) {
     EXPECT_NEAR(view.buffer[13], 255, 5);
     EXPECT_NEAR(view.buffer[14], 255, 5);
     EXPECT_EQ(view.buffer[15], 255);
-}
-
-TEST_F(WebcamSourceTest, ConvertBufferToRGB32_MJPEG_to_RGB32) {
-    const std::string path = android::base::PathUtils::join(
-            android::base::System::get()->getProgramDirectory(), "testdata",
-            "jpeg_rgb24.jpg");
-    android::base::ScopedStdioFile fp(android_fopen(path.c_str(), "rb"));
-    ASSERT_TRUE(fp) << "Failed to open test file: " << path;
-
-    fseek(fp.get(), 0, SEEK_END);
-    long size = ftell(fp.get());
-    fseek(fp.get(), 0, SEEK_SET);
-    std::vector<uint8_t> buffer(size);
-    ASSERT_EQ(size, fread(buffer.data(), 1, size, fp.get()));
-
-    RawImageBufferViewFourCC view = {buffer.data(), buffer.size(),
-                                     V4L2_PIX_FMT_MJPEG, 32, 32};
-
-    std::vector<uint8_t> conversion_storage;
-    std::vector<uint8_t> staging_buffer;
-
-    int res = ConvertBufferToRGB32(view, conversion_storage, staging_buffer);
-
-    ASSERT_EQ(res, 0);
-    ASSERT_EQ(view.pixel_format, V4L2_PIX_FMT_RGB32);
-    ASSERT_EQ(view.buffer, conversion_storage.data());
-    EXPECT_EQ(view.width, 31);
-    EXPECT_EQ(view.height, 31);
-    EXPECT_EQ(view.buffer_size, 31 * 31 * 4);
-
-    // Alpha channel for all pixels should be set to 255 (0xFF)
-    for (int i = 0; i < view.width * view.height; ++i) {
-        EXPECT_EQ(view.buffer[i * 4 + 3], 255);
-    }
-
-    // Compare pixel data against golden BMP
-    ImageResult golden;
-    loadGoldenBmp("jpeg_rgb24_golden.bmp", &golden);
-    ASSERT_EQ(golden.width, static_cast<uint32_t>(view.width));
-    ASSERT_EQ(golden.height, static_cast<uint32_t>(view.height));
-    ASSERT_EQ(golden.buffer.size(), view.buffer_size);
-
-    std::vector<uint8_t> actual(view.buffer, view.buffer + view.buffer_size);
-    compareImageBuffers(actual, golden.buffer, kImageCompareThreshold);
-}
-
-TEST_F(WebcamSourceTest, ConvertBufferToRGB32_MJPEG_InvalidData) {
-    const std::vector<uint8_t> corrupted_data = {0x00, 0x11, 0x22, 0x33, 0x44};
-    RawImageBufferViewFourCC view = {corrupted_data.data(),
-                                     corrupted_data.size(), V4L2_PIX_FMT_MJPEG,
-                                     640, 480};
-
-    std::vector<uint8_t> conversion_storage;
-    std::vector<uint8_t> staging_buffer;
-
-    int res = ConvertBufferToRGB32(view, conversion_storage, staging_buffer);
-    EXPECT_NE(res, 0);
-}
-
-TEST_F(WebcamSourceTest, ConvertBufferToRGB32_NullBuffer) {
-    RawImageBufferViewFourCC view = {nullptr, 1024, V4L2_PIX_FMT_RGB32, 16, 16};
-    std::vector<uint8_t> conversion_storage;
-    std::vector<uint8_t> staging_buffer;
-
-    int res = ConvertBufferToRGB32(view, conversion_storage, staging_buffer);
-    EXPECT_NE(res, 0);
-}
-
-TEST_F(WebcamSourceTest, ConvertBufferToRGB32_ZeroSize) {
-    uint8_t dummy[4] = {0};
-    RawImageBufferViewFourCC view = {dummy, 0, V4L2_PIX_FMT_RGB32, 16, 16};
-    std::vector<uint8_t> conversion_storage;
-    std::vector<uint8_t> staging_buffer;
-
-    int res = ConvertBufferToRGB32(view, conversion_storage, staging_buffer);
-    EXPECT_NE(res, 0);
-}
-
-TEST_F(WebcamSourceTest, FormatSelection_MJPEG_Priority) {
-    std::vector<WebcamSource::WebcamPixelFormat> formats;
-
-    WebcamSource::WebcamPixelFormat formatYuyv;
-    formatYuyv.pixel_format = V4L2_PIX_FMT_YUYV;
-    formats.push_back(formatYuyv);
-
-    WebcamSource::WebcamPixelFormat formatMjpeg;
-    formatMjpeg.pixel_format = V4L2_PIX_FMT_MJPEG;
-    formats.push_back(formatMjpeg);
-
-    WebcamSource::WebcamPixelFormat formatRgb;
-    formatRgb.pixel_format = V4L2_PIX_FMT_RGB32;
-    formats.push_back(formatRgb);
-
-    // MJPEG should be preferred over YUYV and RGB32
-    EXPECT_EQ(WebcamSourceTestHelper::GetPreferredFormatIndex(formats), 1);
-
-    // If YUV420 is present, it should be preferred over MJPEG
-    WebcamSource::WebcamPixelFormat formatYuv420;
-    formatYuv420.pixel_format = V4L2_PIX_FMT_YUV420;
-    formats.insert(formats.begin(), formatYuv420);
-    EXPECT_EQ(WebcamSourceTestHelper::GetPreferredFormatIndex(formats), 0);
 }
 
 TEST(WebcamInfoTest, NegotiateFormatFallback) {

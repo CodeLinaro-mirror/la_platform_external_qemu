@@ -15,9 +15,6 @@
 
 #include <gtest/gtest.h>
 
-#include <stdlib.h>
-#include <vector>
-
 TEST(CmdLineOptions, parsePort) {
     struct {
         const char* input;
@@ -206,69 +203,4 @@ TEST(CmdLineOptions, validateUserModeNetworkingOption) {
         EXPECT_EQ(data.expectSuccess, result)
                 << "Failed on test case: (" << data.input << ")";
     }
-}
-
-namespace {
-
-// Runs android_parse_options() on |args| (without the program name). Returns
-// its result and fills |opts| and |remaining|, the number of arguments left.
-int parseOptions(std::vector<const char*> args,
-                 AndroidOptions* opts,
-                 int* remaining) {
-    args.insert(args.begin(), "emulator");
-    args.push_back(nullptr);
-    int argc = static_cast<int>(args.size()) - 1;
-    char** argv = const_cast<char**>(args.data());
-    int result = android_parse_options(&argc, &argv, opts);
-    *remaining = argc - 1;
-    return result;
-}
-
-}  // namespace
-
-TEST(CmdLineOptions, obsoleteOptionsAreIgnored) {
-    AndroidOptions opts;
-    int remaining = -1;
-
-    // Obsolete options with a parameter must consume it, otherwise the
-    // next option would be dropped silently.
-    EXPECT_EQ(0, parseOptions({"-engine", "auto", "-ranchu", "-avd", "foo"},
-                              &opts, &remaining));
-    ASSERT_NE(nullptr, opts.avd);
-    EXPECT_STREQ("foo", opts.avd);
-    EXPECT_EQ(nullptr, opts.engine);
-    EXPECT_EQ(0, opts.ranchu);
-    EXPECT_EQ(0, remaining);
-    free(opts.avd);
-
-    EXPECT_EQ(0,
-              parseOptions({"-nojni", "-no-jni", "-nand-limits", "x",
-                            "-snapstorage", "file", "-no-accel", "-avd", "foo"},
-                           &opts, &remaining));
-    ASSERT_NE(nullptr, opts.avd);
-    EXPECT_STREQ("foo", opts.avd);
-    EXPECT_EQ(nullptr, opts.nand_limits);
-    EXPECT_EQ(nullptr, opts.snapstorage);
-    EXPECT_EQ(0, opts.nojni);
-    EXPECT_EQ(0, opts.no_jni);
-    EXPECT_EQ(0, opts.no_accel);
-    EXPECT_EQ(0, remaining);
-    free(opts.avd);
-
-    // A trailing obsolete option without its parameter is not an error.
-    EXPECT_EQ(0, parseOptions({"-avd", "foo", "-engine"}, &opts, &remaining));
-    ASSERT_NE(nullptr, opts.avd);
-    EXPECT_STREQ("foo", opts.avd);
-    EXPECT_EQ(nullptr, opts.engine);
-    EXPECT_EQ(0, remaining);
-    free(opts.avd);
-}
-
-TEST(CmdLineOptions, noSnapstorageIsStillParsed) {
-    AndroidOptions opts;
-    int remaining = -1;
-
-    EXPECT_EQ(0, parseOptions({"-no-snapstorage"}, &opts, &remaining));
-    EXPECT_EQ(1, opts.no_snapstorage);
-    EXPECT_EQ(0, remaining);
 }

@@ -1906,14 +1906,8 @@ QemuConsole *graphic_console_init(DeviceState *dev, uint32_t head,
 {
     static const char noinit[] =
         "Guest has not initialized the display (yet).";
-    /* qemu_create_message_surface() allocates a pixman image via
-     * pixman_image_create_bits() and asserts that it is non-null, which
-     * requires positive dimensions. Fall back to a 640x480 placeholder
-     * surface (matching graphic_console_close() below) for 0x0 displayless
-     * devices.
-     */
-    int width = graphic_width > 0 ? graphic_width : 640;
-    int height = graphic_height > 0 ? graphic_height : 480;
+    int width = graphic_width;
+    int height = graphic_height;
     QemuConsole *s;
     DisplayState *ds;
     DisplaySurface *surface;

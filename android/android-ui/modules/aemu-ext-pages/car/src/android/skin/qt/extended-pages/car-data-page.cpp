@@ -10,12 +10,9 @@
 // GNU General Public License for more details.
 #include "android/skin/qt/extended-pages/car-data-page.h"
 
-#include <QPointer>
 #include <QTabWidget>
 #include <functional>
-#include <utility>
 
-#include "aemu/base/async/ThreadLooper.h"
 #include "android/emulation/control/car_data_agent.h"
 #include "android/skin/qt/extended-pages/car-data-emulation/car-sensor-data.h"
 #include "android/skin/qt/extended-pages/car-data-emulation/vhal-table.h"
@@ -50,13 +47,7 @@ CarDataPage::CarDataPage(QWidget* parent)
         mUi->tabWidget->removeTab(DATA_PROPERTY_TABLE_INDEX);
     }
     if (sCarDataAgent != nullptr) {
-        QPointer<CarDataPage> self(this);
-        android::base::ThreadLooper::runOnMainLooper([self]() {
-            if (self && sCarDataAgent != nullptr) {
-                sCarDataAgent->setCarCallback(&CarDataPage::carDataCallback,
-                                              self.data());
-            }
-        });
+        sCarDataAgent->setCarCallback(&CarDataPage::carDataCallback, this);
     }
 }
 
@@ -132,13 +123,7 @@ void CarDataPage::sendCarEmulatorMessageLogged(const EmulatorMessage& msg,
     D("sendCarEmulatorMessageLogged: %s:", log);
     string msgString;
     if (msg.SerializeToString(&msgString)) {
-        android::base::ThreadLooper::runOnMainLooper(
-                [msgString = std::move(msgString)]() {
-                    if (sCarDataAgent != nullptr) {
-                        sCarDataAgent->sendCarData(msgString.c_str(),
-                                                   msgString.length());
-                    }
-                });
+        sCarDataAgent->sendCarData(msgString.c_str(), msgString.length());
     } else {
         D("Failed to send emulator message.");
     }

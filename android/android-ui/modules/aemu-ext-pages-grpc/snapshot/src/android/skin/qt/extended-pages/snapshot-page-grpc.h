@@ -137,5 +137,3 @@ private:
     SnapshotServiceClient mSnapshotService;
     QGraphicsScene mPreviewScene;  // Used to render the preview screenshot
 };
-
-Q_DECLARE_METATYPE(std::vector<android::emulation::control::SnapshotDetails>);

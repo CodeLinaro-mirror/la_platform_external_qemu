@@ -318,14 +318,10 @@ VirtualSceneManager::getEnvironmentConfig(const AvdInfo* avdInfo,
                 }
             }
 
-            float default_blur = EnvironmentConfig::defaultBackgroundBlur;
-            if (getConsoleAgents()->settings->hw()->hw_displayless) {
-                default_blur = 0;
-            }
             // Update background view parameters from config, if given
             ret.backgroundBlur = static_cast<float>(iniFile_getDouble(
                     environmentIni, "background.blurAmount",
-                    default_blur));
+                    EnvironmentConfig::defaultBackgroundBlur));
 
             ret.backgroundEnabled =
                     iniFile_getBoolean(environmentIni, "background.enabled",

@@ -114,17 +114,11 @@ AudioStreamCapturer::AudioStreamCapturer(const AudioFormat& fmt,
                     fmt.channels() == AudioFormat::Mono ? 1 : 2),
       mStream(stream),
       mAudioMode(mode) {
-    if (auto engine = AudioCaptureEngine::get(mAudioMode)) {
-        mRunning = (engine->start(this) == 0);
-    }
+    mRunning = (AudioCaptureEngine::get(mAudioMode)->start(this) == 0);
 }
 
 AudioStreamCapturer::~AudioStreamCapturer() {
-    if (mRunning) {
-        if (auto engine = AudioCaptureEngine::get(mAudioMode)) {
-            engine->stop(this);
-        }
-    }
+    AudioCaptureEngine::get(mAudioMode)->stop(this);
 }
 
 int AudioStreamCapturer::onSample(void* buf, int size) {

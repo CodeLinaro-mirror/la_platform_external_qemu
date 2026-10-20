@@ -34,17 +34,15 @@
 namespace android {
 namespace base {
 
+// From:
+// https://stackoverflow.com/questions/49677034/thread-sleeps-too-long-on-os-x-when-in-background
 void disableAppNap_macImpl(void) {
-    static id<NSObject> sActivityToken = [
-        [
-            [NSProcessInfo processInfo]
-                beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
-                        | NSActivityLatencyCritical
-                reason:@"Not sleepy and don't want to nap"
-        ]
-        retain];
-
-    (void)sActivityToken;
+   if ([[NSProcessInfo processInfo]
+        respondsToSelector:@selector(beginActivityWithOptions:reason:)]) {
+      [[NSProcessInfo processInfo]
+       beginActivityWithOptions:0x00FFFFFF
+       reason:@"Not sleepy and don't want to nap"];
+   }
 }
 
 // based on https://stackoverflow.com/questions/13893134/get-current-pthread-cpu-usage-mac-os-x

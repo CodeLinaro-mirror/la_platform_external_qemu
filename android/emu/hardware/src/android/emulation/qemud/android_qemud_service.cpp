@@ -12,7 +12,6 @@
 #include "android/emulation/qemud/android_qemud_service.h"
 
 #include "android/emulation/qemud/android_qemud_common.h"
-#include "host-common/VmLock.h"
 
 #include <errno.h>
 
@@ -167,12 +166,6 @@ int qemud_service_load(Stream* f, QemudService* current_services) {
 void qemud_service_broadcast(QemudService* sv,
                                     const uint8_t* msg,
                                     int msglen) {
-    // Lock ordering: VmLock (BQL) must be held while iterating sv->clients
-    // to prevent concurrent qemud_client_disconnect() / _qemud_client_free().
-    android::RecursiveScopedVmLock vmlock;
-    if (!sv) {
-        return;
-    }
     QemudClient* c;
 
     for (c = sv->clients; c; c = c->next_serv)

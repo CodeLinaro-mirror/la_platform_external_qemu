@@ -14,9 +14,8 @@
 
 #include "fourcc_utils.h"
 #include <libyuv.h>
-#include <cstddef>
 
-#include "JpegUtils.h"
+#include <cstddef>
 #include "android/camera/camera-common.h"
 
 namespace android {
@@ -56,10 +55,6 @@ RawImageBufferView RawImageBufferViewFourCCBridge(
 int ConvertBufferToRGB32(RawImageBufferViewFourCC& buffer,
                          std::vector<uint8_t>& conversion_storage,
                          std::vector<uint8_t>& staging_buffer) {
-    if (!buffer.buffer || buffer.buffer_size == 0) {
-        return -1;
-    }
-
     if (conversion_storage.size() <
         static_cast<size_t>(buffer.height) * buffer.width * 4) {
         conversion_storage.resize(static_cast<size_t>(buffer.height) *
@@ -81,21 +76,6 @@ int ConvertBufferToRGB32(RawImageBufferViewFourCC& buffer,
         res = libyuv::ARGBToABGR(static_cast<const uint8_t*>(buffer.buffer),
                                  width * 4, conversion_storage.data(),
                                  width * 4, width, height);
-    } else if (buffer.pixel_format == V4L2_PIX_FMT_MJPEG ||
-               buffer.pixel_format == V4L2_PIX_FMT_JPEG) {
-        JpegImageInfo info;
-        JpegDecompressOptions options;
-        options.color_space = JCS_RGBA_8888;
-        options.align_row_stride = false;
-        if (JpegUtils::DecompressFromMemory(
-                    static_cast<const uint8_t*>(buffer.buffer),
-                    buffer.buffer_size, conversion_storage, &info, options)) {
-            width = info.width;
-            height = info.height;
-            res = 0;
-        } else {
-            res = -1;
-        }
     } else {
         int y_stride = (width + 15) & ~15;
         int u_stride = (y_stride / 2 + 15) & ~15;
@@ -114,7 +94,7 @@ int ConvertBufferToRGB32(RawImageBufferViewFourCC& buffer,
         uint8_t* v_staging = u_staging + u_size;
 
         uint32_t src_format = buffer.pixel_format;
-        // These formats are aliases of each other
+        // These formats are aliases of eachother
         if (buffer.pixel_format == V4L2_PIX_FMT_YUY2 ||
             buffer.pixel_format == V4L2_PIX_FMT_YUNV ||
             buffer.pixel_format == V4L2_PIX_FMT_V422) {
@@ -141,8 +121,6 @@ int ConvertBufferToRGB32(RawImageBufferViewFourCC& buffer,
         return res;
     }
 
-    buffer.width = width;
-    buffer.height = height;
     buffer.buffer_size = static_cast<size_t>(width) * height * 4;
     buffer.pixel_format = V4L2_PIX_FMT_RGB32;
     buffer.buffer = conversion_storage.data();

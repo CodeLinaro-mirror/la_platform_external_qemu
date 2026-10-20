@@ -1,7 +1,5 @@
 #include "android/emulation/control/keyboard/TouchpadEventSender.h"
 
-#include "android/console.h"
-
 #include <chrono>
 #include <vector>
 

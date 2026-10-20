@@ -11,12 +11,11 @@
 */
 #include "android/car-cluster.h"
 
-#include "aemu/base/utils/stream.h"
-#include "android/console.h"
 #include "android/emulation/android_qemud.h"
+#include "android/console.h"
 #include "android/utils/debug.h"
+#include "aemu/base/utils/stream.h"
 #include "android/utils/system.h"
-#include "host-common/VmLock.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -37,8 +36,7 @@
 // SECURED: Limit maximum frame size to 32MB to prevent OOM/crashes.
 #define MAX_CLUSTER_FRAME_SIZE (32 * 1024 * 1024)
 
-// All fields of HwCarCluster (_carCluster) are synchronized under VmLock (BQL).
-// Lock ordering: VmLock (BQL) -> g_qemud_client_global_lock (inside QEMUD).
+
 struct HwCarCluster {
     QemudService* service;
     QemudClient* client;
@@ -124,7 +122,6 @@ void android_car_cluster_init(void) {
 }
 
 void set_car_cluster_call_back(car_cluster_callback_t func) {
-    android::RecursiveScopedVmLockIfInstance vmlock;
     HwCarCluster* carCluster = _carCluster;
     if (func == nullptr) {
         D("%s: callback is invalid", __func__);
@@ -137,10 +134,6 @@ void set_car_cluster_call_back(car_cluster_callback_t func) {
 }
 
 void android_send_car_cluster_data(const uint8_t* msg, int msgLen) {
-    // Lock ordering: Acquire VmLock (BQL) before reading _carCluster->client
-    // and calling qemud_client_send() to prevent racing with
-    // _hwCarClusterClient_close().
-    android::RecursiveScopedVmLockIfInstance vmlock;
     if (_carCluster->service == nullptr) {
         D("pipe service is not initialized");
         return;

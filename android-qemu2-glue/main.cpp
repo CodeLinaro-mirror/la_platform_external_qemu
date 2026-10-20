@@ -1828,6 +1828,9 @@ extern "C" int main(int argc, char** argv) {
         return exitStatus;
     }
 
+    // just because we know that we're in the new emulator as we got here
+    opts->ranchu = 1;
+
     getConsoleAgents()->settings->inject_AvdInfo(avd);
     bool reportMetrics = !opts->fuchsia;
 
@@ -2007,7 +2010,12 @@ extern "C" int main(int argc, char** argv) {
         boot_property_add_shared_net_ip(shared_net_id);
     }
 
+#ifdef CONFIG_NAND_LIMITS
+    args.add2If("-nand-limits", opts->nand_limits);
+#endif
+
     args.add2If("-timezone", opts->timezone);
+    args.add2If("-cpu-delay", opts->cpu_delay);
     args.add2If("-dns-server", opts->dns_server);
     args.addIf("-skip-adb-auth", opts->skip_adb_auth);
 
@@ -2194,6 +2202,10 @@ extern "C" int main(int argc, char** argv) {
                     : "null";
 
     args.add2("-serial", serial);
+
+    args.add2If("-radio", opts->radio);
+    args.add2If("-gps", opts->gps);
+    args.add2If("-code-profile", opts->code_profile);
 
     /* Pass boot properties to the core. First, those from boot.prop,
      * then those from the command-line */

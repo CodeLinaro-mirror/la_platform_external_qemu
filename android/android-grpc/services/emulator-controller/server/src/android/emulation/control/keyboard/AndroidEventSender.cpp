@@ -14,8 +14,6 @@
 // limitations under the License.
 #include "android/emulation/control/keyboard/AndroidEventSender.h"
 
-#include "android/console.h"
-
 #include "android/emulation/control/user_event_agent.h"
 #include "android/hw-sensors.h"
 #include "android/skin/generic-event-buffer.h"

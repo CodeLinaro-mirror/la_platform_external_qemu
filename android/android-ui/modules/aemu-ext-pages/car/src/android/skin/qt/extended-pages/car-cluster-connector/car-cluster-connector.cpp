@@ -56,9 +56,8 @@ CarClusterConnector::CarClusterConnector(CarClusterWindow* carClusterWindow)
           return workerProcessFrame(frameInfo);
       }),
       mCarClusterStartMsgThread([this] {
-          sendCarClusterMsg(PIPE_STOP);
-          int msg = MSG_START;
           while (true) {
+              int msg;
               mRefreshMsg.tryReceive(&msg);
               if (msg == MSG_STOP) {
                   break;
@@ -187,6 +186,8 @@ void CarClusterConnector::sendCarClusterMsg(uint8_t flag) {
 }
 
 void CarClusterConnector::startSendingStartRequest() {
+    sendCarClusterMsg(PIPE_STOP);
+    mRefreshMsg.trySend(MSG_START);
     mCarClusterStartMsgThread.start();
 }
 

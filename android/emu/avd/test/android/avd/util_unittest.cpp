@@ -12,7 +12,6 @@
 #include "android/avd/util.h"
 #include "android/avd/info.h"
 #include "android/avd/avd-info.h"
-#include "host-common/hw-config-helper.h"
 #include "android/utils/file_data.h"
 #include "android/utils/system.h"
 #include "aemu/base/ArraySize.h"
@@ -386,75 +385,3 @@ TEST(AvdInfoTest, qemu_version_file_with_unicode_path) {
     avdInfo_free(info);
 }
 
-TEST(AvdInfoTest, displayless_ignores_lcd_dimensions) {
-    AvdInfo* info = avdInfo_new_for_testing(AVD_OTHER);
-    ASSERT_NE(nullptr, info);
-    info->contentPath = ASTRDUP("/dummy/path");
-    info->configIni = iniFile_newEmpty("config.ini");
-    iniFile_setBoolean(info->configIni, "hw.displayless", true);
-    iniFile_setInteger(info->configIni, "hw.lcd.width", 500);
-    iniFile_setInteger(info->configIni, "hw.lcd.height", 340);
-
-    char* skinName = nullptr;
-    char* skinDir = nullptr;
-    avdInfo_getSkinInfo(info, &skinName, &skinDir);
-
-    EXPECT_STREQ("0x0", skinName);
-    EXPECT_EQ(nullptr, skinDir);
-
-    AndroidHwConfig defaultHw = {0};
-    androidHwConfig_init(&defaultHw, 0);
-
-    AndroidHwConfig hw = {0};
-    EXPECT_EQ(0, avdInfo_initHwConfig(info, &hw, true));
-    EXPECT_TRUE(hw.hw_displayless);
-    EXPECT_EQ(defaultHw.hw_lcd_width, hw.hw_lcd_width);
-    EXPECT_EQ(defaultHw.hw_lcd_height, hw.hw_lcd_height);
-    EXPECT_EQ(defaultHw.hw_lcd_depth, hw.hw_lcd_depth);
-
-    androidHwConfig_done(&defaultHw);
-    androidHwConfig_done(&hw);
-    AFREE(skinName);
-    AFREE(skinDir);
-    avdInfo_free(info);
-}
-
-TEST(AvdInfoTest, zero_display_fallback_skin_info) {
-    AvdInfo* info = avdInfo_new_for_testing(AVD_OTHER);
-    ASSERT_NE(nullptr, info);
-    info->contentPath = ASTRDUP("/dummy/path");
-    info->configIni = iniFile_newEmpty("config.ini");
-    iniFile_setInteger(info->configIni, "hw.lcd.width", 0);
-    iniFile_setInteger(info->configIni, "hw.lcd.height", 0);
-
-    char* skinName = nullptr;
-    char* skinDir = nullptr;
-    avdInfo_getSkinInfo(info, &skinName, &skinDir);
-
-    EXPECT_STREQ("HVGA", skinName);
-    EXPECT_EQ(nullptr, skinDir);
-
-    AFREE(skinName);
-    AFREE(skinDir);
-    avdInfo_free(info);
-}
-
-TEST(AvdInfoTest, nonzero_display_skin_info) {
-    AvdInfo* info = avdInfo_new_for_testing(AVD_OTHER);
-    ASSERT_NE(nullptr, info);
-    info->contentPath = ASTRDUP("/dummy/path");
-    info->configIni = iniFile_newEmpty("config.ini");
-    iniFile_setInteger(info->configIni, "hw.lcd.width", 640);
-    iniFile_setInteger(info->configIni, "hw.lcd.height", 480);
-
-    char* skinName = nullptr;
-    char* skinDir = nullptr;
-    avdInfo_getSkinInfo(info, &skinName, &skinDir);
-
-    EXPECT_STREQ("640x480", skinName);
-    EXPECT_EQ(nullptr, skinDir);
-
-    AFREE(skinName);
-    AFREE(skinDir);
-    avdInfo_free(info);
-}

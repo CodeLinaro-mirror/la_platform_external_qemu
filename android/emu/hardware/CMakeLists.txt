@@ -74,7 +74,6 @@ android_add_test(
       android/emulation/android_pipe_zero_unittest.cpp
       android/emulation/AndroidAsyncMessagePipe_unittest.cpp
       android/emulation/DeviceContextRunner_unittest.cpp
-      android/emulation/qemud/android_qemud_client_unittest.cpp
       android/emulation/VmLock_unittest.cpp
   DEPS android-emu
        android-emu-agents

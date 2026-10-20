@@ -28,12 +28,6 @@ struct IVsockNewTransport : std::enable_shared_from_this<IVsockNewTransport> {
 
 std::shared_ptr<IVsockNewTransport> vsock_create_transport_connector(uint64_t key);
 
-#ifndef _WIN32
-std::shared_ptr<IVsockNewTransport> vsock_create_unix_transport_from_fd(
-        uint64_t key,
-        int fd);
-#endif
-
 std::shared_ptr<IVsockNewTransport> vsock_load_transport(android::base::Stream *stream);
 
 void virtio_vsock_new_transport_init();

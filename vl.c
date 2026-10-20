@@ -4712,19 +4712,12 @@ static int main_impl(int argc, char** argv, void (*on_main_loop_done)(void))
         {
             int width  = getConsoleAgents()->settings->hw()->hw_lcd_width;
             int height = getConsoleAgents()->settings->hw()->hw_lcd_height;
-            int env_width  = getConsoleAgents()->settings->hw()->environment_width;
-            int env_height = getConsoleAgents()->settings->hw()->environment_height;
             int depth  = getConsoleAgents()->settings->hw()->hw_lcd_depth;
 
             /* A bit of sanity checking */
-            bool is_zero_display =
-                getConsoleAgents()->settings->hw()->hw_displayless &&
-                (width == 0 && height == 0);
-            bool has_env = (env_width != 0 && env_height != 0);
-            if (!(is_zero_display && has_env) &&
-                (width <= 0 || height <= 0    ||
+            if (width <= 0 || height <= 0    ||
                 (depth != 16 && depth != 32) ||
-                ((width & 1) != 0)))
+                ((width & 1) != 0)  )
             {
                 error_report("Invalid display configuration (%d,%d,%d)",
                       width, height, depth);

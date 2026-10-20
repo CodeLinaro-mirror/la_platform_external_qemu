@@ -11,12 +11,11 @@
 */
 #include "android/car.h"
 
-#include "aemu/base/utils/stream.h"
-#include "android/console.h"
 #include "android/emulation/android_qemud.h"
+#include "android/console.h"
 #include "android/utils/debug.h"
+#include "aemu/base/utils/stream.h"
 #include "android/utils/system.h"
-#include "host-common/VmLock.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -39,8 +38,6 @@ struct CarDataCallback {
     void* context;
 };
 
-// All fields of HwCar (_car) are synchronized under VmLock (BQL).
-// Lock ordering: VmLock (BQL) -> g_qemud_client_global_lock (inside QEMUD).
 struct HwCar {
     QemudService* service;
     QemudClient* client;  // represents the Vehicle Hal on guest side
@@ -101,7 +98,6 @@ void android_car_init(void) {
 }
 
 void set_car_call_back(car_callback_t func, void* context) {
-    android::RecursiveScopedVmLockIfInstance vmlock;
     HwCar* car = _car;
     if (func == nullptr || context == nullptr) {
         D("%s: callback is invalid", __func__);
@@ -117,9 +113,6 @@ void set_car_call_back(car_callback_t func, void* context) {
 }
 
 void android_send_car_data(const char* msg, int msgLen) {
-    // Lock ordering: Acquire VmLock (BQL) before reading _car->client and
-    // calling qemud_client_send() to prevent racing with _hwCarClient_close().
-    android::RecursiveScopedVmLockIfInstance vmlock;
     if (_car->service == nullptr) {
         D("pipe service is not initialized");
         return;

@@ -83,7 +83,10 @@ void process_early_setup(int argc, char** argv) {
 
     android::protobuf::initProtobufLogger();
 
-    System::get()->disableAppNap();
+    // For macOS, app nap can cause all sorts of issues with timers.
+    // Disable it.
+    // bug: 153616209 Not good when we want to allow sleep.
+    // System::get()->disableAppNap();
 }
 
 void process_late_teardown() {

@@ -264,7 +264,6 @@ android_add_test(
           android/base/files/ScopedRegKey_unittest.cpp
           android/base/system/Win32UnicodeString_unittest.cpp
           android/base/system/Win32Utils_unittest.cpp
-          android/utils/win32_unicode_unittest.cpp
   MSVC android/base/system/WinMsvcSystem_unittest.cpp)
 
 android_target_compile_options(

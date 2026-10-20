@@ -58,7 +58,7 @@ public:
      */
     virtual int GetBaseRotation() { return 0; }
     /* This returns the length of any animation from the source,
-     * or 0 if there is no meaningful finite length
+     * or 0 if there is no meaninful finite length
      */
     virtual int64_t GetAnimationLengthUs() { return 0; }
 

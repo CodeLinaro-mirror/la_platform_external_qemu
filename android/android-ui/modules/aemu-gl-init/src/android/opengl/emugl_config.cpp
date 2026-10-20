@@ -29,7 +29,6 @@
 #include "android/console.h"
 #include "android/cpu_accelerator.h"
 #include "android/opengl/EmuglBackendList.h"
-#include "android/opengl/NativeGpuInfo.h"
 #include "android/opengl/gpuinfo.h"
 #include "android/skin/backend-defs.h"
 #include "host-common/FeatureControl.h"
@@ -1050,9 +1049,9 @@ bool emuglConfig_init(EmuglConfig* config,
         bool switchToSoftwareVulkan = false;
         if (!is_xr_mode) {
 #if defined(__APPLE__)
-            // Switch to software vulkan with 'auto' modes on non-Metal 4 capable
-            // devices. XR AVDs will keep using host gpu regardless.
-            switchToSoftwareVulkan = !hasMetal4();
+            // Force MoltenVK with 'auto' modes on XR, but otherwise use
+            // software due to known issues
+            switchToSoftwareVulkan = true;
 #else
             switchToSoftwareVulkan = no_window;
 #endif
@@ -1113,8 +1112,7 @@ bool emuglConfig_init(EmuglConfig* config,
     }
 
     // Android CDD requires GLES 3.1 for API 35 and higher
-    const bool needsNativeGLES31 =
-            (api_level >= 35) && !fc::isEnabled(fc::GuestAngle);
+    const bool needsGLES31 = (api_level >= 35);
 
     // If nothing is enforced so far, and we're using 'auto' mode, decide
     // based on some other parameters and prefer host
@@ -1134,7 +1132,7 @@ bool emuglConfig_init(EmuglConfig* config,
         // On macOS, native host OpenGL is deprecated and only supports
         // GLES 3.0. Use software rendering (swangle) when 'auto' is requested
         // for API levels 35+ so GLES 3.1 and compute shaders are supported.
-        if (needsNativeGLES31) {
+        if (needsGLES31) {
             dinfo("API level %d requires GLES 3.1, forcing software rendering for GLES.",
                   api_level);
             switchToSoftwareGles = true;
@@ -1202,7 +1200,7 @@ bool emuglConfig_init(EmuglConfig* config,
     } else {
         // Forced host GPU mode for GLES, warn if incompatibilities are expected
 #ifdef __APPLE__
-        if (needsNativeGLES31) {
+        if (needsGLES31) {
             // Ref: b/560079433
             dwarning(
                     "API level '%d' requires GLES 3.1, please consider using "
@@ -1304,15 +1302,7 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         std::string selectedICDStr =
                 android::base::getEnvironmentVariable(EnvVarSelectICD);
         if (selectedICDStr.empty()) {
-            if (hasMetal4()) {
-                selectedICDStr = "kosmickrisp";
-            } else {
-                // If the user forces host gpu on a Metal 4 unsupported
-                // machine, fallback to MoltenVK.
-                dwarning(
-                        "Metal4 is not supported. Falling back to using MoltenVK.");
-                selectedICDStr = "moltenvk";
-            }
+            selectedICDStr = "moltenvk";
         } else {
             dinfo("%s: Setting ICD from envvar %s, to '%s'", __func__,
                   EnvVarSelectICD, selectedICDStr.c_str());

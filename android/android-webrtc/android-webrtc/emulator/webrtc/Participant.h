@@ -83,10 +83,9 @@ public:
 private:
     const AndroidConsoleAgents* mAgents;
 
-    std::shared_ptr<android::emulation::control::keyboard::KeyEventSender>
+    android::emulation::control::keyboard::KeyEventSender
             mKeyEventSender;
-    std::shared_ptr<android::emulation::control::TouchEventSender>
-            mTouchEventSender;
+    android::emulation::control::TouchEventSender mTouchEventSender;
     scoped_refptr<::webrtc::DataChannelInterface> mChannel;
     DataChannelLabel mLabel;
 };

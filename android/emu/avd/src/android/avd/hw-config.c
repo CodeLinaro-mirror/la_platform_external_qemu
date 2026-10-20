@@ -97,14 +97,6 @@ androidHwConfig_init( AndroidHwConfig*  config,
     }
 }
 
-#define   HWCFG_BOOL(n,s,d,a,t)
-#define   HWCFG_INT(n,s,d,a,t)        static const int default_##n = d;
-#define   HWCFG_STRING(n,s,d,a,t)
-#define   HWCFG_DOUBLE(n,s,d,a,t)
-#define   HWCFG_DISKSIZE(n,s,d,a,t)
-
-#include "android/avd/hw-config-defs.h"
-
 int androidHwConfig_read(AndroidHwConfig* config, CIniFile* ini) {
     if (ini == NULL)
         return -1;
@@ -118,17 +110,6 @@ int androidHwConfig_read(AndroidHwConfig* config, CIniFile* ini) {
 #define   HWCFG_DISKSIZE(n,s,d,a,t)   if (iniFile_hasKey(ini, s)) { config->n = iniFile_getDiskSize(ini, s, d); }
 
 #include "android/avd/hw-config-defs.h"
-
-    if (config->hw_displayless) {
-        // Standard Android SurfaceFlinger and WindowManagerService require a
-        // primary display with positive dimensions to boot without divide-by-zero
-        // exceptions. Reset to the default LCD dimensions for the guest while
-        // emulatorSetupEnvironment() passes a 0x0 display rect to the host
-        // compositor to hide the guest display overlay.
-        config->hw_lcd_width = default_hw_lcd_width;
-        config->hw_lcd_height = default_hw_lcd_height;
-        config->hw_lcd_depth = default_hw_lcd_depth;
-    }
 
     // Special case for the SD-Card, the AVD Manager can incorrectly create
     // a new AVD with 'sdcard.size=<size>' and 'hw.sdCard=no'. It's not sure
