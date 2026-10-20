@@ -208,9 +208,20 @@ void qpci_init_generic(QGenericPCIBus *qpci, QTestState *qts,
     qpci->bus.qts = qts;
     qpci->bus.pio_alloc_ptr = 0x0000;
     qpci->bus.pio_limit = 0x10000;
+#ifdef CONFIG_ANDROID
+    qpci->bus.mmio_alloc_ptr = 0x3e000000;
+    qpci->bus.mmio_limit = 0x3eff0000;
+#else
     qpci->bus.mmio_alloc_ptr = 0x10000000;
     qpci->bus.mmio_limit = 0x2eff0000;
-    qpci->ecam_alloc_ptr = 0x4010000000;
+#endif
+#if defined(__APPLE__) && defined(__MACH__)
+    qpci->ecam_alloc_ptr = 0x810000000ULL;
+#elif defined(_WIN32) && (defined(__aarch64__) || defined(_M_ARM64))
+    qpci->ecam_alloc_ptr = 0x7d0000000ULL;
+#else
+    qpci->ecam_alloc_ptr = 0x4010000000ULL;
+#endif
 
     qpci->obj.get_driver = qpci_generic_get_driver;
 }
