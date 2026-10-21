@@ -161,6 +161,37 @@ rutabaga_cmd_create_resource_3d(VirtIOGPU *g,
     QTAILQ_INSERT_HEAD(&g->reslist, res, next);
 }
 
+/*
+ * Drops every scanout and cursor reference to `res`.  res->scanout_bitmask
+ * has exactly one bit per scanout that currently shows the resource, so the
+ * scanouts detached here must be precisely the bits that were set.
+ */
+static void
+rutabaga_detach_resource_from_scanouts(VirtIOGPUBase *vb,
+                                       struct virtio_gpu_simple_resource *res)
+{
+    uint32_t detached = 0;
+
+    g_assert(res->resource_id != 0);
+
+    for (uint32_t i = 0; i < vb->conf.max_outputs; i++) {
+        struct virtio_gpu_scanout *scanout = &vb->scanout[i];
+        if (scanout->resource_id == res->resource_id) {
+            scanout->resource_id = 0;
+            scanout->ds = NULL;
+            if (scanout->con) {
+                dpy_gfx_replace_surface(scanout->con, NULL);
+            }
+            detached |= 1u << i;
+        }
+        if (scanout->cursor.resource_id == res->resource_id) {
+            scanout->cursor.resource_id = 0;
+        }
+    }
+    g_assert(res->scanout_bitmask == detached);
+    res->scanout_bitmask = 0;
+}
+
 static void
 virtio_gpu_rutabaga_resource_unref(VirtIOGPU *g,
                                    struct virtio_gpu_simple_resource *res,
@@ -178,11 +209,7 @@ virtio_gpu_rutabaga_resource_unref(VirtIOGPU *g,
                         res->resource_id);
     }
 
-    for (uint32_t i = 0; i < g->parent_obj.conf.max_outputs; i++) {
-        if (g->parent_obj.scanout[i].resource_id == res->resource_id) {
-            g->parent_obj.scanout[i].resource_id = 0;
-        }
-    }
+    rutabaga_detach_resource_from_scanouts(VIRTIO_GPU_BASE(g), res);
 
     g_clear_pointer(&res->image, pixman_image_unref);
 
@@ -363,13 +390,15 @@ rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
 
     for (i = 0; i < vb->conf.max_outputs; i++) {
         scanout = &vb->scanout[i];
-        if (i == res->scanout_bitmask) {
+        if ((res->scanout_bitmask & (1u << i)) &&
+            scanout->resource_id == rf.resource_id &&
+            qemu_console_is_visible(scanout->con)) {
             found = true;
             break;
         }
     }
 
-    if (!found || !qemu_console_is_visible(scanout->con)) {
+    if (!found) {
         return;
     }
 
@@ -381,8 +410,34 @@ rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
                                              &transfer_iovec);
     trace_virtio_gpu_cmd_res_flush_read_end(rf.resource_id, result);
     CHECK(!result, cmd);
-    dpy_gfx_update_full(scanout->con);
+
+    /* One read-back, then repaint every visible scanout showing the resource. */
+    for (i = 0; i < vb->conf.max_outputs; i++) {
+        scanout = &vb->scanout[i];
+        if ((res->scanout_bitmask & (1u << i)) &&
+            scanout->resource_id == rf.resource_id &&
+            qemu_console_is_visible(scanout->con)) {
+            dpy_gfx_update_full(scanout->con);
+        }
+    }
     trace_virtio_gpu_cmd_res_flush_done(rf.resource_id);
+}
+
+/* Clears the bit for `scanout_id` in whichever resource it currently shows. */
+static void
+rutabaga_clear_scanout_bit(VirtIOGPU *g, uint32_t scanout_id)
+{
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
+    struct virtio_gpu_scanout *scanout = &vb->scanout[scanout_id];
+    struct virtio_gpu_simple_resource *old_res;
+
+    if (scanout->resource_id == 0) {
+        return;
+    }
+    old_res = virtio_gpu_find_resource(g, scanout->resource_id);
+    if (old_res) {
+        old_res->scanout_bitmask &= ~(1u << scanout_id);
+    }
 }
 
 static void
@@ -402,11 +457,14 @@ rutabaga_cmd_set_scanout(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
     trace_virtio_gpu_cmd_set_scanout(ss.scanout_id, ss.resource_id,
                                      ss.r.width, ss.r.height, ss.r.x, ss.r.y);
 
-    CHECK(ss.scanout_id < VIRTIO_GPU_MAX_SCANOUTS, cmd);
+    /* Only scanouts that exist may be addressed; the bitmask has that many bits. */
+    CHECK(ss.scanout_id < vb->conf.max_outputs, cmd);
     scanout = &vb->scanout[ss.scanout_id];
 
     if (ss.resource_id == 0) {
+        rutabaga_clear_scanout_bit(g, ss.scanout_id);
         scanout->resource_id = 0;
+        scanout->ds = NULL;
         dpy_gfx_replace_surface(scanout->con, NULL);
         dpy_gl_scanout_disable(scanout->con);
         return;
@@ -432,8 +490,10 @@ rutabaga_cmd_set_scanout(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
     /* realloc the surface ptr */
     scanout->ds = qemu_create_displaysurface_pixman(res->image);
     dpy_gfx_replace_surface(scanout->con, scanout->ds);
+    /* The old resource's bit and the scanout slot always change together. */
+    rutabaga_clear_scanout_bit(g, ss.scanout_id);
     scanout->resource_id = ss.resource_id;
-    res->scanout_bitmask = ss.scanout_id;
+    res->scanout_bitmask |= (1u << ss.scanout_id);
 }
 
 static void
@@ -1546,6 +1606,25 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
     }
 
     vmstate_load_state(f, &vmstate_virtio_gpu_scanouts, g, 1, NULL);
+
+    /*
+     * The scanout vmstate restores scanout[i].resource_id but the per-resource
+     * bitmask is not serialized.  Rebuild it right here so the two never
+     * disagree, not even if a later step of the load fails and the resources
+     * are unreferenced by the fallback reset.
+     */
+    for (i = 0; i < vb->conf.max_outputs; i++) {
+        if (vb->scanout[i].resource_id == 0) {
+            continue;
+        }
+        res = virtio_gpu_find_resource(g, vb->scanout[i].resource_id);
+        if (!res) {
+            error_report("%s: scanout %d references missing resource %u",
+                         __func__, i, vb->scanout[i].resource_id);
+            return -EINVAL;
+        }
+        res->scanout_bitmask |= 1u << i;
+    }
     return 0;
 }
 
