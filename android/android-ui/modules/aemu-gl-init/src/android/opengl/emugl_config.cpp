@@ -1051,8 +1051,9 @@ bool emuglConfig_init(EmuglConfig* config,
         if (!is_xr_mode) {
 #if defined(__APPLE__)
             // Switch to software vulkan with 'auto' modes on non-Metal 4 capable
-            // devices. XR AVDs will keep using host gpu regardless.
-            switchToSoftwareVulkan = !hasMetal4();
+            // devices, or when running without a window, as on other hosts.
+            // XR AVDs will keep using host gpu regardless.
+            switchToSoftwareVulkan = no_window || !hasMetal4();
 #else
             switchToSoftwareVulkan = no_window;
 #endif
