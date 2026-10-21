@@ -5185,6 +5185,20 @@ SRST
     Save the current state to a snapshot when exiting.
 ERST
 
+DEF("vmstate-node", HAS_ARG, QEMU_OPTION_vmstate_node, \
+    "-vmstate-node node-name\n" \
+    "                block node that stores the VM state of internal snapshots\n",
+    QEMU_ARCH_ALL)
+SRST
+``-vmstate-node node-name``
+    Store the VM state of internal snapshots (savevm, loadvm, -savevm,
+    -loadvm, snapshot-save/-load without an explicit ``vmstate``) in the
+    block node ``node-name`` instead of the first snapshottable writable
+    node.  The node must be a writable qcow2 image; it does not need to be
+    attached to a guest device.  Snapshot operations fail if the node does
+    not exist.
+ERST
+
 #if !defined(_WIN32) && !defined(EMSCRIPTEN)
 DEF("daemonize", 0, QEMU_OPTION_daemonize, \
     "-daemonize      daemonize QEMU after initializing\n", QEMU_ARCH_ALL)
