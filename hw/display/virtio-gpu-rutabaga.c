@@ -1531,13 +1531,13 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
                     return -EINVAL;
                 }
                 qemu_get_buffer(f, surface_data(surface), h * stride);
+                surface->flags = flags;
                 dpy_gfx_replace_surface(vb->scanout[i].con, surface);
                 QemuUIInfo info = {
                     .width = w,
                     .height = h,
                 };
                 dpy_set_ui_info(vb->scanout[i].con, &info, false);
-                surface->flags = flags;
             } else {
                 error_report("%s %s %d: corrupted rutagaba surface data", __FILE__, __func__, __LINE__);
                 return -EINVAL;
