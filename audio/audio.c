@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include "qemu/osdep.h"
+#include "qemu/atomic.h"
 #include "hw/hw.h"
 #include "audio.h"
 #include "monitor/monitor.h"
@@ -1207,11 +1208,11 @@ int AUD_write (SWVoiceOut *sw, void *buf, int size)
 static bool allow_real_audio = false;
 
 void qemu_allow_real_audio(bool allow) {
-    allow_real_audio = allow;
+    atomic_set(&allow_real_audio, allow);
 }
 
 bool qemu_is_real_audio_allowed() {
-    return allow_real_audio;
+    return atomic_read(&allow_real_audio);
 }
 
 static void mute_microphone_S16_1(int16_t *a, int frames) {
@@ -1360,7 +1361,7 @@ int AUD_read (SWVoiceIn *sw, void *buf, int size)
 
     int bytes = sw->hw->pcm_ops->read(sw, buf, size);
 
-    if (!allow_real_audio) {
+    if (!atomic_read(&allow_real_audio)) {
         mute_microphone(&sw->hw->info, buf, size);
     }
 

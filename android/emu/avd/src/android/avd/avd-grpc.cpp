@@ -104,6 +104,7 @@ AvdInfo* avdInfo_from_grpc(AvdClient* client) {
     _avdInfo_getBuildSkinHardwareIni(avd);
 
     avd->apiLevel = info->api_level();
+    avd->apiLevelMinor = info->api_level_minor();
     avd->incrementalVersion = info->incremental_version();
     avd->isGoogleApis = info->is_google_apis();
     avd->isUserBuild = info->is_user_build();

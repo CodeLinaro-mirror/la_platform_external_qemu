@@ -1068,12 +1068,7 @@ static void* get_real_audio_event_listener() {
     return &sRealAudioEventSupport;
 }
 
-// Lock ordering: VmLock (BQL) must be acquired before sRealAudioLock.
-// Use RecursiveScopedVmLockIfInstance because ToolWindow queries this during
-// early UI initialization before qemu_android_emulation_early_setup() installs
-// the QEMU VmLock.
 static bool is_real_audio_allowed() {
-    android::RecursiveScopedVmLockIfInstance vmlock;
     std::lock_guard<std::mutex> lock(sRealAudioLock);
     return qemu_is_real_audio_allowed();
 }
@@ -1081,7 +1076,6 @@ static bool is_real_audio_allowed() {
 static void allow_real_audio(bool allow) {
     bool changed = false;
     {
-        android::RecursiveScopedVmLockIfInstance vmlock;
         std::lock_guard<std::mutex> lock(sRealAudioLock);
         changed = qemu_is_real_audio_allowed() != allow;
         qemu_allow_real_audio(allow);

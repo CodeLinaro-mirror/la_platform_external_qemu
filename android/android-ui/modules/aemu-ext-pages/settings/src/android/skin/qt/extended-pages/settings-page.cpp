@@ -26,10 +26,8 @@
 #include "android/metrics/UiEventTracker.h"                 // for UiEventTr...
 #include "android/skin/qt/FramelessDetector.h"              // for Frameless...
 #include "android/skin/qt/extended-pages/common.h"          // for getSelect...
-#include "android/skin/qt/extended-pages/perfstats-page.h"  // for PerfStats...
 #include "android/skin/qt/qt-settings.h"                    // for SaveSnaps...
 #include "android/skin/qt/raised-material-button.h"         // for RaisedMat...
-#include "android/skin/qt/stylesheet.h"                     // for fontStyle...
 #include "android/skin/winsys.h"                            // for WinsysPre...
 #include "ui_settings-page.h"                               // for SettingsPage
 
@@ -938,18 +936,6 @@ void SettingsPage::on_set_resetNotifications_pressed() {
     settings.remove(Ui::Settings::SHOW_ADB_WARNING);
     settings.remove(Ui::Settings::SHOW_VIRTUALSCENE_INFO);
     settings.remove(Ui::Settings::SHOW_NESTED_WARNING);
-}
-
-void SettingsPage::on_perfstatsButton_pressed() {
-    if (!mPerfStatsPage.get()) {
-        const double densityFactor = devicePixelRatioF();
-        QString styleString = Ui::fontStylesheet(densityFactor > 1.5);
-        styleString += Ui::stylesheetForTheme(getSelectedTheme());
-        mPerfStatsPage.reset(new PerfStatsPage(nullptr));
-        mPerfStatsPage->setStyleSheet(styleString);
-    }
-    mPerfStatsPage->show();
-    setFrameOnTop(mPerfStatsPage.get(), true);
 }
 
 void SettingsPage::on_set_clipboardSharing_toggled(bool checked) {

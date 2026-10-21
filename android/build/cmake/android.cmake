@@ -959,6 +959,50 @@ function(android_install_as_debug_info name)
 endfunction()
 
 # ~~~
+# Compiles a Windows resource file and adds it to the specified target.
+# This function is only active on Windows (WIN32).
+#
+# The following parameters are accepted:
+#
+# ``TARGET``   The target to which the compiled resource should be added.
+# ``RESOURCE`` The path to the Windows resource (.rc) file to be compiled.
+# ~~~
+function(add_resource)
+    if(NOT WIN32)
+      return()
+    endif()
+
+    set(options "")
+    set(oneValueArgs TARGET RESOURCE)
+    set(multiValueArgs "")
+    cmake_parse_arguments(RES "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    get_filename_component(RES_NAME ${RES_RESOURCE} NAME_WLE)
+    set(RES_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${RES_TARGET}_${RES_NAME}.res")
+    if(IS_ABSOLUTE "${RES_RESOURCE}")
+      set(RES_INPUT "${RES_RESOURCE}")
+    else()
+      set(RES_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/${RES_RESOURCE}")
+    endif()
+
+    set(RES_DEPENDS "${RES_INPUT}")
+    if(RES_NAME STREQUAL "utf8_manifest")
+      list(APPEND RES_DEPENDS "${ANDROID_QEMU2_TOP_DIR}/android/images/utf8.manifest")
+    endif()
+
+    add_custom_command(
+        OUTPUT "${RES_OUTPUT}"
+        COMMAND "${CMAKE_RC_COMPILER}" /fo "${RES_OUTPUT}" "${RES_INPUT}"
+        DEPENDS ${RES_DEPENDS}
+        COMMENT "Manually compiling resource: ${RES_RESOURCE}"
+        VERBATIM
+    )
+
+    target_sources(${RES_TARGET} PRIVATE "${RES_OUTPUT}")
+    set_source_files_properties("${RES_OUTPUT}" PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+endfunction()
+
+# ~~~
 # Adds the given executable, by calculating the source set and registering the license
 #
 # ``SHARED``  Option indicating that this is a shared library.
@@ -998,6 +1042,8 @@ function(android_add_executable)
   endif()
 
   if(WINDOWS_MSVC_X86_64)
+    add_resource(TARGET ${build_TARGET}
+                 RESOURCE "${ANDROID_QEMU2_TOP_DIR}/android/images/utf8_manifest.rc")
     target_link_libraries(${build_TARGET} PRIVATE msvc-posix-compat)
   endif()
 
@@ -1772,38 +1818,4 @@ function(android_symlink TARGET SYMLINK WORKDIR)
     execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink "${TARGET}"
                             "${SYMLINK}" WORKING_DIRECTORY ${WORKDIR})
   endif()
-endfunction()
-
-# ~~~
-# Compiles a Windows resource file and adds it to the specified target.
-# This function is only active on Windows (WIN32).
-#
-# The following parameters are accepted:
-#
-# ``TARGET``   The target to which the compiled resource should be added.
-# ``RESOURCE`` The path to the Windows resource (.rc) file to be compiled.
-# ~~~
-function(add_resource)
-    if(NOT WIN32)
-      return()
-    endif()
-
-    set(options "")
-    set(oneValueArgs TARGET RESOURCE)
-    set(multiValueArgs "")
-    cmake_parse_arguments(RES "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-    get_filename_component(RES_NAME ${RES_RESOURCE} NAME_WLE)
-    set(RES_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${RES_NAME}.res")
-
-    add_custom_command(
-        OUTPUT "${RES_OUTPUT}"
-        COMMAND "${CMAKE_RC_COMPILER}" /fo "${RES_OUTPUT}" "${CMAKE_CURRENT_SOURCE_DIR}/${RES_RESOURCE}"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${RES_RESOURCE}"
-        COMMENT "Manually compiling resource: ${RES_RESOURCE}"
-        VERBATIM
-    )
-
-    target_sources(${RES_TARGET} PRIVATE "${RES_OUTPUT}")
-    set_source_files_properties("${RES_OUTPUT}" PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 endfunction()

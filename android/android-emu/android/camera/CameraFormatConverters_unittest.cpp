@@ -647,3 +647,131 @@ TEST_P(FrameModifiers, ExpComp) {
 INSTANTIATE_TEST_CASE_P(CameraFormatConverters,
                         FrameModifiers,
                         testing::Values(1.0f, 0.0f, 0.5f, -1.0f, 2.0f));
+
+TEST(CameraFormatConvertersSecurity, CalculateFramebufferSizeOverflowChecks) {
+    size_t size = 0;
+    // 46342 * 46342 overflows 32-bit signed int (46342^2 > INT_MAX).
+    ASSERT_TRUE(calculate_framebuffer_size(V4L2_PIX_FMT_RGB32, 46342, 46342,
+                                           &size));
+    EXPECT_EQ(size, 46342ULL * 46342ULL * 4ULL);
+
+    // 37856 * 37856 aligned YUV420 overflows 32-bit signed int in
+    // y_stride * h + 2 * uv_stride * ((h + 1) / 2).
+    ASSERT_TRUE(calculate_framebuffer_size(V4L2_PIX_FMT_YUV420, 37856, 37856,
+                                           &size));
+    EXPECT_EQ(size, 37856ULL * 37856ULL * 3ULL / 2ULL);
+
+    // INT_MAX x INT_MAX * 32 bits overflows even 64-bit size_t and must fail.
+    EXPECT_FALSE(calculate_framebuffer_size(V4L2_PIX_FMT_RGB32, 0x7fffffff,
+                                            0x7fffffff, &size));
+}
+
+TEST(CameraFormatConvertersSecurity, OddHeightNV12NV21NoOverflow) {
+    constexpr int kWidth = 64;
+    constexpr int kHeights[] = {1, 3, 27};
+    constexpr uint32_t kFormats[] = {V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_NV21};
+    constexpr size_t kGuardBytes = 128;
+    constexpr uint8_t kGuardVal = 0xCD;
+
+    uint8_t* stagingFramebuffer = nullptr;
+    size_t stagingFramebufferSize = 0;
+
+    for (uint32_t dstFormat : kFormats) {
+        for (int height : kHeights) {
+            const std::vector<uint8_t> src = generateFramebuffer(
+                    V4L2_PIX_FMT_RGB32, kWidth, height, kAlpha, kRed, kGreen,
+                    kBlue);
+            const size_t destSize = bufferSize(dstFormat, kWidth, height);
+            // Expected size: w * h + w * ((h + 1) / 2)
+            EXPECT_EQ(destSize,
+                      static_cast<size_t>(kWidth) * height +
+                              static_cast<size_t>(kWidth) * ((height + 1) / 2));
+
+            // Slow path with guard bytes after destSize.
+            std::vector<uint8_t> destSlow(destSize + kGuardBytes, kGuardVal);
+            ClientFrameBuffer fbSlow = {};
+            fbSlow.pixel_format = dstFormat;
+            fbSlow.framebuffer = destSlow.data();
+            fbSlow.framebuffer_size = destSize;
+            fbSlow.width = kWidth;
+            fbSlow.height = height;
+
+            EXPECT_EQ(0, convert_frame_slow(
+                                 src.data(), V4L2_PIX_FMT_RGB32, src.size(),
+                                 kWidth, height, &fbSlow, 1, kDefaultColorScale,
+                                 kDefaultColorScale, kDefaultColorScale,
+                                 kDefaultExpComp));
+            for (size_t i = 0; i < kGuardBytes; ++i) {
+                ASSERT_EQ(kGuardVal, destSlow[destSize + i])
+                        << "Slow path overflow at byte " << i << " for height "
+                        << height;
+            }
+
+            // Fast path with guard bytes after destSize.
+            std::vector<uint8_t> destFast(destSize + kGuardBytes, kGuardVal);
+            ClientFrameBuffer fbFast = {};
+            fbFast.pixel_format = dstFormat;
+            fbFast.framebuffer = destFast.data();
+            fbFast.framebuffer_size = destSize;
+            fbFast.width = kWidth;
+            fbFast.height = height;
+
+            ClientFrame resultFrame = {};
+            resultFrame.framebuffers = &fbFast;
+            resultFrame.framebuffers_count = 1;
+            resultFrame.staging_framebuffer = &stagingFramebuffer;
+            resultFrame.staging_framebuffer_size = &stagingFramebufferSize;
+
+            EXPECT_EQ(0, convert_frame_fast(src.data(), V4L2_PIX_FMT_RGB32,
+                                            src.size(), kWidth, height,
+                                            &resultFrame, kDefaultExpComp, 0));
+            for (size_t i = 0; i < kGuardBytes; ++i) {
+                ASSERT_EQ(kGuardVal, destFast[destSize + i])
+                        << "Fast path overflow at byte " << i << " for height "
+                        << height;
+            }
+        }
+    }
+
+    free(stagingFramebuffer);
+}
+
+TEST(CameraFormatConvertersSecurity, CroppedYVU420AndYUV420StagingNoOverflow) {
+    constexpr int kSrcWidth = 640;
+    constexpr int kSrcHeight = 480;
+    constexpr int kDstWidth = 16;
+    constexpr int kDstHeight = 480;
+    constexpr uint32_t kSrcFormats[] = {V4L2_PIX_FMT_YVU420,
+                                        V4L2_PIX_FMT_YUV420};
+
+    uint8_t* stagingFramebuffer = nullptr;
+    size_t stagingFramebufferSize = 0;
+
+    for (uint32_t srcFormat : kSrcFormats) {
+        const std::vector<uint8_t> src =
+                generateFramebuffer(srcFormat, kSrcWidth, kSrcHeight, kAlpha,
+                                    kRed, kGreen, kBlue);
+        const size_t destSize =
+                bufferSize(V4L2_PIX_FMT_RGB32, kDstWidth, kDstHeight);
+        std::vector<uint8_t> dest(destSize, 0);
+
+        ClientFrameBuffer fb = {};
+        fb.pixel_format = V4L2_PIX_FMT_RGB32;
+        fb.framebuffer = dest.data();
+        fb.framebuffer_size = dest.size();
+        fb.width = kDstWidth;
+        fb.height = kDstHeight;
+
+        ClientFrame resultFrame = {};
+        resultFrame.framebuffers = &fb;
+        resultFrame.framebuffers_count = 1;
+        resultFrame.staging_framebuffer = &stagingFramebuffer;
+        resultFrame.staging_framebuffer_size = &stagingFramebufferSize;
+
+        EXPECT_EQ(0, convert_frame_fast(src.data(), srcFormat, src.size(),
+                                        kSrcWidth, kSrcHeight, &resultFrame,
+                                        kDefaultExpComp, 0));
+    }
+
+    free(stagingFramebuffer);
+}

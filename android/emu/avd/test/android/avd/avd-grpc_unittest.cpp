@@ -122,12 +122,14 @@ TEST_F(AvdGrpcTest, sets_device_name) {
 
 TEST_F(AvdGrpcTest, sets_api_level) {
     AvdInfo response;
-    response.set_api_level(30);
+    response.set_api_level(37);
+    response.set_api_level_minor(2);
     SetupStubCall(response);
 
     auto info = avdInfo_from_grpc(mClient.get());
     EXPECT_TRUE(info != nullptr);
     EXPECT_EQ(info->apiLevel, response.api_level());
+    EXPECT_EQ(info->apiLevelMinor, response.api_level_minor());
     avdInfo_free(info);
 }
 

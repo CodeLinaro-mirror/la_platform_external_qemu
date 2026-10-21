@@ -199,9 +199,16 @@ public:
     }
 
     void OnDone(const grpc::Status& s) override {
+        CloseWriter();
         // TODO(jansene): well, hci is dead.. so... what now?
         dwarning("Netsim %s is gone due to: %s", mContext.peer().c_str(),
                  s.error_message().c_str());
+        {
+            std::lock_guard<std::mutex> lock(mAwaitMutex);
+            mStatus = s;
+            mDone = true;
+            mAwaitCondition.notify_all();
+        }
     }
 
     // Blocks and waits until this connection has completed.
@@ -211,7 +218,10 @@ public:
         return std::move(mStatus);
     }
 
-    void cancel() { mContext.TryCancel(); }
+    void cancel() {
+        CloseWriter();
+        mContext.TryCancel();
+    }
 
     void startCall(PacketStreamer::Stub* stub) {
         stub->async()->StreamPackets(&mContext, this);
@@ -255,6 +265,9 @@ int ble_hci_grpc_open_connection() {
     }
 
     auto channel = netsim::packet::CreateChannel("");
+    if (!channel) {
+        return OS_ENOENT;
+    }
     sTransportStub = PacketStreamer::NewStub(channel);
 
     sTransport = std::make_unique<HciTransport>();

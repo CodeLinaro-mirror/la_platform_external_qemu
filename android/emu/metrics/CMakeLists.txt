@@ -31,12 +31,18 @@ android_add_library(
       android/protobuf/DelimitedSerialization.cpp
       android/session_phase_reporter.cpp)
 
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/protos)
 if(WINDOWS_MSVC_X86_64)
 
   protobuf_generate_with_plugin(
-    TARGET android-emu-metrics PROTOS protos/google_logs_publishing.proto
-                                      protos/studio_stats.proto
-    OUT_VAR AEMU_METRICS_SRC EXPORT_MACRO "AEMU_METRICS_PROTO")
+    APPEND_PATH
+    TARGET android-emu-metrics
+    PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/protos
+    PROTOS ${CMAKE_CURRENT_SOURCE_DIR}/protos/google_logs_publishing.proto
+           ${CMAKE_CURRENT_SOURCE_DIR}/protos/model_registry.proto
+           ${CMAKE_CURRENT_SOURCE_DIR}/protos/studio_stats.proto
+    OUT_VAR AEMU_METRICS_SRC
+    EXPORT_MACRO "AEMU_METRICS_PROTO")
   set_source_files_properties(
     ${AEMU_METRICS_SRC} PROPERTIES COMPILE_DEFINITIONS
                                    AEMU_METRICS_PROTO=__declspec\(dllexport\))
@@ -45,8 +51,12 @@ if(WINDOWS_MSVC_X86_64)
                              PUBLIC AEMU_METRICS_PROTO=__declspec\(dllimport\))
 else()
   protobuf_generate_with_plugin(
-    TARGET android-emu-metrics PROTOS protos/google_logs_publishing.proto
-                                      protos/studio_stats.proto)
+    APPEND_PATH
+    TARGET android-emu-metrics
+    PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/protos
+    PROTOS ${CMAKE_CURRENT_SOURCE_DIR}/protos/google_logs_publishing.proto
+           ${CMAKE_CURRENT_SOURCE_DIR}/protos/model_registry.proto
+           ${CMAKE_CURRENT_SOURCE_DIR}/protos/studio_stats.proto)
 endif()
 
 target_link_libraries(

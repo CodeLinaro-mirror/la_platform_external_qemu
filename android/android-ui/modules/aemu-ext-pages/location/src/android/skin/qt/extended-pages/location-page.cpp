@@ -35,6 +35,7 @@
 #include "host-common/hw-config.h"
 #include "android/avd/util.h"  // for path_...
 #include "aemu/base/Log.h"  // for LOG
+#include "aemu/base/async/ThreadLooper.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/memory/LazyInstance.h"                // for LazyI...
 #include "aemu/base/synchronization/ConditionVariable.h"  // for Condi...
@@ -1162,8 +1163,13 @@ static void sendLocationToDevice() {
 
         timeval timeVal = {};
         gettimeofday(&timeVal, nullptr);
-        sLocationAgent->gpsSendLoc(latitude, longitude, altitude, velocity,
-                                   heading, 4, &timeVal);
+        const auto* agent = sLocationAgent;
+        android::base::ThreadLooper::runOnMainLooper(
+                [agent, latitude, longitude, altitude, velocity, heading,
+                 timeVal]() {
+                    agent->gpsSendLoc(latitude, longitude, altitude, velocity,
+                                      heading, 4, &timeVal);
+                });
     }
 }
 

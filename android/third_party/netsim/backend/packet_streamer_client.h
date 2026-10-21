@@ -16,6 +16,10 @@
 
 #pragma once
 
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "grpcpp/channel.h"
 #include "netsim/packet_streamer.pb.h"
 
@@ -56,6 +60,11 @@ struct NetsimdOptions {
 
 // Configure the endpoint for a server other than the local netsimd server.
 void SetPacketStreamEndpoint(const std::string &endpoint);
+
+// Override the per-attempt connection deadline and initial retry backoff for
+// unit tests.
+void SetConnectionBudgetForTesting(std::chrono::milliseconds deadline,
+                                   std::chrono::milliseconds initial_backoff);
 
 std::shared_ptr<grpc::Channel> CreateChannel(NetsimdOptions);
 

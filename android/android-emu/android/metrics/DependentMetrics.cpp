@@ -470,6 +470,9 @@ static android_studio::EmulatorAvdInfo::EmulatorDeviceName getDeviceName() {
     if (0 == strcmp(id, "ai_glasses_device")) {
         return android_studio::EmulatorAvdInfo::AI_GLASSES_DEVICE;
     }
+    if (0 == strcmp(id, "ai_glasses_displayless")) {
+        return android_studio::EmulatorAvdInfo::AI_GLASSES_AUDIO_DEVICE;
+    }
     return android_studio::EmulatorAvdInfo::UNKNOWN_EMULATOR_DEVICE_NAME;
 }
 

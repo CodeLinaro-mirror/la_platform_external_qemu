@@ -580,8 +580,7 @@ std::vector<std::pair<std::string, std::string>> getUserspaceBootProperties(
         // API level 34 will also support it.
         const bool isXR = (avdFlavor == AVD_XR);
         const bool avdSupportsSkiaVk =
-                ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle) && isXR) ||
-                 apiLevel >= 36);
+                ((apiLevel >= 34 && fc::isEnabled(fc::GuestAngle) && isXR));
         const bool gpuSupportsSkiaVk = fc::isEnabled(fc::Vulkan);
         // TODO(b/394566319): InternalEmulationFailure errors when skiavk is
         // used without minigbm on Windows
