@@ -666,23 +666,6 @@
     },
     "linux-aarch64": {
       "dependencies": {
-        "libpulse": {
-          "lib_type": "bazel",
-          "bazel_target": "@gcc_lib//:libpulse",
-          "version": "3.0",
-          "shim": {
-            "Libs": "-lpulse"
-          }
-        },
-        "alsa": {
-          "lib_type": "bazel",
-          "bazel_target": "@gcc_lib//:libasound",
-          "version": "1.0.25",
-          "shim": {
-            "name": "alsa",
-            "Libs": "-lasound"
-          }
-        },
         "gmodule": {
           "lib_type": "bazel",
           "bazel_target": "@glib//gmodule:gmodule_import",
@@ -693,7 +676,74 @@
             "Requires": "pcre2"
           }
         }
-      }
+      },
+      "meson_options": {
+        "-Db_pie": "true",
+        "-Dcrypto_afalg": "enabled",
+        "-Dkvm": "enabled",
+        "-Dmalloc_trim": "enabled",
+        "-Dvhost_crypto": "enabled",
+        "-Dvhost_kernel": "enabled",
+        "-Dvhost_net": "enabled",
+        "-Dvhost_user": "enabled",
+        "-Dvhost_user_blk_server": "enabled"
+      },
+      "shims": [
+        {
+          "target": "qemu-system-.*",
+          "shims": {
+            "+linkopts": [
+              "-rdynamic",
+              "-lrt"
+            ]
+          }
+        },
+        {
+          "target": "libqemuutil",
+          "shims": {
+            "+linkopts": [
+              "-pthread"
+            ]
+          }
+        },
+        {
+          "target": "qemu-img",
+          "shims": {
+            "+linkopts": [
+              "-lrt"
+            ]
+          }
+        },
+        {
+          "target": ".*",
+          "shims": {
+            "restrict_to": "cc_library|cc_binary|cc_interface_binary",
+            "-hdrs": [
+              "subprojects/libvhost-user/.*"
+            ],
+            "+copts": [
+              "-fwrapv",
+              "-Wno-implicit-function-declaration"
+            ]
+          }
+        }
+      ],
+      "external_deps": {
+        "libvhost-user": [
+          "//subprojects/libvhost-user:vhost-user"
+        ],
+        "libvhost-user-glib": [
+          "//subprojects/libvhost-user:vhost-user-glib"
+        ]
+      },
+      "export": [
+        "qemu-system-x86_64",
+        "qemu-system-aarch64"
+      ],
+      "exclude": [
+        "vhost-user",
+        "vhost-user-glib"
+      ]
     },
     "mac-aarch64": {
       "dependencies": {
@@ -951,6 +1001,149 @@
             "+deps": [
               ":qemu-system-x86_64_manifest_rc"
             ],
+            "win_def_file": "google/build/qemu-system-x86_64.def"
+          }
+        },
+        {
+          "target": "libqemuutil",
+          "shims": {
+            "+linkopts": [
+              "-defaultlib:advapi32.lib",
+              "-defaultlib:synchronization.lib",
+              "-defaultlib:user32.lib"
+            ]
+          }
+        },
+        {
+          "target": "libcommon_qemu-system-.*",
+          "shims": {
+            "+linkopts": [
+              "-defaultlib:advapi32.lib",
+              "-defaultlib:user32.lib"
+            ]
+          }
+        },
+        {
+          "target": ".*",
+          "shims": {
+            "restrict_to": "py_binary",
+            "imports": [
+              "scripts"
+            ]
+          }
+        },
+        {
+          "target": ".*",
+          "shims": {
+            "restrict_to": "cc_library|cc_binary|cc_interface_binary",
+            "+copts": [
+              "-Wno-constant-conversion",
+              "-Wno-macro-redefined",
+              "-Wno-invalid-noreturn",
+              "-Wno-bitfield-constant-conversion",
+              "-Wno-int-to-void-pointer-cast",
+              "-Wno-unused-command-line-argument",
+              "-Wno-undef",
+              "-Wno-microsoft-enum-forward-reference",
+              "-Wno-microsoft-include",
+              "-Wno-deprecated-declarations",
+              "-fms-extensions"
+            ],
+            "+deps": [
+              "//google/compat/windows:compat"
+            ],
+            "+local_defines": [
+              "BUILDING_QEMU_BINARY"
+            ]
+          }
+        }
+      ],
+      "external_deps": {
+        "glib-2.0": [
+          "@glib//glib:glib_import",
+          "@glib//gmodule:gmodule_import"
+        ]
+      },
+      "export": [
+        "qemu-system-x86_64",
+        "qemu-system-aarch64"
+      ],
+      "exclude": []
+    },
+    "windows-aarch64": {
+      "dependencies": {
+        "gmodule": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//gmodule:gmodule_import",
+          "version": "2.77.2",
+          "shim": {
+            "name": "gmodule-export-2.0",
+            "Requires": "pcre2"
+          }
+        },
+        "glib": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib:glib_import",
+          "version": "2.77.2",
+          "shim": {
+            "name": "glib-2.0",
+            "Requires": "pcre2, zlib, gmodule-export-2.0, gnulib, dirent",
+            "link_name": "glib-2.0.lib"
+          }
+        },
+        "gnulib": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib:gnulib",
+          "version": "2.77.2"
+        },
+        "dirent": {
+          "lib_type": "bazel",
+          "bazel_target": "@glib//glib/dirent",
+          "version": "2.77.2",
+          "shim": {
+            "name": "dirent"
+          }
+        }
+      },
+      "meson_options": {
+        "-Daudio_drv_list": "dsound",
+        "-Ddsound": "enabled",
+        "-Dvhost_net": "enabled",
+        "-Dvsenv": "false",
+        "-Dwhpx": "enabled"
+      },
+      "generated_files": [
+        {
+          "filename": "config-host.mak",
+          "content": {
+            "windows-aarch64": {
+              "EXESUF": ".exe"
+            }
+          }
+        }
+      ],
+      "bazel_prefix": "load(\"@goldfish_build//rules:windows_resources.bzl\", \"windows_manifest_resource\", \"windows_resources\")\nwindows_manifest_resource(name = \"qemu-img_manifest_rc\", binary_filename = \"qemu-img.exe\")\nwindows_manifest_resource(name = \"qemu-system-aarch64_manifest_rc\", binary_filename = \"qemu-system-aarch64.exe\")",
+      "shims": [
+        {
+          "target": "qemu-img",
+          "shims": {
+            "+deps": [
+              ":qemu-img_manifest_rc"
+            ]
+          }
+        },
+        {
+          "target": "qemu-system-aarch64",
+          "shims": {
+            "+deps": [
+              ":qemu-system-aarch64_manifest_rc"
+            ],
+            "win_def_file": "google/build/qemu-system-aarch64.def"
+          }
+        },
+        {
+          "target": "qemu-system-x86_64",
+          "shims": {
             "win_def_file": "google/build/qemu-system-x86_64.def"
           }
         },

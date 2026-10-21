@@ -42,7 +42,10 @@ cc_library(
         "platform/linux",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//google/compat/linux:compat"],
+    deps = select({
+        "@goldfish_build//platforms:is_linux_x64": ["//google/compat/linux:compat"],
+        "//conditions:default": [],
+    }),
     alwayslink = True,
 )
 
@@ -73,8 +76,10 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "vhost-user",
-        "//google/compat/linux:compat",
         "@glib//glib:glib_import",
         "@glib//gmodule:gmodule_import",
-    ],
+    ] + select({
+        "@goldfish_build//platforms:is_linux_x64": ["//google/compat/linux:compat"],
+        "//conditions:default": [],
+    }),
 )
