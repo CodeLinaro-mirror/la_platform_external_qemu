@@ -307,12 +307,21 @@ struct MemoryRegionInfo {
 };
 
 struct rutabaga;
+struct virtio_gpu_rutabaga_async_signaled_fence;
 
 struct VirtIOGPURutabaga {
     VirtIOGPU parent_obj;
     struct VMChangeStateEntry* vm_state_entry;
     struct MemoryRegionInfo memory_regions[MAX_SLOTS];
     QTAILQ_HEAD(, virtio_gpu_rutabaga_context) contexts;
+    /*
+     * Fences the renderer has signaled (pushed from its own worker threads)
+     * but that the main loop has not yet matched against g->fenceq and
+     * delivered to the guest.
+     */
+    QSLIST_HEAD(, virtio_gpu_rutabaga_async_signaled_fence)
+        async_signaled_fenceq;
+    QEMUBH *async_signaled_fence_bh;
     uint64_t capset_mask;
     char *wayland_socket_path;
     char *wsi;

@@ -25,7 +25,8 @@
  *         (see virtio_gpu_rutabaga_renderer_dir()); the per-save
  *         "rutabaga-<timestamp>" id string is no longer part of the stream.
  */
-#define VIRTIO_GPU_RUTABAGA_VM_VERSION 2
+/* 2 -> 3: in-flight fenced commands follow the resource list. */
+#define VIRTIO_GPU_RUTABAGA_VM_VERSION 3
 
 #define CHECK(condition, cmd)                                                 \
     do {                                                                      \
@@ -37,9 +38,9 @@
        }                                                                      \
     } while (0)
 
-struct rutabaga_aio_data {
-    struct VirtIOGPURutabaga *vr;
+struct virtio_gpu_rutabaga_async_signaled_fence {
     struct rutabaga_fence fence;
+    QSLIST_ENTRY(virtio_gpu_rutabaga_async_signaled_fence) next;
 };
 
 static void
@@ -1041,64 +1042,126 @@ virtio_gpu_rutabaga_process_cmd(VirtIOGPU *g,
     CHECK(!result, cmd);
 }
 
-static void
-virtio_gpu_rutabaga_aio_cb(void *opaque)
+static bool
+rutabaga_fence_matches_cmd(const struct virtio_gpu_ctrl_command *cmd,
+                           const struct rutabaga_fence *fence)
 {
-    struct rutabaga_aio_data *data = opaque;
-    VirtIOGPU *g = VIRTIO_GPU(data->vr);
-    struct rutabaga_fence fence_data = data->fence;
+    uint32_t signaled_ctx_specific = fence->flags & RUTABAGA_FLAG_INFO_RING_IDX;
+    uint32_t target_ctx_specific = cmd->cmd_hdr.flags & RUTABAGA_FLAG_INFO_RING_IDX;
+
+    /* Due to context specific timelines. */
+    if (signaled_ctx_specific != target_ctx_specific) {
+        return false;
+    }
+    /*
+     * Context specific timelines are per (ctx_id, ring_idx). Fence ids
+     * are allocated from a single guest-wide counter, so a completion
+     * from one context must not retire the pending fences of another.
+     */
+    if (signaled_ctx_specific &&
+        (cmd->cmd_hdr.ring_idx != fence->ring_idx ||
+         cmd->cmd_hdr.ctx_id != fence->ctx_id)) {
+        return false;
+    }
+    return cmd->cmd_hdr.fence_id <= fence->fence_id;
+}
+
+static void
+rutabaga_retire_matching_fences(VirtIOGPU *g,
+                                const struct rutabaga_fence *fence)
+{
     struct virtio_gpu_ctrl_command *cmd, *tmp;
 
-    uint32_t signaled_ctx_specific = fence_data.flags &
-                                     RUTABAGA_FLAG_INFO_RING_IDX;
-
     QTAILQ_FOREACH_SAFE(cmd, &g->fenceq, next, tmp) {
-        /*
-         * Due to context specific timelines.
-         */
-        uint32_t target_ctx_specific = cmd->cmd_hdr.flags &
-                                       RUTABAGA_FLAG_INFO_RING_IDX;
-
-        if (signaled_ctx_specific != target_ctx_specific) {
+        if (!rutabaga_fence_matches_cmd(cmd, fence)) {
             continue;
         }
-
-        if (signaled_ctx_specific &&
-           (cmd->cmd_hdr.ring_idx != fence_data.ring_idx)) {
-            continue;
-        }
-
-        /*
-         * Context specific timelines are per (ctx_id, ring_idx). Fence ids
-         * are allocated from a single guest-wide counter, so a completion
-         * from one context must not retire the pending fences of another.
-         */
-        if (signaled_ctx_specific &&
-           (cmd->cmd_hdr.ctx_id != fence_data.ctx_id)) {
-            continue;
-        }
-
-        if (cmd->cmd_hdr.fence_id > fence_data.fence_id) {
-            continue;
-        }
-
         trace_virtio_gpu_fence_resp(cmd->cmd_hdr.fence_id);
         virtio_gpu_ctrl_response_nodata(g, cmd, VIRTIO_GPU_RESP_OK_NODATA);
         QTAILQ_REMOVE(&g->fenceq, cmd, next);
         g_free(cmd);
         g->inflight--;
     }
+}
 
-    g_free(data);
+/*
+ * Fences the backend has signaled (from its own worker threads) sit in
+ * vgr->async_signaled_fenceq until the main thread does one of two things:
+ *
+ *  - CONSUME (rutabaga_process_async_signaled_fences): match each one
+ *    against g->fenceq and answer the guest's commands.  Used while a
+ *    session is live: from async_signaled_fence_bh in normal operation, and
+ *    directly from virtio_gpu_rutabaga_wait_for_idle() during a snapshot save.
+ *
+ *  - DISCARD (virtio_gpu_rutabaga_discard_async_signaled_fences): free them
+ *    without answering anything.  Used at reset / load boundaries, where the
+ *    commands they refer to are being thrown away and acting on them would
+ *    retire the next session's fences (b/575541006).
+ *
+ * Both run on the main thread with the BQL held, which is also the only
+ * thread that dispatches async_signaled_fence_bh (it lives on the main
+ * AioContext), so neither can race the bottom half.  The only other party is
+ * virtio_gpu_rutabaga_fence_cb() on the renderer's worker threads, which is
+ * why the queue uses the atomic QSLIST operations.
+ */
+static void
+rutabaga_process_async_signaled_fences(VirtIOGPU *g)
+{
+    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
+    QSLIST_HEAD(, virtio_gpu_rutabaga_async_signaled_fence) drained_fences;
+
+    assert(bql_locked());
+    QSLIST_MOVE_ATOMIC(&drained_fences, &vgr->async_signaled_fenceq);
+
+    while (!QSLIST_EMPTY(&drained_fences)) {
+        struct virtio_gpu_rutabaga_async_signaled_fence *f =
+            QSLIST_FIRST(&drained_fences);
+        QSLIST_REMOVE_HEAD(&drained_fences, next);
+        rutabaga_retire_matching_fences(g, &f->fence);
+        g_free(f);
+    }
+}
+
+static void
+virtio_gpu_rutabaga_async_signaled_fence_bh(void *opaque)
+{
+    rutabaga_process_async_signaled_fences(VIRTIO_GPU(opaque));
+}
+
+/*
+ * Discards all pending signaled-fence entries (without answering the guest)
+ * and cancels the bottom half.  Instant; never waits.
+ * Note: if backend worker threads are still running, a worker may push an
+ * entry and reschedule async_signaled_fence_bh concurrently.  Callers tearing
+ * down or restoring the backend must therefore call this again after
+ * rutabaga_finish() or rutabaga_restore() has stopped producer threads.
+ */
+static void
+virtio_gpu_rutabaga_discard_async_signaled_fences(VirtIOGPURutabaga *vgr)
+{
+    QSLIST_HEAD(, virtio_gpu_rutabaga_async_signaled_fence) discarded;
+
+    assert(bql_locked());
+    if (vgr->async_signaled_fence_bh) {
+        qemu_bh_cancel(vgr->async_signaled_fence_bh);
+    }
+    QSLIST_MOVE_ATOMIC(&discarded, &vgr->async_signaled_fenceq);
+
+    while (!QSLIST_EMPTY(&discarded)) {
+        struct virtio_gpu_rutabaga_async_signaled_fence *f =
+            QSLIST_FIRST(&discarded);
+        QSLIST_REMOVE_HEAD(&discarded, next);
+        g_free(f);
+    }
 }
 
 static void
 virtio_gpu_rutabaga_fence_cb(uint64_t user_data,
                              const struct rutabaga_fence *fence)
 {
-    struct rutabaga_aio_data *data;
     VirtIOGPU *g = (VirtIOGPU *)user_data;
-    VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
+    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
+    struct virtio_gpu_rutabaga_async_signaled_fence *entry;
 
     /*
      * gfxstream and both cross-domain (and even newer versions virglrenderer:
@@ -1113,16 +1176,14 @@ virtio_gpu_rutabaga_fence_cb(uint64_t user_data,
      *
      * The reason is QEMU's internal locking is designed to work with QEMU
      * threads (see rcu_register_thread()) and not generic C/C++/Rust threads.
-     * For now, we can workaround this by scheduling the return of the
-     * fence descriptors on the main thread.
+     * So queue the completion and hand it to the main thread through a
+     * bottom half the device owns, which the main thread can drain, cancel or
+     * discard as a unit.
      */
-
-    data = g_new0(struct rutabaga_aio_data, 1);
-    data->vr = vr;
-    data->fence = *fence;
-    aio_bh_schedule_oneshot(qemu_get_aio_context(),
-                            virtio_gpu_rutabaga_aio_cb,
-                            data);
+    entry = g_new0(struct virtio_gpu_rutabaga_async_signaled_fence, 1);
+    entry->fence = *fence;
+    QSLIST_INSERT_HEAD_ATOMIC(&vgr->async_signaled_fenceq, entry, next);
+    qemu_bh_schedule(vgr->async_signaled_fence_bh);
 }
 
 static void
@@ -1302,19 +1363,34 @@ static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
     uint32_t num_capsets;
     VirtIOGPUBase *bdev = VIRTIO_GPU_BASE(qdev);
     VirtIOGPU *gpudev = VIRTIO_GPU(qdev);
-    VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(qdev);
+    VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(qdev);
+    Error *local_err = NULL;
 
 #if HOST_BIG_ENDIAN
     error_setg(errp, "rutabaga is not supported on bigendian platforms");
     return;
 #endif
 
+    QSLIST_INIT(&vr->async_signaled_fenceq);
+    /*
+     * The fence BH must live on the main AioContext, not the iohandler
+     * context that virtio_bh_io_new_guarded() uses for ctrl_bh/cursor_bh.
+     * virtio_gpu_rutabaga_wait_for_idle() spins in
+     * aio_poll(qemu_get_aio_context()), which never dispatches the iohandler
+     * context; a BH there would stay pending for the whole wait, the queue
+     * would never empty and every save with an in-flight fence would hit the
+     * timeout + force-retire path.  virtio_bh_new_guarded() keeps the
+     * transport's reentrancy guard.
+     */
+    vr->async_signaled_fence_bh = virtio_bh_new_guarded(
+        qdev, virtio_gpu_rutabaga_async_signaled_fence_bh, gpudev);
+
     if (!virtio_gpu_rutabaga_init(gpudev, errp)) {
-        return;
+        goto err_bh;
     }
 
     if (!virtio_gpu_rutabaga_get_num_capsets(gpudev, &num_capsets, errp)) {
-        return;
+        goto err_rutabaga;
     }
 
     bdev->conf.flags |= (1 << VIRTIO_GPU_FLAG_RUTABAGA_ENABLED);
@@ -1322,10 +1398,48 @@ static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
     bdev->conf.flags |= (1 << VIRTIO_GPU_FLAG_CONTEXT_INIT_ENABLED);
 
     bdev->virtio_config.num_capsets = num_capsets;
-    virtio_gpu_device_realize(qdev, errp);
+    virtio_gpu_device_realize(qdev, &local_err);
+    if (local_err) {
+        error_propagate(errp, local_err);
+        goto err_rutabaga;
+    }
 
     vr->vm_state_entry = qemu_add_vm_change_state_handler(
         virtio_gpu_rutabaga_vm_state_change, gpudev);
+    return;
+
+err_rutabaga:
+    rutabaga_finish(&vr->rutabaga);
+    virtio_gpu_rutabaga_discard_async_signaled_fences(vr);
+err_bh:
+    g_clear_pointer(&vr->async_signaled_fence_bh, qemu_bh_delete);
+}
+
+static void virtio_gpu_rutabaga_unrealize(DeviceState *qdev)
+{
+    VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(qdev);
+    /*
+     * Resolve against TYPE_VIRTIO_GPU statically rather than the dynamic class
+     * of qdev so any future subclass of TYPE_VIRTIO_GPU_RUTABAGA does not
+     * recurse back into virtio_gpu_rutabaga_unrealize.
+     */
+    VirtioDeviceClass *parent_vdc =
+        VIRTIO_DEVICE_CLASS(object_class_by_name(TYPE_VIRTIO_GPU));
+
+    if (vr->vm_state_entry) {
+        qemu_del_vm_change_state_handler(vr->vm_state_entry);
+        vr->vm_state_entry = NULL;
+    }
+    if (vr->rutabaga) {
+        rutabaga_finish(&vr->rutabaga);
+    }
+    /* rutabaga_finish() joined the worker threads: nothing can be queued now. */
+    virtio_gpu_rutabaga_discard_async_signaled_fences(vr);
+    g_clear_pointer(&vr->async_signaled_fence_bh, qemu_bh_delete);
+
+    if (parent_vdc->unrealize) {
+        parent_vdc->unrealize(qdev);
+    }
 }
 
 static const Property virtio_gpu_rutabaga_properties[] = {
@@ -1377,12 +1491,21 @@ static const VMStateDescription vmstate_virtio_gpu_scanouts = {
             VMSTATE_END_OF_LIST()},
 };
 
-static bool virtio_gpu_rutabaga_has_guest_state(VirtIOGPURutabaga *vgr) {
+static bool virtio_gpu_rutabaga_instance_in_use(VirtIOGPURutabaga *vgr)
+{
+    /*
+     * True if the guest has put anything into the current rutabaga instance:
+     * contexts, resources, mapped blobs, or work that is queued or completed
+     * but not yet delivered.  Reset uses the answer (captured *before* the
+     * parent reset empties these lists) to decide whether the instance must
+     * be torn down and recreated rather than reused.
+     */
     VirtIOGPU *g = &(vgr->parent_obj);
-    if (!QTAILQ_EMPTY(&vgr->contexts)) {
-        return true;
-    }
-    if (!QTAILQ_EMPTY(&g->reslist)) {
+    if (!QTAILQ_EMPTY(&vgr->contexts) ||
+        !QTAILQ_EMPTY(&g->reslist) ||
+        !QTAILQ_EMPTY(&g->cmdq) ||
+        !QTAILQ_EMPTY(&g->fenceq) ||
+        !QSLIST_EMPTY(&vgr->async_signaled_fenceq)) {
         return true;
     }
     for (int slot = 0; slot < MAX_SLOTS; slot++) {
@@ -1393,12 +1516,21 @@ static bool virtio_gpu_rutabaga_has_guest_state(VirtIOGPURutabaga *vgr) {
     return false;
 }
 
-static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
+/*
+ * `was_in_use` is virtio_gpu_rutabaga_instance_in_use() sampled by the caller
+ * *before* virtio_gpu_reset() emptied the lists it looks at; an instance that
+ * ran guest work must be recreated so that no late fence signal from its
+ * worker threads can reach the next session.
+ */
+static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g, bool was_in_use)
+{
     VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
+    struct virtio_gpu_rutabaga_context *ctx, *next_ctx;
+    Error *local_err = NULL;
     int slot;
 
-    if (vgr->rutabaga && !virtio_gpu_rutabaga_has_guest_state(vgr)) {
+    if (vgr->rutabaga && !was_in_use) {
         return;
     }
 
@@ -1418,7 +1550,6 @@ static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
     }
     memory_region_transaction_commit();
 
-    struct virtio_gpu_rutabaga_context *ctx, *next_ctx;
     QTAILQ_FOREACH_SAFE(ctx, &vgr->contexts, next, next_ctx) {
         struct virtio_gpu_rutabaga_resource *res, *next_res;
         QTAILQ_FOREACH_SAFE(res, &ctx->reslist, next, next_res) {
@@ -1430,7 +1561,8 @@ static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g) {
     }
 
     rutabaga_finish(&vgr->rutabaga);
-    Error *local_err = NULL;
+    /* Drop any fence completions emitted while rutabaga_finish tore down workers. */
+    virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
     if (!virtio_gpu_rutabaga_init(g, &local_err)) {
         error_report_err(local_err);
     }
@@ -1469,6 +1601,84 @@ static char *virtio_gpu_rutabaga_renderer_dir(VirtIOGPURutabaga *vgr,
                             "renderer", NULL);
 }
 
+/*
+ * Fenced commands the renderer had not signaled when the VM stopped.  They
+ * travel with the snapshot as virtqueue elements, exactly like virtio-snd
+ * carries its in-flight buffers, so the guest-visible ring state and the
+ * device agree without answering anything on the guest's behalf at save
+ * time.  The renderer snapshot taken just before waits for the GPU itself,
+ * so by the time the snapshot is on disk the work behind these fences is
+ * complete; on load they are completed from virtio_gpu_post_load().
+ */
+static void virtio_gpu_rutabaga_save_inflight_fences(QEMUFile *f, VirtIOGPU *g)
+{
+    VirtIODevice *vdev = VIRTIO_DEVICE(g);
+    struct virtio_gpu_ctrl_command *cmd;
+
+    qemu_put_be32(f, g->inflight);
+    QTAILQ_FOREACH(cmd, &g->fenceq, next) {
+        qemu_put_virtqueue_element(vdev, f, &cmd->elem);
+        qemu_put_be32(f, cmd->cmd_hdr.type);
+        qemu_put_be32(f, cmd->cmd_hdr.flags);
+        qemu_put_be64(f, cmd->cmd_hdr.fence_id);
+        qemu_put_be32(f, cmd->cmd_hdr.ctx_id);
+        qemu_put_byte(f, cmd->cmd_hdr.ring_idx);
+    }
+    if (g->inflight) {
+        warn_report("virtio-gpu-rutabaga: %u fence(s) still in flight at save; "
+                    "they will be completed on load", g->inflight);
+    }
+}
+
+static int virtio_gpu_rutabaga_load_inflight_fences(QEMUFile *f, VirtIOGPU *g)
+{
+    VirtIODevice *vdev = VIRTIO_DEVICE(g);
+    uint32_t n = qemu_get_be32(f);
+
+    if (n > VIRTQUEUE_MAX_SIZE) {
+        error_report("%s: implausible in-flight fence count %u", __func__, n);
+        return -EINVAL;
+    }
+    for (; n; --n) {
+        struct virtio_gpu_ctrl_command *cmd =
+            qemu_get_virtqueue_element(vdev, f, sizeof(*cmd));
+        if (!cmd) {
+            error_report("%s: failed to read an in-flight fenced command",
+                         __func__);
+            return -EINVAL;
+        }
+        cmd->vq = g->ctrl_vq;
+        cmd->error = 0;
+        cmd->finished = false;
+        cmd->cmd_hdr.type = qemu_get_be32(f);
+        cmd->cmd_hdr.flags = qemu_get_be32(f);
+        cmd->cmd_hdr.fence_id = qemu_get_be64(f);
+        cmd->cmd_hdr.ctx_id = qemu_get_be32(f);
+        cmd->cmd_hdr.ring_idx = qemu_get_byte(f);
+        QTAILQ_INSERT_TAIL(&g->fenceq, cmd, next);
+        g->inflight++;
+    }
+    return 0;
+}
+
+/*
+ * Answers every fence restored by virtio_gpu_rutabaga_load_inflight_fences():
+ * the renderer snapshot they were saved with was taken after the GPU went
+ * idle, so their work is done.
+ */
+static void virtio_gpu_rutabaga_complete_restored_fences(VirtIOGPU *g)
+{
+    struct virtio_gpu_ctrl_command *cmd, *tmp;
+
+    QTAILQ_FOREACH_SAFE(cmd, &g->fenceq, next, tmp) {
+        trace_virtio_gpu_fence_resp(cmd->cmd_hdr.fence_id);
+        virtio_gpu_ctrl_response_nodata(g, cmd, VIRTIO_GPU_RESP_OK_NODATA);
+        QTAILQ_REMOVE(&g->fenceq, cmd, next);
+        g_free(cmd);
+        g->inflight--;
+    }
+}
+
 static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
                            const VMStateField *field) {
     VirtIOGPURutabaga *vgr = opaque;
@@ -1483,6 +1693,12 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
         return -EINVAL;
     }
 
+    /*
+     * Drop whatever the pre-restore session still had queued before the
+     * restored renderer can start signaling; nothing it emits afterwards
+     * may be thrown away.
+     */
+    virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
     if (rutabaga_restore(vgr->rutabaga, renderer_dir)) {
         error_report("failed to restore rutabaga from %s", renderer_dir);
         return -EINVAL;
@@ -1548,6 +1764,10 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
 
         QTAILQ_INSERT_HEAD(&g->reslist, res, next);
         resource_id = qemu_get_be32(f);
+    }
+
+    if (virtio_gpu_rutabaga_load_inflight_fences(f, g)) {
+        return -EINVAL;
     }
 
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
@@ -1717,6 +1937,8 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
         }
     }
     qemu_put_be32(f, 0); /* end of list */
+
+    virtio_gpu_rutabaga_save_inflight_fences(f, g);
 
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     for (i = 0; i < vb->conf.max_outputs; i++) {
@@ -1989,51 +2211,75 @@ static int rutabaga_restore_scanout_surfaces(VirtIOGPU *g)
     return 0;
 }
 
-#define VIRTIO_GPU_RUTABAGA_DRAIN_TIMEOUT_MS 5000
+#define VIRTIO_GPU_RUTABAGA_IDLE_TIMEOUT_MS 5000
 
-static void virtio_gpu_rutabaga_drain_wakeup(void* opaque) {
+static void virtio_gpu_rutabaga_wait_for_idle_wakeup(void *opaque)
+{
 }
 
-static void virtio_gpu_rutabaga_drain_for_save(VirtIOGPU* g) {
-  VirtIOGPUClass* vgc = VIRTIO_GPU_GET_CLASS(g);
-  AioContext* ctx = qemu_get_aio_context();
-  struct virtio_gpu_ctrl_command* cmd;
-  QEMUTimer wakeup;
-  unsigned int n;
-  int64_t deadline = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) +
-                     VIRTIO_GPU_RUTABAGA_DRAIN_TIMEOUT_MS;
+/*
+ * Wait (up to VIRTIO_GPU_RUTABAGA_IDLE_TIMEOUT_MS) until the device has no
+ * work in flight: g->cmdq, g->fenceq and vgr->async_signaled_fenceq all
+ * empty.  Runs the main loop and CONSUMES completions while waiting --
+ * nothing is thrown away.  Called from the vm_state_change handler once the
+ * vCPUs are stopped.
+ *
+ * On timeout the fences still in g->fenceq are left alone: a save carries
+ * them in the snapshot (virtio_gpu_rutabaga_save_inflight_fences) and
+ * completes them on load, and a plain pause or shutdown lets the renderer
+ * finish them when the VM resumes.
+ */
+static void virtio_gpu_rutabaga_wait_for_idle(VirtIOGPU *g)
+{
+    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
+    VirtIOGPUClass *vgc = VIRTIO_GPU_GET_CLASS(g);
+    AioContext *ctx = qemu_get_aio_context();
+    QEMUTimer wakeup;
+    int64_t deadline = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) +
+                       VIRTIO_GPU_RUTABAGA_IDLE_TIMEOUT_MS;
 
-  // since vCPU stopped, pop all the commands off vq
-  vgc->handle_ctrl(VIRTIO_DEVICE(g), g->ctrl_vq);
+    /* Since vCPU stopped, pop all remaining commands off ctrl_vq. */
+    vgc->handle_ctrl(VIRTIO_DEVICE(g), g->ctrl_vq);
+    /* Retire anything the backend already completed, without waiting for the BH. */
+    rutabaga_process_async_signaled_fences(g);
 
-  if (QTAILQ_EMPTY(&g->fenceq) && QTAILQ_EMPTY(&g->cmdq)) {
-      return;
-  }
+    if (QTAILQ_EMPTY(&g->fenceq) && QTAILQ_EMPTY(&g->cmdq) &&
+        QSLIST_EMPTY(&vgr->async_signaled_fenceq)) {
+        return;
+    }
 
-  aio_timer_init(ctx, &wakeup, QEMU_CLOCK_REALTIME, SCALE_MS,
-          virtio_gpu_rutabaga_drain_wakeup, NULL);
-  timer_mod(&wakeup, deadline);
+    aio_timer_init(ctx, &wakeup, QEMU_CLOCK_REALTIME, SCALE_MS,
+                   virtio_gpu_rutabaga_wait_for_idle_wakeup, NULL);
+    timer_mod(&wakeup, deadline);
 
-  while (!QTAILQ_EMPTY(&g->fenceq) || !QTAILQ_EMPTY(&g->cmdq)) {
-      if (qemu_clock_get_ms(QEMU_CLOCK_REALTIME) >= deadline) {
-          warn_report( "virtio-gpu-rutabaga: drain timed out; and the restored guest may ANR.");
-          break;
-      }
-      aio_poll(ctx, true);
-      virtio_gpu_process_cmdq(g);
-  }
+    while (!QTAILQ_EMPTY(&g->fenceq) || !QTAILQ_EMPTY(&g->cmdq) ||
+           !QSLIST_EMPTY(&vgr->async_signaled_fenceq)) {
+        if (qemu_clock_get_ms(QEMU_CLOCK_REALTIME) >= deadline) {
+            warn_report("virtio-gpu-rutabaga: wait-for-idle timed out with "
+                        "%u fence(s) in flight", g->inflight);
+            break;
+        }
+        aio_poll(ctx, true);
+        /*
+         * Do not rely on async_signaled_fence_bh having run inside
+         * aio_poll(): retire signaled fences directly so the loop
+         * terminates as soon as the backend is done.
+         */
+        rutabaga_process_async_signaled_fences(g);
+        virtio_gpu_process_cmdq(g);
+    }
 
-  timer_del(&wakeup);
-
+    timer_del(&wakeup);
 }
 
-static void virtio_gpu_rutabaga_vm_state_change(void* opaque, bool running,
-                                                RunState state) {
-  if (!running &&
-      (state == RUN_STATE_SAVE_VM || state == RUN_STATE_FINISH_MIGRATE ||
-       state == RUN_STATE_SHUTDOWN || state == RUN_STATE_PAUSED)) {
-    virtio_gpu_rutabaga_drain_for_save(VIRTIO_GPU(opaque));
-  }
+static void virtio_gpu_rutabaga_vm_state_change(void *opaque, bool running,
+                                                RunState state)
+{
+    if (!running &&
+        (state == RUN_STATE_SAVE_VM || state == RUN_STATE_FINISH_MIGRATE ||
+         state == RUN_STATE_SHUTDOWN || state == RUN_STATE_PAUSED)) {
+        virtio_gpu_rutabaga_wait_for_idle(VIRTIO_GPU(opaque));
+    }
 }
 
 static int virtio_gpu_pre_load(void* opaque) {
@@ -2043,6 +2289,9 @@ static int virtio_gpu_pre_load(void* opaque) {
   VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(g);
 
   int slot;
+
+  /* Signals from the session being replaced must not reach the restored one. */
+  virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
 
   // Use a transaction to bundle the cleanup operations
   memory_region_transaction_begin();
@@ -2103,6 +2352,8 @@ static int virtio_gpu_post_load(void *opaque, int version_id)
     if (ret != 0) {
         return ret;
     }
+
+    virtio_gpu_rutabaga_complete_restored_fences(g);
 
     /*
      * Re-kick both queues so commands that were still in the vrings at save
@@ -2198,9 +2449,22 @@ static const VMStateDescription vmstate_virtio_gpu_rutabaga = {
 static void virtio_gpu_rutabaga_reset(VirtIODevice *vdev)
 {
     VirtIOGPU *g = VIRTIO_GPU(vdev);
+    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
+    bool was_in_use;
 
+    /*
+     * Decide whether the renderer must be recreated before virtio_gpu_reset()
+     * empties the lists that answer the question.
+     */
+    was_in_use = virtio_gpu_rutabaga_instance_in_use(vgr);
+    /*
+     * Signals for commands the reset is about to throw away must not retire
+     * the next session's fences.  reset_state() discards again after
+     * rutabaga_finish() has stopped the producer threads.
+     */
+    virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
     virtio_gpu_reset(vdev);
-    virtio_gpu_rutabaga_reset_state(g);
+    virtio_gpu_rutabaga_reset_state(g, was_in_use);
 }
 
 static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
@@ -2217,6 +2481,7 @@ static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
     vgc->update_cursor_data = virtio_gpu_rutabaga_update_cursor;
     vgc->resource_destroy = virtio_gpu_rutabaga_resource_unref;
     vdc->realize = virtio_gpu_rutabaga_realize;
+    vdc->unrealize = virtio_gpu_rutabaga_unrealize;
     vdc->reset = virtio_gpu_rutabaga_reset;
     dc->vmsd = &vmstate_virtio_gpu_rutabaga;
     device_class_set_props(dc, virtio_gpu_rutabaga_properties);
