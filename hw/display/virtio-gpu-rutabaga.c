@@ -184,9 +184,7 @@ virtio_gpu_rutabaga_resource_unref(VirtIOGPU *g,
         }
     }
 
-    if (res->image) {
-        pixman_image_unref(res->image);
-    }
+    g_clear_pointer(&res->image, pixman_image_unref);
 
     QTAILQ_REMOVE(&g->reslist, res, next);
     g_free(res);
@@ -355,6 +353,13 @@ rutabaga_cmd_resource_flush(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
 
     res = virtio_gpu_find_resource(g, rf.resource_id);
     CHECK(res, cmd);
+    /*
+     * res->image is created lazily by SET_SCANOUT.  A flush of a resource
+     * that was never shown on a scanout is legal and has nothing to update.
+     */
+    if (!res->image) {
+        return;
+    }
 
     for (i = 0; i < vb->conf.max_outputs; i++) {
         scanout = &vb->scanout[i];
@@ -420,7 +425,6 @@ rutabaga_cmd_set_scanout(VirtIOGPU *g, struct virtio_gpu_ctrl_command *cmd)
                                               res->height,
                                               NULL, 0);
         CHECK(res->image, cmd);
-        pixman_image_ref(res->image);
     }
 
     vb->enable = 1;
