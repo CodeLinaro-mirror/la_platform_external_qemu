@@ -342,7 +342,7 @@ VER_EXPORT bool ver_render_view_cache_is_valid_for(VerRenderViewHandle view,
  * @param outHeight The height of the image.
  * @param outFormatBpp The bit per pixel of the image.
  * @param outBuffer The data of the image.
- * @return true if image loaded successfull, false otherwise.
+ * @return true if image loaded successful, false otherwise.
  */
 VER_EXPORT bool ver_texture_utils_load_png(const char* filename,
                                            int* outWidth,

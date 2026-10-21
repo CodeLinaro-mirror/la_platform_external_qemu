@@ -180,8 +180,16 @@ static bool parseQemuOptForQcow2(bool wipeData) {
         }
 
         Error* img_creation_error = NULL;
+        // userdata, sdcard and encrypt (/metadata, which holds the userdata
+        // key) are AVD-local, so keep them across a system image update.
+        // The recreated overlays have no default_boot, so the old quickboot
+        // snapshot can't load.
+        const bool keep_on_sysimg_update =
+                !strcmp(images[p].drive, "userdata") ||
+                !strcmp(images[p].drive, "sdcard") ||
+                !strcmp(images[p].drive, "encrypt");
         if (!path_exists(qcow2_image_path) || wipeData ||
-            reset_version_number_cache) {
+            (reset_version_number_cache && !keep_on_sysimg_update)) {
             const char* fmt = "raw";
             uint8_t buf[BLOCK_PROBE_BUF_SIZE];
             BlockDriver* drv;
