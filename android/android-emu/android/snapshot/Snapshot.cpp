@@ -52,6 +52,7 @@
 #include "host-common/window_agent.h"   // for QAndroidEmulato...
 #include "host-common/FeatureControl.h"    // for getEnabled, isE...
 #include "host-common/Features.h"          // for Feature, AllowS...
+#include "render-utils/snapshot_operations.h"  // for kFramebufferSnapshotVersion
 #include "host-common/opengl/emugl_config.h"              // for emuglConfig_get...
 #include "android/opengl/gpuinfo.h"                   // for GpuInfo, global...
 #include "android/protobuf/LoadSave.h"                // for ProtobufSaveResult
@@ -425,9 +426,32 @@ struct {
          avdInfo_getEncryptionKeyImagePath},
 };
 
-// Calculate snapshot version based on a base version plus featurecontrol-derived integer.
-static constexpr int kVersionBase = 87;
-static_assert(kVersionBase < (1 << 20), "Base version number is too high.");
+// Snapshot version stored in snapshot.pb and checked in isVersionCompatible()
+// before any VM state is loaded. Layout of the 32-bit value:
+//
+//   [30..22]  gfxstream framebuffer snapshot version
+//             (gfxstream::kFramebufferSnapshotVersion, 9 bits; bit 31 is
+//             left clear because snapshot.proto stores this as int32)
+//   [21..10]  kVersionBase, the emulator's own format version (12 bits)
+//   [ 9.. 0]  number of registered feature-control flags (10 bits)
+//
+// Folding the gfxstream version in here means that whenever gfxstream changes
+// its framebuffer stream format, snapshots written with the previous format
+// are rejected up front and the emulator falls back to a cold boot. Without
+// this, the mismatch is only detected inside FrameBuffer::onLoad(), after
+// guest RAM and device state have already been restored, where it is fatal
+// (b/568423542).
+//
+// Bump kVersionBase for incompatible changes on the emulator side.
+// History:
+//   87 -> 88: gfxstream framebuffer version moved into bits [30..22].
+static constexpr int kVersionBase = 88;
+static_assert(kVersionBase < (1 << 12), "Base version number is too high.");
+
+static constexpr int kGfxstreamVersion =
+        static_cast<int>(gfxstream::kFramebufferSnapshotVersion);
+static_assert(kGfxstreamVersion > 0 && kGfxstreamVersion < (1 << 9),
+              "gfxstream framebuffer snapshot version does not fit in 9 bits.");
 
 #define FEATURE_CONTROL_ITEM(item, idx) + 1
 
@@ -441,7 +465,9 @@ static constexpr int kFeatureOffset = 0
 
 static_assert(kFeatureOffset < 1024, "Too many features to include in the feature "
                                      "offset component of the snapshot version");
-static constexpr int kVersion = (kVersionBase << 10) + kFeatureOffset;
+static constexpr int kVersion = (kGfxstreamVersion << 22) |
+                                (kVersionBase << 10) | kFeatureOffset;
+static_assert(kVersion > 0, "Snapshot version must be a positive int32.");
 
 static constexpr int kMaxSaveStatsHistory = 10;
 

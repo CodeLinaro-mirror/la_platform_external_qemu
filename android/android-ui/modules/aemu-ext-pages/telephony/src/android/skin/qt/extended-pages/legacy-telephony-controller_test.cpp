@@ -155,11 +155,19 @@ TEST_F(LegacyTelephonyControllerTest, UnholdCallSuccess) {
 
 TEST_F(LegacyTelephonyControllerTest, SendSmsErrorNoModem) {
     TelephonyResponseStatus status = TelephonyResponseStatus::OK;
-    // getModem is nullptr in SetUp
+    // getModem is nullptr in SetUp, so it fails immediately before scheduling.
     mController->sendSmsAsync("555", "hello", [&](auto s) { status = s; });
-    // pumpLooper not needed as it fails immediately before looper in this
-    // implementation Wait, check implementation - sendSms is NOT scheduled on
-    // main looper currently.
+    EXPECT_EQ(status, TelephonyResponseStatus::ERROR);
+}
+
+TEST_F(LegacyTelephonyControllerTest, SendSmsErrorNullModemOnMainLooper) {
+    TelephonyResponseStatus status = TelephonyResponseStatus::OK;
+    mAgent.getModem = []() -> AModem { return nullptr; };
+
+    mController->sendSmsAsync("555", "hello", [&](auto s) { status = s; });
+    // Should not have executed before pumping the main looper.
+    EXPECT_EQ(status, TelephonyResponseStatus::OK);
+    pumpLooper();
     EXPECT_EQ(status, TelephonyResponseStatus::ERROR);
 }
 

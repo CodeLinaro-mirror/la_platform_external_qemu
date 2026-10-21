@@ -11,6 +11,7 @@
 */
 #include "android/avd/info.h"
 
+#include "android/utils/ini.h"
 #include "host-common/constants.h"
 #include "host-common/hw-config-helper.h"
 #include "android/console.h"
@@ -1023,6 +1024,8 @@ static void _avdInfo_forceGlassesConfig(AvdInfo* i) {
         }
         // Handle legacy audio glasses
         if (!iniFile_hasKey(i->configIni, "hw.displayless") &&
+            iniFile_hasKey(i->configIni, "environment.width") &&
+            iniFile_hasKey(i->configIni, "environment.height") &&
             !iniFile_hasKey(i->configIni, "hw.lcd.width") &&
             !iniFile_hasKey(i->configIni, "hw.lcd.height")) {
             write = true;
