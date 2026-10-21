@@ -1414,7 +1414,7 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
     VirtIOGPURutabaga *vgr = opaque;
     VirtIOGPU *g = &(vgr->parent_obj);
     struct virtio_gpu_simple_resource *res;
-    uint32_t resource_id, pformat;
+    uint32_t resource_id;
     int i;
     g_autofree char *renderer_dir = NULL;
 
