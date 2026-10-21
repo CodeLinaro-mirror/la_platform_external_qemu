@@ -2235,6 +2235,8 @@ bool avdInfo_skinHasOverlay(const char* skinName) {
                  strlen("pixel_9")) || /* include pixel 9, pro etc */
         !strncmp(skinName, "pixel_10",
                  strlen("pixel_10")) || /* include pixel 10, pro etc */
+        !strncmp(skinName, "pixel_11",
+                 strlen("pixel_11")) || /* include pixel 11, pro etc */
         !strncmp(skinName, "pixel_6",
                  strlen("pixel_6")) || /* include pixel 6a, 6, pro etc */
         !strncmp(skinName, "pixel_fold", strlen("pixel_fold")) ||
