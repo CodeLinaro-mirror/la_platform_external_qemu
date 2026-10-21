@@ -35,6 +35,7 @@ virtio_gpu_base_reset(VirtIOGPUBase *g)
         g->scanout[i].x = 0;
         g->scanout[i].y = 0;
         g->scanout[i].ds = NULL;
+        g->scanout[i].cursor.resource_id = 0;
     }
 }
 
