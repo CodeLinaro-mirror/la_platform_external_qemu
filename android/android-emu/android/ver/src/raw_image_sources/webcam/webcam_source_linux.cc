@@ -9,6 +9,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
+#include "aemu/base/logging/Log.h"
 #include "webcam_source.h"
 
 #include <dirent.h>
@@ -443,6 +444,9 @@ public:
             if (view.pixel_format != requested_pixel_format_) {
                 if (ConvertBufferToRGB32(view, conversion_storage_,
                                          staging_buffer_) != 0) {
+                    if (_xioctl(fd_.get(), VIDIOC_QBUF, &buf) < 0) {
+                        dwarning("VIDIOC_QBUF failed: %s", strerror(errno));
+                    }
                     return absl::InternalError("Format conversion failed");
                 }
             }

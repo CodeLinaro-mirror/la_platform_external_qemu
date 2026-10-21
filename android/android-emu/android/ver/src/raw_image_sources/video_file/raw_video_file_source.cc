@@ -219,6 +219,9 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
         int64_t target_time_us,
         std::optional<RawImageToken> token,
         std::function<absl::Status(const RawImageBufferView*)> updater) {
+    if (!mFrameCache || !mConvertedFrameCache) {
+        return absl::FailedPreconditionError("Video source is not started");
+    }
     int64_t target_time_pts = GetPtsFromUs(target_time_us);
     // If the time has not changed, we're probably paused
     paused_ = (last_update_time_us_ == target_time_us);
@@ -255,6 +258,9 @@ absl::StatusOr<std::optional<RawImageToken>> RawVideofileSource::UpdateImage(
     do {
         last_frame_pts = curr_frame_pts;
         err = decodeNextFrame();
+        if (err < 0) {
+            break;
+        }
         curr_frame_pts = mFrameCache->best_effort_timestamp;
         if (mFrameCache->best_effort_timestamp > target_time_pts ||
             mFrameCache->best_effort_timestamp == AV_NOPTS_VALUE) {

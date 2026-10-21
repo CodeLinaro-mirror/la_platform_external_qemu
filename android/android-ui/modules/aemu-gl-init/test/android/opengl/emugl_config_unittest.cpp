@@ -37,7 +37,7 @@ namespace base {
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swiftshader" // Windows redirects swangle to swiftshader
 #  define AUTO_GLES_RESULT "host"
-#  define AUTO_GLES_RESULT_35_PLUS "host"
+#  define AUTO_GLES_RESULT_37_PLUS "host"
 #elif defined(__APPLE__)
 #  define LIB_NAME(x)  "lib" x ".dylib"
 #if defined(__arm64__)
@@ -50,7 +50,7 @@ namespace base {
 #  define SWIFTSHADER_RESULT "swangle" // Mac redirects swiftshader to swangle
 #  define SWANGLE_RESULT "swangle"
 #  define AUTO_GLES_RESULT "host"
-#  define AUTO_GLES_RESULT_35_PLUS "swangle"
+#  define AUTO_GLES_RESULT_37_PLUS "swangle"
 #else
 #  define LIB_NAME(x)  "lib" x ".so"
 #  define LAVAPIPE_RESULT "lavapipe"
@@ -58,7 +58,7 @@ namespace base {
 #  define SWIFTSHADER_RESULT "swiftshader"
 #  define SWANGLE_RESULT "swangle"
 #  define AUTO_GLES_RESULT "host"
-#  define AUTO_GLES_RESULT_35_PLUS "host"
+#  define AUTO_GLES_RESULT_37_PLUS "host"
 #endif
 
 static std::string makeLibSubPath(const char* name) {
@@ -441,33 +441,7 @@ TEST(EmuglConfig, initWithEmuglConfigInitApiLevel) {
     const bool onDenyList = isHostGpuBlacklisted();
 
     {
-        // API level < 35 should use AUTO_GLES_RESULT ("host" on macOS)
-        feature_reset();
-        EmuglConfig config;
-        bool initRes = androidEmuglConfigInit(
-                &config, nullptr, "auto", false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, 34);
-        EXPECT_TRUE(initRes);
-        if (!onDenyList) {
-            EXPECT_STREQ(AUTO_GLES_RESULT, config.gles_backend);
-        }
-    }
-
-    {
-        // API level == 35 should use AUTO_GLES_RESULT_35_PLUS
-        feature_reset();
-        EmuglConfig config;
-        bool initRes = androidEmuglConfigInit(
-                &config, nullptr, "auto", false,
-                WINSYS_GLESBACKEND_PREFERENCE_AUTO, 35);
-        EXPECT_TRUE(initRes);
-        if (!onDenyList) {
-            EXPECT_STREQ(AUTO_GLES_RESULT_35_PLUS, config.gles_backend);
-        }
-    }
-
-    {
-        // API level > 35 (e.g. API 36) should use AUTO_GLES_RESULT_35_PLUS
+        // API level < 37 should use AUTO_GLES_RESULT ("host" on macOS)
         feature_reset();
         EmuglConfig config;
         bool initRes = androidEmuglConfigInit(
@@ -475,10 +449,22 @@ TEST(EmuglConfig, initWithEmuglConfigInitApiLevel) {
                 WINSYS_GLESBACKEND_PREFERENCE_AUTO, 36);
         EXPECT_TRUE(initRes);
         if (!onDenyList) {
-            EXPECT_STREQ(AUTO_GLES_RESULT_35_PLUS, config.gles_backend);
+            EXPECT_STREQ(AUTO_GLES_RESULT, config.gles_backend);
         }
     }
 
+    {
+        // API level >= 37 should use AUTO_GLES_RESULT_37_PLUS ("swangle" on macOS)
+        feature_reset();
+        EmuglConfig config;
+        bool initRes = androidEmuglConfigInit(
+                &config, nullptr, "auto", false,
+                WINSYS_GLESBACKEND_PREFERENCE_AUTO, 37);
+        EXPECT_TRUE(initRes);
+        if (!onDenyList) {
+            EXPECT_STREQ(AUTO_GLES_RESULT_37_PLUS, config.gles_backend);
+        }
+    }
 }
 
 TEST(EmuglConfig, initNoWindowWithAuto) {
