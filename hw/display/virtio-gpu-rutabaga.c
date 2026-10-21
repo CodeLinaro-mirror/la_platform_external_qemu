@@ -1721,7 +1721,35 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     for (i = 0; i < vb->conf.max_outputs; i++) {
         if (vb->scanout[i].con) {
-            DisplaySurface *surface = qemu_console_surface(vb->scanout[i].con);
+            DisplaySurface *surface;
+
+            /*
+             * Read the active scanout back from the renderer first: the
+             * console surface is only refreshed on RESOURCE_FLUSH while a
+             * window is attached, so with no window (headless CI, minimized)
+             * it would otherwise be serialized black or stale.
+             */
+            if (!vgr->headless && vb->scanout[i].resource_id) {
+                res = virtio_gpu_find_resource(g, vb->scanout[i].resource_id);
+                if (res && res->image) {
+                    struct rutabaga_transfer transfer = { 0 };
+                    struct iovec transfer_iovec;
+                    int32_t read_ret;
+
+                    rutabaga_setup_full_res_transfer(res, &transfer,
+                                                     &transfer_iovec);
+                    read_ret = rutabaga_resource_transfer_read(
+                        vgr->rutabaga, 0, vb->scanout[i].resource_id,
+                        &transfer, &transfer_iovec);
+                    if (read_ret != 0) {
+                        warn_report("%s: read-back of scanout %d resource %u "
+                                    "failed: %"PRIi32"; saving the last "
+                                    "flushed frame", __func__, i,
+                                    vb->scanout[i].resource_id, read_ret);
+                    }
+                }
+            }
+            surface = qemu_console_surface(vb->scanout[i].con);
             if (surface && surface_data(surface)) {
                 int w = surface_width(surface);
                 int h = surface_height(surface);
@@ -1852,6 +1880,115 @@ static int virtio_gpu_rutabaga_load_backing(
   return 0;
 }
 
+/*
+ * Rebuilds each scanout's display surface from its restored resource.  The
+ * generic scanout vmstate restores scanout->resource_id but not the pixman
+ * image behind it or the console surface.
+ * The saved surface pixels (if any) are copied in first so there is
+ * something to show immediately, then the renderer's contents are read back
+ * on top.
+ */
+static int rutabaga_restore_scanout_surfaces(VirtIOGPU *g)
+{
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
+    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
+
+    if (vgr->headless) {
+        return 0;
+    }
+
+    for (uint32_t i = 0; i < vb->conf.max_outputs; i++) {
+        struct virtio_gpu_scanout *scanout = &vb->scanout[i];
+        struct virtio_gpu_simple_resource *res;
+        struct rutabaga_transfer transfer = { 0 };
+        struct iovec transfer_iovec;
+        DisplaySurface *restored_ds;
+        uint8_t saved_flags;
+        int32_t read_ret;
+
+        if (scanout->resource_id == 0) {
+            continue;
+        }
+
+        res = virtio_gpu_find_resource(g, scanout->resource_id);
+        if (!res) {
+            error_report("Scanout %u references missing resource %u",
+                         i, scanout->resource_id);
+            return -EINVAL;
+        }
+
+        if (!res->image) {
+            pixman_format_code_t pformat =
+                virtio_gpu_get_pixman_format(res->format);
+            if (!pformat) {
+                error_report("Invalid pixman format %u for scanout resource %u",
+                             res->format, res->resource_id);
+                return -EINVAL;
+            }
+            res->image = pixman_image_create_bits(pformat, res->width,
+                                                  res->height, NULL, 0);
+            if (!res->image) {
+                error_report("Failed to create a %ux%u pixman image for "
+                             "scanout resource %u",
+                             res->width, res->height, res->resource_id);
+                return -EINVAL;
+            }
+        }
+
+        /* The bitmask was rebuilt when the scanout vmstate was loaded. */
+        g_assert(res->scanout_bitmask & (1u << i));
+
+        if (!scanout->con) {
+            continue;
+        }
+
+        restored_ds = qemu_console_surface(scanout->con);
+        saved_flags = restored_ds ? restored_ds->flags : 0;
+
+        if (restored_ds && surface_data(restored_ds)) {
+            if (surface_format(restored_ds) ==
+                pixman_image_get_format(res->image)) {
+                int copy_h = MIN(surface_height(restored_ds),
+                                 pixman_image_get_height(res->image));
+                int src_stride = surface_stride(restored_ds);
+                int dst_stride = pixman_image_get_stride(res->image);
+                size_t row_bytes = MIN((size_t)src_stride,
+                                       (size_t)dst_stride);
+                const uint8_t *src = surface_data(restored_ds);
+                uint8_t *dst = (uint8_t *)pixman_image_get_data(res->image);
+                for (int y = 0; y < copy_h; y++) {
+                    memcpy(dst + (size_t)y * dst_stride,
+                           src + (size_t)y * src_stride, row_bytes);
+                }
+            } else {
+                warn_report("Scanout %u saved surface format 0x%x does not "
+                            "match resource %u pixman format 0x%x; skipping "
+                            "pixel copy",
+                            i, surface_format(restored_ds),
+                            res->resource_id,
+                            pixman_image_get_format(res->image));
+            }
+        }
+
+        rutabaga_setup_full_res_transfer(res, &transfer, &transfer_iovec);
+        read_ret = rutabaga_resource_transfer_read(vgr->rutabaga, 0,
+                                                   scanout->resource_id,
+                                                   &transfer, &transfer_iovec);
+        if (read_ret != 0) {
+            warn_report("%s: read-back of scanout %u resource %u failed: "
+                        "%"PRIi32"; showing the saved frame until the next "
+                        "flush", __func__, i, scanout->resource_id, read_ret);
+        }
+
+        scanout->ds = qemu_create_displaysurface_pixman(res->image);
+        scanout->ds->flags = saved_flags;
+        dpy_gfx_replace_surface(scanout->con, scanout->ds);
+        dpy_gfx_update_full(scanout->con);
+    }
+
+    return 0;
+}
+
 #define VIRTIO_GPU_RUTABAGA_DRAIN_TIMEOUT_MS 5000
 
 static void virtio_gpu_rutabaga_drain_wakeup(void* opaque) {
@@ -1936,41 +2073,44 @@ static int virtio_gpu_pre_load(void* opaque) {
   return 0;  // Signal success
 }
 
-static int virtio_gpu_post_load(void* opaque, int version_id) {
-  VirtIOGPURutabaga* vgr = opaque;
-  VirtIOGPU* g = &(vgr->parent_obj);
-  VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
-  VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
-  struct virtio_gpu_simple_resource* res = NULL;
+static int virtio_gpu_post_load(void *opaque, int version_id)
+{
+    VirtIOGPURutabaga *vgr = opaque;
+    VirtIOGPU *g = &(vgr->parent_obj);
+    struct virtio_gpu_simple_resource *res = NULL;
+    int ret;
 
-  QTAILQ_FOREACH(res, &g->reslist, next) {
-    if (res->addrs) {
-      int ret = virtio_gpu_rutabaga_load_backing(g, res);
-      if (ret != 0) {
-        return ret;
-      }
+    QTAILQ_FOREACH(res, &g->reslist, next) {
+        if (res->addrs) {
+            ret = virtio_gpu_rutabaga_load_backing(g, res);
+            if (ret != 0) {
+                return ret;
+            }
+        }
     }
-  }
-  int ret = virtio_gpu_rutabaga_restore_mappings(g);
-  struct virtio_gpu_rutabaga_context *ctx;
-  struct virtio_gpu_rutabaga_resource *res_ctx;
 
-  QTAILQ_FOREACH(ctx, &vr->contexts, next) {
-      QTAILQ_FOREACH(res_ctx, &ctx->reslist, next) {
-          rutabaga_context_attach_resource(vr->rutabaga,
-                  ctx->context_id,
-                  res_ctx->resource_id);
-      }
-  }
+    ret = virtio_gpu_rutabaga_restore_mappings(g);
+    if (ret != 0) {
+        return ret;
+    }
 
-  // we need to re-kick the bh handler to pick
-  // up the left over in vq commands, that were
-  // not processed at the moment of snapshot save
-  // so guest will not get stuck, as it "believe"
-  // it already sends commands through vq to host
-  qemu_bh_schedule(g->ctrl_bh);
+    /*
+     * Context/resource attachments are not replayed here: gfxstream restores
+     * them itself as part of rutabaga_restore(), and replaying them on top
+     * clobbered its state.
+     */
+    ret = rutabaga_restore_scanout_surfaces(g);
+    if (ret != 0) {
+        return ret;
+    }
 
-  return ret;
+    /*
+     * Re-kick both queues so commands that were still in the vrings at save
+     * time are picked up; the guest believes it already submitted them.
+     */
+    qemu_bh_schedule(g->ctrl_bh);
+    qemu_bh_schedule(g->cursor_bh);
+    return 0;
 }
 
 static int virtio_gpu_blob_load(QEMUFile *f, void *opaque, size_t size,
