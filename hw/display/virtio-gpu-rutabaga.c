@@ -163,6 +163,13 @@ rutabaga_cmd_create_resource_3d(VirtIOGPU *g,
     QTAILQ_INSERT_HEAD(&g->reslist, res, next);
 }
 
+static uint32_t
+rutabaga_slot_hash(uint32_t resource_id)
+{
+    g_assert(resource_id != 0);
+    return resource_id % MAX_SLOTS;
+}
+
 static void
 rutabaga_map_slot_noassert(VirtIOGPURutabaga *vgr,
                            struct MemoryRegionInfo *slot,
@@ -215,14 +222,14 @@ rutabaga_unmap_resource_slot(VirtIOGPURutabaga *vgr, uint32_t resource_id,
                              bool unmap_in_rutabaga)
 {
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
+    uint32_t i = rutabaga_slot_hash(resource_id);
 
-    g_assert(resource_id != 0);
-
-    for (uint32_t slot = 0; slot < MAX_SLOTS; slot++) {
-        if (vgr->memory_regions[slot].resource_id != resource_id) {
+    for (uint32_t n = MAX_SLOTS; n; --n, i = (i + 1) % MAX_SLOTS) {
+        if (vgr->memory_regions[i].resource_id != resource_id) {
             continue;
         }
-        rutabaga_unmap_slot(vb, &vgr->memory_regions[slot]);
+
+        rutabaga_unmap_slot(vb, &vgr->memory_regions[i]);
         if (unmap_in_rutabaga && vgr->rutabaga) {
             int32_t unmap_res = rutabaga_resource_unmap(vgr->rutabaga,
                                                         resource_id);
@@ -922,6 +929,7 @@ rutabaga_cmd_resource_map_blob(VirtIOGPU *g,
     int32_t result;
     uint32_t map_info = 0;
     uint32_t slot = 0;
+    uint32_t i;
     struct virtio_gpu_simple_resource *res;
     struct rutabaga_mapping mapping = { 0 };
     struct virtio_gpu_resource_map_blob mblob;
@@ -959,8 +967,9 @@ rutabaga_cmd_resource_map_blob(VirtIOGPU *g,
      * It is highly unlikely to happen in practice and doesn't affect known
      * use cases. However, it should be fixed and is noted here for posterity.
      */
-    for (slot = 0; slot < MAX_SLOTS; slot++) {
-        struct MemoryRegionInfo *entry = &vr->memory_regions[slot];
+    i = rutabaga_slot_hash(mblob.resource_id);
+    for (slot = 0; slot < MAX_SLOTS; slot++, i = (i + 1) % MAX_SLOTS) {
+        struct MemoryRegionInfo *entry = &vr->memory_regions[i];
         if (entry->resource_id != 0) {
             continue;
         }
