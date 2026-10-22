@@ -1361,35 +1361,5 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         !strcmp(config->gles_backend, "llvmpipe") ||
         !strcmp(config->gles_backend, "swangle")) {
         system->envSet("ANDROID_EGL_ON_EGL", "1");
-        return;
-    }
-
-    // For now, EmuGL selects its own translation libraries for
-    // EGL/GLES libraries, unless the following environment
-    // variables are defined:
-    //    ANDROID_EGL_LIB
-    //    ANDROID_GLESv1_LIB
-    //    ANDROID_GLESv2_LIB
-    //
-    // If a backend provides one of these libraries, use it.
-    std::string lib;
-    if (sBackendList->getBackendLibPath(gles_library,
-                                        EmuglBackendList::LIBRARY_EGL, &lib)) {
-        system->envSet("ANDROID_EGL_LIB", lib);
-    }
-    if (sBackendList->getBackendLibPath(
-                gles_library, EmuglBackendList::LIBRARY_GLESv1, &lib)) {
-        system->envSet("ANDROID_GLESv1_LIB", lib);
-    } else {
-        derror("OpenGL backend '%s' without OpenGL ES 1.x library detected. "
-               "Using GLESv2 only.",
-               gles_library);
-        // A GLESv1 lib is optional---we can deal with a GLESv2 only
-        // backend by using CoreProfileEngine in the Translator.
-    }
-
-    if (sBackendList->getBackendLibPath(
-                gles_library, EmuglBackendList::LIBRARY_GLESv2, &lib)) {
-        system->envSet("ANDROID_GLESv2_LIB", lib);
     }
 }
