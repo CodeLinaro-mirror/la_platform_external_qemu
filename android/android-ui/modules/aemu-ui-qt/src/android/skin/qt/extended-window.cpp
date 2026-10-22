@@ -299,7 +299,8 @@ ExtendedWindow::ExtendedWindow(EmulatorQtWindow* eW, ToolWindow* tW)
     const bool showSnapshotsButton =
             android::featurecontrol::isEnabled(
                     android::featurecontrol::GenericSnapshotsUI) &&
-            !qtHideWindow && (avdFlavor != AVD_GLASSES);
+            !qtHideWindow && (avdFlavor != AVD_GLASSES) && (avdFlavor != AVD_XR);
+
     if (showSnapshotsButton) {
         mSidebarButtons.addButton(mExtendedUi->snapshotButton);
         mExtendedUi->snapshotButton->setVisible(true);
