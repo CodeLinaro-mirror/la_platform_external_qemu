@@ -164,6 +164,31 @@ rutabaga_cmd_create_resource_3d(VirtIOGPU *g,
 }
 
 static void
+rutabaga_map_slot_noassert(VirtIOGPURutabaga *vgr,
+                           struct MemoryRegionInfo *slot,
+                           uint32_t resource_id, hwaddr offset,
+                           void *ptr, uint64_t size)
+{
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
+
+    g_assert(resource_id != 0);
+    g_assert(slot->mr.container == NULL);
+
+    memory_region_init_ram_ptr(&slot->mr, OBJECT(vgr), "blob", size, ptr);
+    memory_region_add_subregion(&vb->hostmem, offset, &slot->mr);
+    slot->resource_id = resource_id;
+    slot->offset = offset;
+}
+
+static void
+rutabaga_map_slot(VirtIOGPURutabaga *vgr, struct MemoryRegionInfo *slot,
+                  uint32_t resource_id, hwaddr offset, void *ptr, uint64_t size)
+{
+    g_assert(slot->resource_id == 0);
+    rutabaga_map_slot_noassert(vgr, slot, resource_id, offset, ptr, size);
+}
+
+static void
 rutabaga_unmap_slot(VirtIOGPUBase *vb, struct MemoryRegionInfo *slot)
 {
     if (slot->mr.container == &vb->hostmem) {
@@ -902,7 +927,6 @@ rutabaga_cmd_resource_map_blob(VirtIOGPU *g,
     struct virtio_gpu_resource_map_blob mblob;
     struct virtio_gpu_resp_map_info resp = { 0 };
 
-    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
     VIRTIO_GPU_FILL_CMD(mblob);
@@ -936,17 +960,13 @@ rutabaga_cmd_resource_map_blob(VirtIOGPU *g,
      * use cases. However, it should be fixed and is noted here for posterity.
      */
     for (slot = 0; slot < MAX_SLOTS; slot++) {
-        if (vr->memory_regions[slot].resource_id != 0) {
+        struct MemoryRegionInfo *entry = &vr->memory_regions[slot];
+        if (entry->resource_id != 0) {
             continue;
         }
 
-        g_assert(mblob.resource_id != 0);
-        MemoryRegion *mr = &(vr->memory_regions[slot].mr);
-        memory_region_init_ram_ptr(mr, OBJECT(vr), "blob", mapping.size,
-                                   mapping.ptr);
-        memory_region_add_subregion(&vb->hostmem, mblob.offset, mr);
-        vr->memory_regions[slot].resource_id = mblob.resource_id;
-        vr->memory_regions[slot].offset = mblob.offset;
+        rutabaga_map_slot(vr, entry, mblob.resource_id, mblob.offset,
+                          mapping.ptr, mapping.size);
         break;
     }
 
@@ -2601,7 +2621,6 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
  * AFTER the Rutabaga backend has been initialized.
  */
 static int virtio_gpu_rutabaga_restore_mappings(VirtIOGPU* g) {
-  VirtIOGPUBase* vb = VIRTIO_GPU_BASE(g);
   VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(g);
   struct virtio_gpu_simple_resource* res;
   int slot;
@@ -2613,6 +2632,7 @@ static int virtio_gpu_rutabaga_restore_mappings(VirtIOGPU* g) {
     if (resource_id == 0) {
       continue;
     }
+
     hwaddr saved_offset = vr->memory_regions[slot].offset;
 
     // 1. Find the RutabagaResource metadata (must be restored first)
@@ -2635,22 +2655,12 @@ static int virtio_gpu_rutabaga_restore_mappings(VirtIOGPU* g) {
       return -EINVAL;
     }
 
-    // 3. Re-initialize the MemoryRegion with the NEW pointer
-    MemoryRegion* mr = &(vr->memory_regions[slot].mr);
-
-    // Note: The MR must be re-initialized because the host pointer
-    // (mapping.ptr) and often the size (mapping.size) are unstable across
-    // migration.
-    memory_region_init_ram_ptr(mr, OBJECT(vr), "blob", mapping.size,
-                               mapping.ptr);
-
-    // 4. Re-add the MemoryRegion to the Host Memory BAR at the saved offset
-    // This re-establishes the MMIO path for the guest.
-    memory_region_add_subregion(&vb->hostmem, saved_offset, mr);
-
-    // The slot tracking fields are already correctly loaded by VMState,
-    // so we don't need to rewrite resource_id or used.
-
+    /*
+     * 3. Re-initialize the MemoryRegion with the NEW pointer and re-add it
+     * to the Host Memory BAR at the saved offset.
+     */
+    rutabaga_map_slot_noassert(vr, &vr->memory_regions[slot], resource_id,
+                               saved_offset, mapping.ptr, mapping.size);
   }
 
   memory_region_transaction_commit();
