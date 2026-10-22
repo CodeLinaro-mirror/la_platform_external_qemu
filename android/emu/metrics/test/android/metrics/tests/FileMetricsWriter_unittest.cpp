@@ -31,6 +31,11 @@
 #include <algorithm>
 #include <array>
 #include <numeric>
+#ifndef _WIN32
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 using namespace android::base;
 using namespace android::metrics;
@@ -224,6 +229,69 @@ TEST_F(FileMetricsWriterTest, finalizeAbandonedSessionFilesLockedSession) {
                " session file path '"
             << openSessionName << '\'';
 }
+
+#ifndef _WIN32
+TEST_F(FileMetricsWriterTest, finalizeAbandonedSessionFilesStaleLock) {
+    makeSpoolDir();
+
+    auto openSessionName = PathUtils::join(
+            kSpoolDir,
+            StringFormat("emulator-metrics-%s-1-1.open", sessionId()));
+    ASSERT_TRUE(mRoot->makeSubFile(openSessionName));
+    const std::string openSessionPath = mRoot->makeSubPath(openSessionName);
+
+    int pipeFds[2] = {-1, -1};
+    ASSERT_EQ(0, pipe(pipeFds));
+    const pid_t childPid = fork();
+    ASSERT_GE(childPid, 0);
+    if (childPid == 0) {
+        close(pipeFds[0]);
+        filelock_init();
+        FileLock* lock = filelock_create(openSessionPath.c_str());
+        uint8_t locked = lock != nullptr ? 1 : 0;
+        (void)write(pipeFds[1], &locked, sizeof(locked));
+        close(pipeFds[1]);
+        pause();
+        _exit(0);
+    }
+    struct ChildReaper {
+        pid_t pid;
+        ~ChildReaper() {
+            if (pid > 0) {
+                kill(pid, SIGKILL);
+                waitpid(pid, nullptr, 0);
+            }
+        }
+        void killAndWait() {
+            ASSERT_EQ(0, kill(pid, SIGKILL));
+            ASSERT_EQ(pid, waitpid(pid, nullptr, 0));
+            pid = -1;
+        }
+    } childReaper{childPid};
+    close(pipeFds[1]);
+    uint8_t locked = 0;
+    ASSERT_EQ(static_cast<ssize_t>(sizeof(locked)),
+              read(pipeFds[0], &locked, sizeof(locked)));
+    close(pipeFds[0]);
+    ASSERT_EQ(1U, locked);
+
+    childReaper.killAndWait();
+
+    // Both .open and the stale .open.lock from the killed process exist.
+    auto filesBefore = mSystem.scanDirEntries(spoolDir());
+    ASSERT_EQ(2U, filesBefore.size());
+
+    // A single call must reclaim the stale lock and finalize the session.
+    auto sessions =
+            FileMetricsWriter::finalizeAbandonedSessionFiles(spoolDir());
+    ASSERT_EQ(1U, sessions.size());
+    EXPECT_NE(sessions.end(), sessions.find(sessionId()));
+
+    auto filesAfter = mSystem.scanDirEntries(spoolDir());
+    ASSERT_EQ(1U, filesAfter.size());
+    EXPECT_STREQ(c_str(PathUtils::extension(filesAfter[0])), ".trk");
+}
+#endif
 
 TEST_F(FileMetricsWriterTest, writeSimple) {
     mWriter = FileMetricsWriter::create(sessionId(), spoolDir(), 0, nullptr, 0);
