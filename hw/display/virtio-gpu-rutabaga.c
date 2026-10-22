@@ -180,11 +180,13 @@ rutabaga_map_slot_noassert(VirtIOGPURutabaga *vgr,
 
     g_assert(resource_id != 0);
     g_assert(slot->mr.container == NULL);
+    g_assert(vgr->num_mapped_slots < MAX_SLOTS);
 
     memory_region_init_ram_ptr(&slot->mr, OBJECT(vgr), "blob", size, ptr);
     memory_region_add_subregion(&vb->hostmem, offset, &slot->mr);
     slot->resource_id = resource_id;
     slot->offset = offset;
+    vgr->num_mapped_slots++;
 }
 
 static void
@@ -196,11 +198,15 @@ rutabaga_map_slot(VirtIOGPURutabaga *vgr, struct MemoryRegionInfo *slot,
 }
 
 static void
-rutabaga_unmap_slot(VirtIOGPUBase *vb, struct MemoryRegionInfo *slot)
+rutabaga_unmap_slot(VirtIOGPURutabaga *vgr, struct MemoryRegionInfo *slot)
 {
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
+
     if (slot->mr.container == &vb->hostmem) {
         memory_region_del_subregion(&vb->hostmem, &slot->mr);
         object_unparent(OBJECT(&slot->mr));
+        g_assert(vgr->num_mapped_slots > 0);
+        vgr->num_mapped_slots--;
     }
     slot->resource_id = 0;
 }
@@ -208,20 +214,18 @@ rutabaga_unmap_slot(VirtIOGPUBase *vb, struct MemoryRegionInfo *slot)
 static void
 rutabaga_unmap_all_slots(VirtIOGPURutabaga *vgr)
 {
-    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
-
     memory_region_transaction_begin();
     for (int slot = 0; slot < MAX_SLOTS; slot++) {
-        rutabaga_unmap_slot(vb, &vgr->memory_regions[slot]);
+        rutabaga_unmap_slot(vgr, &vgr->memory_regions[slot]);
     }
     memory_region_transaction_commit();
+    g_assert(vgr->num_mapped_slots == 0);
 }
 
 static bool
 rutabaga_unmap_resource_slot(VirtIOGPURutabaga *vgr, uint32_t resource_id,
                              bool unmap_in_rutabaga)
 {
-    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
     uint32_t i = rutabaga_slot_hash(resource_id);
 
     for (uint32_t n = MAX_SLOTS; n; --n, i = (i + 1) % MAX_SLOTS) {
@@ -229,7 +233,7 @@ rutabaga_unmap_resource_slot(VirtIOGPURutabaga *vgr, uint32_t resource_id,
             continue;
         }
 
-        rutabaga_unmap_slot(vb, &vgr->memory_regions[i]);
+        rutabaga_unmap_slot(vgr, &vgr->memory_regions[i]);
         if (unmap_in_rutabaga && vgr->rutabaga) {
             int32_t unmap_res = rutabaga_resource_unmap(vgr->rutabaga,
                                                         resource_id);
@@ -1581,19 +1585,12 @@ static bool virtio_gpu_rutabaga_instance_in_use(VirtIOGPURutabaga *vgr)
      * be torn down and recreated rather than reused.
      */
     VirtIOGPU *g = &(vgr->parent_obj);
-    if (!QTAILQ_EMPTY(&vgr->contexts) ||
-        !QTAILQ_EMPTY(&g->reslist) ||
-        !QTAILQ_EMPTY(&g->cmdq) ||
-        !QTAILQ_EMPTY(&g->fenceq) ||
-        !QSLIST_EMPTY(&vgr->async_signaled_fenceq)) {
-        return true;
-    }
-    for (int slot = 0; slot < MAX_SLOTS; slot++) {
-        if (vgr->memory_regions[slot].resource_id != 0) {
-            return true;
-        }
-    }
-    return false;
+    return !QTAILQ_EMPTY(&vgr->contexts) ||
+           !QTAILQ_EMPTY(&g->reslist) ||
+           !QTAILQ_EMPTY(&g->cmdq) ||
+           !QTAILQ_EMPTY(&g->fenceq) ||
+           !QSLIST_EMPTY(&vgr->async_signaled_fenceq) ||
+           vgr->num_mapped_slots > 0;
 }
 
 static void rutabaga_free_all_contexts(VirtIOGPURutabaga *vgr)
@@ -1951,6 +1948,7 @@ static void rutabaga_verify_memory_slots(VirtIOGPU *g, VirtIOGPURutabaga *vgr,
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     bool check_steady = rutabaga_phase_expects_steady(phase);
     bool check_empty = rutabaga_phase_expects_empty(phase);
+    uint32_t counted_slots = 0;
 
     for (int i = 0; i < MAX_SLOTS; i++) {
         struct MemoryRegionInfo *s1 = &vgr->memory_regions[i];
@@ -1962,6 +1960,7 @@ static void rutabaga_verify_memory_slots(VirtIOGPU *g, VirtIOGPURutabaga *vgr,
             }
             continue;
         }
+        counted_slots++;
         if (check_empty) {
             rutabaga_report_violation(phase, violations, "SLOT-ALL-FREE",
                                       "slot %d still used in EMPTY phase", i);
@@ -1994,6 +1993,11 @@ static void rutabaga_verify_memory_slots(VirtIOGPU *g, VirtIOGPURutabaga *vgr,
                                           "slots %d and %d overlap in BAR", i, j);
             }
         }
+    }
+    if (vgr->num_mapped_slots != counted_slots) {
+        rutabaga_report_violation(phase, violations, "SLOT-USED-VALID",
+                                  "num_mapped_slots (%u) != active slots (%u)",
+                                  vgr->num_mapped_slots, counted_slots);
     }
 }
 
