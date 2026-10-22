@@ -166,13 +166,11 @@ rutabaga_cmd_create_resource_3d(VirtIOGPU *g,
 static void
 rutabaga_unmap_slot(VirtIOGPUBase *vb, struct MemoryRegionInfo *slot)
 {
-    if (slot->used && slot->mr.container == &vb->hostmem) {
+    if (slot->mr.container == &vb->hostmem) {
         memory_region_del_subregion(&vb->hostmem, &slot->mr);
         object_unparent(OBJECT(&slot->mr));
     }
-    slot->used = 0;
     slot->resource_id = 0;
-    slot->offset = 0;
 }
 
 static void
@@ -196,8 +194,7 @@ rutabaga_unmap_resource_slot(VirtIOGPURutabaga *vgr, uint32_t resource_id,
     g_assert(resource_id != 0);
 
     for (uint32_t slot = 0; slot < MAX_SLOTS; slot++) {
-        if (!vgr->memory_regions[slot].used ||
-            vgr->memory_regions[slot].resource_id != resource_id) {
+        if (vgr->memory_regions[slot].resource_id != resource_id) {
             continue;
         }
         rutabaga_unmap_slot(vb, &vgr->memory_regions[slot]);
@@ -939,16 +936,16 @@ rutabaga_cmd_resource_map_blob(VirtIOGPU *g,
      * use cases. However, it should be fixed and is noted here for posterity.
      */
     for (slot = 0; slot < MAX_SLOTS; slot++) {
-        if (vr->memory_regions[slot].used) {
+        if (vr->memory_regions[slot].resource_id != 0) {
             continue;
         }
 
+        g_assert(mblob.resource_id != 0);
         MemoryRegion *mr = &(vr->memory_regions[slot].mr);
         memory_region_init_ram_ptr(mr, OBJECT(vr), "blob", mapping.size,
                                    mapping.ptr);
         memory_region_add_subregion(&vb->hostmem, mblob.offset, mr);
         vr->memory_regions[slot].resource_id = mblob.resource_id;
-        vr->memory_regions[slot].used = 1;
         vr->memory_regions[slot].offset = mblob.offset;
         break;
     }
@@ -1563,7 +1560,7 @@ static bool virtio_gpu_rutabaga_instance_in_use(VirtIOGPURutabaga *vgr)
         return true;
     }
     for (int slot = 0; slot < MAX_SLOTS; slot++) {
-        if (vgr->memory_regions[slot].used) {
+        if (vgr->memory_regions[slot].resource_id != 0) {
             return true;
         }
     }
@@ -1928,12 +1925,11 @@ static void rutabaga_verify_memory_slots(VirtIOGPU *g, VirtIOGPURutabaga *vgr,
 
     for (int i = 0; i < MAX_SLOTS; i++) {
         struct MemoryRegionInfo *s1 = &vgr->memory_regions[i];
-        if (!s1->used) {
-            if (s1->resource_id != 0 || s1->offset != 0 ||
-                s1->mr.container != NULL) {
+        if (s1->resource_id == 0) {
+            if (s1->mr.container != NULL) {
                 rutabaga_report_violation(phase, violations, "SLOT-UNUSED-CLEAN",
-                                          "unused slot %d has dirty fields (res=%u off=%"PRIx64")",
-                                          i, s1->resource_id, (uint64_t)s1->offset);
+                                          "unused slot %d still attached to container",
+                                          i);
             }
             continue;
         }
@@ -1954,7 +1950,7 @@ static void rutabaga_verify_memory_slots(VirtIOGPU *g, VirtIOGPURutabaga *vgr,
             struct MemoryRegionInfo *s2 = &vgr->memory_regions[j];
             uint64_t s1_end, s2_end;
 
-            if (!s2->used) {
+            if (s2->resource_id == 0) {
                 continue;
             }
             if (s1->resource_id == s2->resource_id) {
@@ -2613,12 +2609,10 @@ static int virtio_gpu_rutabaga_restore_mappings(VirtIOGPU* g) {
 
   memory_region_transaction_begin();
   for (slot = 0; slot < MAX_SLOTS; slot++) {
-    // Skip slots that were not in use during snapshot
-    if (!vr->memory_regions[slot].used) {
+    uint32_t resource_id = vr->memory_regions[slot].resource_id;
+    if (resource_id == 0) {
       continue;
     }
-
-    uint32_t resource_id = vr->memory_regions[slot].resource_id;
     hwaddr saved_offset = vr->memory_regions[slot].offset;
 
     // 1. Find the RutabagaResource metadata (must be restored first)
@@ -2998,17 +2992,18 @@ const VMStateDescription vmstate_virtio_gpu_rutabaga_blob_state = {
 /* VMState for a single slot in vr->memory_regions array */
 static const VMStateDescription vmstate_rutabaga_slot_info = {
     .name = "virtio-gpu-rutabaga/slot",
-    .version_id = 1,
+    .version_id = 2,
+    .minimum_version_id = 2,
     .fields = (const VMStateField[]){
         VMSTATE_UINT32(resource_id, struct MemoryRegionInfo),
-        VMSTATE_INT32(used, struct MemoryRegionInfo),
         VMSTATE_UINT64(offset,
                        struct MemoryRegionInfo),  // Assuming hwaddr is 64-bit
         VMSTATE_END_OF_LIST()}};
 
 static const VMStateDescription vmstate_rutabaga_slots = {
     .name = "virtio-gpu-rutabaga/slots",
-    .version_id = 1,
+    .version_id = 2,
+    .minimum_version_id = 2,
     .fields =
         (const VMStateField[]){
             VMSTATE_STRUCT_ARRAY(memory_regions, VirtIOGPURutabaga, MAX_SLOTS,
@@ -3138,7 +3133,7 @@ static void hmp_info_virtio_gpu_rutabaga(Monitor *mon, const QDict *qdict)
         num_async++;
     }
     for (int i = 0; i < MAX_SLOTS; i++) {
-        if (vgr->memory_regions[i].used) {
+        if (vgr->memory_regions[i].resource_id != 0) {
             num_slots++;
         }
     }
