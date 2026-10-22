@@ -82,6 +82,10 @@ typedef struct {
      */
     uint64_t qemu_file_transferred;
     /*
+     * Number of bytes read with QEMUFile.
+     */
+    uint64_t qemu_file_read;
+    /*
      * Amount of transferred data at the start of current cycle.
      */
     uint64_t rate_limit_start;

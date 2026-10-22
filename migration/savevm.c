@@ -271,6 +271,226 @@ static SaveState savevm_state = {
     .global_section_id = 0,
 };
 
+static bool qemu_savevm_se_iterable(SaveStateEntry *se);
+
+struct QemuSnapshotProgressEntry {
+    QemuSnapshotProgressHandler *cb;
+    void *opaque;
+    /*
+     * The BQL can be released inside an operation, so a handler may be added
+     * while one is in flight.  It is only armed by the next operation, so
+     * that it never observes a partial operation.
+     */
+    bool armed;
+    QLIST_ENTRY(QemuSnapshotProgressEntry) next;
+};
+
+static QLIST_HEAD(, QemuSnapshotProgressEntry) snapshot_progress_handlers =
+    QLIST_HEAD_INITIALIZER(snapshot_progress_handlers);
+
+/*
+ * Progress of the internal snapshot operation, reported to the handlers.
+ * Only accessed with the BQL held, and only written by the thread running
+ * save_snapshot() or load_snapshot().  While an operation is in flight, name
+ * points to the snapshot name owned by that function, and active_component
+ * to the idstr of the section started most recently, if any.
+ */
+static struct {
+    QemuSnapshotOperation operation;
+    QemuSnapshotPhase phase;
+    const char *name;
+    const char *active_component;
+    int64_t total_bytes;
+    int32_t completed_devices;
+    int32_t total_devices;
+} snapshot_progress;
+
+/*
+ * The hooks also run on migration threads that don't hold the BQL.  No
+ * snapshot operation is in flight there, so they never touch the state.
+ */
+static bool snapshot_progress_in_flight(void)
+{
+    return bql_locked() &&
+           (snapshot_progress.phase == QEMU_SNAPSHOT_PHASE_PREPARING ||
+            snapshot_progress.phase == QEMU_SNAPSHOT_PHASE_TRANSFERRING);
+}
+
+QemuSnapshotProgressEntry *add_snapshot_progress_handler(
+    QemuSnapshotProgressHandler *cb, void *opaque)
+{
+    QemuSnapshotProgressEntry *e;
+
+    assert(bql_locked());
+    e = g_new0(QemuSnapshotProgressEntry, 1);
+    e->cb = cb;
+    e->opaque = opaque;
+    e->armed = !snapshot_progress_in_flight();
+    QLIST_INSERT_HEAD(&snapshot_progress_handlers, e, next);
+    return e;
+}
+
+void del_snapshot_progress_handler(QemuSnapshotProgressEntry *e)
+{
+    assert(bql_locked());
+    if (!e) {
+        return;
+    }
+    QLIST_REMOVE(e, next);
+    g_free(e);
+}
+
+static int32_t count_non_iterable_savevm_devices(QemuSnapshotOperation op)
+{
+    int32_t count = 0;
+    SaveStateEntry *se;
+
+    QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
+        if (qemu_savevm_se_iterable(se)) {
+            continue;
+        }
+        if ((!se->ops || !se->ops->save_state) && !se->vmsd) {
+            continue;
+        }
+        if (op == QEMU_SNAPSHOT_OP_SAVE && se->vmsd &&
+            !vmstate_section_needed(se->vmsd, se->opaque)) {
+            continue;
+        }
+        count++;
+    }
+    return count;
+}
+
+static void snapshot_progress_fill(QemuSnapshotProgress *progress)
+{
+    int64_t total = snapshot_progress.total_bytes;
+    int64_t done;
+
+    *progress = (QemuSnapshotProgress) {
+        .operation = snapshot_progress.operation,
+        .phase = snapshot_progress.phase,
+        .name = snapshot_progress.name,
+        .active_component = snapshot_progress.active_component,
+        .total_bytes = total,
+        .completed_devices = MIN(snapshot_progress.completed_devices,
+                                 snapshot_progress.total_devices),
+        .total_devices = snapshot_progress.total_devices,
+    };
+
+    if (snapshot_progress.operation == QEMU_SNAPSHOT_OP_SAVE) {
+        uint64_t pages = qatomic_read(&mig_stats.normal_pages) +
+                         qatomic_read(&mig_stats.zero_pages);
+
+        done = (int64_t)(pages * qemu_target_page_size());
+        progress->disk_bytes =
+            (int64_t)qatomic_read(&mig_stats.qemu_file_transferred);
+    } else {
+        done = (int64_t)qatomic_read(&mig_stats.qemu_file_read);
+        progress->disk_bytes = done;
+    }
+    progress->transferred_bytes = (total > 0 && done > total) ? total : done;
+}
+
+static void snapshot_progress_notify(const QemuSnapshotProgress *progress)
+{
+    QemuSnapshotProgressEntry *e, *next_e;
+
+    assert(bql_locked());
+    QLIST_FOREACH_SAFE(e, &snapshot_progress_handlers, next, next_e) {
+        if (e->armed) {
+            e->cb(e->opaque, progress);
+        }
+    }
+}
+
+static void snapshot_progress_report(void)
+{
+    QemuSnapshotProgress progress;
+
+    snapshot_progress_fill(&progress);
+    snapshot_progress_notify(&progress);
+}
+
+static void snapshot_progress_start(QemuSnapshotOperation op, const char *name,
+                                    int64_t total_bytes)
+{
+    QemuSnapshotProgressEntry *e;
+
+    qatomic_set(&mig_stats.normal_pages, 0);
+    qatomic_set(&mig_stats.zero_pages, 0);
+    qatomic_set(&mig_stats.qemu_file_transferred, 0);
+    qatomic_set(&mig_stats.qemu_file_read, 0);
+
+    snapshot_progress.operation = op;
+    snapshot_progress.phase = QEMU_SNAPSHOT_PHASE_PREPARING;
+    snapshot_progress.name = name ? name : "";
+    snapshot_progress.active_component = NULL;
+    snapshot_progress.total_bytes = total_bytes;
+    snapshot_progress.completed_devices = 0;
+    snapshot_progress.total_devices = count_non_iterable_savevm_devices(op);
+
+    QLIST_FOREACH(e, &snapshot_progress_handlers, next) {
+        e->armed = true;
+    }
+    snapshot_progress_report();
+}
+
+static void snapshot_progress_set_phase(QemuSnapshotPhase phase)
+{
+    snapshot_progress.phase = phase;
+    snapshot_progress_report();
+}
+
+/*
+ * Called when a VMState section starts being saved or loaded.  Sections are
+ * only reported once the transfer started, so that PREPARING is reported
+ * exactly once.
+ */
+static void snapshot_progress_section(const char *idstr)
+{
+    if (!snapshot_progress_in_flight()) {
+        return;
+    }
+    snapshot_progress.active_component = idstr;
+    if (snapshot_progress.phase == QEMU_SNAPSHOT_PHASE_TRANSFERRING) {
+        snapshot_progress_report();
+    }
+}
+
+/* Called when a non-iterable device state has been saved or loaded. */
+static void snapshot_progress_device_done(void)
+{
+    if (snapshot_progress_in_flight()) {
+        snapshot_progress.completed_devices++;
+        snapshot_progress.active_component = NULL;
+    }
+}
+
+static void snapshot_progress_finish(bool ok, int64_t vm_state_size,
+                                     Error *const *errp)
+{
+    QemuSnapshotProgress progress;
+
+    if (ok) {
+        snapshot_progress.active_component = NULL;
+        snapshot_progress.completed_devices = snapshot_progress.total_devices;
+    }
+    snapshot_progress.phase = ok ? QEMU_SNAPSHOT_PHASE_COMPLETED
+                                 : QEMU_SNAPSHOT_PHASE_FAILED;
+    snapshot_progress_fill(&progress);
+    if (ok) {
+        progress.transferred_bytes = progress.total_bytes;
+        progress.disk_bytes = vm_state_size;
+    } else if (errp && *errp) {
+        progress.error_message = error_get_pretty(*errp);
+    }
+    snapshot_progress_notify(&progress);
+
+    /* Both point to storage owned by others; don't keep them past the end */
+    snapshot_progress.name = NULL;
+    snapshot_progress.active_component = NULL;
+}
+
 static SaveStateEntry *find_se(const char *idstr, uint32_t instance_id);
 
 static bool should_validate_capability(int capability)
@@ -788,6 +1008,9 @@ static void savevm_state_handler_remove(SaveStateEntry *se)
     SaveStateEntry *next;
     MigrationPriority priority = save_state_priority(se);
 
+    if (snapshot_progress.active_component == se->idstr) {
+        snapshot_progress.active_component = NULL;
+    }
     if (se == savevm_state.handler_pri_head[priority]) {
         next = QTAILQ_NEXT(se, entry);
         if (next != NULL && save_state_priority(next) == priority) {
@@ -963,6 +1186,7 @@ void vmstate_unregister(VMStateIf *obj, const VMStateDescription *vmsd,
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se, Error **errp)
 {
     int ret;
+    snapshot_progress_section(se->idstr);
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
         ret = se->ops->load_state(f, se->opaque, se->load_version_id);
@@ -1041,6 +1265,7 @@ static int vmstate_save(QEMUFile *f, SaveStateEntry *se, JSONWriter *vmdesc,
         return 0;
     }
 
+    snapshot_progress_section(se->idstr);
     trace_savevm_section_start(se->idstr, se->section_id);
     save_section_header(f, se, QEMU_VM_SECTION_FULL);
     if (vmdesc) {
@@ -1065,6 +1290,7 @@ static int vmstate_save(QEMUFile *f, SaveStateEntry *se, JSONWriter *vmdesc,
     if (vmdesc) {
         json_writer_end_object(vmdesc);
     }
+    snapshot_progress_device_done();
     return 0;
 }
 
@@ -1403,6 +1629,7 @@ static int qemu_savevm_state_setup(QEMUFile *f, Error **errp)
         if (!qemu_savevm_state_active(se)) {
             continue;
         }
+        snapshot_progress_section(se->idstr);
         save_section_header(f, se, QEMU_VM_SECTION_START);
         ret = se->ops->save_setup(f, se->opaque, errp);
         save_section_footer(f, se);
@@ -1500,6 +1727,7 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
         if (migration_rate_exceeded(f)) {
             return 0;
         }
+        snapshot_progress_section(se->idstr);
         trace_savevm_section_start(se->idstr, se->section_id);
 
         save_section_header(f, se, QEMU_VM_SECTION_PART);
@@ -1545,6 +1773,7 @@ static int qemu_savevm_complete(SaveStateEntry *se, QEMUFile *f)
         return 0;
     }
 
+    snapshot_progress_section(se->idstr);
     trace_savevm_section_start(se->idstr, se->section_id);
     save_section_header(f, se, QEMU_VM_SECTION_END);
     ret = se->ops->save_complete(f, se->opaque);
@@ -1845,6 +2074,8 @@ static int qemu_savevm_state(QEMUFile *f, Error **errp)
     if (ret) {
         goto cleanup;
     }
+
+    snapshot_progress_set_phase(QEMU_SNAPSHOT_PHASE_TRANSFERRING);
 
     while (qemu_file_get_error(f) == 0) {
         if (qemu_savevm_state_iterate(f, false) > 0) {
@@ -2666,6 +2897,10 @@ qemu_loadvm_section_start_full(QEMUFile *f, uint8_t type, Error **errp)
         return -EINVAL;
     }
 
+    if (!qemu_savevm_se_iterable(se)) {
+        snapshot_progress_device_done();
+    }
+
     return 0;
 }
 
@@ -3187,7 +3422,7 @@ bool save_snapshot(const char *name, bool overwrite, const char *vmstate,
     int ret = -1, ret2;
     QEMUFile *f;
     RunState saved_state = runstate_get();
-    uint64_t vm_state_size;
+    uint64_t vm_state_size = 0;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
 
     GLOBAL_STATE_CODE();
@@ -3260,6 +3495,9 @@ bool save_snapshot(const char *name, bool overwrite, const char *vmstate,
         pstrcpy(sn->name, sizeof(sn->name), autoname);
     }
 
+    snapshot_progress_start(QEMU_SNAPSHOT_OP_SAVE, sn->name,
+                            (int64_t)ram_bytes_total());
+
     /* save the VM state */
     f = qemu_fopen_bdrv(bs, 1);
     if (!f) {
@@ -3288,6 +3526,7 @@ bool save_snapshot(const char *name, bool overwrite, const char *vmstate,
 
  the_end:
     bdrv_drain_all_end();
+    snapshot_progress_finish(ret == 0, (int64_t)vm_state_size, errp);
 
     vm_resume(saved_state);
     return ret == 0;
@@ -3417,6 +3656,9 @@ bool load_snapshot(const char *name, const char *vmstate,
         return false;
     }
 
+    snapshot_progress_start(QEMU_SNAPSHOT_OP_LOAD, name ? name : sn.name,
+                            (int64_t)sn.vm_state_size);
+
     /*
      * Flush the record/replay queue. Now the VM state is going
      * to change. Therefore we don't need to preserve its consistency
@@ -3445,10 +3687,12 @@ bool load_snapshot(const char *name, const char *vmstate,
         ret = -EINVAL;
         goto err_drain;
     }
+    snapshot_progress_set_phase(QEMU_SNAPSHOT_PHASE_TRANSFERRING);
     ret = qemu_loadvm_state(f, errp);
     migration_incoming_state_destroy();
 
     bdrv_drain_all_end();
+    snapshot_progress_finish(ret >= 0, (int64_t)sn.vm_state_size, errp);
 
     if (ret < 0) {
         return false;
@@ -3458,6 +3702,7 @@ bool load_snapshot(const char *name, const char *vmstate,
 
 err_drain:
     bdrv_drain_all_end();
+    snapshot_progress_finish(false, (int64_t)sn.vm_state_size, errp);
     return false;
 }
 

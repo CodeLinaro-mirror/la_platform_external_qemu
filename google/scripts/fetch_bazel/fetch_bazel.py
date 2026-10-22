@@ -32,8 +32,13 @@ from tqdm import tqdm
 
 PRESUBMIT_BUILD_TASKS = {
     "emulator_linux_x64:git_emu-main-next": "lin_bid",
+    "emulator_linux_aarch64:git_emu-main-next": "lin_arm_bid",
     "emulator_windows_x64:git_emu-main-next": "win_bid",
     "emulator_mac_aarch64:git_emu-main-next": "mac_bid",
+}
+
+OPTIONAL_PRESUBMIT_BUILD_TASKS = {
+    "emulator_linux_aarch64:git_emu-main-next",
 }
 
 
@@ -158,6 +163,8 @@ def git_commit(destination_dir, args):
 
     # Add a commit_msg footer if buganizer_id is specified
     commit_footer = f"\nBug: {args.buganizer_id}" if args.buganizer_id else ""
+    lin_arm_bullet = f"\n- go/ab/{args.lin_arm_bid}" if getattr(args, "lin_arm_bid", None) else ""
+    lin_arm_flag = f"            --lin-arm-bid {args.lin_arm_bid} \\\n" if getattr(args, "lin_arm_bid", None) else ""
 
     commit_msg = f"""
 
@@ -169,7 +176,7 @@ The build is based on http://go/ag/{args.cl}, with presubmit build targets:
 
 - go/ab/{args.mac_bid}
 - go/ab/{args.win_bid}
-- go/ab/{args.lin_bid}
+- go/ab/{args.lin_bid}{lin_arm_bullet}
 
 You can recreate the commit by running:
 
@@ -180,7 +187,7 @@ You can recreate the commit by running:
             --mac-bid {args.mac_bid} \\
             --win-bid {args.win_bid} \\
             --lin-bid {args.lin_bid} \\
-            --re {args.reviewers} \\
+{lin_arm_flag}            --re {args.reviewers} \\
 
 ```
 {commit_footer}
@@ -280,6 +287,8 @@ def fetch_and_merge(args):
         "emulator_mac_aarch64": ("darwin-arm64", args.mac_bid),
         "emulator_linux_x64": ("linux-x86_64", args.lin_bid),
     }
+    if getattr(args, "lin_arm_bid", None):
+        targets["emulator_linux_aarch64"] = ("linux-aarch64", args.lin_arm_bid)
 
     dest = Path(args.dest)
     dest.mkdir(parents=True, exist_ok=True)
@@ -303,7 +312,10 @@ def fetch_and_merge(args):
         "@platforms//os:macos",
         "--buildfile",
         str(dest / "platform" / "BUILD.linux-x86_64"),
-        "@platforms//os:linux",
+        "@goldfish_build//platforms:is_linux_x64",
+        "--buildfile",
+        str(dest / "platform" / "BUILD.linux-aarch64"),
+        "@goldfish_build//platforms:is_linux_aarch64",
         "--verbatim-buildfile",
         str(qemu / "google" / "build" / "BUILD.common"),
         "--unique",
@@ -403,6 +415,13 @@ def main():
         help="Linux build from which we will fetch bazel-linux-x86_64-{lin-bid}.zip (auto-detected from Gerrit if omitted)",
     )
     parser.add_argument(
+        "--lin-arm-bid",
+        type=str,
+        required=False,
+        default=None,
+        help="Linux ARM64 build from which we will fetch bazel-linux-aarch64-{lin-arm-bid}.zip (auto-detected from Gerrit if omitted)",
+    )
+    parser.add_argument(
         "--mac-bid",
         type=str,
         required=False,
@@ -453,6 +472,8 @@ def main():
         found_bids = fetch_presubmit_bids(args.cl, revision, gerrit_token)
         if not args.lin_bid:
             args.lin_bid = found_bids.get("lin_bid")
+        if not args.lin_arm_bid:
+            args.lin_arm_bid = found_bids.get("lin_arm_bid")
         if not args.win_bid:
             args.win_bid = found_bids.get("win_bid")
         if not args.mac_bid:
@@ -461,7 +482,7 @@ def main():
         missing = [
             task
             for task, attr in PRESUBMIT_BUILD_TASKS.items()
-            if not getattr(args, attr)
+            if task not in OPTIONAL_PRESUBMIT_BUILD_TASKS and not getattr(args, attr)
         ]
         if missing:
             raise ValueError(
