@@ -127,34 +127,35 @@ struct VirtQueue
 
     /* Next head to pop */
     uint16_t last_avail_idx;
-    bool last_avail_wrap_counter;
 
     /* Last avail_idx read from VQ. */
     uint16_t shadow_avail_idx;
-    bool shadow_avail_wrap_counter;
 
     uint16_t used_idx;
-    bool used_wrap_counter;
 
     /* Last used index value we have signalled on */
     uint16_t signalled_used;
+
+    uint16_t queue_index;
+    uint16_t vector;
+
+    unsigned int inuse;
+
+    bool last_avail_wrap_counter;
+    bool shadow_avail_wrap_counter;
+    bool used_wrap_counter;
 
     /* Last used index value we have signalled on */
     bool signalled_used_valid;
 
     /* Notification enabled? */
     bool notification;
+    bool host_notifier_enabled;
 
-    uint16_t queue_index;
-
-    unsigned int inuse;
-
-    uint16_t vector;
     VirtIOHandleOutput handle_output;
     VirtIODevice *vdev;
     EventNotifier guest_notifier;
     EventNotifier host_notifier;
-    bool host_notifier_enabled;
     QLIST_ENTRY(VirtQueue) node;
 };
 
