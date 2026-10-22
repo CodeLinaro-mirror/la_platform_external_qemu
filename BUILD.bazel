@@ -7,6 +7,14 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "objc_library")
 load("@rules_license//rules:license.bzl", "license")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("google/build/cc_interface_binary.bzl", "cc_interface_binary")
+load(
+    "google/build/qtest.bzl",
+    "QTEST_COPTS",
+    "QTEST_LOCAL_DEFINES",
+    "QTEST_TARGET_COMPATIBLE_WITH",
+    "qemu_qtest",
+    "qemu_qtest_goldfish_stub",
+)
 
 package(
     default_applicable_licenses = [":license"],
@@ -25,6 +33,7 @@ license(
 exports_files([
     "COPYING",
     "google/build/darwin-entitlements.plist",
+    "google/system/qtest_goldfish_stub.c",
 ])
 
 filegroup(
@@ -424,6 +433,282 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [":qemu-headers"],
+)
+
+filegroup(
+    name = "qtest-roms",
+    srcs = glob([
+        "pc-bios/*.bin",
+        "pc-bios/*.rom",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+qemu_qtest_goldfish_stub(name = "goldfish_x86_64")
+
+qemu_qtest_goldfish_stub(name = "goldfish_aarch64")
+
+cc_library(
+    name = "libqos",
+    testonly = True,
+    srcs = [
+        "google/system/qtest_env_init.c",
+        "tests/qtest/libqmp.c",
+        "tests/qtest/libqos/aarch64-xlnx-zcu102-machine.c",
+        "tests/qtest/libqos/ahci.c",
+        "tests/qtest/libqos/arm-imx25-pdk-machine.c",
+        "tests/qtest/libqos/arm-raspi2-machine.c",
+        "tests/qtest/libqos/arm-sabrelite-machine.c",
+        "tests/qtest/libqos/arm-smdkc210-machine.c",
+        "tests/qtest/libqos/arm-virt-machine.c",
+        "tests/qtest/libqos/arm-xilinx-zynq-a9-machine.c",
+        "tests/qtest/libqos/e1000e.c",
+        "tests/qtest/libqos/fw_cfg.c",
+        "tests/qtest/libqos/generic-pcihost.c",
+        "tests/qtest/libqos/i2c.c",
+        "tests/qtest/libqos/i2c-imx.c",
+        "tests/qtest/libqos/i2c-omap.c",
+        "tests/qtest/libqos/igb.c",
+        "tests/qtest/libqos/libqos.c",
+        "tests/qtest/libqos/libqos-malloc.c",
+        "tests/qtest/libqos/libqos-pc.c",
+        "tests/qtest/libqos/libqos-spapr.c",
+        "tests/qtest/libqos/loongarch-virt-machine.c",
+        "tests/qtest/libqos/malloc-pc.c",
+        "tests/qtest/libqos/malloc-spapr.c",
+        "tests/qtest/libqos/pci.c",
+        "tests/qtest/libqos/pci-pc.c",
+        "tests/qtest/libqos/pci-spapr.c",
+        "tests/qtest/libqos/ppc64_pseries-machine.c",
+        "tests/qtest/libqos/qgraph.c",
+        "tests/qtest/libqos/qos-iommu-testdev.c",
+        "tests/qtest/libqos/qos-smmuv3.c",
+        "tests/qtest/libqos/qos_external.c",
+        "tests/qtest/libqos/riscv-virt-machine.c",
+        "tests/qtest/libqos/rtas.c",
+        "tests/qtest/libqos/sdhci.c",
+        "tests/qtest/libqos/sdhci-cmd.c",
+        "tests/qtest/libqos/tpci200.c",
+        "tests/qtest/libqos/usb.c",
+        "tests/qtest/libqos/vhost-user-blk.c",
+        "tests/qtest/libqos/virtio.c",
+        "tests/qtest/libqos/virtio-balloon.c",
+        "tests/qtest/libqos/virtio-blk.c",
+        "tests/qtest/libqos/virtio-gpio.c",
+        "tests/qtest/libqos/virtio-iommu.c",
+        "tests/qtest/libqos/virtio-mmio.c",
+        "tests/qtest/libqos/virtio-net.c",
+        "tests/qtest/libqos/virtio-pci.c",
+        "tests/qtest/libqos/virtio-pci-modern.c",
+        "tests/qtest/libqos/virtio-rng.c",
+        "tests/qtest/libqos/virtio-scmi.c",
+        "tests/qtest/libqos/virtio-scsi.c",
+        "tests/qtest/libqos/virtio-serial.c",
+        "tests/qtest/libqos/x86_64_pc-machine.c",
+        "tests/qtest/libqtest.c",
+    ],
+    hdrs = glob(["tests/qtest/**/*.h"]) + [
+        "ebpf/ebpf_rss.h",
+        "hw/i386/amd_iommu.h",
+        "hw/i386/intel_iommu_internal.h",
+        "hw/intc/pnv_xive2_regs.h",
+        "hw/net/e1000_regs.h",
+        "hw/net/e1000x_regs.h",
+        "hw/net/igb_regs.h",
+        "hw/net/tulip.h",
+        "hw/riscv/riscv-iommu-bits.h",
+        "tests/unit/socket-helpers.h",
+    ],
+    copts = QTEST_COPTS,
+    includes = [
+        "tests/qtest",
+        "tests/qtest/libqos",
+    ],
+    local_defines = QTEST_LOCAL_DEFINES,
+    target_compatible_with = QTEST_TARGET_COMPATIBLE_WITH,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":libprintstub",
+        ":libqemuutil",
+        ":qemu-headers",
+    ] + select({
+        "@goldfish_build//platforms:is_linux_x64": [
+            "//google/compat/linux:compat",
+        ],
+        "//conditions:default": [],
+    }),
+    alwayslink = True,
+)
+
+cc_library(
+    name = "libqos_tests",
+    testonly = True,
+    srcs = [
+        "tests/qtest/pci-test.c",
+        "tests/qtest/virtio-blk-test.c",
+        "tests/qtest/virtio-iommu-test.c",
+        "tests/qtest/virtio-net-test.c",
+        "tests/qtest/virtio-rng-test.c",
+        "tests/qtest/virtio-scsi-test.c",
+        "tests/qtest/virtio-serial-test.c",
+        "tests/qtest/virtio-test.c",
+    ],
+    copts = QTEST_COPTS,
+    local_defines = QTEST_LOCAL_DEFINES,
+    target_compatible_with = QTEST_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":libqos",
+        ":qemu-headers",
+    ],
+    alwayslink = True,
+)
+
+qemu_qtest(
+    name = "qmp-test",
+    srcs = ["tests/qtest/qmp-test.c"],
+)
+
+qemu_qtest(
+    name = "qmp-test-aarch64",
+    srcs = ["tests/qtest/qmp-test.c"],
+    arch = "aarch64",
+)
+
+qemu_qtest(
+    name = "machine-none-test",
+    srcs = ["tests/qtest/machine-none-test.c"],
+)
+
+qemu_qtest(
+    name = "machine-none-test-aarch64",
+    srcs = ["tests/qtest/machine-none-test.c"],
+    arch = "aarch64",
+)
+
+qemu_qtest(
+    name = "numa-test",
+    srcs = ["tests/qtest/numa-test.c"],
+)
+
+qemu_qtest(
+    name = "numa-test-aarch64",
+    srcs = ["tests/qtest/numa-test.c"],
+    arch = "aarch64",
+)
+
+qemu_qtest(
+    name = "arm-cpu-features",
+    srcs = ["tests/qtest/arm-cpu-features.c"],
+    arch = "aarch64",
+)
+
+qemu_qtest(
+    name = "fw_cfg-test",
+    srcs = ["tests/qtest/fw_cfg-test.c"],
+)
+
+qemu_qtest(
+    name = "i440fx-test",
+    srcs = ["tests/qtest/i440fx-test.c"],
+)
+
+qemu_qtest(
+    name = "rtc-test",
+    srcs = ["tests/qtest/rtc-test.c"],
+)
+
+qemu_qtest(
+    name = "virtio-balloon-test",
+    srcs = ["tests/qtest/virtio-balloon-test.c"],
+)
+
+qemu_qtest(
+    name = "device-plug-test",
+    srcs = ["tests/qtest/device-plug-test.c"],
+)
+
+qemu_qtest(
+    name = "drive_del-test",
+    srcs = ["tests/qtest/drive_del-test.c"],
+)
+
+qemu_qtest(
+    name = "cpu-plug-test",
+    srcs = ["tests/qtest/cpu-plug-test.c"],
+)
+
+qemu_qtest(
+    name = "test-netfilter",
+    srcs = ["tests/qtest/test-netfilter.c"],
+)
+
+qemu_qtest(
+    name = "netdev-socket",
+    srcs = [
+        "tests/qtest/netdev-socket.c",
+        "tests/unit/socket-helpers.c",
+    ],
+)
+
+qemu_qtest(
+    name = "netdev-socket-aarch64",
+    srcs = [
+        "tests/qtest/netdev-socket.c",
+        "tests/unit/socket-helpers.c",
+    ],
+    arch = "aarch64",
+)
+
+qemu_qtest(
+    name = "qos-test",
+    srcs = ["tests/qtest/qos-test.c"],
+    deps = [":libqos_tests"],
+)
+
+qemu_qtest(
+    name = "qos-test-aarch64",
+    srcs = ["tests/qtest/qos-test.c"],
+    arch = "aarch64",
+    deps = [":libqos_tests"],
+)
+
+test_suite(
+    name = "qtest_x86_64",
+    tests = [
+        ":cpu-plug-test",
+        ":device-plug-test",
+        ":drive_del-test",
+        ":fw_cfg-test",
+        ":i440fx-test",
+        ":machine-none-test",
+        ":netdev-socket",
+        ":numa-test",
+        ":qmp-test",
+        ":qos-test",
+        ":rtc-test",
+        ":test-netfilter",
+        ":virtio-balloon-test",
+    ],
+)
+
+test_suite(
+    name = "qtest_aarch64",
+    tests = [
+        ":arm-cpu-features",
+        ":machine-none-test-aarch64",
+        ":netdev-socket-aarch64",
+        ":numa-test-aarch64",
+        ":qmp-test-aarch64",
+        ":qos-test-aarch64",
+    ],
+)
+
+test_suite(
+    name = "qtest",
+    tests = [
+        ":qtest_aarch64",
+        ":qtest_x86_64",
+    ],
 )
 
 cc_binary(

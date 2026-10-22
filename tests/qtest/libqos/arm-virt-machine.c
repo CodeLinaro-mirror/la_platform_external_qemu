@@ -97,6 +97,9 @@ static void virt_machine_register_nodes(void)
     qos_node_create_machine_args("aarch64/virt", qos_create_machine_arm_virt,
                                  " -cpu max");
     qos_node_contains("aarch64/virt", "generic-pcihost", NULL);
+#ifdef CONFIG_ANDROID
+    qos_node_contains("aarch64/virt", "virtio-mmio", NULL);
+#endif
 }
 
 libqos_init(virt_machine_register_nodes);
