@@ -1285,6 +1285,13 @@ static void updateLibrarySearchPath(bool isHeadless,
     bool forceSwAngle = false;
 #if defined(__APPLE__)
     forceSwAngle = true;
+#elif defined(__linux__)
+    const char* selectSws =
+            getenv("ANDROID_EMU_LAVAPIPE_GL_MODE_SWIFTSHADER");
+    bool force_swiftshader =
+            (selectSws && strcmp(selectSws, "1") == 0) ||
+            (gpu && strncmp(gpu, "swiftshader", 11) == 0);
+    forceSwAngle = !force_swiftshader;
 #else
     if (gpu) {
         if (strcmp(gpu, "lavapipe") == 0) {
