@@ -824,16 +824,24 @@ struct MemoryRegion {
 
     /* The following fields should fit in a cache line */
     bool romd_mode;
-    bool ram;
-    bool subpage;
-    bool readonly; /* For RAM regions */
-    bool nonvolatile;
-    bool rom_device;
-    bool flush_coalesced_mmio;
-    bool lockless_io;
-    bool unmergeable;
+    bool enabled;
     uint8_t dirty_log_mask;
-    bool is_iommu;
+    uint8_t vga_logging_count;
+
+    bool ram : 1;
+    bool subpage : 1;
+    bool readonly : 1; /* For RAM regions */
+    bool nonvolatile : 1;
+    bool rom_device : 1;
+    bool flush_coalesced_mmio : 1;
+    bool lockless_io : 1;
+    bool unmergeable : 1;
+    bool is_iommu : 1;
+    bool terminates : 1;
+    bool ram_device : 1;
+    /* For devices designed to perform re-entrant IO into their own IO MRs */
+    bool disable_reentrancy_guard : 1;
+
     RAMBlock *ram_block;
     Object *owner;
     /* owner as TYPE_DEVICE. Used for re-entrancy checks in MR access hotpath */
@@ -847,10 +855,6 @@ struct MemoryRegion {
     hwaddr addr;
     void (*destructor)(MemoryRegion *mr);
     uint64_t align;
-    bool terminates;
-    bool ram_device;
-    bool enabled;
-    uint8_t vga_logging_count;
     MemoryRegion *alias;
     hwaddr alias_offset;
     int32_t priority;
@@ -861,9 +865,6 @@ struct MemoryRegion {
     unsigned ioeventfd_nb;
     MemoryRegionIoeventfd *ioeventfds;
     RamDiscardManager *rdm; /* Only for RAM */
-
-    /* For devices designed to perform re-entrant IO into their own IO MRs */
-    bool disable_reentrancy_guard;
 };
 
 struct IOMMUMemoryRegion {
