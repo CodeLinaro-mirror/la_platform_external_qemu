@@ -75,6 +75,8 @@ cc_library(
     hdrs = [
         "config-poison.h",
         "generate_shared_QAPI_source_files",
+        "google/drivers/hw/acpi/goldfish_defs.h",
+        "google/drivers/hw/i386/goldfish_board.h",
         "google/drivers/trace/goldfish.h",
         "qapi/trace.h",
         "trace/trace-accel_kvm.h",

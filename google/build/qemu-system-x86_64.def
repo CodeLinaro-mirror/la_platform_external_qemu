@@ -98,11 +98,15 @@ EXPORTS
     load_snapshot_resume
     machine_current_cpu_type
     memory_region_add_subregion
+    memory_region_add_subregion_overlap
     memory_region_del_subregion
     memory_region_init
     memory_region_init_ram_ptr
     memory_region_init_io
+    memory_region_set_enabled
     memory_region_size
+    memory_region_transaction_begin
+    memory_region_transaction_commit
     message_with_timestamp
     migrate_add_blocker
     migrate_del_blocker
@@ -164,6 +168,7 @@ EXPORTS
     pci_address_space
     pci_address_space_io
     pci_register_bar
+    pci_set_irq
     pci_std_vga_mmio_region_init
     qapi_enum_lookup
     qapi_event_send_device_deleted

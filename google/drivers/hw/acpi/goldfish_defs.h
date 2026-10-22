@@ -77,15 +77,20 @@
 #define GOLDFISH_ADDRESS_SPACE_AREA_NAME            "goldfish_address_space_area"
 
 
-#define GOLDFISH_ONE_KB 1024
-#define GOLDFISH_ONE_MB 1024 * GOLDFISH_ONE_KB
-#define GOLDFISH_ONE_GB 1024 * GOLDFISH_ONE_MB
+#define GOLDFISH_ONE_KB (1024ULL)
+#define GOLDFISH_ONE_MB (1024ULL * GOLDFISH_ONE_KB)
+#define GOLDFISH_ONE_GB (1024ULL * GOLDFISH_ONE_MB)
 
 #if defined(__APPLE__) && defined(__arm64__)
 // Apple Silicon only has 36 bits of address space. Be more conservative here.
-#define GOLDFISH_ADDRESS_SPACE_AREA_SIZE            (8 * GOLDFISH_ONE_GB)
+#define GOLDFISH_ADDRESS_SPACE_AREA_SIZE            (8ULL * GOLDFISH_ONE_GB)
 #else
-#define GOLDFISH_ADDRESS_SPACE_AREA_SIZE            (16 * GOLDFISH_ONE_GB)
+#define GOLDFISH_ADDRESS_SPACE_AREA_SIZE            (16ULL * GOLDFISH_ONE_GB)
+#endif
+
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+_Static_assert(GOLDFISH_ADDRESS_SPACE_AREA_SIZE >= (8ULL << 30),
+               "GOLDFISH_ADDRESS_SPACE_AREA_SIZE must not overflow 32-bit int");
 #endif
 
 #endif  /* !ACPI_GOLDFISH_DEFS_H */
