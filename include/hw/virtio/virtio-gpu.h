@@ -307,12 +307,30 @@ struct MemoryRegionInfo {
 };
 
 struct rutabaga;
+struct virtio_gpu_rutabaga_async_signaled_fence;
 
 struct VirtIOGPURutabaga {
     VirtIOGPU parent_obj;
     struct VMChangeStateEntry* vm_state_entry;
     struct MemoryRegionInfo memory_regions[MAX_SLOTS];
     QTAILQ_HEAD(, virtio_gpu_rutabaga_context) contexts;
+    /*
+     * Fences the renderer has signaled (pushed from its own worker threads)
+     * but that the main loop has not yet matched against g->fenceq and
+     * delivered to the guest.
+     */
+    QSLIST_HEAD(, virtio_gpu_rutabaga_async_signaled_fence)
+        async_signaled_fenceq;
+    QEMUBH *async_signaled_fence_bh;
+    /*
+     * True from the moment virtio_gpu_rutabaga_load() starts rutabaga_restore()
+     * until virtio_gpu_post_load() has finished.  If a reset or another
+     * pre_load sees it set, a restore never completed (it failed in this
+     * device or load_snapshot() bailed out on a later one) and the rutabaga
+     * instance may hold objects QEMU's tables know nothing about: force
+     * virtio_gpu_rutabaga_reinit().  Cleared by virtio_gpu_rutabaga_init().
+     */
+    bool restore_incomplete;
     uint64_t capset_mask;
     char *wayland_socket_path;
     char *wsi;
