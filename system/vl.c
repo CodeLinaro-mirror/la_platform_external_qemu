@@ -84,6 +84,7 @@
 #include "migration/cpr.h"
 #include "migration/misc.h"
 #include "migration/snapshot.h"
+#include "block/snapshot.h"
 #include "system/tpm.h"
 #include "system/dma.h"
 #include "hw/audio/model.h"
@@ -3492,6 +3493,9 @@ void qemu_init(int argc, char **argv)
               break;
             case QEMU_OPTION_savevm:
                 savevm = optarg;
+                break;
+            case QEMU_OPTION_vmstate_node:
+                bdrv_set_default_vmstate_node(optarg);
                 break;
             case QEMU_OPTION_full_screen:
                 dpy.has_full_screen = true;
