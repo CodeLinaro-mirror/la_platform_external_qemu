@@ -29,7 +29,9 @@
 #include <string_view>
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -71,6 +73,38 @@ static std::string formatFilename(std::string_view sessionId,
     return StringFormat("emulator-metrics-%s-%d-%d%s", sessionId.data(),
                         static_cast<int>(System::get()->getCurrentProcessId()),
                         counter, extension.data());
+}
+
+static bool parseOpenFilename(std::string_view file,
+                              std::string* sessionId,
+                              int* filenameCounter) {
+    static constexpr std::string_view kPrefix = "emulator-metrics-";
+    if (file.size() <= kPrefix.size() + kTempExtension.size() ||
+        file.substr(0, kPrefix.size()) != kPrefix ||
+        file.substr(file.size() - kTempExtension.size()) != kTempExtension) {
+        return false;
+    }
+    const std::string_view stem =
+            file.substr(kPrefix.size(),
+                        file.size() - kPrefix.size() - kTempExtension.size());
+    const size_t lastDash = stem.rfind('-');
+    if (lastDash == std::string_view::npos || lastDash == 0) {
+        return false;
+    }
+    const size_t pidDash = stem.rfind('-', lastDash - 1);
+    if (pidDash == std::string_view::npos || pidDash == 0) {
+        return false;
+    }
+    const std::string counterStr(stem.substr(lastDash + 1));
+    const std::string pidStr(stem.substr(pidDash + 1, lastDash - pidDash - 1));
+    int pid = 0;
+    char tail = '\0';
+    if (sscanf(pidStr.c_str(), "%d%c", &pid, &tail) != 1 ||
+        sscanf(counterStr.c_str(), "%d%c", filenameCounter, &tail) != 1) {
+        return false;
+    }
+    *sessionId = std::string(stem.substr(0, pidDash));
+    return !sessionId->empty();
 }
 
 // A cross-platform function to rename an |from| file to |to| name only if |to|
@@ -145,15 +179,16 @@ FileMetricsWriter::finalizeAbandonedSessionFiles(std::string_view spoolDir) {
             continue;
         }
 
+        const std::string fullPath = PathUtils::join(spoolDir.data(), file);
+
         // try to lock the file to find out if it's abandoned
-        const auto lock = makeCustomScopedPtr(
-                filelock_create(PathUtils::join(spoolDir.data(), file).c_str()),
-                filelock_release);
+        const auto lock = makeCustomScopedPtr(filelock_create(fullPath.c_str()),
+                                              filelock_release);
         if (!lock) {
             continue;
         }
 
-        if (!System::get()->pathIsFile(PathUtils::join(spoolDir.data(), file))) {
+        if (!System::get()->pathIsFile(fullPath)) {
             D("Saw a ghost file right before it disappeared from the file "
               "system; most probably a rename: '%s'",
               file.c_str());
@@ -162,24 +197,28 @@ FileMetricsWriter::finalizeAbandonedSessionFiles(std::string_view spoolDir) {
 
         // parse the file name to get session ID and the filename counter
         int filenameCounter = 0;
-        std::string sessionId = Uuid::nullUuidStr;
-        assert(sessionId.size() >= 36);
-        int scanned = sscanf(file.c_str(), "emulator-metrics-%36s-%*d-%d",
-                             &sessionId[0], &filenameCounter);
-        assert(scanned == 2);
-        (void)scanned;
+        std::string sessionId;
+        if (!parseOpenFilename(file, &sessionId, &filenameCounter)) {
+            continue;
+        }
 
-        // now rename it
-        if (!runFileOperationWithRetries(
-                    &filenameCounter,
-                    [spoolDir, &sessionId, &filenameCounter, &file]() -> bool {
-                        const std::string finalName = PathUtils::join(
-                                spoolDir.data(),
-                                formatFilename(sessionId, filenameCounter,
-                                               kFinalExtension));
-                        return renameIfNotExists(
-                                PathUtils::join(spoolDir.data(), file), finalName);
-                    })) {
+        System::FileSize fileSize = 0;
+        if (System::get()->pathFileSize(fullPath, &fileSize) && fileSize == 0) {
+            if (HANDLE_EINTR(android_unlink(fullPath.c_str())) != 0) {
+                W("failed to delete an empty abandoned log file '%s': %s",
+                  fullPath.c_str(), strerror(errno));
+            }
+        } else if (!runFileOperationWithRetries(
+                           &filenameCounter,
+                           [spoolDir, &sessionId, &filenameCounter,
+                            &fullPath]() -> bool {
+                               const std::string finalName = PathUtils::join(
+                                       spoolDir.data(),
+                                       formatFilename(sessionId,
+                                                      filenameCounter,
+                                                      kFinalExtension));
+                               return renameIfNotExists(fullPath, finalName);
+                           })) {
             W("failed to rename an abandoned log file '%s'", file.c_str());
         }
 
@@ -222,49 +261,54 @@ void FileMetricsWriter::finalizeActiveFileNoLock() {
     advanceFilenameCounter(&mFilenameCounter);
 }
 
-void FileMetricsWriter::openNewFileNoLock() {
-    std::string newName;
-    int fd = -1;
-    if (!runFileOperationWithRetries(
-                &mFilenameCounter, [this, &newName, &fd]() -> bool {
-                    std::string testName = PathUtils::join(
-                            mSpoolDir,
-                            formatFilename(sessionId(), mFilenameCounter,
-                                           kTempExtension));
+std::optional<FileMetricsWriter::LockedOpenFile>
+FileMetricsWriter::createLockedOpenFile(std::string_view spoolDir,
+                                        std::string_view sessionId,
+                                        int* filenameCounter) {
+    std::optional<LockedOpenFile> result;
+    runFileOperationWithRetries(filenameCounter, [&]() -> bool {
+        std::string path = PathUtils::join(
+                spoolDir.data(),
+                formatFilename(sessionId, *filenameCounter, kTempExtension));
 
-                    mActiveFileLock.reset(filelock_create(testName.c_str()));
-                    if (!mActiveFileLock) {
-                        return false;
-                    }
-                    const int testFd = HANDLE_EINTR(
-                            open(testName.c_str(),
-                                 O_WRONLY | O_CREAT | O_EXCL | kCommonOpenFlags,
-                                 S_IREAD | S_IWRITE));
-                    if (testFd < 0) {
-                        mActiveFileLock.reset();
-                        return false;
-                    }
-                    newName = std::move(testName);
-                    fd = testFd;
-                    return true;
-                })) {
+        auto lock = makeCustomScopedPtr(filelock_create(path.c_str()),
+                                        filelock_release);
+        if (!lock) {
+            return false;
+        }
+        const int fd = HANDLE_EINTR(android_open(
+                path.c_str(), O_WRONLY | O_CREAT | O_EXCL | kCommonOpenFlags,
+                S_IREAD | S_IWRITE));
+        if (fd < 0) {
+            return false;
+        }
+        result = LockedOpenFile{fd, std::move(path), std::move(lock)};
+        return true;
+    });
+    return result;
+}
+
+void FileMetricsWriter::openNewFileNoLock() {
+    auto file = createLockedOpenFile(mSpoolDir, sessionId(), &mFilenameCounter);
+    if (!file) {
         W("failed to open a new log file");
         return;
     }
 
-    assert(fd >= 0);
-    assert(!newName.empty());
+    assert(file->fd >= 0);
+    assert(!file->path.empty());
 
-    mActiveFile = absl::make_unique<google::protobuf::io::FileOutputStream>(fd);
+    mActiveFile =
+            absl::make_unique<google::protobuf::io::FileOutputStream>(file->fd);
     if (!mActiveFile) {
         E("memory allocation failed");
-        close(fd);
-        HANDLE_EINTR(android_unlink(newName.c_str()));
-        mActiveFileLock.reset();
+        close(file->fd);
+        HANDLE_EINTR(android_unlink(file->path.c_str()));
         return;
     }
     mActiveFile->SetCloseOnDelete(true);
-    mActiveFileName = std::move(newName);
+    mActiveFileName = std::move(file->path);
+    mActiveFileLock = std::move(file->lock);
     mRecordCount = 0;
 
     D("opened new metrics file %s", mActiveFileName.c_str());
