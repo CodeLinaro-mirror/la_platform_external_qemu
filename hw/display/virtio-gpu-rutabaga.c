@@ -162,6 +162,55 @@ rutabaga_cmd_create_resource_3d(VirtIOGPU *g,
     QTAILQ_INSERT_HEAD(&g->reslist, res, next);
 }
 
+static void
+rutabaga_unmap_slot(VirtIOGPUBase *vb, struct MemoryRegionInfo *slot)
+{
+    if (slot->used && slot->mr.container == &vb->hostmem) {
+        memory_region_del_subregion(&vb->hostmem, &slot->mr);
+        object_unparent(OBJECT(&slot->mr));
+    }
+    slot->used = 0;
+    slot->resource_id = 0;
+    slot->offset = 0;
+}
+
+static void
+rutabaga_unmap_all_slots(VirtIOGPURutabaga *vgr)
+{
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
+
+    memory_region_transaction_begin();
+    for (int slot = 0; slot < MAX_SLOTS; slot++) {
+        rutabaga_unmap_slot(vb, &vgr->memory_regions[slot]);
+    }
+    memory_region_transaction_commit();
+}
+
+static bool
+rutabaga_unmap_resource_slot(VirtIOGPURutabaga *vgr, uint32_t resource_id,
+                             bool unmap_in_rutabaga)
+{
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
+
+    for (uint32_t slot = 0; slot < MAX_SLOTS; slot++) {
+        if (!vgr->memory_regions[slot].used ||
+            vgr->memory_regions[slot].resource_id != resource_id) {
+            continue;
+        }
+        rutabaga_unmap_slot(vb, &vgr->memory_regions[slot]);
+        if (unmap_in_rutabaga && vgr->rutabaga) {
+            int32_t unmap_res = rutabaga_resource_unmap(vgr->rutabaga,
+                                                        resource_id);
+            if (unmap_res != 0) {
+                warn_report("%s: rutabaga_resource_unmap(%"PRIu32") returned "
+                            "%"PRIi32, __func__, resource_id, unmap_res);
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 /*
  * Drops every scanout and cursor reference to `res`.  res->scanout_bitmask
  * has exactly one bit per scanout that currently shows the resource, so the
@@ -201,16 +250,25 @@ virtio_gpu_rutabaga_resource_unref(VirtIOGPU *g,
     int32_t result;
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
-    result = rutabaga_resource_unref(vr->rutabaga, res->resource_id);
-    if (result) {
-        error_setg_errno(errp,
-                        (int)result,
-                        "%s: rutabaga_resource_unref returned %"PRIi32
-                        " for resource_id = %"PRIu32, __func__, result,
-                        res->resource_id);
-    }
-
+    /*
+     * Drop the BAR window and the guest DMA mapping before the backend
+     * object goes away, so that nothing can still address the memory a blob
+     * resource backed.  Also covers a guest that unrefs a mapped blob without
+     * sending UNMAP_BLOB first.
+     */
+    rutabaga_unmap_resource_slot(vr, res->resource_id, true);
+    virtio_gpu_cleanup_mapping(g, res);
     rutabaga_detach_resource_from_scanouts(VIRTIO_GPU_BASE(g), res);
+
+    if (vr->rutabaga) {
+        result = rutabaga_resource_unref(vr->rutabaga, res->resource_id);
+        if (result) {
+            error_setg_errno(errp, (int)result,
+                             "%s: rutabaga_resource_unref returned %"PRIi32
+                             " for resource_id = %"PRIu32, __func__, result,
+                             res->resource_id);
+        }
+    }
 
     g_clear_pointer(&res->image, pixman_image_unref);
 
@@ -901,11 +959,8 @@ rutabaga_cmd_resource_unmap_blob(VirtIOGPU *g,
                                  struct virtio_gpu_ctrl_command *cmd)
 {
     int32_t result;
-    uint32_t slot = 0;
     struct virtio_gpu_simple_resource *res;
     struct virtio_gpu_resource_unmap_blob ublob;
-
-    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
 
     VIRTIO_GPU_FILL_CMD(ublob);
@@ -915,21 +970,9 @@ rutabaga_cmd_resource_unmap_blob(VirtIOGPU *g,
     res = virtio_gpu_find_resource(g, ublob.resource_id);
     CHECK(res, cmd);
 
-    for (slot = 0; slot < MAX_SLOTS; slot++) {
-        if (vr->memory_regions[slot].resource_id != ublob.resource_id) {
-            continue;
-        }
+    bool unmapped_slot = rutabaga_unmap_resource_slot(vr, ublob.resource_id, false);
+    CHECK(unmapped_slot, cmd);
 
-        MemoryRegion *mr = &(vr->memory_regions[slot].mr);
-        memory_region_del_subregion(&vb->hostmem, mr);
-        object_unparent(OBJECT(mr));
-
-        vr->memory_regions[slot].resource_id = 0;
-        vr->memory_regions[slot].used = 0;
-        break;
-    }
-
-    CHECK(slot < MAX_SLOTS, cmd);
     result = rutabaga_resource_unmap(vr->rutabaga, res->resource_id);
     CHECK(!result, cmd);
 }
@@ -1240,6 +1283,7 @@ static bool virtio_gpu_rutabaga_init(VirtIOGPU *g, Error **errp)
     VirtIOGPUBase *base = VIRTIO_GPU_BASE(g);
     VirtIOGPURutabaga *vr = VIRTIO_GPU_RUTABAGA(g);
     vr->rutabaga = NULL;
+    vr->restore_incomplete = false;
     QTAILQ_INIT(&vr->contexts);
 
     builder.wsi = RUTABAGA_WSI_SURFACELESS;
@@ -1516,39 +1560,9 @@ static bool virtio_gpu_rutabaga_instance_in_use(VirtIOGPURutabaga *vgr)
     return false;
 }
 
-/*
- * `was_in_use` is virtio_gpu_rutabaga_instance_in_use() sampled by the caller
- * *before* virtio_gpu_reset() emptied the lists it looks at; an instance that
- * ran guest work must be recreated so that no late fence signal from its
- * worker threads can reach the next session.
- */
-static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g, bool was_in_use)
+static void rutabaga_free_all_contexts(VirtIOGPURutabaga *vgr)
 {
-    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
-    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
     struct virtio_gpu_rutabaga_context *ctx, *next_ctx;
-    Error *local_err = NULL;
-    int slot;
-
-    if (vgr->rutabaga && !was_in_use) {
-        return;
-    }
-
-    memory_region_transaction_begin();
-    for (slot = 0; slot < MAX_SLOTS; slot++) {
-        MemoryRegion* mr = &(vgr->memory_regions[slot].mr);
-        if (!vgr->memory_regions[slot].used) {
-            continue;
-        }
-        if (mr->container == &vb->hostmem) {
-            memory_region_del_subregion(&vb->hostmem, mr);
-            object_unparent(OBJECT(mr));
-        }
-        vgr->memory_regions[slot].used = 0;
-        vgr->memory_regions[slot].resource_id = 0;
-        vgr->memory_regions[slot].offset = 0;
-    }
-    memory_region_transaction_commit();
 
     QTAILQ_FOREACH_SAFE(ctx, &vgr->contexts, next, next_ctx) {
         struct virtio_gpu_rutabaga_resource *res, *next_res;
@@ -1559,10 +1573,19 @@ static void virtio_gpu_rutabaga_reset_state(VirtIOGPU *g, bool was_in_use)
         QTAILQ_REMOVE(&vgr->contexts, ctx, next);
         g_free(ctx);
     }
+}
 
-    rutabaga_finish(&vgr->rutabaga);
+static void virtio_gpu_rutabaga_reinit(VirtIOGPU *g)
+{
+    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
+    Error *local_err = NULL;
+
+    if (vgr->rutabaga) {
+        rutabaga_finish(&vgr->rutabaga);
+    }
     /* Drop any fence completions emitted while rutabaga_finish tore down workers. */
     virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
+
     if (!virtio_gpu_rutabaga_init(g, &local_err)) {
         error_report_err(local_err);
     }
@@ -1699,6 +1722,14 @@ static int virtio_gpu_rutabaga_load(QEMUFile *f, void *opaque, size_t size,
      * may be thrown away.
      */
     virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
+    /*
+     * Mark the restore as incomplete before calling rutabaga_restore() so
+     * that if rutabaga_restore(), the stream parsing below, or any later
+     * device's post_load fails, the fallback cold-boot reset still tears
+     * down and re-initializes the Rutabaga instance.  Cleared only once
+     * virtio_gpu_post_load() has finished.
+     */
+    vgr->restore_incomplete = true;
     if (rutabaga_restore(vgr->rutabaga, renderer_dir)) {
         error_report("failed to restore rutabaga from %s", renderer_dir);
         return -EINVAL;
@@ -1871,13 +1902,42 @@ static void virtio_gpu_rutabaga_remove_dir_recursive(const char *path)
     g_rmdir(path);
 }
 
+static int rutabaga_save_renderer_staged(VirtIOGPURutabaga *vgr,
+                                         const char *renderer_dir)
+{
+    g_autofree char *staging_dir = g_strdup_printf("%s.tmp", renderer_dir);
+
+    virtio_gpu_rutabaga_remove_dir_recursive(staging_dir);
+    if (g_mkdir_with_parents(staging_dir, 0755) == -1) {
+        error_report("Failed to create staging directory %s: %s",
+                     staging_dir, g_strerror(errno));
+        return -EINVAL;
+    }
+
+    if (rutabaga_snapshot(vgr->rutabaga, staging_dir)) {
+        error_report("Failed to save graphics to %s", staging_dir);
+        virtio_gpu_rutabaga_remove_dir_recursive(staging_dir);
+        return -EINVAL;
+    }
+
+    /* Only the renderer state of *this* snapshot is replaced. */
+    virtio_gpu_rutabaga_remove_dir_recursive(renderer_dir);
+    if (g_rename(staging_dir, renderer_dir) != 0) {
+        error_report("Failed to rename %s to %s: %s",
+                     staging_dir, renderer_dir, g_strerror(errno));
+        virtio_gpu_rutabaga_remove_dir_recursive(staging_dir);
+        return -EINVAL;
+    }
+    return 0;
+}
+
 static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
                            const VMStateField *field, JSONWriter *vmdesc)
 {
     VirtIOGPURutabaga *vgr = opaque;
     VirtIOGPU *g = &(vgr->parent_obj);
     struct virtio_gpu_simple_resource *res = NULL;
-    int i;
+    int i, ret;
     g_autofree char *renderer_dir = NULL;
 
     renderer_dir = virtio_gpu_rutabaga_renderer_dir(vgr, __func__);
@@ -1885,27 +1945,14 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
         return -EINVAL;
     }
 
-    /*
-     * Refuse before touching the disk: with pending commands the save fails,
-     * and the previous renderer state of this snapshot must survive that.
-     */
     if (!QTAILQ_EMPTY(&g->cmdq)) {
-        error_report("virtio-gpu cmdq not empty; cannot migrate");
+        error_report("%s: command queue is not empty", __func__);
         return -EBUSY;
     }
 
-    /* Only the renderer state of *this* snapshot is replaced. */
-    virtio_gpu_rutabaga_remove_dir_recursive(renderer_dir);
-
-    if (g_mkdir_with_parents(renderer_dir, 0755) == -1) {
-        error_report("Failed to create snapshot directory %s", renderer_dir);
-        return -EINVAL;
-    }
-
-    if (rutabaga_snapshot(vgr->rutabaga, renderer_dir)) {
-        error_report("Failed to save graphics to %s", renderer_dir);
-        virtio_gpu_rutabaga_remove_dir_recursive(renderer_dir);
-        return -EINVAL;
+    ret = rutabaga_save_renderer_staged(vgr, renderer_dir);
+    if (ret != 0) {
+        return ret;
     }
 
     struct virtio_gpu_rutabaga_context *ctx;
@@ -2023,8 +2070,7 @@ static int virtio_gpu_rutabaga_restore_mappings(VirtIOGPU* g) {
       error_report(
           "Failed to find metadata for mapped resource ID %u at slot %d.",
           resource_id, slot);
-      // This is a serious error: the MMIO slot points to a resource that
-      // doesn't exist.
+      memory_region_transaction_commit();
       return -EINVAL;
     }
 
@@ -2034,6 +2080,7 @@ static int virtio_gpu_rutabaga_restore_mappings(VirtIOGPU* g) {
     if (result != 0) {
       error_report("Failed to re-map Rutabaga resource %u: %d", resource_id,
                    result);
+      memory_region_transaction_commit();
       return -EINVAL;
     }
 
@@ -2282,44 +2329,32 @@ static void virtio_gpu_rutabaga_vm_state_change(void *opaque, bool running,
     }
 }
 
-static int virtio_gpu_pre_load(void* opaque) {
-  VirtIOGPURutabaga* vgr = opaque;
-  VirtIOGPU* g = &(vgr->parent_obj);
-  VirtIOGPUBase* vb = VIRTIO_GPU_BASE(g);
-  VirtIOGPURutabaga* vr = VIRTIO_GPU_RUTABAGA(g);
+static int virtio_gpu_pre_load(void *opaque)
+{
+    VirtIOGPURutabaga *vgr = opaque;
+    VirtIOGPU *g = &(vgr->parent_obj);
+    struct virtio_gpu_simple_resource *res, *tmp;
 
-  int slot;
-
-  /* Signals from the session being replaced must not reach the restored one. */
-  virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
-
-  // Use a transaction to bundle the cleanup operations
-  memory_region_transaction_begin();
-
-  for (slot = 0; slot < MAX_SLOTS; slot++) {
-    MemoryRegion* mr = &(vr->memory_regions[slot].mr);
-    if (!vr->memory_regions[slot].used) {
-      continue;
+    /*
+     * load_snapshot() runs qemu_system_reset() before qemu_loadvm_state(), so
+     * these tables are normally already empty. Clean up any residual state
+     * defensively so pre_load is self-healing on any load entry path.
+     */
+    virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
+    rutabaga_unmap_all_slots(vgr);
+    QTAILQ_FOREACH_SAFE(res, &g->reslist, next, tmp) {
+        Error *local_err = NULL;
+        virtio_gpu_rutabaga_resource_unref(g, res, &local_err);
+        if (local_err) {
+            error_report_err(local_err);
+        }
+    }
+    rutabaga_free_all_contexts(vgr);
+    if (!vgr->rutabaga || vgr->restore_incomplete) {
+        virtio_gpu_rutabaga_reinit(g);
     }
 
-    // Check if the slot's MemoryRegion is currently attached to the hostmem
-    // container. If it is, delete the subregion to clear the address space.
-    if (mr->container == &vb->hostmem) {
-      memory_region_del_subregion(&vb->hostmem, mr);
-      object_unparent(OBJECT(mr));
-    }
-
-    // Reset local metadata flags to ensure consistency before VMState
-    // overwrites them.
-    vr->memory_regions[slot].used = 0;
-    vr->memory_regions[slot].resource_id = 0;
-    vr->memory_regions[slot].offset = 0;
-  }
-
-  // Commit the changes to update QEMU's internal memory manager tables.
-  memory_region_transaction_commit();
-
-  return 0;  // Signal success
+    return 0;
 }
 
 static int virtio_gpu_post_load(void *opaque, int version_id)
@@ -2354,6 +2389,7 @@ static int virtio_gpu_post_load(void *opaque, int version_id)
     }
 
     virtio_gpu_rutabaga_complete_restored_fences(g);
+    vgr->restore_incomplete = false;
 
     /*
      * Re-kick both queues so commands that were still in the vrings at save
@@ -2453,18 +2489,40 @@ static void virtio_gpu_rutabaga_reset(VirtIODevice *vdev)
     bool was_in_use;
 
     /*
-     * Decide whether the renderer must be recreated before virtio_gpu_reset()
-     * empties the lists that answer the question.
+     * 1. Capture whether the rutabaga instance was in use (including
+     *    undelivered signaled fences) BEFORE discarding queues or resetting
+     *    parent VirtIOGPU state, which empties the lists this looks at.
      */
     was_in_use = virtio_gpu_rutabaga_instance_in_use(vgr);
+
     /*
-     * Signals for commands the reset is about to throw away must not retire
-     * the next session's fences.  reset_state() discards again after
-     * rutabaga_finish() has stopped the producer threads.
+     * 2. Discard pending signaled fences before touching device state.
+     *    Signals for commands the reset is about to throw away must not
+     *    retire the next session's fences; reinit() discards again after
+     *    rutabaga_finish() has stopped the producer threads.
      */
     virtio_gpu_rutabaga_discard_async_signaled_fences(vgr);
+
+    /* 3. Unmap BAR slots BEFORE virtio_gpu_reset unrefs resources. */
+    rutabaga_unmap_all_slots(vgr);
+
+    /*
+     * 4. Reset parent VirtIOGPU state (calls resource_destroy /
+     *    rutabaga_resource_unref per resource while vgr->rutabaga is still
+     *    live, and empties cmdq/fenceq).
+     */
     virtio_gpu_reset(vdev);
-    virtio_gpu_rutabaga_reset_state(g, was_in_use);
+
+    /* 5. Free all 3D contexts and their attached resource lists. */
+    rutabaga_free_all_contexts(vgr);
+
+    /*
+     * 6. Recreate the rutabaga instance if there is none, a restore never
+     *    completed, or it was in use; otherwise keep the pristine one.
+     */
+    if (!vgr->rutabaga || vgr->restore_incomplete || was_in_use) {
+        virtio_gpu_rutabaga_reinit(g);
+    }
 }
 
 static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
