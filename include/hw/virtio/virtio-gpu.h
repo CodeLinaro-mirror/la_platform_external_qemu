@@ -306,10 +306,9 @@ struct VhostUserGPU {
 #define MAX_SLOTS 4096
 
 struct MemoryRegionInfo {
-  hwaddr offset;  // Must be tracked to re-map later
-  int used;
-  MemoryRegion mr;
-  uint32_t resource_id;
+    hwaddr offset;  /* Must be tracked to re-map later */
+    uint32_t resource_id;
+    MemoryRegion mr;
 };
 
 struct rutabaga;
