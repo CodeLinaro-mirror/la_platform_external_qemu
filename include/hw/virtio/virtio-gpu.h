@@ -72,6 +72,12 @@ struct virtio_gpu_rutabaga_resource {
 
 struct virtio_gpu_rutabaga_context {
     uint32_t context_id;
+    /*
+     * Cached at runtime for pre-save CTX-SNAPSHOTTABLE checks; not serialized
+     * to the QEMUFile stream (gfxstream persists its own capset_id in
+     * gfxstream_frontend.txtproto).
+     */
+    uint32_t capset_id;
     QTAILQ_HEAD(, virtio_gpu_rutabaga_resource) reslist;
     QTAILQ_ENTRY(virtio_gpu_rutabaga_context) next;
 };
@@ -322,6 +328,13 @@ struct VirtIOGPURutabaga {
     QSLIST_HEAD(, virtio_gpu_rutabaga_async_signaled_fence)
         async_signaled_fenceq;
     QEMUBH *async_signaled_fence_bh;
+    uint64_t capset_mask;
+    char *wayland_socket_path;
+    char *wsi;
+    char *renderer_features;
+    char *snapshot_directory;
+    /* RutabagaVerifyMode; set through the "x-verify-state" enum property. */
+    int verify_state_mode;
     /*
      * True from the moment virtio_gpu_rutabaga_load() starts rutabaga_restore()
      * until virtio_gpu_post_load() has finished.  If a reset or another
@@ -331,11 +344,6 @@ struct VirtIOGPURutabaga {
      * virtio_gpu_rutabaga_reinit().  Cleared by virtio_gpu_rutabaga_init().
      */
     bool restore_incomplete;
-    uint64_t capset_mask;
-    char *wayland_socket_path;
-    char *wsi;
-    char *renderer_features;
-    char *snapshot_directory;
     bool headless;
     uint32_t num_capsets;
     struct rutabaga *rutabaga;

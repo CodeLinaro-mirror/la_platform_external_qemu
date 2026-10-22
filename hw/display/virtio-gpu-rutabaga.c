@@ -11,6 +11,7 @@
 #include "hw/virtio/virtio-iommu.h"
 #include "migration/qemu-file-types.h"
 #include "migration/snapshot.h"
+#include "monitor/monitor.h"
 #include "qemu/main-loop.h"
 #include "qemu/timer.h"
 #include "system/runstate.h"
@@ -192,6 +193,8 @@ rutabaga_unmap_resource_slot(VirtIOGPURutabaga *vgr, uint32_t resource_id,
 {
     VirtIOGPUBase *vb = VIRTIO_GPU_BASE(vgr);
 
+    g_assert(resource_id != 0);
+
     for (uint32_t slot = 0; slot < MAX_SLOTS; slot++) {
         if (!vgr->memory_regions[slot].used ||
             vgr->memory_regions[slot].resource_id != resource_id) {
@@ -335,6 +338,13 @@ rutabaga_cmd_context_create(VirtIOGPU *g,
 
     ctx = g_new0(struct virtio_gpu_rutabaga_context, 1);
     ctx->context_id = cc.hdr.ctx_id;
+    /*
+     * Cached in memory so CTX-SNAPSHOTTABLE can inspect the capset before
+     * save. Not serialized to the QEMUFile stream because any snapshot that
+     * succeeded had no cross-domain contexts, and gfxstream persists its own
+     * capset_id in gfxstream_frontend.txtproto.
+     */
+    ctx->capset_id = cc.context_init & VIRTIO_GPU_CONTEXT_INIT_CAPSET_ID_MASK;
     QTAILQ_INIT(&ctx->reslist);
     QTAILQ_INSERT_TAIL(&vr->contexts, ctx, next);
 }
@@ -1592,6 +1602,538 @@ static void virtio_gpu_rutabaga_reinit(VirtIOGPU *g)
 }
 
 /*
+ * What virtio_gpu_rutabaga_verify() does when it finds a violation.  Set
+ * through the "x-verify-state" property; see the lookup table below for the
+ * spelling on the command line.
+ */
+typedef enum {
+    RUTABAGA_VERIFY_MODE_OFF,     /* skip all checks */
+    RUTABAGA_VERIFY_MODE_LOG,     /* default: error_report() and carry on */
+    RUTABAGA_VERIFY_MODE_ENFORCE, /* fail the save/load (-EBUSY / -EINVAL) */
+    RUTABAGA_VERIFY_MODE_STRICT,  /* abort() */
+    RUTABAGA_VERIFY_MODE__MAX,
+} RutabagaVerifyMode;
+
+static const QEnumLookup rutabaga_verify_mode_lookup = {
+    .array = (const char *const[]) {
+        [RUTABAGA_VERIFY_MODE_OFF]     = "off",
+        [RUTABAGA_VERIFY_MODE_LOG]     = "log",
+        [RUTABAGA_VERIFY_MODE_ENFORCE] = "enforce",
+        [RUTABAGA_VERIFY_MODE_STRICT]  = "strict",
+    },
+    .size = RUTABAGA_VERIFY_MODE__MAX,
+};
+
+static int virtio_gpu_rutabaga_get_verify_mode(Object *obj, Error **errp)
+{
+    return VIRTIO_GPU_RUTABAGA(obj)->verify_state_mode;
+}
+
+static void virtio_gpu_rutabaga_set_verify_mode(Object *obj, int mode,
+                                                Error **errp)
+{
+    VIRTIO_GPU_RUTABAGA(obj)->verify_state_mode = mode;
+}
+
+/*
+ * Verification phases, one pair per lifecycle transition:
+ *   RESET      - virtio_gpu_rutabaga_reset()
+ *   WAIT_IDLE  - virtio_gpu_rutabaga_wait_for_idle(); runs on every vm_stop
+ *                (save, migrate, pause, shutdown), not only before a save
+ *   SAVE       - virtio_gpu_rutabaga_save()
+ *   LOAD       - virtio_gpu_pre_load() .. virtio_gpu_post_load()
+ */
+typedef enum {
+    RUTABAGA_VERIFY_PRE_RESET,
+    RUTABAGA_VERIFY_POST_RESET,
+    RUTABAGA_VERIFY_PRE_WAIT_IDLE,
+    RUTABAGA_VERIFY_POST_WAIT_IDLE,
+    RUTABAGA_VERIFY_PRE_SAVE,
+    RUTABAGA_VERIFY_POST_SAVE,
+    RUTABAGA_VERIFY_PRE_LOAD,
+    RUTABAGA_VERIFY_POST_LOAD,
+} RutabagaVerifyPhase;
+
+static const char *rutabaga_phase_name(RutabagaVerifyPhase phase)
+{
+    switch (phase) {
+    case RUTABAGA_VERIFY_PRE_RESET:        return "PRE_RESET";
+    case RUTABAGA_VERIFY_POST_RESET:       return "POST_RESET";
+    case RUTABAGA_VERIFY_PRE_WAIT_IDLE:    return "PRE_WAIT_IDLE";
+    case RUTABAGA_VERIFY_POST_WAIT_IDLE:   return "POST_WAIT_IDLE";
+    case RUTABAGA_VERIFY_PRE_SAVE:         return "PRE_SAVE";
+    case RUTABAGA_VERIFY_POST_SAVE:        return "POST_SAVE";
+    case RUTABAGA_VERIFY_PRE_LOAD:         return "PRE_LOAD";
+    case RUTABAGA_VERIFY_POST_LOAD:        return "POST_LOAD";
+    default:                               return "UNKNOWN";
+    }
+}
+
+static bool rutabaga_phase_expects_empty(RutabagaVerifyPhase phase)
+{
+    return phase == RUTABAGA_VERIFY_POST_RESET ||
+           phase == RUTABAGA_VERIFY_PRE_LOAD;
+}
+
+/*
+ * Phases at which no command may be queued.  Fences may still be in flight
+ * around a save (they travel with the snapshot, see
+ * virtio_gpu_rutabaga_save_inflight_fences), so the SAVE phases only require
+ * an empty command queue; see rutabaga_phase_expects_no_fences().
+ */
+static bool rutabaga_phase_expects_quiesced(RutabagaVerifyPhase phase)
+{
+    return phase == RUTABAGA_VERIFY_POST_WAIT_IDLE ||
+           phase == RUTABAGA_VERIFY_PRE_SAVE ||
+           phase == RUTABAGA_VERIFY_POST_SAVE ||
+           phase == RUTABAGA_VERIFY_POST_LOAD;
+}
+
+static bool rutabaga_phase_expects_no_fences(RutabagaVerifyPhase phase)
+{
+    return rutabaga_phase_expects_empty(phase) ||
+           phase == RUTABAGA_VERIFY_POST_WAIT_IDLE ||
+           phase == RUTABAGA_VERIFY_POST_LOAD;
+}
+
+static bool rutabaga_phase_expects_steady(RutabagaVerifyPhase phase)
+{
+    return phase == RUTABAGA_VERIFY_PRE_RESET ||
+           phase == RUTABAGA_VERIFY_PRE_WAIT_IDLE ||
+           phase == RUTABAGA_VERIFY_PRE_SAVE ||
+           phase == RUTABAGA_VERIFY_POST_SAVE ||
+           phase == RUTABAGA_VERIFY_POST_LOAD;
+}
+
+static G_GNUC_PRINTF(4, 5) void
+rutabaga_report_violation(RutabagaVerifyPhase phase, size_t *violations,
+                          const char *id, const char *fmt, ...)
+{
+    va_list ap;
+    g_autofree char *detail = NULL;
+
+    va_start(ap, fmt);
+    detail = g_strdup_vprintf(fmt, ap);
+    va_end(ap);
+
+    (*violations)++;
+    error_report("virtio-gpu-rutabaga: verify[%s] %s: %s",
+                 rutabaga_phase_name(phase), id, detail);
+}
+
+static void rutabaga_verify_lifetime(VirtIOGPURutabaga *vgr,
+                                     RutabagaVerifyPhase phase,
+                                     size_t *violations)
+{
+    if (!vgr->rutabaga) {
+        rutabaga_report_violation(phase, violations, "LIFE-RUTABAGA",
+                                  "vgr->rutabaga is NULL");
+    }
+    if (rutabaga_phase_expects_empty(phase)) {
+        if (virtio_gpu_rutabaga_instance_in_use(vgr)) {
+            rutabaga_report_violation(phase, violations, "LIFE-RUTABAGA-UNUSED",
+                                      "rutabaga instance still holds guest objects or work");
+        }
+        if (vgr->restore_incomplete) {
+            rutabaga_report_violation(phase, violations, "LIFE-RESTORE-COMPLETE",
+                                      "a snapshot restore never completed and rutabaga was not reinitialized");
+        }
+    }
+}
+
+static void rutabaga_verify_queues_and_fences(VirtIOGPU *g,
+                                              VirtIOGPURutabaga *vgr,
+                                              RutabagaVerifyPhase phase,
+                                              size_t *violations)
+{
+    bool need_empty_or_quiesced = rutabaga_phase_expects_empty(phase) ||
+                                  rutabaga_phase_expects_quiesced(phase);
+    uint32_t fenceq_len = 0;
+    struct virtio_gpu_ctrl_command *cmd;
+
+    if (g->ctrl_vq && virtio_queue_ready(g->ctrl_vq) &&
+        (!g->ctrl_bh || !g->cursor_bh)) {
+        rutabaga_report_violation(phase, violations, "VQ-BH",
+                                  "ctrl_vq ready but BHs are NULL");
+    }
+    if (g->processing_cmdq) {
+        rutabaga_report_violation(phase, violations, "CMDQ-NOREENTRY",
+                                  "called while processing_cmdq is true");
+    }
+    if (need_empty_or_quiesced && !QTAILQ_EMPTY(&g->cmdq)) {
+        rutabaga_report_violation(phase, violations, "CMDQ-EMPTY",
+                                  "g->cmdq is not empty");
+    }
+
+    QTAILQ_FOREACH(cmd, &g->fenceq, next) {
+        fenceq_len++;
+        if (!(cmd->cmd_hdr.flags & VIRTIO_GPU_FLAG_FENCE) || cmd->finished) {
+            rutabaga_report_violation(phase, violations, "FENCE-FLAGS",
+                                      "cmd in fenceq missing FENCE flag or already finished");
+        }
+    }
+    if (g->inflight != fenceq_len) {
+        rutabaga_report_violation(phase, violations, "FENCE-COUNT",
+                                  "g->inflight (%u) != fenceq length (%u)",
+                                  g->inflight, fenceq_len);
+    }
+    if (rutabaga_phase_expects_no_fences(phase) &&
+        (fenceq_len > 0 || g->inflight != 0)) {
+        rutabaga_report_violation(phase, violations, "FENCE-EMPTY",
+                                  "fenceq_len=%u inflight=%u",
+                                  fenceq_len, g->inflight);
+    }
+    if (rutabaga_phase_expects_no_fences(phase) &&
+        qatomic_load_acquire(&vgr->async_signaled_fenceq.slh_first) != NULL) {
+        rutabaga_report_violation(phase, violations, "ASYNC-SIGNALED-EMPTY",
+                                  "async_signaled_fenceq is not empty");
+    }
+    if (!vgr->async_signaled_fence_bh) {
+        rutabaga_report_violation(phase, violations, "ASYNC-SIGNALED-BH",
+                                  "async_signaled_fence_bh is NULL");
+    }
+}
+
+static bool rutabaga_has_gfxstream_capset(const VirtIOGPURutabaga *vgr)
+{
+    uint64_t gfxstream_mask = (1ULL << RUTABAGA_CAPSET_GFXSTREAM_VULKAN) |
+                              (1ULL << RUTABAGA_CAPSET_GFXSTREAM_GLES) |
+                              (1ULL << RUTABAGA_CAPSET_GFXSTREAM_COMPOSER);
+    return (vgr->capset_mask & gfxstream_mask) != 0;
+}
+
+static void rutabaga_verify_contexts(VirtIOGPU *g, VirtIOGPURutabaga *vgr,
+                                     RutabagaVerifyPhase phase, size_t *violations)
+{
+    struct virtio_gpu_rutabaga_context *ctx, *other_ctx;
+    struct virtio_gpu_rutabaga_resource *r1, *r2;
+
+    if (rutabaga_phase_expects_empty(phase) && !QTAILQ_EMPTY(&vgr->contexts)) {
+        rutabaga_report_violation(phase, violations, "CTX-EMPTY",
+                                  "vgr->contexts is not empty");
+    }
+
+    QTAILQ_FOREACH(ctx, &vgr->contexts, next) {
+        for (other_ctx = QTAILQ_NEXT(ctx, next); other_ctx;
+             other_ctx = QTAILQ_NEXT(other_ctx, next)) {
+            if (ctx->context_id == other_ctx->context_id) {
+                rutabaga_report_violation(phase, violations, "CTX-UNIQUE",
+                                          "duplicate context_id %u",
+                                          ctx->context_id);
+            }
+        }
+        if (phase == RUTABAGA_VERIFY_PRE_SAVE &&
+            ctx->capset_id == RUTABAGA_CAPSET_CROSS_DOMAIN) {
+            rutabaga_report_violation(phase, violations, "CTX-SNAPSHOTTABLE",
+                                      "context %u uses unsnapshottable cross-domain capset",
+                                      ctx->context_id);
+        }
+
+        QTAILQ_FOREACH(r1, &ctx->reslist, next) {
+            if (!virtio_gpu_find_resource(g, r1->resource_id)) {
+                rutabaga_report_violation(phase, violations, "CTX-RES-EXISTS",
+                                          "ctx %u references missing resource %u",
+                                          ctx->context_id, r1->resource_id);
+            }
+            for (r2 = QTAILQ_NEXT(r1, next); r2; r2 = QTAILQ_NEXT(r2, next)) {
+                if (r1->resource_id == r2->resource_id) {
+                    rutabaga_report_violation(phase, violations, "CTX-UNIQUE",
+                                              "ctx %u has duplicate resource %u",
+                                              ctx->context_id, r1->resource_id);
+                }
+            }
+        }
+    }
+}
+
+static void rutabaga_verify_resources_and_dma(VirtIOGPU *g,
+                                              RutabagaVerifyPhase phase,
+                                              size_t *violations)
+{
+    struct virtio_gpu_simple_resource *res, *other_res;
+    bool check_mapped = rutabaga_phase_expects_steady(phase);
+
+    if (rutabaga_phase_expects_empty(phase) && !QTAILQ_EMPTY(&g->reslist)) {
+        rutabaga_report_violation(phase, violations, "RES-EMPTY",
+                                  "g->reslist is not empty");
+    }
+
+    QTAILQ_FOREACH(res, &g->reslist, next) {
+        bool is_2d_or_3d = (res->width > 0 && res->height > 0 && res->format != 0);
+        bool is_blob = (res->blob_size > 0);
+
+        if (res->resource_id == 0) {
+            rutabaga_report_violation(phase, violations, "RES-UNIQUE",
+                                      "resource_id is 0");
+        }
+        for (other_res = QTAILQ_NEXT(res, next); other_res;
+             other_res = QTAILQ_NEXT(other_res, next)) {
+            if (res->resource_id == other_res->resource_id) {
+                rutabaga_report_violation(phase, violations, "RES-UNIQUE",
+                                          "duplicate resource_id %u",
+                                          res->resource_id);
+            }
+        }
+
+        /* Every resource is either a 2D/3D image, a blob, or (host3d) both. */
+        if (!is_2d_or_3d && !is_blob) {
+            rutabaga_report_violation(phase, violations, "RES-SHAPE",
+                                      "resource %u has neither dimensions nor a blob size (w=%u h=%u fmt=%u blob=%"PRIu64")",
+                                      res->resource_id, res->width, res->height,
+                                      res->format, (uint64_t)res->blob_size);
+        }
+
+        /*
+         * Every resource with guest backing in this device goes through
+         * virtio_gpu_create_mapping_iov() with &res->addrs (ATTACH_BACKING
+         * and guest-memory blobs alike), so iov, iov_cnt and addrs are set
+         * and cleared together.
+         */
+        if (((res->iov == NULL) != (res->iov_cnt == 0)) ||
+            ((res->addrs == NULL) != (res->iov == NULL))) {
+            rutabaga_report_violation(phase, violations, "DMA-FIELDS-CONSISTENT",
+                                      "resource %u inconsistent DMA fields",
+                                      res->resource_id);
+        }
+        if (res->iov_cnt > 16384) {
+            rutabaga_report_violation(phase, violations, "DMA-BOUND",
+                                      "resource %u iov_cnt %u > 16384",
+                                      res->resource_id, res->iov_cnt);
+        }
+        if (check_mapped && res->iov) {
+            for (uint32_t i = 0; i < res->iov_cnt; i++) {
+                if (!res->iov[i].iov_base || res->iov[i].iov_len == 0) {
+                    rutabaga_report_violation(phase, violations, "DMA-MAPPED",
+                                              "resource %u iov[%u] unmapped or empty",
+                                              res->resource_id, i);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/*
+ * Scans all MAX_SLOTS entries and checks pairwise overlap among used slots in
+ * O(used * MAX_SLOTS) time. Intended for lifecycle transitions and HMP rather
+ * than per-command hot paths.
+ */
+static void rutabaga_verify_memory_slots(VirtIOGPU *g, VirtIOGPURutabaga *vgr,
+                                         RutabagaVerifyPhase phase,
+                                         size_t *violations)
+{
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
+    bool check_steady = rutabaga_phase_expects_steady(phase);
+    bool check_empty = rutabaga_phase_expects_empty(phase);
+
+    for (int i = 0; i < MAX_SLOTS; i++) {
+        struct MemoryRegionInfo *s1 = &vgr->memory_regions[i];
+        if (!s1->used) {
+            if (s1->resource_id != 0 || s1->offset != 0 ||
+                s1->mr.container != NULL) {
+                rutabaga_report_violation(phase, violations, "SLOT-UNUSED-CLEAN",
+                                          "unused slot %d has dirty fields (res=%u off=%"PRIx64")",
+                                          i, s1->resource_id, (uint64_t)s1->offset);
+            }
+            continue;
+        }
+        if (check_empty) {
+            rutabaga_report_violation(phase, violations, "SLOT-ALL-FREE",
+                                      "slot %d still used in EMPTY phase", i);
+        }
+        if (check_steady) {
+            struct virtio_gpu_simple_resource *res =
+                virtio_gpu_find_resource(g, s1->resource_id);
+            if (!res || res->blob_size == 0 || s1->mr.container != &vb->hostmem) {
+                rutabaga_report_violation(phase, violations, "SLOT-USED-VALID",
+                                          "used slot %d invalid (res=%u)",
+                                          i, s1->resource_id);
+            }
+        }
+        for (int j = i + 1; j < MAX_SLOTS; j++) {
+            struct MemoryRegionInfo *s2 = &vgr->memory_regions[j];
+            uint64_t s1_end, s2_end;
+
+            if (!s2->used) {
+                continue;
+            }
+            if (s1->resource_id == s2->resource_id) {
+                rutabaga_report_violation(phase, violations, "SLOT-NO-OVERLAP",
+                                          "slots %d and %d share resource %u",
+                                          i, j, s1->resource_id);
+            }
+            s1_end = s1->offset + memory_region_size(&s1->mr);
+            s2_end = s2->offset + memory_region_size(&s2->mr);
+            if (s1->offset < s2_end && s2->offset < s1_end) {
+                rutabaga_report_violation(phase, violations, "SLOT-NO-OVERLAP",
+                                          "slots %d and %d overlap in BAR", i, j);
+            }
+        }
+    }
+}
+
+static void rutabaga_verify_scanouts_and_cursors(VirtIOGPU *g,
+                                                 VirtIOGPURutabaga *vgr,
+                                                 RutabagaVerifyPhase phase,
+                                                 size_t *violations)
+{
+    VirtIOGPUBase *vb = VIRTIO_GPU_BASE(g);
+    bool check_steady = rutabaga_phase_expects_steady(phase);
+    bool check_empty = rutabaga_phase_expects_empty(phase);
+    /*
+     * scanout_bitmask is 32 bits wide and max_outputs <= VIRTIO_GPU_MAX_SCANOUTS,
+     * so the shift below is always < 32.
+     */
+    QEMU_BUILD_BUG_ON(VIRTIO_GPU_MAX_SCANOUTS >= 32);
+    uint32_t valid_bits = (1u << vb->conf.max_outputs) - 1;
+    struct virtio_gpu_simple_resource *res;
+
+    for (uint32_t i = 0; i < vb->conf.max_outputs; i++) {
+        struct virtio_gpu_scanout *scanout = &vb->scanout[i];
+        struct virtio_gpu_simple_resource *cres;
+
+        if (check_empty && (scanout->resource_id != 0 || scanout->ds != NULL)) {
+            rutabaga_report_violation(phase, violations, "SCAN-ALL-OFF",
+                                      "scanout %u active in EMPTY phase", i);
+        }
+        if (check_steady && scanout->resource_id != 0 && !vgr->headless) {
+            res = virtio_gpu_find_resource(g, scanout->resource_id);
+            if (!res || !res->image ||
+                !(res->scanout_bitmask & (1u << i)) ||
+                (uint32_t)pixman_image_get_width(res->image) != res->width ||
+                (uint32_t)pixman_image_get_height(res->image) != res->height) {
+                rutabaga_report_violation(phase, violations, "SCAN-RES-IMAGE",
+                                          "scanout %u resource %u missing valid image/bitmask",
+                                          i, scanout->resource_id);
+            } else if (scanout->con) {
+                DisplaySurface *ds = qemu_console_surface(scanout->con);
+                if (!ds ||
+                    surface_data(ds) != (void *)pixman_image_get_data(res->image)) {
+                    rutabaga_report_violation(phase, violations, "SCAN-SURFACE-BACKED",
+                                              "scanout %u DisplaySurface not backed by res->image",
+                                              i);
+                }
+            }
+        }
+        if (check_steady && scanout->cursor.resource_id != 0) {
+            cres = virtio_gpu_find_resource(g, scanout->cursor.resource_id);
+            if (!cres ||
+                (scanout->current_cursor &&
+                 (cres->width != scanout->current_cursor->width ||
+                  cres->height != scanout->current_cursor->height))) {
+                rutabaga_report_violation(phase, violations, "CUR-RES-EXISTS",
+                                          "scanout %u cursor resource %u invalid or missing",
+                                          i, scanout->cursor.resource_id);
+            }
+        }
+    }
+
+    QTAILQ_FOREACH(res, &g->reslist, next) {
+        if (res->scanout_bitmask & ~valid_bits) {
+            rutabaga_report_violation(phase, violations, "SCAN-REVERSE-MAP",
+                                      "resource %u scanout_bitmask 0x%x has bits beyond max_outputs %u",
+                                      res->resource_id, res->scanout_bitmask,
+                                      vb->conf.max_outputs);
+        }
+        for (uint32_t i = 0; i < vb->conf.max_outputs; i++) {
+            bool bit_set = (res->scanout_bitmask & (1u << i)) != 0;
+            bool scanout_matches = (vb->scanout[i].resource_id == res->resource_id);
+            if (bit_set != scanout_matches) {
+                rutabaga_report_violation(phase, violations, "SCAN-REVERSE-MAP",
+                                          "resource %u scanout_bitmask 0x%x disagrees with scanout[%u].resource_id %u",
+                                          res->resource_id, res->scanout_bitmask,
+                                          i, vb->scanout[i].resource_id);
+            }
+        }
+    }
+}
+
+static void rutabaga_verify_disk_snapshot(VirtIOGPURutabaga *vgr,
+                                          const char *renderer_dir,
+                                          RutabagaVerifyPhase phase,
+                                          size_t *violations)
+{
+    g_autofree char *rutabaga_snap = NULL;
+
+    if (phase != RUTABAGA_VERIFY_POST_SAVE || !renderer_dir) {
+        return;
+    }
+    rutabaga_snap = g_build_filename(renderer_dir, "rutabaga_snapshot", NULL);
+    if (!g_file_test(rutabaga_snap, G_FILE_TEST_IS_REGULAR)) {
+        rutabaga_report_violation(phase, violations, "X-DISK-COMPLETE",
+                                  "missing %s", rutabaga_snap);
+    }
+
+    if (rutabaga_has_gfxstream_capset(vgr)) {
+        static const char *const k_gfxstream_files[] = {
+            "gfxstream_renderer.bin",
+            "gfxstream_frontend.txtproto",
+            "gfxstream_asg.bin",
+        };
+        for (size_t i = 0; i < G_N_ELEMENTS(k_gfxstream_files); i++) {
+            g_autofree char *path = g_build_filename(
+                renderer_dir, "gfxstream", k_gfxstream_files[i], NULL);
+            if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+                rutabaga_report_violation(phase, violations, "X-DISK-COMPLETE",
+                                          "missing %s", path);
+            }
+        }
+    }
+}
+
+/*
+ * Runs every invariant check for `phase` and acts on the result according to
+ * vgr->verify_state_mode (see RutabagaVerifyMode).  The checks around reset
+ * and the pre-stop idle wait are always advisory: those paths cannot fail,
+ * so a violation there is only reported.
+ */
+static int virtio_gpu_rutabaga_verify(VirtIOGPU *g, RutabagaVerifyPhase phase,
+                                      const char *renderer_dir)
+{
+    VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
+    size_t violations = 0;
+    int64_t start_us;
+    bool advisory_only;
+
+    if (vgr->verify_state_mode == RUTABAGA_VERIFY_MODE_OFF) {
+        return 0;
+    }
+
+    start_us = qemu_clock_get_us(QEMU_CLOCK_REALTIME);
+
+    rutabaga_verify_lifetime(vgr, phase, &violations);
+    rutabaga_verify_queues_and_fences(g, vgr, phase, &violations);
+    rutabaga_verify_contexts(g, vgr, phase, &violations);
+    rutabaga_verify_resources_and_dma(g, phase, &violations);
+    rutabaga_verify_memory_slots(g, vgr, phase, &violations);
+    rutabaga_verify_scanouts_and_cursors(g, vgr, phase, &violations);
+    rutabaga_verify_disk_snapshot(vgr, renderer_dir, phase, &violations);
+
+    trace_virtio_gpu_rutabaga_verify(rutabaga_phase_name(phase), violations,
+                                     qemu_clock_get_us(QEMU_CLOCK_REALTIME) - start_us);
+
+    if (violations == 0) {
+        return 0;
+    }
+
+    advisory_only = (phase == RUTABAGA_VERIFY_PRE_RESET ||
+                     phase == RUTABAGA_VERIFY_POST_RESET ||
+                     phase == RUTABAGA_VERIFY_PRE_WAIT_IDLE ||
+                     phase == RUTABAGA_VERIFY_POST_WAIT_IDLE);
+    if (advisory_only) {
+        return 0;
+    }
+    switch (vgr->verify_state_mode) {
+    case RUTABAGA_VERIFY_MODE_STRICT:
+        abort();
+    case RUTABAGA_VERIFY_MODE_ENFORCE:
+        return (phase == RUTABAGA_VERIFY_PRE_SAVE) ? -EBUSY : -EINVAL;
+    default:
+        return 0;
+    }
+}
+
+/*
  * The renderer (gfxstream) state of a snapshot does not go through the VM
  * state stream; rutabaga writes it to its own directory.  Keep that directory
  * per snapshot, next to the other per-snapshot metadata the launcher keeps:
@@ -1950,6 +2492,11 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
         return -EBUSY;
     }
 
+    ret = virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_PRE_SAVE, NULL);
+    if (ret != 0) {
+        return ret;
+    }
+
     ret = rutabaga_save_renderer_staged(vgr, renderer_dir);
     if (ret != 0) {
         return ret;
@@ -2038,8 +2585,18 @@ static int virtio_gpu_rutabaga_save(QEMUFile *f, void *opaque, size_t size,
         }
     }
 
-    vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL, NULL);
-    return 0;
+    ret = vmstate_save_state(f, &vmstate_virtio_gpu_scanouts, g, NULL, NULL);
+    if (ret != 0) {
+        error_report("%s: failed to save scanout state: %d", __func__, ret);
+        virtio_gpu_rutabaga_remove_dir_recursive(renderer_dir);
+        return ret;
+    }
+    ret = virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_POST_SAVE, renderer_dir);
+    if (ret != 0) {
+        /* In enforce mode the save fails; do not leave the half-trusted state behind. */
+        virtio_gpu_rutabaga_remove_dir_recursive(renderer_dir);
+    }
+    return ret;
 }
 
 /*
@@ -2285,6 +2842,8 @@ static void virtio_gpu_rutabaga_wait_for_idle(VirtIOGPU *g)
     int64_t deadline = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) +
                        VIRTIO_GPU_RUTABAGA_IDLE_TIMEOUT_MS;
 
+    virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_PRE_WAIT_IDLE, NULL);
+
     /* Since vCPU stopped, pop all remaining commands off ctrl_vq. */
     vgc->handle_ctrl(VIRTIO_DEVICE(g), g->ctrl_vq);
     /* Retire anything the backend already completed, without waiting for the BH. */
@@ -2292,6 +2851,7 @@ static void virtio_gpu_rutabaga_wait_for_idle(VirtIOGPU *g)
 
     if (QTAILQ_EMPTY(&g->fenceq) && QTAILQ_EMPTY(&g->cmdq) &&
         QSLIST_EMPTY(&vgr->async_signaled_fenceq)) {
+        virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_POST_WAIT_IDLE, NULL);
         return;
     }
 
@@ -2317,6 +2877,7 @@ static void virtio_gpu_rutabaga_wait_for_idle(VirtIOGPU *g)
     }
 
     timer_del(&wakeup);
+    virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_POST_WAIT_IDLE, NULL);
 }
 
 static void virtio_gpu_rutabaga_vm_state_change(void *opaque, bool running,
@@ -2354,7 +2915,7 @@ static int virtio_gpu_pre_load(void *opaque)
         virtio_gpu_rutabaga_reinit(g);
     }
 
-    return 0;
+    return virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_PRE_LOAD, NULL);
 }
 
 static int virtio_gpu_post_load(void *opaque, int version_id)
@@ -2389,6 +2950,11 @@ static int virtio_gpu_post_load(void *opaque, int version_id)
     }
 
     virtio_gpu_rutabaga_complete_restored_fences(g);
+
+    ret = virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_POST_LOAD, NULL);
+    if (ret != 0) {
+        return ret;
+    }
     vgr->restore_incomplete = false;
 
     /*
@@ -2488,6 +3054,8 @@ static void virtio_gpu_rutabaga_reset(VirtIODevice *vdev)
     VirtIOGPURutabaga *vgr = VIRTIO_GPU_RUTABAGA(g);
     bool was_in_use;
 
+    virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_PRE_RESET, NULL);
+
     /*
      * 1. Capture whether the rutabaga instance was in use (including
      *    undelivered signaled fences) BEFORE discarding queues or resetting
@@ -2523,6 +3091,70 @@ static void virtio_gpu_rutabaga_reset(VirtIODevice *vdev)
     if (!vgr->rutabaga || vgr->restore_incomplete || was_in_use) {
         virtio_gpu_rutabaga_reinit(g);
     }
+
+    virtio_gpu_rutabaga_verify(g, RUTABAGA_VERIFY_POST_RESET, NULL);
+}
+
+static void hmp_info_virtio_gpu_rutabaga(Monitor *mon, const QDict *qdict)
+{
+    Object *obj = object_resolve_path_type("", TYPE_VIRTIO_GPU_RUTABAGA, NULL);
+    VirtIOGPU *g;
+    VirtIOGPURutabaga *vgr;
+    uint32_t num_ctx = 0, num_res = 0, num_cmdq = 0, num_fenceq = 0;
+    uint32_t num_async = 0, num_slots = 0;
+    size_t violations = 0;
+    struct virtio_gpu_rutabaga_context *ctx;
+    struct virtio_gpu_simple_resource *res;
+    struct virtio_gpu_ctrl_command *cmd;
+    struct virtio_gpu_rutabaga_async_signaled_fence *af;
+
+    if (!obj) {
+        monitor_printf(mon, "No virtio-gpu-rutabaga device found\n");
+        return;
+    }
+    g = VIRTIO_GPU(obj);
+    vgr = VIRTIO_GPU_RUTABAGA(obj);
+
+    QTAILQ_FOREACH(ctx, &vgr->contexts, next) {
+        num_ctx++;
+    }
+    QTAILQ_FOREACH(res, &g->reslist, next) {
+        num_res++;
+    }
+    QTAILQ_FOREACH(cmd, &g->cmdq, next) {
+        num_cmdq++;
+    }
+    QTAILQ_FOREACH(cmd, &g->fenceq, next) {
+        num_fenceq++;
+    }
+    /*
+     * Renderer threads push to the head of this list concurrently; walk a
+     * snapshot of the head taken with acquire semantics (the publishing
+     * cmpxchg in QSLIST_INSERT_HEAD_ATOMIC orders each entry's `next` before
+     * it).  Only the main thread ever unlinks, so the walk cannot loop.
+     */
+    for (af = qatomic_load_acquire(&vgr->async_signaled_fenceq.slh_first);
+         af; af = af->next.sle_next) {
+        num_async++;
+    }
+    for (int i = 0; i < MAX_SLOTS; i++) {
+        if (vgr->memory_regions[i].used) {
+            num_slots++;
+        }
+    }
+
+    rutabaga_verify_lifetime(vgr, RUTABAGA_VERIFY_PRE_RESET, &violations);
+    rutabaga_verify_queues_and_fences(g, vgr, RUTABAGA_VERIFY_PRE_RESET, &violations);
+    rutabaga_verify_contexts(g, vgr, RUTABAGA_VERIFY_PRE_RESET, &violations);
+    rutabaga_verify_resources_and_dma(g, RUTABAGA_VERIFY_PRE_RESET, &violations);
+    rutabaga_verify_memory_slots(g, vgr, RUTABAGA_VERIFY_PRE_RESET, &violations);
+    rutabaga_verify_scanouts_and_cursors(g, vgr, RUTABAGA_VERIFY_PRE_RESET, &violations);
+
+    monitor_printf(mon, "virtio-gpu-rutabaga: rutabaga=%p contexts=%u "
+                        "resources=%u slots=%u cmdq=%u fenceq=%u (inflight=%u) "
+                        "async_signaled_fenceq=%u violations=%zu\n",
+                   vgr->rutabaga, num_ctx, num_res, num_slots,
+                   num_cmdq, num_fenceq, g->inflight, num_async, violations);
 }
 
 static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
@@ -2531,6 +3163,7 @@ static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
     VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
     VirtIOGPUBaseClass *vbc = VIRTIO_GPU_BASE_CLASS(klass);
     VirtIOGPUClass *vgc = VIRTIO_GPU_CLASS(klass);
+    ObjectProperty *prop;
 
     vbc->gl_flushed = virtio_gpu_rutabaga_gl_flushed;
     vbc->update_display = virtio_gpu_rutabaga_update_display;
@@ -2543,6 +3176,15 @@ static void virtio_gpu_rutabaga_class_init(ObjectClass *klass, const void *data)
     vdc->reset = virtio_gpu_rutabaga_reset;
     dc->vmsd = &vmstate_virtio_gpu_rutabaga;
     device_class_set_props(dc, virtio_gpu_rutabaga_properties);
+    prop = object_class_property_add_enum(klass, "x-verify-state",
+                                          "RutabagaVerifyMode",
+                                          &rutabaga_verify_mode_lookup,
+                                          virtio_gpu_rutabaga_get_verify_mode,
+                                          virtio_gpu_rutabaga_set_verify_mode);
+    object_property_set_default_str(prop, "log");
+    object_class_property_set_description(klass, "x-verify-state",
+            "What to do when a device invariant check fails: "
+            "off, log (default), enforce (fail the save/load) or strict (abort)");
 }
 
 static const TypeInfo virtio_gpu_rutabaga_info[] = {
@@ -2555,6 +3197,14 @@ static const TypeInfo virtio_gpu_rutabaga_info[] = {
 };
 
 DEFINE_TYPES(virtio_gpu_rutabaga_info)
+
+static void virtio_gpu_rutabaga_register_hmp(void)
+{
+    monitor_register_hmp("virtio-gpu-rutabaga", true,
+                         hmp_info_virtio_gpu_rutabaga);
+}
+
+type_init(virtio_gpu_rutabaga_register_hmp)
 
 module_obj(TYPE_VIRTIO_GPU_RUTABAGA);
 module_kconfig(VIRTIO_GPU);
