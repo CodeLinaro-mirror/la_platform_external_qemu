@@ -299,6 +299,7 @@ TEST(EmuglConfig, initFromUISetting) {
         EXPECT_TRUE(emuglConfig_init(
                     &config, UiOptionToGpuOption[i], false, 0));
 
+        System::get()->envSet(System::kLibrarySearchListEnvVarName, "");
         emuglConfig_setupEnv(&config);
 
         switch (i) {
@@ -357,6 +358,13 @@ TEST(EmuglConfig, initFromUISetting) {
             EXPECT_STREQ("",
                          System::get()->envGet("ANDROID_EMU_VK_ICD").c_str());
 #endif
+        }
+
+        if (strcmp(config.gles_backend, "swangle") == 0) {
+            std::string libSearchPath =
+                    System::get()->envGet(System::kLibrarySearchListEnvVarName);
+            EXPECT_NE(std::string::npos, libSearchPath.find("gles_angle"));
+            EXPECT_EQ(std::string::npos, libSearchPath.find("gles_swangle"));
         }
     }
 }

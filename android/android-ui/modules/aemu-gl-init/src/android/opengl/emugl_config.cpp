@@ -1332,13 +1332,16 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
 
     // Setup GLES
     bool use_swangle = strstr(config->gles_backend, "angle");
+    const char* gles_library = (strcmp(config->gles_backend, "swangle") == 0)
+                                       ? "angle"
+                                       : config->gles_backend;
     // $EXEC_DIR/<lib>/ is already added to the library search path by default,
     // since generic libraries are bundled there. We may need more though:
     resetBackendList();
     if (strcmp(config->gles_backend, "host") != 0) {
         // If the backend is not 'host', we also need to add the
         // backend directory.
-        std::string dir = sBackendList->getLibDirPath(config->gles_backend);
+        std::string dir = sBackendList->getLibDirPath(gles_library);
         if (dir.size()) {
             dprint("Adding to the library search path: %s\n", dir.c_str());
             system->addLibrarySearchDir(dir);
@@ -1369,9 +1372,6 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
     //    ANDROID_GLESv2_LIB
     //
     // If a backend provides one of these libraries, use it.
-    const char* gles_library = (strcmp(config->gles_backend, "swangle") == 0)
-                                       ? "angle"
-                                       : config->gles_backend;
     std::string lib;
     if (sBackendList->getBackendLibPath(gles_library,
                                         EmuglBackendList::LIBRARY_EGL, &lib)) {
