@@ -647,13 +647,10 @@ uint32_t whpx_arm_get_ipa_bit_size(void)
 static void clamp_id_aa64mmfr0_parange_to_ipa_size(ARMISARegisters *isar)
 {
     uint32_t ipa_size = whpx_arm_get_ipa_bit_size();
-    uint64_t id_aa64mmfr0;
 
     /* Clamp down the PARange to the IPA size the kernel supports. */
     uint8_t index = round_down_to_parange_index(ipa_size);
-    id_aa64mmfr0 = GET_IDREG(isar, ID_AA64MMFR0);
-    id_aa64mmfr0 = (id_aa64mmfr0 & ~R_ID_AA64MMFR0_PARANGE_MASK) | index;
-    SET_IDREG(isar, ID_AA64MMFR0, id_aa64mmfr0);
+    FIELD_DP64_IDREG(isar, ID_AA64MMFR0, PARANGE, index);
 }
 
 static uint64_t whpx_read_midr(void)
@@ -719,11 +716,8 @@ static bool whpx_arm_get_host_cpu_features(ARMHostCPUFeatures *ahcf)
      * - any potentially needed VL management
      * Also disable SME at the same time.
      */
-    SET_IDREG(&ahcf->isar, ID_AA64PFR0,
-              GET_IDREG(&ahcf->isar, ID_AA64PFR0) & ~R_ID_AA64PFR0_SVE_MASK);
-
-    SET_IDREG(&ahcf->isar, ID_AA64PFR1,
-              GET_IDREG(&ahcf->isar, ID_AA64PFR1) & ~R_ID_AA64PFR1_SME_MASK);
+    FIELD_DP64_IDREG(&ahcf->isar, ID_AA64PFR0, SVE, 0);
+    FIELD_DP64_IDREG(&ahcf->isar, ID_AA64PFR1, SME, 0);
 
     return true;
 }
