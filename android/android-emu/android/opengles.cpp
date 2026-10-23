@@ -482,6 +482,10 @@ static int startOpenglesRendererImpl(
 
     gfxstreamFeatures.EglOnEgl.setEnabled(sEgl2egl);
 
+    // Always enable compressed texture emulation
+    gfxstreamFeatures.VulkanAstcEmulation.setEnabled(true);
+    gfxstreamFeatures.VulkanEtc2Emulation.setEnabled(true);
+
     const AndroidOptions* opts = getConsoleAgents() ? getConsoleAgents()->settings->android_cmdLineOptions() : nullptr;
     if (opts) {
         if (opts->vulkan_validation) {
