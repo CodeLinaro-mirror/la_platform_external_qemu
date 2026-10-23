@@ -318,6 +318,7 @@ struct VirtIOGPURutabaga {
     VirtIOGPU parent_obj;
     struct VMChangeStateEntry* vm_state_entry;
     struct MemoryRegionInfo memory_regions[MAX_SLOTS];
+    uint32_t num_mapped_slots;
     QTAILQ_HEAD(, virtio_gpu_rutabaga_context) contexts;
     /*
      * Fences the renderer has signaled (pushed from its own worker threads)
