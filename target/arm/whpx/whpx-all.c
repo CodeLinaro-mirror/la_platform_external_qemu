@@ -16,6 +16,7 @@
 #include "system/whpx.h"
 #include "system/cpus.h"
 #include "system/runstate.h"
+#include "system/reset.h"
 #include "qemu/main-loop.h"
 #include "hw/core/boards.h"
 #include "qemu/error-report.h"
@@ -472,9 +473,9 @@ int whpx_vcpu_run(CPUState *cpu)
             if (arm_cpu->power_state != PSCI_OFF) {
                 whpx_psci_cpu_off(arm_cpu);
             }
-            /* Partition-wide reset, to reset state for reboots to succeed. */
-            whp_dispatch.WHvResetPartition(whpx->partition);
             bql_unlock();
+            cpu->exception_index = EXCP_INTERRUPT;
+            ret = 1;
             break;
         case WHvRunVpExitReasonNone:
         case WHvRunVpExitReasonUnrecoverableException:
@@ -817,6 +818,19 @@ void whpx_cpu_instance_init(CPUState *cs)
 {
 }
 
+static void whpx_arm_system_reset(void *opaque)
+{
+    struct whpx_state *whpx = opaque;
+
+    if (whp_dispatch.WHvResetPartition) {
+        /* Partition-wide reset, to reset non-architectural state for reboots to succeed. */
+        HRESULT hr = whp_dispatch.WHvResetPartition(whpx->partition);
+        if (FAILED(hr)) {
+            error_report("WHPX: Failed to reset partition, hr=%08lx", hr);
+        }
+    }
+}
+
 int whpx_accel_init(AccelState *as, MachineState *ms)
 {
     struct whpx_state *whpx;
@@ -982,6 +996,8 @@ int whpx_accel_init(AccelState *as, MachineState *ms)
     }
 
     whpx_memory_init();
+
+    qemu_register_reset(whpx_arm_system_reset, whpx);
 
     return 0;
 
