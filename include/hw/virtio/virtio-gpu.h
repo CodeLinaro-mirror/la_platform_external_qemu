@@ -116,7 +116,13 @@ enum virtio_gpu_base_conf_flags {
     VIRTIO_GPU_FLAG_DMABUF_ENABLED,
     VIRTIO_GPU_FLAG_BLOB_ENABLED,
     VIRTIO_GPU_FLAG_CONTEXT_INIT_ENABLED,
-    VIRTIO_GPU_FLAG_RUTABAGA_ENABLED,
+    /*
+     * Set by VirtIOGPU subclasses whose 3D renderer is not virglrenderer:
+     * the in-tree virtio-gpu-rutabaga device and the goldfish plugin's
+     * virtio-gpu-gfxstream device.  Has the same effect as VIRGL_ENABLED on
+     * the feature bits and on the blob-resource checks.
+     */
+    VIRTIO_GPU_FLAG_EXTERNAL_RENDERER_ENABLED,
     VIRTIO_GPU_FLAG_VENUS_ENABLED,
     VIRTIO_GPU_FLAG_RESOURCE_UUID_ENABLED,
     VIRTIO_GPU_FLAG_DRM_ENABLED,
@@ -135,8 +141,8 @@ enum virtio_gpu_base_conf_flags {
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_BLOB_ENABLED))
 #define virtio_gpu_context_init_enabled(_cfg) \
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_CONTEXT_INIT_ENABLED))
-#define virtio_gpu_rutabaga_enabled(_cfg) \
-    (_cfg.flags & (1 << VIRTIO_GPU_FLAG_RUTABAGA_ENABLED))
+#define virtio_gpu_external_renderer_enabled(_cfg) \
+    (_cfg.flags & (1 << VIRTIO_GPU_FLAG_EXTERNAL_RENDERER_ENABLED))
 #define virtio_gpu_resource_uuid_enabled(_cfg) \
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_RESOURCE_UUID_ENABLED))
 #define virtio_gpu_hostmem_enabled(_cfg) \

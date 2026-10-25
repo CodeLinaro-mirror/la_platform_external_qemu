@@ -366,7 +366,8 @@ rutabaga_cmd_context_create(VirtIOGPU *g,
                                     cc.debug_name);
 
     result = rutabaga_context_create(vr->rutabaga, cc.hdr.ctx_id,
-                                     cc.context_init, cc.debug_name, cc.nlen);
+                                     cc.context_init, cc.debug_name,
+                                     MIN(cc.nlen, sizeof(cc.debug_name)));
     CHECK(!result, cmd);
 
     ctx = g_new0(struct virtio_gpu_rutabaga_context, 1);
@@ -1477,7 +1478,7 @@ static void virtio_gpu_rutabaga_realize(DeviceState *qdev, Error **errp)
         goto err_rutabaga;
     }
 
-    bdev->conf.flags |= (1 << VIRTIO_GPU_FLAG_RUTABAGA_ENABLED);
+    bdev->conf.flags |= (1 << VIRTIO_GPU_FLAG_EXTERNAL_RENDERER_ENABLED);
     bdev->conf.flags |= (1 << VIRTIO_GPU_FLAG_BLOB_ENABLED);
     bdev->conf.flags |= (1 << VIRTIO_GPU_FLAG_CONTEXT_INIT_ENABLED);
 

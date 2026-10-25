@@ -163,8 +163,9 @@ void del_snapshot_progress_handler(QemuSnapshotProgressEntry *e);
  * loaded by save_snapshot() or load_snapshot() on the calling thread.
  *
  * Lets device save/load hooks that keep state outside the VM state stream
- * (e.g. virtio-gpu-rutabaga's renderer snapshot directory) key that state by
- * snapshot name, so that distinct snapshots do not overwrite each other.
+ * (e.g. the renderer directory of virtio-gpu-rutabaga / virtio-gpu-gfxstream)
+ * key that state by snapshot name, so that distinct snapshots do not
+ * overwrite each other.
  *
  * Must be called with the BQL held.  The returned string is owned by the
  * caller of save_snapshot()/load_snapshot() and is only valid until that

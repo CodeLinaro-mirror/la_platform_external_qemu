@@ -1,0 +1,178 @@
+# Copyright 2026 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Lazy loader for the rutabaga_gfx C FFI.
+#
+# librutabaga_ffi statically embeds a full copy of gfxstream. The goldfish
+# plugin's virtio-gpu-gfxstream device dlopen()s libgfxstream_backend, a second
+# copy, and the plugin's virtio_gpu_glue must be able to reach either device.
+# Linking qemu-system-* (or the plugin) against librutabaga_ffi would load both
+# in one process and produce duplicate Objective-C classes on macOS
+# (EmuGLContext / EmuGLView / EmuGLViewWithMetal).
+#
+# This target provides every rutabaga_* entry point as a trampoline that
+# loads librutabaga_ffi via GLib GModule from $ANDROID_EMULATOR_LIBRARY_DIR on
+# first use (rutabaga_init(), i.e. only when a virtio-gpu-rutabaga device is
+# realized). librutabaga_ffi itself is still packaged into lib/qemu by
+# goldfish's collect_plugins.
+
+load("@bazel_lib//lib:copy_file.bzl", "copy_file")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# Re-expose the rutabaga C FFI headers under the "rutabaga_gfx/" include prefix
+# expected by virtio-gpu-rutabaga.c ("rutabaga_gfx/rutabaga_gfx_ffi.h").
+copy_file(
+    name = "rutabaga_gfx_ffi_h",
+    src = "@rutabaga_gfx//:ffi/src/include/rutabaga_gfx_ffi.h",
+    out = "include/rutabaga_gfx/rutabaga_gfx_ffi.h",
+)
+
+copy_file(
+    name = "rutabaga_gfx_ffi_goldfish_h",
+    src = "@rutabaga_gfx//:ffi/src/include/rutabaga_gfx_ffi_goldfish.h",
+    out = "include/rutabaga_gfx/rutabaga_gfx_ffi_goldfish.h",
+)
+
+cc_library(
+    name = "rutabaga_ffi_headers",
+    hdrs = [
+        ":rutabaga_gfx_ffi_goldfish_h",
+        ":rutabaga_gfx_ffi_h",
+    ],
+    defines = ["RUTABAGA_GFX_FFI_UNSTABLE"],
+    strip_include_prefix = "include",
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "rutabaga_ffi_lazy",
+    srcs = ["rutabaga_ffi_lazy.c"],
+    hdrs = [
+        ":rutabaga_gfx_ffi_goldfish_h",
+        ":rutabaga_gfx_ffi_h",
+    ],
+    defines = ["RUTABAGA_GFX_FFI_UNSTABLE"],
+    implementation_deps = [
+        "@glib//glib:glib_import",
+        "@glib//gmodule:gmodule_import",
+    ],
+    linkstatic = True,
+    strip_include_prefix = "include",
+)
+
+# --- Unit tests --------------------------------------------------------------
+
+_NOT_ON_WINDOWS = select({
+    "@platforms//os:windows": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
+[
+    cc_binary(
+        name = variant + "/librutabaga_ffi." + ext,
+        testonly = True,
+        srcs = ["fake_rutabaga_ffi.c"],
+        linkshared = True,
+        local_defines = defines,
+        target_compatible_with = compatible_with,
+        visibility = ["//visibility:private"],
+        deps = [":rutabaga_ffi_headers"],
+    )
+    for variant, defines in [
+        ("fake_complete", []),
+        (
+            "fake_incomplete",
+            ["RUTABAGA_FAKE_OMIT_REQUIRED_SYMBOL=1"],
+        ),
+        (
+            "fake_no_goldfish",
+            ["RUTABAGA_FAKE_OMIT_GOLDFISH_SYMBOL=1"],
+        ),
+    ]
+    for ext, compatible_with in [
+        (
+            "so",
+            ["@platforms//os:linux"],
+        ),
+        (
+            "dylib",
+            ["@platforms//os:macos"],
+        ),
+    ]
+]
+
+_FAKE_COMPLETE_DATA = select({
+    "@platforms//os:macos": [":fake_complete/librutabaga_ffi.dylib"],
+    "//conditions:default": [":fake_complete/librutabaga_ffi.so"],
+})
+
+_FAKE_COMPLETE_RLOCATION = select({
+    "@platforms//os:macos": {"RUTABAGA_FAKE_RLOCATION": "$(rlocationpath :fake_complete/librutabaga_ffi.dylib)"},
+    "//conditions:default": {"RUTABAGA_FAKE_RLOCATION": "$(rlocationpath :fake_complete/librutabaga_ffi.so)"},
+})
+
+_FAKE_INCOMPLETE_DATA = select({
+    "@platforms//os:macos": [":fake_incomplete/librutabaga_ffi.dylib"],
+    "//conditions:default": [":fake_incomplete/librutabaga_ffi.so"],
+})
+
+_FAKE_INCOMPLETE_RLOCATION = select({
+    "@platforms//os:macos": {"RUTABAGA_FAKE_RLOCATION": "$(rlocationpath :fake_incomplete/librutabaga_ffi.dylib)"},
+    "//conditions:default": {"RUTABAGA_FAKE_RLOCATION": "$(rlocationpath :fake_incomplete/librutabaga_ffi.so)"},
+})
+
+_FAKE_NO_GOLDFISH_DATA = select({
+    "@platforms//os:macos": [":fake_no_goldfish/librutabaga_ffi.dylib"],
+    "//conditions:default": [":fake_no_goldfish/librutabaga_ffi.so"],
+})
+
+_FAKE_NO_GOLDFISH_RLOCATION = select({
+    "@platforms//os:macos": {"RUTABAGA_FAKE_RLOCATION": "$(rlocationpath :fake_no_goldfish/librutabaga_ffi.dylib)"},
+    "//conditions:default": {"RUTABAGA_FAKE_RLOCATION": "$(rlocationpath :fake_no_goldfish/librutabaga_ffi.so)"},
+})
+
+[
+    cc_test(
+        name = "rutabaga_ffi_lazy_" + scenario + "_test",
+        size = "small",
+        srcs = ["rutabaga_ffi_lazy_test.c"],
+        data = data,
+        dynamic_deps = [
+            "@glib//glib:glib_shared",
+            "@glib//gmodule:gmodule_shared",
+        ],
+        env = {
+            "RUTABAGA_LAZY_TEST_SCENARIO": scenario,
+        } | rlocation,
+        target_compatible_with = _NOT_ON_WINDOWS,
+        visibility = ["//visibility:private"],
+        deps = [
+            ":rutabaga_ffi_headers",
+            ":rutabaga_ffi_lazy",
+            "@glib//glib:glib_import",
+            "@glib//gmodule:gmodule_import",
+        ],
+    )
+    for scenario, data, rlocation in [
+        ("fake", _FAKE_COMPLETE_DATA, _FAKE_COMPLETE_RLOCATION),
+        ("missing", [], {}),
+        ("corrupt", [], {}),
+        ("incomplete", _FAKE_INCOMPLETE_DATA, _FAKE_INCOMPLETE_RLOCATION),
+        ("optional_missing", _FAKE_NO_GOLDFISH_DATA, _FAKE_NO_GOLDFISH_RLOCATION),
+    ]
+]

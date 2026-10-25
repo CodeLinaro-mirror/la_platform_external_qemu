@@ -49,11 +49,10 @@
       // specifies a different Bazel target for the library archive.
       "rutabaga_gfx_ffi": {
         "lib_type": "bazel",
-        "bazel_target": "@rutabaga_gfx//:rutabaga_c_ffi",
+        "bazel_target": "//google/rutabaga:rutabaga_ffi_lazy",
         "version": "0.1.2",
         "shim": {
-          "name": "rutabaga_gfx_ffi",
-          "archive_target": "@rutabaga_gfx//:rutabaga_ffi"
+          "name": "rutabaga_gfx_ffi"
         }
       },
       "libfdt": {
@@ -538,7 +537,7 @@
         "@dtc//:libfdt"
       ],
       "rutabaga_gfx_ffi": [
-        "@rutabaga_gfx//:rutabaga_c_ffi"
+        "//google/rutabaga:rutabaga_ffi_lazy"
       ],
       "slirp": [
         "@libslirp"

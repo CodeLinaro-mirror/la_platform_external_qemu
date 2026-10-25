@@ -90,6 +90,14 @@ static const QDevAlias qdev_alias_table[] = {
     { "virtio-gpu-device", "virtio-gpu", QEMU_ARCH_VIRTIO_MMIO },
     { "virtio-gpu-ccw", "virtio-gpu", QEMU_ARCH_VIRTIO_CCW },
     { "virtio-gpu-pci", "virtio-gpu", QEMU_ARCH_VIRTIO_PCI },
+    /*
+     * virtio-gpu-gfxstream is registered by the goldfish plugin
+     * (hardware/generic/goldfish/emulator/plugin/hal/virtio_gpu_gfxstream);
+     * the aliases let "-device virtio-gpu-gfxstream" pick the right bus.
+     */
+    { "virtio-gpu-gfxstream-device", "virtio-gpu-gfxstream",
+      QEMU_ARCH_VIRTIO_MMIO },
+    { "virtio-gpu-gfxstream-pci", "virtio-gpu-gfxstream", QEMU_ARCH_VIRTIO_PCI },
     { "virtio-gpu-gl-device", "virtio-gpu-gl", QEMU_ARCH_VIRTIO_MMIO },
     { "virtio-gpu-gl-pci", "virtio-gpu-gl", QEMU_ARCH_VIRTIO_PCI },
     { "virtio-gpu-rutabaga-device", "virtio-gpu-rutabaga",

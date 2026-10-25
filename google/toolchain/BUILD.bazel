@@ -157,8 +157,9 @@ amc_pkg_config(
 amc_pkg_config(
     name = "rutabaga_gfx_ffi_pc",
     package_name = "rutabaga_gfx_ffi",
-    archive_library = "@rutabaga_gfx//:rutabaga_ffi",
-    library = "@rutabaga_gfx//:rutabaga_c_ffi",
+    # Static shim that dlopen()s librutabaga_ffi lazily; the shared library
+    # itself is packaged via collect_plugins in goldfish.
+    library = "//google/rutabaga:rutabaga_ffi_lazy",
     toolchain = ":toolchain",
     version = "0.1.2",
 )
