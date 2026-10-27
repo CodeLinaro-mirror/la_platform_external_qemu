@@ -55,6 +55,9 @@ android_add_library(
 target_compile_options(android-emu-media PRIVATE -Wno-extern-c-compat
                                                  -Wno-return-type-c-linkage)
 target_compile_definitions(android-emu-media PRIVATE AEMU_MIN AEMU_LAUNCHER)
+# include/host-common/ holds the NVIDIA CUDA/NVDEC dynlink headers and the
+# MediaCuda* declarations used by the CUDA decoders. They used to come from
+# hardware/google/aemu, which now ships open-source code only.
 target_include_directories(
   android-emu-media
   PUBLIC include
