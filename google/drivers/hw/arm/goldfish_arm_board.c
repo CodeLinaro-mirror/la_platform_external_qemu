@@ -20,6 +20,7 @@
 #include "hw/arm/virt.h"
 #include "hw/pci/pci.h"
 #include "qemu/error-report.h"
+#include "qemu/module.h"
 #include "system/device_tree.h"
 
 static const int a15irqmap[] = {
@@ -33,8 +34,8 @@ static const int a15irqmap[] = {
     [RANCHU_GOLDFISH_BATTERY] = 17,
     //[RANCHU_GOLDFISH_AUDIO] = 18,
     //[RANCHU_GOLDFISH_EVDEV] = 19,
-    //[RANCHU_GOLDFISH_PIPE] = 20,
-    //[RANCHU_GOLDFISH_SYNC] = 21,
+    [RANCHU_GOLDFISH_PIPE] = 20,
+    [RANCHU_GOLDFISH_SYNC] = 21,
     [VIRT_MMIO] = 32,          /* ...to 16 + NUM_VIRTIO_TRANSPORTS - 1 */
     [VIRT_GIC_V2M] = 64,       /* ...to 48 + NUM_GICV2M_SPIS - 1 */
     [VIRT_PLATFORM_BUS] = 128, /* ...to 112 + PLATFORM_BUS_NUM_IRQS -1 */
@@ -55,7 +56,7 @@ static MachineClass *find_machine(const char *name, GSList *machines) {
 }
 
 
-static void init_simple_device(DeviceState *dev, const VirtMachineState *vms,
+static void init_simple_device(const VirtMachineState *vms,
                                int devid, const char *sysbus_name,
                                const char *compat, int num_compat_strings,
                                const char *clocks, int num_clocks) {
@@ -99,18 +100,25 @@ static void create_simple_device(const VirtMachineState *vms, int devid,
                                  const char *sysbus_name, const char *compat,
                                  int num_compat_strings, const char *clocks,
                                  int num_clocks) {
-  DeviceState *dev = qdev_new(sysbus_name);
-  init_simple_device(dev, vms, devid, sysbus_name, compat, num_compat_strings,
+  if (!module_object_class_by_name(sysbus_name)) {
+    error_report("QOM type '%s' is not registered (is libgoldfish loaded?)",
+                 sysbus_name);
+    exit(1);
+  }
+
+  init_simple_device(vms, devid, sysbus_name, compat, num_compat_strings,
                      clocks, num_clocks);
 }
 
 static void arm_init_goldfish(MachineState *machine) {
   GSList *machines = object_class_get_list(TYPE_MACHINE, false);
   MachineClass *machine_class;
+  GoldfishMachineState *ams = ANDROID_MACHINE(machine);
+  VirtMachineState *vms = VIRT_MACHINE(machine);
+  void *fdt;
+
   machine_class = find_machine("virt-8.2", machines);
   machine_class->init(machine);
-
-  VirtMachineState *vms = VIRT_MACHINE(machine);
 
   if (machine_usb(machine)) {
     PCIBus *pci_bus =
@@ -121,7 +129,7 @@ static void arm_init_goldfish(MachineState *machine) {
       pci_create_simple(pci_bus, -1, "pci-ohci");
   }
 
-  void *fdt = machine->fdt;
+  fdt = machine->fdt;
   qemu_fdt_setprop_string(fdt, "/", "compatible", "linux,ranchu");
   qemu_fdt_setprop_cell(fdt, "/", "#address-cells", 0x2);
   qemu_fdt_setprop_cell(fdt, "/", "#size-cells", 0x2);
@@ -144,6 +152,20 @@ static void arm_init_goldfish(MachineState *machine) {
                        "google,goldfish-battery\0"
                        "generic,goldfish-battery",
                        2, 0, 0);
+
+  if (ams->enable_goldfish_pipe) {
+    create_simple_device(vms, RANCHU_GOLDFISH_PIPE, "goldfish_pipe",
+                         "google,android-pipe\0"
+                         "generic,android-pipe",
+                         2, 0, 0);
+  }
+
+  if (ams->enable_goldfish_sync) {
+    create_simple_device(vms, RANCHU_GOLDFISH_SYNC, "goldfish_sync",
+                         "google,goldfish-sync\0"
+                         "generic,goldfish-sync",
+                         2, 0, 0);
+  }
 }
 
 static void goldfish_instance_init(Object *obj)
@@ -177,12 +199,36 @@ static void goldfish_set_vendor_device_in_guest(Object *obj, const char *value,
   ams->vendor_device_in_guest = g_strdup(value);
 }
 
+static bool goldfish_get_pipe(Object *obj, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  return ams->enable_goldfish_pipe;
+}
+
+static void goldfish_set_pipe(Object *obj, bool value, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  ams->enable_goldfish_pipe = value;
+}
+
+static bool goldfish_get_sync(Object *obj, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  return ams->enable_goldfish_sync;
+}
+
+static void goldfish_set_sync(Object *obj, bool value, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  ams->enable_goldfish_sync = value;
+}
+
 static void goldfish_machine_std_class_init(ObjectClass *oc, const void *data) {
   MachineClass *mc = MACHINE_CLASS(oc);
   object_class_property_add_str(oc, "system", NULL,
                                 goldfish_set_system_device_in_guest);
   object_class_property_add_str(oc, "vendor", NULL,
                                 goldfish_set_vendor_device_in_guest);
+  object_class_property_add_bool(oc, "goldfish-pipe", goldfish_get_pipe,
+                                 goldfish_set_pipe);
+  object_class_property_add_bool(oc, "goldfish-sync", goldfish_get_sync,
+                                 goldfish_set_sync);
   goldfish_machine_options(mc);
 }
 

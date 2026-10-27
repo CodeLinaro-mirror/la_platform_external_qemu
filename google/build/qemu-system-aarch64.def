@@ -78,6 +78,7 @@ EXPORTS
     error_setg_win32_internal
     freq_to_str
     get_ptr_rcu_reader
+    get_qemu_system_address_space
     graphic_console_init
     graphic_console_set_hwops
     graphic_hw_update

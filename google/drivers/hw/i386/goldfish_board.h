@@ -41,6 +41,10 @@ typedef struct GoldfishMachineState {
    */
   char *vendor_device_in_guest;
 
+  /* Opt-in legacy Goldfish SysBus devices */
+  bool enable_goldfish_pipe;
+  bool enable_goldfish_sync;
+
 } GoldfishMachineState;
 
 #define TYPE_ANDROID_MACHINE "goldfish-machine"

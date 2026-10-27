@@ -219,6 +219,16 @@ void add_goldfish_dsdt(MachineState *machine, Aml *table) {
   build_goldfish_device_aml(scope, "GFBY", "GFSH0001", "goldfish battery",
                             GOLDFISH_BATTERY_IOMEM_BASE,
                             GOLDFISH_BATTERY_IOMEM_SIZE, GOLDFISH_BATTERY_IRQ);
+  if (ams->enable_goldfish_pipe) {
+    build_goldfish_device_aml(scope, "GFPP", "GFSH0003", "goldfish pipe",
+                              GOLDFISH_PIPE_IOMEM_BASE,
+                              GOLDFISH_PIPE_IOMEM_SIZE, GOLDFISH_PIPE_IRQ);
+  }
+  if (ams->enable_goldfish_sync) {
+    build_goldfish_device_aml(scope, "GFSY", "GFSH0006", "goldfish sync",
+                              GOLDFISH_SYNC_IOMEM_BASE,
+                              GOLDFISH_SYNC_IOMEM_SIZE, GOLDFISH_SYNC_IRQ);
+  }
   build_android_dt_aml(ams, scope, "ANDT", "ANDR0001", "android device tree");
   aml_append(table, scope);
 }

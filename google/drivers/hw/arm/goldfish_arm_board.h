@@ -22,6 +22,10 @@ typedef struct GoldfishMachineState {
   /* The path of system.img in the guest */
   char* system_device_in_guest;
 
+  /* Opt-in legacy Goldfish SysBus devices */
+  bool enable_goldfish_pipe;
+  bool enable_goldfish_sync;
+
   /* The path of the vendor.img in the guest (if any) */
   char* vendor_device_in_guest;
 } GoldfishMachineState;
