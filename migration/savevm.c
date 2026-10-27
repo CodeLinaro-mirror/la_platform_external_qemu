@@ -340,6 +340,15 @@ void del_snapshot_progress_handler(QemuSnapshotProgressEntry *e)
     g_free(e);
 }
 
+const char *qemu_snapshot_in_flight_name(void)
+{
+    assert(bql_locked());
+    if (!snapshot_progress_in_flight()) {
+        return NULL;
+    }
+    return snapshot_progress.name;
+}
+
 static int32_t count_non_iterable_savevm_devices(QemuSnapshotOperation op)
 {
     int32_t count = 0;

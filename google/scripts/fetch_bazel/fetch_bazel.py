@@ -34,11 +34,13 @@ PRESUBMIT_BUILD_TASKS = {
     "emulator_linux_x64:git_emu-main-next": "lin_bid",
     "emulator_linux_aarch64:git_emu-main-next": "lin_arm_bid",
     "emulator_windows_x64:git_emu-main-next": "win_bid",
+    "emulator_windows_aarch64:git_emu-main-next": "win_arm_bid",
     "emulator_mac_aarch64:git_emu-main-next": "mac_bid",
 }
 
 OPTIONAL_PRESUBMIT_BUILD_TASKS = {
     "emulator_linux_aarch64:git_emu-main-next",
+    "emulator_windows_aarch64:git_emu-main-next",
 }
 
 
@@ -163,6 +165,8 @@ def git_commit(destination_dir, args):
 
     # Add a commit_msg footer if buganizer_id is specified
     commit_footer = f"\nBug: {args.buganizer_id}" if args.buganizer_id else ""
+    win_arm_bullet = f"\n- go/ab/{args.win_arm_bid}" if getattr(args, "win_arm_bid", None) else ""
+    win_arm_flag = f"            --win-arm-bid {args.win_arm_bid} \\\n" if getattr(args, "win_arm_bid", None) else ""
     lin_arm_bullet = f"\n- go/ab/{args.lin_arm_bid}" if getattr(args, "lin_arm_bid", None) else ""
     lin_arm_flag = f"            --lin-arm-bid {args.lin_arm_bid} \\\n" if getattr(args, "lin_arm_bid", None) else ""
 
@@ -175,7 +179,7 @@ This updates the bazel build from the running the meson generator on build bots.
 The build is based on http://go/ag/{args.cl}, with presubmit build targets:
 
 - go/ab/{args.mac_bid}
-- go/ab/{args.win_bid}
+- go/ab/{args.win_bid}{win_arm_bullet}
 - go/ab/{args.lin_bid}{lin_arm_bullet}
 
 You can recreate the commit by running:
@@ -186,7 +190,7 @@ You can recreate the commit by running:
             --cl {args.cl} \\
             --mac-bid {args.mac_bid} \\
             --win-bid {args.win_bid} \\
-            --lin-bid {args.lin_bid} \\
+{win_arm_flag}            --lin-bid {args.lin_bid} \\
 {lin_arm_flag}            --re {args.reviewers} \\
 
 ```
@@ -287,6 +291,8 @@ def fetch_and_merge(args):
         "emulator_mac_aarch64": ("darwin-arm64", args.mac_bid),
         "emulator_linux_x64": ("linux-x86_64", args.lin_bid),
     }
+    if getattr(args, "win_arm_bid", None):
+        targets["emulator_windows_aarch64"] = ("windows-aarch64", args.win_arm_bid)
     if getattr(args, "lin_arm_bid", None):
         targets["emulator_linux_aarch64"] = ("linux-aarch64", args.lin_arm_bid)
 
@@ -306,23 +312,36 @@ def fetch_and_merge(args):
         str(merge),
         "--buildfile",
         str(dest / "platform" / "BUILD.windows-x86_64"),
-        "@platforms//os:windows",
+        "@goldfish_build//platforms:is_windows_x64",
+    ]
+    if getattr(args, "win_arm_bid", None) or (dest / "platform" / "BUILD.windows-aarch64").exists():
+        merge_cmd.extend([
+            "--buildfile",
+            str(dest / "platform" / "BUILD.windows-aarch64"),
+            "@goldfish_build//platforms:is_windows_aarch64",
+        ])
+    merge_cmd.extend([
         "--buildfile",
         str(dest / "platform" / "BUILD.darwin-arm64"),
         "@platforms//os:macos",
         "--buildfile",
         str(dest / "platform" / "BUILD.linux-x86_64"),
         "@goldfish_build//platforms:is_linux_x64",
-        "--buildfile",
-        str(dest / "platform" / "BUILD.linux-aarch64"),
-        "@goldfish_build//platforms:is_linux_aarch64",
+    ])
+    if getattr(args, "lin_arm_bid", None) or (dest / "platform" / "BUILD.linux-aarch64").exists():
+        merge_cmd.extend([
+            "--buildfile",
+            str(dest / "platform" / "BUILD.linux-aarch64"),
+            "@goldfish_build//platforms:is_linux_aarch64",
+        ])
+    merge_cmd.extend([
         "--verbatim-buildfile",
         str(qemu / "google" / "build" / "BUILD.common"),
         "--unique",
         "win_def_file",
         "-o",
         str(dest / "BUILD.bazel"),
-    ]
+    ])
     logging.info("Merging using: %s", " ".join(merge_cmd))
     subprocess.check_call(merge_cmd)
     logging.info("Running buildifier on %s", str(dest / "BUILD.bazel"))
@@ -408,6 +427,13 @@ def main():
         help="Windows build from which we will fetch bazel-windows-x86_64-{win-bid}.zip (auto-detected from Gerrit if omitted)",
     )
     parser.add_argument(
+        "--win-arm-bid",
+        type=str,
+        required=False,
+        default=None,
+        help="Windows ARM64 build from which we will fetch bazel-windows-aarch64-{win-arm-bid}.zip (auto-detected from Gerrit if omitted)",
+    )
+    parser.add_argument(
         "--lin-bid",
         type=str,
         required=False,
@@ -467,7 +493,7 @@ def main():
     args.cl = cl
 
     # Auto-detect missing build IDs from Gerrit Treetop presubmit tasks
-    if not (args.win_bid and args.lin_bid and args.mac_bid):
+    if not (args.win_bid and args.lin_bid and args.mac_bid and args.win_arm_bid and args.lin_arm_bid):
         gerrit_token = args.gerrit_token or obtain_token("gerritcodereview")
         found_bids = fetch_presubmit_bids(args.cl, revision, gerrit_token)
         if not args.lin_bid:
@@ -476,6 +502,8 @@ def main():
             args.lin_arm_bid = found_bids.get("lin_arm_bid")
         if not args.win_bid:
             args.win_bid = found_bids.get("win_bid")
+        if not args.win_arm_bid:
+            args.win_arm_bid = found_bids.get("win_arm_bid")
         if not args.mac_bid:
             args.mac_bid = found_bids.get("mac_bid")
 
