@@ -152,8 +152,10 @@ EXPORTS
     object_property_add_bool
     object_property_add_child
     object_property_add_link
+    object_property_add_uint64_ptr
     object_property_allow_set_link
     object_property_del
+    object_property_get_uint
     object_property_set_bool
     object_property_set_default_bool
     object_property_set_default_int
@@ -253,6 +255,8 @@ EXPORTS
     qemu_in_coroutine
     qemu_in_coroutine
     qemu_in_vcpu_thread
+    qemu_input_event_send_key_delay
+    qemu_input_event_send_key_qcode
     qemu_input_event_sync
     qemu_input_linux_to_qcode
     qemu_input_queue_abs
@@ -337,6 +341,7 @@ EXPORTS
     qkbd_state_free
     qkbd_state_init
     qkbd_state_key_event
+    qkbd_state_lift_all_keys
     qmp_quit
     qobject_destroy
     rcu_add_force_rcu_notifier
