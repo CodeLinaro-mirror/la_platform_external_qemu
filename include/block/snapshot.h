@@ -110,4 +110,13 @@ BlockDriverState *bdrv_all_find_vmstate_bs(const char *vmstate_bs,
                                            bool has_devices, strList *devices,
                                            Error **errp);
 
+/*
+ * Node that holds the VM state of internal snapshots whenever a caller does
+ * not name one explicitly (savevm/loadvm/delvm, -savevm/-loadvm, and
+ * snapshot-save/-load without 'vmstate').  Unset by default, in which case
+ * the first snapshottable writable node is used, as upstream does.  Passing
+ * NULL frees the stored name and restores that default.
+ */
+void bdrv_set_default_vmstate_node(const char *node_name);
+
 #endif

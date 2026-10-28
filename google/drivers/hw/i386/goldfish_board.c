@@ -24,6 +24,7 @@
 #include "hw/hyperv/vmbus-bridge.h"
 #include "hw/i386/pc.h"
 #include "hw/southbridge/piix.h"
+#include "qemu/error-report.h"
 #include "qemu/module.h"
 #include "qemu/typedefs.h"
 
@@ -58,24 +59,46 @@ static MachineClass *find_machine(const char *name, GSList *machines) {
   return NULL;
 }
 
+static DeviceState *create_simple_device(const char *name,
+                                         hwaddr addr, qemu_irq irq) {
+  if (!module_object_class_by_name(name)) {
+    error_report("QOM type '%s' is not registered (is libgoldfish loaded?)",
+                 name);
+    exit(1);
+  }
+
+  return sysbus_create_simple(name, addr, irq);
+}
+
 static void pc_init_goldfish(MachineState *machine) {
   // The goldfish board is basically a modified pc-i440fx board with a custom
   // acpi. So we are going to find the pc-i440fx machine, and call its
   // initialize function. This will give us a good baseline.
   GSList *machines = object_class_get_list(TYPE_MACHINE, false);
   MachineClass *machine_class;
+  GoldfishMachineState *ams = ANDROID_MACHINE(machine);
+  X86MachineState *x86ms = X86_MACHINE(machine);
+  PCMachineState *pcms = PC_MACHINE(machine);
 
   machine_class = find_machine("pc", machines);
   machine_class->init(machine);
 
   // Add the battery device.
-  X86MachineState *x86ms = X86_MACHINE(machine);
   sysbus_create_simple("goldfish_battery", GOLDFISH_BATTERY_IOMEM_BASE,
                        x86ms ->gsi[GOLDFISH_BATTERY_IRQ]);
 
+  if (ams->enable_goldfish_pipe) {
+    create_simple_device("goldfish_pipe", GOLDFISH_PIPE_IOMEM_BASE,
+                         x86ms->gsi[GOLDFISH_PIPE_IRQ]);
+  }
+
+  if (ams->enable_goldfish_sync) {
+    create_simple_device("goldfish_sync", GOLDFISH_SYNC_IOMEM_BASE,
+                         x86ms->gsi[GOLDFISH_SYNC_IRQ]);
+  }
+
   // Make sure we override dsdt function, as we want to configure the board
   // properly.
-  PCMachineState *pcms = PC_MACHINE(machine);
   pcms->add_goldfish_dsdt = add_goldfish_dsdt;
 }
 
@@ -93,6 +116,26 @@ goldfish_set_str(acpi_ini);
 goldfish_set_str(system_device_in_guest);
 goldfish_set_str(vendor_device_in_guest);
 
+static bool goldfish_get_pipe(Object *obj, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  return ams->enable_goldfish_pipe;
+}
+
+static void goldfish_set_pipe(Object *obj, bool value, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  ams->enable_goldfish_pipe = value;
+}
+
+static bool goldfish_get_sync(Object *obj, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  return ams->enable_goldfish_sync;
+}
+
+static void goldfish_set_sync(Object *obj, bool value, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  ams->enable_goldfish_sync = value;
+}
+
 static int x86_kvm_type(MachineState *ms, const char *vm_type)
 {
     // Should this use kvm_get_vm_type?
@@ -108,6 +151,10 @@ static void goldfish_machine_std_class_init(ObjectClass *oc, const void *data) {
                                 goldfish_set_system_device_in_guest);
   object_class_property_add_str(oc, "vendor", NULL,
                                 goldfish_set_vendor_device_in_guest);
+  object_class_property_add_bool(oc, "goldfish-pipe", goldfish_get_pipe,
+                                 goldfish_set_pipe);
+  object_class_property_add_bool(oc, "goldfish-sync", goldfish_get_sync,
+                                 goldfish_set_sync);
 
   android_machine_options(mc);
   mc->init = pc_init_goldfish;

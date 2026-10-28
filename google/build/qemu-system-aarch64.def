@@ -6,6 +6,7 @@ EXPORTS
     address_space_unmap
     aio_bh_call
     aio_bh_schedule_oneshot_full
+    aio_poll
     all_cpu_threads_idle
     aml_append
     aml_int
@@ -77,6 +78,7 @@ EXPORTS
     error_setg_win32_internal
     freq_to_str
     get_ptr_rcu_reader
+    get_qemu_system_address_space
     graphic_console_init
     graphic_console_set_hwops
     graphic_hw_update
@@ -92,19 +94,28 @@ EXPORTS
     iov_to_buf_full
     load_snapshot
     load_snapshot_resume
+    loc_pop
+    loc_push_none
+    loc_set_file
     machine_current_cpu_type
     memory_region_add_subregion
+    memory_region_add_subregion_overlap
     memory_region_del_subregion
     memory_region_init
     memory_region_init_ram_ptr
     memory_region_init_io
+    memory_region_set_enabled
     memory_region_size
+    memory_region_transaction_begin
+    memory_region_transaction_commit
     message_with_timestamp
     migrate_add_blocker
     migrate_del_blocker
     module_load_qom
     module_object_class_by_name
     monitor_init_hmp
+    monitor_printf
+    monitor_register_hmp
     notifier_remove
     object_apply_compat_props
     object_apply_global_props
@@ -119,6 +130,7 @@ EXPORTS
     object_class_is_abstract
     object_class_property_add
     object_class_property_add_bool
+    object_class_property_add_enum
     object_class_property_add_link
     object_class_property_add_str
     object_class_property_set_description
@@ -136,8 +148,10 @@ EXPORTS
     object_property_add_bool
     object_property_add_child
     object_property_add_link
+    object_property_add_uint64_ptr
     object_property_allow_set_link
     object_property_del
+    object_property_get_uint
     object_property_set_bool
     object_property_set_default_bool
     object_property_set_default_int
@@ -160,6 +174,7 @@ EXPORTS
     pci_address_space
     pci_address_space_io
     pci_register_bar
+    pci_set_irq
     pci_std_vga_mmio_region_init
     qapi_enum_lookup
     qapi_event_send_device_deleted
@@ -194,6 +209,7 @@ EXPORTS
     qemu_console_get_index
     qemu_console_get_name
     qemu_console_is_graphic
+    qemu_console_is_visible
     qemu_console_lookup_by_index
     qemu_console_lookup_default
     qemu_console_surface
@@ -202,6 +218,7 @@ EXPORTS
     qemu_cpu_list_lock
     qemu_create
     qemu_create_displaysurface
+    qemu_create_displaysurface_from
     qemu_create_displaysurface_pixman
     qemu_del_net_client
     qemu_del_nic
@@ -229,10 +246,13 @@ EXPORTS
     qemu_get_queue
     qemu_get_subqueue
     qemu_get_thread_id
+    qemu_get_virtqueue_element
     qemu_guest_random_seed_thread_part2
     qemu_in_coroutine
     qemu_in_coroutine
     qemu_in_vcpu_thread
+    qemu_input_event_send_key_delay
+    qemu_input_event_send_key_qcode
     qemu_input_event_sync
     qemu_input_linux_to_qcode
     qemu_input_queue_abs
@@ -266,6 +286,7 @@ EXPORTS
     qemu_put_be64
     qemu_put_buffer
     qemu_put_byte
+    qemu_put_virtqueue_element
     qemu_register_main_loop_exit_notifier
     qemu_register_reset
     qemu_register_shutdown_notifier
@@ -274,6 +295,7 @@ EXPORTS
     qemu_set_cloexec
     qemu_set_fd_handler
     qemu_set_irq
+    qemu_snapshot_in_flight_name
     qemu_system_reset_request
     qemu_system_shutdown_request
     qemu_thread_create
@@ -315,6 +337,7 @@ EXPORTS
     qkbd_state_free
     qkbd_state_init
     qkbd_state_key_event
+    qkbd_state_lift_all_keys
     qmp_quit
     qobject_destroy
     rcu_add_force_rcu_notifier
@@ -373,6 +396,21 @@ EXPORTS
     virtio_error
     virtio_get_queue
     virtio_get_queue_index
+    virtio_gpu_base_device_realize
+    virtio_gpu_base_device_unrealize
+    virtio_gpu_base_fill_display_info
+    virtio_gpu_base_generate_edid
+    virtio_gpu_base_reset
+    virtio_gpu_cleanup_mapping
+    virtio_gpu_create_mapping_iov
+    virtio_gpu_ctrl_response
+    virtio_gpu_ctrl_response_nodata
+    virtio_gpu_device_realize
+    virtio_gpu_find_resource
+    virtio_gpu_get_display_info
+    virtio_gpu_get_edid
+    virtio_gpu_process_cmdq
+    virtio_gpu_reset
     virtio_init
     virtio_input_add_config
     virtio_input_init_config
@@ -416,6 +454,7 @@ EXPORTS
     vmstate_unregister
     warn_report
     warn_report_err
+    warn_report_once_cond
     yank_register_function
     yank_register_instance
     yank_unregister_function

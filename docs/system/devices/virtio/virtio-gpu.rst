@@ -42,7 +42,8 @@ QEMU virtio-gpu device variants come in the following form:
 **Backends:** QEMU provides a 2D virtio-gpu backend, and two accelerated
 backends: virglrenderer ('gl' device label) and rutabaga_gfx ('rutabaga'
 device label).  There is a vhost-user backend that runs the graphics stack
-in a separate process for improved isolation.
+in a separate process for improved isolation.  The Android Emulator adds a
+``virtio-gpu-gfxstream`` device from its goldfish plugin (see below).
 
 **Interfaces:** QEMU further categorizes virtio-gpu device variants based
 on the interface exposed to the guest. The interfaces can be classified
@@ -234,3 +235,28 @@ Surfaceless is the default if ``wsi`` is not specified.
   * - Vulkan+Wayland pass-through
     - Linux 5.16+
     - 24.3.0+
+
+virtio-gpu gfxstream (Android Emulator)
+---------------------------------------
+
+The Android Emulator additionally provides a ``virtio-gpu-gfxstream`` device
+that drives `gfxstream`_ directly through its ``stream_renderer_*`` C API,
+without rutabaga_gfx in between.  The device is not part of this tree: it is a
+``VirtIOGPU`` subclass implemented in the goldfish plugin
+(``hardware/generic/goldfish/emulator/plugin/hal/virtio_gpu_gfxstream``) and
+registered when the plugin is loaded; ``libgfxstream_backend`` is loaded with
+``dlopen()`` when the device is realized.  QEMU only keeps the
+``-device virtio-gpu-gfxstream`` bus aliases and the
+``VIRTIO_GPU_FLAG_EXTERNAL_RENDERER_ENABLED`` configuration flag (shared with
+``virtio-gpu-rutabaga``) that lets a subclass negotiate ``VIRTIO_GPU_F_VIRGL``
+and blob resources.  It accepts the ``gfxstream-vulkan``,
+``x-gfxstream-gles``, ``x-gfxstream-composer``, ``wsi``, ``renderer_features``
+and ``snapshot_directory`` options of ``virtio-gpu-rutabaga`` with the same
+meaning; ``cross-domain`` and ``wayland-socket-path`` are intentionally not
+provided (no Wayland passthrough), and at least one capset option must be
+enabled (there is no 2D-only fallback).  Exactly one of the two devices is
+instantiated per VM.
+
+.. parsed-literal::
+    -device virtio-gpu-gfxstream,gfxstream-vulkan=on,x-gfxstream-gles=on,
+       hostmem=4096M,wsi=headless,snapshot_directory=/path/to/snapshots/

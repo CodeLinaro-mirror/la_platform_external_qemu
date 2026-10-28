@@ -30,17 +30,16 @@ struct RAMBlock {
     ram_addr_t offset;
     ram_addr_t used_length;
     ram_addr_t max_length;
-    void (*resized)(const char*, uint64_t length, void *host);
-    uint32_t flags;
-    /* Protected by the BQL.  */
-    char idstr[256];
     /* RCU-enabled, writes protected by the ramlist lock */
     QLIST_ENTRY(RAMBlock) next;
+    void (*resized)(const char*, uint64_t length, void *host);
+    uint32_t flags;
+    int fd;
+    int guest_memfd;
+    uint8_t clear_bmap_shift;
     QLIST_HEAD(, RAMBlockNotifier) ramblock_notifiers;
     Error *cpr_blocker;
-    int fd;
     uint64_t fd_offset;
-    int guest_memfd;
     RamBlockAttributes *attributes;
     size_t page_size;
     /* dirty bitmap used during migration */
@@ -73,12 +72,11 @@ struct RAMBlock {
      *
      * NOTE: this bitmap is different comparing to the other bitmaps
      * in that one bit can represent multiple guest pages (which is
-     * decided by the `clear_bmap_shift' variable below).  On
+     * decided by the `clear_bmap_shift' variable above).  On
      * destination side, this should always be NULL, and the variable
      * `clear_bmap_shift' is meaningless.
      */
     unsigned long *clear_bmap;
-    uint8_t clear_bmap_shift;
 
     /*
      * RAM block length that corresponds to the used_length on the migration
@@ -89,6 +87,8 @@ struct RAMBlock {
      * could not have been valid on the source.
      */
     ram_addr_t postcopy_length;
+    /* Protected by the BQL.  */
+    char idstr[256];
 };
 
 struct RamBlockAttributes {

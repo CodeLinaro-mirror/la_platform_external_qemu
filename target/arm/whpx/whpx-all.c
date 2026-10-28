@@ -16,6 +16,7 @@
 #include "system/whpx.h"
 #include "system/cpus.h"
 #include "system/runstate.h"
+#include "system/reset.h"
 #include "qemu/main-loop.h"
 #include "hw/core/boards.h"
 #include "qemu/error-report.h"
@@ -472,9 +473,9 @@ int whpx_vcpu_run(CPUState *cpu)
             if (arm_cpu->power_state != PSCI_OFF) {
                 whpx_psci_cpu_off(arm_cpu);
             }
-            /* Partition-wide reset, to reset state for reboots to succeed. */
-            whp_dispatch.WHvResetPartition(whpx->partition);
             bql_unlock();
+            cpu->exception_index = EXCP_INTERRUPT;
+            ret = 1;
             break;
         case WHvRunVpExitReasonNone:
         case WHvRunVpExitReasonUnrecoverableException:
@@ -647,13 +648,10 @@ uint32_t whpx_arm_get_ipa_bit_size(void)
 static void clamp_id_aa64mmfr0_parange_to_ipa_size(ARMISARegisters *isar)
 {
     uint32_t ipa_size = whpx_arm_get_ipa_bit_size();
-    uint64_t id_aa64mmfr0;
 
     /* Clamp down the PARange to the IPA size the kernel supports. */
     uint8_t index = round_down_to_parange_index(ipa_size);
-    id_aa64mmfr0 = GET_IDREG(isar, ID_AA64MMFR0);
-    id_aa64mmfr0 = (id_aa64mmfr0 & ~R_ID_AA64MMFR0_PARANGE_MASK) | index;
-    SET_IDREG(isar, ID_AA64MMFR0, id_aa64mmfr0);
+    FIELD_DP64_IDREG(isar, ID_AA64MMFR0, PARANGE, index);
 }
 
 static uint64_t whpx_read_midr(void)
@@ -719,11 +717,8 @@ static bool whpx_arm_get_host_cpu_features(ARMHostCPUFeatures *ahcf)
      * - any potentially needed VL management
      * Also disable SME at the same time.
      */
-    SET_IDREG(&ahcf->isar, ID_AA64PFR0,
-              GET_IDREG(&ahcf->isar, ID_AA64PFR0) & ~R_ID_AA64PFR0_SVE_MASK);
-
-    SET_IDREG(&ahcf->isar, ID_AA64PFR1,
-              GET_IDREG(&ahcf->isar, ID_AA64PFR1) & ~R_ID_AA64PFR1_SME_MASK);
+    FIELD_DP64_IDREG(&ahcf->isar, ID_AA64PFR0, SVE, 0);
+    FIELD_DP64_IDREG(&ahcf->isar, ID_AA64PFR1, SME, 0);
 
     return true;
 }
@@ -821,6 +816,19 @@ int whpx_init_vcpu(CPUState *cpu)
 
 void whpx_cpu_instance_init(CPUState *cs)
 {
+}
+
+static void whpx_arm_system_reset(void *opaque)
+{
+    struct whpx_state *whpx = opaque;
+
+    if (whp_dispatch.WHvResetPartition) {
+        /* Partition-wide reset, to reset non-architectural state for reboots to succeed. */
+        HRESULT hr = whp_dispatch.WHvResetPartition(whpx->partition);
+        if (FAILED(hr)) {
+            error_report("WHPX: Failed to reset partition, hr=%08lx", hr);
+        }
+    }
 }
 
 int whpx_accel_init(AccelState *as, MachineState *ms)
@@ -988,6 +996,8 @@ int whpx_accel_init(AccelState *as, MachineState *ms)
     }
 
     whpx_memory_init();
+
+    qemu_register_reset(whpx_arm_system_reset, whpx);
 
     return 0;
 

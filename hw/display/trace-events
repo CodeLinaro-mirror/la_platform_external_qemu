@@ -50,6 +50,7 @@ virtio_gpu_cmd_res_flush(uint32_t res, uint32_t w, uint32_t h, uint32_t x, uint3
 virtio_gpu_cmd_res_flush_read_start(uint32_t res) "res 0x%x"
 virtio_gpu_cmd_res_flush_read_end(uint32_t res, int32_t result) "res 0x%x, result %d"
 virtio_gpu_cmd_res_flush_done(uint32_t res) "res 0x%x"
+virtio_gpu_rutabaga_verify(const char *phase, size_t violations, int64_t elapsed_us) "phase %s, violations %zu, elapsed %" PRId64 " us"
 virtio_gpu_cmd_ctx_create(uint32_t ctx, const char *name) "ctx 0x%x, name %s"
 virtio_gpu_cmd_ctx_destroy(uint32_t ctx) "ctx 0x%x"
 virtio_gpu_cmd_ctx_res_attach(uint32_t ctx, uint32_t res) "ctx 0x%x, res 0x%x"
