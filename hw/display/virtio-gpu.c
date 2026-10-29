@@ -1502,10 +1502,10 @@ void virtio_gpu_device_realize(DeviceState *qdev, Error **errp)
     VirtIOGPU *g = VIRTIO_GPU(qdev);
 
     if (virtio_gpu_blob_enabled(g->parent_obj.conf)) {
-        if (!virtio_gpu_rutabaga_enabled(g->parent_obj.conf) &&
+        if (!virtio_gpu_external_renderer_enabled(g->parent_obj.conf) &&
             !virtio_gpu_virgl_enabled(g->parent_obj.conf) &&
             !virtio_gpu_have_udmabuf()) {
-            error_setg(errp, "need rutabaga or udmabuf for blob resources");
+            error_setg(errp, "need virgl, an external renderer or udmabuf for blob resources");
             return;
         }
 

@@ -732,6 +732,17 @@ int bdrv_all_create_snapshot(QEMUSnapshotInfo *sn,
     return 0;
 }
 
+static char *default_vmstate_node;
+
+void bdrv_set_default_vmstate_node(const char *node_name)
+{
+    GLOBAL_STATE_CODE();
+    g_free(default_vmstate_node);
+    default_vmstate_node = NULL;
+    if (node_name) {
+        default_vmstate_node = g_strdup(node_name);
+    }
+}
 
 BlockDriverState *bdrv_all_find_vmstate_bs(const char *vmstate_bs,
                                            bool has_devices, strList *devices,
@@ -742,6 +753,16 @@ BlockDriverState *bdrv_all_find_vmstate_bs(const char *vmstate_bs,
 
     GLOBAL_STATE_CODE();
     GRAPH_RDLOCK_GUARD_MAINLOOP();
+
+    /*
+     * Pin the VM state to the configured node rather than to whichever
+     * snapshottable node happens to come first in the graph; the latter
+     * changes with the drive configuration (e.g. whether an sdcard is
+     * attached) and silently moves the snapshot between image files.
+     */
+    if (!vmstate_bs) {
+        vmstate_bs = default_vmstate_node;
+    }
 
     if (bdrv_all_get_snapshot_devices(has_devices, devices, &bdrvs, errp) < 0) {
         return NULL;

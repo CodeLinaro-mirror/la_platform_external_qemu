@@ -72,6 +72,12 @@ struct virtio_gpu_rutabaga_resource {
 
 struct virtio_gpu_rutabaga_context {
     uint32_t context_id;
+    /*
+     * Cached at runtime for pre-save CTX-SNAPSHOTTABLE checks; not serialized
+     * to the QEMUFile stream (gfxstream persists its own capset_id in
+     * gfxstream_frontend.txtproto).
+     */
+    uint32_t capset_id;
     QTAILQ_HEAD(, virtio_gpu_rutabaga_resource) reslist;
     QTAILQ_ENTRY(virtio_gpu_rutabaga_context) next;
 };
@@ -110,7 +116,13 @@ enum virtio_gpu_base_conf_flags {
     VIRTIO_GPU_FLAG_DMABUF_ENABLED,
     VIRTIO_GPU_FLAG_BLOB_ENABLED,
     VIRTIO_GPU_FLAG_CONTEXT_INIT_ENABLED,
-    VIRTIO_GPU_FLAG_RUTABAGA_ENABLED,
+    /*
+     * Set by VirtIOGPU subclasses whose 3D renderer is not virglrenderer:
+     * the in-tree virtio-gpu-rutabaga device and the goldfish plugin's
+     * virtio-gpu-gfxstream device.  Has the same effect as VIRGL_ENABLED on
+     * the feature bits and on the blob-resource checks.
+     */
+    VIRTIO_GPU_FLAG_EXTERNAL_RENDERER_ENABLED,
     VIRTIO_GPU_FLAG_VENUS_ENABLED,
     VIRTIO_GPU_FLAG_RESOURCE_UUID_ENABLED,
     VIRTIO_GPU_FLAG_DRM_ENABLED,
@@ -129,8 +141,8 @@ enum virtio_gpu_base_conf_flags {
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_BLOB_ENABLED))
 #define virtio_gpu_context_init_enabled(_cfg) \
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_CONTEXT_INIT_ENABLED))
-#define virtio_gpu_rutabaga_enabled(_cfg) \
-    (_cfg.flags & (1 << VIRTIO_GPU_FLAG_RUTABAGA_ENABLED))
+#define virtio_gpu_external_renderer_enabled(_cfg) \
+    (_cfg.flags & (1 << VIRTIO_GPU_FLAG_EXTERNAL_RENDERER_ENABLED))
 #define virtio_gpu_resource_uuid_enabled(_cfg) \
     (_cfg.flags & (1 << VIRTIO_GPU_FLAG_RESOURCE_UUID_ENABLED))
 #define virtio_gpu_hostmem_enabled(_cfg) \
@@ -300,24 +312,44 @@ struct VhostUserGPU {
 #define MAX_SLOTS 4096
 
 struct MemoryRegionInfo {
-  hwaddr offset;  // Must be tracked to re-map later
-  int used;
-  MemoryRegion mr;
-  uint32_t resource_id;
+    hwaddr offset;  /* Must be tracked to re-map later */
+    uint32_t resource_id;
+    MemoryRegion mr;
 };
 
 struct rutabaga;
+struct virtio_gpu_rutabaga_async_signaled_fence;
 
 struct VirtIOGPURutabaga {
     VirtIOGPU parent_obj;
     struct VMChangeStateEntry* vm_state_entry;
     struct MemoryRegionInfo memory_regions[MAX_SLOTS];
+    uint32_t num_mapped_slots;
     QTAILQ_HEAD(, virtio_gpu_rutabaga_context) contexts;
+    /*
+     * Fences the renderer has signaled (pushed from its own worker threads)
+     * but that the main loop has not yet matched against g->fenceq and
+     * delivered to the guest.
+     */
+    QSLIST_HEAD(, virtio_gpu_rutabaga_async_signaled_fence)
+        async_signaled_fenceq;
+    QEMUBH *async_signaled_fence_bh;
     uint64_t capset_mask;
     char *wayland_socket_path;
     char *wsi;
     char *renderer_features;
     char *snapshot_directory;
+    /* RutabagaVerifyMode; set through the "x-verify-state" enum property. */
+    int verify_state_mode;
+    /*
+     * True from the moment virtio_gpu_rutabaga_load() starts rutabaga_restore()
+     * until virtio_gpu_post_load() has finished.  If a reset or another
+     * pre_load sees it set, a restore never completed (it failed in this
+     * device or load_snapshot() bailed out on a later one) and the rutabaga
+     * instance may hold objects QEMU's tables know nothing about: force
+     * virtio_gpu_rutabaga_reinit().  Cleared by virtio_gpu_rutabaga_init().
+     */
+    bool restore_incomplete;
     bool headless;
     uint32_t num_capsets;
     struct rutabaga *rutabaga;

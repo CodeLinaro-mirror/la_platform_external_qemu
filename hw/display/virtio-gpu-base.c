@@ -35,6 +35,7 @@ virtio_gpu_base_reset(VirtIOGPUBase *g)
         g->scanout[i].x = 0;
         g->scanout[i].y = 0;
         g->scanout[i].ds = NULL;
+        g->scanout[i].cursor.resource_id = 0;
     }
 }
 
@@ -276,7 +277,7 @@ virtio_gpu_base_get_features(VirtIODevice *vdev, uint64_t features,
     VirtIOGPUBase *g = VIRTIO_GPU_BASE(vdev);
 
     if (virtio_gpu_virgl_enabled(g->conf) ||
-        virtio_gpu_rutabaga_enabled(g->conf)) {
+        virtio_gpu_external_renderer_enabled(g->conf)) {
         features |= (1 << VIRTIO_GPU_F_VIRGL);
     }
     if (virtio_gpu_edid_enabled(g->conf)) {

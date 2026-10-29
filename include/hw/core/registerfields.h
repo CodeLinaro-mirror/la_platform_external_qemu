@@ -42,7 +42,7 @@
 #define FIELD(reg, field, shift, length)                                  \
     enum { R_ ## reg ## _ ## field ## _SHIFT = (shift)};                  \
     enum { R_ ## reg ## _ ## field ## _LENGTH = (length)};                \
-    enum { R_ ## reg ## _ ## field ## _MASK =                             \
+    enum : uint64_t { R_ ## reg ## _ ## field ## _MASK =                  \
                                         MAKE_64BIT_MASK(shift, length)};
 
 /* Extract a field from a register */
@@ -161,10 +161,10 @@
  */
 
 /* Define shared SHIFT, LENGTH, and MASK constants */
-#define SHARED_FIELD(name, shift, length)   \
-    enum { name ## _ ## SHIFT = (shift)};   \
-    enum { name ## _ ## LENGTH = (length)}; \
-    enum { name ## _ ## MASK = MAKE_64BIT_MASK(shift, length)};
+#define SHARED_FIELD(name, shift, length)            \
+    enum { name ## _ ## SHIFT = (shift)};            \
+    enum { name ## _ ## LENGTH = (length)};          \
+    enum : uint64_t { name ## _ ## MASK = MAKE_64BIT_MASK(shift, length)};
 
 /* Extract a shared field */
 #define SHARED_FIELD_EX8(storage, field) \

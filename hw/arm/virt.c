@@ -220,9 +220,7 @@ static const MemMapEntry base_memmap[] = {
     [RANCHU_GOLDFISH_BATTERY] = { 0x0a040000, 0x00001000 },
     [RANCHU_GOLDFISH_EVDEV] =   { 0x0a050000, 0x00001000 },
     [RANCHU_GOLDFISH_PIPE] =    { 0x0a060000, 0x00002000 },
-#if defined (__APPLE__) && defined(__aarch64__)
     [RANCHU_GOLDFISH_SYNC] =    { 0x0a070000, 0x00002000 },
-#endif
 #endif
     [VIRT_PLATFORM_BUS] =       { 0x0c000000, 0x02000000 },
 #ifdef CONFIG_ANDROID

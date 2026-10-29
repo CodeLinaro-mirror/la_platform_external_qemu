@@ -392,6 +392,31 @@ SRST
 ERST
 
     {
+        .name       = "virtio-gpu-rutabaga",
+        .args_type  = "",
+        .params     = "",
+        .help       = "show virtio-gpu-rutabaga state and invariant check results",
+    },
+
+SRST
+  ``info virtio-gpu-rutabaga``
+    Show virtio-gpu-rutabaga state and invariant check results.
+ERST
+
+    {
+        .name       = "virtio-gpu-gfxstream",
+        .args_type  = "",
+        .params     = "",
+        .help       = "show virtio-gpu-gfxstream state and invariant check results",
+    },
+
+SRST
+  ``info virtio-gpu-gfxstream``
+    Show virtio-gpu-gfxstream state and invariant check results (the device
+    is provided by the goldfish plugin).
+ERST
+
+    {
         .name       = "status",
         .args_type  = "",
         .params     = "",

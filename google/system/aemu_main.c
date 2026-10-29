@@ -28,6 +28,7 @@
 #include <gmodule.h>
 
 #include "qemu/osdep.h"
+#include "system/address-spaces.h"
 #include "qemu/module.h"
 #include "system/system.h"
 
@@ -125,4 +126,8 @@ int main(int argc, char **argv) {
   gf_shutdown_func();
 
   return status;
+}
+
+AddressSpace *get_qemu_system_address_space(void) {
+    return &address_space_memory;
 }
