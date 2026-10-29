@@ -346,6 +346,10 @@ SettingsPage::SettingsPage(QWidget* parent)
         }
     }
 
+    // Guest GLES driver preference is not exposed in the UI.
+    mUi->set_guestGlesDriverPrefTitle->hide();
+    mUi->set_guestGlesDriverPrefComboBox->hide();
+
     {
         bool isMac = false;
         auto avdInfo = getConsoleAgents()->settings->avdInfo();

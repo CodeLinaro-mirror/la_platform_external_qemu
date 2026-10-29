@@ -16,8 +16,10 @@
 #include <queue>     // for queue
 #include <string>    // for string
 
+#include "aemu/base/memory/ScopedPtr.h"
 #include "android/metrics/MetricsWriter.h"  // for MetricsWriter
 #include "android/metrics/export.h"         // for AEMU_METRICS_API
+#include "android/utils/filelock.h"
 #include "google_logs_publishing.pb.h"      // for LogEvent (ptr only)
 
 namespace android_studio {
@@ -60,11 +62,17 @@ public:
 
 private:
     void writeCookie(std::string proto);
+    void openSessionFile();
+    void closeSessionFile();
 
     // Queue that stores events not using more than kMaxStorage of bytes
     std::queue<wireless_android_play_playlog::LogEvent> mEvents;
     const std::string mUrl;
     const std::string mCookieFile;
+    std::string mSpoolDir;
+    std::string mSessionFilePath;
+    base::ScopedCustomPtr<FileLock, decltype(&filelock_release)>
+            mSessionFileLock;
     uint32_t mBytes{0};  // # of bytes in our event queue, <= kMaxStorage.
     std::chrono::milliseconds mSendAfterMs{
             0};  // Earliest timestamp after which we send metrics.

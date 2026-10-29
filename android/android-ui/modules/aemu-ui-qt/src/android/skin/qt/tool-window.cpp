@@ -2353,12 +2353,14 @@ void ToolWindow::onHostClipboardChanged() {
 
 static bool isPaneEnabled(ExtendedWindowPane pane) {
     if (pane == PANE_IDX_SNAPSHOT) {
-        // Snapshot pane is disabled in embedded emulator and for glasses AVDs.
+        // Snapshot pane is disabled in embedded emulator and for glasses&XR
+        // AVDs.
         const auto& settings = getConsoleAgents()->settings;
-        bool disableSnapshotsPane =
-                (settings->android_cmdLineOptions()->qt_hide_window ||
-                 avdInfo_getAvdFlavor(settings->avdInfo()) == AVD_GLASSES);
-        return !disableSnapshotsPane;
+        const bool qtHideWindow =
+                settings->android_cmdLineOptions()->qt_hide_window;
+        auto avdFlavor = avdInfo_getAvdFlavor(settings->avdInfo());
+        return (!qtHideWindow && avdFlavor != AVD_GLASSES &&
+                avdFlavor != AVD_XR);
     }
 
     return true;

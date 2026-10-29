@@ -11,8 +11,10 @@
 #include "android/metrics/PlaystoreMetricsWriter.h"
 
 #include <assert.h>    // for assert
+#include <errno.h>     // for errno
 #include <inttypes.h>  // for PRIi64
 #include <stdlib.h>    // for size_t
+#include <string.h>    // for strerror
 #include <chrono>      // for millise...
 #include <fstream>     // for ios
 #include <memory>
@@ -23,14 +25,19 @@
 #include "aemu/base/Uuid.h"                 // for Uuid
 #include "aemu/base/files/GzipStreambuf.h"  // for GzipOut...
 #include "aemu/base/files/PathUtils.h"      // for PathUtils
-#include "android/base/system/System.h"        // for System
-#include "android/curl-support.h"              // for curl_post
-#include "android/metrics/MetricsLogging.h"    // for D
+#include "android/base/system/System.h"     // for System
+#include "android/curl-support.h"           // for curl_post
+#include "android/metrics/FileMetricsWriter.h"
+#include "android/metrics/MetricsLogging.h"  // for D
+#include "android/metrics/MetricsPaths.h"    // for getSpoolDirectory
 #include "android/metrics/StudioConfig.h"
-#include "android/utils/debug.h"               // for VERBOSE...
-#include "android/version.h"                   // for EMULATO...
-#include "google_logs_publishing.pb.h"         // for LogEvent
-#include "android/metrics/studio_stats_wrapper.pb.h"                   // for Android...
+#include "android/metrics/studio_stats_wrapper.pb.h"  // for Android...
+#include "android/utils/debug.h"                      // for VERBOSE...
+#include "android/utils/eintr_wrapper.h"              // for HANDLE_EINTR
+#include "android/utils/file_io.h"                    // for android_unlink
+#include "android/utils/path.h"         // for path_mkdir_if_needed
+#include "android/version.h"            // for EMULATO...
+#include "google_logs_publishing.pb.h"  // for LogEvent
 
 namespace android {
 namespace metrics {
@@ -51,7 +58,21 @@ static milliseconds epoch_time_in_ms() {
 PlaystoreMetricsWriter::PlaystoreMetricsWriter(const std::string& sessionId,
                                                const std::string& cookieFile,
                                                std::string url)
-    : MetricsWriter(sessionId), mUrl(std::move(url)), mCookieFile(cookieFile) {
+    : MetricsWriter(sessionId),
+      mUrl(std::move(url)),
+      mCookieFile(cookieFile),
+      mSessionFileLock(
+              base::makeCustomScopedPtr<FileLock*>(nullptr, filelock_release)) {
+    std::string dirName;
+    if (!mCookieFile.empty() &&
+        PathUtils::split(mCookieFile.data(), PathUtils::HOST_TYPE, &dirName,
+                         nullptr)) {
+        mSpoolDir = PathUtils::removeTrailingDirSeparator(dirName.c_str());
+    } else {
+        mSpoolDir = getSpoolDirectory();
+    }
+    openSessionFile();
+
     std::ifstream cookieResponse(PathUtils::asUnicodePath(cookieFile.data()).c_str(),
                                  std::ios::in | std::ios::binary);
     if (cookieResponse.good()) {
@@ -64,7 +85,46 @@ PlaystoreMetricsWriter::PlaystoreMetricsWriter(const std::string& sessionId,
 }
 
 PlaystoreMetricsWriter::~PlaystoreMetricsWriter() {
+    // The session ended cleanly: remove the crash marker before the final
+    // upload, which can block for a long time, so that killing the process
+    // during that upload isn't reported as a crash by the next session.
+    closeSessionFile();
     commit();
+}
+
+void PlaystoreMetricsWriter::openSessionFile() {
+    if (mSpoolDir.empty() || sessionId().empty()) {
+        return;
+    }
+    path_mkdir_if_needed(mSpoolDir.c_str(), 0744);
+    if (!base::System::get()->pathIsDir(mSpoolDir)) {
+        return;
+    }
+
+    int counter = 0;
+    auto file = FileMetricsWriter::createLockedOpenFile(mSpoolDir, sessionId(),
+                                                        &counter);
+    if (!file) {
+        W("Failed to create Playstore session marker in %s", mSpoolDir.c_str());
+        return;
+    }
+    IGNORE_EINTR(close(file->fd));
+    mSessionFilePath = std::move(file->path);
+    mSessionFileLock = std::move(file->lock);
+    D("Opened Playstore session marker %s", mSessionFilePath.c_str());
+}
+
+void PlaystoreMetricsWriter::closeSessionFile() {
+    if (!mSessionFilePath.empty()) {
+        if (HANDLE_EINTR(android_unlink(mSessionFilePath.c_str())) != 0) {
+            W("Failed to delete Playstore session marker '%s': %s",
+              mSessionFilePath.c_str(), strerror(errno));
+        } else {
+            D("Removed Playstore session marker %s", mSessionFilePath.c_str());
+        }
+        mSessionFilePath.clear();
+    }
+    mSessionFileLock.reset();
 }
 
 PlaystoreMetricsWriter::Ptr PlaystoreMetricsWriter::create(
