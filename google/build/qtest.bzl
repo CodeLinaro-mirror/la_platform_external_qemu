@@ -23,11 +23,11 @@ QTEST_TARGET_COMPATIBLE_WITH = select({
     "//conditions:default": [],
 })
 
-def qemu_qtest_goldfish_stub(name, **kwargs):
-    """Defines a stub libgoldfish_<arch> shared library for standalone qtest runs.
+def qemu_qtest_goldfish_stub(name = "goldfish", **kwargs):
+    """Defines a stub libgoldfish shared library for standalone qtest runs.
 
     The stub is architecture independent; `name` selects the plugin file name
-    that aemu_main.c loads (e.g. "goldfish_x86_64").
+    that aemu_main.c loads (defaults to "goldfish").
 
     Args:
         name: Target name of the shared library.
@@ -80,7 +80,7 @@ def qemu_qtest(
         srcs: C source files for the qtest binary.
         arch: Target QEMU architecture ("x86_64" or "aarch64").
         plugin: Goldfish plugin target loaded via ANDROID_EMULATOR_LIBRARY_DIR
-            (defaults to "@qemu//:goldfish_<arch>" stub plugin).
+            (defaults to "@qemu//:goldfish" stub plugin).
         extra_plugin: Optional higher-layer plugin target chained by the stub
             plugin via QTEST_GOLDFISH_EXTRA_PLUGIN.
         deps: Additional cc_library dependencies.
@@ -98,7 +98,7 @@ def qemu_qtest(
     copts = copts or []
 
     qemu_bin = "@qemu//:qemu-system-" + arch
-    gf_plugin = plugin if plugin != None else ("@qemu//:goldfish_" + arch)
+    gf_plugin = plugin if plugin != None else "@qemu//:goldfish"
 
     test_env = {
         # Upstream QEMU runs qtests with detect_leaks=0 under ASan because
