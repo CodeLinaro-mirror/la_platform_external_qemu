@@ -1051,8 +1051,9 @@ bool emuglConfig_init(EmuglConfig* config,
         if (!is_xr_mode) {
 #if defined(__APPLE__)
             // Switch to software vulkan with 'auto' modes on non-Metal 4 capable
-            // devices. XR AVDs will keep using host gpu regardless.
-            switchToSoftwareVulkan = !hasMetal4();
+            // devices, or when running without a window, as on other hosts.
+            // XR AVDs will keep using host gpu regardless.
+            switchToSoftwareVulkan = no_window || !hasMetal4();
 #else
             switchToSoftwareVulkan = no_window;
 #endif
@@ -1331,13 +1332,16 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
 
     // Setup GLES
     bool use_swangle = strstr(config->gles_backend, "angle");
+    const char* gles_library = (strcmp(config->gles_backend, "swangle") == 0)
+                                       ? "angle"
+                                       : config->gles_backend;
     // $EXEC_DIR/<lib>/ is already added to the library search path by default,
     // since generic libraries are bundled there. We may need more though:
     resetBackendList();
     if (strcmp(config->gles_backend, "host") != 0) {
         // If the backend is not 'host', we also need to add the
         // backend directory.
-        std::string dir = sBackendList->getLibDirPath(config->gles_backend);
+        std::string dir = sBackendList->getLibDirPath(gles_library);
         if (dir.size()) {
             dprint("Adding to the library search path: %s\n", dir.c_str());
             system->addLibrarySearchDir(dir);
@@ -1357,38 +1361,5 @@ void emuglConfig_setupEnv(const EmuglConfig* config) {
         !strcmp(config->gles_backend, "llvmpipe") ||
         !strcmp(config->gles_backend, "swangle")) {
         system->envSet("ANDROID_EGL_ON_EGL", "1");
-        return;
-    }
-
-    // For now, EmuGL selects its own translation libraries for
-    // EGL/GLES libraries, unless the following environment
-    // variables are defined:
-    //    ANDROID_EGL_LIB
-    //    ANDROID_GLESv1_LIB
-    //    ANDROID_GLESv2_LIB
-    //
-    // If a backend provides one of these libraries, use it.
-    const char* gles_library = (strcmp(config->gles_backend, "swangle") == 0)
-                                       ? "angle"
-                                       : config->gles_backend;
-    std::string lib;
-    if (sBackendList->getBackendLibPath(gles_library,
-                                        EmuglBackendList::LIBRARY_EGL, &lib)) {
-        system->envSet("ANDROID_EGL_LIB", lib);
-    }
-    if (sBackendList->getBackendLibPath(
-                gles_library, EmuglBackendList::LIBRARY_GLESv1, &lib)) {
-        system->envSet("ANDROID_GLESv1_LIB", lib);
-    } else {
-        derror("OpenGL backend '%s' without OpenGL ES 1.x library detected. "
-               "Using GLESv2 only.",
-               gles_library);
-        // A GLESv1 lib is optional---we can deal with a GLESv2 only
-        // backend by using CoreProfileEngine in the Translator.
-    }
-
-    if (sBackendList->getBackendLibPath(
-                gles_library, EmuglBackendList::LIBRARY_GLESv2, &lib)) {
-        system->envSet("ANDROID_GLESv2_LIB", lib);
     }
 }

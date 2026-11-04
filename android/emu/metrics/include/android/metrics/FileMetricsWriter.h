@@ -23,6 +23,7 @@
 
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -93,6 +94,24 @@ public:
 
     // Uses the default sppol directory to finalize abandond session files.
     static AbandonedSessions finalizeAbandonedSessionFilesFromDefault();
+
+    // A new .open session file, created and locked by createLockedOpenFile().
+    struct LockedOpenFile {
+        // Write-only file descriptor; the caller must close it.
+        int fd = -1;
+        // Full path of the .open file.
+        std::string path;
+        // Lock on |path|.
+        base::ScopedCustomPtr<FileLock, decltype(&filelock_release)> lock;
+    };
+
+    // Creates and locks a new .open session file in |spoolDir| for
+    // |sessionId|, updating |*filenameCounter|. Returns std::nullopt on error.
+    static std::optional<LockedOpenFile> createLockedOpenFile(
+            std::string_view spoolDir,
+            std::string_view sessionId,
+            int* filenameCounter);
+
     ~FileMetricsWriter() override;
 
     // MetricsWriter::write() implementation that writes into the current log

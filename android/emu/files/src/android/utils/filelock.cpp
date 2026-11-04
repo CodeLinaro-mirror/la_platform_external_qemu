@@ -281,9 +281,10 @@ static auto filelock_lock(FileLock* lock, int timeout) -> int {
     int lock_fd = -1;
     int rc;
     FILE* f = nullptr;
-    char pid[8];
+    char pid[16];
     struct stat st_temp;
     int sleep_duration_ms = 0;
+    bool retried_stale = false;
 
     temp_fd = mkstemp(lock->temp);
 
@@ -392,9 +393,10 @@ static auto filelock_lock(FileLock* lock, int timeout) -> int {
                 // If that doesn't work, bail.
                 // If we waited until the process exited, the process
                 // is not fresh anymore.
-                if (System::get()->waitForProcessExit(lockpid,
+                if (sleep_duration_ms > 0 &&
+                    System::get()->waitForProcessExit(lockpid,
                                                       sleep_duration_ms) ==
-                    System::WaitExitResult::Exited) {
+                            System::WaitExitResult::Exited) {
                     freshness = FRESHNESS_STALE;
                 }
                 slept = true;
@@ -411,6 +413,10 @@ static auto filelock_lock(FileLock* lock, int timeout) -> int {
         if (freshness == FRESHNESS_STALE) {
             D("Removing stale lockfile '%s'", lock->lock);
             rc = HANDLE_EINTR(android_unlink(lock->lock));
+            if (rc == 0 && !retried_stale) {
+                retried_stale = true;
+                continue;
+            }
         }
 
         const int kSleepDurationMsIncrement = 50;

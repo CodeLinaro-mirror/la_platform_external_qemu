@@ -79,6 +79,28 @@ protected:
         EXPECT_EQ(ready, 1);
         return ready;
     }
+    void verifyKillChildStaleLock(int activeTimeoutMs, int reclaimTimeoutMs) {
+        if (isParentProcess()) {
+            // Parent process
+            uint8_t ready = 1;
+            assertChildSuccess();
+            expectLockFail(activeTimeoutMs);
+            writeToOther(&ready, sizeof(uint8_t));
+            killChild();
+            expectLockSuccessAndRelease(reclaimTimeoutMs);
+        } else {
+            // Child process
+            uint8_t succeed = 1;
+            FileLock* lock = filelock_create(mFileLockPath.c_str());
+            EXPECT_NE(lock, nullptr);
+            succeed &= lock != nullptr;
+            writeToOther(&succeed, sizeof(uint8_t));
+            expectReady();
+            android::base::System::get()->sleepMs(5000);
+            // should not hit here
+            ADD_FAILURE();
+        }
+    }
     std::unique_ptr<android::base::TestTempDir> mTempDir;
     std::string mFileLockPath;
 };
@@ -162,6 +184,7 @@ protected:
     void killChild() override {
         ASSERT_TRUE(TerminateProcess(mPi.hProcess, 0));
         if (mPi.hProcess) {
+            WaitForSingleObject(mPi.hProcess, INFINITE);
             CloseHandle(mPi.hProcess);
         }
         if (mPi.hThread) {
@@ -333,25 +356,9 @@ TEST_F(FileLockTest, childSuicideStaleLock) {
 }
 
 TEST_F(FileLockTest, killChildStaleLock) {
-    if (isParentProcess()) {
-        // Parent process
-        uint8_t ready = 1;
-        assertChildSuccess();
-        expectLockFail(500);
-        writeToOther(&ready, sizeof(uint8_t));
-        killChild();
-        expectLockSuccessAndRelease(2000);
-    } else {
-        // Child process
-        uint8_t succeed = 1;
-        FileLock* lock = filelock_create(mFileLockPath.c_str());
-        EXPECT_NE(lock, nullptr);
-        succeed &= lock != nullptr;
-        writeToOther(&succeed, sizeof(uint8_t));
-        expectReady();
-        android::base::System::get()->sleepMs(5000);
-        // should not hit here
-        ADD_FAILURE();
-    }
+    verifyKillChildStaleLock(500, 2000);
 }
 
+TEST_F(FileLockTest, killChildStaleLockZeroTimeout) {
+    verifyKillChildStaleLock(0, 0);
+}

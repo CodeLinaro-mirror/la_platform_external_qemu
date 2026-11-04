@@ -23,19 +23,23 @@
 #include <windows.h>
 #include <winsock2.h>
 #else
+#include <signal.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
+#include <algorithm>
 #include "aemu/base/files/GzipStreambuf.h"
 #include "aemu/base/files/PathUtils.h"
 #include "aemu/base/sockets/ScopedSocket.h"
 #include "aemu/base/sockets/SocketUtils.h"
 #include "android/base/testing/TestSystem.h"
 #include "android/curl-support.h"
+#include "android/metrics/FileMetricsWriter.h"
 #include "android/metrics/MetricsLogging.h"
-#include "google_logs_publishing.pb.h"
 #include "android/metrics/studio_stats_wrapper.pb.h"
+#include "google_logs_publishing.pb.h"
 
 using namespace android;
 using namespace android::base;
@@ -118,6 +122,7 @@ protected:
             }
             socketSetNonBlocking(s.get());
             mRequestsMade++;
+            mOpenMarkersAtRequest = countOpenMarkers();
             int rec = 1;
             while (rec > 0 && waitForData(s.get(), SOCK_WAIT)) {
                 char buffer[512];
@@ -149,11 +154,24 @@ protected:
         mServer.join();
     }
 
+    // Counts the PlaystoreMetricsWriter session markers (.open files) in the
+    // spool directory, which is the directory of |mCookie|.
+    int countOpenMarkers() const {
+        const auto files = mTestSystem.scanDirEntries(
+                mTestSystem.getTempRoot()->pathString());
+        return static_cast<int>(std::count_if(
+                files.begin(), files.end(), [](const std::string& name) {
+                    return PathUtils::extension(name) == ".open";
+                }));
+    }
+
     std::string mHttpRequest;
     std::thread mServer;
     int mFd{0};
     int mPort{0};
     int mRequestsMade{0};
+    // Number of .open session markers present when the last request arrived.
+    int mOpenMarkersAtRequest{-1};
     bool mRunning{true};
     TestSystem mTestSystem{"/", System::kProgramBitness};
     std::string mCookie;
@@ -327,3 +345,121 @@ TEST_F(PlaystoreMetricsWriterTest, doCallAfterTime) {
     waitForServerThread();
     EXPECT_EQ(mRequestsMade, 1);
 }
+
+TEST_F(PlaystoreMetricsWriterTest, sessionMarkerCreatedAndRemovedOnCleanClose) {
+    const std::string spoolDir = mTestSystem.getTempRoot()->pathString();
+    const std::string sessionId = "11111111-2222-3333-4444-555555555555";
+    {
+        PlaystoreMetricsWriter metrics(
+                sessionId, mCookie,
+                "http://localhost:" + std::to_string(mPort));
+        auto files = mTestSystem.scanDirEntries(spoolDir);
+        EXPECT_EQ(1, std::count_if(files.begin(), files.end(),
+                                   [](const std::string& name) {
+                                       return PathUtils::extension(name) ==
+                                              ".open";
+                                   }));
+        EXPECT_EQ(1, std::count_if(files.begin(), files.end(),
+                                   [](const std::string& name) {
+                                       return PathUtils::extension(name) ==
+                                              ".lock";
+                                   }));
+
+        // Active session must not be treated as abandoned while locked.
+        auto abandoned =
+                FileMetricsWriter::finalizeAbandonedSessionFiles(spoolDir);
+        EXPECT_TRUE(abandoned.empty());
+
+        // Mid-session commit() must keep the session marker open.
+        metrics.commit();
+        files = mTestSystem.scanDirEntries(spoolDir);
+        EXPECT_EQ(1, std::count_if(files.begin(), files.end(),
+                                   [](const std::string& name) {
+                                       return PathUtils::extension(name) ==
+                                              ".open";
+                                   }));
+    }
+
+    waitForServerThread();
+
+    // Clean destruction must remove both .open and .open.lock without .trk.
+    auto filesAfter = mTestSystem.scanDirEntries(spoolDir);
+    EXPECT_EQ(0,
+              std::count_if(filesAfter.begin(), filesAfter.end(),
+                            [](const std::string& name) {
+                                return PathUtils::extension(name) == ".open" ||
+                                       PathUtils::extension(name) == ".lock" ||
+                                       PathUtils::extension(name) == ".trk";
+                            }));
+    auto abandonedAfter =
+            FileMetricsWriter::finalizeAbandonedSessionFiles(spoolDir);
+    EXPECT_TRUE(abandonedAfter.empty());
+}
+
+TEST_F(PlaystoreMetricsWriterTest, sessionMarkerRemovedBeforeFinalUpload) {
+    {
+        PlaystoreMetricsWriter metrics(
+                "33333333-4444-5555-6666-777777777777", mCookie,
+                "http://localhost:" + std::to_string(mPort));
+        addFakeMetricToWriter(metrics);
+    }
+
+    waitForServerThread();
+
+    // The destructor uploads the pending event only after removing the
+    // session marker, so a kill during a slow final upload isn't reported as
+    // a crash by the next session.
+    EXPECT_EQ(mRequestsMade, 1);
+    EXPECT_EQ(mOpenMarkersAtRequest, 0);
+}
+
+#ifndef _WIN32
+TEST_F(PlaystoreMetricsWriterTest, abandonedSessionMarkerFinalizedAfterCrash) {
+    waitForServerThread();
+
+    const std::string spoolDir = mTestSystem.getTempRoot()->pathString();
+    const std::string crashedSessionId = "22222222-3333-4444-5555-666666666666";
+
+    int pipeFds[2] = {-1, -1};
+    ASSERT_EQ(0, pipe(pipeFds));
+    const pid_t childPid = fork();
+    ASSERT_GE(childPid, 0);
+    if (childPid == 0) {
+        close(pipeFds[0]);
+        filelock_init();
+        PlaystoreMetricsWriter metrics(
+                crashedSessionId, mCookie,
+                "http://localhost:" + std::to_string(mPort));
+        uint8_t ready = 1;
+        (void)write(pipeFds[1], &ready, sizeof(ready));
+        close(pipeFds[1]);
+        pause();
+        _exit(0);
+    }
+    close(pipeFds[1]);
+    uint8_t ready = 0;
+    ASSERT_EQ(static_cast<ssize_t>(sizeof(ready)),
+              read(pipeFds[0], &ready, sizeof(ready)));
+    close(pipeFds[0]);
+    ASSERT_EQ(1U, ready);
+
+    // Simulate an unclean crash (SIGKILL) of the PlaystoreMetricsWriter run.
+    ASSERT_EQ(0, kill(childPid, SIGKILL));
+    ASSERT_EQ(childPid, waitpid(childPid, nullptr, 0));
+
+    // A single finalizeAbandonedSessionFiles call in the next session must
+    // detect the crashed session and delete the 0-byte .open marker.
+    auto abandoned = FileMetricsWriter::finalizeAbandonedSessionFiles(spoolDir);
+    ASSERT_EQ(1U, abandoned.size());
+    EXPECT_NE(abandoned.end(), abandoned.find(crashedSessionId));
+
+    auto filesAfter = mTestSystem.scanDirEntries(spoolDir);
+    EXPECT_EQ(0,
+              std::count_if(filesAfter.begin(), filesAfter.end(),
+                            [](const std::string& name) {
+                                return PathUtils::extension(name) == ".open" ||
+                                       PathUtils::extension(name) == ".lock" ||
+                                       PathUtils::extension(name) == ".trk";
+                            }));
+}
+#endif
