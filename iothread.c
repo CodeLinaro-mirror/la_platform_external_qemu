@@ -213,10 +213,8 @@ static void iothread_init(EventLoopBase *base, Error **errp)
     qemu_thread_create(&iothread->thread, thread_name, iothread_run,
                        iothread, QEMU_THREAD_JOINABLE);
 
-    /* Wait for initialization to complete */
-    while (iothread->thread_id == -1) {
-        qemu_sem_wait(&iothread->init_done_sem);
-    }
+    /* Wait for initialization; iothread_run() sets thread_id first */
+    qemu_sem_wait(&iothread->init_done_sem);
 }
 
 typedef struct {
