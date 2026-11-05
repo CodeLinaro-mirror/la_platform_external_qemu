@@ -117,6 +117,14 @@
 #endif
 
 /*
+ * Our pregenerated config-host.h is shared by TSAN and non-TSAN builds, so
+ * follow the compiler flag instead. Defined empty, like Meson's config.set().
+ */
+#if defined(QEMU_SANITIZE_THREAD) && !defined(CONFIG_TSAN)
+# define CONFIG_TSAN
+#endif
+
+/*
  * GCC doesn't provide __has_attribute() until GCC 5, but we know all the GCC
  * versions we support have the "flatten" attribute. Clang may not have the
  * "flatten" attribute but always has __has_attribute() to check for it.
