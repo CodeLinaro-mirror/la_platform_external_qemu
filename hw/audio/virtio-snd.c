@@ -1611,14 +1611,18 @@ static void virtio_snd_reset(VirtIODevice *vdev)
         return;
     }
 
+    /*
+     * Release the streams but keep their params: a driver may PREPARE a
+     * stream again without resending SET_PARAMS, and
+     * virtio_snd_stream_create() asserts that the params are set.
+     */
     for (i = 0; i < s->snd_conf.streams; ++i) {
         VirtIOSoundPCMItem *item = &s->pcm_items[i];
-        VirtIOSoundPCMStream *stream = item->stream;
-        if (stream) {
-            virtio_snd_stream_be_set_active(stream, false);
-            virtio_snd_stream_destroy(stream);
+        if (item->stream) {
+            virtio_snd_stream_be_set_active(item->stream, false);
+            virtio_snd_stream_destroy(item->stream);
+            item->stream = NULL;
         }
-        memset(item, 0, sizeof(*item));
     }
 }
 
