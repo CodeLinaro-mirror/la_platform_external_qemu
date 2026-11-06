@@ -19,7 +19,7 @@ cc_headers_only = rule(
     },
 )
 
-def _posix_export_files(name, win_def_file):
+def _posix_export_files(name, win_def_file, linkshared = False):
     """Generates macOS and Linux linker export files from a Windows .def file."""
     macos_exp = "_" + name + "_macos.exp"
     native.genrule(
@@ -28,22 +28,23 @@ def _posix_export_files(name, win_def_file):
         outs = [macos_exp],
         tools = ["@qemu//google/scripts:gen_linker_exports"],
         cmd = (
-            "$(location @qemu//google/scripts:gen_linker_exports) --os=macos " +
-            "$(location " + win_def_file + ") -o \"$@\""
+            "$(execpath @qemu//google/scripts:gen_linker_exports) --os=macos " +
+            "$(execpath " + win_def_file + ") -o \"$@\""
         ),
         target_compatible_with = ["@platforms//os:macos"],
         visibility = ["//visibility:private"],
     )
 
     linux_lds = "_" + name + "_linux.lds"
+    linux_mode_flag = " --linkshared" if linkshared else ""
     native.genrule(
         name = "_" + name + "_linux_exports",
         srcs = [win_def_file],
         outs = [linux_lds],
         tools = ["@qemu//google/scripts:gen_linker_exports"],
         cmd = (
-            "$(location @qemu//google/scripts:gen_linker_exports) --os=linux " +
-            "$(location " + win_def_file + ") -o \"$@\""
+            "$(execpath @qemu//google/scripts:gen_linker_exports) --os=linux" +
+            linux_mode_flag + " $(execpath " + win_def_file + ") -o \"$@\""
         ),
         target_compatible_with = ["@platforms//os:linux"],
         visibility = ["//visibility:private"],
@@ -167,4 +168,57 @@ def cc_interface_binary(
         system_provided = True,
         tags = ["manual"],
         visibility = visibility,
+    )
+
+def cc_exported_shared_library(
+        name,
+        win_def_file,
+        linkopts = None,
+        additional_linker_inputs = None,
+        visibility = None,
+        **kwargs):
+    """Creates a shared library exporting only the symbols in win_def_file.
+
+    Uses win_def_file as the single source of truth across Windows (/DEF:),
+    macOS (-exported_symbols_list), and Linux (a GNU ld / lld version script
+    with EXTERN and 'local: *;').
+
+    Args:
+        name: The name of the shared library cc_binary target.
+        win_def_file: Label of the .def file listing exported symbols.
+        linkopts: Additional linker options for the shared library target.
+        additional_linker_inputs: Additional files required at link time.
+        visibility: Visibility labels for the shared library target.
+        **kwargs: Additional arguments forwarded to cc_binary.
+    """
+    macos_exp, linux_lds = _posix_export_files(
+        name,
+        win_def_file,
+        linkshared = True,
+    )
+    cc_binary(
+        name = name,
+        linkshared = True,
+        visibility = visibility,
+        win_def_file = select({
+            "@platforms//os:windows": win_def_file,
+            "//conditions:default": None,
+        }),
+        linkopts = ([] if linkopts == None else linkopts) + select({
+            "@platforms//os:macos": [
+                "-Wl,-exported_symbols_list,$(execpath :" + macos_exp + ")",
+            ],
+            "@platforms//os:linux": [
+                "-Wl,$(execpath :" + linux_lds + ")",
+            ],
+            "//conditions:default": [],
+        }),
+        additional_linker_inputs = (
+            [] if additional_linker_inputs == None else additional_linker_inputs
+        ) + select({
+            "@platforms//os:macos": [":" + macos_exp],
+            "@platforms//os:linux": [":" + linux_lds],
+            "//conditions:default": [],
+        }),
+        **kwargs
     )

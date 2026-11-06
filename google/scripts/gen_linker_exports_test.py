@@ -52,23 +52,61 @@ class GenLinkerExportsTest(unittest.TestCase):
             "--export-dynamic-symbol=bar\n",
         )
 
+    def test_format_linux_shared_exports_emits_extern_and_local_wildcard(self):
+        output = gen_linker_exports.format_linux_shared_exports(["foo", "bar"])
+        self.assertEqual(
+            output,
+            "EXTERN(\n"
+            "  foo\n"
+            "  bar\n"
+            ")\n"
+            "VERSION {\n"
+            "  {\n"
+            "    global:\n"
+            "      foo;\n"
+            "      bar;\n"
+            "    local:\n"
+            "      *;\n"
+            "  };\n"
+            "}\n",
+        )
+
     def test_main_writes_output_files_and_Handles_empty_def(self):
         with tempfile.TemporaryDirectory(prefix="测试_🚀_é_") as tmp_dir:
             tmp_path = Path(tmp_dir)
             def_file = tmp_path / "test.def"
-            def_file.write_text("EXPORTS\n  qemu_init\n", encoding="utf-8")
+            def_file.write_text("EXPORTS\r\n  qemu_init\r\n", encoding="utf-8")
 
             macos_out = tmp_path / "macos.exp"
             self.assertEqual(
                 gen_linker_exports.main(["--os=macos", str(def_file), "-o", str(macos_out)]),
                 0,
             )
-            self.assertTrue(macos_out.read_text(encoding="utf-8").startswith("_qemu_init\n"))
+            self.assertEqual(macos_out.read_bytes(), b"_qemu_init\n")
+
+            linux_shared_out = tmp_path / "linux_shared.lds"
+            self.assertEqual(
+                gen_linker_exports.main(
+                    ["--os=linux", "--linkshared", str(def_file), "-o", str(linux_shared_out)]
+                ),
+                0,
+            )
+            self.assertEqual(
+                linux_shared_out.read_bytes(),
+                gen_linker_exports.format_linux_shared_exports(["qemu_init"]).encode("utf-8"),
+            )
 
             empty_def = tmp_path / "empty.def"
             empty_def.write_text("EXPORTS\n", encoding="utf-8")
             self.assertEqual(
                 gen_linker_exports.main(["--os=linux", str(empty_def), "-o", str(tmp_path / "out.lds")]),
+                1,
+            )
+
+            self.assertEqual(
+                gen_linker_exports.main(
+                    ["--os=linux", str(tmp_path / "missing.def"), "-o", str(tmp_path / "out.lds")]
+                ),
                 1,
             )
 

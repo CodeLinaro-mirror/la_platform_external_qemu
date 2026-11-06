@@ -62,6 +62,24 @@ def format_linux_exports(symbols: Sequence[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def format_linux_shared_exports(symbols: Sequence[str]) -> str:
+    """Formats a GNU ld / lld linker script exporting only the given symbols.
+
+    For `-shared` libraries, `--export-dynamic-symbol` does not hide other
+    default-visibility symbols. Instead, emit `EXTERN(...)` (so symbols in
+    static archives are retained) and an anonymous `VERSION` block with
+    `local: *;` so all unlisted symbols become hidden and eligible for
+    `--gc-sections` and ThinLTO dead-stripping.
+    """
+    extern_lines = "\n".join(f"  {sym}" for sym in symbols)
+    global_lines = "\n".join(f"      {sym};" for sym in symbols)
+    return (
+        f"EXTERN(\n{extern_lines}\n)\n"
+        f"VERSION {{\n  {{\n    global:\n{global_lines}\n"
+        "    local:\n      *;\n  };\n}\n"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate macOS or Linux linker export files from a Windows .def file."
@@ -71,6 +89,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         choices=("macos", "linux"),
         required=True,
         help="Target OS format ('macos' for ld64 -exported_symbols_list, 'linux' for GNU ld script).",
+    )
+    parser.add_argument(
+        "--linkshared",
+        action="store_true",
+        help=(
+            "Target a shared library (-shared): on Linux, emit a GNU ld / lld "
+            "version script with 'local: *;' instead of executable "
+            "--export-dynamic-symbol flags (no-op on macOS, where "
+            "-exported_symbols_list applies to both)."
+        ),
     )
     parser.add_argument(
         "def_file",
@@ -105,14 +133,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    output_text = (
-        format_macos_exports(symbols)
-        if args.os == "macos"
-        else format_linux_exports(symbols)
-    )
+    if args.os == "macos":
+        output_text = format_macos_exports(symbols)
+    elif args.linkshared:
+        output_text = format_linux_shared_exports(symbols)
+    else:
+        output_text = format_linux_exports(symbols)
 
     try:
-        args.output.write_text(output_text, encoding="utf-8")
+        args.output.write_text(output_text, encoding="utf-8", newline="\n")
     except OSError as exc:
         print(
             f"Failed to write linker export file '{args.output}': {exc}. "
