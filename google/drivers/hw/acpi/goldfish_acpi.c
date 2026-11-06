@@ -219,6 +219,11 @@ void add_goldfish_dsdt(MachineState *machine, Aml *table) {
   build_goldfish_device_aml(scope, "GFBY", "GFSH0001", "goldfish battery",
                             GOLDFISH_BATTERY_IOMEM_BASE,
                             GOLDFISH_BATTERY_IOMEM_SIZE, GOLDFISH_BATTERY_IRQ);
+  if (ams->enable_goldfish_events) {
+    build_goldfish_device_aml(scope, "GFEV", "GFSH0002", "goldfish events",
+                              GOLDFISH_EVENTS_IOMEM_BASE,
+                              GOLDFISH_EVENTS_IOMEM_SIZE, GOLDFISH_EVENTS_IRQ);
+  }
   if (ams->enable_goldfish_pipe) {
     build_goldfish_device_aml(scope, "GFPP", "GFSH0003", "goldfish pipe",
                               GOLDFISH_PIPE_IOMEM_BASE,

@@ -23,6 +23,7 @@ typedef struct GoldfishMachineState {
   char* system_device_in_guest;
 
   /* Opt-in legacy Goldfish SysBus devices */
+  bool enable_goldfish_events;
   bool enable_goldfish_pipe;
   bool enable_goldfish_sync;
 
