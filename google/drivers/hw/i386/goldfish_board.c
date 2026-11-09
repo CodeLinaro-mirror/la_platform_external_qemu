@@ -87,6 +87,11 @@ static void pc_init_goldfish(MachineState *machine) {
   sysbus_create_simple("goldfish_battery", GOLDFISH_BATTERY_IOMEM_BASE,
                        x86ms ->gsi[GOLDFISH_BATTERY_IRQ]);
 
+  if (ams->enable_goldfish_events) {
+    create_simple_device("goldfish-events", GOLDFISH_EVENTS_IOMEM_BASE,
+                         x86ms->gsi[GOLDFISH_EVENTS_IRQ]);
+  }
+
   if (ams->enable_goldfish_pipe) {
     create_simple_device("goldfish_pipe", GOLDFISH_PIPE_IOMEM_BASE,
                          x86ms->gsi[GOLDFISH_PIPE_IRQ]);
@@ -115,6 +120,16 @@ static void pc_init_goldfish(MachineState *machine) {
 goldfish_set_str(acpi_ini);
 goldfish_set_str(system_device_in_guest);
 goldfish_set_str(vendor_device_in_guest);
+
+static bool goldfish_get_events_enabled(Object *obj, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  return ams->enable_goldfish_events;
+}
+
+static void goldfish_set_events_enabled(Object *obj, bool value, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  ams->enable_goldfish_events = value;
+}
 
 static bool goldfish_get_pipe(Object *obj, Error **errp) {
   GoldfishMachineState *ams = ANDROID_MACHINE(obj);
@@ -151,6 +166,9 @@ static void goldfish_machine_std_class_init(ObjectClass *oc, const void *data) {
                                 goldfish_set_system_device_in_guest);
   object_class_property_add_str(oc, "vendor", NULL,
                                 goldfish_set_vendor_device_in_guest);
+  object_class_property_add_bool(oc, "goldfish-events",
+                                 goldfish_get_events_enabled,
+                                 goldfish_set_events_enabled);
   object_class_property_add_bool(oc, "goldfish-pipe", goldfish_get_pipe,
                                  goldfish_set_pipe);
   object_class_property_add_bool(oc, "goldfish-sync", goldfish_get_sync,

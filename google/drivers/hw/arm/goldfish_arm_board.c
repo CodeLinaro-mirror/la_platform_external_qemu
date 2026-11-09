@@ -33,7 +33,7 @@ static const int a15irqmap[] = {
     //[RANCHU_GOLDFISH_FB] = 16,
     [RANCHU_GOLDFISH_BATTERY] = 17,
     //[RANCHU_GOLDFISH_AUDIO] = 18,
-    //[RANCHU_GOLDFISH_EVDEV] = 19,
+    [RANCHU_GOLDFISH_EVDEV] = 19,
     [RANCHU_GOLDFISH_PIPE] = 20,
     [RANCHU_GOLDFISH_SYNC] = 21,
     [VIRT_MMIO] = 32,          /* ...to 16 + NUM_VIRTIO_TRANSPORTS - 1 */
@@ -153,6 +153,13 @@ static void arm_init_goldfish(MachineState *machine) {
                        "generic,goldfish-battery",
                        2, 0, 0);
 
+  if (ams->enable_goldfish_events) {
+    create_simple_device(vms, RANCHU_GOLDFISH_EVDEV, "goldfish-events",
+                         "google,goldfish-events-keypad\0"
+                         "generic,goldfish-events-keypad",
+                         2, 0, 0);
+  }
+
   if (ams->enable_goldfish_pipe) {
     create_simple_device(vms, RANCHU_GOLDFISH_PIPE, "goldfish_pipe",
                          "google,android-pipe\0"
@@ -199,6 +206,16 @@ static void goldfish_set_vendor_device_in_guest(Object *obj, const char *value,
   ams->vendor_device_in_guest = g_strdup(value);
 }
 
+static bool goldfish_get_events_enabled(Object *obj, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  return ams->enable_goldfish_events;
+}
+
+static void goldfish_set_events_enabled(Object *obj, bool value, Error **errp) {
+  GoldfishMachineState *ams = ANDROID_MACHINE(obj);
+  ams->enable_goldfish_events = value;
+}
+
 static bool goldfish_get_pipe(Object *obj, Error **errp) {
   GoldfishMachineState *ams = ANDROID_MACHINE(obj);
   return ams->enable_goldfish_pipe;
@@ -225,6 +242,9 @@ static void goldfish_machine_std_class_init(ObjectClass *oc, const void *data) {
                                 goldfish_set_system_device_in_guest);
   object_class_property_add_str(oc, "vendor", NULL,
                                 goldfish_set_vendor_device_in_guest);
+  object_class_property_add_bool(oc, "goldfish-events",
+                                 goldfish_get_events_enabled,
+                                 goldfish_set_events_enabled);
   object_class_property_add_bool(oc, "goldfish-pipe", goldfish_get_pipe,
                                  goldfish_set_pipe);
   object_class_property_add_bool(oc, "goldfish-sync", goldfish_get_sync,
