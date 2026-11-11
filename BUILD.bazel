@@ -470,9 +470,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-qemu_qtest_goldfish_stub(name = "goldfish_x86_64")
-
-qemu_qtest_goldfish_stub(name = "goldfish_aarch64")
+qemu_qtest_goldfish_stub(name = "goldfish")
 
 cc_library(
     name = "libqos",
@@ -972,7 +970,7 @@ cc_interface_binary(
     }),
     visibility = ["//visibility:public"],
     win_def_file = "google/build/qemu-system-aarch64.def",
-    deps = ["//google/rutabaga:rutabaga_ffi_lazy"] + select({
+    deps = select({
         "@goldfish_build//platforms:is_windows_x64": [
             "//google/compat/windows:compat",
             "@glib//gmodule",
@@ -1124,7 +1122,7 @@ cc_interface_binary(
     }),
     visibility = ["//visibility:public"],
     win_def_file = "google/build/qemu-system-x86_64.def",
-    deps = ["//google/rutabaga:rutabaga_ffi_lazy"] + select({
+    deps = select({
         "@goldfish_build//platforms:is_windows_x64": [
             ":qemu-system-x86_64_manifest_rc",
             "//google/compat/windows:compat",
@@ -2065,10 +2063,7 @@ cc_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = [
-        "//google/rutabaga:rutabaga_ffi_lazy",
-        "@dtc//:libfdt",
-    ] + select({
+    deps = ["@dtc//:libfdt"] + select({
         "@goldfish_build//platforms:is_windows_x64": [
             "//google/compat/windows:compat",
             "@glib//gmodule",
@@ -3177,7 +3172,7 @@ cc_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = ["//google/rutabaga:rutabaga_ffi_lazy"] + select({
+    deps = select({
         "@goldfish_build//platforms:is_windows_x64": [
             ":libsystem_qemu-system-aarch64",
             "//google/compat/windows:compat",
@@ -3649,7 +3644,7 @@ cc_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = ["//google/rutabaga:rutabaga_ffi_lazy"] + select({
+    deps = select({
         "@goldfish_build//platforms:is_windows_x64": [
             ":libsystem_qemu-system-x86_64",
             "//google/compat/windows:compat",
@@ -5309,10 +5304,7 @@ cc_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = [
-        "//google/rutabaga:rutabaga_ffi_lazy",
-        "@dtc//:libfdt",
-    ] + select({
+    deps = ["@dtc//:libfdt"] + select({
         "@goldfish_build//platforms:is_windows_x64": [
             "//google/compat/windows:compat",
             "@glib//gmodule",
@@ -5709,8 +5701,6 @@ cc_library(
         "hw/display/virtio-gpu.c",
         "hw/display/virtio-gpu-base.c",
         "hw/display/virtio-gpu-pci.c",
-        "hw/display/virtio-gpu-pci-rutabaga.c",
-        "hw/display/virtio-gpu-rutabaga.c",
         "hw/display/xlnx_dp.c",
         "hw/dma/bcm2835_dma.c",
         "hw/dma/npcm8xx-gdma.c",
@@ -6870,7 +6860,7 @@ cc_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = ["//google/rutabaga:rutabaga_ffi_lazy"] + select({
+    deps = select({
         "@goldfish_build//platforms:is_windows_x64": [
             "//google/compat/windows:compat",
             "@glib//gmodule",
@@ -7098,8 +7088,6 @@ cc_library(
         "hw/display/virtio-gpu.c",
         "hw/display/virtio-gpu-base.c",
         "hw/display/virtio-gpu-pci.c",
-        "hw/display/virtio-gpu-pci-rutabaga.c",
-        "hw/display/virtio-gpu-rutabaga.c",
         "hw/display/virtio-gpu-udmabuf-stubs.c",
         "hw/display/xlnx_dp.c",
         "hw/dma/bcm2835_dma.c",
@@ -8119,7 +8107,6 @@ cc_library(
         ":internal_system_qemu-system-aarch64-unsigned_darwin",
         ":qemu-headers",
         ":trace_backend_deps",
-        "//google/rutabaga:rutabaga_ffi_lazy",
         "@dtc//:libfdt",
         "@glib//glib",
         "@libslirp",
@@ -8482,10 +8469,7 @@ cc_library(
         "hw/display/virtio-gpu.c",
         "hw/display/virtio-gpu-base.c",
         "hw/display/virtio-gpu-pci.c",
-        "hw/display/virtio-gpu-pci-rutabaga.c",
-        "hw/display/virtio-gpu-rutabaga.c",
         "hw/display/virtio-vga.c",
-        "hw/display/virtio-vga-rutabaga.c",
         "hw/display/vmware_vga.c",
         "hw/dma/i8257.c",
         "hw/hyperv/hv-balloon-stub.c",
@@ -9325,7 +9309,7 @@ cc_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = ["//google/rutabaga:rutabaga_ffi_lazy"] + select({
+    deps = select({
         "@goldfish_build//platforms:is_windows_x64": [
             "//google/compat/windows:compat",
             "@glib//gmodule",
@@ -9522,11 +9506,8 @@ cc_library(
         "hw/display/virtio-gpu.c",
         "hw/display/virtio-gpu-base.c",
         "hw/display/virtio-gpu-pci.c",
-        "hw/display/virtio-gpu-pci-rutabaga.c",
-        "hw/display/virtio-gpu-rutabaga.c",
         "hw/display/virtio-gpu-udmabuf-stubs.c",
         "hw/display/virtio-vga.c",
-        "hw/display/virtio-vga-rutabaga.c",
         "hw/display/vmware_vga.c",
         "hw/dma/i8257.c",
         "hw/hyperv/hv-balloon-stub.c",
@@ -10212,7 +10193,6 @@ cc_library(
         ":internal_system_qemu-system-x86_64-unsigned_darwin",
         ":qemu-headers",
         ":trace_backend_deps",
-        "//google/rutabaga:rutabaga_ffi_lazy",
         "@dtc//:libfdt",
         "@glib//glib",
         "@libslirp",
@@ -13833,7 +13813,6 @@ objc_library(
     deps = [
         ":qemu-headers",
         ":trace_backend_deps",
-        "//google/rutabaga:rutabaga_ffi_lazy",
         "@dtc//:libfdt",
         "@glib//glib",
         "@libslirp",
@@ -13878,7 +13857,6 @@ objc_library(
     deps = [
         ":qemu-headers",
         ":trace_backend_deps",
-        "//google/rutabaga:rutabaga_ffi_lazy",
         "@dtc//:libfdt",
         "@glib//glib",
         "@libslirp",

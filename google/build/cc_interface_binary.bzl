@@ -1,5 +1,6 @@
 """Support for building plugins"""
 
+load("@goldfish_build//rules:symbol_exports.bzl", "posix_export_files")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_import.bzl", "cc_import")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
@@ -18,37 +19,6 @@ cc_headers_only = rule(
         "deps": attr.label_list(providers = [CcInfo]),
     },
 )
-
-def _posix_export_files(name, win_def_file):
-    """Generates macOS and Linux linker export files from a Windows .def file."""
-    macos_exp = "_" + name + "_macos.exp"
-    native.genrule(
-        name = "_" + name + "_macos_exports",
-        srcs = [win_def_file],
-        outs = [macos_exp],
-        tools = ["@qemu//google/scripts:gen_linker_exports"],
-        cmd = (
-            "$(location @qemu//google/scripts:gen_linker_exports) --os=macos " +
-            "$(location " + win_def_file + ") -o \"$@\""
-        ),
-        target_compatible_with = ["@platforms//os:macos"],
-        visibility = ["//visibility:private"],
-    )
-
-    linux_lds = "_" + name + "_linux.lds"
-    native.genrule(
-        name = "_" + name + "_linux_exports",
-        srcs = [win_def_file],
-        outs = [linux_lds],
-        tools = ["@qemu//google/scripts:gen_linker_exports"],
-        cmd = (
-            "$(location @qemu//google/scripts:gen_linker_exports) --os=linux " +
-            "$(location " + win_def_file + ") -o \"$@\""
-        ),
-        target_compatible_with = ["@platforms//os:linux"],
-        visibility = ["//visibility:private"],
-    )
-    return macos_exp, linux_lds
 
 def cc_interface_binary(
         name,
@@ -102,7 +72,7 @@ def cc_interface_binary(
     macos_exp = None
     linux_lds = None
     if win_def_file:
-        macos_exp, linux_lds = _posix_export_files(name, win_def_file)
+        macos_exp, linux_lds = posix_export_files(name, win_def_file)
 
     cc_binary(
         name = name,
