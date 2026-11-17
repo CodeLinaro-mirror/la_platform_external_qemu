@@ -45,16 +45,6 @@
     // (which provide prebuilt packages via amc_pkg_config rules), and is only
     // used when running `amc setup` non-hermetically.
     "dependencies": {
-      // Example: This shim renames the package to "rutabaga_gfx_ffi" and
-      // specifies a different Bazel target for the library archive.
-      "rutabaga_gfx_ffi": {
-        "lib_type": "bazel",
-        "bazel_target": "//google/rutabaga:rutabaga_ffi_lazy",
-        "version": "0.1.2",
-        "shim": {
-          "name": "rutabaga_gfx_ffi"
-        }
-      },
       "libfdt": {
         "lib_type": "bazel",
         "bazel_target": "@dtc//:libfdt",
@@ -248,7 +238,7 @@
       "-Dreplication": "disabled",
       "-Drng_none": "false",
       "-Drust": "disabled",
-      "-Drutabaga_gfx": "enabled",
+      "-Drutabaga_gfx": "disabled",
       "-Dsafe_stack": "false",
       "-Dsdl": "disabled",
       "-Dsdl_image": "disabled",
@@ -526,9 +516,6 @@
       ],
       "libfdt": [
         "@dtc//:libfdt"
-      ],
-      "rutabaga_gfx_ffi": [
-        "//google/rutabaga:rutabaga_ffi_lazy"
       ],
       "slirp": [
         "@libslirp"

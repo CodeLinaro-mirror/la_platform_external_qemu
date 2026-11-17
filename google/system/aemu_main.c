@@ -73,7 +73,7 @@ static bool module_load_gf(bool export_symbols, gf_startup_func_t *startup_func,
         return false;
     }
     char full_path[PATH_MAX];
-    if (snprintf(full_path, sizeof(full_path), "%s/" LIB_PREFIX "goldfish_" TARGET_NAME, module_dir) < 0) {
+    if (snprintf(full_path, sizeof(full_path), "%s/" LIB_PREFIX "goldfish", module_dir) < 0) {
       fprintf(stderr, "error: Failed to generate goldfish module path using directory: %s\n", module_dir);
       return false;
     }

@@ -466,9 +466,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-qemu_qtest_goldfish_stub(name = "goldfish_x86_64")
-
-qemu_qtest_goldfish_stub(name = "goldfish_aarch64")
+qemu_qtest_goldfish_stub(name = "goldfish")
 
 cc_library(
     name = "libqos",

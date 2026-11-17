@@ -3623,6 +3623,23 @@ void qmp_xen_load_devices_state(const char *filename, Error **errp)
     migration_incoming_state_destroy();
 }
 
+/*
+ * Called when loading fails after qemu_system_reset(SHUTDOWN_CAUSE_SNAPSHOT_LOAD)
+ * dropped the previous guest: the devices hold a mix of reset and partially
+ * loaded state.  Reset them again and, like main_loop_should_exit() does after
+ * resetting a stopped VM, move the VM to prelaunch so that neither callers nor
+ * the exit-time save treat it as a booted guest.
+ */
+static void load_snapshot_reset_after_failure(void)
+{
+    qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+    if (!runstate_check(RUN_STATE_RUNNING) &&
+        !runstate_check(RUN_STATE_INMIGRATE) &&
+        !runstate_check(RUN_STATE_FINISH_MIGRATE)) {
+        runstate_set(RUN_STATE_PRELAUNCH);
+    }
+}
+
 bool load_snapshot(const char *name, const char *vmstate,
                    bool has_devices, strList *devices, Error **errp)
 {
@@ -3713,12 +3730,17 @@ bool load_snapshot(const char *name, const char *vmstate,
     mis->from_src_file = f;
 
     if (!yank_register_instance(MIGRATION_YANK_INSTANCE, errp)) {
+        load_snapshot_reset_after_failure();
         ret = -EINVAL;
         goto err_drain;
     }
     snapshot_progress_set_phase(QEMU_SNAPSHOT_PHASE_TRANSFERRING);
     ret = qemu_loadvm_state(f, errp);
     migration_incoming_state_destroy();
+
+    if (ret < 0) {
+        load_snapshot_reset_after_failure();
+    }
 
     bdrv_drain_all_end();
     snapshot_progress_finish(ret >= 0, (int64_t)sn.vm_state_size, errp);

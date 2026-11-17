@@ -1602,6 +1602,30 @@ static void virtio_snd_realize(DeviceState *dev, Error **errp)
         virtio_add_queue(vdev, 64, virtio_snd_handle_rx_xfer);
 }
 
+static void virtio_snd_reset(VirtIODevice *vdev)
+{
+    VirtIOSound *s = VIRTIO_SND(vdev);
+    uint32_t i;
+
+    if (!s->pcm_items) {
+        return;
+    }
+
+    /*
+     * Release the streams but keep their params: a driver may PREPARE a
+     * stream again without resending SET_PARAMS, and
+     * virtio_snd_stream_create() asserts that the params are set.
+     */
+    for (i = 0; i < s->snd_conf.streams; ++i) {
+        VirtIOSoundPCMItem *item = &s->pcm_items[i];
+        if (item->stream) {
+            virtio_snd_stream_be_set_active(item->stream, false);
+            virtio_snd_stream_destroy(item->stream);
+            item->stream = NULL;
+        }
+    }
+}
+
 static void virtio_snd_unrealize(DeviceState *dev)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
@@ -1611,12 +1635,7 @@ static void virtio_snd_unrealize(DeviceState *dev)
     trace_virtio_snd_unrealize(vsnd);
 
     if (vsnd->pcm_items) {
-        for (uint32_t i = 0; i < vsnd->snd_conf.streams; i++) {
-            VirtIOSoundPCMStream* stream = vsnd->pcm_items[i].stream;
-            if (stream) {
-                virtio_snd_stream_destroy(stream);
-            }
-        }
+        virtio_snd_reset(vdev);
         g_free(vsnd->pcm_items);
         vsnd->pcm_items = NULL;
     }
@@ -1630,18 +1649,7 @@ static void virtio_snd_unrealize(DeviceState *dev)
 
 static int virtio_snd_device_pre_load(void *opaque)
 {
-    VirtIOSound *s = opaque;
-    uint32_t i;
-
-    for (i = 0; i < s->snd_conf.streams; ++i) {
-        VirtIOSoundPCMStream* stream = s->pcm_items[i].stream;
-        if (stream) {
-            virtio_snd_stream_be_set_active(stream, false);
-            virtio_snd_stream_destroy(stream);
-            s->pcm_items[i].stream = NULL;
-        }
-    }
-
+    virtio_snd_reset(VIRTIO_DEVICE(opaque));
     return 0;
 }
 
@@ -1889,6 +1897,7 @@ static void virtio_snd_class_init(ObjectClass *klass, const void *data)
     vdc->vmsd = &vmstate_virtio_snd_device;
     vdc->realize = virtio_snd_realize;
     vdc->unrealize = virtio_snd_unrealize;
+    vdc->reset = virtio_snd_reset;
     vdc->get_config = virtio_snd_get_config;
     vdc->get_features = get_features;
     vdc->legacy_features = 0;
